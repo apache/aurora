@@ -21,14 +21,14 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.http import HttpServer
 from twitter.common.http.diagnostics import DiagnosticsEndpoints
 
-from apache.thermos.common.path import TaskPath
+from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
 from apache.thermos.observer.http.http_observer import BottleObserver
 from apache.thermos.observer.task_observer import TaskObserver
 
 app.add_option("--root",
                dest="root",
                metavar="DIR",
-               default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
+               default=DEFAULT_CHECKPOINT_ROOT,
                help="root checkpoint directory for thermos task runners")
 
 

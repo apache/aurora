@@ -51,7 +51,6 @@ class TaskPath(object):
   class UnknownPath(Exception): pass
   class UnderspecifiedPath(Exception): pass
 
-  DEFAULT_CHECKPOINT_ROOT = "/var/run/thermos"
   KNOWN_KEYS = ['root', 'task_id', 'state', 'process', 'run', 'log_dir']
   LEGACY_KNOWN_KEYS = KNOWN_KEYS[:-1]
 
@@ -73,8 +72,6 @@ class TaskPath(object):
   def __init__(self, **kw):
     self._filename = None
     # initialize with self-interpolating values
-    if kw.get('root') is None:
-      kw['root'] = self.DEFAULT_CHECKPOINT_ROOT
     # Before log_dir was added explicitly to RunnerHeader, it resolved to %(root)s/logs
     if kw.get('log_dir'):
       self._template, keys = self.DIR_TEMPLATE, self.KNOWN_KEYS

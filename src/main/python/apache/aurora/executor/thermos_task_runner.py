@@ -30,6 +30,7 @@ from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
 
 from apache.aurora.common.http_signaler import HttpSignaler
+from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
 from apache.thermos.common.path import TaskPath
 from apache.thermos.common.statuses import (
     INTERNAL_ERROR,
@@ -70,7 +71,7 @@ class ThermosTaskRunner(TaskRunner):
                role,
                portmap,
                sandbox,
-               checkpoint_root=None,
+               checkpoint_root=DEFAULT_CHECKPOINT_ROOT,
                artifact_dir=None,
                clock=time,
                hostname=None):
@@ -93,7 +94,7 @@ class ThermosTaskRunner(TaskRunner):
     self._status = None
     self._ports = portmap
     self._root = sandbox.root
-    self._checkpoint_root = checkpoint_root or TaskPath.DEFAULT_CHECKPOINT_ROOT
+    self._checkpoint_root = checkpoint_root
     self._enable_chroot = sandbox.chrooted
     self._role = role
     self._clock = clock

@@ -26,7 +26,7 @@ from twitter.common.metrics.sampler import DiskMetricWriter
 
 from apache.aurora.executor.executor_detector import ExecutorDetector
 from apache.aurora.executor.gc_executor import ThermosGCExecutor
-from apache.thermos.common.path import TaskPath
+from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
 
 app.configure(debug=True)
 
@@ -40,7 +40,7 @@ LogOptions.set_log_dir(ExecutorDetector.LOG_PATH)
 def proxy_main():
   def main():
     # Create executor stub
-    thermos_gc_executor = ThermosGCExecutor(checkpoint_root=TaskPath.DEFAULT_CHECKPOINT_ROOT)
+    thermos_gc_executor = ThermosGCExecutor(checkpoint_root=DEFAULT_CHECKPOINT_ROOT)
     thermos_gc_executor.start()
 
     # Start metrics collection

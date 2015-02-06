@@ -35,7 +35,7 @@ from apache.aurora.executor.thermos_task_runner import (
     DefaultThermosTaskRunnerProvider,
     UserOverrideThermosTaskRunnerProvider
 )
-from apache.thermos.common.path import TaskPath
+from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
 
 CWD = os.environ.get('MESOS_SANDBOX', '.')
 
@@ -82,7 +82,7 @@ app.add_option(
     '--checkpoint-root',
     dest='checkpoint_root',
     metavar='PATH',
-    default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
+    default=DEFAULT_CHECKPOINT_ROOT,
     help='The checkpoint root where Thermos task checkpoints are stored.')
 
 

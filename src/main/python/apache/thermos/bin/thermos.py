@@ -33,6 +33,7 @@ from twitter.common.quantity.parse_simple import parse_data, parse_time
 from twitter.common.recordio import RecordIO, ThriftRecordReader
 
 from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
 from apache.thermos.common.options import add_binding_to, add_port_to
 from apache.thermos.common.path import TaskPath
 from apache.thermos.config.loader import ThermosConfigLoader, ThermosTaskWrapper
@@ -46,7 +47,7 @@ from apache.thermos.monitoring.monitor import TaskMonitor
 from gen.apache.thermos.ttypes import ProcessState, RunnerCkpt, RunnerState, TaskState
 
 app.add_option("--root", dest="root", metavar="PATH",
-               default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
+               default=DEFAULT_CHECKPOINT_ROOT,
                help="the thermos config root")
 
 

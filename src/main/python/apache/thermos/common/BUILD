@@ -49,9 +49,15 @@ python_library(
 )
 
 python_library(
+  name = 'constants',
+  sources = ['constants.py']
+)
+
+python_library(
   name = 'common',
   dependencies = [
     ':ckpt',
+    ':constants',
     ':options',
     ':path',
     ':planner',
