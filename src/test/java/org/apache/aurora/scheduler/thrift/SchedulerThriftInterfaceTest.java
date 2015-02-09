@@ -2683,46 +2683,61 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartUpdateFailsInvalidGroupSize() throws Exception {
     control.replay();
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
-        defaultTask(true),
-        5,
-        buildJobUpdateSettings().setUpdateGroupSize(0)), SESSION));
+
+    JobUpdateRequest updateRequest = buildServiceJobUpdateRequest();
+    updateRequest.getSettings().setUpdateGroupSize(0);
+
+    assertEquals(
+        invalidResponse(SchedulerThriftInterface.INVALID_GROUP_SIZE),
+        thrift.startJobUpdate(updateRequest, SESSION));
   }
 
   @Test
   public void testStartUpdateFailsInvalidMaxInstanceFailures() throws Exception {
     control.replay();
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
-        defaultTask(true),
-        5,
-        buildJobUpdateSettings().setMaxPerInstanceFailures(-1)), SESSION));
+
+    JobUpdateRequest updateRequest = buildServiceJobUpdateRequest();
+    updateRequest.getSettings().setMaxPerInstanceFailures(-1);
+
+    assertEquals(
+        invalidResponse(SchedulerThriftInterface.INVALID_MAX_INSTANCE_FAILURES),
+        thrift.startJobUpdate(updateRequest, SESSION));
   }
 
   @Test
   public void testStartUpdateFailsInvalidMaxFailedInstances() throws Exception {
     control.replay();
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
-        defaultTask(true),
-        5,
-        buildJobUpdateSettings().setMaxFailedInstances(-1)), SESSION));
+
+    JobUpdateRequest updateRequest = buildServiceJobUpdateRequest();
+    updateRequest.getSettings().setMaxFailedInstances(-1);
+
+    assertEquals(
+        invalidResponse(SchedulerThriftInterface.INVALID_MAX_FAILED_INSTANCES),
+        thrift.startJobUpdate(updateRequest, SESSION));
   }
 
   @Test
   public void testStartUpdateFailsInvalidMaxWaitToRunning() throws Exception {
     control.replay();
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
-        defaultTask(true),
-        5,
-        buildJobUpdateSettings().setMaxWaitToInstanceRunningMs(-1)), SESSION));
+
+    JobUpdateRequest updateRequest = buildServiceJobUpdateRequest();
+    updateRequest.getSettings().setMaxWaitToInstanceRunningMs(-1);
+
+    assertEquals(
+        invalidResponse(SchedulerThriftInterface.INVALID_MAX_WAIT_TO_RUNNING),
+        thrift.startJobUpdate(updateRequest, SESSION));
   }
 
   @Test
   public void testStartUpdateFailsInvalidMinWaitInRunning() throws Exception {
     control.replay();
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
-        defaultTask(true),
-        5,
-        buildJobUpdateSettings().setMinWaitInInstanceRunningMs(-1)), SESSION));
+
+    JobUpdateRequest updateRequest = buildServiceJobUpdateRequest();
+    updateRequest.getSettings().setMinWaitInInstanceRunningMs(-1);
+
+    assertEquals(
+        invalidResponse(SchedulerThriftInterface.INVALID_MIN_WAIT_TO_RUNNING),
+        thrift.startJobUpdate(updateRequest, SESSION));
   }
 
   @Test
@@ -2734,7 +2749,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsAuth() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
+    JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     expectAuth(ROLE, false);
 
     control.replay();
@@ -2743,7 +2758,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsForCronJob() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
+    JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
 
@@ -2810,7 +2825,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsInstanceCountCheck() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
+    JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     request.setInstanceCount(4001);
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
@@ -2825,7 +2840,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsTaskIdLength() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
+    JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
@@ -2841,7 +2856,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsQuotaCheck() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
+    JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
@@ -3129,6 +3144,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static Constraint dedicatedConstraint(Set<String> values) {
     return new Constraint(DEDICATED_ATTRIBUTE,
         TaskConstraint.value(new ValueConstraint(false, values)));
+  }
+
+  private static JobUpdateRequest buildServiceJobUpdateRequest() {
+    return buildServiceJobUpdateRequest(defaultTask(true));
+  }
+
+  private static JobUpdateRequest buildServiceJobUpdateRequest(TaskConfig config) {
+    return buildJobUpdateRequest(config.setIsService(true));
   }
 
   private static JobUpdateRequest buildJobUpdateRequest(TaskConfig config) {

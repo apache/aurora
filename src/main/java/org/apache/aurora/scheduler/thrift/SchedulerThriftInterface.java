@@ -1362,28 +1362,28 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         .setName(mutableRequest.getTaskConfig().getJobName())));
 
     if (!mutableRequest.getTaskConfig().isIsService()) {
-      return invalidResponse("Updates are not supported for non-service tasks.");
+      return invalidResponse(NON_SERVICE_TASK);
     }
 
     JobUpdateSettings settings = requireNonNull(mutableRequest.getSettings());
     if (settings.getUpdateGroupSize() <= 0) {
-      return invalidResponse("updateGroupSize must be positive.");
+      return invalidResponse(INVALID_GROUP_SIZE);
     }
 
     if (settings.getMaxPerInstanceFailures() < 0) {
-      return invalidResponse("maxPerInstanceFailures must be non-negative.");
+      return invalidResponse(INVALID_MAX_INSTANCE_FAILURES);
     }
 
     if (settings.getMaxFailedInstances() < 0) {
-      return invalidResponse("maxFailedInstances must be non-negative.");
+      return invalidResponse(INVALID_MAX_FAILED_INSTANCES);
     }
 
     if (settings.getMaxWaitToInstanceRunningMs() < 0) {
-      return invalidResponse("maxWaitToInstanceRunningMs must be non-negative.");
+      return invalidResponse(INVALID_MAX_WAIT_TO_RUNNING);
     }
 
     if (settings.getMinWaitInInstanceRunningMs() < 0) {
-      return invalidResponse("minWaitInInstanceRunningMs must be non-negative.");
+      return invalidResponse(INVALID_MIN_WAIT_TO_RUNNING);
     }
 
     final SessionContext context;
@@ -1608,6 +1608,27 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @VisibleForTesting
   static final String NO_CRON = "Cron jobs may only be created/updated by calling scheduleCronJob.";
+
+  @VisibleForTesting
+  static final String NON_SERVICE_TASK = "Updates are not supported for non-service tasks.";
+
+  @VisibleForTesting
+  static final String INVALID_GROUP_SIZE = "updateGroupSize must be positive.";
+
+  @VisibleForTesting
+  static final String INVALID_MAX_FAILED_INSTANCES = "maxFailedInstances must be non-negative.";
+
+  @VisibleForTesting
+  static final String INVALID_MAX_INSTANCE_FAILURES =
+      "maxPerInstanceFailures must be non-negative.";
+
+  @VisibleForTesting
+  static final String INVALID_MAX_WAIT_TO_RUNNING =
+      "maxWaitToInstanceRunningMs must be non-negative.";
+
+  @VisibleForTesting
+  static final String INVALID_MIN_WAIT_TO_RUNNING =
+      "minWaitInInstanceRunningMs must be non-negative.";
 
   private static Response okEmptyResponse()  {
     return emptyResponse().setResponseCode(OK);
