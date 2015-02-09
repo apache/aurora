@@ -33,33 +33,37 @@ def make_assigned_task(thermos_config, assigned_ports=None):
   assigned_ports = assigned_ports or {}
   executor_config = ExecutorConfig(name=AURORA_EXECUTOR_NAME, data=thermos_config.json_dumps())
   task_config = TaskConfig(
-    owner=Identity(role=thermos_config.role().get(), user=thermos_config.role().get()),
-    environment=thermos_config.environment().get(),
-    jobName=thermos_config.name().get(),
-    executorConfig=executor_config)
+      owner=Identity(role=thermos_config.role().get(), user=thermos_config.role().get()),
+      environment=thermos_config.environment().get(),
+      jobName=thermos_config.name().get(),
+      executorConfig=executor_config)
 
-  return AssignedTask(instanceId=12345, task=task_config, assignedPorts=assigned_ports)
+  return AssignedTask(
+      instanceId=12345,
+      task=task_config,
+      assignedPorts=assigned_ports,
+      taskId="taskId-12345")
 
 
 def make_job(role, environment, name, primary_port, portmap):
   from apache.aurora.config.schema.base import (
-    Announcer,
-    Job,
-    Process,
-    Resources,
-    Task,
+      Announcer,
+      Job,
+      Process,
+      Resources,
+      Task,
   )
   task = Task(
-    name='ignore2',
-    processes=[Process(name='ignore3', cmdline='ignore4')],
-    resources=Resources(cpu=1, ram=1, disk=1))
+      name='ignore2',
+      processes=[Process(name='ignore3', cmdline='ignore4')],
+      resources=Resources(cpu=1, ram=1, disk=1))
   job = Job(
-    role=role,
-    environment=environment,
-    name=name,
-    cluster='ignore1',
-    task=task,
-    announce=Announcer(primary_port=primary_port, portmap=portmap))
+      role=role,
+      environment=environment,
+      name=name,
+      cluster='ignore1',
+      task=task,
+      announce=Announcer(primary_port=primary_port, portmap=portmap))
   return job
 
 

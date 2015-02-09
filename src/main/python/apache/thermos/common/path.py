@@ -77,6 +77,9 @@ class TaskPath(object):
       self._template, keys = self.DIR_TEMPLATE, self.KNOWN_KEYS
     else:
       self._template, keys = self.LEGACY_DIR_TEMPLATE, self.LEGACY_KNOWN_KEYS
+    for k, v in kw.items():
+      if v is None:
+        raise ValueError("Key %s is None" % k)
     self._data = dict((key, '%%(%s)s' % key) for key in keys)
     self._data.update(kw)
 

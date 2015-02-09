@@ -359,7 +359,7 @@ class ThermosTaskRunner(TaskRunner):
 class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
   def __init__(self,
                pex_location,
-               checkpoint_root=None,
+               checkpoint_root=DEFAULT_CHECKPOINT_ROOT,
                artifact_dir=None,
                task_runner_class=ThermosTaskRunner,
                max_wait=Amount(1, Time.MINUTES),

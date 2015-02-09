@@ -12,6 +12,8 @@
 # limitations under the License.
 #
 
+import pytest
+
 from apache.thermos.common.path import TaskPath
 
 
@@ -23,3 +25,10 @@ def test_legacy_task_roots():
 def test_legacy_log_dirs():
   assert TaskPath(log_dir='sloth_love_chunk').given(task_id='foo').getpath(
       'process_logbase') == 'sloth_love_chunk'
+
+
+def test_exception_on_none_keys():
+  with pytest.raises(ValueError):
+    TaskPath(root=None).given(task_id='foo').getpath('checkpoint_path')
+  with pytest.raises(ValueError):
+    TaskPath(root='/var/lib/mesos').given(task_id=None).getpath('checkpoint_path')

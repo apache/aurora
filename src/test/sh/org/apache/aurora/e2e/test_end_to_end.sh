@@ -55,6 +55,11 @@ test_http_example() {
   check_url_live "$base_url/scheduler"
   check_url_live "$base_url/scheduler/$_role"
   check_url_live "$base_url/scheduler/$_role/$_env/$_job"
+  # Check the observer page
+  observer_url="http://$_sched_ip:1338"
+  task_id=$(vagrant ssh -c "aurora_admin query -l '%taskId%' --states=RUNNING $_cluster $_role $_job | tr -d '\n'")
+  check_url_live "$observer_url"
+  check_url_live "$observer_url/task/$task_id"
 
   echo "== Restarting test job"
 
