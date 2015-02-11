@@ -60,6 +60,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ROLLBACK_FAILED;
+import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ROLLED_BACK;
 import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_UPDATED;
 import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_UPDATING;
@@ -362,6 +363,10 @@ public class DBJobUpdateStoreTest {
             new StoredJobUpdateDetails(details1.newBuilder(), "lock1"),
             new StoredJobUpdateDetails(details2.newBuilder(), "lock2")),
         getAllUpdateDetails());
+
+    assertEquals(
+        ImmutableList.of(getUpdateDetails(updateId2).get(), getUpdateDetails(updateId1).get()),
+        queryDetails(new JobUpdateQuery().setRole("role")));
   }
 
   @Test
@@ -650,6 +655,77 @@ public class DBJobUpdateStoreTest {
         getSummaries(new JobUpdateQuery().setRole("no_match")));
   }
 
+  @Test
+  public void testQueryDetails() {
+    String updateId1 = "u1";
+    String updateId2 = "u2";
+    IJobKey jobKey1 = JobKeys.from("role1", "env", "name1");
+    IJobKey jobKey2 = JobKeys.from("role2", "env", "name2");
+
+    IJobUpdate update1 = makeJobUpdate(jobKey1, updateId1);
+    IJobUpdate update2 = makeJobUpdate(jobKey2, updateId2);
+
+    assertEquals(ImmutableList.<IJobInstanceUpdateEvent>of(), getInstanceEvents(updateId2, 3));
+
+    saveUpdate(update1, Optional.of("lock1"));
+    saveUpdate(update2, Optional.of("lock2"));
+
+    updateJobDetails(populateExpected(update1), FIRST_EVENT);
+    updateJobDetails(populateExpected(update2), FIRST_EVENT);
+
+    IJobUpdateEvent jEvent11 = makeJobUpdateEvent(ROLLING_BACK, 450L);
+    IJobUpdateEvent jEvent12 = makeJobUpdateEvent(ROLLED_BACK, 500L);
+    IJobInstanceUpdateEvent iEvent11 = makeJobInstanceEvent(1, 451L, INSTANCE_ROLLING_BACK);
+    IJobInstanceUpdateEvent iEvent12 = makeJobInstanceEvent(2, 458L, INSTANCE_ROLLED_BACK);
+
+    IJobUpdateEvent jEvent21 = makeJobUpdateEvent(ROLL_FORWARD_PAUSED, 550L);
+    IJobUpdateEvent jEvent22 = makeJobUpdateEvent(ABORTED, 600L);
+    IJobInstanceUpdateEvent iEvent21 = makeJobInstanceEvent(3, 561L, INSTANCE_UPDATING);
+    IJobInstanceUpdateEvent iEvent22 = makeJobInstanceEvent(3, 570L, INSTANCE_UPDATED);
+
+    saveJobEvent(jEvent11, updateId1);
+    saveJobEvent(jEvent12, updateId1);
+    saveJobInstanceEvent(iEvent11, updateId1);
+    saveJobInstanceEvent(iEvent12, updateId1);
+
+    saveJobEvent(jEvent21, updateId2);
+    saveJobEvent(jEvent22, updateId2);
+
+    saveJobInstanceEvent(iEvent21, updateId2);
+    saveJobInstanceEvent(iEvent22, updateId2);
+
+    IJobUpdateDetails details1 = getUpdateDetails(updateId1).get();
+    IJobUpdateDetails details2 = getUpdateDetails(updateId2).get();
+
+    // Test empty query returns all.
+    assertEquals(ImmutableList.of(details2, details1), queryDetails(new JobUpdateQuery()));
+
+    // Test query by update ID.
+    assertEquals(
+        ImmutableList.of(details1),
+        queryDetails(new JobUpdateQuery().setUpdateId(updateId1)));
+
+    // Test query by role.
+    assertEquals(
+        ImmutableList.of(details2),
+        queryDetails(new JobUpdateQuery().setRole(jobKey2.getRole())));
+
+    // Test query by job key.
+    assertEquals(
+        ImmutableList.of(details2),
+        queryDetails(new JobUpdateQuery().setJobKey(jobKey2.newBuilder())));
+
+    // Test query by status.
+    assertEquals(
+        ImmutableList.of(details2),
+        queryDetails(new JobUpdateQuery().setUpdateStatuses(ImmutableSet.of(ABORTED))));
+
+    // Test no match.
+    assertEquals(
+        ImmutableList.<IJobUpdateDetails>of(),
+        queryDetails(new JobUpdateQuery().setRole("no match")));
+  }
+
   private void assertUpdate(IJobUpdate expected) {
     String updateId = expected.getSummary().getUpdateId();
     assertEquals(populateExpected(expected), getUpdate(updateId).get());
@@ -698,6 +774,16 @@ public class DBJobUpdateStoreTest {
       @Override
       public Set<StoredJobUpdateDetails> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchAllJobUpdateDetails();
+      }
+    });
+  }
+
+  private List<IJobUpdateDetails> queryDetails(final JobUpdateQuery query) {
+    return storage.read(new Quiet<List<IJobUpdateDetails>>() {
+      @Override
+      public List<IJobUpdateDetails> apply(Storage.StoreProvider storeProvider) {
+        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(
+            IJobUpdateQuery.build(query));
       }
     });
   }

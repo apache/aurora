@@ -51,6 +51,7 @@ import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.JobUpdateInstructions;
+import org.apache.aurora.gen.JobUpdatePulseStatus;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
@@ -114,6 +115,7 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
@@ -140,6 +142,7 @@ public class JobUpdaterIT extends EasyMockTest {
   private static final ITaskConfig OLD_CONFIG =
       ITaskConfig.build(makeTaskConfig().setExecutorConfig(new ExecutorConfig().setName("new")));
   private static final ITaskConfig NEW_CONFIG = ITaskConfig.build(makeTaskConfig());
+  private static final long PULSE_TIMEOUT_MS = 10000;
 
   private FakeScheduledExecutor clock;
   private JobUpdateController updater;
@@ -375,6 +378,253 @@ public class JobUpdaterIT extends EasyMockTest {
     assertJobState(
         JOB,
         ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, NEW_CONFIG, 100, NEW_CONFIG));
+  }
+
+  @Test
+  public void testSuccessfulCoordinatedUpdate() throws Exception {
+    expectTaskKilled().times(2);
+
+    control.replay();
+
+    JobUpdate builder = makeJobUpdate(
+        // No-op - task is already matching the new config.
+        makeInstanceConfig(0, 0, NEW_CONFIG),
+        // Tasks needing update.
+        makeInstanceConfig(1, 2, OLD_CONFIG)).newBuilder();
+
+    builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
+    insertInitialTasks(IJobUpdate.build(builder));
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+    updater.start(IJobUpdate.build(builder), USER);
+
+    // The update is blocked initially waiting for a pulse.
+    assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+
+    // Pulse arrives and update starts.
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+    changeState(JOB, 1, KILLED, ASSIGNED, STARTING, RUNNING);
+    actions.put(1, INSTANCE_UPDATING);
+    assertState(ROLLING_FORWARD, actions.build());
+    clock.advance(WATCH_TIMEOUT);
+    actions.put(1, INSTANCE_UPDATED);
+
+    // The update is blocked due to expired pulse timeout.
+    clock.advance(Amount.of(PULSE_TIMEOUT_MS, Time.MILLISECONDS));
+    actions.put(2, INSTANCE_UPDATING);
+    assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+
+    // Pulse arrives and instance 2 is updated.
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+    actions.putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED);
+    actions.putAll(2, INSTANCE_UPDATING);
+    changeState(JOB, 2, KILLED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+    actions.put(2, INSTANCE_UPDATED);
+
+    assertState(ROLLED_FORWARD, actions.build());
+    assertJobState(JOB, ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, NEW_CONFIG));
+    assertEquals(JobUpdatePulseStatus.FINISHED, updater.pulse(UPDATE_ID));
+  }
+
+  @Test
+  public void testRecoverCoordinatedUpdateFromStorage() throws Exception {
+    expectTaskKilled().times(2);
+
+    control.replay();
+
+    JobUpdate builder =
+        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2).newBuilder();
+    builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
+    final IJobUpdate update = IJobUpdate.build(builder);
+    insertInitialTasks(update);
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    clock.advance(ONE_DAY);
+
+    storage.write(new NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD);
+      }
+    });
+
+    subscriber.startAsync().awaitRunning();
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+
+    // The update is blocked initially waiting for a pulse.
+    assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+
+    // Instance 0 is updated.
+    changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    // Instance 1 is updated.
+    changeState(JOB, 1, KILLED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    actions.putAll(0, INSTANCE_UPDATING, INSTANCE_UPDATED)
+        .putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED);
+
+    assertState(ROLLED_FORWARD, actions.build());
+    assertEquals(JobUpdatePulseStatus.FINISHED, updater.pulse(UPDATE_ID));
+  }
+
+  @Test
+  public void testResumeToAwaitingPulse() throws Exception {
+    expectTaskKilled().times(2);
+
+    control.replay();
+
+    JobUpdate builder =
+        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2).newBuilder();
+    builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
+    final IJobUpdate update = IJobUpdate.build(builder);
+    insertInitialTasks(update);
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    clock.advance(ONE_DAY);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+    updater.start(IJobUpdate.build(builder), USER);
+
+    // The update is blocked initially waiting for a pulse.
+    assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+
+    // Pause the awaiting pulse update.
+    updater.pause(JOB, USER);
+    assertState(ROLL_FORWARD_PAUSED, actions.build());
+
+    // Resume into awaiting pulse state.
+    updater.resume(JOB, USER);
+    assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+
+    // Instance 0 is updated.
+    changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    // Instance 1 is updated.
+    changeState(JOB, 1, KILLED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    actions.putAll(0, INSTANCE_UPDATING, INSTANCE_UPDATED)
+        .putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED);
+
+    assertState(ROLLED_FORWARD, actions.build());
+    assertEquals(JobUpdatePulseStatus.FINISHED, updater.pulse(UPDATE_ID));
+  }
+
+  @Test
+  public void testPulsePausedUpdate() throws Exception {
+    expectTaskKilled().times(2);
+
+    control.replay();
+
+    JobUpdate builder = makeJobUpdate(
+        // No-op - task is already matching the new config.
+        makeInstanceConfig(0, 0, NEW_CONFIG),
+        // Tasks needing update.
+        makeInstanceConfig(1, 2, OLD_CONFIG)).newBuilder();
+
+    builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
+    insertInitialTasks(IJobUpdate.build(builder));
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+    updater.start(IJobUpdate.build(builder), USER);
+
+    // The update is blocked initially waiting for a pulse.
+    assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+
+    // Pulse arrives and update starts.
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+    changeState(JOB, 1, KILLED, ASSIGNED, STARTING, RUNNING);
+    actions.put(1, INSTANCE_UPDATING);
+    clock.advance(WATCH_TIMEOUT);
+    actions.put(1, INSTANCE_UPDATED);
+    actions.put(2, INSTANCE_UPDATING);
+    clock.advance(Amount.of(PULSE_TIMEOUT_MS, Time.MILLISECONDS));
+
+    // Update is paused
+    updater.pause(JOB, USER);
+    assertState(ROLL_FORWARD_PAUSED, actions.build());
+
+    // A paused update is pulsed.
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+
+    // Update is resumed
+    updater.resume(JOB, USER);
+    actions.putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED);
+    actions.put(2, INSTANCE_UPDATING);
+    assertState(ROLLING_FORWARD, actions.build());
+
+    // Instance 2 is updated.
+    changeState(JOB, 2, KILLED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+    actions.put(2, INSTANCE_UPDATED);
+
+    assertState(ROLLED_FORWARD, actions.build());
+    assertJobState(JOB, ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, NEW_CONFIG));
+
+    assertEquals(JobUpdatePulseStatus.FINISHED, updater.pulse(UPDATE_ID));
+  }
+
+  @Test
+  public void testUnblockDeletedUpdate() throws Exception {
+    control.replay();
+
+    JobUpdate builder =
+        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2).newBuilder();
+    builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
+    final IJobUpdate update = IJobUpdate.build(builder);
+    insertInitialTasks(update);
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    clock.advance(ONE_DAY);
+
+    storage.write(new NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD);
+      }
+    });
+
+    subscriber.startAsync().awaitRunning();
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+    // The update is blocked initially waiting for a pulse.
+    assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+
+    storage.write(new NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+        releaseAllLocks();
+      }
+    });
+
+    // The pulse still returns OK but the error is handled.
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+  }
+
+  @Test
+  public void testPulseInvalidUpdateId() throws Exception {
+    control.replay();
+
+    assertEquals(JobUpdatePulseStatus.FINISHED, updater.pulse("invalid"));
   }
 
   @Test
@@ -1024,6 +1274,13 @@ public class JobUpdaterIT extends EasyMockTest {
     } catch (UpdateStateException e) {
       // Expected.
     }
+  }
+
+  @Test(expected = UpdateStateException.class)
+  public void testResumeUnknownUpdate() throws Exception {
+    control.replay();
+
+    updater.resume(JOB, USER);
   }
 
   private static IJobUpdateSummary makeUpdateSummary() {

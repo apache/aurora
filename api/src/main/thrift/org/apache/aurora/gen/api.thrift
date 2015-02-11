@@ -552,21 +552,29 @@ enum JobUpdateStatus {
   ABORTED = 6,
 
   /** Unknown error during update. */
-  ERROR = 7
+  ERROR = 7,
 
   /**
    * Update failed to complete.
    * This can happen if failure thresholds are met while rolling forward, but rollback is disabled,
    * or if failure thresholds are met when rolling back.
    */
-  FAILED = 8
+  FAILED = 8,
+
+  /** Update has been blocked while in progress due to missing/expired pulse. */
+  ROLL_FORWARD_AWAITING_PULSE = 9,
+
+  /** Update has been blocked during rollback due to missing/expired pulse. */
+  ROLL_BACK_AWAITING_PULSE = 10
 }
 
 /** States the job update can be in while still considered active. */
 const set<JobUpdateStatus> ACTIVE_JOB_UPDATE_STATES = [JobUpdateStatus.ROLLING_FORWARD,
                                                        JobUpdateStatus.ROLLING_BACK,
                                                        JobUpdateStatus.ROLL_FORWARD_PAUSED,
-                                                       JobUpdateStatus.ROLL_BACK_PAUSED]
+                                                       JobUpdateStatus.ROLL_BACK_PAUSED,
+                                                       JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE,
+                                                       JobUpdateStatus.ROLL_BACK_AWAITING_PULSE]
 
 /** Job update actions that can be applied to job instances. */
 enum JobUpdateAction {
@@ -604,19 +612,15 @@ enum JobUpdateAction {
 /** Status of the coordinated update. Intended as a response to pulseJobUpdate RPC. */
 enum JobUpdatePulseStatus {
   /**
-   *  Update is active (ACK).
+   *  Update is active. See ACTIVE_JOB_UPDATE_STATES for statuses considered active.
    */
   OK = 1,
 
   /**
-   * Update is paused and will not progress unless explicitly resumed (NACK).
+   * Update has reached terminal state. See TERMINAL_JOB_UPDATE_STATES for statuses
+   * considered terminal.
    */
-  PAUSED = 2,
-
-  /**
-   * Update has reached terminal state.
-   */
-  FINISHED = 3
+  FINISHED = 2
 }
 
 /** Job update thresholds and limits. */

@@ -28,7 +28,9 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_AWAITING_PULSE;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.MonitorAction;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.MonitorAction.ROLL_BACK;
@@ -43,21 +45,33 @@ public class JobUpdateStateMachineTest {
       ImmutableMap.<Pair<JobUpdateStatus, JobUpdateStatus>, MonitorAction>builder()
           .put(Pair.of(ROLLING_FORWARD, ROLLING_BACK), ROLL_BACK)
           .put(Pair.of(ROLLING_FORWARD, ROLL_FORWARD_PAUSED), STOP_WATCHING)
+          .put(Pair.of(ROLLING_FORWARD, ROLL_FORWARD_AWAITING_PULSE), STOP_WATCHING)
           .put(Pair.of(ROLLING_FORWARD, ROLLED_FORWARD), STOP_WATCHING)
           .put(Pair.of(ROLLING_FORWARD, ABORTED), STOP_WATCHING)
           .put(Pair.of(ROLLING_FORWARD, ERROR), STOP_WATCHING)
           .put(Pair.of(ROLLING_FORWARD, FAILED), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, ROLL_BACK_PAUSED), STOP_WATCHING)
+          .put(Pair.of(ROLLING_BACK, ROLL_BACK_AWAITING_PULSE), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, ROLLED_BACK), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, ABORTED), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, ERROR), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, FAILED), STOP_WATCHING)
           .put(Pair.of(ROLL_FORWARD_PAUSED, ROLLING_FORWARD), ROLL_FORWARD)
+          .put(Pair.of(ROLL_FORWARD_PAUSED, ROLL_FORWARD_AWAITING_PULSE), STOP_WATCHING)
           .put(Pair.of(ROLL_FORWARD_PAUSED, ABORTED), STOP_WATCHING)
           .put(Pair.of(ROLL_FORWARD_PAUSED, ERROR), STOP_WATCHING)
           .put(Pair.of(ROLL_BACK_PAUSED, ROLLING_BACK), ROLL_BACK)
+          .put(Pair.of(ROLL_BACK_PAUSED, ROLL_BACK_AWAITING_PULSE), STOP_WATCHING)
           .put(Pair.of(ROLL_BACK_PAUSED, ABORTED), STOP_WATCHING)
           .put(Pair.of(ROLL_BACK_PAUSED, ERROR), STOP_WATCHING)
+          .put(Pair.of(ROLL_FORWARD_AWAITING_PULSE, ROLLING_FORWARD), ROLL_FORWARD)
+          .put(Pair.of(ROLL_FORWARD_AWAITING_PULSE, ROLL_FORWARD_PAUSED), STOP_WATCHING)
+          .put(Pair.of(ROLL_FORWARD_AWAITING_PULSE, ABORTED), STOP_WATCHING)
+          .put(Pair.of(ROLL_FORWARD_AWAITING_PULSE, ERROR), STOP_WATCHING)
+          .put(Pair.of(ROLL_BACK_AWAITING_PULSE, ROLLING_BACK), ROLL_BACK)
+          .put(Pair.of(ROLL_BACK_AWAITING_PULSE, ROLL_BACK_PAUSED), STOP_WATCHING)
+          .put(Pair.of(ROLL_BACK_AWAITING_PULSE, ABORTED), STOP_WATCHING)
+          .put(Pair.of(ROLL_BACK_AWAITING_PULSE, ERROR), STOP_WATCHING)
           .build();
 
   @Test

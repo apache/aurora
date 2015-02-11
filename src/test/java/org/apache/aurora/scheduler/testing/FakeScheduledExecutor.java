@@ -51,7 +51,22 @@ public final class FakeScheduledExecutor extends FakeClock {
         EasyMock.<TimeUnit>anyObject());
     expectLastCall().andAnswer(answerSchedule(executor)).anyTimes();
 
+    mock.execute(EasyMock.<Runnable>anyObject());
+    expectLastCall().andAnswer(answerExecute()).anyTimes();
+
     return executor;
+  }
+
+  private static IAnswer<Void> answerExecute() {
+    return new IAnswer<Void>() {
+      @Override
+      public Void answer() throws Throwable {
+        Object[] args = EasyMock.getCurrentArguments();
+        Runnable work = (Runnable) args[0];
+        work.run();
+        return null;
+      }
+    };
   }
 
   private static IAnswer<ScheduledFuture<?>> answerSchedule(final FakeScheduledExecutor executor) {

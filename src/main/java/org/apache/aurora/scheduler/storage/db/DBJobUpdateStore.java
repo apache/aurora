@@ -20,6 +20,7 @@ import javax.inject.Inject;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.base.MorePreconditions;
 
@@ -160,6 +161,19 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   @Override
   public List<IJobUpdateSummary> fetchJobUpdateSummaries(IJobUpdateQuery query) {
     return IJobUpdateSummary.listFromBuilders(detailsMapper.selectSummaries(query.newBuilder()));
+  }
+
+  @Timed("job_update_store_fetch_details_list")
+  @Override
+  public List<IJobUpdateDetails> fetchJobUpdateDetails(IJobUpdateQuery query) {
+    return FluentIterable
+        .from(detailsMapper.selectDetailsList(query.newBuilder()))
+        .transform(new Function<StoredJobUpdateDetails, IJobUpdateDetails>() {
+          @Override
+          public IJobUpdateDetails apply(StoredJobUpdateDetails input) {
+            return IJobUpdateDetails.build(input.getDetails());
+          }
+        }).toList();
   }
 
   @Timed("job_update_store_fetch_details")

@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.updater;
 
 import java.util.EnumSet;
 
+import org.apache.aurora.gen.JobUpdatePulseStatus;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
@@ -101,4 +102,15 @@ public interface JobUpdateController {
    * updates, but resumes after a restart of the scheduler process.
    */
   void systemResume();
+
+  /**
+   * Resets the update pulse timeout specified by the
+   * {@link org.apache.aurora.gen.JobUpdateSettings#getBlockIfNoPulsesAfterMs}. Unblocks progress
+   * if the update was previously blocked.
+   *
+   * @param updateId Job update ID being pulsed.
+   * @return Job update pulse status.
+   * @throws UpdateStateException If there is no update found or update is not coordinated.
+   */
+  JobUpdatePulseStatus pulse(String updateId) throws UpdateStateException;
 }

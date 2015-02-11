@@ -156,6 +156,15 @@ interface JobUpdateDetailsMapper {
   StoredJobUpdateDetails selectDetails(String updateId);
 
   /**
+   * Gets all job update details matching the provided {@code query}.
+   * All {@code query} fields are ANDed together.
+   *
+   * @param query Query to filter results by.
+   * @return Job update details matching the query.
+   */
+  List<StoredJobUpdateDetails> selectDetailsList(JobUpdateQuery query);
+
+  /**
    * Gets job update for the provided {@code updateId}.
    *
    * @param updateId Update ID to select by.

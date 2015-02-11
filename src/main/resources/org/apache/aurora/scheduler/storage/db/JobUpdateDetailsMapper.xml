@@ -258,22 +258,13 @@
     <include refid="last_updated_timestamp_inner_join" />
   </sql>
 
-  <select id="selectSummaries" resultMap="jobUpdateSummaryMap">
-    SELECT
-      u.update_id AS update_id,
-      u.user AS user,
-      max_status.status AS just_status,
-      min_ts.timestamp_ms AS just_created_timestamp_ms,
-      max_ts.timestamp_ms AS just_last_modified_timestamp_ms,
-      j.id AS jk_id,
-      j.role AS jk_role,
-      j.environment AS jk_environment,
-      j.name AS jk_name
-    FROM job_updates AS u
+  <sql id="job_key_inner_join">
     INNER JOIN job_keys AS j ON j.id = u.job_key_id
-    <include refid="timestamps_inner_joins" />
+  </sql>
+
+  <sql id="query_filter">
     <if test="updateId != null || role != null || user != null || jobKey != null || updateStatuses != null || limit != 0 || offset != 0">
-    WHERE TRUE
+      WHERE TRUE
       <if test="updateId != null">AND u.update_id = #{updateId}</if>
       <if test="user != null">AND u.user = #{user}</if>
       <if test="role != null">AND j.role = #{role}</if>
@@ -294,6 +285,23 @@
     ORDER BY max_ts.timestamp_ms DESC
     <if test="limit != 0">LIMIT #{limit}</if>
     <if test="offset != 0">OFFSET #{offset}</if>
+  </sql>
+
+  <select id="selectSummaries" resultMap="jobUpdateSummaryMap">
+    SELECT
+      u.update_id AS update_id,
+      u.user AS user,
+      max_status.status AS just_status,
+      min_ts.timestamp_ms AS just_created_timestamp_ms,
+      max_ts.timestamp_ms AS just_last_modified_timestamp_ms,
+      j.id AS jk_id,
+      j.role AS jk_role,
+      j.environment AS jk_environment,
+      j.name AS jk_name
+    FROM job_updates AS u
+    <include refid="job_key_inner_join" />
+    <include refid="timestamps_inner_joins" />
+    <include refid="query_filter" />
   </select>
 
   <!--Column naming convention below follows the thrift object hierarchy and columnPrefix
@@ -333,10 +341,6 @@
       io.id AS jui_juse_r_id,
       io.first AS jui_juse_r_first,
       io.last AS jui_juse_r_last
-  </sql>
-
-  <sql id="job_key_inner_join">
-    INNER JOIN job_keys AS j ON j.id = u.job_key_id
   </sql>
 
   <sql id="job_update_outer_joins">
@@ -420,6 +424,11 @@
     <include refid="unscoped_details_select"/>
     WHERE u.update_id = #{id}
     ORDER BY e_timestamp_ms, i_timestamp_ms
+  </select>
+
+  <select id="selectDetailsList" resultMap="jobUpdateDetailsMap">
+    <include refid="unscoped_details_select"/>
+    <include refid="query_filter"/>
   </select>
 
   <select id="selectAllDetails" resultMap="jobUpdateDetailsMap">

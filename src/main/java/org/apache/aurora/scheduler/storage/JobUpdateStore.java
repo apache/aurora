@@ -41,6 +41,14 @@ public interface JobUpdateStore {
   List<IJobUpdateSummary> fetchJobUpdateSummaries(IJobUpdateQuery query);
 
   /**
+   * Fetches a read-only view of job update details matching the {@code query}.
+   *
+   * @param query Query to identify job update details with.
+   * @return A read-only list view of job update details matching the query.
+   */
+  List<IJobUpdateDetails> fetchJobUpdateDetails(IJobUpdateQuery query);
+
+  /**
    * Fetches a read-only view of job update details.
    *
    * @param updateId Update ID to fetch details for.

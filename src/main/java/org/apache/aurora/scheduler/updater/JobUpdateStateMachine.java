@@ -35,7 +35,9 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_AWAITING_PULSE;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.MonitorAction.ROLL_BACK;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.MonitorAction.ROLL_FORWARD;
@@ -55,13 +57,22 @@ final class JobUpdateStateMachine {
           .putAll(ROLLING_FORWARD,
               ROLLING_BACK,
               ROLL_FORWARD_PAUSED,
+              ROLL_FORWARD_AWAITING_PULSE,
               ROLLED_FORWARD,
               ABORTED,
               FAILED,
               ERROR)
-          .putAll(ROLLING_BACK, ROLL_BACK_PAUSED, ROLLED_BACK, ABORTED, ERROR, FAILED)
-          .putAll(ROLL_FORWARD_PAUSED, ROLLING_FORWARD, ABORTED, ERROR)
-          .putAll(ROLL_BACK_PAUSED, ROLLING_BACK, ABORTED, ERROR)
+          .putAll(ROLLING_BACK,
+              ROLL_BACK_PAUSED,
+              ROLL_BACK_AWAITING_PULSE,
+              ROLLED_BACK,
+              ABORTED,
+              ERROR,
+              FAILED)
+          .putAll(ROLL_FORWARD_PAUSED, ROLLING_FORWARD, ROLL_FORWARD_AWAITING_PULSE, ABORTED, ERROR)
+          .putAll(ROLL_BACK_PAUSED, ROLLING_BACK, ROLL_BACK_AWAITING_PULSE, ABORTED, ERROR)
+          .putAll(ROLL_FORWARD_AWAITING_PULSE, ROLLING_FORWARD, ROLL_FORWARD_PAUSED, ABORTED, ERROR)
+          .putAll(ROLL_BACK_AWAITING_PULSE, ROLLING_BACK, ROLL_BACK_PAUSED, ABORTED, ERROR)
           .build();
 
   private static final Map<JobUpdateStatus, MonitorAction> ACTIONS =
@@ -75,6 +86,16 @@ final class JobUpdateStateMachine {
           ROLLING_FORWARD, ROLL_FORWARD_PAUSED,
           ROLLING_BACK, ROLL_BACK_PAUSED);
 
+  private static final BiMap<JobUpdateStatus, JobUpdateStatus> ACTIVE_TO_BLOCKED_STATES =
+      ImmutableBiMap.of(
+          ROLLING_FORWARD, ROLL_FORWARD_AWAITING_PULSE,
+          ROLLING_BACK, ROLL_BACK_AWAITING_PULSE);
+
+  private static final BiMap<JobUpdateStatus, JobUpdateStatus> BLOCKED_TO_PAUSED_STATES =
+      ImmutableBiMap.of(
+          ROLL_FORWARD_AWAITING_PULSE, ROLL_FORWARD_PAUSED,
+          ROLL_BACK_AWAITING_PULSE, ROLL_BACK_PAUSED);
+
   static final IJobUpdateQuery ACTIVE_QUERY = IJobUpdateQuery.build(
       new JobUpdateQuery()
           .setUpdateStatuses(ImmutableSet.copyOf(ACTIVE_TO_PAUSED_STATES.keySet())));
@@ -82,6 +103,23 @@ final class JobUpdateStateMachine {
   private static final Map<JobUpdateStatus, JobUpdateStatus> PAUSE_BEHAVIOR =
       ImmutableMap.<JobUpdateStatus, JobUpdateStatus>builder()
           .putAll(ACTIVE_TO_PAUSED_STATES)
+          .putAll(BLOCKED_TO_PAUSED_STATES)
+          .put(ROLL_FORWARD_PAUSED, ROLL_FORWARD_PAUSED)
+          .put(ROLL_BACK_PAUSED, ROLL_BACK_PAUSED)
+          .build();
+
+  private static final Map<JobUpdateStatus, JobUpdateStatus> BLOCK_BEHAVIOR =
+      ImmutableMap.<JobUpdateStatus, JobUpdateStatus>builder()
+          .putAll(ACTIVE_TO_BLOCKED_STATES)
+          .put(ROLL_FORWARD_AWAITING_PULSE, ROLL_FORWARD_AWAITING_PULSE)
+          .put(ROLL_BACK_AWAITING_PULSE, ROLL_BACK_AWAITING_PULSE)
+          .build();
+
+  private static final Map<JobUpdateStatus, JobUpdateStatus> UNBLOCK_BEHAVIOR =
+      ImmutableMap.<JobUpdateStatus, JobUpdateStatus>builder()
+          .putAll(ACTIVE_TO_BLOCKED_STATES.inverse())
+          .put(ROLLING_FORWARD, ROLLING_FORWARD)
+          .put(ROLLING_BACK, ROLLING_BACK)
           .put(ROLL_FORWARD_PAUSED, ROLL_FORWARD_PAUSED)
           .put(ROLL_BACK_PAUSED, ROLL_BACK_PAUSED)
           .build();
@@ -94,20 +132,47 @@ final class JobUpdateStateMachine {
         }
       };
 
-  private static final Map<JobUpdateStatus, JobUpdateStatus> RESUME_BEHAVIOR =
+  private static final Map<JobUpdateStatus, JobUpdateStatus> RESUME_ACTIVE_BEHAVIOR =
       ImmutableMap.<JobUpdateStatus, JobUpdateStatus>builder()
           .putAll(ACTIVE_TO_PAUSED_STATES.inverse())
           .put(ROLLING_FORWARD, ROLLING_FORWARD)
           .put(ROLLING_BACK, ROLLING_BACK)
           .build();
 
-  static final Function<JobUpdateStatus, JobUpdateStatus> GET_RESUME_STATE =
+  private static final Map<JobUpdateStatus, JobUpdateStatus> RESUME_BLOCKED_BEHAVIOR =
+      ImmutableMap.<JobUpdateStatus, JobUpdateStatus>builder()
+          .putAll(BLOCKED_TO_PAUSED_STATES.inverse())
+          .put(ROLL_FORWARD_AWAITING_PULSE, ROLL_FORWARD_AWAITING_PULSE)
+          .put(ROLL_BACK_AWAITING_PULSE, ROLL_BACK_AWAITING_PULSE)
+          .build();
+
+  static final Function<JobUpdateStatus, JobUpdateStatus> GET_ACTIVE_RESUME_STATE =
       new Function<JobUpdateStatus, JobUpdateStatus>() {
         @Override
         public JobUpdateStatus apply(JobUpdateStatus status) {
-          return RESUME_BEHAVIOR.get(status);
+          return RESUME_ACTIVE_BEHAVIOR.get(status);
         }
       };
+
+  static final Function<JobUpdateStatus, JobUpdateStatus> GET_BLOCKED_RESUME_STATE =
+      new Function<JobUpdateStatus, JobUpdateStatus>() {
+        @Override
+        public JobUpdateStatus apply(JobUpdateStatus status) {
+          return RESUME_BLOCKED_BEHAVIOR.get(status);
+        }
+      };
+
+  static final Function<JobUpdateStatus, JobUpdateStatus> GET_UNBLOCKED_STATE =
+      new Function<JobUpdateStatus, JobUpdateStatus>() {
+        @Override
+        public JobUpdateStatus apply(JobUpdateStatus status) {
+          return UNBLOCK_BEHAVIOR.get(status);
+        }
+      };
+
+  static JobUpdateStatus getBlockedState(JobUpdateStatus status) {
+    return BLOCK_BEHAVIOR.get(status);
+  }
 
   /**
    * Determines the action to take in response to a status change on a job update.
@@ -128,6 +193,10 @@ final class JobUpdateStateMachine {
 
   static boolean isActive(JobUpdateStatus status) {
     return ACTIVE_TO_PAUSED_STATES.keySet().contains(status);
+  }
+
+  static boolean isAwaitingPulse(JobUpdateStatus status) {
+    return BLOCKED_TO_PAUSED_STATES.keySet().contains(status);
   }
 
   /**
