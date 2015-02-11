@@ -322,7 +322,7 @@ codeQualityTasks.each {
 
 checkstyle {
   sourceSets = [sourceSets.main , sourceSets.test, sourceSets.jmh]
-  toolVersion = 6.2
+  toolVersion = 6.3
 }
 
 tasks.withType(FindBugs) {
