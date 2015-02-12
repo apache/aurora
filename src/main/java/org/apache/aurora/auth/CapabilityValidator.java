@@ -25,7 +25,8 @@ public interface CapabilityValidator extends SessionValidator {
   enum Capability {
     ROOT,
     MACHINE_MAINTAINER,
-    PROVISIONER
+    PROVISIONER,
+    UPDATE_COORDINATOR,
   }
 
   /**

@@ -623,6 +623,16 @@ enum JobUpdatePulseStatus {
   FINISHED = 2
 }
 
+// TODO(maxim): refactor beta updater to use JobUpdateKey (AURORA-1093).
+/** Job update key. */
+struct JobUpdateKey {
+  /** Job being updated */
+  1: JobKey job
+
+  /** Update ID. */
+  2: string id
+}
+
 /** Job update thresholds and limits. */
 struct JobUpdateSettings {
   /** Max number of instances being updated at any given moment. */
@@ -658,7 +668,7 @@ struct JobUpdateSettings {
   * block. A blocked update is unable to continue but retains its current status. It may only get
   * unblocked by a fresh pulseJobUpdate call.
   */
-  9: i32 blockIfNoPulsesAfterMs
+  9: optional i32 blockIfNoPulsesAfterMs
 }
 
 /** Event marking a state transition in job update lifecycle. */
@@ -1033,7 +1043,7 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
    * JobUpdateSettings. Unblocks progress if the update was previously blocked.
    * Responds with ResponseCode.INVALID_REQUEST in case an unknown updateId is specified.
    */
-  Response pulseJobUpdate(1: string updateId, 2: SessionKey session)
+  Response pulseJobUpdate(1: JobUpdateKey key, 2: SessionKey session)
 }
 
 struct InstanceConfigRewrite {

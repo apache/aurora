@@ -71,6 +71,8 @@ import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateInstructions;
+import org.apache.aurora.gen.JobUpdateKey;
+import org.apache.aurora.gen.JobUpdatePulseStatus;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSettings;
@@ -81,6 +83,7 @@ import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.PendingReason;
+import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ResourceAggregate;
@@ -129,6 +132,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -150,6 +154,7 @@ import org.junit.Test;
 import static org.apache.aurora.auth.CapabilityValidator.Capability.MACHINE_MAINTAINER;
 import static org.apache.aurora.auth.CapabilityValidator.Capability.PROVISIONER;
 import static org.apache.aurora.auth.CapabilityValidator.Capability.ROOT;
+import static org.apache.aurora.auth.CapabilityValidator.Capability.UPDATE_COORDINATOR;
 import static org.apache.aurora.auth.SessionValidator.SessionContext;
 import static org.apache.aurora.gen.LockValidation.CHECKED;
 import static org.apache.aurora.gen.LockValidation.UNCHECKED;
@@ -203,6 +208,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final String TASK_ID = "task_id";
   private static final String UPDATE_ID = "82d6d790-3212-11e3-aa6e-0800200c9a74";
   private static final UUID UU_ID = UUID.fromString(UPDATE_ID);
+  private static final IJobUpdateKey UPDATE_KEY =
+      IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), UPDATE_ID));
 
   private static final IResourceAggregate QUOTA =
       IResourceAggregate.build(new ResourceAggregate(10.0, 1024, 2048));
@@ -2748,6 +2755,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartUpdateFailsInvalidPulseTimeout() throws Exception {
+    control.replay();
+
+    JobUpdateRequest updateRequest = buildServiceJobUpdateRequest();
+    updateRequest.getSettings().setBlockIfNoPulsesAfterMs(-1);
+
+    assertEquals(
+        invalidResponse(SchedulerThriftInterface.INVALID_PULSE_TIMEOUT),
+        thrift.startJobUpdate(updateRequest, SESSION));
+  }
+
+  @Test
   public void testStartUpdateFailsAuth() throws Exception {
     JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     expectAuth(ROLE, false);
@@ -3027,12 +3046,48 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testPulseJobUpdate() throws Exception {
+  public void testPulseJobUpdatePulsedAsCoordinator() throws Exception {
+    expectAuth(UPDATE_COORDINATOR, true);
+    expect(jobUpdateController.pulse(UPDATE_ID)).andReturn(JobUpdatePulseStatus.OK);
+
     control.replay();
 
     assertEquals(
-        errorResponse(SchedulerThriftInterface.NOT_IMPLEMENTED_MESSAGE),
-        thrift.pulseJobUpdate("update", SESSION));
+        okResponse(Result.pulseJobUpdateResult(new PulseJobUpdateResult(JobUpdatePulseStatus.OK))),
+        thrift.pulseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testPulseJobUpdatePulsedAsUser() throws Exception {
+    expectAuth(UPDATE_COORDINATOR, false);
+    expectAuth(ROLE, true);
+    expect(jobUpdateController.pulse(UPDATE_ID)).andReturn(JobUpdatePulseStatus.OK);
+
+    control.replay();
+
+    assertEquals(
+        okResponse(Result.pulseJobUpdateResult(new PulseJobUpdateResult(JobUpdatePulseStatus.OK))),
+        thrift.pulseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testPulseJobUpdateFails() throws Exception {
+    expectAuth(UPDATE_COORDINATOR, true);
+    expect(jobUpdateController.pulse(UPDATE_ID)).andThrow(new UpdateStateException("failure"));
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.pulseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testPulseJobUpdateFailsAuth() throws Exception {
+    expectAuth(UPDATE_COORDINATOR, false);
+    expectAuth(ROLE, false);
+
+    control.replay();
+
+    assertResponse(AUTH_FAILED, thrift.pulseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
   }
 
   private static JobConfiguration makeProdJob() {

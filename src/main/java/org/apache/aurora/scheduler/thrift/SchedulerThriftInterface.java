@@ -52,7 +52,6 @@ import com.twitter.common.args.constraints.Positive;
 
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
-import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator.AuthFailedException;
 import org.apache.aurora.gen.AcquireLockResult;
 import org.apache.aurora.gen.AddInstancesConfig;
@@ -80,6 +79,8 @@ import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
+import org.apache.aurora.gen.JobUpdateKey;
+import org.apache.aurora.gen.JobUpdatePulseStatus;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSettings;
@@ -92,6 +93,7 @@ import org.apache.aurora.gen.LockValidation;
 import org.apache.aurora.gen.MaintenanceStatusResult;
 import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.PopulateJobResult;
+import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
@@ -147,6 +149,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
@@ -172,6 +175,10 @@ import static java.util.Objects.requireNonNull;
 import static com.google.common.base.CharMatcher.WHITESPACE;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
+import static org.apache.aurora.auth.CapabilityValidator.Capability.MACHINE_MAINTAINER;
+import static org.apache.aurora.auth.CapabilityValidator.Capability.PROVISIONER;
+import static org.apache.aurora.auth.CapabilityValidator.Capability.ROOT;
+import static org.apache.aurora.auth.CapabilityValidator.Capability.UPDATE_COORDINATOR;
 import static org.apache.aurora.auth.SessionValidator.SessionContext;
 import static org.apache.aurora.gen.ResponseCode.AUTH_FAILED;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
@@ -750,8 +757,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   private Optional<SessionContext> isAdmin(SessionKey session) {
     try {
-      return Optional.of(
-          sessionValidator.checkAuthorized(session, Capability.ROOT, AuditCheck.REQUIRED));
+      return Optional.of(sessionValidator.checkAuthorized(session, ROOT, AuditCheck.REQUIRED));
     } catch (AuthFailedException e) {
       return Optional.absent();
     }
@@ -881,7 +887,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return okResponse(Result.getQuotaResult(result));
   }
 
-  @Requires(whitelist = Capability.PROVISIONER)
+  @Requires(whitelist = PROVISIONER)
   @Override
   public Response setQuota(
       final String ownerRole,
@@ -900,7 +906,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
   }
 
-  @Requires(whitelist = Capability.MACHINE_MAINTAINER)
+  @Requires(whitelist = MACHINE_MAINTAINER)
   @Override
   public Response startMaintenance(Hosts hosts, SessionKey session) {
     return okResponse(Result.startMaintenanceResult(
@@ -908,21 +914,21 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             .setStatuses(maintenance.startMaintenance(hosts.getHostNames()))));
   }
 
-  @Requires(whitelist = Capability.MACHINE_MAINTAINER)
+  @Requires(whitelist = MACHINE_MAINTAINER)
   @Override
   public Response drainHosts(Hosts hosts, SessionKey session) {
     return okResponse(Result.drainHostsResult(
         new DrainHostsResult().setStatuses(maintenance.drain(hosts.getHostNames()))));
   }
 
-  @Requires(whitelist = Capability.MACHINE_MAINTAINER)
+  @Requires(whitelist = MACHINE_MAINTAINER)
   @Override
   public Response maintenanceStatus(Hosts hosts, SessionKey session) {
     return okResponse(Result.maintenanceStatusResult(
         new MaintenanceStatusResult().setStatuses(maintenance.getStatus(hosts.getHostNames()))));
   }
 
-  @Requires(whitelist = Capability.MACHINE_MAINTAINER)
+  @Requires(whitelist = MACHINE_MAINTAINER)
   @Override
   public Response endMaintenance(Hosts hosts, SessionKey session) {
     return okResponse(Result.endMaintenanceResult(
@@ -942,8 +948,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     final SessionContext context;
     try {
-      // TODO(Sathya): Remove this after AOP-style session validation passes in a SessionContext.
-      context = sessionValidator.checkAuthorized(session, Capability.ROOT, AuditCheck.REQUIRED);
+      // TODO(maxim): Remove this after AOP-style session validation passes in a SessionContext.
+      context = sessionValidator.checkAuthorized(session, ROOT, AuditCheck.REQUIRED);
     } catch (AuthFailedException e) {
       return errorResponse(AUTH_FAILED, e);
     }
@@ -1386,6 +1392,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return invalidResponse(INVALID_MIN_WAIT_TO_RUNNING);
     }
 
+    if (settings.isSetBlockIfNoPulsesAfterMs() && settings.getBlockIfNoPulsesAfterMs() <= 0) {
+      return invalidResponse(INVALID_PULSE_TIMEOUT);
+    }
+
     final SessionContext context;
     final IJobUpdateRequest request;
     try {
@@ -1530,12 +1540,20 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return changeJobUpdateState(mutableJobKey, session, ABORT);
   }
 
-  @VisibleForTesting
-  static final String NOT_IMPLEMENTED_MESSAGE = "Not implemented";
-
   @Override
-  public Response pulseJobUpdate(String updateId, SessionKey session) {
-    throw new UnsupportedOperationException(NOT_IMPLEMENTED_MESSAGE);
+  public Response pulseJobUpdate(JobUpdateKey mutableUpdateKey, final SessionKey session) {
+    IJobUpdateKey updateKey = validateJobUpdateKey(mutableUpdateKey);
+    try {
+      authorizeJobUpdateAction(updateKey, session);
+
+      // TODO(maxim): use IJobUpdateKey to pulse when AURORA-1093 is addressed.
+      JobUpdatePulseStatus result = jobUpdateController.pulse(updateKey.getId());
+      return okResponse(Result.pulseJobUpdateResult(new PulseJobUpdateResult(result)));
+    } catch (AuthFailedException e) {
+      return errorResponse(AUTH_FAILED, e);
+    } catch (UpdateStateException e) {
+      return errorResponse(INVALID_REQUEST, e);
+    }
   }
 
   @Override
@@ -1568,6 +1586,38 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     } else {
       return invalidResponse("Invalid update ID:" + updateId);
     }
+  }
+
+  private Optional<SessionContext> isUpdateCoordinator(SessionKey session) {
+    try {
+      return Optional.of(
+          sessionValidator.checkAuthorized(session, UPDATE_COORDINATOR, AuditCheck.NONE));
+    } catch (AuthFailedException e) {
+      return Optional.absent();
+    }
+  }
+
+  private SessionContext authorizeJobUpdateAction(IJobUpdateKey key, SessionKey session)
+      throws AuthFailedException {
+
+      Optional<SessionContext> maybeCoordinatorContext = isUpdateCoordinator(session);
+      SessionContext context;
+      if (maybeCoordinatorContext.isPresent()) {
+        context = maybeCoordinatorContext.get();
+      } else {
+        context = sessionValidator.checkAuthenticated(
+            session,
+            ImmutableSet.of(key.getJob().getRole()));
+      }
+
+    return context;
+  }
+
+  private static IJobUpdateKey validateJobUpdateKey(JobUpdateKey mutableKey) {
+    IJobUpdateKey key = IJobUpdateKey.build(mutableKey);
+    JobKeys.assertValid(key.getJob());
+    checkNotBlank(key.getId());
+    return key;
   }
 
   @VisibleForTesting
@@ -1629,6 +1679,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @VisibleForTesting
   static final String INVALID_MIN_WAIT_TO_RUNNING =
       "minWaitInInstanceRunningMs must be non-negative.";
+
+  @VisibleForTesting
+  static final String INVALID_PULSE_TIMEOUT = "blockIfNoPulsesAfterMs must be positive.";
 
   private static Response okEmptyResponse()  {
     return emptyResponse().setResponseCode(OK);
