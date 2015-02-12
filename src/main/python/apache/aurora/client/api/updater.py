@@ -95,6 +95,8 @@ class Updater(object):
       self._update_config = UpdaterConfig(**config.update_config().get())
     except ValueError as e:
       raise self.Error(str(e))
+    if self._update_config.pulse_interval_secs:
+      raise self.Error('Pulse interval seconds is not supported by the client updater.')
     self._lock = None
     self._thread_lock = threading_lock()
     self._batch_wait_event = Event()

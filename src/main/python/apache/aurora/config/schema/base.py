@@ -32,6 +32,7 @@ class UpdateConfig(Struct):
   max_total_failures          = Default(Integer, 0)
   rollback_on_failure         = Default(Boolean, True)
   wait_for_batch_completion   = Default(Boolean, False)
+  pulse_interval_secs         = Integer
 
 
 class HealthCheckConfig(Struct):

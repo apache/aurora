@@ -347,7 +347,15 @@ class UpdaterTest(TestCase):
         'Unexpected error count:%s' % len(resp.details))
 
       assert message in resp.details[0].message, (
-        "Expected %s message not found in: %s" % (message, resp.details[0].message))
+        'Expected %s message not found in: %s' % (message, resp.details[0].message))
+
+  def test_pulse_interval_not_supported(self):
+    update_config = self.UPDATE_CONFIG.copy()
+    update_config.update(pulse_interval_secs=60)
+
+    with raises(Updater.Error) as e:
+      self.init_updater(update_config)
+      assert 'Pulse interval seconds is not supported in client updater.' in e.message
 
   def test_grow(self):
     """Adds instances to the existing job."""

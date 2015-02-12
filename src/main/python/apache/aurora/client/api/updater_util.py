@@ -22,6 +22,8 @@ from gen.apache.aurora.api.ttypes import JobUpdateSettings, Range
 
 
 class UpdaterConfig(object):
+  MIN_PULSE_INTERVAL_SECONDS = 60
+
   """
   For updates involving a health check,
 
@@ -42,7 +44,8 @@ class UpdaterConfig(object):
                max_per_shard_failures,
                max_total_failures,
                rollback_on_failure=True,
-               wait_for_batch_completion=False):
+               wait_for_batch_completion=False,
+               pulse_interval_secs=None):
 
     if batch_size <= 0:
       raise ValueError('Batch size should be greater than 0')
@@ -50,6 +53,9 @@ class UpdaterConfig(object):
       raise ValueError('Restart Threshold should be greater than 0')
     if watch_secs <= 0:
       raise ValueError('Watch seconds should be greater than 0')
+    if pulse_interval_secs is not None and pulse_interval_secs < self.MIN_PULSE_INTERVAL_SECONDS:
+      raise ValueError('Pulse interval seconds must be at least %s seconds.'
+                       % self.MIN_PULSE_INTERVAL_SECONDS)
     self.batch_size = batch_size
     self.restart_threshold = restart_threshold
     self.watch_secs = watch_secs
@@ -57,6 +63,7 @@ class UpdaterConfig(object):
     self.max_per_instance_failures = max_per_shard_failures
     self.rollback_on_failure = rollback_on_failure
     self.wait_for_batch_completion = wait_for_batch_completion
+    self.pulse_interval_secs = pulse_interval_secs
 
   @classmethod
   def instances_to_ranges(cls, instances):
@@ -95,7 +102,9 @@ class UpdaterConfig(object):
         minWaitInInstanceRunningMs=self.watch_secs * 1000,
         rollbackOnFailure=self.rollback_on_failure,
         waitForBatchCompletion=self.wait_for_batch_completion,
-        updateOnlyTheseInstances=self.instances_to_ranges(instances) if instances else None)
+        updateOnlyTheseInstances=self.instances_to_ranges(instances) if instances else None,
+        blockIfNoPulsesAfterMs=self.pulse_interval_secs * 1000 if self.pulse_interval_secs else None
+    )
 
   def __eq__(self, other):
     return self.__dict__ == other.__dict__
