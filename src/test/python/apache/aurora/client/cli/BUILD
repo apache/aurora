@@ -18,6 +18,7 @@ python_test_suite(
     ':api',
     ':client',
     ':command_hooks',
+    ':context',
     ':cron',
     ':inspect',
     ':job',
@@ -38,6 +39,7 @@ python_library(
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/client/cli',
+    'src/test/python/apache/aurora/client:util',
   ]
 )
 
@@ -211,5 +213,15 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/client/cli',
+  ]
+)
+
+python_tests(
+  name = 'context',
+  sources = [ 'test_context.py' ],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/client/cli',
+    'src/main/python/apache/aurora/client:factory',
   ]
 )

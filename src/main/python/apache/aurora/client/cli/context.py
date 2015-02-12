@@ -68,16 +68,19 @@ class AuroraCommandContext(Context):
   def __init__(self):
     super(AuroraCommandContext, self).__init__()
     self.apis = {}
+    self.unhooked_apis = {}
 
-  def get_api(self, cluster):
+  def get_api(self, cluster, enable_hooks=True):
     """Gets an API object for a specified cluster
     Keeps the API handle cached, so that only one handle for each cluster will be created in a
     session.
     """
-    if cluster not in self.apis:
-      api = make_client(cluster, AURORA_V2_USER_AGENT_NAME)
-      self.apis[cluster] = api
-    return self.apis[cluster]
+    apis = self.apis if enable_hooks else self.unhooked_apis
+
+    if cluster not in apis:
+      api = make_client(cluster, AURORA_V2_USER_AGENT_NAME, enable_hooks)
+      apis[cluster] = api
+    return apis[cluster]
 
   def get_job_config(self, jobkey, config_file):
     """Loads a job configuration from a config file."""
