@@ -330,6 +330,7 @@ tasks.withType(FindBugs) {
     xml.enabled = false
     html.enabled = true
   }
+  maxHeapSize = '1g'
   excludeFilter = rootProject.file('config/findbugs/excludeFilter.xml')
 }
 
