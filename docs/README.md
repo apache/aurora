@@ -5,7 +5,7 @@ Apache Aurora is a service scheduler that runs on top of Apache Mesos, enabling 
  * Operators: For those that wish to manage and fine-tune an Aurora cluster.
  * Developers: All the information you need to start modifying Aurora and contributing back to the project.
 
-This documentation is a work in progress, and we encourage you to ask questions on the [Aurora developer list](http://aurora.incubator.apache.org/community/) or the `#aurora` IRC channel on `irc.freenode.net`.
+We encourage you to ask questions on the [Aurora developer list](http://aurora.incubator.apache.org/community/) or the `#aurora` IRC channel on `irc.freenode.net`.
 
 ## Users
  * [Install Aurora on virtual machines on your private machine](vagrant.md)
@@ -27,7 +27,7 @@ This documentation is a work in progress, and we encourage you to ask questions 
  * [Generating test resources](test-resource-generation.md)
 
 ## Developers
- * [Contributing to the project](CONTRIBUTING.md)
+ * [Contributing to the project](contributing.md)
  * [Developing the Aurora Scheduler](developing-aurora-scheduler.md)
  * [Developing the Aurora Client](developing-aurora-client.md)
  * [Committers Guide](committers.md)
