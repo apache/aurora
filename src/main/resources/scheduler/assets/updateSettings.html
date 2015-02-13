@@ -86,4 +86,14 @@
       <strong>{{update.update.instructions.settings.updateOnlyTheseInstances | toNiceRanges}}</strong>
     </td>
   </tr>
+  <tr ng-if="update.update.instructions.settings.blockIfNoPulsesAfterMs">
+    <td>
+      <span class="setting-label" tooltip="Time in ms to wait for a pulse before blocking update progress.">
+        Pulse Timeout
+      </span>
+    </td>
+    <td>
+      <strong>{{update.update.instructions.settings.blockIfNoPulsesAfterMs}}</strong>
+    </td>
+  </tr>
 </table>
