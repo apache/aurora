@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.util.EnumSet;
 import java.util.Map;
 
 import com.google.common.base.Optional;
@@ -36,6 +37,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -52,14 +54,13 @@ import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.scheduler.TaskVars.VETO_DYNAMIC_NAME;
-import static org.apache.aurora.scheduler.TaskVars.VETO_MIXED_NAME;
-import static org.apache.aurora.scheduler.TaskVars.VETO_STATIC_NAME;
+import static org.apache.aurora.scheduler.TaskVars.VETO_GROUPS_TO_COUNTERS;
 import static org.apache.aurora.scheduler.TaskVars.jobStatName;
 import static org.apache.aurora.scheduler.TaskVars.rackStatName;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 
 public class TaskVarsTest extends EasyMockTest {
 
@@ -68,6 +69,10 @@ public class TaskVarsTest extends EasyMockTest {
   private static final String JOB_B = "job_b";
   private static final String TASK_ID = "task_id";
   private static final String ENV = "test";
+
+  private static final String STATIC_COUNTER = VETO_GROUPS_TO_COUNTERS.get(VetoGroup.STATIC);
+  private static final String DYNAMIC_COUNTER = VETO_GROUPS_TO_COUNTERS.get(VetoGroup.DYNAMIC);
+  private static final String MIXED_COUNTER = VETO_GROUPS_TO_COUNTERS.get(VetoGroup.MIXED);
 
   private StorageTestUtil storageUtil;
   private StatsProvider trackedProvider;
@@ -219,7 +224,7 @@ public class TaskVarsTest extends EasyMockTest {
   @Test
   public void testStaticVetoGroup() {
     expectStatusCountersInitialized();
-    expectStatExport(VETO_STATIC_NAME);
+    expectStatExport(STATIC_COUNTER);
 
     replayAndBuild();
     schedulerActivated();
@@ -229,25 +234,25 @@ public class TaskVarsTest extends EasyMockTest {
         Veto.insufficientResources("ram", 500),
         Veto.insufficientResources("cpu", 500));
 
-    assertEquals(1, getValue(VETO_STATIC_NAME));
+    assertEquals(1, getValue(STATIC_COUNTER));
   }
 
   @Test
   public void testDynamicVetoGroup() {
     expectStatusCountersInitialized();
-    expectStatExport(VETO_DYNAMIC_NAME);
+    expectStatExport(DYNAMIC_COUNTER);
 
     replayAndBuild();
     schedulerActivated();
 
     applyVeto(makeTask(JOB_A, PENDING), Veto.unsatisfiedLimit("constraint"));
-    assertEquals(1, getValue(VETO_DYNAMIC_NAME));
+    assertEquals(1, getValue(DYNAMIC_COUNTER));
   }
 
   @Test
   public void testMixedVetoGroup() {
     expectStatusCountersInitialized();
-    expectStatExport(VETO_MIXED_NAME);
+    expectStatExport(MIXED_COUNTER);
 
     replayAndBuild();
     schedulerActivated();
@@ -256,7 +261,7 @@ public class TaskVarsTest extends EasyMockTest {
         Veto.unsatisfiedLimit("constraint"),
         Veto.insufficientResources("ram", 500));
 
-    assertEquals(1, getValue(VETO_MIXED_NAME));
+    assertEquals(1, getValue(MIXED_COUNTER));
   }
 
   @Test
@@ -345,5 +350,13 @@ public class TaskVarsTest extends EasyMockTest {
 
     changeState(a, LOST);
     // Since no attributes are stored for the host, a variable is not exported/updated.
+  }
+
+  @Test
+  public void testAllVetoGroupsCovered() {
+    replayAndBuild();
+    for (VetoGroup group : EnumSet.complementOf(EnumSet.of(VetoGroup.EMPTY))) {
+      assertNotNull("Unknown VetoGroup value: " + group, VETO_GROUPS_TO_COUNTERS.get(group));
+    }
   }
 }

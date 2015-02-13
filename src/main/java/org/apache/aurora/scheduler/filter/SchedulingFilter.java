@@ -31,35 +31,66 @@ import static org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType.MAINT
  */
 public interface SchedulingFilter {
 
+  enum VetoGroup {
+    /**
+     * An empty group of {@link Veto} instances.
+     */
+    EMPTY,
+
+    /**
+     * Represents a group of static {@link Veto} instances. Vetoes are considered static if
+     * a given offer will never be able to satisfy given task requirements.
+     */
+    STATIC,
+
+    /**
+     * Represents a group of dynamic {@link Veto} instances. Vetoes are considered dynamic if
+     * a given offer may be able to satisfy given task requirements if cluster conditions change
+     * (e.g. other tasks are killed or rescheduled).
+     */
+    DYNAMIC,
+
+    /**
+     * Represents a group of both static and dynamic {@link Veto} instances.
+     */
+    MIXED
+  }
+
   enum VetoType {
     /**
      * Not enough resources to satisfy a proposed scheduling assignment.
      */
-    INSUFFICIENT_RESOURCES("Insufficient: %s"),
+    INSUFFICIENT_RESOURCES("Insufficient: %s", VetoGroup.STATIC),
 
     /**
      * Unable to satisfy proposed scheduler assignment constraints.
      */
-    CONSTRAINT_MISMATCH("Constraint not satisfied: %s"),
+    CONSTRAINT_MISMATCH("Constraint not satisfied: %s", VetoGroup.STATIC),
 
     /**
      * Constraint limit is not satisfied for a proposed scheduling assignment.
      */
-    LIMIT_NOT_SATISFIED("Limit not satisfied: %s"),
+    LIMIT_NOT_SATISFIED("Limit not satisfied: %s", VetoGroup.DYNAMIC),
 
     /**
      * Unable to satisfy a proposed scheduler assignment due to cluster maintenance.
      */
-    MAINTENANCE("Host %s for maintenance");
+    MAINTENANCE("Host %s for maintenance", VetoGroup.STATIC);
 
     private final String reasonFormat;
+    private final VetoGroup group;
 
-    VetoType(String reasonFormat) {
+    VetoType(String reasonFormat, VetoGroup group) {
       this.reasonFormat = reasonFormat;
+      this.group = group;
     }
 
     String formatReason(String reason) {
       return String.format(reasonFormat, reason);
+    }
+
+    VetoGroup getGroup() {
+      return group;
     }
   }
 
@@ -137,6 +168,21 @@ public interface SchedulingFilter {
 
     public VetoType getVetoType() {
       return vetoType;
+    }
+
+    public static VetoGroup identifyGroup(Iterable<Veto> vetoes) {
+      // This code has high call frequency and is optimized for reduced heap churn.
+      VetoGroup group = VetoGroup.EMPTY;
+      for (Veto veto : vetoes) {
+        VetoGroup currentGroup = veto.getVetoType().getGroup();
+
+        if (group == VetoGroup.EMPTY) {
+          group = currentGroup;
+        } else if (!currentGroup.equals(group)) {
+          return VetoGroup.MIXED;
+        }
+      }
+      return group;
     }
 
     @Override

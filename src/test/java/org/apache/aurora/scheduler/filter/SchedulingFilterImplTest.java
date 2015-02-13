@@ -41,6 +41,7 @@ import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.mesos.Offers;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -455,6 +456,30 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     checkConstraint(hostA, "jvm", true, "1.6");
     checkConstraint(hostA, "jvm", true, "1.7");
     checkConstraint(hostA, "jvm", true, "1.6", "1.7");
+  }
+
+  @Test
+  public void testVetoGroups() {
+    control.replay();
+
+    assertEquals(VetoGroup.EMPTY, Veto.identifyGroup(ImmutableSet.<Veto>of()));
+
+    assertEquals(
+        VetoGroup.STATIC,
+        Veto.identifyGroup(ImmutableSet.of(
+            Veto.constraintMismatch("denied"),
+            Veto.insufficientResources("ram", 100),
+            Veto.maintenance("draining"))));
+
+    assertEquals(
+        VetoGroup.DYNAMIC,
+        Veto.identifyGroup(ImmutableSet.of(Veto.unsatisfiedLimit("denied"))));
+
+    assertEquals(
+        VetoGroup.MIXED,
+        Veto.identifyGroup(ImmutableSet.of(
+            Veto.insufficientResources("ram", 100),
+            Veto.unsatisfiedLimit("denied"))));
   }
 
   private ITaskConfig checkConstraint(

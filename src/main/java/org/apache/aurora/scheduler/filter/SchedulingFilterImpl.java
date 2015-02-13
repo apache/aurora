@@ -19,7 +19,6 @@ import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
@@ -101,7 +100,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   private static void maybeAddVeto(
-      ImmutableList.Builder<Veto> vetoes,
+      ImmutableSet.Builder<Veto> vetoes,
       ResourceVector vector,
       double available,
       double requested) {
@@ -112,8 +111,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     }
   }
 
-  private static Iterable<Veto> getResourceVetoes(ResourceSlot available, ResourceSlot required) {
-    ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
+  private static Set<Veto> getResourceVetoes(ResourceSlot available, ResourceSlot required) {
+    ImmutableSet.Builder<Veto> vetoes = ImmutableSet.builder();
     maybeAddVeto(vetoes, CPU, available.getNumCpus(), required.getNumCpus());
     maybeAddVeto(vetoes, RAM, available.getRam().as(Data.MB), required.getRam().as(Data.MB));
     maybeAddVeto(vetoes, DISK, available.getDisk().as(Data.MB), required.getDisk().as(Data.MB));
@@ -144,12 +143,12 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     this.executorSettings = requireNonNull(executorSettings);
   }
 
-  private Iterable<Veto> getConstraintVetoes(
+  private Set<Veto> getConstraintVetoes(
       Iterable<IConstraint> taskConstraints,
       AttributeAggregate jobState,
       Iterable<IAttribute> offerAttributes) {
 
-    ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
+    ImmutableSet.Builder<Veto> vetoes = ImmutableSet.builder();
     for (IConstraint constraint : VALUES_FIRST.sortedCopy(taskConstraints)) {
       Optional<Veto> veto = ConstraintMatcher.getVeto(jobState, offerAttributes, constraint);
       if (veto.isPresent()) {
@@ -190,14 +189,16 @@ public class SchedulingFilterImpl implements SchedulingFilter {
       return maintenanceVeto.asSet();
     }
 
-    return ImmutableSet.<Veto>builder()
-        .addAll(getConstraintVetoes(
-            request.getConstraints(),
-            request.getJobState(),
-            resource.getAttributes().getAttributes()))
-        .addAll(getResourceVetoes(
-            resource.getResourceSlot(),
-            ResourceSlot.from(request.getTask(), executorSettings)))
-        .build();
+    Set<Veto> resourceVetoes = getResourceVetoes(
+        resource.getResourceSlot(),
+        ResourceSlot.from(request.getTask(), executorSettings));
+    if (!resourceVetoes.isEmpty()) {
+      return resourceVetoes;
+    }
+
+    return getConstraintVetoes(
+        request.getConstraints(),
+        request.getJobState(),
+        resource.getAttributes().getAttributes());
   }
 }
