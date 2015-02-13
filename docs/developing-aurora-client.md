@@ -86,4 +86,6 @@ a Run configuration:
   is the directory where our example clusters.json is found).
 * You should now be able to run and debug this configuration!
 
-
+Making thrift schema changes
+============================
+See [this document](thrift-deprecation.md) for any thrift related changes.

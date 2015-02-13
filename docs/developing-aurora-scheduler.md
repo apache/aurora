@@ -106,3 +106,7 @@ should not be modified directly:
 
 To upgrade Gradle unpack the new version somewhere, run `/path/to/new/gradle wrapper` in the
 repository root and commit the changed files.
+
+Making thrift schema changes
+============================
+See [this document](thrift-deprecation.md) for any thrift related changes.
