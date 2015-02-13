@@ -1476,7 +1476,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     final IJobKey jobKey = JobKeys.assertValid(IJobKey.build(requireNonNull(mutableJobKey)));
     final SessionContext context;
     try {
-      context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
+      // TODO(maxim): pass a JobUpdateKey here instead of generating a fake one. AURORA-1093.
+      IJobUpdateKey updateKey = IJobUpdateKey.build(new JobUpdateKey().setJob(mutableJobKey));
+      context = authorizeJobUpdateAction(updateKey, session);
     } catch (AuthFailedException e) {
       return errorResponse(AUTH_FAILED, e);
     }
