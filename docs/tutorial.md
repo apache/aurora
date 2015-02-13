@@ -166,14 +166,14 @@ are available, contact your sysadmin.
 
 Environment names are namespaces; you can count on `prod`, `devel` and `test` existing.
 
-The Aurora Client command that actually runs our Job is `aurora create`. It creates a Job as
+The Aurora Client command that actually runs our Job is `aurora job create`. It creates a Job as
 specified by its job key and configuration file arguments and runs it.
 
-    aurora create <cluster>/<role>/<environment>/<jobname> <config_file>
+    aurora job create <cluster>/<role>/<environment>/<jobname> <config_file>
 
 Or for our example:
 
-    aurora create devcluster/www-data/devel/hello_world /vagrant/hello_world.aurora
+    aurora job create devcluster/www-data/devel/hello_world /vagrant/hello_world.aurora
 
 This returns:
 
@@ -183,7 +183,7 @@ This returns:
      * Documentation:  https://help.ubuntu.com/
     Welcome to your Vagrant-built virtual machine.
     Last login: Fri Jan  3 02:18:55 2014 from 10.0.2.2
-    vagrant@precise64:~$ aurora create devcluster/www-data/devel/hello_world \
+    vagrant@precise64:~$ aurora job create devcluster/www-data/devel/hello_world \
         /vagrant/hello_world.aurora
      INFO] Creating job hello_world
      INFO] Response from scheduler: OK (message: 1 new tasks pending for job
@@ -226,7 +226,7 @@ It looks like we made a typo in our Python script. We wanted `xrange`,
 not `xrang`. Edit the `hello_world.py` script to use the correct function and
 we will try again.
 
-    aurora update devcluster/www-data/devel/hello_world /vagrant/hello_world.aurora
+    aurora job update devcluster/www-data/devel/hello_world /vagrant/hello_world.aurora
 
 This time, the task comes up, we inspect the page, and see that the
 `hello_world` process is running.
@@ -242,7 +242,7 @@ output:
 
 Now that we're done, we kill the job using the Aurora client:
 
-    vagrant@precise64:~$ aurora killall devcluster/www-data/devel/hello_world
+    vagrant@precise64:~$ aurora job killall devcluster/www-data/devel/hello_world
      INFO] Killing tasks for job: devcluster/www-data/devel/hello_world
      INFO] Response from scheduler: OK (message: Tasks killed.)
      INFO] Job url: http://precise64:8081/scheduler/www-data/devel/hello_world

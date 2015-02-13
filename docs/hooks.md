@@ -133,11 +133,11 @@ jobs.extend(
 
 All Aurora Command Line commands now accept an `.aurora` config file as an optional parameter (some, of course, accept it as a required parameter). Whenever a command has a `.aurora` file parameter, any hooks specified and activated in the `.aurora` file can be used. For example:
 
-    aurora restart cluster1/role/env/app myapp.aurora
+    aurora job restart cluster1/role/env/app myapp.aurora
 
 The command activates any hooks specified and activated in `myapp.aurora`. For the `restart` command, that is the only thing the `myapp.aurora` parameter does. So, if the command was the following, since there is no `.aurora` config file to specify any hooks, no hooks on the `restart` command can run.
 
-    aurora restart cluster1/role/env/app
+    aurora job restart cluster1/role/env/app
 
 ## Hooks Protocol
 

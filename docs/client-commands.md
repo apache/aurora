@@ -319,7 +319,7 @@ cluster.
 When you create a job, part of the output response contains a URL that goes
 to the job's scheduler UI page. For example:
 
-    vagrant@precise64:~$ aurora create devcluster/www-data/prod/hello /vagrant/examples/jobs/hello_world.aurora
+    vagrant@precise64:~$ aurora job create devcluster/www-data/prod/hello /vagrant/examples/jobs/hello_world.aurora
     INFO] Creating job hello
     INFO] Response from scheduler: OK (message: 1 new tasks pending for job www-data/prod/hello)
     INFO] Job url: http://precise64:8081/scheduler/www-data/prod/hello

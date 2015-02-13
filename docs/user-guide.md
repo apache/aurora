@@ -45,7 +45,7 @@ request 1 core of cpu, 1 GB of RAM, and 1 GB of disk space as specified
 in the configuration file `hello_world.aurora`. I want to
 update it so it requests 2 GB of RAM instead of 1. I create a new
 configuration file to do that called `new_hello_world.aurora` and
-issue a `aurora update --shards=0-1 <job_key_value> new_hello_world.aurora`
+issue a `aurora job update <job_key_value>/0-1 new_hello_world.aurora`
 command.
 
 This results in instances 0 and 1 having 1 cpu, 2 GB of RAM, and 1 GB of disk space,
@@ -274,7 +274,7 @@ after reaching a set of failure limits, it goes into `FAILED` state.
 
 ### Forceful Termination: KILLING, RESTARTING
 
-You can terminate a `Task` by issuing an `aurora kill` command, which
+You can terminate a `Task` by issuing an `aurora job kill` command, which
 moves it into `KILLING` state. The scheduler then sends the slave  a
 request to terminate the `Task`. If the scheduler receives a successful
 response, it moves the Task into `KILLED` state and never restarts it.
@@ -329,7 +329,7 @@ You interact with Aurora jobs either via:
 
   For example:
 
-      vagrant@precise64:~$ aurora create devcluster/www-data/prod/hello \
+      vagrant@precise64:~$ aurora job create devcluster/www-data/prod/hello \
       /vagrant/examples/jobs/hello_world.aurora
       INFO] Creating job hello
       INFO] Response from scheduler: OK (message: 1 new tasks pending for job www-data/prod/hello)
@@ -338,9 +338,9 @@ You interact with Aurora jobs either via:
   The "Job url" goes to the Job's scheduler UI page. To go to the overall scheduler UI page,
   stop at the "scheduler" part of the URL, in this case, `http://precise64:8081/scheduler`
 
-  You can also reach the scheduler UI page via the Client command `aurora open`:
+  You can also reach the scheduler UI page via the Client command `aurora job open`:
 
-      aurora open [<cluster>[/<role>[/<env>/<job_name>]]]
+      aurora job open [<cluster>[/<role>[/<env>/<job_name>]]]
 
   If only the cluster is specified, it goes directly to that cluster's scheduler main page.
   If the role is specified, it goes to the top-level role page. If the full job key is specified,

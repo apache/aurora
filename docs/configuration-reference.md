@@ -521,9 +521,9 @@ for values such as `cluster`s.
 
 Then issue the following commands to create and kill the job, using your own values for the job key.
 
-    aurora create cluster1/$USER/test/hello_world hello_world.aurora
+    aurora job create cluster1/$USER/test/hello_world hello_world.aurora
 
-    aurora kill cluster1/$USER/test/hello_world
+    aurora job kill cluster1/$USER/test/hello_world
 
 ### Environment Tailoring
 
@@ -554,6 +554,6 @@ for values such as `cluster`s.
 
 Then issue the following commands to create and kill the job, using your own values for the job key
 
-    aurora create cluster1/$USER/test/hello_world-cluster1 hello_world_productionized.aurora
+    aurora job create cluster1/$USER/test/hello_world-cluster1 hello_world_productionized.aurora
 
-    aurora kill cluster1/$USER/test/hello_world-cluster1
+    aurora job kill cluster1/$USER/test/hello_world-cluster1

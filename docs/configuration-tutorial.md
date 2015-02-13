@@ -3,8 +3,8 @@ Aurora Configuration Tutorial
 
 How to write Aurora configuration files, including feature descriptions
 and best practices. When writing a configuration file, make use of
-`aurora inspect`. It takes the same job key and configuration file
-arguments as `aurora create` or `aurora update`. It first ensures the
+`aurora job inspect`. It takes the same job key and configuration file
+arguments as `aurora job create` or `aurora job update`. It first ensures the
 configuration parses, then outputs it in human-readable form.
 
 You should read this after going through the general [Aurora Tutorial](tutorial.md).
@@ -443,7 +443,7 @@ The simplest idiomatic Job configuration thus becomes:
       cluster="cluster1")
 
 When written to `hello_world.aurora`, you invoke it with a simple
-`aurora create cluster1/$USER/test/hello_world hello_world.aurora`.
+`aurora job create cluster1/$USER/test/hello_world hello_world.aurora`.
 
 ### Combining tasks
 
