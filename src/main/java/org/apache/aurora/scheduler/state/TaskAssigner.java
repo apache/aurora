@@ -18,7 +18,10 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSet;
+import com.twitter.common.base.MorePreconditions;
 
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
@@ -41,16 +44,117 @@ import static org.apache.mesos.Protos.Offer;
  */
 public interface TaskAssigner {
 
+  final class Assignment {
+
+    public enum Result {
+      /**
+       * Assignment successful.
+       */
+      SUCCESS,
+
+      /**
+       * Assignment failed.
+       */
+      FAILURE
+    }
+
+    private static final Optional<TaskInfo> NO_TASK_INFO = Optional.absent();
+    private static final ImmutableSet<Veto> NO_VETOES = ImmutableSet.of();
+    private final Optional<TaskInfo> taskInfo;
+    private final Set<Veto> vetoes;
+
+    private Assignment(Optional<TaskInfo> taskInfo, Set<Veto> vetoes) {
+      this.taskInfo = taskInfo;
+      this.vetoes = vetoes;
+    }
+
+    /**
+     * Creates a successful assignment instance.
+     *
+     * @param taskInfo {@link TaskInfo} to launch.
+     * @return A successful {@link Assignment}.
+     */
+    public static Assignment success(TaskInfo taskInfo) {
+      return new Assignment(Optional.of(taskInfo), NO_VETOES);
+    }
+
+    /**
+     * Creates a failed assignment instance with a set of {@link Veto} applied.
+     *
+     * @param vetoes Set of {@link Veto} instances issued for the failed offer/task match.
+     * @return A failed {@link Assignment}.
+     */
+    public static Assignment failure(Set<Veto> vetoes) {
+      return new Assignment(NO_TASK_INFO, MorePreconditions.checkNotBlank(vetoes));
+    }
+
+    /**
+     * Creates a failed assignment instance.
+     *
+     * @return A failed {@link Assignment}.
+     */
+    public static Assignment failure() {
+      return new Assignment(NO_TASK_INFO, NO_VETOES);
+    }
+
+    /**
+     * Generates the {@link Result} based on the assignment details.
+     *
+     * @return An assignment {@link Result}.
+     */
+    public Result getResult() {
+      if (taskInfo.isPresent()) {
+        return Result.SUCCESS;
+      }
+
+      return Result.FAILURE;
+    }
+
+    /**
+     * A {@link TaskInfo} to launch.
+     *
+     * @return Optional of {@link TaskInfo}.
+     */
+    public Optional<TaskInfo> getTaskInfo() {
+      return taskInfo;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof Assignment)) {
+        return false;
+      }
+
+      Assignment other = (Assignment) o;
+
+      return Objects.equal(taskInfo, other.taskInfo)
+          && Objects.equal(vetoes, other.vetoes);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(taskInfo, vetoes);
+    }
+
+    @Override
+    public String toString() {
+      return Objects.toStringHelper(this)
+          .add("taskInfo", taskInfo)
+          .add("vetoes", vetoes)
+          .toString();
+    }
+  }
+
   /**
    * Tries to match a task against an offer.  If a match is found, the assigner should
-   * make the appropriate changes to the task and provide a non-empty result.
+   * make the appropriate changes to the task and provide an {@link Assignment} result.
    *
    * @param storeProvider Storage provider.
    * @param offer The resource offer.
    * @param resourceRequest The request for resources being scheduled.
-   * @return Instructions for launching the task if matching and assignment were successful.
+   * @return {@link Assignment} with assignment result.
    */
-  Optional<TaskInfo> maybeAssign(
+  Assignment maybeAssign(
       MutableStoreProvider storeProvider,
       HostOffer offer,
       ResourceRequest resourceRequest);
@@ -93,7 +197,7 @@ public interface TaskAssigner {
     }
 
     @Override
-    public Optional<TaskInfo> maybeAssign(
+    public Assignment maybeAssign(
         MutableStoreProvider storeProvider,
         HostOffer offer,
         ResourceRequest resourceRequest) {
@@ -102,7 +206,7 @@ public interface TaskAssigner {
           new UnusedResource(ResourceSlot.from(offer.getOffer()), offer.getAttributes()),
           resourceRequest);
       if (vetoes.isEmpty()) {
-        return Optional.of(assign(
+        return Assignment.success(assign(
             storeProvider,
             offer.getOffer(),
             resourceRequest.getNumRequestedPorts(),
@@ -110,7 +214,7 @@ public interface TaskAssigner {
       } else {
         LOG.fine("Slave " + offer.getOffer().getHostname()
             + " vetoed task " + resourceRequest.getTaskId() + ": " + vetoes);
-        return Optional.absent();
+        return Assignment.failure(vetoes);
       }
     }
   }

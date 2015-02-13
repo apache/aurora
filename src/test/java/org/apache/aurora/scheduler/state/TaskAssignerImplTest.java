@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -32,6 +31,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
+import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -120,7 +120,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        Optional.of(TASK_INFO),
+        Assignment.success(TASK_INFO),
         assigner.maybeAssign(
             storeProvider,
             OFFER,
@@ -137,7 +137,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        Optional.<TaskInfo>absent(),
+        Assignment.failure(ImmutableSet.of(Veto.constraintMismatch("denied"))),
         assigner.maybeAssign(
             storeProvider,
             OFFER,

@@ -48,6 +48,8 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
+import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
+import org.apache.aurora.scheduler.state.TaskAssigner.Assignment.Result;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -140,7 +142,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         storageUtil.mutableStoreProvider,
         OFFER,
         new ResourceRequest(task.getAssignedTask().getTask(), Tasks.id(task), emptyJob)))
-        .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
+        .andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
   }
 
   @Test
@@ -156,12 +158,12 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
-    Capture<Function<HostOffer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(false);
+    AssignmentCapture firstAssignment = expectLaunchAttempt(false);
     expect(preemptor.findPreemptionSlotFor("b", emptyJob)).andReturn(Optional.<String>absent());
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
-    Capture<Function<HostOffer, Optional<TaskInfo>>> secondAssignment = expectLaunchAttempt(true);
+    AssignmentCapture secondAssignment = expectLaunchAttempt(true);
     expectAssigned(TASK_B);
 
     control.replay();
@@ -169,13 +171,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     assertFalse(scheduler.schedule("a"));
     assertFalse(scheduler.schedule("b"));
 
-    assertEquals(Optional.<TaskInfo>absent(), firstAssignment.getValue().apply(OFFER));
+    assignAndAssert(Result.FAILURE, OFFER, firstAssignment);
 
     clock.advance(reservationDuration);
 
     assertTrue(scheduler.schedule("b"));
 
-    assertEquals(true, secondAssignment.getValue().apply(OFFER).isPresent());
+    assignAndAssert(Result.SUCCESS, OFFER, secondAssignment);
   }
 
   @Test
@@ -191,28 +193,28 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    Capture<Function<HostOffer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(true);
+    AssignmentCapture firstAssignment = expectLaunchAttempt(true);
     expectAssigned(TASK_A);
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
 
-    Capture<Function<HostOffer, Optional<TaskInfo>>> secondAssignment = expectLaunchAttempt(true);
+    AssignmentCapture secondAssignment = expectLaunchAttempt(true);
 
     expect(assigner.maybeAssign(
         storageUtil.mutableStoreProvider,
         OFFER,
         new ResourceRequest(TASK_B.getAssignedTask().getTask(), Tasks.id(TASK_B), emptyJob)))
-        .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
+        .andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
 
     control.replay();
     assertFalse(scheduler.schedule("a"));
     assertTrue(scheduler.schedule("a"));
-    firstAssignment.getValue().apply(OFFER);
+    assignAndAssert(Result.SUCCESS, OFFER, firstAssignment);
     eventSink.post(TaskStateChange.transition(TASK_A, PENDING));
     clock.advance(halfReservationDuration);
     assertTrue(scheduler.schedule("b"));
-    secondAssignment.getValue().apply(OFFER);
+    assignAndAssert(Result.SUCCESS, OFFER, secondAssignment);
   }
 
   @Test
@@ -227,7 +229,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    Capture<Function<HostOffer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(true);
+    AssignmentCapture assignment = expectLaunchAttempt(true);
     expectAssigned(TASK_A);
 
     control.replay();
@@ -235,7 +237,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     clock.advance(halfReservationDuration);
     assertTrue(scheduler.schedule("a"));
 
-    firstAssignment.getValue().apply(OFFER);
+    assignAndAssert(Result.SUCCESS, OFFER, assignment);
   }
 
   @Test
@@ -252,7 +254,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
-    Capture<Function<HostOffer, Optional<TaskInfo>>> assignment = expectLaunchAttempt(true);
+    AssignmentCapture assignment = expectLaunchAttempt(true);
     expectAssigned(TASK_B);
 
     control.replay();
@@ -261,7 +263,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     // Task is killed by user before it is scheduled
     eventSink.post(TaskStateChange.transition(TASK_A, PENDING));
     assertTrue(scheduler.schedule("b"));
-    assignment.getValue().apply(OFFER);
+    assignAndAssert(Result.SUCCESS, OFFER, assignment);
   }
 
   @Test
@@ -277,7 +279,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    Capture<Function<HostOffer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(true);
+    AssignmentCapture assignment = expectLaunchAttempt(true);
     expectAssigned(TASK_A);
 
     control.replay();
@@ -285,7 +287,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     // We don't act on the reservation made by b because we want to see timeout behaviour.
     clock.advance(reservationDuration);
     assertTrue(scheduler.schedule("a"));
-    firstAssignment.getValue().apply(OFFER);
+    assignAndAssert(Result.SUCCESS, OFFER, assignment);
   }
 
   @Test
@@ -311,17 +313,17 @@ public class TaskSchedulerImplTest extends EasyMockTest {
       }
     });
 
-    Capture<Function<HostOffer, Optional<TaskInfo>>> assignment = expectLaunchAttempt(true);
+    AssignmentCapture assignment = expectLaunchAttempt(true);
     expect(assigner.maybeAssign(
         EasyMock.<MutableStoreProvider>anyObject(),
         eq(OFFER),
         eq(new ResourceRequest(taskA.getAssignedTask().getTask(), Tasks.id(taskA), emptyJob))))
-        .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
+        .andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
 
     control.replay();
 
     assertTrue(scheduler.schedule(Tasks.id(taskA)));
-    assignment.getValue().apply(OFFER);
+    assignAndAssert(Result.SUCCESS, OFFER, assignment);
   }
 
   private static IScheduledTask makeTask(String taskId) {
@@ -336,11 +338,23 @@ public class TaskSchedulerImplTest extends EasyMockTest {
                 .setEnvironment("env-" + taskId))));
   }
 
-  private Capture<Function<HostOffer, Optional<TaskInfo>>> expectLaunchAttempt(boolean taskLaunched)
+  private static class AssignmentCapture {
+    public Capture<Function<HostOffer, Assignment>> assigner = createCapture();
+  }
+
+  private AssignmentCapture expectLaunchAttempt(boolean taskLaunched)
       throws OfferQueue.LaunchException {
-        Capture<Function<HostOffer, Optional<TaskInfo>>> assignment = createCapture();
-        expect(offerQueue.launchFirst(capture(assignment))).andReturn(taskLaunched);
-        return assignment;
+        AssignmentCapture capture = new AssignmentCapture();
+        expect(offerQueue.launchFirst(capture(capture.assigner))).andReturn(taskLaunched);
+        return capture;
+  }
+
+  private void assignAndAssert(
+      Result result,
+      HostOffer offer,
+      AssignmentCapture capture) {
+
+    assertEquals(result, capture.assigner.getValue().apply(offer).getResult());
   }
 
   private void expectActiveJobFetch(IScheduledTask taskInJob) {

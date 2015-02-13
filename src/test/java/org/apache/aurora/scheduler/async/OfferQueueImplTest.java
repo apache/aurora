@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.async;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.testing.TearDown;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -29,6 +28,7 @@ import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.mesos.Driver;
+import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.apache.mesos.Protos.TaskInfo;
@@ -59,7 +59,7 @@ public class OfferQueueImplTest extends EasyMockTest {
 
   private Driver driver;
   private FakeScheduledExecutor clock;
-  private Function<HostOffer, Optional<TaskInfo>> offerAcceptor;
+  private Function<HostOffer, Assignment> offerAcceptor;
   private OfferQueueImpl offerQueue;
 
   @Before
@@ -74,7 +74,7 @@ public class OfferQueueImplTest extends EasyMockTest {
         clock.assertEmpty();
       }
     });
-    offerAcceptor = createMock(new Clazz<Function<HostOffer, Optional<TaskInfo>>>() { });
+    offerAcceptor = createMock(new Clazz<Function<HostOffer, Assignment>>() { });
     OfferReturnDelay returnDelay = new OfferReturnDelay() {
       @Override
       public Amount<Long, Time> get() {
@@ -92,7 +92,7 @@ public class OfferQueueImplTest extends EasyMockTest {
     HostOffer offerC = setMode(OFFER_C, DRAINING);
 
     TaskInfo task = TaskInfo.getDefaultInstance();
-    expect(offerAcceptor.apply(OFFER_B)).andReturn(Optional.of(task));
+    expect(offerAcceptor.apply(OFFER_B)).andReturn(Assignment.success(task));
     driver.launchTask(OFFER_B.getOffer().getId(), task);
 
     driver.declineOffer(offerA.getOffer().getId());

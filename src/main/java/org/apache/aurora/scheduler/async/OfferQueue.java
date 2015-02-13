@@ -41,10 +41,10 @@ import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
+import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskInfo;
 
 import static java.util.Objects.requireNonNull;
 
@@ -75,7 +75,7 @@ public interface OfferQueue extends EventSubscriber {
   void cancelOffer(OfferID offer);
 
   /**
-   * Launches the first task that satisfies the {@code acceptor} by returning a {@link TaskInfo}.
+   * Launches the first task that satisfies the {@code acceptor} by returning a {@link Assignment}.
    *
    * @param acceptor Function that determines if an offer is accepted.
    * @return {@code true} if the task was launched, {@code false} if no offers satisfied the
@@ -83,7 +83,7 @@ public interface OfferQueue extends EventSubscriber {
    * @throws LaunchException If the acceptor accepted an offer, but there was an error launching the
    *                         task.
    */
-  boolean launchFirst(Function<HostOffer, Optional<TaskInfo>> acceptor) throws LaunchException;
+  boolean launchFirst(Function<HostOffer, Assignment> acceptor) throws LaunchException;
 
   /**
    * Notifies the offer queue that a host's attributes have changed.
@@ -290,7 +290,7 @@ public interface OfferQueue extends EventSubscriber {
 
     @Timed("offer_queue_launch_first")
     @Override
-    public boolean launchFirst(Function<HostOffer, Optional<TaskInfo>> acceptor)
+    public boolean launchFirst(Function<HostOffer, Assignment> acceptor)
         throws LaunchException {
 
       // It's important that this method is not called concurrently - doing so would open up the
@@ -308,33 +308,36 @@ public interface OfferQueue extends EventSubscriber {
     @Timed("offer_queue_accept_offer")
     protected boolean acceptOffer(
         HostOffer offer,
-        Function<HostOffer, Optional<TaskInfo>> acceptor) throws LaunchException {
+        Function<HostOffer, Assignment> acceptor) throws LaunchException {
 
-      Optional<TaskInfo> assignment = acceptor.apply(offer);
-      if (assignment.isPresent()) {
-        // Guard against an offer being removed after we grabbed it from the iterator.
-        // If that happens, the offer will not exist in hostOffers, and we can immediately
-        // send it back to LOST for quick reschedule.
-        // Removing while iterating counts on the use of a weakly-consistent iterator being used,
-        // which is a feature of ConcurrentSkipListSet.
-        if (hostOffers.remove(offer.getOffer().getId())) {
-          try {
-            driver.launchTask(offer.getOffer().getId(), assignment.get());
-            return true;
-          } catch (IllegalStateException e) {
-            // TODO(William Farner): Catch only the checked exception produced by Driver
-            // once it changes from throwing IllegalStateException when the driver is not yet
-            // registered.
-            throw new LaunchException("Failed to launch task.", e);
+      Assignment assignment = acceptor.apply(offer);
+      switch (assignment.getResult()) {
+
+        case SUCCESS:
+          // Guard against an offer being removed after we grabbed it from the iterator.
+          // If that happens, the offer will not exist in hostOffers, and we can immediately
+          // send it back to LOST for quick reschedule.
+          // Removing while iterating counts on the use of a weakly-consistent iterator being used,
+          // which is a feature of ConcurrentSkipListSet.
+          if (hostOffers.remove(offer.getOffer().getId())) {
+            try {
+              driver.launchTask(offer.getOffer().getId(), assignment.getTaskInfo().get());
+              return true;
+            } catch (IllegalStateException e) {
+              // TODO(William Farner): Catch only the checked exception produced by Driver
+              // once it changes from throwing IllegalStateException when the driver is not yet
+              // registered.
+              throw new LaunchException("Failed to launch task.", e);
+            }
+          } else {
+            offerRaces.incrementAndGet();
+            throw new LaunchException(
+                "Accepted offer no longer exists in offer queue, likely data race.");
           }
-        } else {
-          offerRaces.incrementAndGet();
-          throw new LaunchException(
-              "Accepted offer no longer exists in offer queue, likely data race.");
-        }
+        case FAILURE:
+        default:
+          return false;
       }
-
-      return false;
     }
   }
 }
