@@ -18,10 +18,16 @@ import pytest
 from mock import create_autospec, Mock, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.cli import Context, EXIT_API_ERROR, EXIT_INVALID_CONFIGURATION, EXIT_OK
+from apache.aurora.client.cli import (
+    Context,
+    EXIT_API_ERROR,
+    EXIT_INVALID_CONFIGURATION,
+    EXIT_INVALID_PARAMETER,
+    EXIT_OK
+)
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.options import TaskInstanceKey
-from apache.aurora.client.cli.update import StartUpdate
+from apache.aurora.client.cli.update import StartUpdate, UpdateStatus
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
@@ -55,7 +61,7 @@ class TestStartUpdateCommand(AuroraClientCommandTest):
     self._mock_options.instance_spec = TaskInstanceKey(self._job_key, [])
     self._fake_context = FakeAuroraCommandContext()
     self._fake_context.set_options(self._mock_options)
-    self._mock_api = self._fake_context.get_api("test")
+    self._mock_api = self._fake_context.get_api('UNUSED')
 
   @classmethod
   def create_mock_config(cls, is_cron=False):
@@ -103,6 +109,27 @@ class TestStartUpdateCommand(AuroraClientCommandTest):
       self._mock_options.instance_spec.instance)
 
 
+class TestUpdateStatusCommand(AuroraClientCommandTest):
+
+  def setUp(self):
+    self._command = UpdateStatus()
+    self._mock_options = mock_verb_options(self._command)
+    self._mock_options.jobspec = self.TEST_JOBKEY
+    self._fake_context = FakeAuroraCommandContext()
+    self._fake_context.set_options(self._mock_options)
+    self._mock_api = self._fake_context.get_api('UNUSED')
+
+  def test_status_fails_no_updates(self):
+    response = self.create_simple_success_response()
+    response.result = Result(
+        getJobUpdateSummariesResult=GetJobUpdateSummariesResult(updateSummaries=[]))
+
+    self._mock_api.query_job_updates.return_value = response
+
+    assert EXIT_INVALID_PARAMETER == self._command.execute(self._fake_context)
+    assert self._fake_context.get_err()[0] == "No updates found for job west/bozo/test/hello"
+
+
 class TestUpdateCommand(AuroraClientCommandTest):
 
   def setUp(self):
@@ -118,7 +145,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_api = mock_context.get_api('west')
+      mock_api = mock_context.get_api(self.TEST_CLUSTER)
       mock_api.start_job_update.return_value = resp
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -144,7 +171,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_api = mock_context.get_api('west')
+      mock_api = mock_context.get_api(self.TEST_CLUSTER)
       mock_api.start_job_update.return_value = resp
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -165,7 +192,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_api = mock_context.get_api('west')
+      mock_api = mock_context.get_api(self.TEST_CLUSTER)
       mock_api.pause_job_update.return_value = self.create_simple_success_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -183,7 +210,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_api = mock_context.get_api('west')
+      mock_api = mock_context.get_api(self.TEST_CLUSTER)
       mock_api.abort_job_update.return_value = self.create_simple_success_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -201,7 +228,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_api = mock_context.get_api('west')
+      mock_api = mock_context.get_api(self.TEST_CLUSTER)
       mock_api.resume_job_update.return_value = self.create_simple_success_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -218,7 +245,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_api = mock_context.get_api('west')
+      mock_api = mock_context.get_api(self.TEST_CLUSTER)
       with temporary_file() as fp:
         fp.write(self.get_invalid_config('invalid_field=False,'))
         fp.flush()
@@ -232,7 +259,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_api = mock_context.get_api('west')
+      mock_api = mock_context.get_api(self.TEST_CLUSTER)
       mock_api.resume_job_update.return_value = self.create_error_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -250,7 +277,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_api = mock_context.get_api('west')
+      mock_api = mock_context.get_api(self.TEST_CLUSTER)
       mock_api.abort_job_update.return_value = self.create_error_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -268,7 +295,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_api = mock_context.get_api('west')
+      mock_api = mock_context.get_api(self.TEST_CLUSTER)
       mock_api.pause_job_update.return_value = self.create_error_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -281,29 +308,20 @@ class TestUpdateCommand(AuroraClientCommandTest):
       assert mock_context.get_out() == []
       assert mock_context.get_err() == ["Failed to pause update due to error:", "\tDamn"]
 
-  @classmethod
-  def get_status_query_response(cls):
+  def get_status_query_response(self, count=3):
     query_response = Response()
     query_response.responseCode = ResponseCode.OK
     query_response.result = Result()
     summaries = GetJobUpdateSummariesResult()
     query_response.result.getJobUpdateSummariesResult = summaries
-    summaries.updateSummaries = [
-        JobUpdateSummary(
-            updateId="hello",
-            jobKey=AuroraJobKey('west', 'mcc', 'test', 'hello'), user="me",
-            state=JobUpdateState(status=JobUpdateStatus.ROLLING_FORWARD,
-                createdTimestampMs=1411404927, lastModifiedTimestampMs=14114056030)),
-        JobUpdateSummary(
-            updateId="goodbye",
-            jobKey=AuroraJobKey('west', 'mch', 'prod', 'goodbye'), user="me",
-            state=JobUpdateState(status=JobUpdateStatus.ROLLING_BACK,
-                createdTimestampMs=1411300632, lastModifiedTimestampMs=14114092632)),
-        JobUpdateSummary(
-            updateId="gasp",
-            jobKey=AuroraJobKey('west', 'mcq', 'devel', 'gasp'), user="me",
-            state=JobUpdateState(status=JobUpdateStatus.ROLL_FORWARD_PAUSED,
-                createdTimestampMs=1411600891, lastModifiedTimestampMs=1411800891))]
+    summaries.updateSummaries = [JobUpdateSummary(
+        updateId="%s" % i,
+        jobKey=self.TEST_JOBKEY.to_thrift(),
+        user="me",
+        state=JobUpdateState(
+            status=JobUpdateStatus.ROLLED_FORWARD,
+            createdTimestampMs=1411404927,
+            lastModifiedTimestampMs=14114056030)) for i in range(count)]
     return query_response
 
   def test_list_updates_command(self):
@@ -313,15 +331,15 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      result = cmd.execute(["beta-update", "list", "west", "--user=me"])
+      result = cmd.execute(["beta-update", "list", self.TEST_CLUSTER, "--user=me"])
       assert result == EXIT_OK
       assert mock_context.get_out_str() == textwrap.dedent("""\
-          Job: west/mcc/test/hello, Id: hello, User: me, Status: ROLLING_FORWARD
+          Job: west/bozo/test/hello, Id: 0, User: me, Status: ROLLED_FORWARD
             Created: 1411404927, Last Modified 14114056030
-          Job: west/mch/prod/goodbye, Id: goodbye, User: me, Status: ROLLING_BACK
-            Created: 1411300632, Last Modified 14114092632
-          Job: west/mcq/devel/gasp, Id: gasp, User: me, Status: ROLL_FORWARD_PAUSED
-            Created: 1411600891, Last Modified 1411800891""")
+          Job: west/bozo/test/hello, Id: 1, User: me, Status: ROLLED_FORWARD
+            Created: 1411404927, Last Modified 14114056030
+          Job: west/bozo/test/hello, Id: 2, User: me, Status: ROLLED_FORWARD
+            Created: 1411404927, Last Modified 14114056030""")
 
   def test_list_updates_command_json(self):
     mock_context = FakeAuroraCommandContext()
@@ -330,92 +348,94 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      result = cmd.execute(["beta-update", "list", "west", "--user=me", '--write-json'])
+      result = cmd.execute(["beta-update", "list", self.TEST_CLUSTER, "--user=me", '--write-json'])
       assert result == EXIT_OK
       assert mock_context.get_out_str() == textwrap.dedent("""\
           [
             {
-              "status": "ROLLING_FORWARD",
+              "status": "ROLLED_FORWARD",
               "started": 1411404927,
               "lastModified": 14114056030,
               "user": "me",
-              "jobkey": "west/mcc/test/hello",
-              "id": "hello"
+              "jobkey": "west/bozo/test/hello",
+              "id": "0"
             },
             {
-              "status": "ROLLING_BACK",
-              "started": 1411300632,
-              "lastModified": 14114092632,
+              "status": "ROLLED_FORWARD",
+              "started": 1411404927,
+              "lastModified": 14114056030,
               "user": "me",
-              "jobkey": "west/mch/prod/goodbye",
-              "id": "goodbye"
+              "jobkey": "west/bozo/test/hello",
+              "id": "1"
             },
             {
-              "status": "ROLL_FORWARD_PAUSED",
-              "started": 1411600891,
-              "lastModified": 1411800891,
+              "status": "ROLLED_FORWARD",
+              "started": 1411404927,
+              "lastModified": 14114056030,
               "user": "me",
-              "jobkey": "west/mcq/devel/gasp",
-              "id": "gasp"
+              "jobkey": "west/bozo/test/hello",
+              "id": "2"
             }
           ]""")
 
-  @classmethod
-  def get_update_details_response(cls):
+  def get_update_details_response(self):
     query_response = Response()
     query_response.responseCode = ResponseCode.OK
     query_response.result = Result()
-    details = JobUpdateDetails()
+    details = JobUpdateDetails(
+        update=JobUpdate(
+            summary=JobUpdateSummary(
+                jobKey=self.TEST_JOBKEY.to_thrift(),
+                updateId="0",
+                user="me",
+                state=JobUpdateState(
+                  status=JobUpdateStatus.ROLLING_FORWARD,
+                  createdTimestampMs=1411404927,
+                  lastModifiedTimestampMs=14114056030))),
+        updateEvents=[
+            JobUpdateEvent(
+                status=JobUpdateStatus.ROLLING_FORWARD,
+                timestampMs=1411404927),
+            JobUpdateEvent(
+                status=JobUpdateStatus.ROLL_FORWARD_PAUSED,
+                timestampMs=1411405000),
+            JobUpdateEvent(
+                status=JobUpdateStatus.ROLLING_FORWARD,
+                timestampMs=1411405100)],
+        instanceEvents=[
+            JobInstanceUpdateEvent(
+                instanceId=1,
+                timestampMs=1411404930,
+                action=JobUpdateAction.INSTANCE_UPDATING),
+            JobInstanceUpdateEvent(
+                instanceId=2,
+                timestampMs=1411404940,
+                action=JobUpdateAction.INSTANCE_UPDATING),
+            JobInstanceUpdateEvent(
+                instanceId=1,
+                timestampMs=1411404950,
+                action=JobUpdateAction.INSTANCE_UPDATED),
+            JobInstanceUpdateEvent(
+                instanceId=2,
+                timestampMs=1411404960,
+                action=JobUpdateAction.INSTANCE_UPDATED)])
     query_response.result.getJobUpdateDetailsResult = GetJobUpdateDetailsResult(details=details)
-    details.update = JobUpdate()
-    details.update.summary = JobUpdateSummary(
-        jobKey=AuroraJobKey('west', 'mcc', 'test', 'hello'),
-        updateId="fake-update-identifier",
-        user="me",
-        state=JobUpdateState(status=JobUpdateStatus.ROLLING_FORWARD,
-            createdTimestampMs=1411404927, lastModifiedTimestampMs=14114056030))
-    details.updateEvents = [
-      JobUpdateEvent(status=JobUpdateStatus.ROLLING_FORWARD,
-         timestampMs=1411404927),
-      JobUpdateEvent(status=JobUpdateStatus.ROLL_FORWARD_PAUSED,
-         timestampMs=1411405000),
-      JobUpdateEvent(status=JobUpdateStatus.ROLLING_FORWARD,
-         timestampMs=1411405100)
-    ]
-    details.instanceEvents = [
-      JobInstanceUpdateEvent(
-          instanceId=1,
-          timestampMs=1411404930,
-          action=JobUpdateAction.INSTANCE_UPDATING),
-      JobInstanceUpdateEvent(
-          instanceId=2,
-          timestampMs=1411404940,
-          action=JobUpdateAction.INSTANCE_UPDATING),
-      JobInstanceUpdateEvent(
-          instanceId=1,
-          timestampMs=1411404950,
-          action=JobUpdateAction.INSTANCE_UPDATED),
-      JobInstanceUpdateEvent(
-          instanceId=2,
-          timestampMs=1411404960,
-          action=JobUpdateAction.INSTANCE_UPDATED)
-    ]
     return query_response
 
   def test_update_status(self):
     mock_context = FakeAuroraCommandContext()
-    api = mock_context.get_api('west')
-    api.query_job_updates.return_value = self.get_status_query_response()
+    api = mock_context.get_api(self.TEST_CLUSTER)
+    api.query_job_updates.return_value = self.get_status_query_response(count=1)
     api.get_job_update_details.return_value = self.get_update_details_response()
 
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      result = cmd.execute(["beta-update", "status", "west/mcc/test/hello"])
+      result = cmd.execute(["beta-update", "status", self.TEST_JOBSPEC])
       assert result == EXIT_OK
       assert mock_context.get_out() == [
-          "Job: west/mcc/test/hello, UpdateID: fake-update-identifier",
+          "Job: west/bozo/test/hello, UpdateID: 0",
           "Started YYYY-MM-DD HH:MM:SS, last updated: YYYY-MM-DD HH:MM:SS",
           "Current status: ROLLING_FORWARD",
           "Update events:",
@@ -427,24 +447,24 @@ class TestUpdateCommand(AuroraClientCommandTest):
           "  Instance 2 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATING",
           "  Instance 1 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATED",
           "  Instance 2 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATED"]
-      mock_context.get_api("west").query_job_updates.assert_called_with(job_key=AuroraJobKey(
-          'west', 'mcc', 'test', 'hello'))
+      mock_context.get_api(self.TEST_CLUSTER).query_job_updates.assert_called_with(
+          job_key=self.TEST_JOBKEY)
 
   def test_update_status_json(self):
     mock_context = FakeAuroraCommandContext()
-    api = mock_context.get_api('west')
-    api.query_job_updates.return_value = self.get_status_query_response()
+    api = mock_context.get_api(self.TEST_CLUSTER)
+    api.query_job_updates.return_value = self.get_status_query_response(count=1)
     api.get_job_update_details.return_value = self.get_update_details_response()
 
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      result = cmd.execute(["beta-update", "status", "--write-json", "west/mcc/test/hello"])
+      result = cmd.execute(["beta-update", "status", "--write-json", self.TEST_JOBSPEC])
       assert result == EXIT_OK
-      mock_context.get_api("west").query_job_updates.assert_called_with(job_key=AuroraJobKey(
-          'west', 'mcc', 'test', 'hello'))
-      mock_context.get_api("west").get_job_update_details.assert_called_with('hello')
+      mock_context.get_api(self.TEST_CLUSTER).query_job_updates.assert_called_with(
+          job_key=self.TEST_JOBKEY)
+      mock_context.get_api(self.TEST_CLUSTER).get_job_update_details.assert_called_with("0")
       assert mock_context.get_out_str() == textwrap.dedent("""\
         {
           "status": "ROLLING_FORWARD",
@@ -464,8 +484,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
               "timestampMs": 1411405100
             }
           ],
-          "job": "west/mcc/test/hello",
-          "updateId": "fake-update-identifier",
+          "job": "west/bozo/test/hello",
+          "updateId": "0",
           "instance_update_events": [
             {
               "action": "INSTANCE_UPDATING",

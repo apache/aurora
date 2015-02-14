@@ -19,7 +19,14 @@ import textwrap
 import time
 
 from apache.aurora.client.base import combine_messages
-from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_COMMAND_FAILURE, EXIT_OK, Noun, Verb
+from apache.aurora.client.cli import (
+    EXIT_API_ERROR,
+    EXIT_COMMAND_FAILURE,
+    EXIT_INVALID_PARAMETER,
+    EXIT_OK,
+    Noun,
+    Verb
+)
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
     ALL_INSTANCES,
@@ -36,6 +43,7 @@ from apache.aurora.client.cli.options import (
     ROLE_OPTION,
     STRICT_OPTION
 )
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.ttypes import JobUpdateAction, JobUpdateStatus
 
@@ -190,7 +198,8 @@ class ListUpdates(Verb):
         """)
 
   def execute(self, context):
-    api = context.get_api(context.options.cluster)
+    cluster = context.options.cluster
+    api = context.get_api(cluster)
     response = api.query_job_updates(
         role=context.options.role,
         job_key=context.options.jobspec,
@@ -201,7 +210,7 @@ class ListUpdates(Verb):
       result = []
       for summary in response.result.getJobUpdateSummariesResult.updateSummaries:
         job_entry = {
-            "jobkey": str(summary.jobKey),
+            "jobkey": AuroraJobKey.from_thrift(cluster, summary.jobKey).to_path(),
             "id": summary.updateId,
             "user": summary.user,
             "started": summary.state.createdTimestampMs,
@@ -215,7 +224,7 @@ class ListUpdates(Verb):
         created = summary.state.createdTimestampMs
         lastMod = summary.state.lastModifiedTimestampMs
         context.print_out("Job: %s, Id: %s, User: %s, Status: %s" % (
-            str(summary.jobKey),
+            AuroraJobKey.from_thrift(cluster, summary.jobKey).to_path(),
             summary.updateId,
             summary.user,
             JobUpdateStatus._VALUES_TO_NAMES[summary.state.status]))
@@ -235,18 +244,22 @@ class UpdateStatus(Verb):
   def help(self):
     return """Display detailed status information about a scheduler-driven in-progress update."""
 
-  def _get_update_id(self, context, jobkey):
+  def _get_update_id(self, context, job_key):
     api = context.get_api(context.options.jobspec.cluster)
     response = api.query_job_updates(job_key=context.options.jobspec)
     context.log_response_and_raise(response)
     for summary in response.result.getJobUpdateSummariesResult.updateSummaries:
-      if summary.jobKey == jobkey:
+      if summary.jobKey == job_key.to_thrift():
         return summary.updateId
     else:
       return None
 
   def execute(self, context):
     id = self._get_update_id(context, context.options.jobspec)
+    if not id:
+      context.print_err("No updates found for job %s" % context.options.jobspec)
+      return EXIT_INVALID_PARAMETER
+
     api = context.get_api(context.options.jobspec.cluster)
     response = api.get_job_update_details(id)
     context.log_response_and_raise(response)

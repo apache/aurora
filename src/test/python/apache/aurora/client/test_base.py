@@ -44,6 +44,8 @@ class TestBase(unittest.TestCase):
     assert base.combine_messages(resp) == ''
     resp = Response(responseCode=ResponseCode.ERROR, details=[ResponseDetail(message='Error')])
     assert base.combine_messages(resp) == 'Error'
+    resp = Response(responseCode=ResponseCode.ERROR, details=[ResponseDetail()])
+    assert base.combine_messages(resp) == 'Unknown error'
     resp = Response(
         responseCode=ResponseCode.ERROR,
         details=[ResponseDetail(message='Error1'), ResponseDetail(message='Error2')])

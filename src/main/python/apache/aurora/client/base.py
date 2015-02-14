@@ -47,7 +47,7 @@ def combine_messages(response):
   :param response: response to extract messages from.
   :return: Messages from the details in the response, or an empty string if there were no messages.
   """
-  return ', '.join([d.message for d in (response.details or [])])
+  return ', '.join([d.message or 'Unknown error' for d in (response.details or [])])
 
 
 def format_response(resp):
