@@ -32,44 +32,11 @@ class ExecutorVars(Observable, ExceptionalThread):
     pending MESOS-433.
   """
   MUTATOR_METRICS = ('rss', 'cpu', 'thermos_pss', 'thermos_cpu')
-  RELEASE_TAG_FORMAT = ScanfParser('%(project)s_R%(release)d')
-  DEPLOY_TAG_FORMAT = ScanfParser('%(project)s_%(environment)s_%(release)d_R%(deploy)d')
-  PROJECT_NAMES = ('thermos', 'thermos_executor')
   COLLECTION_INTERVAL = Amount(1, Time.MINUTES)
-
-  @classmethod
-  def get_release_from_tag(cls, tag):
-    def parse_from(parser):
-      try:
-        scanf = parser.parse(tag)
-        if scanf and scanf.project in cls.PROJECT_NAMES:
-          return scanf.release
-      except ScanfParser.ParseError:
-        pass
-    release = parse_from(cls.RELEASE_TAG_FORMAT)
-    if release is None:
-      release = parse_from(cls.DEPLOY_TAG_FORMAT)
-    if release is None:
-      release = 'UNKNOWN'
-    return release
-
-  @classmethod
-  def get_release_from_binary(cls, binary):
-    try:
-      pex_info = PexInfo.from_pex(binary)
-      return cls.get_release_from_tag(pex_info.build_properties.get('tag', ''))
-    except (BadZipfile, IOError, OSError):
-      return 'UNKNOWN'
 
   def __init__(self, clock=time):
     self._clock = clock
     self._self = psutil.Process(os.getpid())
-    try:
-      self._version = self.get_release_from_binary(
-        os.path.join(self._self.cwd(), self._self.cmdline()[1]))
-    except (IndexError, psutil.Error):
-      self._version = 'UNKNOWN'
-    self.metrics.register(NamedGauge('version', self._version))
     self._orphan = False
     self.metrics.register(LambdaGauge('orphan', lambda: int(self._orphan)))
     self._metrics = dict((metric, MutatorGauge(metric, 0)) for metric in self.MUTATOR_METRICS)

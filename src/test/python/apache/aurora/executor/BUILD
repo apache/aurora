@@ -116,6 +116,7 @@ python_tests(name = 'status_manager',
 python_tests(name = 'executor_vars',
   sources = ['test_executor_vars.py'],
   dependencies = [
+    '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/executor:executor_vars',
   ]
