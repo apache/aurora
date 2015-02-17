@@ -19,6 +19,7 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 
 import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.EnableUpdater;
 import org.apache.aurora.scheduler.thrift.aop.AopModule;
 
@@ -34,6 +35,7 @@ public class ThriftModule extends AbstractModule {
 
   @Override
   protected void configure() {
+    bind(ReadOnlyScheduler.Iface.class).to(ReadOnlySchedulerImpl.class);
     bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
     bind(Boolean.class).annotatedWith(EnableUpdater.class).toInstance(ENABLE_BETA_UPDATER.get());
 

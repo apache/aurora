@@ -22,7 +22,7 @@ import com.google.common.base.Predicate;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.aurora.gen.ResponseCode;
-import org.apache.aurora.scheduler.thrift.Util;
+import org.apache.aurora.scheduler.thrift.Responses;
 
 /**
  * A method interceptor that blocks access to features based on a supplied predicate.
@@ -37,8 +37,8 @@ public class FeatureToggleInterceptor implements MethodInterceptor {
     if (allowMethod.apply(method)) {
       return invocation.proceed();
     } else {
-      return Util.addMessage(
-          Util.emptyResponse(),
+      return Responses.addMessage(
+          Responses.empty(),
           ResponseCode.ERROR,
           "The " + method.getName() + " feature is currently disabled on this scheduler.");
     }

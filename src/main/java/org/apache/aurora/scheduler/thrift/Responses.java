@@ -19,15 +19,18 @@ import com.twitter.common.base.MorePreconditions;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.ResponseDetail;
+import org.apache.aurora.gen.Result;
 
+import static org.apache.aurora.gen.ResponseCode.ERROR;
+import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.OK;
 
 /**
  * Utility class for constructing responses to API calls.
  */
-public final class Util {
+public final class Responses {
 
-  private Util() {
+  private Responses() {
     // Utility class.
   }
 
@@ -36,7 +39,7 @@ public final class Util {
    *
    * @return An empty response message.
    */
-  public static Response emptyResponse() {
+  public static Response empty() {
     return new Response().setDetails(Lists.<ResponseDetail>newArrayList());
   }
 
@@ -84,11 +87,33 @@ public final class Util {
   }
 
   /**
+   * Creates an ERROR response that has a single associated error message.
+   *
+   * @param message The error message.
+   * @return A response with an ERROR code set containing the message indicated.
+   */
+  public static Response error(String message) {
+    return addMessage(empty(), ERROR, message);
+  }
+
+  /**
    * Creates an OK response that has no result entity.
    *
    * @return Ok response with an empty result.
    */
-  public static Response okEmptyResponse()  {
-    return emptyResponse().setResponseCode(OK);
+  public static Response ok()  {
+    return empty().setResponseCode(OK);
+  }
+
+  static Response invalidRequest(String message) {
+    return addMessage(empty(), INVALID_REQUEST, message);
+  }
+
+  static Response ok(Result result) {
+    return ok().setResult(result);
+  }
+
+  static Response error(ResponseCode code, Throwable error) {
+    return addMessage(empty(), code, error);
   }
 }

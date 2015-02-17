@@ -48,9 +48,8 @@ import com.google.gson.JsonSyntaxException;
 
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraAdmin.Iface;
-import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.scheduler.storage.entities.AuroraAdminMetadata;
-import org.apache.aurora.scheduler.thrift.Util;
+import org.apache.aurora.scheduler.thrift.Responses;
 
 import static org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler.GSON;
 
@@ -76,7 +75,7 @@ public class ApiBeta {
 
   private static Response errorResponse(Status status, String message) {
     return Response.status(status)
-        .entity(Util.addMessage(Util.emptyResponse(), message).setResponseCode(ResponseCode.ERROR))
+        .entity(Responses.error(message))
         .build();
   }
 

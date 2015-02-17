@@ -86,6 +86,7 @@ import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.Range;
+import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
@@ -277,6 +278,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(CronJobManager.class).toInstance(cronJobManager);
         bind(QuotaManager.class).toInstance(quotaManager);
         bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
+        // TODO(ksweeney): Bind a mock here and create ReadOnlySchedulerImplTest.
+        bind(ReadOnlyScheduler.Iface.class).to(ReadOnlySchedulerImpl.class);
+        bind(Storage.class).toInstance(storageUtil.storage);
         bind(IServerInfo.class).toInstance(IServerInfo.build(SERVER_INFO));
         bind(CronPredictor.class).toInstance(cronPredictor);
         bind(NearestFit.class).toInstance(nearestFit);
@@ -1835,7 +1839,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       };
 
   private Response response(ResponseCode code, Optional<Result> result, String... messages) {
-    Response response = Util.emptyResponse()
+    Response response = Responses.empty()
         .setResponseCode(code)
         .setServerInfo(SERVER_INFO)
         .setResult(result.orNull());
@@ -1861,7 +1865,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private Response invalidResponse(String message) {
-    return Util.emptyResponse()
+    return Responses.empty()
         .setResponseCode(INVALID_REQUEST)
         .setServerInfo(SERVER_INFO)
         .setDetails(ImmutableList.of(new ResponseDetail(message)));
@@ -2942,6 +2946,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(TaskIdGenerator.class).toInstance(createMock(TaskIdGenerator.class));
         bind(UUIDGenerator.class).toInstance(createMock(UUIDGenerator.class));
         bind(JobUpdateController.class).toInstance(createMock(JobUpdateController.class));
+        bind(ReadOnlyScheduler.Iface.class).toInstance(createMock(ReadOnlyScheduler.Iface.class));
         bind(Boolean.class)
             .annotatedWith(EnableUpdater.class)
             .toInstance(ThriftModule.ENABLE_BETA_UPDATER.get());
