@@ -14,14 +14,11 @@
 
 import os
 import time
-from zipfile import BadZipfile
 
 import psutil
-from pex.pex import PexInfo
 from twitter.common.exceptions import ExceptionalThread
-from twitter.common.metrics import LambdaGauge, MutatorGauge, NamedGauge, Observable
+from twitter.common.metrics import LambdaGauge, MutatorGauge, Observable
 from twitter.common.quantity import Amount, Time
-from twitter.common.string.scanf import ScanfParser
 
 
 class ExecutorVars(Observable, ExceptionalThread):
