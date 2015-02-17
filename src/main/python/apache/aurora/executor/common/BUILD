@@ -34,6 +34,9 @@ python_library(
   sources = ['status_checker.py'],
   dependencies = [
     '3rdparty/python:mesos.interface',
+    # To prevent an alpha version of protobuf from being pulled down by pants we
+    # specify protobuf here. See AURORA-1128 for more details.
+    '3rdparty/python:protobuf',
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.metrics',
@@ -56,6 +59,9 @@ python_library(
     ':status_checker',
     ':task_info',
     '3rdparty/python:mesos.interface',
+    # To prevent an alpha version of protobuf from being pulled down by pants we
+    # specify protobuf here. See AURORA-1128 for more details.
+    '3rdparty/python:protobuf',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.exceptions',
     'src/main/python/apache/aurora/common:http_signaler',
@@ -92,6 +98,9 @@ python_library(
   sources = ['kill_manager.py'],
   dependencies = [
     '3rdparty/python:mesos.interface',
+    # To prevent an alpha version of protobuf from being pulled down by pants we
+    # specify protobuf here. See AURORA-1128 for more details.
+    '3rdparty/python:protobuf',
     ':status_checker',
   ]
 )

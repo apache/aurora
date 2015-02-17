@@ -19,6 +19,9 @@ python_binary(
   always_write_cache = True,
   dependencies = [
     '3rdparty/python:mesos.native',
+    # To prevent an alpha version of protobuf from being pulled down by pants we
+    # specify protobuf here. See AURORA-1128 for more details.
+    '3rdparty/python:protobuf',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.metrics',
@@ -42,6 +45,9 @@ python_binary(
   always_write_cache = True,
   dependencies = [
     '3rdparty/python:mesos.native',
+    # To prevent an alpha version of protobuf from being pulled down by pants we
+    # specify protobuf here. See AURORA-1128 for more details.
+    '3rdparty/python:protobuf',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.metrics',

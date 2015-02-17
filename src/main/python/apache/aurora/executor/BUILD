@@ -19,6 +19,9 @@ python_library(
   sources = ['thermos_task_runner.py'],
   dependencies = [
     '3rdparty/python:mesos.interface',
+    # To prevent an alpha version of protobuf from being pulled down by pants we
+    # specify protobuf here. See AURORA-1128 for more details.
+    '3rdparty/python:protobuf',
     '3rdparty/python:twitter.common.dirutil',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
@@ -63,6 +66,9 @@ python_library(
   sources = ['executor_base.py'],
   dependencies = [
     '3rdparty/python:mesos.interface',
+    # To prevent an alpha version of protobuf from being pulled down by pants we
+    # specify protobuf here. See AURORA-1128 for more details.
+    '3rdparty/python:protobuf',
     '3rdparty/python:twitter.common.log',
   ]
 )
@@ -74,6 +80,9 @@ python_library(
     ':status_manager',
     ':executor_base',
     '3rdparty/python:mesos.interface',
+    # To prevent an alpha version of protobuf from being pulled down by pants we
+    # specify protobuf here. See AURORA-1128 for more details.
+    '3rdparty/python:protobuf',
     '3rdparty/python:pystachio',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.concurrent',
@@ -93,6 +102,9 @@ python_library(
   dependencies = [
     ':executor_base',
     '3rdparty/python:mesos.interface',
+    # To prevent an alpha version of protobuf from being pulled down by pants we
+    # specify protobuf here. See AURORA-1128 for more details.
+    '3rdparty/python:protobuf',
     '3rdparty/python:psutil',
     '3rdparty/python:twitter.common.collections',
     '3rdparty/python:twitter.common.exceptions',
