@@ -24,7 +24,7 @@ public interface SnapshotStore<T> {
    *
    * @return A blob that can be used to recover local storage via {@link #applySnapshot(Object)}.
    */
-   T createSnapshot();
+  T createSnapshot();
 
   /**
    * Applies a snapshot blob to the local storage system, wiping out all existing data and

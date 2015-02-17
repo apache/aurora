@@ -216,12 +216,12 @@ public interface MaintenanceController {
         };
 
     private static final Function<HostStatus, MaintenanceMode> GET_MODE =
-      new Function<HostStatus, MaintenanceMode>() {
-        @Override
-        public MaintenanceMode apply(HostStatus status) {
-          return status.getMode();
-        }
-      };
+        new Function<HostStatus, MaintenanceMode>() {
+          @Override
+          public MaintenanceMode apply(HostStatus status) {
+            return status.getMode();
+          }
+        };
 
     @Override
     public MaintenanceMode getMode(final String host) {

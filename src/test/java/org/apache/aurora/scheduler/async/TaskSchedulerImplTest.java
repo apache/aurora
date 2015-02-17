@@ -344,9 +344,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private AssignmentCapture expectLaunchAttempt(boolean taskLaunched)
       throws OfferQueue.LaunchException {
-        AssignmentCapture capture = new AssignmentCapture();
-        expect(offerQueue.launchFirst(capture(capture.assigner))).andReturn(taskLaunched);
-        return capture;
+
+    AssignmentCapture capture = new AssignmentCapture();
+    expect(offerQueue.launchFirst(capture(capture.assigner))).andReturn(taskLaunched);
+    return capture;
   }
 
   private void assignAndAssert(

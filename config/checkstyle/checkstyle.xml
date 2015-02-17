@@ -41,6 +41,10 @@ limitations under the License.
   To completely disable a check, just comment it out or delete it from the file.
 
   Finally, it is worth reading the documentation.
+
+  TODO(wfarner): Iterate on this file to converge towards the google style checks provided
+  by checkstyle:
+  https://github.com/checkstyle/checkstyle/blob/master/src/main/resources/google_checks.xml
 -->
 
 <module name="Checker">
@@ -63,7 +67,9 @@ limitations under the License.
 
   <!-- Checks for whitespace                               -->
   <!-- See http://checkstyle.sf.net/config_whitespace.html -->
-  <module name="FileTabCharacter"/>
+  <module name="FileTabCharacter">
+    <property name="eachLine" value="true"/>
+  </module>
 
   <!-- Miscellaneous other checks.                   -->
   <!-- See http://checkstyle.sf.net/config_misc.html -->
@@ -81,6 +87,15 @@ limitations under the License.
 
   <module name="TreeWalker">
     <property name="tabWidth" value="2"/>
+
+    <module name="Indentation">
+      <property name="basicOffset" value="2"/>
+      <property name="braceAdjustment" value="0"/>
+      <property name="caseIndent" value="2"/>
+      <property name="throwsIndent" value="4"/>
+      <property name="lineWrappingIndentation" value="4"/>
+      <property name="arrayInitIndent" value="2"/>
+    </module>
 
     <!-- needed for SuppressWithNearbyCommentFilter -->
     <module name="FileContentsHolder"/>

@@ -401,8 +401,8 @@ class TaskStateMachine {
                             addFollowup(RESCHEDULE);
                             break;
 
-                           default:
-                             // No-op.
+                          default:
+                            // No-op.
                         }
                       }
                     }

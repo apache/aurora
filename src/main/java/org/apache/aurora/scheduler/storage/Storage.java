@@ -218,7 +218,7 @@ public interface Storage {
    *
    * @throws StorageException if there was a problem preparing storage.
    */
-   void prepare() throws StorageException;
+  void prepare() throws StorageException;
 
   /**
    * A non-volatile storage that has additional methods to control its lifecycle.

@@ -129,20 +129,19 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
     return delegate.createJob(description, lock, session);
   }
 
-    @Override
-    public Response scheduleCronJob(JobConfiguration description, Lock lock, SessionKey session)
-        throws TException {
+  @Override
+  public Response scheduleCronJob(JobConfiguration description, Lock lock, SessionKey session)
+      throws TException {
 
-      return delegate.scheduleCronJob(description, lock, session);
-    }
+    return delegate.scheduleCronJob(description, lock, session);
+  }
 
-    @Override
-    public Response descheduleCronJob(JobKey job, Lock lock, SessionKey session) throws TException {
+  @Override
+  public Response descheduleCronJob(JobKey job, Lock lock, SessionKey session) throws TException {
+    return delegate.descheduleCronJob(job, lock, session);
+  }
 
-      return delegate.descheduleCronJob(job, lock, session);
-    }
-
-    @Override
+  @Override
   public Response replaceCronTemplate(JobConfiguration config, Lock lock, SessionKey session)
       throws TException {
 

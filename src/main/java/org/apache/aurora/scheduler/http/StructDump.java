@@ -59,7 +59,7 @@ public class StructDump extends JerseyTemplateServlet {
   }
 
   private static final String USAGE =
-    "<html>Usage: /structdump/task/{task_id} or /structdump/cron/{role}/{env}/{job}</html>";
+      "<html>Usage: /structdump/task/{task_id} or /structdump/cron/{role}/{env}/{job}</html>";
 
   @GET
   @Produces(MediaType.TEXT_HTML)

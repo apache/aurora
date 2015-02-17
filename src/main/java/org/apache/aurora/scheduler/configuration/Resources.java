@@ -108,10 +108,10 @@ public class Resources {
    */
   public List<Resource> toResourceList(Set<Integer> selectedPorts) {
     ImmutableList.Builder<Resource> resourceBuilder =
-      ImmutableList.<Resource>builder()
-          .add(Resources.makeMesosResource(CPUS, numCpus))
-          .add(Resources.makeMesosResource(DISK_MB, disk.as(Data.MB)))
-          .add(Resources.makeMesosResource(RAM_MB, ram.as(Data.MB)));
+        ImmutableList.<Resource>builder()
+            .add(Resources.makeMesosResource(CPUS, numCpus))
+            .add(Resources.makeMesosResource(DISK_MB, disk.as(Data.MB)))
+            .add(Resources.makeMesosResource(RAM_MB, ram.as(Data.MB)));
     if (!selectedPorts.isEmpty()) {
       resourceBuilder.add(Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts));
     }
@@ -266,7 +266,7 @@ public class Resources {
   }
 
   private static Resource getResource(List<Resource> resource, String key) {
-      return Iterables.find(resource, withName(key), null);
+    return Iterables.find(resource, withName(key), null);
   }
 
   private static Predicate<Resource> withName(final String name) {

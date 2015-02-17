@@ -141,7 +141,7 @@ interface SlaAlgorithm {
         }
       }
 
-     return SlaUtil.percentile(waitTimes, 50.0);
+      return SlaUtil.percentile(waitTimes, 50.0);
     }
   }
 
@@ -299,19 +299,19 @@ interface SlaAlgorithm {
     /**
      * Combine all task events per given instance into the unified sorted instance history view.
      */
-    private static final Function<Collection<IScheduledTask>, List<ITaskEvent>>
-        TASKS_TO_SORTED_TASK_EVENTS = new Function<Collection<IScheduledTask>, List<ITaskEvent>>() {
-      @Override
-      public List<ITaskEvent> apply(Collection<IScheduledTask> tasks) {
-        List<ITaskEvent> result = Lists.newLinkedList();
-        for (IScheduledTask task : tasks) {
-          result.addAll(task.getTaskEvents());
-        }
+    private static final Function<Collection<IScheduledTask>, List<ITaskEvent>> TO_SORTED_EVENTS =
+        new Function<Collection<IScheduledTask>, List<ITaskEvent>>() {
+          @Override
+          public List<ITaskEvent> apply(Collection<IScheduledTask> tasks) {
+            List<ITaskEvent> result = Lists.newLinkedList();
+            for (IScheduledTask task : tasks) {
+              result.addAll(task.getTaskEvents());
+            }
 
-        return Ordering.natural()
-            .onResultOf(TASK_EVENT_TO_TIMESTAMP).immutableSortedCopy(result);
-      }
-    };
+            return Ordering.natural()
+                .onResultOf(TASK_EVENT_TO_TIMESTAMP).immutableSortedCopy(result);
+          }
+        };
 
     /**
      * Convert instance history into the {@link SlaState} based {@link Interval} list.
@@ -407,7 +407,7 @@ interface SlaAlgorithm {
       Map<InstanceId, List<Interval>> instanceSlaTimeline =
           Maps.transformValues(
               Multimaps.index(tasks, TO_ID).asMap(),
-              Functions.compose(TASK_EVENTS_TO_INTERVALS, TASKS_TO_SORTED_TASK_EVENTS));
+              Functions.compose(TASK_EVENTS_TO_INTERVALS, TO_SORTED_EVENTS));
 
       // Given the instance timeline converted to SlaState-based time intervals, aggregate the
       // platform uptime per given timeFrame.

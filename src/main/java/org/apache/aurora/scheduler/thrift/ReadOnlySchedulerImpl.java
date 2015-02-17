@@ -99,14 +99,15 @@ import static org.apache.aurora.scheduler.thrift.Responses.invalidRequest;
 import static org.apache.aurora.scheduler.thrift.Responses.ok;
 
 class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
-  private static final Function<Entry<ITaskConfig, Collection<Integer>>, ConfigGroup>
-      CONFIG_TO_GROUP = new Function<Entry<ITaskConfig, Collection<Integer>>, ConfigGroup>() {
-
-    @Override
-    public ConfigGroup apply(Entry<ITaskConfig, Collection<Integer>> input) {
-      return new ConfigGroup(input.getKey().newBuilder(), ImmutableSet.copyOf(input.getValue()));
-    }
-  };
+  private static final Function<Entry<ITaskConfig, Collection<Integer>>, ConfigGroup> TO_GROUP =
+      new Function<Entry<ITaskConfig, Collection<Integer>>, ConfigGroup>() {
+        @Override
+        public ConfigGroup apply(Entry<ITaskConfig, Collection<Integer>> input) {
+          return new ConfigGroup(
+              input.getKey().newBuilder(),
+              ImmutableSet.copyOf(input.getValue()));
+        }
+      };
 
   private final Storage storage;
   private final NearestFit nearestFit;
@@ -223,7 +224,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
         Multimaps.forMap(tasksByInstance),
         HashMultimap.<ITaskConfig, Integer>create());
     Iterable<ConfigGroup> groups = Iterables.transform(
-        instancesByDetails.asMap().entrySet(), CONFIG_TO_GROUP);
+        instancesByDetails.asMap().entrySet(), TO_GROUP);
 
     ConfigSummary summary = new ConfigSummary(job, ImmutableSet.copyOf(groups));
     return ok(Result.configSummaryResult(new ConfigSummaryResult().setSummary(summary)));

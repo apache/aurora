@@ -1345,15 +1345,15 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private SessionContext authorizeJobUpdateAction(IJobUpdateKey key, SessionKey session)
       throws AuthFailedException {
 
-      Optional<SessionContext> maybeCoordinatorContext = isUpdateCoordinator(session);
-      SessionContext context;
-      if (maybeCoordinatorContext.isPresent()) {
-        context = maybeCoordinatorContext.get();
-      } else {
-        context = sessionValidator.checkAuthenticated(
-            session,
-            ImmutableSet.of(key.getJob().getRole()));
-      }
+    Optional<SessionContext> maybeCoordinatorContext = isUpdateCoordinator(session);
+    SessionContext context;
+    if (maybeCoordinatorContext.isPresent()) {
+      context = maybeCoordinatorContext.get();
+    } else {
+      context = sessionValidator.checkAuthenticated(
+          session,
+          ImmutableSet.of(key.getJob().getRole()));
+    }
 
     return context;
   }

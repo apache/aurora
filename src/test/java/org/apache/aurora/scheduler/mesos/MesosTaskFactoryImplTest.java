@@ -48,19 +48,19 @@ public class MesosTaskFactoryImplTest {
 
   private static final String EXECUTOR_WRAPPER_PATH = "/fake/executor_wrapper.sh";
   private static final IAssignedTask TASK = IAssignedTask.build(new AssignedTask()
-    .setInstanceId(2)
-    .setTaskId("task-id")
-    .setAssignedPorts(ImmutableMap.of("http", 80))
-    .setTask(new TaskConfig()
-        .setJob(new JobKey("role", "environment", "job-name"))
-        .setOwner(new Identity("role", "user"))
-        .setEnvironment("environment")
-        .setJobName("job-name")
-        .setDiskMb(10)
-        .setRamMb(100)
-        .setNumCpus(5)
-        .setContainer(Container.mesos(new MesosContainer()))
-        .setRequestedPorts(ImmutableSet.of("http"))));
+      .setInstanceId(2)
+      .setTaskId("task-id")
+      .setAssignedPorts(ImmutableMap.of("http", 80))
+      .setTask(new TaskConfig()
+          .setJob(new JobKey("role", "environment", "job-name"))
+          .setOwner(new Identity("role", "user"))
+          .setEnvironment("environment")
+          .setJobName("job-name")
+          .setDiskMb(10)
+          .setRamMb(100)
+          .setNumCpus(5)
+          .setContainer(Container.mesos(new MesosContainer()))
+          .setRequestedPorts(ImmutableSet.of("http"))));
   private static final IAssignedTask TASK_WITH_DOCKER = IAssignedTask.build(TASK.newBuilder()
       .setTask(
           new TaskConfig(TASK.getTask().newBuilder())

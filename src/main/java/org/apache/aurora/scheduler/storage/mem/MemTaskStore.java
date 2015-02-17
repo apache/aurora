@@ -75,7 +75,7 @@ class MemTaskStore implements TaskStore.Mutable {
       new Function<Query.Builder, Optional<Set<IJobKey>>>() {
         @Override
         public Optional<Set<IJobKey>> apply(Query.Builder query) {
-            return JobKeys.from(query);
+          return JobKeys.from(query);
         }
       };
   private static final Function<Query.Builder, Optional<Set<String>>> QUERY_TO_SLAVE_HOST =
