@@ -25,6 +25,7 @@ from itertools import product
 import mock
 from mesos.interface import mesos_pb2
 from thrift.TSerialization import serialize as thrift_serialize
+from twitter.common import log
 from twitter.common.concurrent import deadline, Timeout
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
@@ -62,7 +63,6 @@ TASK_ID = 'gc_executor_task_id'
 
 
 if 'THERMOS_DEBUG' in os.environ:
-  from twitter.common import log
   from twitter.common.log.options import LogOptions
   LogOptions.set_disk_log_level('NONE')
   LogOptions.set_stderr_log_level('DEBUG')
@@ -101,9 +101,11 @@ class ProxyDriver(object):
     self.updates = []
 
   def stop(self):
+    log.debug('ProxyDriver.stop')
     self.stopped.set()
 
   def sendStatusUpdate(self, update):  # noqa
+    log.debug('ProxyDriver.sendStatusUpdate %r' % update)
     self.updates.append(StatusUpdate(update.state, update.task_id.value))
 
 
@@ -383,6 +385,8 @@ def build_blocking_gc_executor(td, proxy_driver):
   class LongGCThinTestThermosGCExecutor(ThinTestThermosGCExecutor):
     def _run_gc(self, task, retain_tasks, retain_start):
       # just block until we shutdown
+      log.debug('%r : _run_gc called (%r, %r, %r)' % (
+          self, task, retain_tasks, retain_start))
       self._start_time = retain_start
       self._task_id = task.task_id.value
       self._stop_event.wait()
@@ -467,26 +471,6 @@ def test_gc_shutdown():
   proxy_driver.stopped.wait(timeout=1.0)
   assert proxy_driver.stopped.is_set()
   assert len(proxy_driver.updates) == 0
-
-
-def test_gc_shutdown_queued():
-  TASK2_ID = "task2"
-  proxy_driver = ProxyDriver()
-  with temporary_dir() as td:
-    executor = build_blocking_gc_executor(td, proxy_driver)
-    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
-    thread_yield()
-    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK2_ID))
-    thread_yield()
-    assert len(executor._gc_task_queue) == 1
-    executor.shutdown(proxy_driver)
-    executor._clock.tick(executor.PERSISTENCE_WAIT.as_(Time.SECONDS))
-    assert executor._stop_event.is_set()
-  proxy_driver.stopped.wait(timeout=1.0)
-  assert proxy_driver.stopped.is_set()
-  assert len(proxy_driver.updates) == 1
-  assert proxy_driver.updates[-1][0] == mesos_pb2.TASK_FINISHED
-  assert proxy_driver.updates[-1][1] == TASK2_ID
 
 
 def test_ignores_launch_task_when_shutting_down():

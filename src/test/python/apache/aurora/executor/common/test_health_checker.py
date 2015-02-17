@@ -36,13 +36,9 @@ from .fixtures import HELLO_WORLD, MESOS_JOB
 from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, TaskConfig
 
 
-def thread_yield():
-  time.sleep(0.1)
-
-
 class TestHealthChecker(unittest.TestCase):
   def setUp(self):
-    self._clock = ThreadedClock()
+    self._clock = ThreadedClock(0)
     self._checker = mock.Mock(spec=HttpSignaler)
 
     self.fake_health_checks = []
@@ -59,14 +55,17 @@ class TestHealthChecker(unittest.TestCase):
     self.append_health_checks(False)
     hct = HealthChecker(self._checker.health, interval_secs=5, clock=self._clock)
     hct.start()
-    thread_yield()
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    self._clock.assert_waiting(hct.threaded_health_checker, 10)
     assert hct.status is None
     self._clock.tick(6)
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
     self._clock.tick(3)
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
     self._clock.tick(5)
-    thread_yield()
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status.status == TaskState.Value('TASK_FAILED')
     hct.stop()
     assert self._checker.health.call_count == 1
@@ -74,14 +73,18 @@ class TestHealthChecker(unittest.TestCase):
   def test_initial_interval_whatev(self):
     self.append_health_checks(False)
     hct = HealthChecker(
-      self._checker.health,
-      interval_secs=5,
-      initial_interval_secs=0,
-      clock=self._clock)
+        self._checker.health,
+        interval_secs=5,
+        initial_interval_secs=0,
+        clock=self._clock)
     hct.start()
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status.status == TaskState.Value('TASK_FAILED')
     hct.stop()
-    assert self._checker.health.call_count == 1
+    # this is an implementation detail -- we healthcheck in the initializer and
+    # healthcheck in the run loop.  if we ever change the implementation, expect
+    # this to break.
+    assert self._checker.health.call_count == 2
 
   def test_consecutive_failures(self):
     '''Verify that a task is unhealthy only after max_consecutive_failures is exceeded'''
@@ -100,19 +103,24 @@ class TestHealthChecker(unittest.TestCase):
 
     # 2 consecutive health check failures followed by a successful health check.
     self._clock.tick(initial_interval_secs)
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
     self._clock.tick(interval_secs)
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
     self._clock.tick(interval_secs)
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
 
     # 3 consecutive health check failures.
     self._clock.tick(interval_secs)
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
     self._clock.tick(interval_secs)
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
     self._clock.tick(interval_secs)
-    thread_yield()
+    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status.status == TaskState.Value('TASK_FAILED')
     hct.stop()
     assert self._checker.health.call_count == 6

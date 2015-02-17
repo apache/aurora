@@ -461,6 +461,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         pass
       if self._driver is not None:
         self.clean_orphans(self._driver)
+      # TODO(wickman) This should be polling with self._clock
       self._stop_event.wait(self.POLL_WAIT.as_(Time.SECONDS))
 
     # shutdown
@@ -474,7 +475,9 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
                          'Garbage collection skipped - GC executor shutting down')
         # TODO(jon) Remove this once external MESOS-243 is resolved.
         self.log('Sleeping briefly to mitigate https://issues.apache.org/jira/browse/MESOS-243')
+        self.log('Clock is %r, time is %s' % (self._clock, self._clock.time()))
         self._clock.sleep(self.PERSISTENCE_WAIT.as_(Time.SECONDS))
+        self.log('Finished sleeping.')
 
       self._driver.stop()
 
