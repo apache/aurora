@@ -28,7 +28,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Resource;
@@ -42,11 +42,11 @@ import static org.apache.mesos.Protos.Offer;
 @Path("/offers")
 public class Offers {
 
-  private final OfferQueue offerQueue;
+  private final OfferManager offerManager;
 
   @Inject
-  Offers(OfferQueue offerQueue) {
-    this.offerQueue = Objects.requireNonNull(offerQueue);
+  Offers(OfferManager offerManager) {
+    this.offerManager = Objects.requireNonNull(offerManager);
   }
 
   /**
@@ -58,7 +58,7 @@ public class Offers {
   @Produces(MediaType.APPLICATION_JSON)
   public Response getOffers() {
     return Response.ok(
-        FluentIterable.from(offerQueue.getOffers()).transform(TO_BEAN).toList()).build();
+        FluentIterable.from(offerManager.getOffers()).transform(TO_BEAN).toList()).build();
   }
 
   private static final Function<ExecutorID, String> EXECUTOR_ID_TOSTRING =

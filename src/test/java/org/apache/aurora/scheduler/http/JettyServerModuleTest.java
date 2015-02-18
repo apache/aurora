@@ -48,7 +48,7 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.app.LocalServiceRegistryWithOverrides;
-import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.async.TaskScheduler;
@@ -117,7 +117,7 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
             thrift = bindMock(AuroraAdmin.Iface.class);
             bindMock(CronJobManager.class);
             bindMock(LockManager.class);
-            bindMock(OfferQueue.class);
+            bindMock(OfferManager.class);
             bindMock(QuotaManager.class);
             bindMock(RescheduleCalculator.class);
             bindMock(TaskScheduler.class);

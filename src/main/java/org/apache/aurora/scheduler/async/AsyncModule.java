@@ -47,8 +47,8 @@ import com.twitter.common.util.TruncatedBinaryBackoff;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.RandomGcExecutorSettings;
-import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
-import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
+import org.apache.aurora.scheduler.async.OfferManager.OfferManagerImpl;
+import org.apache.aurora.scheduler.async.OfferManager.OfferReturnDelay;
 import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.async.TaskHistoryPruner.HistoryPrunnerSettings;
@@ -249,12 +249,12 @@ public class AsyncModule extends AbstractModule {
                 OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
                 new Random.SystemRandom(new java.util.Random())));
         bind(ScheduledExecutorService.class).toInstance(executor);
-        bind(OfferQueue.class).to(OfferQueueImpl.class);
-        bind(OfferQueueImpl.class).in(Singleton.class);
-        expose(OfferQueue.class);
+        bind(OfferManager.class).to(OfferManagerImpl.class);
+        bind(OfferManagerImpl.class).in(Singleton.class);
+        expose(OfferManager.class);
       }
     });
-    PubsubEventModule.bindSubscriber(binder(), OfferQueue.class);
+    PubsubEventModule.bindSubscriber(binder(), OfferManager.class);
 
     install(new PrivateModule() {
       @Override

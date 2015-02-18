@@ -41,7 +41,7 @@ import org.apache.aurora.benchmark.fakes.FakeRescheduleCalculator;
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskIdGenerator;
-import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.TaskScheduler;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
@@ -79,7 +79,7 @@ public class SchedulingBenchmarks {
   public abstract static class AbstractBase {
     protected Storage storage;
     protected TaskScheduler taskScheduler;
-    protected OfferQueue offerQueue;
+    protected OfferManager offerManager;
     protected IScheduledTask task;
     protected Set<HostOffer> offers;
     protected Set<IHostAttributes> hostAttributes;
@@ -107,10 +107,10 @@ public class SchedulingBenchmarks {
                       .setNameFormat("TestProcessor-%d").build());
               bind(ScheduledExecutorService.class).toInstance(executor);
 
-              bind(OfferQueue.class).to(OfferQueue.OfferQueueImpl.class);
-              bind(OfferQueue.OfferQueueImpl.class).in(Singleton.class);
-              bind(OfferQueue.OfferReturnDelay.class).toInstance(
-                  new OfferQueue.OfferReturnDelay() {
+              bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
+              bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
+              bind(OfferManager.OfferReturnDelay.class).toInstance(
+                  new OfferManager.OfferReturnDelay() {
                     @Override
                     public Amount<Long, Time> get() {
                       return Amount.of(30L, Time.DAYS);
@@ -157,14 +157,14 @@ public class SchedulingBenchmarks {
       );
 
       taskScheduler = injector.getInstance(TaskScheduler.class);
-      offerQueue = injector.getInstance(OfferQueue.class);
+      offerManager = injector.getInstance(OfferManager.class);
       eventBus.register(injector.getInstance(CachedClusterState.class));
 
       hostAttributes = createHostAttributes();
       saveHostAttributes(hostAttributes);
 
       offers = createOffers(hostAttributes);
-      Offers.addOffers(offerQueue, offers);
+      Offers.addOffers(offerManager, offers);
       fillUpCluster();
 
       task = createTask();

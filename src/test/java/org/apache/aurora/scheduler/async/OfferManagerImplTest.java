@@ -24,8 +24,8 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
-import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
+import org.apache.aurora.scheduler.async.OfferManager.OfferManagerImpl;
+import org.apache.aurora.scheduler.async.OfferManager.OfferReturnDelay;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
@@ -41,7 +41,7 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class OfferQueueImplTest extends EasyMockTest {
+public class OfferManagerImplTest extends EasyMockTest {
 
   private static final Amount<Long, Time> RETURN_DELAY = Amount.of(1L, Time.DAYS);
   private static final String HOST_A = "HOST_A";
@@ -60,7 +60,7 @@ public class OfferQueueImplTest extends EasyMockTest {
   private Driver driver;
   private FakeScheduledExecutor clock;
   private Function<HostOffer, Assignment> offerAcceptor;
-  private OfferQueueImpl offerQueue;
+  private OfferManagerImpl offerQueue;
 
   @Before
   public void setUp() {
@@ -81,7 +81,7 @@ public class OfferQueueImplTest extends EasyMockTest {
         return RETURN_DELAY;
       }
     };
-    offerQueue = new OfferQueueImpl(driver, returnDelay, executorMock);
+    offerQueue = new OfferManagerImpl(driver, returnDelay, executorMock);
   }
 
   @Test

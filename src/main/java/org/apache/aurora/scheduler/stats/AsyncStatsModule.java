@@ -31,7 +31,7 @@ import com.twitter.common.quantity.Time;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
-import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
@@ -148,16 +148,16 @@ public class AsyncStatsModule extends AbstractModule {
           }
         };
 
-    private final OfferQueue offerQueue;
+    private final OfferManager offerManager;
 
     @Inject
-    OfferAdapter(OfferQueue offerQueue) {
-      this.offerQueue = requireNonNull(offerQueue);
+    OfferAdapter(OfferManager offerManager) {
+      this.offerManager = requireNonNull(offerManager);
     }
 
     @Override
     public Iterable<MachineResource> get() {
-      Iterable<HostOffer> offers = offerQueue.getOffers();
+      Iterable<HostOffer> offers = offerManager.getOffers();
       return FluentIterable.from(offers).transform(TO_RESOURCE);
     }
   }

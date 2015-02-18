@@ -57,7 +57,7 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.HostAttributesChang
 /**
  * Tracks the Offers currently known by the scheduler.
  */
-public interface OfferQueue extends EventSubscriber {
+public interface OfferManager extends EventSubscriber {
 
   /**
    * Notifies the scheduler of a new resource offer.
@@ -120,8 +120,8 @@ public interface OfferQueue extends EventSubscriber {
     }
   }
 
-  class OfferQueueImpl implements OfferQueue {
-    private static final Logger LOG = Logger.getLogger(OfferQueueImpl.class.getName());
+  class OfferManagerImpl implements OfferManager {
+    private static final Logger LOG = Logger.getLogger(OfferManagerImpl.class.getName());
 
     private final HostOffers hostOffers = new HostOffers();
     private final AtomicLong offerRaces = Stats.exportLong("offer_accept_races");
@@ -131,7 +131,11 @@ public interface OfferQueue extends EventSubscriber {
     private final ScheduledExecutorService executor;
 
     @Inject
-    OfferQueueImpl(Driver driver, OfferReturnDelay returnDelay, ScheduledExecutorService executor) {
+    OfferManagerImpl(
+        Driver driver,
+        OfferReturnDelay returnDelay,
+        ScheduledExecutorService executor) {
+
       this.driver = requireNonNull(driver);
       this.returnDelay = requireNonNull(returnDelay);
       this.executor = requireNonNull(executor);

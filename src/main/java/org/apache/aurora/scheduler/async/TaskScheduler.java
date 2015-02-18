@@ -104,7 +104,7 @@ public interface TaskScheduler extends EventSubscriber {
     private final Storage storage;
     private final StateManager stateManager;
     private final TaskAssigner assigner;
-    private final OfferQueue offerQueue;
+    private final OfferManager offerManager;
     private final Preemptor preemptor;
     private final Reservations reservations;
 
@@ -117,7 +117,7 @@ public interface TaskScheduler extends EventSubscriber {
         Storage storage,
         StateManager stateManager,
         TaskAssigner assigner,
-        OfferQueue offerQueue,
+        OfferManager offerManager,
         Preemptor preemptor,
         @ReservationDuration Amount<Long, Time> reservationDuration,
         final Clock clock,
@@ -126,7 +126,7 @@ public interface TaskScheduler extends EventSubscriber {
       this.storage = requireNonNull(storage);
       this.stateManager = requireNonNull(stateManager);
       this.assigner = requireNonNull(assigner);
-      this.offerQueue = requireNonNull(offerQueue);
+      this.offerManager = requireNonNull(offerManager);
       this.preemptor = requireNonNull(preemptor);
       this.reservations = new Reservations(statsProvider, reservationDuration, clock);
     }
@@ -215,7 +215,7 @@ public interface TaskScheduler extends EventSubscriber {
       } else {
         AttributeAggregate aggregate = getJobState(store, task.getJob());
         try {
-          boolean launched = offerQueue.launchFirst(
+          boolean launched = offerManager.launchFirst(
               getAssignerFunction(store, new ResourceRequest(task, taskId, aggregate)));
 
           if (!launched) {
@@ -224,7 +224,7 @@ public interface TaskScheduler extends EventSubscriber {
             attemptsNoMatch.incrementAndGet();
             return false;
           }
-        } catch (OfferQueue.LaunchException e) {
+        } catch (OfferManager.LaunchException e) {
           LOG.log(Level.WARNING, "Failed to launch task.", e);
           attemptsFailed.incrementAndGet();
 

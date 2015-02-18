@@ -42,7 +42,7 @@ import com.twitter.common.util.Clock;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
@@ -102,7 +102,7 @@ public class PreemptorImpl implements Preemptor {
 
   private final Storage storage;
   private final StateManager stateManager;
-  private final OfferQueue offerQueue;
+  private final OfferManager offerManager;
   private final SchedulingFilter schedulingFilter;
   private final Amount<Long, Time> preemptionCandidacyDelay;
   private final Clock clock;
@@ -115,7 +115,7 @@ public class PreemptorImpl implements Preemptor {
    *
    * @param storage Backing store for tasks.
    * @param stateManager Scheduler state controller to instruct when preempting tasks.
-   * @param offerQueue Queue that contains available Mesos resource offers.
+   * @param offerManager Queue that contains available Mesos resource offers.
    * @param schedulingFilter Filter to identify whether tasks may reside on given slaves.
    * @param preemptionCandidacyDelay Time a task must be PENDING before it may preempt other
    *                                 tasks.
@@ -125,7 +125,7 @@ public class PreemptorImpl implements Preemptor {
   PreemptorImpl(
       Storage storage,
       StateManager stateManager,
-      OfferQueue offerQueue,
+      OfferManager offerManager,
       SchedulingFilter schedulingFilter,
       @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
       Clock clock,
@@ -135,7 +135,7 @@ public class PreemptorImpl implements Preemptor {
 
     this.storage = requireNonNull(storage);
     this.stateManager = requireNonNull(stateManager);
-    this.offerQueue = requireNonNull(offerQueue);
+    this.offerManager = requireNonNull(offerManager);
     this.schedulingFilter = requireNonNull(schedulingFilter);
     this.preemptionCandidacyDelay = requireNonNull(preemptionCandidacyDelay);
     this.clock = requireNonNull(clock);
@@ -323,7 +323,7 @@ public class PreemptorImpl implements Preemptor {
 
     // Group the offers by slave id so they can be paired with active tasks from the same slave.
     Multimap<String, HostOffer> slavesToOffers =
-        Multimaps.index(offerQueue.getOffers(), OFFER_TO_SLAVE_ID);
+        Multimaps.index(offerManager.getOffers(), OFFER_TO_SLAVE_ID);
 
     Set<String> allSlaves = ImmutableSet.<String>builder()
         .addAll(slavesToOffers.keySet())

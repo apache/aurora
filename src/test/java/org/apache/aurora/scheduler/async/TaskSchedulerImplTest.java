@@ -84,7 +84,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private TaskAssigner assigner;
-  private OfferQueue offerQueue;
+  private OfferManager offerManager;
   private TaskScheduler scheduler;
   private FakeClock clock;
   private Preemptor preemptor;
@@ -98,7 +98,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     stateManager = createMock(StateManager.class);
     assigner = createMock(TaskAssigner.class);
-    offerQueue = createMock(OfferQueue.class);
+    offerManager = createMock(OfferManager.class);
     reservationDuration = Amount.of(2L, Time.MINUTES);
     halfReservationDuration = Amount.of(1L, Time.MINUTES);
     clock = new FakeClock();
@@ -121,7 +121,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
           protected void configure() {
             bind(Preemptor.class).toInstance(preemptor);
             AsyncModule.bindTaskScheduler(binder(), reservationDuration);
-            bind(OfferQueue.class).toInstance(offerQueue);
+            bind(OfferManager.class).toInstance(offerManager);
             bind(StateManager.class).toInstance(stateManager);
             bind(TaskAssigner.class).toInstance(assigner);
             bind(Clock.class).toInstance(clock);
@@ -343,10 +343,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   private AssignmentCapture expectLaunchAttempt(boolean taskLaunched)
-      throws OfferQueue.LaunchException {
+      throws OfferManager.LaunchException {
 
     AssignmentCapture capture = new AssignmentCapture();
-    expect(offerQueue.launchFirst(capture(capture.assigner))).andReturn(taskLaunched);
+    expect(offerManager.launchFirst(capture(capture.assigner))).andReturn(taskLaunched);
     return capture;
   }
 

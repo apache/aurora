@@ -19,7 +19,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.mesos.Offers;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
@@ -46,7 +46,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
       Offers.createOffer(4, 1024, 1024, Pair.of(80, 80)),
       IHostAttributes.build(new HostAttributes()));
 
-  private OfferQueue offerQueue;
+  private OfferManager offerManager;
   private StateManager stateManager;
   private StorageTestUtil storageUtil;
 
@@ -54,16 +54,16 @@ public class UserTaskLauncherTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    offerQueue = createMock(OfferQueue.class);
+    offerManager = createMock(OfferManager.class);
     stateManager = createMock(StateManager.class);
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
-    launcher = new UserTaskLauncher(storageUtil.storage, offerQueue, stateManager);
+    launcher = new UserTaskLauncher(storageUtil.storage, offerManager, stateManager);
   }
 
   @Test
   public void testForwardsOffers() throws Exception {
-    offerQueue.addOffer(OFFER);
+    offerManager.addOffer(OFFER);
 
     control.replay();
 

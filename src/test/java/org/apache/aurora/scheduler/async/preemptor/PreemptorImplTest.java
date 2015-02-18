@@ -44,7 +44,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
@@ -106,7 +106,7 @@ public class PreemptorImplTest extends EasyMockTest {
   private SchedulingFilter schedulingFilter;
   private FakeClock clock;
   private StatsProvider statsProvider;
-  private OfferQueue offerQueue;
+  private OfferManager offerManager;
   private AttributeAggregate emptyJob;
 
   @Before
@@ -116,7 +116,7 @@ public class PreemptorImplTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
     clock = new FakeClock();
     statsProvider = new FakeStatsProvider();
-    offerQueue = createMock(OfferQueue.class);
+    offerManager = createMock(OfferManager.class);
     emptyJob = new AttributeAggregate(
         Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
         createMock(AttributeStore.class));
@@ -126,7 +126,7 @@ public class PreemptorImplTest extends EasyMockTest {
     PreemptorImpl preemptor = new PreemptorImpl(
         storageUtil.storage,
         stateManager,
-        offerQueue,
+        offerManager,
         schedulingFilter,
         PREEMPTION_DELAY,
         clock,
@@ -524,7 +524,7 @@ public class PreemptorImplTest extends EasyMockTest {
     PreemptorImpl preemptor = new PreemptorImpl(
         storage,
         stateManager,
-        offerQueue,
+        offerManager,
         schedulingFilter,
         PREEMPTION_DELAY,
         clock,
@@ -567,11 +567,11 @@ public class PreemptorImplTest extends EasyMockTest {
                 IHostAttributes.build(new HostAttributes().setMode(MaintenanceMode.NONE)));
           }
         });
-    expect(offerQueue.getOffers()).andReturn(hostOffers);
+    expect(offerManager.getOffers()).andReturn(hostOffers);
   }
 
   private void expectNoOffers() {
-    expect(offerQueue.getOffers()).andReturn(ImmutableList.<HostOffer>of());
+    expect(offerManager.getOffers()).andReturn(ImmutableList.<HostOffer>of());
   }
 
   private IExpectationSetters<Set<Veto>> expectFiltering() {

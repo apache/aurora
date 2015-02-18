@@ -20,7 +20,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Random;
 
-import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
+import org.apache.aurora.scheduler.async.OfferManager.OfferReturnDelay;
 
 import static com.google.common.base.Preconditions.checkArgument;
 

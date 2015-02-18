@@ -23,7 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -47,13 +47,13 @@ class UserTaskLauncher implements TaskLauncher {
   static final String MEMORY_LIMIT_DISPLAY = "Task used more memory than requested.";
 
   private final Storage storage;
-  private final OfferQueue offerQueue;
+  private final OfferManager offerManager;
   private final StateManager stateManager;
 
   @Inject
-  UserTaskLauncher(Storage storage, OfferQueue offerQueue, StateManager stateManager) {
+  UserTaskLauncher(Storage storage, OfferManager offerManager, StateManager stateManager) {
     this.storage = requireNonNull(storage);
-    this.offerQueue = requireNonNull(offerQueue);
+    this.offerManager = requireNonNull(offerManager);
     this.stateManager = requireNonNull(stateManager);
   }
 
@@ -61,7 +61,7 @@ class UserTaskLauncher implements TaskLauncher {
   public boolean willUse(HostOffer offer) {
     requireNonNull(offer);
 
-    offerQueue.addOffer(offer);
+    offerManager.addOffer(offer);
     return true;
   }
 
@@ -103,6 +103,6 @@ class UserTaskLauncher implements TaskLauncher {
 
   @Override
   public void cancelOffer(OfferID offer) {
-    offerQueue.cancelOffer(offer);
+    offerManager.cancelOffer(offer);
   }
 }
