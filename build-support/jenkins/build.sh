@@ -30,7 +30,7 @@ pip install -d third_party -r <(grep -v mesos.native 3rdparty/python/requirement
 # Run all Python tests
 export JUNIT_XML_BASE="$PWD/dist/test-results"
 mkdir -p "$JUNIT_XML_BASE"
-./pants test.pytest --no-fast src/test/python::
+./pants test.pytest --no-fast --options='-v' src/test/python::
 
 # Run Python style checks
 ./build-support/python/isort-check
