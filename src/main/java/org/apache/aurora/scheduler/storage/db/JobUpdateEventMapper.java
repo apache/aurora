@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.storage.db;
 
 import org.apache.aurora.gen.JobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -26,8 +27,8 @@ interface JobUpdateEventMapper {
   /**
    * Inserts a new job update event into the database.
    *
-   * @param updateId Update ID of the event.
+   * @param key ID of the update associated with the event.
    * @param event Event to insert.
    */
-  void insert(@Param("updateId") String updateId, @Param("event") JobUpdateEvent event);
+  void insert(@Param("key") IJobUpdateKey key, @Param("event") JobUpdateEvent event);
 }

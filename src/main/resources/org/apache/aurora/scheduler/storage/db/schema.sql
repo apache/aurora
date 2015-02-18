@@ -108,41 +108,42 @@ CREATE TABLE job_updates(
   wait_for_batch_completion BOOLEAN NOT NULL,
   block_if_no_pulses_after_ms INT NULL,
 
+  -- TODO(wfarner): Convert this to UNIQUE(job_key_id, update_id) to complete AURORA-1093.
   UNIQUE(update_id)
 );
 
 CREATE TABLE job_update_locks(
   id IDENTITY,
-  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
   lock_token VARCHAR NOT NULL REFERENCES locks(token) ON DELETE CASCADE,
 
-  UNIQUE(update_id),
+  UNIQUE(update_row_id),
   UNIQUE(lock_token)
 );
 
 CREATE TABLE job_update_configs(
   id IDENTITY,
-  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
   task_config BINARY NOT NULL,
   is_new BOOLEAN NOT NULL
 );
 
 CREATE TABLE job_updates_to_instance_overrides(
   id IDENTITY,
-  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
   first INT NOT NULL,
   last INT NOT NULL,
 
-  UNIQUE(update_id, first, last)
+  UNIQUE(update_row_id, first, last)
 );
 
 CREATE TABLE job_updates_to_desired_instances(
   id IDENTITY,
-  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
   first INT NOT NULL,
   last INT NOT NULL,
 
-  UNIQUE(update_id, first, last)
+  UNIQUE(update_row_id, first, last)
 );
 
 CREATE TABLE job_update_configs_to_instances(
@@ -156,7 +157,7 @@ CREATE TABLE job_update_configs_to_instances(
 
 CREATE TABLE job_update_events(
   id IDENTITY,
-  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
   status INT NOT NULL REFERENCES job_update_statuses(id),
   timestamp_ms BIGINT NOT NULL,
   user VARCHAR
@@ -164,7 +165,7 @@ CREATE TABLE job_update_events(
 
 CREATE TABLE job_instance_update_events(
   id IDENTITY,
-  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
   action INT NOT NULL REFERENCES job_instance_update_actions(id),
   instance_id INT NOT NULL,
   timestamp_ms BIGINT NOT NULL

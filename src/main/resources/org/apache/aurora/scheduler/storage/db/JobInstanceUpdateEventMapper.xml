@@ -19,16 +19,12 @@
 <mapper namespace="org.apache.aurora.scheduler.storage.db.JobInstanceUpdateEventMapper">
   <insert id="insert">
     INSERT INTO job_instance_update_events (
-      update_id,
+      update_row_id,
       action,
       instance_id,
       timestamp_ms
     ) VALUES (
-      (
-        SELECT ID
-        FROM job_updates
-        WHERE update_id = #{updateId}
-      ),
+      <include refid="org.apache.aurora.scheduler.storage.db.JobUpdateDetailsMapper.select_update_row_id"/>,
       #{event.action, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateActionTypeHandler},
       #{event.instanceId},
       #{event.timestampMs}

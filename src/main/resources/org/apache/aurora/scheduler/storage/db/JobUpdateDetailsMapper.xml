@@ -17,11 +17,27 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.JobUpdateDetailsMapper">
-  <sql id="selectUpdateIdentity">
+  <sql id="job_key_inner_join">
+    INNER JOIN job_keys AS j ON j.id = u.job_key_id
+  </sql>
+
+  <sql id="filter_by_update_key">
+    u.update_id = #{key.id}
+    AND j.role = #{key.job.role}
+    AND j.environment = #{key.job.environment}
+    AND j.name = #{key.job.name}
+  </sql>
+
+  <sql id="select_update_row_id">
       (
-        SELECT id
-        FROM job_updates
-        WHERE update_id = #{updateId}
+        SELECT u.id
+        FROM job_updates AS u
+        <!-- Full qualification is needed since this fragment is accessed from outside of this
+             mapper.  Without full qualification, mybatis looks for job_key_inner_join in the
+             caller's namespace.  It's unclear if this is a feature or bug in mybatis.
+         -->
+        <include refid="org.apache.aurora.scheduler.storage.db.JobUpdateDetailsMapper.job_key_inner_join"/>
+        WHERE <include refid="org.apache.aurora.scheduler.storage.db.JobUpdateDetailsMapper.filter_by_update_key"/>
       )
   </sql>
 
@@ -61,29 +77,29 @@
 
   <insert id="insertLockToken">
     INSERT INTO job_update_locks (
-      update_id,
+      update_row_id,
       lock_token
     ) VALUES (
-      <include refid="selectUpdateIdentity"/>,
+      <include refid="select_update_row_id"/>,
       #{lockToken}
     )
   </insert>
 
   <insert id="insertTaskConfig" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
     INSERT INTO job_update_configs (
-      update_id,
+      update_row_id,
       task_config,
       is_new
     ) VALUES (
-      <include refid="selectUpdateIdentity"/>,
+      <include refid="select_update_row_id"/>,
       #{config, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.TaskConfigTypeHandler},
       #{isNew}
     )
   </insert>
 
-  <sql id="insertInstanceRanges">
+  <sql id="insert_instance_ranges">
     <foreach item="element" collection="ranges" open="(" separator="),(" close=")">
-      <include refid="selectUpdateIdentity"/>,
+      <include refid="select_update_row_id"/>,
       #{element.first},
       #{element.last}
     </foreach>
@@ -104,20 +120,20 @@
 
   <insert id="insertInstanceOverrides">
     INSERT INTO job_updates_to_instance_overrides (
-      update_id,
+      update_row_id,
       first,
       last
     ) VALUES
-  <include refid="insertInstanceRanges" />
+  <include refid="insert_instance_ranges" />
   </insert>
 
   <insert id="insertDesiredInstances">
     INSERT INTO job_updates_to_desired_instances (
-      update_id,
+      update_row_id,
       first,
       last
     ) VALUES
-    <include refid="insertInstanceRanges" />
+    <include refid="insert_instance_ranges" />
   </insert>
 
   <resultMap id="jobUpdateStateMap" type="org.apache.aurora.gen.JobUpdateState">
@@ -205,51 +221,51 @@
     INNER JOIN
     (
       SELECT
-        e_s.update_id,
+        e_s.update_row_id,
         e_s.status
       FROM job_update_events AS e_s
       INNER JOIN
       (
         SELECT
-          update_id,
+          update_row_id,
           MAX(timestamp_ms) AS timestamp_ms
         FROM job_update_events
-        GROUP BY update_id
-      ) AS e_t ON e_t.update_id = e_s.update_id AND e_t.timestamp_ms = e_s.timestamp_ms
-    ) AS max_status ON max_status.update_id = u.id
+        GROUP BY update_row_id
+      ) AS e_t ON e_t.update_row_id = e_s.update_row_id AND e_t.timestamp_ms = e_s.timestamp_ms
+    ) AS max_status ON max_status.update_row_id = u.id
   </sql>
 
   <sql id="created_timestamp_inner_join">
     INNER JOIN
     (
       SELECT
-        update_id,
+        update_row_id,
         MIN(timestamp_ms) AS timestamp_ms
       FROM job_update_events
-      GROUP BY update_id
-    ) AS min_ts ON min_ts.update_id = u.id
+      GROUP BY update_row_id
+    ) AS min_ts ON min_ts.update_row_id = u.id
   </sql>
 
   <sql id="last_updated_timestamp_inner_join">
     INNER JOIN
     (
       SELECT
-        update_id,
+        update_row_id,
         MAX(timestamp_ms) AS timestamp_ms
       FROM
       (
         SELECT
-          update_id,
+          update_row_id,
           timestamp_ms
         FROM job_update_events
         UNION ALL
         SELECT
-          update_id,
+          update_row_id,
           timestamp_ms
         FROM job_instance_update_events
       )
-      GROUP BY update_id
-    ) AS max_ts ON max_ts.update_id = u.id
+      GROUP BY update_row_id
+    ) AS max_ts ON max_ts.update_row_id = u.id
   </sql>
 
   <sql id="timestamps_inner_joins">
@@ -258,14 +274,13 @@
     <include refid="last_updated_timestamp_inner_join" />
   </sql>
 
-  <sql id="job_key_inner_join">
-    INNER JOIN job_keys AS j ON j.id = u.job_key_id
-  </sql>
-
   <sql id="query_filter">
-    <if test="updateId != null || role != null || user != null || jobKey != null || updateStatuses != null || limit != 0 || offset != 0">
+    <if test="updateId != null || key != null || role != null || user != null || jobKey != null || updateStatuses != null || limit != 0 || offset != 0">
       WHERE TRUE
       <if test="updateId != null">AND u.update_id = #{updateId}</if>
+      <if test="key != null">
+        AND <include refid="filter_by_update_key"/>
+      </if>
       <if test="user != null">AND u.user = #{user}</if>
       <if test="role != null">AND j.role = #{role}</if>
       <if test="jobKey != null">
@@ -302,6 +317,17 @@
     <include refid="job_key_inner_join" />
     <include refid="timestamps_inner_joins" />
     <include refid="query_filter" />
+  </select>
+
+  <select id="selectUpdateKey" resultMap="jobUpdateKeyMap">
+    SELECT
+      u.update_id AS id,
+      j.role AS jk_role,
+      j.environment AS jk_environment,
+      j.name AS jk_name
+    FROM job_updates AS u
+    <include refid="job_key_inner_join" />
+    WHERE u.update_id = #{id}
   </select>
 
   <!--Column naming convention below follows the thrift object hierarchy and columnPrefix
@@ -344,15 +370,15 @@
   </sql>
 
   <sql id="job_update_outer_joins">
-    LEFT OUTER JOIN job_update_configs AS cn ON cn.update_id = u.id AND cn.is_new = TRUE
-    LEFT OUTER JOIN job_update_configs AS co ON co.update_id = u.id AND co.is_new = FALSE
+    LEFT OUTER JOIN job_update_configs AS cn ON cn.update_row_id = u.id AND cn.is_new = TRUE
+    LEFT OUTER JOIN job_update_configs AS co ON co.update_row_id = u.id AND co.is_new = FALSE
     LEFT OUTER JOIN job_update_configs_to_instances AS ci ON ci.config_id = co.id
-    LEFT OUTER JOIN job_updates_to_desired_instances AS di ON di.update_id = u.id
-    LEFT OUTER JOIN job_updates_to_instance_overrides AS io ON io.update_id = u.id
+    LEFT OUTER JOIN job_updates_to_desired_instances AS di ON di.update_row_id = u.id
+    LEFT OUTER JOIN job_updates_to_instance_overrides AS io ON io.update_row_id = u.id
   </sql>
 
   <sql id="lock_outer_join">
-    LEFT OUTER JOIN job_update_locks AS l on l.update_id = u.id
+    LEFT OUTER JOIN job_update_locks AS l on l.update_row_id = u.id
   </sql>
 
   <sql id="unscoped_details_select">
@@ -371,8 +397,8 @@
     <include refid="job_key_inner_join" />
     <include refid="timestamps_inner_joins" />
     <include refid="job_update_outer_joins" />
-    LEFT OUTER JOIN job_update_events AS e ON e.update_id = u.id
-    LEFT OUTER JOIN job_instance_update_events AS i ON i.update_id = u.id
+    LEFT OUTER JOIN job_update_events AS e ON e.update_row_id = u.id
+    LEFT OUTER JOIN job_instance_update_events AS i ON i.update_row_id = u.id
     <include refid="lock_outer_join" />
   </sql>
 
@@ -407,7 +433,7 @@
     FROM job_updates AS u
     <include refid="job_key_inner_join" />
     <include refid="job_update_outer_joins" />
-    WHERE u.update_id = #{id}
+    WHERE <include refid="filter_by_update_key"/>
   </select>
 
   <select id="selectUpdate" resultMap="jobUpdateMap">
@@ -417,12 +443,12 @@
     <include refid="job_key_inner_join" />
     <include refid="timestamps_inner_joins" />
     <include refid="job_update_outer_joins" />
-    WHERE u.update_id = #{id}
+    WHERE <include refid="filter_by_update_key"/>
   </select>
 
   <select id="selectDetails" resultMap="jobUpdateDetailsMap">
     <include refid="unscoped_details_select"/>
-    WHERE u.update_id = #{id}
+    WHERE <include refid="filter_by_update_key"/>
     ORDER BY e_timestamp_ms, i_timestamp_ms
   </select>
 
@@ -439,8 +465,9 @@
     SELECT
       lock_token
     FROM job_update_locks AS l
-    INNER JOIN job_updates u ON l.update_id = u.id
-    WHERE u.update_id = #{id}
+    INNER JOIN job_updates u ON l.update_row_id = u.id
+    <include refid="job_key_inner_join" />
+    WHERE <include refid="filter_by_update_key"/>
   </select>
 
   <select id="selectInstanceUpdateEvents" resultMap="jobInstanceUpdateMap">
@@ -450,8 +477,10 @@
       timestamp_ms,
       action
     FROM job_instance_update_events as e
-    INNER JOIN job_updates as j ON j.id = e.update_id
-    WHERE j.update_id = #{updateId} AND e.instance_id = #{instanceId}
+    INNER JOIN job_updates as u ON u.id = e.update_row_id
+    <include refid="job_key_inner_join" />
+    WHERE <include refid="filter_by_update_key"/>
+      AND e.instance_id = #{instanceId}
     ORDER BY e.timestamp_ms
   </select>
 
@@ -477,12 +506,34 @@
     WHERE min_ts.timestamp_ms &lt; #{pruneThresholdMs} AND l.id IS NULL
   </select>
 
-  <select id="selectPruneVictims" resultType="String">
-    SELECT id FROM
+  <resultMap id="jobUpdateKeyMap" type="org.apache.aurora.gen.JobUpdateKey">
+    <association property="job"
+                 resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
+                 columnPrefix="jk_"/>
+  </resultMap>
+
+  <resultMap id="pruneVictimMap" type="org.apache.aurora.scheduler.storage.db.PruneVictim">
+    <id column="row_id" property="rowId"/>
+    <association property="update" resultMap="jobUpdateKeyMap" columnPrefix="u_" />
+  </resultMap>
+
+  <select id="selectPruneVictims" resultMap="pruneVictimMap">
+    SELECT
+      row_id,
+      u_id,
+      u_jk_role,
+      u_jk_environment,
+      u_jk_name
+    FROM
     (
       SELECT
-        u.update_id as id
+        u.id as row_id,
+        u.update_id AS u_id,
+        j.role AS u_jk_role,
+        j.environment AS u_jk_environment,
+        j.name AS u_jk_name
       FROM job_updates as u
+      <include refid="job_key_inner_join" />
       <include refid="created_timestamp_inner_join" />
       <include refid="lock_outer_join" />
       WHERE u.job_key_id = #{keyId}
@@ -493,8 +544,13 @@
     )
     UNION
     SELECT
-      u.update_id as id
+      u.id,
+      u.update_id AS u_id,
+      j.role AS u_jk_role,
+      j.environment AS u_jk_environment,
+      j.name AS u_jk_name
     FROM job_updates as u
+    <include refid="job_key_inner_join" />
     <include refid="created_timestamp_inner_join" />
     <include refid="lock_outer_join" />
     WHERE u.job_key_id = #{keyId}
@@ -504,8 +560,8 @@
 
   <delete id="deleteCompletedUpdates">
     DELETE FROM job_updates
-    WHERE update_id IN
-    <foreach item="element" collection="updateIds" open="(" separator="," close=")">
+    WHERE id IN
+    <foreach item="element" collection="rowIds" open="(" separator="," close=")">
       #{element}
     </foreach>
   </delete>

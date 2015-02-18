@@ -718,6 +718,7 @@ struct JobUpdateState {
 
 /** Summary of the job update including job key, user and current state. */
 struct JobUpdateSummary {
+  // TODO(wfarner): As part of AURORA-1093, add a JobUpdateKey field, deprecate updateId and jobKey.
   /** Update ID. */
   1: string updateId
 
@@ -785,6 +786,9 @@ struct JobUpdateQuery {
 
   /** Job role. */
   2: string role
+
+  /** Unique identifier for a job update. */
+  8: JobUpdateKey key
 
   /** Job key. */
   3: JobKey jobKey

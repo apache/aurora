@@ -30,6 +30,7 @@ import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.JobUpdateInstructions;
+import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateState;
@@ -73,6 +74,7 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 public class DBJobUpdateStoreTest {
 
@@ -109,6 +111,15 @@ public class DBJobUpdateStoreTest {
 
     saveUpdate(update2, Optional.<String>absent());
     assertUpdate(update2);
+
+    // Colliding update IDs should be forbidden.
+    IJobUpdate update3 = makeJobUpdate(JobKeys.from("role", "env", "name3"), updateId2);
+    try {
+      saveUpdate(update3, Optional.<String>absent());
+      fail("Update ID collision should not be allowed");
+    } catch (StorageException e) {
+      // Expected.
+    }
   }
 
   @Test
@@ -621,6 +632,22 @@ public class DBJobUpdateStoreTest {
     assertEquals(
         ImmutableList.of(s5),
         getSummaries(new JobUpdateQuery().setJobKey(job5.newBuilder())));
+
+    // Test querying by update key.
+    assertEquals(
+        ImmutableList.of(s5),
+        getSummaries(
+            new JobUpdateQuery().setKey(new JobUpdateKey(job5.newBuilder(), s5.getUpdateId()))));
+
+    // Test querying by incorrect update keys.
+    assertEquals(
+        ImmutableList.<IJobUpdateSummary>of(),
+        getSummaries(
+            new JobUpdateQuery().setKey(new JobUpdateKey(job5.newBuilder(), s4.getUpdateId()))));
+    assertEquals(
+        ImmutableList.<IJobUpdateSummary>of(),
+        getSummaries(
+            new JobUpdateQuery().setKey(new JobUpdateKey(job4.newBuilder(), s5.getUpdateId()))));
 
     // Test query by user.
     assertEquals(ImmutableList.of(s2, s1), getSummaries(new JobUpdateQuery().setUser("user")));

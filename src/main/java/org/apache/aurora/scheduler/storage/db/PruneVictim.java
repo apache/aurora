@@ -13,22 +13,28 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
-import org.apache.aurora.gen.JobInstanceUpdateEvent;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.ibatis.annotations.Param;
+import org.apache.aurora.gen.JobUpdateKey;
 
 /**
- * MyBatis mapper class for JobInstanceUpdateEventMapper.xml
- *
- * See http://mybatis.github.io/mybatis-3/sqlmap-xml.html for more details.
+ * A job update that should be pruned.
  */
-interface JobInstanceUpdateEventMapper {
+public class PruneVictim {
+  private long rowId;
+  private JobUpdateKey update;
 
-  /**
-   * Inserts a new job instance update event into the database.
-   *
-   * @param event Event to insert.
-   * @param key Update key of the event.
-   */
-  void insert(@Param("event") JobInstanceUpdateEvent event, @Param("key") IJobUpdateKey key);
+  public long getRowId() {
+    return rowId;
+  }
+
+  public JobUpdateKey getUpdate() {
+    return update;
+  }
+
+  public void setRowId(long rowId) {
+    this.rowId = rowId;
+  }
+
+  public void setUpdate(JobUpdateKey update) {
+    this.update = update;
+  }
 }
