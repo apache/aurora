@@ -347,6 +347,9 @@ Parameters for controlling the rate and policy of rolling updates.
 | ```watch_secs```             | Integer  | Minimum number of seconds a shard must remain in ```RUNNING``` state before considered a success (Default: 45)
 | ```max_per_shard_failures``` | Integer  | Maximum number of restarts per shard during update. Increments total failure count when this limit is exceeded. (Default: 0)
 | ```max_total_failures```     | Integer  | Maximum number of shard failures to be tolerated in total during an update. Cannot be greater than or equal to the total number of tasks in a job. (Default: 0)
+| ```rollback_on_failure```    | boolean  | When False, prevents auto rollback of a failed update (Default: True)
+| ```wait_for_batch_completion```| boolean | When True, all threads from a given batch will be blocked from picking up new instances until the entire batch is updated. This essentially simulates the legacy sequential updater algorithm. (Default: False)
+| ```pulse_interval_secs```    | Integer  |  Indicates a [coordinated update](client-commands.md#user-content-coordinated-job-updates-beta). If no pulses are received within the provided interval the update will be blocked. Beta-updater only. Will fail on submission when used with client updater. (Default: None)
 
 ### HealthCheckConfig Objects
 

@@ -11,6 +11,7 @@ Aurora Client Commands
     - [Killing a Job](#killing-a-job)
     - [Updating a Job](#updating-a-job)
         - [Asynchronous job updates (beta)](#user-content-asynchronous-job-updates-beta)
+            - [Coordinated job updates (beta)](#user-content-coordinated-job-updates-beta)
     - [Renaming a Job](#renaming-a-job)
     - [Restarting Jobs](#restarting-jobs)
 - [Cron Jobs](#cron-jobs)
@@ -194,7 +195,7 @@ used to define and activate hooks for `job update`.
 
 #### Asynchronous job updates (beta)
 
-As of 0.6.0, Aurora will coordinate updates (and rollbacks) within the
+As of 0.6.0, Aurora will control and dispatch updates (and rollbacks) within the
 scheduler. Performing updates this way also allows the scheduler to display
 update progress and job update history in the browser.
 
@@ -221,6 +222,27 @@ proceed.
 You may `abort` a job update regardless of the state it is in. This will
 instruct the scheduler to completely abandon the job update and leave the job
 in the current (possibly partially-updated) state.
+
+##### Coordinated job updates (beta)
+
+Some Aurora services may benefit from having more control over the
+[asynchronous scheduler updater](#user-content-asynchronous-job-updates-beta) by explicitly
+acknowledging ("heartbeating") job update progress. This may be helpful for mission-critical
+service updates where explicit job health monitoring is vital during the entire job update
+lifecycle. Such job updates would rely on an external service (or a custom client) periodically
+pulsing an active coordinated job update via a
+[pulseJobUpdate RPC](../api/src/main/thrift/org/apache/aurora/gen/api.thrift).
+
+A coordinated update is defined by setting a positive
+[pulse_interval_secs](configuration-reference.md#updateconfig-objects) value in job configuration
+file. If no pulses are received within specified interval the update will be blocked. A blocked
+update is unable to continue rolling forward (or rolling back) but retains its active status.
+It may only be unblocked by a fresh `pulseJobUpdate` call.
+
+NOTE: A coordinated update starts in `ROLL_FORWARD_AWAITING_PULSE` state and will not make any
+progress until the first pulse arrives. However, a paused update (`ROLL_FORWARD_PAUSED` or
+`ROLL_BACK_PAUSED`) is still considered active and upon resuming will immediately make progress
+provided the pulse interval has not expired.
 
 ### Renaming a Job
 
