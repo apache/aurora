@@ -17,8 +17,6 @@ from __future__ import print_function
 import logging
 from fnmatch import fnmatch
 
-from pystachio import Ref
-
 from apache.aurora.client.base import AURORA_V2_USER_AGENT_NAME, combine_messages, synthesize_url
 from apache.aurora.client.cli import (
     Context,
@@ -34,25 +32,6 @@ from apache.aurora.common.clusters import CLUSTERS
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import ResponseCode
-
-
-def bindings_to_list(bindings):
-  """Pystachio takes bindings in the form of a list of dictionaries. Each pystachio binding
-  becomes another dictionary in the list. So we need to convert the bindings specified by
-  the user from a list of "name=value" formatted strings to a list of the dictionaries
-  expected by pystachio.
-  """
-  result = []
-  for b in bindings:
-    binding_parts = b.split("=")
-    if len(binding_parts) != 2:
-      raise ValueError('Binding parameter must be formatted name=value')
-    try:
-      ref = Ref.from_address(binding_parts[0])
-    except Ref.InvalidRefError as e:
-      raise ValueError("Could not parse binding parameter %s: %s" % (b, e))
-    result.append({ref: binding_parts[1]})
-  return result
 
 
 class AuroraCommandContext(Context):
@@ -90,12 +69,11 @@ class AuroraCommandContext(Context):
       # file without double-reading.
       with open(config_file, "r") as fp:
         logging.debug("Config: %s" % fp.readlines())
-      bindings = bindings_to_list(self.options.bindings) if self.options.bindings else None
       result = get_config(
           jobname,
           config_file,
           self.options.read_json,
-          bindings,
+          self.options.bindings,
           select_cluster=jobkey.cluster,
           select_role=jobkey.role,
           select_env=jobkey.env)
@@ -136,10 +114,6 @@ class AuroraCommandContext(Context):
       if resp.responseCode == ResponseCode.LOCK_ERROR:
         self.print_err("\t%s" % self.LOCK_ERROR_MSG)
       raise self.CommandErrorLogged(err_code, err_msg)
-
-  @classmethod
-  def render_partial_jobkey(cls, jobkey):
-    return "%s/%s/%s/%s" % jobkey
 
   def get_job_list(self, clusters, role=None):
     """Get a list of jobs from a group of clusters.
@@ -184,13 +158,6 @@ class AuroraCommandContext(Context):
       jobs = filter_job_list(self.get_job_list(clusters_to_search, key.role),
           key.role, key.env, key.name)
       return jobs
-
-  def get_job_status(self, key):
-    """Returns a list of task instances."""
-    api = self.get_api(key.cluster)
-    resp = api.check_status(key)
-    self.log_response_and_raise(resp, err_code=EXIT_INVALID_PARAMETER)
-    return resp.result.scheduleStatusResult.tasks
 
   def get_active_instances(self, key):
     """Returns a list of the currently active instances of a job"""

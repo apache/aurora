@@ -114,13 +114,6 @@ class FakeAuroraCommandContext(AuroraCommandContext):
   def open_page(self, url):
     self.showed_urls.append(url)
 
-  def handle_open(self, api):
-    pass
-
-  def timestamp_to_string(self, ts):
-    """To fuzz around timezone issues with timestamps, just return fixed strings."""
-    return "YYYY-MM-DD HH:MM:SS"
-
   def add_expected_status_query_result(self, expected_result):
     self.add_task_result(expected_result)
     self.fake_api.check_status.side_effect = self.task_result

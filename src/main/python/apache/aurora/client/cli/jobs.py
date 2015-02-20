@@ -619,6 +619,13 @@ class StatusCommand(Verb):
       result.append(render_task_pretty(t))
     return "".join(result)
 
+  def _get_job_status(self, key, context):
+    """Returns a list of task instances."""
+    api = context.get_api(key.cluster)
+    resp = api.check_status(key)
+    context.log_response_and_raise(resp, err_code=EXIT_INVALID_PARAMETER)
+    return resp.result.scheduleStatusResult.tasks
+
   def get_status_for_jobs(self, jobkeys, context):
     """Retrieve and render the status information for a collection of jobs"""
     def is_active(task):
@@ -626,7 +633,7 @@ class StatusCommand(Verb):
 
     result = []
     for jk in jobkeys:
-      job_tasks = context.get_job_status(jk)
+      job_tasks = self._get_job_status(jk, context)
       if not job_tasks:
         logging.info("No tasks were found for jobkey %s" % jk)
         continue
@@ -645,10 +652,13 @@ class StatusCommand(Verb):
     else:
       return "".join(result)
 
+  def _render_partial_jobkey(self, jobkey):
+    return "%s/%s/%s/%s" % jobkey
+
   def _print_jobs_not_found(self, context):
     if context.options.write_json:
       context.print_out(json.dumps(
-        {"jobspec": context.render_partial_jobkey(context.options.jobspec),
+        {"jobspec": self._render_partial_jobkey(context.options.jobspec),
          "error": "No matching jobs found"},
         separators=[",", ":"],
         sort_keys=False))
@@ -657,7 +667,7 @@ class StatusCommand(Verb):
       return EXIT_OK
     else:
       context.print_err("Found no jobs matching %s" %
-          context.render_partial_jobkey(context.options.jobspec))
+          self._render_partial_jobkey(context.options.jobspec))
       return EXIT_INVALID_PARAMETER
 
   def execute(self, context):

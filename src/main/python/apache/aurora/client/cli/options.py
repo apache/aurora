@@ -15,6 +15,7 @@
 from argparse import ArgumentTypeError
 from collections import namedtuple
 
+from pystachio import Ref
 from twitter.common.quantity.parse_simple import parse_time
 
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -136,6 +137,22 @@ def instance_specifier(spec_str):
   return TaskInstanceKey(jobkey, instances)
 
 
+def binding_parser(binding):
+  """Pystachio takes bindings in the form of a list of dictionaries. Each pystachio binding
+  becomes another dictionary in the list. So we need to convert the bindings specified by
+  the user from a list of "name=value" formatted strings to a list of the dictionaries
+  expected by pystachio.
+  """
+  binding_parts = binding.split("=")
+  if len(binding_parts) != 2:
+    raise ValueError('Binding parameter must be formatted name=value')
+  try:
+    ref = Ref.from_address(binding_parts[0])
+  except Ref.InvalidRefError as e:
+    raise ValueError("Could not parse binding parameter %s: %s" % (binding, e))
+  return {ref: binding_parts[1]}
+
+
 BATCH_OPTION = CommandOption('--batch-size', type=int, default=1,
         help='Number of instances to be operate on in one iteration')
 
@@ -144,6 +161,7 @@ BIND_OPTION = CommandOption('--bind', dest='bindings',
     action='append',
     default=[],
     metavar="var=value",
+    type=binding_parser,
     help='Bind a pystachio variable name to a value. '
     'Multiple flags may be used to specify multiple values.')
 
