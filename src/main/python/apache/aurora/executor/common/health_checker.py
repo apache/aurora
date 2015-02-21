@@ -19,6 +19,7 @@ import time
 from mesos.interface.mesos_pb2 import TaskState
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
+from twitter.common.metrics import LambdaGauge
 
 from apache.aurora.common.http_signaler import HttpSignaler
 
@@ -63,6 +64,7 @@ class ThreadedHealthChecker(ExceptionalThread):
     self.interval = interval_secs
     self.max_consecutive_failures = max_consecutive_failures
     self.snooze_file = None
+    self.snoozed = False
 
     if self.sandbox and self.sandbox.exists():
       self.snooze_file = os.path.join(self.sandbox.root, '.healthchecksnooze')
@@ -81,9 +83,11 @@ class ThreadedHealthChecker(ExceptionalThread):
 
   def _perform_check_if_not_disabled(self):
     if self.snooze_file and os.path.isfile(self.snooze_file):
+      self.snoozed = True
       log.info("Health check snooze file found at %s. Health checks disabled.", self.snooze_file)
       return True, None
 
+    self.snoozed = False
     log.debug("Health checks enabled. Performing health check.")
     return self.checker()
 
@@ -123,6 +127,14 @@ class HealthChecker(StatusChecker):
     health_checker should be a callable returning a tuple of (boolean, reason), indicating
     respectively the health of the service and the reason for its failure (or None if the service is
     still healthy).
+
+    Exported metrics:
+      health_checker.consecutive_failures: Number of consecutive failures observed.  Resets
+        to zero on successful health check.
+      health_checker.snoozed: Returns 1 if the health checker is snoozed, 0 if not.
+      health_checker.total_latency_secs: Total time waiting for the health checker to respond in
+        seconds. To get average latency, use health_checker.total_latency / health_checker.checks.
+      health_checker.checks: Total number of health checks performed.
   """
 
   def __init__(self,
@@ -132,19 +144,43 @@ class HealthChecker(StatusChecker):
                initial_interval_secs=None,
                max_consecutive_failures=0,
                clock=time):
+    self._health_checks = 0
+    self._total_latency = 0
+    self._stats_lock = threading.Lock()
+    self._clock = clock
     self.threaded_health_checker = ThreadedHealthChecker(
-        health_checker,
+        self._timing_wrapper(health_checker),
         sandbox,
         interval_secs,
         initial_interval_secs,
         max_consecutive_failures,
         clock)
+    self.metrics.register(LambdaGauge('consecutive_failures',
+        lambda: self.threaded_health_checker.current_consecutive_failures))
+    self.metrics.register(LambdaGauge('snoozed', lambda: int(self.threaded_health_checker.snoozed)))
+    self.metrics.register(LambdaGauge('total_latency_secs', lambda: self._total_latency))
+    self.metrics.register(LambdaGauge('checks', lambda: self._health_checks))
+
+  def _timing_wrapper(self, closure):
+    """A wrapper around the health check closure that times the health check duration."""
+    def wrapper(*args, **kw):
+      start = self._clock.time()
+      success, failure_reason = closure(*args, **kw)
+      stop = self._clock.time()
+      with self._stats_lock:
+        self._health_checks += 1
+        self._total_latency += stop - start
+      return (success, failure_reason)
+    return wrapper
 
   @property
   def status(self):
     if not self.threaded_health_checker.healthy:
       return StatusResult('Failed health check! %s' % self.threaded_health_checker.reason,
           TaskState.Value('TASK_FAILED'))
+
+  def name(self):
+    return 'health_checker'
 
   def start(self):
     super(HealthChecker, self).start()

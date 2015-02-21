@@ -105,25 +105,61 @@ class TestHealthChecker(unittest.TestCase):
     self._clock.tick(initial_interval_secs)
     assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
+    assert hct.metrics.sample()['consecutive_failures'] == 1
     self._clock.tick(interval_secs)
     assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
+    assert hct.metrics.sample()['consecutive_failures'] == 2
     self._clock.tick(interval_secs)
     assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
+    assert hct.metrics.sample()['consecutive_failures'] == 0
 
     # 3 consecutive health check failures.
     self._clock.tick(interval_secs)
     assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
+    assert hct.metrics.sample()['consecutive_failures'] == 1
     self._clock.tick(interval_secs)
     assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status is None
+    assert hct.metrics.sample()['consecutive_failures'] == 2
     self._clock.tick(interval_secs)
     assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
     assert hct.status.status == TaskState.Value('TASK_FAILED')
+    assert hct.metrics.sample()['consecutive_failures'] == 3
     hct.stop()
     assert self._checker.health.call_count == 6
+
+  def test_health_checker_metrics(self):
+    def slow_check():
+      self._clock.sleep(0.5)
+      return (True, None)
+    hct = HealthChecker(slow_check, interval_secs=1, initial_interval_secs=1, clock=self._clock)
+    hct.start()
+    assert hct._total_latency == 0
+    assert hct.metrics.sample()['total_latency_secs'] == 0
+
+    # start the health check (during health check it is still 0)
+    self._clock.tick(1.0)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    assert hct._total_latency == 0
+    assert hct.metrics.sample()['total_latency_secs'] == 0
+    assert hct.metrics.sample()['checks'] == 0
+
+    # finish the health check
+    self._clock.tick(0.5)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    assert hct._total_latency == 0.5
+    assert hct.metrics.sample()['total_latency_secs'] == 0.5
+    assert hct.metrics.sample()['checks'] == 1
+
+    # tick again
+    self._clock.tick(1.5)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    assert hct._total_latency == 1.0
+    assert hct.metrics.sample()['total_latency_secs'] == 1.0
+    assert hct.metrics.sample()['checks'] == 2
 
 
 class TestHealthCheckerProvider(unittest.TestCase):
@@ -166,15 +202,15 @@ class TestThreadedHealthChecker(unittest.TestCase):
     self.interval_secs = 5
     self.max_consecutive_failures = 2
     self.clock = mock.Mock(spec=time)
-    self.threaded_health_checker = ThreadedHealthChecker(
+    self.clock.time.return_value = 1.0
+    self.health_checker = HealthChecker(
         self.signaler.health,
         None,
         self.interval_secs,
         self.initial_interval_secs,
         self.max_consecutive_failures,
         self.clock)
-
-    self.threaded_health_checker_sandbox_exists = ThreadedHealthChecker(
+    self.health_checker_sandbox_exists = HealthChecker(
         self.signaler.health,
         self.sandbox,
         self.interval_secs,
@@ -183,59 +219,63 @@ class TestThreadedHealthChecker(unittest.TestCase):
         self.clock)
 
   def test_perform_check_if_not_disabled_snooze_file_is_none(self):
-    self.threaded_health_checker.snooze_file = None
-
+    self.health_checker.threaded_health_checker.snooze_file = None
     assert self.signaler.health.call_count == 0
-    self.threaded_health_checker._perform_check_if_not_disabled()
+    assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
+    self.health_checker.threaded_health_checker._perform_check_if_not_disabled()
     assert self.signaler.health.call_count == 1
+    assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
 
   @mock.patch('os.path', spec_set=os.path)
   def test_perform_check_if_not_disabled_no_snooze_file(self, mock_os_path):
     mock_os_path.isfile.return_value = False
-
     assert self.signaler.health.call_count == 0
-    self.threaded_health_checker_sandbox_exists._perform_check_if_not_disabled()
+    assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
+    self.health_checker_sandbox_exists.threaded_health_checker._perform_check_if_not_disabled()
     assert self.signaler.health.call_count == 1
+    assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
 
   @mock.patch('os.path', spec_set=os.path)
   def test_perform_check_if_not_disabled_snooze_file_exists(self, mock_os_path):
     mock_os_path.isfile.return_value = True
-
     assert self.signaler.health.call_count == 0
-    result = self.threaded_health_checker_sandbox_exists._perform_check_if_not_disabled()
+    assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
+    result = (
+        self.health_checker_sandbox_exists.threaded_health_checker._perform_check_if_not_disabled())
     assert self.signaler.health.call_count == 0
+    assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 1
     assert result == (True, None)
 
   def test_maybe_update_failure_count(self):
-    assert self.threaded_health_checker.current_consecutive_failures == 0
-    assert self.threaded_health_checker.healthy is True
+    hc = self.health_checker.threaded_health_checker
 
-    self.threaded_health_checker._maybe_update_failure_count(True, 'reason')
-    assert self.threaded_health_checker.current_consecutive_failures == 0
+    assert hc.current_consecutive_failures == 0
+    assert hc.healthy is True
 
-    self.threaded_health_checker._maybe_update_failure_count(False, 'reason')
-    assert self.threaded_health_checker.current_consecutive_failures == 1
-    assert self.threaded_health_checker.healthy is True
+    hc._maybe_update_failure_count(True, 'reason')
+    assert hc.current_consecutive_failures == 0
 
-    self.threaded_health_checker._maybe_update_failure_count(False, 'reason')
-    assert self.threaded_health_checker.current_consecutive_failures == 2
-    assert self.threaded_health_checker.healthy is True
+    hc._maybe_update_failure_count(False, 'reason')
+    assert hc.current_consecutive_failures == 1
+    assert hc.healthy is True
 
-    self.threaded_health_checker._maybe_update_failure_count(False, 'reason')
-    assert self.threaded_health_checker.healthy is False
-    assert self.threaded_health_checker.reason == 'reason'
+    hc._maybe_update_failure_count(False, 'reason')
+    assert hc.current_consecutive_failures == 2
+    assert hc.healthy is True
+
+    hc._maybe_update_failure_count(False, 'reason')
+    assert hc.healthy is False
+    assert hc.reason == 'reason'
 
   @mock.patch('apache.aurora.executor.common.health_checker.ThreadedHealthChecker'
       '._maybe_update_failure_count',
       spec=ThreadedHealthChecker._maybe_update_failure_count)
   def test_run(self, mock_maybe_update_failure_count):
     mock_is_set = mock.Mock(spec=threading._Event.is_set)
-    self.threaded_health_checker.dead.is_set = mock_is_set
+    self.health_checker.threaded_health_checker.dead.is_set = mock_is_set
     liveness = [False, False, True]
-    def is_set():
-      return liveness.pop(0)
-    self.threaded_health_checker.dead.is_set.side_effect = is_set
-    self.threaded_health_checker.run()
+    self.health_checker.threaded_health_checker.dead.is_set.side_effect = lambda: liveness.pop(0)
+    self.health_checker.threaded_health_checker.run()
     assert self.clock.sleep.call_count == 3
     assert mock_maybe_update_failure_count.call_count == 2
 
@@ -243,10 +283,10 @@ class TestThreadedHealthChecker(unittest.TestCase):
       spec=ExceptionalThread.start)
   def test_start(self, mock_start):
     assert mock_start.call_count == 0
-    self.threaded_health_checker.start()
-    mock_start.assert_called_once_with(self.threaded_health_checker)
+    self.health_checker.threaded_health_checker.start()
+    mock_start.assert_called_once_with(self.health_checker.threaded_health_checker)
 
   def test_stop(self):
-    assert not self.threaded_health_checker.dead.is_set()
-    self.threaded_health_checker.stop()
-    assert self.threaded_health_checker.dead.is_set()
+    assert not self.health_checker.threaded_health_checker.dead.is_set()
+    self.health_checker.threaded_health_checker.stop()
+    assert self.health_checker.threaded_health_checker.dead.is_set()
