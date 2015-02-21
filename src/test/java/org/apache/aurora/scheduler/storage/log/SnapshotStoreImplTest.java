@@ -31,6 +31,7 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateEvent;
+import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Lock;
@@ -49,6 +50,7 @@ import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -72,6 +74,11 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     clock.setNowMillis(NOW);
     storageUtil = new StorageTestUtil(this);
     snapshotStore = new SnapshotStoreImpl(clock, storageUtil.storage);
+  }
+
+  private static IJobUpdateKey makeKey(String id) {
+    return IJobUpdateKey.build(
+        new JobUpdateKey(JobKeys.from("role", "env", "job").newBuilder(), id));
   }
 
   @Test
@@ -100,15 +107,21 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     SchedulerMetadata metadata = new SchedulerMetadata()
         .setFrameworkId(frameworkId)
         .setVersion(CURRENT_API_VERSION);
-    final String updateId1 = "updateId1";
-    final String updateId2 = "updateId2";
+    IJobUpdateKey updateId1 =  makeKey("updateId1");
+    IJobUpdateKey updateId2 = makeKey("updateId2");
     IJobUpdateDetails updateDetails1 = IJobUpdateDetails.build(new JobUpdateDetails()
-        .setUpdate(new JobUpdate().setSummary(new JobUpdateSummary().setUpdateId(updateId1)))
+        .setUpdate(new JobUpdate().setSummary(
+            new JobUpdateSummary()
+                .setUpdateId(updateId1.getId())
+                .setJobKey(updateId1.getJob().newBuilder())))
         .setUpdateEvents(ImmutableList.of(new JobUpdateEvent().setStatus(JobUpdateStatus.ERROR)))
         .setInstanceEvents(ImmutableList.of(new JobInstanceUpdateEvent().setTimestampMs(123L))));
 
     IJobUpdateDetails updateDetails2 = IJobUpdateDetails.build(new JobUpdateDetails()
-        .setUpdate(new JobUpdate().setSummary(new JobUpdateSummary().setUpdateId(updateId2))));
+        .setUpdate(new JobUpdate().setSummary(
+            new JobUpdateSummary()
+                .setUpdateId(updateId2.getId())
+                .setJobKey(updateId2.getJob().newBuilder()))));
 
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
@@ -139,11 +152,11 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.jobUpdateStore.saveJobUpdate(
         updateDetails1.getUpdate(), Optional.fromNullable(lockToken));
     storageUtil.jobUpdateStore.saveJobUpdateEvent(
-        Iterables.getOnlyElement(updateDetails1.getUpdateEvents()),
-        updateId1);
+        updateId1,
+        Iterables.getOnlyElement(updateDetails1.getUpdateEvents()));
     storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(
-        Iterables.getOnlyElement(updateDetails1.getInstanceEvents()),
-        updateId1);
+        updateId1,
+        Iterables.getOnlyElement(updateDetails1.getInstanceEvents()));
     storageUtil.jobUpdateStore.saveJobUpdate(
         updateDetails2.getUpdate(), Optional.<String>absent());
 

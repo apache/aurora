@@ -30,7 +30,6 @@ import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
@@ -126,24 +125,14 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
 
   @Timed("job_update_store_save_event")
   @Override
-  public void saveJobUpdateEvent(IJobUpdateEvent event, String updateId) {
-    Optional<IJobUpdateKey> key = fetchUpdateKey(updateId);
-    if (key.isPresent()) {
-      jobEventMapper.insert(key.get(), event.newBuilder());
-    } else {
-      throw new StorageException("No update to associate with update ID " + updateId);
-    }
+  public void saveJobUpdateEvent(IJobUpdateKey key, IJobUpdateEvent event) {
+    jobEventMapper.insert(key, event.newBuilder());
   }
 
   @Timed("job_update_store_save_instance_event")
   @Override
-  public void saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent event, String updateId) {
-    Optional<IJobUpdateKey> key = fetchUpdateKey(updateId);
-    if (key.isPresent()) {
-      instanceEventMapper.insert(event.newBuilder(), key.get());
-    } else {
-      throw new StorageException("No update to associate with update ID " + updateId);
-    }
+  public void saveJobInstanceUpdateEvent(IJobUpdateKey key, IJobInstanceUpdateEvent event) {
+    instanceEventMapper.insert(key, event.newBuilder());
   }
 
   @Timed("job_update_store_delete_all")
@@ -159,18 +148,18 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
     }
   };
 
-  private static final Function<PruneVictim, String> GET_UPDATE_ID =
-      new Function<PruneVictim, String>() {
+  private static final Function<PruneVictim, IJobUpdateKey> GET_UPDATE_KEY =
+      new Function<PruneVictim, IJobUpdateKey>() {
         @Override
-        public String apply(PruneVictim victim) {
-          return victim.getUpdate().getId();
+        public IJobUpdateKey apply(PruneVictim victim) {
+          return IJobUpdateKey.build(victim.getUpdate());
         }
       };
 
   @Timed("job_update_store_prune_history")
   @Override
-  public Set<String> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs) {
-    ImmutableSet.Builder<String> pruned = ImmutableSet.builder();
+  public Set<IJobUpdateKey> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs) {
+    ImmutableSet.Builder<IJobUpdateKey> pruned = ImmutableSet.builder();
 
     Set<Long> jobKeyIdsToPrune = detailsMapper.selectJobKeysForPruning(
         perJobRetainCount,
@@ -184,7 +173,7 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
 
       detailsMapper.deleteCompletedUpdates(
           FluentIterable.from(pruneVictims).transform(GET_ROW_ID).toSet());
-      pruned.addAll(FluentIterable.from(pruneVictims).transform(GET_UPDATE_ID));
+      pruned.addAll(FluentIterable.from(pruneVictims).transform(GET_UPDATE_KEY));
     }
 
     return pruned.build();
@@ -266,7 +255,9 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
     return ImmutableSet.copyOf(detailsMapper.selectAllDetails());
   }
 
-  private Optional<IJobUpdateKey> fetchUpdateKey(String updateId) {
+  @Timed("job_update_store_fetch_update_key")
+  @Override
+  public Optional<IJobUpdateKey> fetchUpdateKey(String updateId) {
     return Optional.fromNullable(detailsMapper.selectUpdateKey(updateId))
         .transform(IJobUpdateKey.FROM_BUILDER);
   }

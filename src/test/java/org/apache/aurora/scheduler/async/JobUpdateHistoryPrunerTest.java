@@ -21,7 +21,10 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.scheduler.async.JobUpdateHistoryPruner.HistoryPrunerSettings;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.junit.Test;
@@ -41,8 +44,12 @@ public class JobUpdateHistoryPrunerTest extends EasyMockTest {
     Clock mockClock = createMock(Clock.class);
     expect(mockClock.nowMillis()).andReturn(2L).times(2);
 
-    expect(storageUtil.jobUpdateStore.pruneHistory(1, 1)).andReturn(ImmutableSet.of("id1", "id2"));
-    expect(storageUtil.jobUpdateStore.pruneHistory(1, 1)).andReturn(ImmutableSet.<String>of());
+    expect(storageUtil.jobUpdateStore.pruneHistory(1, 1))
+        .andReturn(ImmutableSet.of(
+            IJobUpdateKey.build(
+                new JobUpdateKey().setJob(new JobKey("role", "env", "job")).setId("id1"))));
+    expect(storageUtil.jobUpdateStore.pruneHistory(1, 1))
+        .andReturn(ImmutableSet.<IJobUpdateKey>of());
 
     control.replay();
 

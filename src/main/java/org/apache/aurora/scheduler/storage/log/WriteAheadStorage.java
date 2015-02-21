@@ -23,7 +23,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-import com.twitter.common.base.MorePreconditions;
 
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
@@ -60,6 +59,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -276,28 +276,28 @@ class WriteAheadStorage extends ForwardingStore implements
   }
 
   @Override
-  public void saveJobUpdateEvent(IJobUpdateEvent event, String updateId) {
+  public void saveJobUpdateEvent(IJobUpdateKey key, IJobUpdateEvent event) {
+    requireNonNull(key);
     requireNonNull(event);
-    MorePreconditions.checkNotBlank(updateId);
 
-    write(Op.saveJobUpdateEvent(new SaveJobUpdateEvent(event.newBuilder(), updateId)));
-    jobUpdateStore.saveJobUpdateEvent(event, updateId);
+    write(Op.saveJobUpdateEvent(
+        new SaveJobUpdateEvent(event.newBuilder(), key.getId(), key.newBuilder())));
+    jobUpdateStore.saveJobUpdateEvent(key, event);
   }
 
   @Override
-  public void saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent event, String updateId) {
+  public void saveJobInstanceUpdateEvent(IJobUpdateKey key, IJobInstanceUpdateEvent event) {
+    requireNonNull(key);
     requireNonNull(event);
-    MorePreconditions.checkNotBlank(updateId);
 
-    write(Op.saveJobInstanceUpdateEvent(new SaveJobInstanceUpdateEvent(
-        event.newBuilder(),
-        updateId)));
-    jobUpdateStore.saveJobInstanceUpdateEvent(event, updateId);
+    write(Op.saveJobInstanceUpdateEvent(
+        new SaveJobInstanceUpdateEvent(event.newBuilder(), key.getId(), key.newBuilder())));
+    jobUpdateStore.saveJobInstanceUpdateEvent(key, event);
   }
 
   @Override
-  public Set<String> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs) {
-    Set<String> prunedUpdates = jobUpdateStore.pruneHistory(
+  public Set<IJobUpdateKey> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs) {
+    Set<IJobUpdateKey> prunedUpdates = jobUpdateStore.pruneHistory(
         perJobRetainCount,
         historyPruneThresholdMs);
 

@@ -1312,9 +1312,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     IJobUpdateKey updateKey = validateJobUpdateKey(mutableUpdateKey);
     try {
       authorizeJobUpdateAction(updateKey, session);
-
-      // TODO(maxim): use IJobUpdateKey to pulse when AURORA-1093 is addressed.
-      JobUpdatePulseStatus result = jobUpdateController.pulse(updateKey.getId());
+      JobUpdatePulseStatus result = jobUpdateController.pulse(updateKey);
       return ok(Result.pulseJobUpdateResult(new PulseJobUpdateResult(result)));
     } catch (AuthFailedException e) {
       return error(AUTH_FAILED, e);

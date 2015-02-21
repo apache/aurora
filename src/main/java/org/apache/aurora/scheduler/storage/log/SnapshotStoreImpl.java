@@ -50,9 +50,11 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.updater.Updates;
 
 import static java.util.Objects.requireNonNull;
 
@@ -226,16 +228,16 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
               if (details.getUpdateEventsSize() > 0) {
                 for (JobUpdateEvent updateEvent : details.getUpdateEvents()) {
                   updateStore.saveJobUpdateEvent(
-                      IJobUpdateEvent.build(updateEvent),
-                      details.getUpdate().getSummary().getUpdateId());
+                      Updates.getKey(IJobUpdateSummary.build(details.getUpdate().getSummary())),
+                      IJobUpdateEvent.build(updateEvent));
                 }
               }
 
               if (details.getInstanceEventsSize() > 0) {
                 for (JobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
                   updateStore.saveJobInstanceUpdateEvent(
-                      IJobInstanceUpdateEvent.build(instanceEvent),
-                      details.getUpdate().getSummary().getUpdateId());
+                      Updates.getKey(IJobUpdateSummary.build(details.getUpdate().getSummary())),
+                      IJobInstanceUpdateEvent.build(instanceEvent));
                 }
               }
             }

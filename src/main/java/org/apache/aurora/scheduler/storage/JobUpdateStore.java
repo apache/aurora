@@ -24,6 +24,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 
@@ -82,6 +83,18 @@ public interface JobUpdateStore {
   Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails();
 
   /**
+   * Fetches an update key based on the update ID.
+   *
+   * <p>
+   * This is a compatibility shim for when updates were only identified by a string, and should
+   * be removed in 0.9.0.
+   *
+   * @param updateId Update identifier.
+   * @return The update key matching {@code updateId}.
+   */
+  Optional<IJobUpdateKey> fetchUpdateKey(String updateId);
+
+  /**
    * Gets the lock token associated with a job update.
    *
    * @param updateId Job update ID.
@@ -104,8 +117,9 @@ public interface JobUpdateStore {
      * Saves a new job update.
      *
      * <p>
-     * Note: This call must be followed by the {@link #saveJobUpdateEvent(IJobUpdateEvent, String)}
-     * before fetching a saved update as it does not save the following required fields:
+     * Note: This call must be followed by the
+     * {@link #saveJobUpdateEvent(IJobUpdateKey, IJobUpdateEvent)} before fetching a saved update as
+     * it does not save the following required fields:
      * <ul>
      *   <li>{@link org.apache.aurora.gen.JobUpdateState#status}</li>
      *   <li>{@link org.apache.aurora.gen.JobUpdateState#createdTimestampMs}</li>
@@ -124,18 +138,18 @@ public interface JobUpdateStore {
     /**
      * Saves a new job update event.
      *
+     * @param key Update identifier.
      * @param event Job update event to save.
-     * @param updateId Job update ID.
      */
-    void saveJobUpdateEvent(IJobUpdateEvent event, String updateId);
+    void saveJobUpdateEvent(IJobUpdateKey key, IJobUpdateEvent event);
 
     /**
      * Saves a new job instance update event.
      *
+     * @param key Update identifier.
      * @param event Job instance update event.
-     * @param updateId Job update ID.
      */
-    void saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent event, String updateId);
+    void saveJobInstanceUpdateEvent(IJobUpdateKey key, IJobInstanceUpdateEvent event);
 
     /**
      * Deletes all updates and update events from the store.
@@ -152,8 +166,8 @@ public interface JobUpdateStore {
      * @param historyPruneThresholdMs Earliest timestamp in the past to retain history.
      *                                Any completed updates created before this timestamp
      *                                will be pruned.
-     * @return Set of pruned update IDs.
+     * @return Set of pruned update keys.
      */
-    Set<String> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs);
+    Set<IJobUpdateKey> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs);
   }
 }

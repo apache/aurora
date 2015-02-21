@@ -207,10 +207,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("* * * * *");
   private static final Lock DEFAULT_LOCK = null;
   private static final String TASK_ID = "task_id";
-  private static final String UPDATE_ID = "82d6d790-3212-11e3-aa6e-0800200c9a74";
-  private static final UUID UU_ID = UUID.fromString(UPDATE_ID);
+  private static final UUID UU_ID = UUID.fromString("82d6d790-3212-11e3-aa6e-0800200c9a74");
   private static final IJobUpdateKey UPDATE_KEY =
-      IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), UPDATE_ID));
+      IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), UU_ID.toString()));
 
   private static final IResourceAggregate QUOTA =
       IResourceAggregate.build(new ResourceAggregate(10.0, 1024, 2048));
@@ -2621,7 +2620,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     request.getTaskConfig().unsetJob();
 
     Response response = assertOkResponse(thrift.startJobUpdate(request, SESSION));
-    assertEquals(UPDATE_ID, response.getResult().getStartJobUpdateResult().getUpdateId());
+    assertEquals(UPDATE_KEY.getId(), response.getResult().getStartJobUpdateResult().getUpdateId());
   }
 
   @Test
@@ -2661,7 +2660,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Response response =
         assertOkResponse(thrift.startJobUpdate(buildJobUpdateRequest(update), SESSION));
-    assertEquals(UPDATE_ID, response.getResult().getStartJobUpdateResult().getUpdateId());
+    assertEquals(UPDATE_KEY.getId(), response.getResult().getStartJobUpdateResult().getUpdateId());
   }
 
   @Test
@@ -3089,7 +3088,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testPulseJobUpdatePulsedAsCoordinator() throws Exception {
     expectAuth(UPDATE_COORDINATOR, true);
-    expect(jobUpdateController.pulse(UPDATE_ID)).andReturn(JobUpdatePulseStatus.OK);
+    expect(jobUpdateController.pulse(UPDATE_KEY)).andReturn(JobUpdatePulseStatus.OK);
 
     control.replay();
 
@@ -3102,7 +3101,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testPulseJobUpdatePulsedAsUser() throws Exception {
     expectAuth(UPDATE_COORDINATOR, false);
     expectAuth(ROLE, true);
-    expect(jobUpdateController.pulse(UPDATE_ID)).andReturn(JobUpdatePulseStatus.OK);
+    expect(jobUpdateController.pulse(UPDATE_KEY)).andReturn(JobUpdatePulseStatus.OK);
 
     control.replay();
 
@@ -3114,7 +3113,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testPulseJobUpdateFails() throws Exception {
     expectAuth(UPDATE_COORDINATOR, true);
-    expect(jobUpdateController.pulse(UPDATE_ID)).andThrow(new UpdateStateException("failure"));
+    expect(jobUpdateController.pulse(UPDATE_KEY)).andThrow(new UpdateStateException("failure"));
 
     control.replay();
 
@@ -3296,8 +3295,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     return IJobUpdate.build(new JobUpdate()
         .setSummary(new JobUpdateSummary()
-            .setJobKey(JOB_KEY.newBuilder())
-            .setUpdateId(UPDATE_ID)
+            .setJobKey(UPDATE_KEY.getJob().newBuilder())
+            .setUpdateId(UPDATE_KEY.getId())
             .setUser(ROLE_IDENTITY.getUser()))
         .setInstructions(new JobUpdateInstructions()
             .setSettings(buildJobUpdateSettings())

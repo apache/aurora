@@ -54,7 +54,7 @@ import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.aurora.scheduler.updater.JobUpdateController;
+import org.apache.aurora.scheduler.updater.Updates;
 
 import static java.util.Objects.requireNonNull;
 
@@ -362,7 +362,7 @@ public interface QuotaManager {
     static IJobUpdateQuery updateQuery(String role) {
       return IJobUpdateQuery.build(new JobUpdateQuery()
           .setRole(role)
-          .setUpdateStatuses(JobUpdateController.ACTIVE_JOB_UPDATE_STATES));
+          .setUpdateStatuses(Updates.ACTIVE_JOB_UPDATE_STATES));
     }
 
     private static RangeSet<Integer> instanceRangeSet(Set<IInstanceTaskConfig> configs) {

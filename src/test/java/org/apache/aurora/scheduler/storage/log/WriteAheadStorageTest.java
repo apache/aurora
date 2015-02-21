@@ -24,12 +24,14 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
 import org.apache.aurora.gen.storage.SaveTasks;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
@@ -41,6 +43,7 @@ import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.easymock.EasyMock;
 import org.junit.Before;
@@ -98,7 +101,10 @@ public class WriteAheadStorageTest extends EasyMockTest {
 
   @Test
   public void testPruneHistory() {
-    Set<String> pruned = ImmutableSet.of("a", "b");
+    Set<IJobUpdateKey> pruned = ImmutableSet.of(
+        IJobUpdateKey.build(new JobUpdateKey(JobKeys.from("role", "env", "job").newBuilder(), "a")),
+        IJobUpdateKey.build(
+            new JobUpdateKey(JobKeys.from("role", "env", "job").newBuilder(), "b")));
     expect(jobUpdateStore.pruneHistory(1, 1)).andReturn(pruned);
     expectOp(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory(1, 1)));
 
@@ -109,7 +115,7 @@ public class WriteAheadStorageTest extends EasyMockTest {
 
   @Test
   public void testNoopPruneHistory() {
-    expect(jobUpdateStore.pruneHistory(1, 1)).andReturn(ImmutableSet.<String>of());
+    expect(jobUpdateStore.pruneHistory(1, 1)).andReturn(ImmutableSet.<IJobUpdateKey>of());
 
     control.replay();
 

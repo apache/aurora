@@ -51,6 +51,7 @@ import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.JobUpdateInstructions;
+import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdatePulseStatus;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
@@ -87,6 +88,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
@@ -132,9 +134,10 @@ import static org.junit.Assert.fail;
 
 public class JobUpdaterIT extends EasyMockTest {
 
-  private static final String UPDATE_ID = "update_id";
   private static final String USER = "user";
   private static final IJobKey JOB = JobKeys.from("role", "env", "job1");
+  private static final IJobUpdateKey UPDATE_ID =
+      IJobUpdateKey.build(new JobUpdateKey(JOB.newBuilder(), "update_id"));
   private static final Amount<Long, Time> RUNNING_TIMEOUT = Amount.of(1000L, Time.MILLISECONDS);
   private static final Amount<Long, Time> WATCH_TIMEOUT = Amount.of(2000L, Time.MILLISECONDS);
   private static final Amount<Long, Time> FLAPPING_THRESHOLD = Amount.of(1L, Time.MILLISECONDS);
@@ -277,7 +280,7 @@ public class JobUpdaterIT extends EasyMockTest {
     IJobUpdateDetails details = storage.read(new Work.Quiet<IJobUpdateDetails>() {
       @Override
       public IJobUpdateDetails apply(StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(UPDATE_ID).get();
+        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(UPDATE_ID.getId()).get();
       }
     });
     Iterable<IJobInstanceUpdateEvent> orderedEvents =
@@ -624,7 +627,9 @@ public class JobUpdaterIT extends EasyMockTest {
   public void testPulseInvalidUpdateId() throws Exception {
     control.replay();
 
-    assertEquals(JobUpdatePulseStatus.FINISHED, updater.pulse("invalid"));
+    assertEquals(
+        JobUpdatePulseStatus.FINISHED,
+        updater.pulse(IJobUpdateKey.build(new JobUpdateKey(JOB.newBuilder(), "invalid"))));
   }
 
   @Test
@@ -1012,11 +1017,11 @@ public class JobUpdaterIT extends EasyMockTest {
 
     store.saveJobUpdate(update, Optional.of(lock.getToken()));
     store.saveJobUpdateEvent(
+        Updates.getKey(update.getSummary()),
         IJobUpdateEvent.build(
             new JobUpdateEvent()
                 .setStatus(status)
-                .setTimestampMs(clock.nowMillis())),
-        update.getSummary().getUpdateId());
+                .setTimestampMs(clock.nowMillis())));
     return lock;
   }
 
@@ -1287,7 +1292,7 @@ public class JobUpdaterIT extends EasyMockTest {
     return IJobUpdateSummary.build(new JobUpdateSummary()
         .setUser("user")
         .setJobKey(JOB.newBuilder())
-        .setUpdateId(UPDATE_ID));
+        .setUpdateId(UPDATE_ID.getId()));
   }
 
   private static IJobUpdate makeJobUpdate(IInstanceTaskConfig... configs) {

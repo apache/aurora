@@ -13,26 +13,17 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import java.util.EnumSet;
-
 import org.apache.aurora.gen.JobUpdatePulseStatus;
-import org.apache.aurora.gen.JobUpdateStatus;
-import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 /**
  * A controller that exposes commands to initiate and modify active job updates.
  */
 public interface JobUpdateController {
-
-  /**
-   * Different states that an active job update may be in.
-   */
-  EnumSet<JobUpdateStatus> ACTIVE_JOB_UPDATE_STATES =
-      EnumSet.copyOf(apiConstants.ACTIVE_JOB_UPDATE_STATES);
 
   /**
    * Initiates an update.
@@ -108,9 +99,9 @@ public interface JobUpdateController {
    * {@link org.apache.aurora.gen.JobUpdateSettings#getBlockIfNoPulsesAfterMs}. Unblocks progress
    * if the update was previously blocked.
    *
-   * @param updateId Job update ID being pulsed.
+   * @param key Update identifier.
    * @return Job update pulse status.
    * @throws UpdateStateException If there is no update found or update is not coordinated.
    */
-  JobUpdatePulseStatus pulse(String updateId) throws UpdateStateException;
+  JobUpdatePulseStatus pulse(IJobUpdateKey key) throws UpdateStateException;
 }

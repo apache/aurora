@@ -27,8 +27,8 @@ interface JobInstanceUpdateEventMapper {
   /**
    * Inserts a new job instance update event into the database.
    *
-   * @param event Event to insert.
    * @param key Update key of the event.
+   * @param event Event to insert.
    */
-  void insert(@Param("event") JobInstanceUpdateEvent event, @Param("key") IJobUpdateKey key);
+  void insert(@Param("key") IJobUpdateKey key, @Param("event") JobInstanceUpdateEvent event);
 }

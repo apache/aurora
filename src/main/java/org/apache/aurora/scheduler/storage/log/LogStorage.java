@@ -22,6 +22,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,14 +39,18 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.SlidingStats;
+import com.twitter.common.stats.Stats;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.RewriteTask;
 import org.apache.aurora.gen.storage.SaveAcceptedJob;
+import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
+import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.base.AsyncUtil;
@@ -70,6 +75,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -201,6 +207,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
   private final SlidingStats writerWaitStats =
       new SlidingStats("log_storage_write_lock_wait", "ns");
+  private final AtomicLong droppedUpdateEvents = Stats.exportLong("dropped_update_events");
 
   /**
    * Identifies a local storage layer that is written to only after first ensuring the write
@@ -314,7 +321,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     return ImmutableMap.<LogEntry._Fields, Closure<LogEntry>>builder()
         .put(LogEntry._Fields.SNAPSHOT, new Closure<LogEntry>() {
           @Override
-          public void execute(LogEntry logEntry) throws RuntimeException {
+          public void execute(LogEntry logEntry) {
             Snapshot snapshot = logEntry.getSnapshot();
             LOG.info("Applying snapshot taken on " + new Date(snapshot.getTimestamp()));
             snapshotStore.applySnapshot(snapshot);
@@ -322,7 +329,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         })
         .put(LogEntry._Fields.TRANSACTION, new Closure<LogEntry>() {
           @Override
-          public void execute(final LogEntry logEntry) throws RuntimeException {
+          public void execute(final LogEntry logEntry) {
             write(new MutateWork.NoResult.Quiet() {
               @Override
               protected void execute(MutableStoreProvider unused) {
@@ -335,7 +342,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         })
         .put(LogEntry._Fields.NOOP, new Closure<LogEntry>() {
           @Override
-          public void execute(LogEntry item) throws RuntimeException {
+          public void execute(LogEntry item) {
             // Nothing to do here
           }
         })
@@ -347,13 +354,13 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     return ImmutableMap.<Op._Fields, Closure<Op>>builder()
         .put(Op._Fields.SAVE_FRAMEWORK_ID, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             writeBehindSchedulerStore.saveFrameworkId(op.getSaveFrameworkId().getId());
           }
         })
         .put(Op._Fields.SAVE_ACCEPTED_JOB, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             SaveAcceptedJob acceptedJob = op.getSaveAcceptedJob();
             writeBehindJobStore.saveAcceptedJob(
                 acceptedJob.getManagerId(),
@@ -362,20 +369,20 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         })
         .put(Op._Fields.REMOVE_JOB, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             writeBehindJobStore.removeJob(IJobKey.build(op.getRemoveJob().getJobKey()));
           }
         })
         .put(Op._Fields.SAVE_TASKS, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             writeBehindTaskStore.saveTasks(
                 IScheduledTask.setFromBuilders(op.getSaveTasks().getTasks()));
           }
         })
         .put(Op._Fields.REWRITE_TASK, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             RewriteTask rewriteTask = op.getRewriteTask();
             writeBehindTaskStore.unsafeModifyInPlace(
                 rewriteTask.getTaskId(),
@@ -384,13 +391,13 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         })
         .put(Op._Fields.REMOVE_TASKS, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             writeBehindTaskStore.deleteTasks(op.getRemoveTasks().getTaskIds());
           }
         })
         .put(Op._Fields.SAVE_QUOTA, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             SaveQuota saveQuota = op.getSaveQuota();
             writeBehindQuotaStore.saveQuota(
                 saveQuota.getRole(),
@@ -399,13 +406,13 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         })
         .put(Op._Fields.REMOVE_QUOTA, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             writeBehindQuotaStore.removeQuota(op.getRemoveQuota().getRole());
           }
         })
         .put(Op._Fields.SAVE_HOST_ATTRIBUTES, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             HostAttributes attributes = op.getSaveHostAttributes().getHostAttributes();
             // Prior to commit 5cf760b, the store would persist maintenance mode changes for
             // unknown hosts.  5cf760b began rejecting these, but the replicated log may still
@@ -419,19 +426,19 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         })
         .put(Op._Fields.SAVE_LOCK, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             writeBehindLockStore.saveLock(ILock.build(op.getSaveLock().getLock()));
           }
         })
         .put(Op._Fields.REMOVE_LOCK, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             writeBehindLockStore.removeLock(ILockKey.build(op.getRemoveLock().getLockKey()));
           }
         })
         .put(Op._Fields.SAVE_JOB_UPDATE, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             writeBehindJobUpdateStore.saveJobUpdate(
                 IJobUpdate.build(op.getSaveJobUpdate().getJobUpdate()),
                 Optional.fromNullable(op.getSaveJobUpdate().getLockToken()));
@@ -439,28 +446,52 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         })
         .put(Op._Fields.SAVE_JOB_UPDATE_EVENT, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
-            writeBehindJobUpdateStore.saveJobUpdateEvent(
-                IJobUpdateEvent.build(op.getSaveJobUpdateEvent().getEvent()),
-                op.getSaveJobUpdateEvent().getUpdateId());
+          public void execute(Op op) {
+            SaveJobUpdateEvent event = op.getSaveJobUpdateEvent();
+            if (!event.isSetKey()) {
+              event.setKey(getUpdateKeyById(event.getUpdateId()).orNull());
+            }
+
+            if (event.isSetKey()) {
+              writeBehindJobUpdateStore.saveJobUpdateEvent(
+                  IJobUpdateKey.build(event.getKey()),
+                  IJobUpdateEvent.build(op.getSaveJobUpdateEvent().getEvent()));
+            } else {
+              LOG.severe("Dropping unidentifiable op: " + op);
+              droppedUpdateEvents.incrementAndGet();
+            }
           }
         })
         .put(Op._Fields.SAVE_JOB_INSTANCE_UPDATE_EVENT, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
-            writeBehindJobUpdateStore.saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent.build(
-                op.getSaveJobInstanceUpdateEvent().getEvent()),
-                op.getSaveJobInstanceUpdateEvent().getUpdateId());
+          public void execute(Op op) {
+            SaveJobInstanceUpdateEvent event = op.getSaveJobInstanceUpdateEvent();
+            if (!event.isSetKey()) {
+              event.setKey(getUpdateKeyById(event.getUpdateId()).orNull());
+            }
+
+            if (event.isSetKey()) {
+              writeBehindJobUpdateStore.saveJobInstanceUpdateEvent(
+                  IJobUpdateKey.build(event.getKey()),
+                  IJobInstanceUpdateEvent.build(op.getSaveJobInstanceUpdateEvent().getEvent()));
+            } else {
+              LOG.severe("Dropping unidentifiable op: " + op);
+              droppedUpdateEvents.incrementAndGet();
+            }
           }
         })
         .put(Op._Fields.PRUNE_JOB_UPDATE_HISTORY, new Closure<Op>() {
           @Override
-          public void execute(Op op) throws RuntimeException {
+          public void execute(Op op) {
             writeBehindJobUpdateStore.pruneHistory(
                 op.getPruneJobUpdateHistory().getPerJobRetainCount(),
                 op.getPruneJobUpdateHistory().getHistoryPruneThresholdMs());
           }
         }).build();
+  }
+
+  private Optional<JobUpdateKey> getUpdateKeyById(String updateId) {
+    return writeBehindJobUpdateStore.fetchUpdateKey(updateId).transform(IJobUpdateKey.TO_BUILDER);
   }
 
   @Override

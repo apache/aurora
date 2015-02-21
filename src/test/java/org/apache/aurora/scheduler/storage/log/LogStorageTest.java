@@ -45,6 +45,7 @@ import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.JobUpdateInstructions;
+import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
@@ -97,6 +98,8 @@ import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -106,6 +109,7 @@ import org.apache.aurora.scheduler.storage.log.LogStorage.SchedulingService;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.updater.Updates;
 import org.easymock.Capture;
 import org.easymock.IAnswer;
 import org.junit.Before;
@@ -124,7 +128,8 @@ public class LogStorageTest extends EasyMockTest {
 
   private static final Amount<Long, Time> SNAPSHOT_INTERVAL = Amount.of(1L, Time.MINUTES);
   private static final IJobKey JOB_KEY = JobKeys.from("role", "env", "name");
-  private static final String UPDATE_ID = "testUpdateId";
+  private static final IJobUpdateKey UPDATE_ID =
+      IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), "testUpdateId"));
   private static final long NOW = 42L;
 
   private LogStorage logStorage;
@@ -347,27 +352,48 @@ public class LogStorageTest extends EasyMockTest {
     builder.add(createTransaction(Op.removeLock(removeLock)));
     storageUtil.lockStore.removeLock(ILockKey.build(removeLock.getLockKey()));
 
-    SaveJobUpdate saveUpdate = new SaveJobUpdate(new JobUpdate(), "token");
+    JobUpdate update = new JobUpdate()
+        .setSummary(new JobUpdateSummary()
+            .setJobKey(UPDATE_ID.getJob().newBuilder())
+            .setUpdateId(UPDATE_ID.getId()));
+    SaveJobUpdate saveUpdate = new SaveJobUpdate(update, "token");
     builder.add(createTransaction(Op.saveJobUpdate(saveUpdate)));
     storageUtil.jobUpdateStore.saveJobUpdate(
         IJobUpdate.build(saveUpdate.getJobUpdate()),
         Optional.of(saveUpdate.getLockToken()));
 
-    SaveJobUpdateEvent saveUpdateEvent = new SaveJobUpdateEvent(new JobUpdateEvent(), "update");
+    IJobUpdateKey key = Updates.getKey(IJobUpdateSummary.build(update.getSummary()));
+    SaveJobUpdateEvent saveUpdateEvent =
+        new SaveJobUpdateEvent(new JobUpdateEvent(), "update", key.newBuilder());
     builder.add(createTransaction(Op.saveJobUpdateEvent(saveUpdateEvent)));
     storageUtil.jobUpdateStore.saveJobUpdateEvent(
-        IJobUpdateEvent.build(saveUpdateEvent.getEvent()),
-        saveUpdateEvent.getUpdateId());
+        key,
+        IJobUpdateEvent.build(saveUpdateEvent.getEvent()));
 
     SaveJobInstanceUpdateEvent saveInstanceEvent =
-        new SaveJobInstanceUpdateEvent(new JobInstanceUpdateEvent(), "update");
+        new SaveJobInstanceUpdateEvent(new JobInstanceUpdateEvent(), "update", key.newBuilder());
     builder.add(createTransaction(Op.saveJobInstanceUpdateEvent(saveInstanceEvent)));
     storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(
-        IJobInstanceUpdateEvent.build(saveInstanceEvent.getEvent()),
-        saveInstanceEvent.getUpdateId());
+        key,
+        IJobInstanceUpdateEvent.build(saveInstanceEvent.getEvent()));
+
+    // Backwards compatibility as part of AURORA-1093.  Exercises behavior to drop job
+    // update-related records that cannot be found based on their update ID string alone.
+    SaveJobInstanceUpdateEvent unknownSaveInstanceEvent =
+        new SaveJobInstanceUpdateEvent(new JobInstanceUpdateEvent(), "update5", null);
+    builder.add(createTransaction(Op.saveJobInstanceUpdateEvent(unknownSaveInstanceEvent)));
+    expect(storageUtil.jobUpdateStore.fetchUpdateKey("update5"))
+        .andReturn(Optional.<IJobUpdateKey>absent());
+
+    SaveJobUpdateEvent unknownSaveUpdateEvent =
+        new SaveJobUpdateEvent(new JobUpdateEvent(), "update6", null);
+    builder.add(createTransaction(Op.saveJobUpdateEvent(unknownSaveUpdateEvent)));
+    expect(storageUtil.jobUpdateStore.fetchUpdateKey("update6"))
+        .andReturn(Optional.<IJobUpdateKey>absent());
 
     builder.add(createTransaction(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory(5, 10L))));
-    expect(storageUtil.jobUpdateStore.pruneHistory(5, 10L)).andReturn(ImmutableSet.of("id2"));
+    expect(storageUtil.jobUpdateStore.pruneHistory(5, 10L))
+        .andReturn(ImmutableSet.of(IJobUpdateKey.build(UPDATE_ID.newBuilder())));
 
     // NOOP LogEntry
     builder.add(LogEntry.noop(true));
@@ -928,15 +954,16 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
-        storageUtil.jobUpdateStore.saveJobUpdateEvent(event, UPDATE_ID);
+        storageUtil.jobUpdateStore.saveJobUpdateEvent(UPDATE_ID, event);
         streamMatcher.expectTransaction(Op.saveJobUpdateEvent(new SaveJobUpdateEvent(
             event.newBuilder(),
-            UPDATE_ID))).andReturn(position);
+            UPDATE_ID.getId(),
+            UPDATE_ID.newBuilder()))).andReturn(position);
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().saveJobUpdateEvent(event, UPDATE_ID);
+        storeProvider.getJobUpdateStore().saveJobUpdateEvent(UPDATE_ID, event);
       }
     }.run();
   }
@@ -952,14 +979,18 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
-        storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(event, UPDATE_ID);
+        storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(UPDATE_ID, event);
         streamMatcher.expectTransaction(Op.saveJobInstanceUpdateEvent(
-            new SaveJobInstanceUpdateEvent(event.newBuilder(), UPDATE_ID))).andReturn(position);
+            new SaveJobInstanceUpdateEvent(
+                event.newBuilder(),
+                UPDATE_ID.getId(),
+                UPDATE_ID.newBuilder())))
+            .andReturn(position);
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().saveJobInstanceUpdateEvent(event, UPDATE_ID);
+        storeProvider.getJobUpdateStore().saveJobInstanceUpdateEvent(UPDATE_ID, event);
       }
     }.run();
   }
@@ -976,7 +1007,8 @@ public class LogStorageTest extends EasyMockTest {
         storageUtil.expectWrite();
         expect(storageUtil.jobUpdateStore.pruneHistory(
             pruneHistory.getPerJobRetainCount(),
-            pruneHistory.getHistoryPruneThresholdMs())).andReturn(ImmutableSet.of("id1"));
+            pruneHistory.getHistoryPruneThresholdMs()))
+            .andReturn(ImmutableSet.of(UPDATE_ID));
 
         streamMatcher.expectTransaction(Op.pruneJobUpdateHistory(pruneHistory)).andReturn(position);
       }

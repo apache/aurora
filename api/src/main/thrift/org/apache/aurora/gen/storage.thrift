@@ -80,13 +80,16 @@ struct StoredJobUpdateDetails {
 
 struct SaveJobUpdateEvent {
   1: api.JobUpdateEvent event
-  /** ID of the lock associated with this update. */
+  // TODO(wfarner): Remove this in 0.9.0.
   2: string updateId
+  3: api.JobUpdateKey key
 }
 
 struct SaveJobInstanceUpdateEvent {
   1: api.JobInstanceUpdateEvent event
+  // TODO(wfarner): Remove this in 0.9.0.
   2: string updateId
+  3: api.JobUpdateKey key
 }
 
 struct PruneJobUpdateHistory {
