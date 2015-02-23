@@ -15,6 +15,7 @@
 import os.path
 import threading
 import time
+import traceback
 
 from mesos.interface.mesos_pb2 import TaskState
 from twitter.common import log
@@ -89,7 +90,13 @@ class ThreadedHealthChecker(ExceptionalThread):
 
     self.snoozed = False
     log.debug("Health checks enabled. Performing health check.")
-    return self.checker()
+
+    try:
+      return self.checker()
+    except Exception as e:
+      log.error('Internal error in health check:')
+      log.error(traceback.format_exc())
+      return False, 'Internal health check error: %s' % e
 
   def _maybe_update_failure_count(self, is_healthy, reason):
     if not is_healthy:
@@ -106,7 +113,8 @@ class ThreadedHealthChecker(ExceptionalThread):
 
   def run(self):
     log.debug('Health checker thread started.')
-    self.clock.sleep(self.initial_interval)
+    if self.initial_interval > 0:
+      self.clock.sleep(self.initial_interval)
     log.debug('Initial interval expired.')
     while not self.dead.is_set():
       is_healthy, reason = self._perform_check_if_not_disabled()

@@ -55,30 +55,31 @@ class TestHealthChecker(unittest.TestCase):
     self.append_health_checks(False)
     hct = HealthChecker(self._checker.health, interval_secs=5, clock=self._clock)
     hct.start()
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
     self._clock.assert_waiting(hct.threaded_health_checker, 10)
     assert hct.status is None
     self._clock.tick(6)
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
     assert hct.status is None
     self._clock.tick(3)
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
     assert hct.status is None
     self._clock.tick(5)
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
     assert hct.status.status == TaskState.Value('TASK_FAILED')
     hct.stop()
     assert self._checker.health.call_count == 1
 
   def test_initial_interval_whatev(self):
-    self.append_health_checks(False)
+    self.append_health_checks(False, 2)
     hct = HealthChecker(
         self._checker.health,
         interval_secs=5,
         initial_interval_secs=0,
         clock=self._clock)
     hct.start()
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=5)
     assert hct.status.status == TaskState.Value('TASK_FAILED')
     hct.stop()
     # this is an implementation detail -- we healthcheck in the initializer and
@@ -100,32 +101,40 @@ class TestHealthChecker(unittest.TestCase):
         max_consecutive_failures=2,
         clock=self._clock)
     hct.start()
+    self._clock.converge(threads=[hct.threaded_health_checker])
 
     # 2 consecutive health check failures followed by a successful health check.
-    self._clock.tick(initial_interval_secs)
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    epsilon = 0.001
+    self._clock.tick(initial_interval_secs + epsilon)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
     assert hct.status is None
     assert hct.metrics.sample()['consecutive_failures'] == 1
-    self._clock.tick(interval_secs)
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    self._clock.tick(interval_secs + epsilon)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
     assert hct.status is None
     assert hct.metrics.sample()['consecutive_failures'] == 2
-    self._clock.tick(interval_secs)
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    self._clock.tick(interval_secs + epsilon)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
     assert hct.status is None
     assert hct.metrics.sample()['consecutive_failures'] == 0
 
     # 3 consecutive health check failures.
-    self._clock.tick(interval_secs)
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    self._clock.tick(interval_secs + epsilon)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
     assert hct.status is None
     assert hct.metrics.sample()['consecutive_failures'] == 1
-    self._clock.tick(interval_secs)
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    self._clock.tick(interval_secs + epsilon)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
     assert hct.status is None
     assert hct.metrics.sample()['consecutive_failures'] == 2
-    self._clock.tick(interval_secs)
-    assert self._clock.converge(threads=[hct.threaded_health_checker], timeout=1)
+    self._clock.tick(interval_secs + epsilon)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
     assert hct.status.status == TaskState.Value('TASK_FAILED')
     assert hct.metrics.sample()['consecutive_failures'] == 3
     hct.stop()
@@ -137,26 +146,35 @@ class TestHealthChecker(unittest.TestCase):
       return (True, None)
     hct = HealthChecker(slow_check, interval_secs=1, initial_interval_secs=1, clock=self._clock)
     hct.start()
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
+
     assert hct._total_latency == 0
     assert hct.metrics.sample()['total_latency_secs'] == 0
 
     # start the health check (during health check it is still 0)
-    self._clock.tick(1.0)
+    epsilon = 0.001
+    self._clock.tick(1.0 + epsilon)
     self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=0.5)
     assert hct._total_latency == 0
     assert hct.metrics.sample()['total_latency_secs'] == 0
     assert hct.metrics.sample()['checks'] == 0
 
     # finish the health check
-    self._clock.tick(0.5)
+    self._clock.tick(0.5 + epsilon)
     self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=1)  # interval_secs
     assert hct._total_latency == 0.5
     assert hct.metrics.sample()['total_latency_secs'] == 0.5
     assert hct.metrics.sample()['checks'] == 1
 
     # tick again
-    self._clock.tick(1.5)
+    self._clock.tick(1.0 + epsilon)
     self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.tick(0.5 + epsilon)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=1)  # interval_secs
     assert hct._total_latency == 1.0
     assert hct.metrics.sample()['total_latency_secs'] == 1.0
     assert hct.metrics.sample()['checks'] == 2

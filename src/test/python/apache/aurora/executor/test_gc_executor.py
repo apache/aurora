@@ -56,10 +56,9 @@ FINISHED_TASKS = {
 # TODO(wickman) These should be constant sets in the Thermos thrift
 THERMOS_LIVES = (TaskState.ACTIVE, TaskState.CLEANING, TaskState.FINALIZING)
 THERMOS_TERMINALS = (TaskState.SUCCESS, TaskState.FAILED, TaskState.KILLED, TaskState.LOST)
-
 STARTING_STATES = (ScheduleStatus.STARTING, ScheduleStatus.ASSIGNED)
-
 TASK_ID = 'gc_executor_task_id'
+EVENT_WAIT_TIMEOUT_SECS = 10
 
 
 if 'THERMOS_DEBUG' in os.environ:
@@ -131,7 +130,7 @@ class FakeExecutorDetector(object):
 
 
 class ThinTestThermosGCExecutor(ThermosGCExecutor):
-  POLL_WAIT = Amount(1, Time.MICROSECONDS)
+  POLL_WAIT = Amount(5, Time.MILLISECONDS)
   MINIMUM_KILL_AGE = Amount(5, Time.SECONDS)
 
   def __init__(self, checkpoint_root, active_executors=[]):
@@ -303,15 +302,16 @@ def test_real_get_states():
       assert executor.get_sandbox(task) is not None
 
 
-def wait_until_not(thing, clock=time, timeout=1.0):
+def wait_until_not(thing, timeout=EVENT_WAIT_TIMEOUT_SECS):
   """wait until something is booleany False"""
   def wait():
     while thing():
-      clock.sleep(1.0)
+      time.sleep(0.1)
   try:
     deadline(wait, timeout=timeout, daemon=True)
+    return True
   except Timeout:
-    pass
+    return False
 
 
 def run_gc_with(active_executors, retained_tasks, lose=False):
@@ -319,14 +319,17 @@ def run_gc_with(active_executors, retained_tasks, lose=False):
   with temporary_dir() as td:
     setup_tree(td, lose=lose)
     executor = ThinTestThermosGCExecutor(td, active_executors=active_executors)
-    executor.registered(proxy_driver, None, None, None)
-    executor.start()
-    art = AdjustRetainedTasks(retainedTasks=retained_tasks)
-    executor.launchTask(proxy_driver, serialize_art(art, TASK_ID))
-    wait_until_not(lambda: executor._gc_task_queue, clock=executor._clock)
-    wait_until_not(lambda: executor._task_id, clock=executor._clock)
-    assert len(executor._gc_task_queue) == 0
-    assert not executor._task_id
+    try:
+      executor.registered(proxy_driver, None, None, None)
+      executor.start()
+      art = AdjustRetainedTasks(retainedTasks=retained_tasks)
+      executor.launchTask(proxy_driver, serialize_art(art, TASK_ID))
+      assert wait_until_not(lambda: executor._gc_task_queue)
+      assert wait_until_not(lambda: executor._task_id)
+      assert len(executor._gc_task_queue) == 0
+      assert not executor._task_id
+    finally:
+      executor.shutdown(proxy_driver)
   assert len(proxy_driver.updates) >= 1
   if not lose:  # if the task is lost it will be cleaned out of band (by clean_orphans),
                 # so we don't care when the GC task actually finishes
@@ -402,26 +405,33 @@ def test_gc_killtask_noop():
   proxy_driver = ProxyDriver()
   with temporary_dir() as td:
     executor = ThinTestThermosGCExecutor(td)
-    executor.registered(proxy_driver, None, None, None)
-    executor.start()
-    executor.killTask(proxy_driver, TASK_ID)
-  assert not proxy_driver.stopped.is_set()
-  assert len(proxy_driver.updates) == 0
+    try:
+      executor.registered(proxy_driver, None, None, None)
+      executor.start()
+      executor.killTask(proxy_driver, TASK_ID)
+      assert not proxy_driver.stopped.is_set()
+      assert len(proxy_driver.updates) == 0
+    finally:
+      executor.shutdown(proxy_driver)
 
 
 def test_gc_killtask_current():
   proxy_driver = ProxyDriver()
   with temporary_dir() as td:
     executor = build_blocking_gc_executor(td, proxy_driver)
-    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
-    wait_until_not(lambda: executor._gc_task_queue, clock=executor._clock)
-    assert len(executor._gc_task_queue) == 0
-    assert executor._task_id == TASK_ID
-    executor.killTask(proxy_driver, TASK_ID)
-    assert executor._task_id == TASK_ID
-    assert len(executor._gc_task_queue) == 0
-  assert not proxy_driver.stopped.is_set()
-  assert len(proxy_driver.updates) == 0
+
+    try:
+      executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
+      assert wait_until_not(lambda: len(executor._gc_task_queue))
+      assert len(executor._gc_task_queue) == 0
+      assert executor._task_id == TASK_ID
+      executor.killTask(proxy_driver, TASK_ID)
+      assert executor._task_id == TASK_ID
+      assert len(executor._gc_task_queue) == 0
+      assert not proxy_driver.stopped.is_set()
+      assert len(proxy_driver.updates) == 0
+    finally:
+      executor.shutdown(proxy_driver)
 
 
 def test_gc_killtask_queued():
@@ -429,16 +439,19 @@ def test_gc_killtask_queued():
   proxy_driver = ProxyDriver()
   with temporary_dir() as td:
     executor = build_blocking_gc_executor(td, proxy_driver)
-    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
-    thread_yield()
-    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK2_ID))
-    thread_yield()
-    assert len(executor._gc_task_queue) == 1
-    executor.killTask(proxy_driver, TASK2_ID)
-    thread_yield()
-    assert len(executor._gc_task_queue) == 0
-  assert not proxy_driver.stopped.is_set()
-  assert len(proxy_driver.updates) == 0
+    try:
+      executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
+      thread_yield()
+      executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK2_ID))
+      thread_yield()
+      assert len(executor._gc_task_queue) == 1
+      executor.killTask(proxy_driver, TASK2_ID)
+      thread_yield()
+      assert len(executor._gc_task_queue) == 0
+      assert not proxy_driver.stopped.is_set()
+      assert len(proxy_driver.updates) == 0
+    finally:
+      executor.shutdown(proxy_driver)
 
 
 def test_gc_multiple_launchtasks():
@@ -446,17 +459,21 @@ def test_gc_multiple_launchtasks():
   proxy_driver = ProxyDriver()
   with temporary_dir() as td:
     executor = build_blocking_gc_executor(td, proxy_driver)
-    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
-    thread_yield()
-    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK2))
-    thread_yield()
-    assert len(executor._gc_task_queue) == 1
-    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK3))
-    thread_yield()
-    assert len(executor._gc_task_queue) == 1
-  assert not proxy_driver.stopped.is_set()
-  assert len(proxy_driver.updates) >= 1
-  assert StatusUpdate(mesos_pb2.TASK_FINISHED, TASK2) in proxy_driver.updates
+
+    try:
+      executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
+      thread_yield()
+      executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK2))
+      thread_yield()
+      assert len(executor._gc_task_queue) == 1
+      executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK3))
+      thread_yield()
+      assert len(executor._gc_task_queue) == 1
+      assert not proxy_driver.stopped.is_set()
+      assert len(proxy_driver.updates) >= 1
+      assert StatusUpdate(mesos_pb2.TASK_FINISHED, TASK2) in proxy_driver.updates
+    finally:
+      executor.shutdown(proxy_driver)
 
 
 def test_gc_shutdown():
@@ -466,9 +483,9 @@ def test_gc_shutdown():
     executor.registered(proxy_driver, None, None, None)
     executor.start()
     executor.shutdown(proxy_driver)
-    executor._stop_event.wait(timeout=1.0)
+    executor._stop_event.wait(timeout=EVENT_WAIT_TIMEOUT_SECS)
     assert executor._stop_event.is_set()
-  proxy_driver.stopped.wait(timeout=1.0)
+  proxy_driver.stopped.wait(timeout=EVENT_WAIT_TIMEOUT_SECS)
   assert proxy_driver.stopped.is_set()
   assert len(proxy_driver.updates) == 0
 
@@ -499,13 +516,14 @@ def run_gc_with_timeout(**kw):
     executor.registered(proxy_driver, None, None, None)
     executor.start()
     yield (proxy_driver, executor)
+    executor.shutdown(proxy_driver)
 
 
 def test_gc_lifetime():
   with run_gc_with_timeout(maximum_executor_lifetime=Amount(500, Time.MILLISECONDS)) as (
       proxy_driver, executor):
     executor._clock.tick(1)
-    proxy_driver.stopped.wait(timeout=1.0)
+    proxy_driver.stopped.wait(timeout=EVENT_WAIT_TIMEOUT_SECS)
     assert proxy_driver.stopped.is_set()
     assert not executor._stop_event.is_set()
 
@@ -525,7 +543,7 @@ class TestRealGC(unittest.TestCase):
     """Set up the checkpoint stream for the given task in the given checkpoint root, optionally
     finished and/or with a corrupt stream"""
     class FastTaskRunner(TaskRunner):
-      COORDINATOR_INTERVAL_SLEEP = Amount(1, Time.MICROSECONDS)
+      COORDINATOR_INTERVAL_SLEEP = Amount(1, Time.MILLISECONDS)
     tr = FastTaskRunner(
         task=task,
         checkpoint_root=root,
@@ -565,7 +583,7 @@ class TestRealGC(unittest.TestCase):
         pass
 
     class FastThermosGCExecutor(ThermosGCExecutor):
-      POLL_WAIT = Amount(1, Time.MICROSECONDS)
+      POLL_WAIT = Amount(1, Time.MILLISECONDS)
 
     detector = functools.partial(FakeExecutorDetector, task_id) if retain else FakeExecutorDetector
     executor = FastThermosGCExecutor(
