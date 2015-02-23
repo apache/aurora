@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,8 +28,9 @@ function upstart_update {
   # Stop and start is necessary to update a the configuration of
   # an upstart job.  We'll rarely change the configuration, but
   # it's probably better to do this upfront and avoid surprises/confusion.
-  sudo stop $1
-  sudo start $1
+  # Executing true on failure to please bash -e
+  sudo stop $1  || true
+  sudo start $1 || true
 }
 
 function build_client {

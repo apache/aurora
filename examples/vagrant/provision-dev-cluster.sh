@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash -ex
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -82,9 +82,10 @@ EOF
 }
 
 function start_services {
-  start zookeeper
-  start mesos-master
-  start mesos-slave
+  #Executing true on failure to please bash -e in case services are already running
+  start zookeeper    || true
+  start mesos-master || true
+  start mesos-slave  || true
 }
 
 function prepare_sources {
