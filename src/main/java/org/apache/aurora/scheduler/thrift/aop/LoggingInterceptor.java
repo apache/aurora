@@ -20,6 +20,7 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
@@ -35,6 +36,8 @@ import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.thrift.Responses;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * A method interceptor that logs all invocations as well as any unchecked exceptions thrown from
  * the underlying call.
@@ -45,6 +48,15 @@ class LoggingInterceptor implements MethodInterceptor {
 
   @Inject
   private CapabilityValidator validator;
+
+  LoggingInterceptor() {
+    // Guice constructor.
+  }
+
+  @VisibleForTesting
+  LoggingInterceptor(CapabilityValidator validator) {
+    this.validator = requireNonNull(validator);
+  }
 
   private final Map<Class<?>, Function<Object, String>> printFunctions =
       ImmutableMap.<Class<?>, Function<Object, String>>of(
