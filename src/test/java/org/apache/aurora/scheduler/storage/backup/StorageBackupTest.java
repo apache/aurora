@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.storage.backup;
 
 import java.io.File;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -40,6 +41,7 @@ import org.apache.aurora.gen.storage.StoredJob;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
+import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -59,8 +61,9 @@ public class StorageBackupTest extends EasyMockTest {
   @Before
   public void setUp() {
     delegate = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
-    clock = new FakeClock();
     final File backupDir = Files.createTempDir();
+    ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
+    clock = FakeScheduledExecutor.scheduleExecutor(executor);
     addTearDown(new TearDown() {
       @Override
       public void tearDown() throws Exception {
@@ -69,7 +72,7 @@ public class StorageBackupTest extends EasyMockTest {
     });
     config = new BackupConfig(backupDir, MAX_BACKUPS, INTERVAL);
     clock.advance(Amount.of(365 * 30L, Time.DAYS));
-    storageBackup = new StorageBackupImpl(delegate, clock, config);
+    storageBackup = new StorageBackupImpl(delegate, clock, config, executor);
   }
 
   @Test

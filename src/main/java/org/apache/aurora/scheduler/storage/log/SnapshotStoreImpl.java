@@ -44,7 +44,6 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -258,9 +257,11 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   @Timed("snapshot_create")
   @Override
   public Snapshot createSnapshot() {
-    return storage.read(new Work.Quiet<Snapshot>() {
+    // It's important to perform snapshot creation in a write lock to ensure all upstream callers
+    // are correctly synchronized (e.g. during backup creation).
+    return storage.write(new MutateWork.Quiet<Snapshot>() {
       @Override
-      public Snapshot apply(StoreProvider storeProvider) {
+      public Snapshot apply(MutableStoreProvider storeProvider) {
         Snapshot snapshot = new Snapshot();
 
         // Capture timestamp to signify the beginning of a snapshot operation, apply after in case

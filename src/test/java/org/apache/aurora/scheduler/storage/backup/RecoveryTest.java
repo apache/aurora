@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.storage.backup;
 
 import java.io.File;
+import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
@@ -48,6 +49,7 @@ import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImp
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import org.apache.aurora.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
@@ -87,10 +89,15 @@ public class RecoveryTest extends EasyMockTest {
     primaryStorage = createMock(Storage.class);
     storeProvider = createMock(MutableStoreProvider.class);
     shutDownNow = createMock(Command.class);
-    clock = new FakeClock();
+    ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
+    clock = FakeScheduledExecutor.scheduleExecutor(executor);
     TemporaryStorageFactory factory = new TemporaryStorageFactory();
-    storageBackup =
-        new StorageBackupImpl(snapshotStore, clock, new BackupConfig(backupDir, 5, INTERVAL));
+    storageBackup = new StorageBackupImpl(
+        snapshotStore,
+        clock,
+        new BackupConfig(backupDir, 5, INTERVAL),
+        executor);
+
     recovery = new RecoveryImpl(backupDir, factory, primaryStorage, distributedStore, shutDownNow);
   }
 

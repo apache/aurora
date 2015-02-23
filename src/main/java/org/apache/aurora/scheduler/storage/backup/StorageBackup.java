@@ -26,6 +26,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -60,9 +61,6 @@ import static java.util.Objects.requireNonNull;
 /**
  * A backup routine that layers over a snapshot store and periodically writes snapshots to
  * local disk.
- *
- * TODO(William Farner): Perform backups asynchronously.  As written, they are performed in a
- * blocking write operation, which is asking for trouble.
  */
 public interface StorageBackup {
 
@@ -106,6 +104,7 @@ public interface StorageBackup {
     private final long backupIntervalMs;
     private volatile long lastBackupMs;
     private final DateFormat backupDateFormat;
+    private final Executor executor;
 
     private final AtomicLong successes = Stats.exportLong("scheduler_backup_success");
     @VisibleForTesting
@@ -123,11 +122,13 @@ public interface StorageBackup {
     StorageBackupImpl(
         @SnapshotDelegate SnapshotStore<Snapshot> delegate,
         Clock clock,
-        BackupConfig config) {
+        BackupConfig config,
+        Executor executor) {
 
       this.delegate = requireNonNull(delegate);
       this.clock = requireNonNull(clock);
       this.config = requireNonNull(config);
+      this.executor = requireNonNull(executor);
       backupDateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm", Locale.ENGLISH);
       backupIntervalMs = config.interval.as(Time.MILLISECONDS);
       lastBackupMs = clock.nowMillis();
@@ -135,9 +136,14 @@ public interface StorageBackup {
 
     @Override
     public Snapshot createSnapshot() {
-      Snapshot snapshot = delegate.createSnapshot();
+      final Snapshot snapshot = delegate.createSnapshot();
       if (clock.nowMillis() >= (lastBackupMs + backupIntervalMs)) {
-        save(snapshot);
+        executor.execute(new Runnable() {
+          @Override
+          public void run() {
+            save(snapshot);
+          }
+        });
       }
       return snapshot;
     }
@@ -176,7 +182,7 @@ public interface StorageBackup {
       } finally {
         if (tempFile.exists()) {
           LOG.info("Deleting incomplete backup file " + tempFile);
-          tempFile.delete();
+          tryDelete(tempFile);
         }
       }
 
@@ -191,9 +197,15 @@ public interface StorageBackup {
               .sortedCopy(ImmutableList.copyOf(backups)).subList(0, backupsToDelete);
           LOG.info("Deleting " + backupsToDelete + " outdated backups: " + toDelete);
           for (File outdated : toDelete) {
-            outdated.delete();
+            tryDelete(outdated);
           }
         }
+      }
+    }
+
+    private void tryDelete(File fileToDelete) {
+      if (!fileToDelete.delete()) {
+        LOG.severe("Failed to delete file: " + fileToDelete.getName());
       }
     }
 

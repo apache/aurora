@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.storage.backup;
 
 import java.io.File;
+import java.util.concurrent.Executor;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
@@ -33,6 +34,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
@@ -87,6 +89,9 @@ public class BackupModule extends PrivateModule {
 
   @Override
   protected void configure() {
+    Executor executor = AsyncUtil.singleThreadLoggingScheduledExecutor("StorageBackup-%d", LOG);
+    bind(Executor.class).toInstance(executor);
+
     TypeLiteral<SnapshotStore<Snapshot>> type = new TypeLiteral<SnapshotStore<Snapshot>>() { };
     bind(type).annotatedWith(StorageBackupImpl.SnapshotDelegate.class).to(snapshotStore);
 
