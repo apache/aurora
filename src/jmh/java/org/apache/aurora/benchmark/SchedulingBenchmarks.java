@@ -77,13 +77,11 @@ public class SchedulingBenchmarks {
    */
   @State(Scope.Thread)
   public abstract static class AbstractBase {
-    protected Storage storage;
-    protected TaskScheduler taskScheduler;
-    protected OfferManager offerManager;
-    protected IScheduledTask task;
-    protected Set<HostOffer> offers;
-    protected Set<IHostAttributes> hostAttributes;
-    protected EventBus eventBus;
+    private Storage storage;
+    private TaskScheduler taskScheduler;
+    private OfferManager offerManager;
+    private EventBus eventBus;
+    private BenchmarkSettings settings;
 
     /**
      * Runs once to setup up benchmark state.
@@ -160,20 +158,26 @@ public class SchedulingBenchmarks {
       offerManager = injector.getInstance(OfferManager.class);
       eventBus.register(injector.getInstance(CachedClusterState.class));
 
-      hostAttributes = createHostAttributes();
-      saveHostAttributes(hostAttributes);
+      settings = getSettings();
+      saveHostAttributes(settings.getHostAttributes());
 
-      offers = createOffers(hostAttributes);
+      Set<HostOffer> offers = new Offers.Builder().build(settings.getHostAttributes());
       Offers.addOffers(offerManager, offers);
-      fillUpCluster();
+      fillUpCluster(offers.size());
 
-      task = createTask();
-      saveTasks(ImmutableSet.of(task));
+      saveTasks(ImmutableSet.of(settings.getTask()));
     }
 
-    private void fillUpCluster() {
-      int numOffersToFill = (int) Math.round(offers.size() * getClusterUtilization());
-      Set<IScheduledTask> tasksToAssign = new Tasks.Builder().build(numOffersToFill);
+    private Set<IScheduledTask> buildClusterTasks(int numOffers) {
+      int numOffersToFill = (int) Math.round(numOffers * settings.getClusterUtilization());
+      return new Tasks.Builder()
+          .setRole("victim")
+          .setProduction(!settings.areAllVictimsEligibleForPreemption())
+          .build(numOffersToFill);
+    }
+
+    private void fillUpCluster(int numOffers) {
+      Set<IScheduledTask> tasksToAssign = buildClusterTasks(numOffers);
       saveTasks(tasksToAssign);
       for (IScheduledTask scheduledTask : tasksToAssign) {
         taskScheduler.schedule(scheduledTask.getAssignedTask().getTaskId());
@@ -200,13 +204,7 @@ public class SchedulingBenchmarks {
       });
     }
 
-    protected abstract double getClusterUtilization();
-
-    protected abstract Set<IHostAttributes> createHostAttributes();
-
-    protected abstract Set<HostOffer> createOffers(Set<IHostAttributes> attributes);
-
-    protected abstract IScheduledTask createTask();
+    protected abstract BenchmarkSettings getSettings();
 
     /**
      * Benchmark entry point. All settings (e.g. iterations, benchmarkMode and etc.) are defined
@@ -217,7 +215,7 @@ public class SchedulingBenchmarks {
      */
     @Benchmark
     public boolean runBenchmark() {
-      return taskScheduler.schedule(task.getAssignedTask().getTaskId());
+      return taskScheduler.schedule(settings.getTask().getAssignedTask().getTaskId());
     }
   }
 
@@ -226,56 +224,46 @@ public class SchedulingBenchmarks {
    */
   public static class InsufficientResourcesSchedulingBenchmark extends AbstractBase {
     @Override
-    protected Set<IHostAttributes> createHostAttributes() {
-      return new Hosts.Builder().setNumHostsPerRack(2).build(1000);
-    }
-
-    @Override
-    protected Set<HostOffer> createOffers(Set<IHostAttributes> hostAttributes) {
-      return new Offers.Builder().build(hostAttributes);
-    }
-
-    @Override
-    protected double getClusterUtilization() {
-      return 0.9;
-    }
-
-    @Override
-    protected IScheduledTask createTask() {
-      return Iterables.getOnlyElement(new Tasks.Builder()
-          .setProduction(true)
-          .setCpu(32)
-          .setTaskIdFormat("test-%s")
-          .build(1));
+    protected BenchmarkSettings getSettings() {
+      return new BenchmarkSettings.Builder()
+          .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(1000))
+          .setTask(Iterables.getOnlyElement(new Tasks.Builder()
+              .setProduction(true)
+              .setCpu(32)
+              .setTaskIdFormat("test-%s")
+              .build(1))).build();
     }
   }
 
   /**
-   * Tests scheduling performance with a task vetoed due to constraint mismatch.
+   * Tests scheduling performance with a task vetoed due to value constraint mismatch.
    */
-  public static class ConstraintMismatchsSchedulingBenchmark extends AbstractBase {
+  public static class ValueConstraintMismatchSchedulingBenchmark extends AbstractBase {
     @Override
-    protected Set<IHostAttributes> createHostAttributes() {
-      return new Hosts.Builder().setNumHostsPerRack(2).build(1000);
+    protected BenchmarkSettings getSettings() {
+      return new BenchmarkSettings.Builder()
+          .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(1000))
+          .setTask(Iterables.getOnlyElement(new Tasks.Builder()
+              .setProduction(true)
+              .addValueConstraint("host", "denied")
+              .setTaskIdFormat("test-%s")
+              .build(1))).build();
     }
+  }
 
+  /**
+   * Tests scheduling performance with a task vetoed due to limit constraint mismatch.
+   */
+  public static class LimitConstraintMismatchSchedulingBenchmark extends AbstractBase {
     @Override
-    protected Set<HostOffer> createOffers(Set<IHostAttributes> hostAttributes) {
-      return new Offers.Builder().build(hostAttributes);
-    }
-
-    @Override
-    protected double getClusterUtilization() {
-      return 0.9;
-    }
-
-    @Override
-    protected IScheduledTask createTask() {
-      return Iterables.getOnlyElement(new Tasks.Builder()
-          .setProduction(true)
-          .addValueConstraint("host", "denied")
-          .setTaskIdFormat("test-%s")
-          .build(1));
+    protected BenchmarkSettings getSettings() {
+      return new BenchmarkSettings.Builder()
+          .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(1000))
+          .setTask(Iterables.getOnlyElement(new Tasks.Builder()
+              .setProduction(true)
+              .addLimitConstraint("host", 0)
+              .setTaskIdFormat("test-%s")
+              .build(1))).build();
     }
   }
 
@@ -285,27 +273,16 @@ public class SchedulingBenchmarks {
    */
   public static class PreemptorFallbackForLargeClusterBenchmark extends AbstractBase {
     @Override
-    protected Set<IHostAttributes> createHostAttributes() {
-      return new Hosts.Builder().setNumHostsPerRack(2).build(10000);
-    }
-
-    @Override
-    protected Set<HostOffer> createOffers(Set<IHostAttributes> hostAttributes) {
-      return new Offers.Builder().build(hostAttributes);
-    }
-
-    @Override
-    protected double getClusterUtilization() {
-      return 1.0;
-    }
-
-    @Override
-    protected IScheduledTask createTask() {
-      return Iterables.getOnlyElement(new Tasks.Builder()
-          .setProduction(true)
-          .addValueConstraint("host", "denied")
-          .setTaskIdFormat("test-%s")
-          .build(1));
+    protected BenchmarkSettings getSettings() {
+      return new BenchmarkSettings.Builder()
+          .setClusterUtilization(1.0)
+          .setVictimPreemptionEligibilty(true)
+          .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(10000))
+          .setTask(Iterables.getOnlyElement(new Tasks.Builder()
+              .setProduction(true)
+              .addLimitConstraint("host", 0)
+              .setTaskIdFormat("test-%s")
+              .build(1))).build();
     }
   }
 }

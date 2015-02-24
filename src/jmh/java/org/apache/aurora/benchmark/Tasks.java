@@ -46,9 +46,9 @@ final class Tasks {
    * Builds tasks for the specified configuration.
    */
   static final class Builder {
-    private static final JobKey JOB_KEY = new JobKey("jmh", "dev", "benchmark");
     private static final String USER_FORMAT = "user-%s";
 
+    private JobKey jobKey = new JobKey("jmh", "dev", "benchmark");
     private String taskIdFormat = "default_task-%s";
     private boolean isProduction = false;
     private double cpu = 6.0;
@@ -56,6 +56,11 @@ final class Tasks {
     private Amount<Long, Data> disk = Amount.of(128L, Data.GB);
     private ScheduleStatus scheduleStatus = ScheduleStatus.PENDING;
     private ImmutableSet.Builder<Constraint> constraints = ImmutableSet.builder();
+
+    Builder setRole(String newRole) {
+      jobKey.setRole(newRole);
+      return this;
+    }
 
     Builder setTaskIdFormat(String newTaskIdFormat) {
       taskIdFormat = newTaskIdFormat;
@@ -131,11 +136,11 @@ final class Tasks {
                     .setDiskMb(disk.as(Data.MB))
                     .setProduction(isProduction)
                     .setRequestedPorts(ImmutableSet.<String>of())
-                    .setJob(JOB_KEY)
-                    .setJobName(JOB_KEY.getName())
-                    .setEnvironment(JOB_KEY.getEnvironment())
+                    .setJob(jobKey)
+                    .setJobName(jobKey.getName())
+                    .setEnvironment(jobKey.getEnvironment())
                     .setOwner(new Identity()
-                        .setRole(JOB_KEY.getRole())
+                        .setRole(jobKey.getRole())
                         .setUser(String.format(USER_FORMAT, taskId)))))));
       }
 
