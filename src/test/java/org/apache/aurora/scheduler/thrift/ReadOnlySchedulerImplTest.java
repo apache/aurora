@@ -281,7 +281,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   @Test
   public void testGetQuota() throws Exception {
     QuotaInfo infoMock = createMock(QuotaInfo.class);
-    expect(quotaManager.getQuotaInfo(ROLE)).andReturn(infoMock);
+    expect(quotaManager.getQuotaInfo(ROLE, storageUtil.storeProvider)).andReturn(infoMock);
     expect(infoMock.getQuota()).andReturn(QUOTA);
     expect(infoMock.getProdConsumption()).andReturn(CONSUMED);
     IResourceAggregate nonProdConsumed = IResourceAggregate.build(new ResourceAggregate(1, 0, 0));

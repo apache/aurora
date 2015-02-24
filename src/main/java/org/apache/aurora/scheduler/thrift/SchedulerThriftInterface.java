@@ -39,6 +39,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Range;
+
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.Positive;
@@ -279,7 +280,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
           int count = sanitized.getJobConfig().getInstanceCount();
 
-          validateTaskLimits(template, count, quotaManager.checkInstanceAddition(template, count));
+          validateTaskLimits(
+              template,
+              count,
+              quotaManager.checkInstanceAddition(template, count, storeProvider));
 
           LOG.info("Launching " + count + " tasks.");
           stateManager.insertPendingTasks(
@@ -346,7 +350,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
           int count = sanitized.getJobConfig().getInstanceCount();
 
-          validateTaskLimits(template, count, quotaManager.checkInstanceAddition(template, count));
+          validateTaskLimits(
+              template,
+              count,
+              quotaManager.checkInstanceAddition(template, count, storeProvider));
 
           // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
           if (updateOnly || getCronJob(storeProvider, jobKey).isPresent()) {
@@ -664,7 +671,15 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(session);
 
     try {
-      quotaManager.saveQuota(ownerRole, IResourceAggregate.build(resourceAggregate));
+      storage.write(new MutateWork.NoResult<QuotaException>() {
+        @Override
+        protected void execute(MutableStoreProvider store) throws QuotaException {
+          quotaManager.saveQuota(
+              ownerRole,
+              IResourceAggregate.build(resourceAggregate),
+              store.getQuotaStore());
+        }
+      });
       return ok();
     } catch (QuotaException e) {
       return error(INVALID_REQUEST, e);
@@ -941,7 +956,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           validateTaskLimits(
               task,
               currentTasks.size() + config.getInstanceIdsSize(),
-              quotaManager.checkInstanceAddition(task, config.getInstanceIdsSize()));
+              quotaManager.checkInstanceAddition(task, config.getInstanceIdsSize(), storeProvider));
 
           storage.write(new NoResult.Quiet() {
             @Override
@@ -1207,7 +1222,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           validateTaskLimits(
               request.getTaskConfig(),
               request.getInstanceCount(),
-              quotaManager.checkJobUpdate(update));
+              quotaManager.checkJobUpdate(update, storeProvider));
 
           jobUpdateController.start(update, context.getIdentity());
           return ok(Result.startJobUpdateResult(new StartJobUpdateResult(updateId)));

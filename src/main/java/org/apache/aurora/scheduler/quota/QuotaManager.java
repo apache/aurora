@@ -31,7 +31,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
 import com.google.common.collect.Sets;
-import com.google.inject.Inject;
 
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.ResourceAggregate;
@@ -39,9 +38,8 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -71,17 +69,20 @@ public interface QuotaManager {
    *
    * @param role Quota owner.
    * @param quota Quota to save.
+   * @param quoteStore A quota store.
    * @throws QuotaException If provided quota specification is invalid.
    */
-  void saveQuota(String role, IResourceAggregate quota) throws QuotaException;
+  void saveQuota(String role, IResourceAggregate quota, QuotaStore.Mutable quoteStore)
+      throws QuotaException;
 
   /**
    * Gets {@code QuotaInfo} for the specified role.
    *
    * @param role Quota owner.
+   * @param storeProvider A store provider to access quota data.
    * @return {@code QuotaInfo} instance.
    */
-  QuotaInfo getQuotaInfo(String role);
+  QuotaInfo getQuotaInfo(String role, StoreProvider storeProvider);
 
   /**
    * Checks if there is enough resource quota available for adding {@code instances} of
@@ -90,18 +91,23 @@ public interface QuotaManager {
    *
    * @param template Task resource requirement.
    * @param instances Number of additional instances requested.
+   * @param storeProvider A store provider to access quota data.
    * @return {@code QuotaComparisonResult} instance with quota check result details.
    */
-  QuotaCheckResult checkInstanceAddition(ITaskConfig template, int instances);
+  QuotaCheckResult checkInstanceAddition(
+      ITaskConfig template,
+      int instances,
+      StoreProvider storeProvider);
 
   /**
    * Checks if there is enough resource quota available for performing a job update represented
    * by the {@code jobUpdate}. The quota is defined at the task owner (role) level.
    *
    * @param jobUpdate Job update to check quota for.
+   * @param storeProvider A store provider to access quota data.
    * @return {@code QuotaComparisonResult} instance with quota check result details.
    */
-  QuotaCheckResult checkJobUpdate(IJobUpdate jobUpdate);
+  QuotaCheckResult checkJobUpdate(IJobUpdate jobUpdate, StoreProvider storeProvider);
 
   /**
    * Thrown when quota related operation failed.
@@ -113,19 +119,15 @@ public interface QuotaManager {
   }
 
   /**
-   * Quota provider that stores quotas in the canonical {@link Storage} system.
+   * Quota provider that stores quotas in the canonical store.
    */
   class QuotaManagerImpl implements QuotaManager {
-    private final Storage storage;
-
-    @Inject
-    QuotaManagerImpl(Storage storage) {
-      this.storage = requireNonNull(storage);
-    }
 
     @Override
-    public void saveQuota(final String ownerRole, final IResourceAggregate quota)
-        throws QuotaException {
+    public void saveQuota(
+        final String ownerRole,
+        final IResourceAggregate quota,
+        QuotaStore.Mutable quoteStore) throws QuotaException {
 
       if (!quota.isSetNumCpus() || !quota.isSetRamMb() || !quota.isSetDiskMb()) {
         throw new QuotaException("Missing quota specification(s) in: " + quota.toString());
@@ -135,27 +137,26 @@ public interface QuotaManager {
         throw new QuotaException("Negative values in: " + quota.toString());
       }
 
-      storage.write(new Storage.MutateWork.NoResult.Quiet() {
-        @Override
-        protected void execute(Storage.MutableStoreProvider storeProvider) {
-          storeProvider.getQuotaStore().saveQuota(ownerRole, quota);
-        }
-      });
+      quoteStore.saveQuota(ownerRole, quota);
     }
 
     @Override
-    public QuotaInfo getQuotaInfo(final String role) {
-      return getQuotaInfo(role, Optional.<IJobUpdate>absent());
+    public QuotaInfo getQuotaInfo(String role, StoreProvider storeProvider) {
+      return getQuotaInfo(role, Optional.<IJobUpdate>absent(), storeProvider);
     }
 
     @Override
-    public QuotaCheckResult checkInstanceAddition(ITaskConfig template, int instances) {
+    public QuotaCheckResult checkInstanceAddition(
+        ITaskConfig template,
+        int instances,
+        StoreProvider storeProvider) {
+
       Preconditions.checkArgument(instances >= 0);
       if (!template.isProduction()) {
         return new QuotaCheckResult(SUFFICIENT_QUOTA);
       }
 
-      QuotaInfo quotaInfo = getQuotaInfo(template.getJob().getRole());
+      QuotaInfo quotaInfo = getQuotaInfo(template.getJob().getRole(), storeProvider);
       IResourceAggregate requestedTotal = add(
           quotaInfo.getProdConsumption(),
           ResourceAggregates.scale(fromTasks(ImmutableSet.of(template)), instances));
@@ -164,7 +165,7 @@ public interface QuotaManager {
     }
 
     @Override
-    public QuotaCheckResult checkJobUpdate(IJobUpdate jobUpdate) {
+    public QuotaCheckResult checkJobUpdate(IJobUpdate jobUpdate, StoreProvider storeProvider) {
       requireNonNull(jobUpdate);
       if (!jobUpdate.getInstructions().isSetDesiredState()
           || !jobUpdate.getInstructions().getDesiredState().getTask().isProduction()) {
@@ -174,7 +175,8 @@ public interface QuotaManager {
 
       QuotaInfo quotaInfo = getQuotaInfo(
           jobUpdate.getSummary().getJobKey().getRole(),
-          Optional.of(jobUpdate));
+          Optional.of(jobUpdate),
+          storeProvider);
 
       return QuotaCheckResult.greaterOrEqual(quotaInfo.getQuota(), quotaInfo.getProdConsumption());
     }
@@ -187,41 +189,41 @@ public interface QuotaManager {
      *
      * @param role Role to get quota info for.
      * @param requestedUpdate An optional {@code IJobUpdate} to forecast the consumption.
+     * @param storeProvider A store provider to access quota data.
      * @return {@code QuotaInfo} with quota and consumption details.
      */
-    private QuotaInfo getQuotaInfo(final String role, final Optional<IJobUpdate> requestedUpdate) {
-      return storage.read(new Work.Quiet<QuotaInfo>() {
-        @Override
-        public QuotaInfo apply(StoreProvider storeProvider) {
-          FluentIterable<IScheduledTask> tasks = FluentIterable.from(
-              storeProvider.getTaskStore().fetchTasks(Query.roleScoped(role).active()));
+    private QuotaInfo getQuotaInfo(
+        String role,
+        Optional<IJobUpdate> requestedUpdate,
+        StoreProvider storeProvider) {
 
-          Map<IJobKey, IJobUpdate> updates = Maps.newHashMap(
-              fetchActiveJobUpdates(storeProvider.getJobUpdateStore(), role)
-                  .uniqueIndex(UPDATE_TO_JOB_KEY));
+      FluentIterable<IScheduledTask> tasks = FluentIterable.from(
+          storeProvider.getTaskStore().fetchTasks(Query.roleScoped(role).active()));
 
-          // Mix in a requested job update (if present) to correctly calculate consumption.
-          // This would be an update that is not saved in the store yet (i.e. the one quota is
-          // checked for).
-          if (requestedUpdate.isPresent()) {
-            updates.put(requestedUpdate.get().getSummary().getJobKey(), requestedUpdate.get());
-          }
+      Map<IJobKey, IJobUpdate> updates = Maps.newHashMap(
+          fetchActiveJobUpdates(storeProvider.getJobUpdateStore(), role)
+              .uniqueIndex(UPDATE_TO_JOB_KEY));
 
-          Map<IJobKey, IJobConfiguration> cronTemplates =
-              FluentIterable.from(storeProvider.getJobStore().fetchJobs())
-                  .filter(Predicates.compose(Predicates.equalTo(role), JobKeys.CONFIG_TO_ROLE))
-                  .uniqueIndex(JobKeys.FROM_CONFIG);
+      // Mix in a requested job update (if present) to correctly calculate consumption.
+      // This would be an update that is not saved in the store yet (i.e. the one quota is
+      // checked for).
+      if (requestedUpdate.isPresent()) {
+        updates.put(requestedUpdate.get().getSummary().getJobKey(), requestedUpdate.get());
+      }
 
-          IResourceAggregate prodConsumed = getConsumption(tasks, updates, cronTemplates, true);
+      Map<IJobKey, IJobConfiguration> cronTemplates =
+          FluentIterable.from(storeProvider.getJobStore().fetchJobs())
+              .filter(Predicates.compose(Predicates.equalTo(role), JobKeys.CONFIG_TO_ROLE))
+              .uniqueIndex(JobKeys.FROM_CONFIG);
 
-          IResourceAggregate nonProdConsumed = getConsumption(tasks, updates, cronTemplates, false);
+      IResourceAggregate prodConsumed = getConsumption(tasks, updates, cronTemplates, true);
 
-          IResourceAggregate quota =
-              storeProvider.getQuotaStore().fetchQuota(role).or(ResourceAggregates.none());
+      IResourceAggregate nonProdConsumed = getConsumption(tasks, updates, cronTemplates, false);
 
-          return new QuotaInfo(quota, prodConsumed, nonProdConsumed);
-        }
-      });
+      IResourceAggregate quota =
+          storeProvider.getQuotaStore().fetchQuota(role).or(ResourceAggregates.none());
+
+      return new QuotaInfo(quota, prodConsumed, nonProdConsumed);
     }
 
     private IResourceAggregate getConsumption(

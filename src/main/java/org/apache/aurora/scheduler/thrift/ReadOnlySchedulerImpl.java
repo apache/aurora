@@ -289,13 +289,17 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   @Override
   public Response getQuota(final String ownerRole) {
     MorePreconditions.checkNotBlank(ownerRole);
+    return storage.read(new Quiet<Response>() {
+      @Override
+      public Response apply(StoreProvider storeProvider) {
+        QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ownerRole, storeProvider);
+        GetQuotaResult result = new GetQuotaResult(quotaInfo.getQuota().newBuilder())
+            .setProdConsumption(quotaInfo.getProdConsumption().newBuilder())
+            .setNonProdConsumption(quotaInfo.getNonProdConsumption().newBuilder());
 
-    QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ownerRole);
-    GetQuotaResult result = new GetQuotaResult(quotaInfo.getQuota().newBuilder())
-        .setProdConsumption(quotaInfo.getProdConsumption().newBuilder())
-        .setNonProdConsumption(quotaInfo.getNonProdConsumption().newBuilder());
-
-    return ok(Result.getQuotaResult(result));
+        return ok(Result.getQuotaResult(result));
+      }
+    });
   }
 
   @Override

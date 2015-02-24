@@ -37,6 +37,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
@@ -69,12 +70,14 @@ public class QuotaManagerImplTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private JobUpdateStore jobUpdateStore;
   private QuotaManagerImpl quotaManager;
+  private StoreProvider storeProvider;
 
   @Before
   public void setUp() throws Exception {
     storageUtil = new StorageTestUtil(this);
+    storeProvider = storageUtil.storeProvider;
     jobUpdateStore = storageUtil.jobUpdateStore;
-    quotaManager = new QuotaManagerImpl(storageUtil.storage);
+    quotaManager = new QuotaManagerImpl();
     storageUtil.expectOperations();
   }
 
@@ -95,7 +98,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     assertEquals(
         new QuotaInfo(from(4, 4, 4), from(6, 6, 6), from(9, 9, 9)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -130,7 +133,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     assertEquals(
         new QuotaInfo(from(4, 4, 4), from(7, 7, 7), from(10, 10, 10)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -151,7 +154,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     // Expected consumption from: prodTask + updatingProdTask + job update.
     assertEquals(
         new QuotaInfo(from(4, 4, 4), from(7, 7, 7), from(2, 2, 2)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -167,7 +170,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     assertEquals(
         new QuotaInfo(from(4, 4, 4), from(0, 0, 0), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -179,7 +182,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -192,7 +196,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -205,7 +210,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -218,7 +224,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -232,7 +239,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -240,7 +248,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testCheckQuotaSkippedForNonProdRequest() {
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, false), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, false), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -255,7 +264,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -268,7 +278,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(2, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(2, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertTrue(checkQuota.getDetails().get().contains("CPU"));
   }
@@ -282,7 +293,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 2, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 2, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertTrue(checkQuota.getDetails().get().contains("RAM"));
   }
@@ -296,7 +308,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 2, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 2, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertTrue(checkQuota.getDetails().get().contains("DISK"));
   }
@@ -312,11 +325,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(2, 2, 2, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(2, 2, 2, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(5, 5, 5), from(4, 4, 4), from(7, 7, 7)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -330,11 +344,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(5, 5, 5), from(4, 4, 4), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -347,11 +362,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(5, 5, 5), from(4, 4, 4), from(8, 8, 8)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -364,11 +380,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(5, 5, 5), from(4, 4, 4), from(7, 7, 7)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -381,11 +398,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(5, 5, 5), from(5, 5, 5), from(1, 1, 1)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -397,11 +415,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(6, 6, 6), from(6, 6, 6), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -413,11 +432,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(6, 6, 6), from(6, 6, 6), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -429,11 +449,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(6, 6, 6), from(6, 6, 6), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -458,11 +479,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(6, 6, 6), from(4, 4, 4), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -487,11 +509,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(6, 6, 6), from(4, 4, 4), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -516,11 +539,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota =
+        quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(6, 6, 6), from(6, 6, 6), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -544,11 +568,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update);
+    QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(6, 6, 6), from(6, 6, 6), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -569,11 +593,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update);
+    QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(6, 6, 6), from(4, 4, 4), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -597,11 +621,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update);
+    QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
         new QuotaInfo(from(6, 6, 6), from(6, 6, 6), from(0, 0, 0)),
-        quotaManager.getQuotaInfo(ROLE));
+        quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
@@ -616,7 +640,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update);
+    QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -634,7 +658,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(IJobUpdate.build(updateBuilder));
+    QuotaCheckResult checkQuota =
+        quotaManager.checkJobUpdate(IJobUpdate.build(updateBuilder), storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -643,19 +668,25 @@ public class QuotaManagerImplTest extends EasyMockTest {
     storageUtil.quotaStore.saveQuota(ROLE, QUOTA);
 
     control.replay();
-    quotaManager.saveQuota(ROLE, QUOTA);
+    quotaManager.saveQuota(ROLE, QUOTA, storageUtil.mutableStoreProvider.getQuotaStore());
   }
 
   @Test(expected = QuotaException.class)
   public void testSaveQuotaFailsMissingSpecs() throws Exception {
     control.replay();
-    quotaManager.saveQuota(ROLE, IResourceAggregate.build(new ResourceAggregate()));
+    quotaManager.saveQuota(
+        ROLE,
+        IResourceAggregate.build(new ResourceAggregate()),
+        storageUtil.mutableStoreProvider.getQuotaStore());
   }
 
   @Test(expected = QuotaException.class)
   public void testSaveQuotaFailsNegativeValues() throws Exception {
     control.replay();
-    quotaManager.saveQuota(ROLE, IResourceAggregate.build(new ResourceAggregate(-2.0, 4, 5)));
+    quotaManager.saveQuota(
+        ROLE,
+        IResourceAggregate.build(new ResourceAggregate(-2.0, 4, 5)),
+        storageUtil.mutableStoreProvider.getQuotaStore());
   }
 
   private IExpectationSetters<?> expectTasks(IScheduledTask... tasks) {

@@ -182,7 +182,8 @@ public class ThriftIT extends EasyMockTest {
 
   @Test
   public void testProvisionAccess() throws Exception {
-    quotaManager.saveQuota(USER, QUOTA);
+    storageTestUtil.expectOperations();
+    quotaManager.saveQuota(USER, QUOTA, storageTestUtil.quotaStore);
     expectLastCall().times(2);
 
     control.replay();
