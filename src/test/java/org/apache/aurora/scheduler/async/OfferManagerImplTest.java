@@ -14,22 +14,30 @@
 package org.apache.aurora.scheduler.async;
 
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.logging.Level;
 
 import com.google.common.base.Function;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.testing.TearDown;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.OfferManager.OfferManagerImpl;
 import org.apache.aurora.scheduler.async.OfferManager.OfferReturnDelay;
+import org.apache.aurora.scheduler.async.TaskGroups.GroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.apache.mesos.Protos.TaskInfo;
 import org.junit.Before;
@@ -38,6 +46,7 @@ import org.junit.Test;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -56,14 +65,23 @@ public class OfferManagerImplTest extends EasyMockTest {
   private static final HostOffer OFFER_C = new HostOffer(
       Offers.makeOffer("OFFER_C", HOST_C),
       IHostAttributes.build(new HostAttributes().setMode(NONE)));
+  private static final GroupKey GROUP_KEY =
+      new GroupKey(ITaskConfig.build(new TaskConfig().setJob(new JobKey("role", "env", "name"))));
 
   private Driver driver;
   private FakeScheduledExecutor clock;
   private Function<HostOffer, Assignment> offerAcceptor;
-  private OfferManagerImpl offerQueue;
+  private OfferManagerImpl offerManager;
 
   @Before
   public void setUp() {
+    offerManager.LOG.setLevel(Level.FINE);
+    addTearDown(new TearDown() {
+      @Override
+      public void tearDown() throws Exception {
+        offerManager.LOG.setLevel(Level.INFO);
+      }
+    });
     driver = createMock(Driver.class);
     ScheduledExecutorService executorMock = createMock(ScheduledExecutorService.class);
     clock = FakeScheduledExecutor.scheduleExecutor(executorMock);
@@ -81,7 +99,7 @@ public class OfferManagerImplTest extends EasyMockTest {
         return RETURN_DELAY;
       }
     };
-    offerQueue = new OfferManagerImpl(driver, returnDelay, executorMock);
+    offerManager = new OfferManagerImpl(driver, returnDelay, executorMock);
   }
 
   @Test
@@ -100,10 +118,90 @@ public class OfferManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    offerQueue.addOffer(offerA);
-    offerQueue.addOffer(OFFER_B);
-    offerQueue.addOffer(offerC);
-    assertTrue(offerQueue.launchFirst(offerAcceptor));
+    offerManager.addOffer(offerA);
+    offerManager.addOffer(OFFER_B);
+    offerManager.addOffer(offerC);
+    assertTrue(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
+    clock.advance(RETURN_DELAY);
+  }
+
+  @Test
+  public void testGetOffersReturnsAllOffers() throws Exception {
+    expect(offerAcceptor.apply(OFFER_A))
+        .andReturn(Assignment.failure(ImmutableSet.of(Veto.constraintMismatch("denied"))));
+
+    control.replay();
+
+    offerManager.addOffer(OFFER_A);
+    assertFalse(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
+    assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
+
+    offerManager.cancelOffer(OFFER_A.getOffer().getId());
+    assertTrue(Iterables.isEmpty(offerManager.getOffers()));
+
+    clock.advance(RETURN_DELAY);
+  }
+
+  @Test
+  public void testOfferFilteringDueToStaticBan() throws Exception {
+    expect(offerAcceptor.apply(OFFER_A))
+        .andReturn(Assignment.failure(ImmutableSet.of(Veto.constraintMismatch("denied"))));
+
+    TaskInfo task = TaskInfo.getDefaultInstance();
+    expect(offerAcceptor.apply(OFFER_B)).andReturn(Assignment.success(task));
+    driver.launchTask(OFFER_B.getOffer().getId(), task);
+
+    driver.declineOffer(OFFER_A.getOffer().getId());
+
+    control.replay();
+
+    offerManager.addOffer(OFFER_A);
+    assertFalse(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
+    // Run again to make sure all offers are banned (via no expectations set).
+    assertFalse(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
+
+    // Add a new offer to accept the task previously banned for OFFER_A.
+    offerManager.addOffer(OFFER_B);
+    assertTrue(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
+
+    clock.advance(RETURN_DELAY);
+  }
+
+  @Test
+  public void testStaticBanIsCleared() throws Exception {
+    expect(offerAcceptor.apply(OFFER_A))
+        .andReturn(Assignment.failure(ImmutableSet.of(Veto.insufficientResources("ram", 100))));
+
+    TaskInfo task = TaskInfo.getDefaultInstance();
+    expect(offerAcceptor.apply(OFFER_A)).andReturn(Assignment.success(task));
+    driver.launchTask(OFFER_A.getOffer().getId(), task);
+
+    expect(offerAcceptor.apply(OFFER_A))
+        .andReturn(Assignment.failure(ImmutableSet.of(Veto.maintenance("draining"))));
+
+    expect(offerAcceptor.apply(OFFER_A)).andReturn(Assignment.success(task));
+    driver.launchTask(OFFER_A.getOffer().getId(), task);
+
+    driver.declineOffer(OFFER_A.getOffer().getId());
+
+    control.replay();
+
+    offerManager.addOffer(OFFER_A);
+    assertFalse(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
+
+    // Make sure the static ban is cleared when the offers are returned.
+    clock.advance(RETURN_DELAY);
+    offerManager.addOffer(OFFER_A);
+    assertTrue(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
+
+    offerManager.addOffer(OFFER_A);
+    assertFalse(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
+
+    // Make sure the static ban is cleared when driver is disconnected.
+    offerManager.driverDisconnected(new DriverDisconnected());
+    offerManager.addOffer(OFFER_A);
+    assertTrue(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
+
     clock.advance(RETURN_DELAY);
   }
 
@@ -111,10 +209,10 @@ public class OfferManagerImplTest extends EasyMockTest {
   public void testFlushOffers() throws Exception {
     control.replay();
 
-    offerQueue.addOffer(OFFER_A);
-    offerQueue.addOffer(OFFER_B);
-    offerQueue.driverDisconnected(new DriverDisconnected());
-    assertFalse(offerQueue.launchFirst(offerAcceptor));
+    offerManager.addOffer(OFFER_A);
+    offerManager.addOffer(OFFER_B);
+    offerManager.driverDisconnected(new DriverDisconnected());
+    assertFalse(offerManager.launchFirst(offerAcceptor, GROUP_KEY));
     clock.advance(RETURN_DELAY);
   }
 
@@ -124,7 +222,7 @@ public class OfferManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    offerQueue.addOffer(OFFER_A);
+    offerManager.addOffer(OFFER_A);
     clock.advance(RETURN_DELAY);
   }
 

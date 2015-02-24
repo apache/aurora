@@ -30,6 +30,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.Protos.TaskInfo;
@@ -55,7 +56,14 @@ public interface TaskAssigner {
       /**
        * Assignment failed.
        */
-      FAILURE
+      FAILURE,
+
+      /**
+       * Assignment failed with static mismatch (i.e. all {@link Veto} instances group
+       * as {@link VetoGroup}).
+       * @see VetoGroup#STATIC
+       */
+      FAILURE_STATIC_MISMATCH,
     }
 
     private static final Optional<TaskInfo> NO_TASK_INFO = Optional.absent();
@@ -107,7 +115,9 @@ public interface TaskAssigner {
         return Result.SUCCESS;
       }
 
-      return Result.FAILURE;
+      return Veto.identifyGroup(vetoes) == VetoGroup.STATIC
+          ? Result.FAILURE_STATIC_MISMATCH
+          : Result.FAILURE;
     }
 
     /**

@@ -36,6 +36,7 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.async.TaskGroups.GroupKey;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.base.Query;
@@ -80,6 +81,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private static final HostOffer OFFER = new HostOffer(
       Offers.makeOffer("OFFER_A", "HOST_A"),
       IHostAttributes.build(new HostAttributes().setMode(MaintenanceMode.NONE)));
+
+  private static final GroupKey GROUP_A = new GroupKey(TASK_A.getAssignedTask().getTask());
+  private static final GroupKey GROUP_B = new GroupKey(TASK_B.getAssignedTask().getTask());
 
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
@@ -171,13 +175,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     assertFalse(scheduler.schedule("a"));
     assertFalse(scheduler.schedule("b"));
 
-    assignAndAssert(Result.FAILURE, OFFER, firstAssignment);
+    assignAndAssert(Result.FAILURE, GROUP_B, OFFER, firstAssignment);
 
     clock.advance(reservationDuration);
 
     assertTrue(scheduler.schedule("b"));
 
-    assignAndAssert(Result.SUCCESS, OFFER, secondAssignment);
+    assignAndAssert(Result.SUCCESS, GROUP_B, OFFER, secondAssignment);
   }
 
   @Test
@@ -210,11 +214,11 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     control.replay();
     assertFalse(scheduler.schedule("a"));
     assertTrue(scheduler.schedule("a"));
-    assignAndAssert(Result.SUCCESS, OFFER, firstAssignment);
+    assignAndAssert(Result.SUCCESS, GROUP_A, OFFER, firstAssignment);
     eventSink.post(TaskStateChange.transition(TASK_A, PENDING));
     clock.advance(halfReservationDuration);
     assertTrue(scheduler.schedule("b"));
-    assignAndAssert(Result.SUCCESS, OFFER, secondAssignment);
+    assignAndAssert(Result.SUCCESS, GROUP_B, OFFER, secondAssignment);
   }
 
   @Test
@@ -237,7 +241,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     clock.advance(halfReservationDuration);
     assertTrue(scheduler.schedule("a"));
 
-    assignAndAssert(Result.SUCCESS, OFFER, assignment);
+    assignAndAssert(Result.SUCCESS, GROUP_A, OFFER, assignment);
   }
 
   @Test
@@ -263,7 +267,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     // Task is killed by user before it is scheduled
     eventSink.post(TaskStateChange.transition(TASK_A, PENDING));
     assertTrue(scheduler.schedule("b"));
-    assignAndAssert(Result.SUCCESS, OFFER, assignment);
+    assignAndAssert(Result.SUCCESS, GROUP_B, OFFER, assignment);
   }
 
   @Test
@@ -287,7 +291,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     // We don't act on the reservation made by b because we want to see timeout behaviour.
     clock.advance(reservationDuration);
     assertTrue(scheduler.schedule("a"));
-    assignAndAssert(Result.SUCCESS, OFFER, assignment);
+    assignAndAssert(Result.SUCCESS, GROUP_A, OFFER, assignment);
   }
 
   @Test
@@ -323,7 +327,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     control.replay();
 
     assertTrue(scheduler.schedule(Tasks.id(taskA)));
-    assignAndAssert(Result.SUCCESS, OFFER, assignment);
+    assignAndAssert(Result.SUCCESS, GROUP_A, OFFER, assignment);
   }
 
   private static IScheduledTask makeTask(String taskId) {
@@ -340,22 +344,26 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private static class AssignmentCapture {
     public Capture<Function<HostOffer, Assignment>> assigner = createCapture();
+    public Capture<GroupKey> groupKey = createCapture();
   }
 
   private AssignmentCapture expectLaunchAttempt(boolean taskLaunched)
       throws OfferManager.LaunchException {
 
     AssignmentCapture capture = new AssignmentCapture();
-    expect(offerManager.launchFirst(capture(capture.assigner))).andReturn(taskLaunched);
+    expect(offerManager.launchFirst(capture(capture.assigner), capture(capture.groupKey)))
+        .andReturn(taskLaunched);
     return capture;
   }
 
   private void assignAndAssert(
       Result result,
+      GroupKey groupKey,
       HostOffer offer,
       AssignmentCapture capture) {
 
     assertEquals(result, capture.assigner.getValue().apply(offer).getResult());
+    assertEquals(groupKey, capture.groupKey.getValue());
   }
 
   private void expectActiveJobFetch(IScheduledTask taskInJob) {

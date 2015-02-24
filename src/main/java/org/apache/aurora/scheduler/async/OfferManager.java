@@ -20,15 +20,19 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -38,6 +42,7 @@ import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.async.TaskGroups.GroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -78,12 +83,14 @@ public interface OfferManager extends EventSubscriber {
    * Launches the first task that satisfies the {@code acceptor} by returning a {@link Assignment}.
    *
    * @param acceptor Function that determines if an offer is accepted.
+   * @param groupKey Task group key.
    * @return {@code true} if the task was launched, {@code false} if no offers satisfied the
    *         {@code acceptor}.
    * @throws LaunchException If the acceptor accepted an offer, but there was an error launching the
    *                         task.
    */
-  boolean launchFirst(Function<HostOffer, Assignment> acceptor) throws LaunchException;
+  boolean launchFirst(Function<HostOffer, Assignment> acceptor, GroupKey groupKey)
+      throws LaunchException;
 
   /**
    * Notifies the offer queue that a host's attributes have changed.
@@ -121,7 +128,8 @@ public interface OfferManager extends EventSubscriber {
   }
 
   class OfferManagerImpl implements OfferManager {
-    private static final Logger LOG = Logger.getLogger(OfferManagerImpl.class.getName());
+    @VisibleForTesting
+    static final Logger LOG = Logger.getLogger(OfferManagerImpl.class.getName());
 
     private final HostOffers hostOffers = new HostOffers();
     private final AtomicLong offerRaces = Stats.exportLong("offer_accept_races");
@@ -243,6 +251,10 @@ public interface OfferManager extends EventSubscriber {
       private final Map<OfferID, HostOffer> offersById = Maps.newHashMap();
       private final Map<SlaveID, HostOffer> offersBySlave = Maps.newHashMap();
       private final Map<String, HostOffer> offersByHost = Maps.newHashMap();
+      // TODO(maxim): Expose via a debug endpoint. AURORA-1136.
+      // Keep track of offer->groupKey mappings that will never be matched to avoid redundant
+      // scheduling attempts. See Assignment.Result for more details on static ban.
+      private final Multimap<OfferID, GroupKey> staticallyBannedOffers = HashMultimap.create();
 
       HostOffers() {
         // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
@@ -267,6 +279,7 @@ public interface OfferManager extends EventSubscriber {
           offers.remove(removed);
           offersBySlave.remove(removed.getOffer().getSlaveId());
           offersByHost.remove(removed.getOffer().getHostname());
+          staticallyBannedOffers.removeAll(id);
         }
         return removed != null;
       }
@@ -284,24 +297,50 @@ public interface OfferManager extends EventSubscriber {
         return Iterables.unmodifiableIterable(offers);
       }
 
+      synchronized boolean isStaticallyBanned(HostOffer offer, GroupKey groupKey) {
+        boolean result = staticallyBannedOffers.containsEntry(offer.getOffer().getId(), groupKey);
+        if (LOG.isLoggable(Level.FINE)) {
+          LOG.fine(String.format(
+              "Host offer %s is statically banned for %s: %s",
+              offer,
+              groupKey,
+              result));
+        }
+        return result;
+      }
+
+      synchronized void addStaticGroupBan(HostOffer offer, GroupKey groupKey) {
+        OfferID offerId = offer.getOffer().getId();
+        if (offersById.containsKey(offerId)) {
+          staticallyBannedOffers.put(offerId, groupKey);
+
+          if (LOG.isLoggable(Level.FINE)) {
+            LOG.fine(
+                String.format("Adding static ban for offer: %s, groupKey: %s", offer, groupKey));
+          }
+        }
+      }
+
       synchronized void clear() {
         offers.clear();
         offersById.clear();
         offersBySlave.clear();
         offersByHost.clear();
+        staticallyBannedOffers.clear();
       }
     }
 
     @Timed("offer_queue_launch_first")
     @Override
-    public boolean launchFirst(Function<HostOffer, Assignment> acceptor)
+    public boolean launchFirst(Function<HostOffer, Assignment> acceptor, GroupKey groupKey)
         throws LaunchException {
 
       // It's important that this method is not called concurrently - doing so would open up the
       // possibility of a race between the same offers being accepted by different threads.
 
       for (HostOffer offer : hostOffers.getWeaklyConsistentOffers()) {
-        if (acceptOffer(offer, acceptor)) {
+        if (!hostOffers.isStaticallyBanned(offer, groupKey)
+            && acceptOffer(offer, acceptor, groupKey)) {
           return true;
         }
       }
@@ -312,7 +351,8 @@ public interface OfferManager extends EventSubscriber {
     @Timed("offer_queue_accept_offer")
     protected boolean acceptOffer(
         HostOffer offer,
-        Function<HostOffer, Assignment> acceptor) throws LaunchException {
+        Function<HostOffer, Assignment> acceptor,
+        GroupKey groupKey) throws LaunchException {
 
       Assignment assignment = acceptor.apply(offer);
       switch (assignment.getResult()) {
@@ -338,7 +378,13 @@ public interface OfferManager extends EventSubscriber {
             throw new LaunchException(
                 "Accepted offer no longer exists in offer queue, likely data race.");
           }
-        case FAILURE:
+
+        case FAILURE_STATIC_MISMATCH:
+          // Exclude an offer that results in a static mismatch from further attempts to match
+          // against all tasks from the same group.
+          hostOffers.addStaticGroupBan(offer, groupKey);
+          return false;
+
         default:
           return false;
       }
