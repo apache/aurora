@@ -145,7 +145,17 @@
 
   <resultMap id="jobUpdateSummaryMap" type="org.apache.aurora.gen.JobUpdateSummary">
     <id column="update_id" property="updateId"/>
-    <association property="jobKey"
+    <result column="update_id" property="key.id" javaType="String"/>
+    <!-- myBatis breaks here if an association is used to map the job key into both the old
+         and new job key fields.  The observed behavior is that only the first declared association
+         will result in a field being set, and the other will be null.  Expanding the association
+         allows for the desired result of populating both JobKey fields.
+    -->
+    <result column="jk_role" property="jobKey.role" javaType="String"/>
+    <result column="jk_environment" property="jobKey.environment" javaType="String"/>
+    <result column="jk_name" property="jobKey.name" javaType="String"/>
+
+    <association property="key.job"
                  resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
                  columnPrefix="jk_"/>
     <association property="state"

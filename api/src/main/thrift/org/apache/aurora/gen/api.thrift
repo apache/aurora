@@ -623,7 +623,6 @@ enum JobUpdatePulseStatus {
   FINISHED = 2
 }
 
-// TODO(maxim): refactor beta updater to use JobUpdateKey (AURORA-1093).
 /** Job update key. */
 struct JobUpdateKey {
   /** Job being updated */
@@ -724,6 +723,9 @@ struct JobUpdateSummary {
 
   /** Job key. */
   2: JobKey jobKey
+
+  /** Unique identifier for the update. */
+  5: JobUpdateKey key
 
   /** User initiated an update. */
   3: string user

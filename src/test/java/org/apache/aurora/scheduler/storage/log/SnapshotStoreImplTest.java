@@ -49,6 +49,7 @@ import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -111,6 +112,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     IJobUpdateDetails updateDetails1 = IJobUpdateDetails.build(new JobUpdateDetails()
         .setUpdate(new JobUpdate().setSummary(
             new JobUpdateSummary()
+                .setKey(updateId1.newBuilder())
                 .setUpdateId(updateId1.getId())
                 .setJobKey(updateId1.getJob().newBuilder())))
         .setUpdateEvents(ImmutableList.of(new JobUpdateEvent().setStatus(JobUpdateStatus.ERROR)))
@@ -119,6 +121,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     IJobUpdateDetails updateDetails2 = IJobUpdateDetails.build(new JobUpdateDetails()
         .setUpdate(new JobUpdate().setSummary(
             new JobUpdateSummary()
+                // Deliberately not setting the key field here to validate backwards compatibility
+                // with data written before that field existed.
                 .setUpdateId(updateId2.getId())
                 .setJobKey(updateId2.getJob().newBuilder()))));
 
@@ -153,8 +157,12 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(
         updateId1,
         Iterables.getOnlyElement(updateDetails1.getInstanceEvents()));
+
+    // The saved object for update2 should be backfilled.
+    JobUpdate update2Expected = updateDetails2.getUpdate().newBuilder();
+    update2Expected.getSummary().setKey(updateId2.newBuilder());
     storageUtil.jobUpdateStore.saveJobUpdate(
-        updateDetails2.getUpdate(), Optional.<String>absent());
+        IJobUpdate.build(update2Expected), Optional.<String>absent());
 
     control.replay();
 

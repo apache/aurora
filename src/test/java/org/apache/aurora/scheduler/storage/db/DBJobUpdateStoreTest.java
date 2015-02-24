@@ -994,6 +994,7 @@ public class DBJobUpdateStoreTest {
 
   private IJobUpdateSummary makeSummary(IJobUpdateKey key, String user) {
     return IJobUpdateSummary.build(new JobUpdateSummary()
+        .setKey(key.newBuilder())
         .setUpdateId(key.getId())
         .setJobKey(key.getJob().newBuilder())
         .setUser(user));
@@ -1007,6 +1008,7 @@ public class DBJobUpdateStoreTest {
       Optional<String> lockToken) {
 
     IJobUpdateSummary summary = IJobUpdateSummary.build(new JobUpdateSummary()
+        .setKey(key.newBuilder())
         .setUpdateId(key.getId())
         .setJobKey(key.getJob().newBuilder())
         .setUser(user));

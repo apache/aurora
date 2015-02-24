@@ -99,7 +99,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -109,7 +108,6 @@ import org.apache.aurora.scheduler.storage.log.LogStorage.SchedulingService;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-import org.apache.aurora.scheduler.updater.Updates;
 import org.easymock.Capture;
 import org.easymock.IAnswer;
 import org.junit.Before;
@@ -351,6 +349,7 @@ public class LogStorageTest extends EasyMockTest {
 
     JobUpdate update = new JobUpdate()
         .setSummary(new JobUpdateSummary()
+            .setKey(UPDATE_ID.newBuilder())
             .setJobKey(UPDATE_ID.getJob().newBuilder())
             .setUpdateId(UPDATE_ID.getId()));
     SaveJobUpdate saveUpdate = new SaveJobUpdate(update, "token");
@@ -359,19 +358,35 @@ public class LogStorageTest extends EasyMockTest {
         IJobUpdate.build(saveUpdate.getJobUpdate()),
         Optional.of(saveUpdate.getLockToken()));
 
-    IJobUpdateKey key = Updates.getKey(IJobUpdateSummary.build(update.getSummary()));
+    // Ensure that JobUpdateSummary.key is backfilled.
+    IJobUpdateKey updateId2 =
+        IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), "backfilled"));
+    JobUpdate legacyUpdate = new JobUpdate()
+        .setSummary(new JobUpdateSummary()
+            .setJobKey(updateId2.getJob().newBuilder())
+            .setUpdateId(updateId2.getId()));
+    SaveJobUpdate saveUpdateBackfilled = new SaveJobUpdate(legacyUpdate, "token2");
+    builder.add(createTransaction(Op.saveJobUpdate(saveUpdateBackfilled)));
+    JobUpdate legacyUpdateBackfilled = legacyUpdate.deepCopy();
+    legacyUpdateBackfilled.getSummary().setKey(updateId2.newBuilder());
+    storageUtil.jobUpdateStore.saveJobUpdate(
+        IJobUpdate.build(legacyUpdateBackfilled),
+        Optional.of(saveUpdateBackfilled.getLockToken()));
+
     SaveJobUpdateEvent saveUpdateEvent =
-        new SaveJobUpdateEvent(new JobUpdateEvent(), "update", key.newBuilder());
+        new SaveJobUpdateEvent(new JobUpdateEvent(), "update", UPDATE_ID.newBuilder());
     builder.add(createTransaction(Op.saveJobUpdateEvent(saveUpdateEvent)));
     storageUtil.jobUpdateStore.saveJobUpdateEvent(
-        key,
+        UPDATE_ID,
         IJobUpdateEvent.build(saveUpdateEvent.getEvent()));
 
-    SaveJobInstanceUpdateEvent saveInstanceEvent =
-        new SaveJobInstanceUpdateEvent(new JobInstanceUpdateEvent(), "update", key.newBuilder());
+    SaveJobInstanceUpdateEvent saveInstanceEvent = new SaveJobInstanceUpdateEvent(
+        new JobInstanceUpdateEvent(),
+        "update",
+        UPDATE_ID.newBuilder());
     builder.add(createTransaction(Op.saveJobInstanceUpdateEvent(saveInstanceEvent)));
     storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(
-        key,
+        UPDATE_ID,
         IJobInstanceUpdateEvent.build(saveInstanceEvent.getEvent()));
 
     // Backwards compatibility as part of AURORA-1093.  Exercises behavior to drop job

@@ -2453,6 +2453,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     return IJobUpdate.build(new JobUpdate()
         .setSummary(new JobUpdateSummary()
+            .setKey(UPDATE_KEY.newBuilder())
             .setJobKey(UPDATE_KEY.getJob().newBuilder())
             .setUpdateId(UPDATE_KEY.getId())
             .setUser(ROLE_IDENTITY.getUser()))

@@ -1017,7 +1017,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     store.saveJobUpdate(update, Optional.of(lock.getToken()));
     store.saveJobUpdateEvent(
-        Updates.getKey(update.getSummary()),
+        update.getSummary().getKey(),
         IJobUpdateEvent.build(
             new JobUpdateEvent()
                 .setStatus(status)
@@ -1291,7 +1291,8 @@ public class JobUpdaterIT extends EasyMockTest {
   private static IJobUpdateSummary makeUpdateSummary() {
     return IJobUpdateSummary.build(new JobUpdateSummary()
         .setUser("user")
-        .setJobKey(JOB.newBuilder())
+        .setKey(UPDATE_ID.newBuilder())
+        .setJobKey(UPDATE_ID.getJob().newBuilder())
         .setUpdateId(UPDATE_ID.getId()));
   }
 

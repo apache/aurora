@@ -44,6 +44,7 @@ import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
@@ -76,11 +77,13 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.updater.Updates;
 
 import static java.util.Objects.requireNonNull;
 
@@ -438,8 +441,12 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         .put(Op._Fields.SAVE_JOB_UPDATE, new Closure<Op>() {
           @Override
           public void execute(Op op) {
+            JobUpdate update = op.getSaveJobUpdate().getJobUpdate();
+            update.setSummary(Updates.backfillJobUpdateKey(
+                IJobUpdateSummary.build(update.getSummary())).newBuilder());
+
             writeBehindJobUpdateStore.saveJobUpdate(
-                IJobUpdate.build(op.getSaveJobUpdate().getJobUpdate()),
+                IJobUpdate.build(update),
                 Optional.fromNullable(op.getSaveJobUpdate().getLockToken()));
           }
         })

@@ -19,6 +19,7 @@ import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateStatus;
+import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
@@ -45,5 +46,22 @@ public final class Updates {
         new JobUpdateKey(
             JobKeys.assertValid(summary.getJobKey()).newBuilder(),
             requireNonNull(summary.getUpdateId())));
+  }
+
+  /**
+   * Populates the {@link IJobUpdateSummary#getKey()} if it is not set by cloning other fields.
+   *
+   * @param summary Update summary to backfill.
+   * @return The original summary, guaranteed to have the {@code key} field populated.
+   */
+  public static IJobUpdateSummary backfillJobUpdateKey(IJobUpdateSummary summary) {
+    if (summary.isSetKey()) {
+      return summary;
+    } else {
+      JobUpdateSummary mutableSummary = summary.newBuilder();
+      mutableSummary.setKey(
+          new JobUpdateKey(mutableSummary.getJobKey(), mutableSummary.getUpdateId()));
+      return IJobUpdateSummary.build(mutableSummary);
+    }
   }
 }

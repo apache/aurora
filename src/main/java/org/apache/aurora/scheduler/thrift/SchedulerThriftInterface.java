@@ -1198,6 +1198,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
         IJobUpdate update = IJobUpdate.build(new JobUpdate()
             .setSummary(new JobUpdateSummary()
+                .setKey(new JobUpdateKey(job.newBuilder(), updateId))
                 .setJobKey(job.newBuilder())
                 .setUpdateId(updateId)
                 .setUser(context.getIdentity()))
