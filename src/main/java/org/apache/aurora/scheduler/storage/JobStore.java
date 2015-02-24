@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.storage;
 
-import java.util.Set;
-
 import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -26,41 +24,29 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 public interface JobStore {
 
   /**
-   * Fetches all {@code JobConfiguration}s for jobs owned by the manager identified by
-   * {@code managerId}; if there are none then an empty set is returned.
+   * Fetches all {@code JobConfiguration} instances.
    *
-   * @param managerId The unique identifier of the manager to find registered jobs for.
-   * @return the set of job configurations owned by the specififed job manager
+   * @return {@link Iterable} of job configurations.
    */
-  Iterable<IJobConfiguration> fetchJobs(String managerId);
+  Iterable<IJobConfiguration> fetchJobs();
 
   /**
    * Fetches the {@code JobConfiguration} for the specified {@code jobKey} if it exists.
    *
-   * @param managerId The unique identifier of the manager that accepted the job.
    * @param jobKey The jobKey identifying the job to be fetched.
    * @return the job configuration for the given {@code jobKey} or absent if none is found.
    */
-  Optional<IJobConfiguration> fetchJob(String managerId, IJobKey jobKey);
-
-  /**
-   * Fetches all the unique manager ids that are present in the job store.
-   *
-   * @return The IDs of all stored job managers.
-   */
-  Set<String> fetchManagerIds();
+  Optional<IJobConfiguration> fetchJob(IJobKey jobKey);
 
   interface Mutable extends JobStore {
     /**
-     * Saves the job configuration for a job that has been accepted by the scheduler. Acts as an
-     * update if the managerId already exists.
+     * Saves the job configuration for a job that has been accepted by the scheduler.
      * TODO(William Farner): Consider accepting SanitizedConfiguration here to require that
      * validation always happens for things entering storage.
      *
-     * @param managerId The unique id of the manager that accepted the job.
      * @param jobConfig The configuration of the accepted job.
      */
-    void saveAcceptedJob(String managerId, IJobConfiguration jobConfig);
+    void saveAcceptedJob(IJobConfiguration jobConfig);
 
     /**
      * Removes the job configuration for the job identified by {@code jobKey}.

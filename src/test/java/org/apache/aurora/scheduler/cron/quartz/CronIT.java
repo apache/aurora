@@ -133,15 +133,12 @@ public class CronIT extends EasyMockTest {
     auroraCronJob.execute(isA(JobExecutionContext.class));
 
     control.replay();
-    final CronJobManager cronJobManager = injector.getInstance(CronJobManager.class);
     final Scheduler scheduler = injector.getInstance(Scheduler.class);
 
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().saveAcceptedJob(
-            cronJobManager.getManagerKey(),
-            CRON_JOB);
+        storeProvider.getJobStore().saveAcceptedJob(CRON_JOB);
       }
     });
 

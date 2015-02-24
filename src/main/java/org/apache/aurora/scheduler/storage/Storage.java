@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.SchedulerException;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 /**
@@ -279,6 +280,15 @@ public interface Storage {
         @Override
         public ImmutableSet<IScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);
+        }
+      });
+    }
+
+    public static Iterable<IJobConfiguration> fetchCronJobs(Storage storage) {
+      return storage.read(new Work.Quiet<Iterable<IJobConfiguration>>() {
+        @Override
+        public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
+          return storeProvider.getJobStore().fetchJobs();
         }
       });
     }

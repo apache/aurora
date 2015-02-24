@@ -66,11 +66,6 @@ class CronJobManagerImpl implements CronJobManager {
   }
 
   @Override
-  public String getManagerKey() {
-    return "CRON";
-  }
-
-  @Override
   public void startJobNow(final IJobKey jobKey) throws CronException {
     requireNonNull(jobKey);
 
@@ -139,13 +134,13 @@ class CronJobManagerImpl implements CronJobManager {
   }
 
   private void checkNotExists(IJobKey jobKey, JobStore jobStore) throws CronException {
-    if (jobStore.fetchJob(getManagerKey(), jobKey).isPresent()) {
+    if (jobStore.fetchJob(jobKey).isPresent()) {
       throw new CronException(formatMessage("Job already exists for %s.", jobKey));
     }
   }
 
   private void checkCronExists(IJobKey jobKey, JobStore jobStore) throws CronException {
-    if (!jobStore.fetchJob(getManagerKey(), jobKey).isPresent()) {
+    if (!jobStore.fetchJob(jobKey).isPresent()) {
       throw new CronException(formatMessage("No cron job found for %s.", jobKey));
     }
   }
@@ -158,7 +153,7 @@ class CronJobManagerImpl implements CronJobManager {
   private void saveJob(SanitizedCronJob cronJob, JobStore.Mutable jobStore) {
     IJobConfiguration config = cronJob.getSanitizedConfig().getJobConfig();
 
-    jobStore.saveAcceptedJob(getManagerKey(), config);
+    jobStore.saveAcceptedJob(config);
     LOG.info(formatMessage("Saved new cron job %s to storage.", config.getKey()));
   }
 
@@ -175,36 +170,13 @@ class CronJobManagerImpl implements CronJobManager {
   }
 
   @Override
-  public Iterable<IJobConfiguration> getJobs() {
-    // NOTE: no synchronization is needed here since we don't touch internal quartz state.
-    return storage.read(new Work.Quiet<Iterable<IJobConfiguration>>() {
-      @Override
-      public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobStore().fetchJobs(getManagerKey());
-      }
-    });
-  }
-
-  @Override
-  public boolean hasJob(final IJobKey jobKey) {
-    requireNonNull(jobKey);
-
-    return storage.read(new Work.Quiet<Boolean>() {
-      @Override
-      public Boolean apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobStore().fetchJob(getManagerKey(), jobKey).isPresent();
-      }
-    });
-  }
-
-  @Override
   public boolean deleteJob(final IJobKey jobKey) {
     requireNonNull(jobKey);
 
     return storage.write(new MutateWork.Quiet<Boolean>() {
       @Override
       public Boolean apply(Storage.MutableStoreProvider storeProvider) {
-        if (!hasJob(jobKey)) {
+        if (!storeProvider.getJobStore().fetchJob(jobKey).isPresent()) {
           return false;
         }
 

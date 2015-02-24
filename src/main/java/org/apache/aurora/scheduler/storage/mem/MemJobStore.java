@@ -14,14 +14,8 @@
 package org.apache.aurora.scheduler.storage.mem;
 
 import java.util.Map;
-import java.util.Set;
-
-import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
@@ -30,75 +24,35 @@ import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
-import static java.util.Objects.requireNonNull;
-
 /**
  * An in-memory job store.
  */
 class MemJobStore implements JobStore.Mutable {
-
-  private final LoadingCache<String, Manager> managers = CacheBuilder.newBuilder()
-      .build(new CacheLoader<String, Manager>() {
-        @Override
-        public Manager load(String key) {
-          return new Manager();
-        }
-      });
+  private final Map<IJobKey, IJobConfiguration> jobs = Maps.newConcurrentMap();
 
   @Override
-  public void saveAcceptedJob(String managerId, IJobConfiguration jobConfig) {
-    requireNonNull(managerId);
-    requireNonNull(jobConfig);
-
+  public void saveAcceptedJob(IJobConfiguration jobConfig) {
     IJobKey key = JobKeys.assertValid(jobConfig.getKey());
-    managers.getUnchecked(managerId).jobs.put(key, jobConfig);
+    jobs.put(key, jobConfig);
   }
 
   @Override
   public void removeJob(IJobKey jobKey) {
-    requireNonNull(jobKey);
-
-    for (Manager manager : managers.asMap().values()) {
-      manager.jobs.remove(jobKey);
-    }
+    jobs.remove(jobKey);
   }
 
   @Override
   public void deleteJobs() {
-    managers.invalidateAll();
+    jobs.clear();
   }
 
   @Override
-  public Iterable<IJobConfiguration> fetchJobs(String managerId) {
-    requireNonNull(managerId);
-
-    @Nullable Manager manager = managers.getIfPresent(managerId);
-    if (manager == null) {
-      return ImmutableSet.of();
-    }
-
-    return ImmutableSet.copyOf(manager.jobs.values());
+  public Iterable<IJobConfiguration> fetchJobs() {
+    return ImmutableSet.copyOf(jobs.values());
   }
 
   @Override
-  public Optional<IJobConfiguration> fetchJob(String managerId, IJobKey jobKey) {
-    requireNonNull(managerId);
-    requireNonNull(jobKey);
-
-    Optional<Manager> manager = Optional.fromNullable(managers.getIfPresent(managerId));
-    if (manager.isPresent()) {
-      return Optional.fromNullable(manager.get().jobs.get(jobKey));
-    } else {
-      return Optional.absent();
-    }
-  }
-
-  @Override
-  public Set<String> fetchManagerIds() {
-    return ImmutableSet.copyOf(managers.asMap().keySet());
-  }
-
-  private static class Manager {
-    private final Map<IJobKey, IJobConfiguration> jobs = Maps.newConcurrentMap();
+  public Optional<IJobConfiguration> fetchJob(IJobKey jobKey) {
+    return Optional.fromNullable(jobs.get(jobKey));
   }
 }

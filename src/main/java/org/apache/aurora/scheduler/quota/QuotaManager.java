@@ -38,7 +38,6 @@ import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ResourceAggregates;
-import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
@@ -118,12 +117,10 @@ public interface QuotaManager {
    */
   class QuotaManagerImpl implements QuotaManager {
     private final Storage storage;
-    private final CronJobManager cronJobManager;
 
     @Inject
-    QuotaManagerImpl(Storage storage, CronJobManager cronJobManager) {
+    QuotaManagerImpl(Storage storage) {
       this.storage = requireNonNull(storage);
-      this.cronJobManager = requireNonNull(cronJobManager);
     }
 
     @Override
@@ -211,7 +208,7 @@ public interface QuotaManager {
           }
 
           Map<IJobKey, IJobConfiguration> cronTemplates =
-              FluentIterable.from(cronJobManager.getJobs())
+              FluentIterable.from(storeProvider.getJobStore().fetchJobs())
                   .filter(Predicates.compose(Predicates.equalTo(role), JobKeys.CONFIG_TO_ROLE))
                   .uniqueIndex(JobKeys.FROM_CONFIG);
 

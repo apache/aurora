@@ -55,7 +55,6 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
-import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
@@ -98,7 +97,6 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private NearestFit nearestFit;
   private CronPredictor cronPredictor;
-  private CronJobManager cronJobManager;
   private QuotaManager quotaManager;
   private LockManager lockManager;
 
@@ -110,7 +108,6 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     storageUtil.expectOperations();
     nearestFit = createMock(NearestFit.class);
     cronPredictor = createMock(CronPredictor.class);
-    cronJobManager = createMock(CronJobManager.class);
     quotaManager = createMock(QuotaManager.class);
     lockManager = createMock(LockManager.class);
 
@@ -118,7 +115,6 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         storageUtil.storage,
         nearestFit,
         cronPredictor,
-        cronJobManager,
         quotaManager,
         lockManager);
   }
@@ -178,23 +174,25 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         .andReturn(new Date(nextCronRunMs))
         .anyTimes();
 
-    expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(ownedCronJobOnly));
     storageUtil.expectTaskFetch(query);
+    expect(storageUtil.jobStore.fetchJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(ownedCronJobOnly));
 
-    expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(bothCronJobs));
     storageUtil.expectTaskFetch(query);
+    expect(storageUtil.jobStore.fetchJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(bothCronJobs));
 
-    expect(cronJobManager.getJobs())
-        .andReturn(IJobConfiguration.setFromBuilders(unownedCronJobOnly));
     storageUtil.expectTaskFetch(query, ownedImmediateTask);
+    expect(storageUtil.jobStore.fetchJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(unownedCronJobOnly));
 
-    expect(cronJobManager.getJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
     storageUtil.expectTaskFetch(query);
+    expect(storageUtil.jobStore.fetchJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
 
     // Handle the case where a cron job has a running task (same JobKey present in both stores).
-    expect(cronJobManager.getJobs())
-        .andReturn(ImmutableList.of(IJobConfiguration.build(ownedCronJob)));
     storageUtil.expectTaskFetch(query, ownedCronJobScheduledTask);
+    expect(storageUtil.jobStore.fetchJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(ImmutableSet.of(ownedCronJob)));
 
     control.replay();
 
@@ -349,7 +347,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         .setTaskConfig(immediateTaskConfig);
 
     Set<JobConfiguration> crons = ImmutableSet.of(cronJobOne, cronJobTwo);
-    expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(crons));
+    expect(storageUtil.jobStore.fetchJobs()).andReturn(IJobConfiguration.setFromBuilders(crons));
     storageUtil.expectTaskFetch(Query.unscoped().active(), immediateTask);
 
     control.replay();
@@ -394,23 +392,25 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         .setTaskConfig(ownedImmediateTaskInfo);
     Query.Builder query = Query.roleScoped(ROLE).active();
 
-    expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(ownedCronJobOnly));
     storageUtil.expectTaskFetch(query);
+    expect(storageUtil.jobStore.fetchJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(ownedCronJobOnly));
 
-    expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(bothCronJobs));
     storageUtil.expectTaskFetch(query);
+    expect(storageUtil.jobStore.fetchJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(bothCronJobs));
 
-    expect(cronJobManager.getJobs())
-        .andReturn(IJobConfiguration.setFromBuilders(unownedCronJobOnly));
     storageUtil.expectTaskFetch(query, ownedImmediateTask);
+    expect(storageUtil.jobStore.fetchJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(unownedCronJobOnly));
 
-    expect(cronJobManager.getJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
+    expect(storageUtil.jobStore.fetchJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
     storageUtil.expectTaskFetch(query);
 
     // Handle the case where a cron job has a running task (same JobKey present in both stores).
-    expect(cronJobManager.getJobs())
-        .andReturn(ImmutableList.of(IJobConfiguration.build(ownedCronJob)));
     storageUtil.expectTaskFetch(query, ownedCronJobScheduledTask);
+    expect(storageUtil.jobStore.fetchJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(ImmutableSet.of(ownedCronJob)));
 
     control.replay();
 
@@ -626,7 +626,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     storageUtil.expectTaskFetch(Query.unscoped(), task1, task2, task3, task4);
 
-    expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(crons));
+    expect(storageUtil.jobStore.fetchJobs()).andReturn(IJobConfiguration.setFromBuilders(crons));
 
     RoleSummaryResult expectedResult = new RoleSummaryResult();
     expectedResult.addToSummaries(

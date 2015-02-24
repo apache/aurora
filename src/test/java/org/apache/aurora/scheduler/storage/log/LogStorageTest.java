@@ -296,12 +296,9 @@ public class LogStorageTest extends EasyMockTest {
     builder.add(createTransaction(Op.saveFrameworkId(new SaveFrameworkId("bob"))));
     storageUtil.schedulerStore.saveFrameworkId("bob");
 
-    SaveAcceptedJob acceptedJob =
-        new SaveAcceptedJob().setManagerId("CRON").setJobConfig(new JobConfiguration());
+    SaveAcceptedJob acceptedJob = new SaveAcceptedJob().setJobConfig(new JobConfiguration());
     builder.add(createTransaction(Op.saveAcceptedJob(acceptedJob)));
-    storageUtil.jobStore.saveAcceptedJob(
-        acceptedJob.getManagerId(),
-        IJobConfiguration.build(acceptedJob.getJobConfig()));
+    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(acceptedJob.getJobConfig()));
 
     RemoveJob removeJob = new RemoveJob(JOB_KEY.newBuilder());
     builder.add(createTransaction(Op.removeJob(removeJob)));
@@ -526,20 +523,19 @@ public class LogStorageTest extends EasyMockTest {
   public void testSaveAcceptedJob() throws Exception {
     final IJobConfiguration jobConfig =
         IJobConfiguration.build(new JobConfiguration().setKey(JOB_KEY.newBuilder()));
-    final String managerId = "CRON";
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
-        storageUtil.jobStore.saveAcceptedJob(managerId, jobConfig);
+        storageUtil.jobStore.saveAcceptedJob(jobConfig);
         streamMatcher.expectTransaction(
-            Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())))
+            Op.saveAcceptedJob(new SaveAcceptedJob(jobConfig.newBuilder())))
             .andReturn(position);
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().saveAcceptedJob(managerId, jobConfig);
+        storeProvider.getJobStore().saveAcceptedJob(jobConfig);
       }
     }.run();
   }

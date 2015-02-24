@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.cron.quartz;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -22,7 +21,6 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.CronCollisionPolicy;
@@ -163,17 +161,6 @@ public class CronJobManagerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testGetJobs() throws Exception {
-    control.replay();
-    assertEquals(Collections.emptyList(), ImmutableList.copyOf(cronJobManager.getJobs()));
-
-    populateStorage();
-    assertEquals(
-        QuartzTestUtil.makeSanitizedCronJob().getSanitizedConfig().getJobConfig(),
-        Iterables.getOnlyElement(cronJobManager.getJobs()));
-  }
-
-  @Test
   public void testNoRunOverlap() throws Exception {
     SanitizedCronJob runOverlapJob = SanitizedCronJob.fromUnsanitized(
         IJobConfiguration.build(QuartzTestUtil.JOB.newBuilder()
@@ -264,7 +251,6 @@ public class CronJobManagerImplTest extends EasyMockTest {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) throws Exception {
         storeProvider.getJobStore().saveAcceptedJob(
-            cronJobManager.getManagerKey(),
             QuartzTestUtil.makeSanitizedCronJob().getSanitizedConfig().getJobConfig());
       }
     });
@@ -274,8 +260,7 @@ public class CronJobManagerImplTest extends EasyMockTest {
     return storage.read(new Storage.Work.Quiet<Optional<IJobConfiguration>>() {
       @Override
       public Optional<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobStore().fetchJob(cronJobManager.getManagerKey(),
-            QuartzTestUtil.AURORA_JOB_KEY);
+        return storeProvider.getJobStore().fetchJob(QuartzTestUtil.AURORA_JOB_KEY);
       }
     });
   }

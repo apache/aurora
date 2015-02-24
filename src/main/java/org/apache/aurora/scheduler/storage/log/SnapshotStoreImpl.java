@@ -133,10 +133,9 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         @Override
         public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<StoredJob> jobs = ImmutableSet.builder();
-          for (String managerId : store.getJobStore().fetchManagerIds()) {
-            for (IJobConfiguration config : store.getJobStore().fetchJobs(managerId)) {
-              jobs.add(new StoredJob(managerId, config.newBuilder()));
-            }
+
+          for (IJobConfiguration config : store.getJobStore().fetchJobs()) {
+            jobs.add(new StoredJob(config.newBuilder()));
           }
           snapshot.setJobs(jobs.build());
         }
@@ -148,7 +147,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
           if (snapshot.isSetJobs()) {
             for (StoredJob job : snapshot.getJobs()) {
               store.getJobStore().saveAcceptedJob(
-                  job.getJobManagerId(),
                   IJobConfiguration.build(job.getJobConfiguration()));
             }
           }

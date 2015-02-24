@@ -27,10 +27,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 public class MemJobStoreTest {
-
-  private static final String MANAGER_1 = "manager1";
-  private static final String MANAGER_2 = "manager2";
-
   private static final IJobConfiguration JOB_A = makeJob("a");
   private static final IJobConfiguration JOB_B = makeJob("b");
 
@@ -46,31 +42,22 @@ public class MemJobStoreTest {
 
   @Test
   public void testJobStore() {
-    assertNull(store.fetchJob(MANAGER_1, JobKeys.from("nobody", "nowhere", "noname")).orNull());
-    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs(MANAGER_1));
-    assertEquals(ImmutableSet.<String>of(), store.fetchManagerIds());
+    assertNull(store.fetchJob(JobKeys.from("nobody", "nowhere", "noname")).orNull());
+    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs());
 
-    store.saveAcceptedJob(MANAGER_1, JOB_A);
-    assertEquals(JOB_A, store.fetchJob(MANAGER_1, KEY_A).orNull());
-    assertEquals(ImmutableSet.of(JOB_A), store.fetchJobs(MANAGER_1));
+    store.saveAcceptedJob(JOB_A);
+    assertEquals(JOB_A, store.fetchJob(KEY_A).orNull());
+    assertEquals(ImmutableSet.of(JOB_A), store.fetchJobs());
 
-    store.saveAcceptedJob(MANAGER_1, JOB_B);
-    assertEquals(JOB_B, store.fetchJob(MANAGER_1, KEY_B).orNull());
-    assertEquals(ImmutableSet.of(JOB_A, JOB_B), store.fetchJobs(MANAGER_1));
-    assertEquals(ImmutableSet.of(MANAGER_1), store.fetchManagerIds());
-
-    store.saveAcceptedJob(MANAGER_2, JOB_B);
-    assertEquals(JOB_B, store.fetchJob(MANAGER_1, KEY_B).orNull());
-    assertEquals(ImmutableSet.of(JOB_B), store.fetchJobs(MANAGER_2));
-    assertEquals(ImmutableSet.of(MANAGER_1, MANAGER_2), store.fetchManagerIds());
+    store.saveAcceptedJob(JOB_B);
+    assertEquals(JOB_B, store.fetchJob(KEY_B).orNull());
+    assertEquals(ImmutableSet.of(JOB_A, JOB_B), store.fetchJobs());
 
     store.removeJob(KEY_B);
-    assertEquals(ImmutableSet.of(JOB_A), store.fetchJobs(MANAGER_1));
-    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs(MANAGER_2));
+    assertEquals(ImmutableSet.of(JOB_A), store.fetchJobs());
 
     store.deleteJobs();
-    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs(MANAGER_1));
-    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs(MANAGER_2));
+    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs());
   }
 
   @Test
@@ -83,18 +70,17 @@ public class MemJobStoreTest {
     stagingBuilder.getKey().setEnvironment("staging");
     IJobConfiguration staging = IJobConfiguration.build(stagingBuilder);
 
-    store.saveAcceptedJob(MANAGER_1, prod);
-    store.saveAcceptedJob(MANAGER_1, staging);
+    store.saveAcceptedJob(prod);
+    store.saveAcceptedJob(staging);
 
     assertNull(store.fetchJob(
-        MANAGER_1,
         IJobKey.build(templateConfig.getKey().newBuilder().setEnvironment("test"))).orNull());
-    assertEquals(prod, store.fetchJob(MANAGER_1, prod.getKey()).orNull());
-    assertEquals(staging, store.fetchJob(MANAGER_1, staging.getKey()).orNull());
+    assertEquals(prod, store.fetchJob(prod.getKey()).orNull());
+    assertEquals(staging, store.fetchJob(staging.getKey()).orNull());
 
     store.removeJob(prod.getKey());
-    assertNull(store.fetchJob(MANAGER_1, prod.getKey()).orNull());
-    assertEquals(staging, store.fetchJob(MANAGER_1, staging.getKey()).orNull());
+    assertNull(store.fetchJob(prod.getKey()).orNull());
+    assertEquals(staging, store.fetchJob(staging.getKey()).orNull());
   }
 
   private static IJobConfiguration makeJob(String name) {

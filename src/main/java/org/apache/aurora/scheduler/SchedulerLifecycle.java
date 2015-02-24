@@ -46,7 +46,6 @@ import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.common.util.StateMachine.Transition;
 import com.twitter.common.zookeeper.Group.JoinException;
@@ -127,7 +126,6 @@ public class SchedulerLifecycle implements EventSubscriber {
       Driver driver,
       LeadingOptions leadingOptions,
       ScheduledExecutorService executorService,
-      Clock clock,
       EventSink eventSink,
       ShutdownRegistry shutdownRegistry,
       StatsProvider statsProvider,
@@ -138,7 +136,6 @@ public class SchedulerLifecycle implements EventSubscriber {
         lifecycle,
         driver,
         new DefaultDelayedActions(leadingOptions, executorService),
-        clock,
         eventSink,
         shutdownRegistry,
         statsProvider,
@@ -200,7 +197,6 @@ public class SchedulerLifecycle implements EventSubscriber {
       final Lifecycle lifecycle,
       final Driver driver,
       final DelayedActions delayedActions,
-      final Clock clock,
       final EventSink eventSink,
       final ShutdownRegistry shutdownRegistry,
       StatsProvider statsProvider,
@@ -210,7 +206,6 @@ public class SchedulerLifecycle implements EventSubscriber {
     requireNonNull(lifecycle);
     requireNonNull(driver);
     requireNonNull(delayedActions);
-    requireNonNull(clock);
     requireNonNull(eventSink);
     requireNonNull(shutdownRegistry);
 
@@ -257,7 +252,7 @@ public class SchedulerLifecycle implements EventSubscriber {
         storage.start(new MutateWork.NoResult.Quiet() {
           @Override
           protected void execute(MutableStoreProvider storeProvider) {
-            StorageBackfill.backfill(storeProvider, clock);
+            StorageBackfill.backfill(storeProvider);
           }
         });
 

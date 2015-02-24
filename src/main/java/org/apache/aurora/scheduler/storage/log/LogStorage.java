@@ -363,7 +363,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
           public void execute(Op op) {
             SaveAcceptedJob acceptedJob = op.getSaveAcceptedJob();
             writeBehindJobStore.saveAcceptedJob(
-                acceptedJob.getManagerId(),
                 IJobConfiguration.build(acceptedJob.getJobConfig()));
           }
         })

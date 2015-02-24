@@ -24,8 +24,8 @@ struct SaveFrameworkId {
   1: string id
 }
 
+// TODO(maxim): Rename this into SaveCronJob.
 struct SaveAcceptedJob {
-  1: string managerId
   2: api.JobConfiguration jobConfig
 }
 
@@ -126,8 +126,8 @@ struct Transaction {
   2: i32 schemaVersion
 }
 
+// TODO(maxim): rename this into StoredCronJob.
 struct StoredJob {
-  1: string jobManagerId
   3: api.JobConfiguration jobConfiguration
 }
 

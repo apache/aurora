@@ -32,7 +32,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -306,7 +305,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   private void checkJobExists(StoreProvider store, IJobKey jobKey) throws JobExistsException {
     if (!store.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()).isEmpty()
-        || cronJobManager.hasJob(jobKey)) {
+        || getCronJob(store, jobKey).isPresent()) {
 
       throw new JobExistsException(jobAlreadyExistsMessage(jobKey));
     }
@@ -350,7 +349,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           validateTaskLimits(template, count, quotaManager.checkInstanceAddition(template, count));
 
           // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
-          if (updateOnly || cronJobManager.hasJob(sanitized.getJobConfig().getKey())) {
+          if (updateOnly || getCronJob(storeProvider, jobKey).isPresent()) {
             // The job already has a schedule: so update it.
             cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
           } else {
@@ -783,17 +782,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return ok();
   }
 
-  private static Multimap<String, IJobConfiguration> jobsByKey(JobStore jobStore, IJobKey jobKey) {
-    ImmutableMultimap.Builder<String, IJobConfiguration> matches = ImmutableMultimap.builder();
-    for (String managerId : jobStore.fetchManagerIds()) {
-      Optional<IJobConfiguration> job = jobStore.fetchJob(managerId, jobKey);
-      if (job.isPresent()) {
-        matches.put(managerId, job.get());
-      }
-    }
-    return matches.build();
-  }
-
   @Override
   public Response rewriteConfigs(final RewriteConfigsRequest request, SessionKey session) {
     if (request.getRewriteCommandsSize() == 0) {
@@ -839,28 +827,18 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     if (existingJob.getKey().equals(rewrittenJob.getKey())) {
-      Multimap<String, IJobConfiguration> matches = jobsByKey(jobStore, existingJob.getKey());
-      switch (matches.size()) {
-        case 0:
+      Optional<IJobConfiguration> job = jobStore.fetchJob(existingJob.getKey());
+      if (job.isPresent()) {
+        IJobConfiguration storedJob = job.get();
+        if (storedJob.equals(existingJob)) {
+          jobStore.saveAcceptedJob(rewrittenJob);
+        } else {
           error = Optional.of(
-              "No jobs found for key " + JobKeys.canonicalString(existingJob.getKey()));
-          break;
-
-        case 1:
-          Map.Entry<String, IJobConfiguration> match =
-              Iterables.getOnlyElement(matches.entries());
-          IJobConfiguration storedJob = match.getValue();
-          if (storedJob.equals(existingJob)) {
-            jobStore.saveAcceptedJob(match.getKey(), rewrittenJob);
-          } else {
-            error = Optional.of(
-                "CAS compare failed for " + JobKeys.canonicalString(storedJob.getKey()));
-          }
-          break;
-
-        default:
-          error = Optional.of("Multiple jobs found for key "
-              + JobKeys.canonicalString(existingJob.getKey()));
+              "CAS compare failed for " + JobKeys.canonicalString(storedJob.getKey()));
+        }
+      } else {
+        error = Optional.of(
+            "No jobs found for key " + JobKeys.canonicalString(existingJob.getKey()));
       }
     } else {
       error = Optional.of("Disallowing rewrite attempting to change job key.");
@@ -949,7 +927,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
         try {
-          if (cronJobManager.hasJob(jobKey)) {
+          if (getCronJob(storeProvider, jobKey).isPresent()) {
             return invalidRequest("Instances may not be added to cron jobs.");
           }
 
@@ -983,6 +961,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         }
       }
     });
+  }
+
+  public Optional<IJobConfiguration> getCronJob(StoreProvider storeProvider, final IJobKey jobKey) {
+    requireNonNull(jobKey);
+    return storeProvider.getJobStore().fetchJob(jobKey);
   }
 
   private String getRoleFromLockKey(ILockKey lockKey) {
@@ -1169,9 +1152,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ConfigurationManager.validateAndPopulate(
               ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
 
-      if (cronJobManager.hasJob(job)) {
-        return invalidRequest(NO_CRON);
-      }
     } catch (AuthFailedException e) {
       return error(AUTH_FAILED, e);
     } catch (TaskDescriptionException e) {
@@ -1181,6 +1161,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return storage.write(new MutateWork.Quiet<Response>() {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
+        if (getCronJob(storeProvider, job).isPresent()) {
+          return invalidRequest(NO_CRON);
+        }
+
         String updateId = uuidGenerator.createNew().toString();
         IJobUpdateSettings settings = request.getSettings();
 

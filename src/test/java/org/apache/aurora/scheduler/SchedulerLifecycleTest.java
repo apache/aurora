@@ -21,7 +21,6 @@ import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.testing.easymock.EasyMockTest;
-import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 
@@ -48,9 +47,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 public class SchedulerLifecycleTest extends EasyMockTest {
-
-  private static final String FRAMEWORK_ID = "framework id";
-
   private StorageTestUtil storageUtil;
   private ShutdownSystem shutdownRegistry;
   private Driver driver;
@@ -84,8 +80,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     Capture<ExceptionalCommand<?>> shutdownCommand = createCapture();
     shutdownRegistry.addAction(capture(shutdownCommand));
 
-    Clock clock = createMock(Clock.class);
-
     control.replay();
 
     schedulerLifecycle = new SchedulerLifecycle(
@@ -98,7 +92,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
         }),
         driver,
         delayedActions,
-        clock,
         eventSink,
         shutdownRegistry,
         statsProvider,

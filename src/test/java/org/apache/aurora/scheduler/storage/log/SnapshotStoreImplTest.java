@@ -96,7 +96,6 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     IHostAttributes legacyAttribute = IHostAttributes.build(
         new HostAttributes("host", ImmutableSet.<Attribute>of()));
     StoredJob job = new StoredJob(
-        "jobManager",
         new JobConfiguration().setKey(new JobKey("owner", "env", "name")));
     String frameworkId = "framework_id";
     ILock lock = ILock.build(new Lock()
@@ -129,8 +128,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .andReturn(ImmutableMap.of("steve", ResourceAggregates.none()));
     expect(storageUtil.attributeStore.getHostAttributes())
         .andReturn(ImmutableSet.of(attribute, legacyAttribute));
-    expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of("jobManager"));
-    expect(storageUtil.jobStore.fetchJobs("jobManager"))
+    expect(storageUtil.jobStore.fetchJobs())
         .andReturn(ImmutableSet.of(IJobConfiguration.build(job.getJobConfiguration())));
     expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(frameworkId));
     expect(storageUtil.lockStore.fetchLocks()).andReturn(ImmutableSet.of(lock));
@@ -144,9 +142,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.taskStore.saveTasks(tasks);
     storageUtil.quotaStore.saveQuota("steve", ResourceAggregates.none());
     expect(storageUtil.attributeStore.saveHostAttributes(attribute)).andReturn(true);
-    storageUtil.jobStore.saveAcceptedJob(
-        job.getJobManagerId(),
-        IJobConfiguration.build(job.getJobConfiguration()));
+    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(job.getJobConfiguration()));
     storageUtil.schedulerStore.saveFrameworkId(frameworkId);
     storageUtil.lockStore.saveLock(lock);
     storageUtil.jobUpdateStore.saveJobUpdate(

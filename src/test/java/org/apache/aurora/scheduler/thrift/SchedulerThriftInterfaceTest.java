@@ -278,7 +278,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
     expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
@@ -301,7 +301,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
     expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
@@ -381,7 +381,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
+    expectCronJob();
 
     control.replay();
 
@@ -396,7 +396,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(quotaManager.checkInstanceAddition(anyObject(ITaskConfig.class), anyInt()))
         .andReturn(ENOUGH_QUOTA);
 
@@ -412,7 +412,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(quotaManager.checkInstanceAddition(anyObject(ITaskConfig.class), anyInt()))
         .andReturn(ENOUGH_QUOTA);
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
@@ -430,7 +430,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
     expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
@@ -579,7 +579,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(taskIdGenerator.generate(ITaskConfig.build(sanitized.getTaskConfig()), 1))
         .andReturn(TASK_ID);
     expect(quotaManager.checkInstanceAddition(ITaskConfig.build(sanitized.getTaskConfig()), 1))
@@ -1128,7 +1128,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(ENOUGH_QUOTA);
 
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false).times(2);
+    expectNoCronJob().times(2);
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     cronJobManager.createJob(SanitizedCronJob.from(sanitized));
     control.replay();
@@ -1147,7 +1147,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(ENOUGH_QUOTA);
 
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active(), buildScheduledTask());
     control.replay();
     assertEquals(
@@ -1167,7 +1167,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(ENOUGH_QUOTA);
 
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
+    expectCronJob();
     cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
     control.replay();
 
@@ -1413,9 +1413,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
     newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
-    String manager = "manager_key";
-    expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
-    expect(storageUtil.jobStore.fetchJob(manager, IJobKey.build(oldJob.getKey())))
+    expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
         .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
 
     control.replay();
@@ -1431,36 +1429,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
     newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
-    String manager = "manager_key";
-    expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
-    expect(storageUtil.jobStore.fetchJob(manager, IJobKey.build(oldJob.getKey())))
+    expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
         .andReturn(Optional.<IJobConfiguration>absent());
-
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.jobRewrite(
-            new JobConfigRewrite(oldJob, newJob))));
-    assertResponse(WARNING, thrift.rewriteConfigs(request, SESSION));
-  }
-
-  @Test
-  public void testRewriteJobMultipleMatches() throws Exception {
-    JobConfiguration oldJob = makeJob(productionTask());
-    JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
-    String manager1 = "manager1";
-    String manager2 = "manager2";
-    String manager3 = "manager3";
-    expect(storageUtil.jobStore.fetchManagerIds())
-        .andReturn(ImmutableSet.of(manager1, manager2, manager3));
-    expect(storageUtil.jobStore.fetchJob(manager1, IJobKey.build(oldJob.getKey())))
-        .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
-    expect(storageUtil.jobStore.fetchJob(manager2, IJobKey.build(oldJob.getKey())))
-        .andReturn(Optional.of(IJobConfiguration.build(makeJob())));
-    expect(storageUtil.jobStore.fetchJob(manager3, IJobKey.build(oldJob.getKey())))
-        .andReturn(Optional.of(IJobConfiguration.build(
-            makeJob().setKey(JobKeys.from("1", "2", "3").newBuilder()))));
 
     control.replay();
 
@@ -1475,12 +1445,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
     newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
-    String manager = "manager_key";
-    expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
-    expect(storageUtil.jobStore.fetchJob(manager, IJobKey.build(oldJob.getKey())))
+    expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
         .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
     storageUtil.jobStore.saveAcceptedJob(
-        manager,
         ConfigurationManager.validateAndPopulate(IJobConfiguration.build(newJob)));
 
     control.replay();
@@ -1594,7 +1561,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testAddInstances() throws Exception {
     ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(taskIdGenerator.generate(populatedTask, 1))
@@ -1618,7 +1585,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
     AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(taskIdGenerator.generate(populatedTask, 1))
@@ -1658,7 +1625,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testAddInstancesFailsCronJob() throws Exception {
     AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
+    expectCronJob();
 
     control.replay();
 
@@ -1669,7 +1636,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testAddInstancesFailsWithNonTransient() throws Exception {
     AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andThrow(new StorageException("no retry"));
+    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andThrow(new StorageException("no retry"));
 
     control.replay();
 
@@ -1680,7 +1647,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testAddInstancesLockCheckFails() throws Exception {
     AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     expectLastCall().andThrow(new LockException("Failed lock check."));
 
@@ -1694,7 +1661,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
     AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(quotaManager.checkInstanceAddition(anyObject(ITaskConfig.class), anyInt()))
@@ -1712,7 +1679,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
     AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(taskIdGenerator.generate(populatedTask, 1))
@@ -1729,7 +1696,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
     AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(taskIdGenerator.generate(populatedTask, 1))
@@ -1833,7 +1800,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartUpdate() throws Exception {
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
 
     ITaskConfig newTask = buildTaskForJobUpdate(0).getAssignedTask().getTask();
     expect(taskIdGenerator.generate(newTask, 6)).andReturn(TASK_ID);
@@ -1878,7 +1845,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartUpdateEmptyDesired() throws Exception {
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
 
     ITaskConfig newTask = buildTaskForJobUpdate(0).getAssignedTask().getTask();
     expect(taskIdGenerator.generate(newTask, 1)).andReturn(TASK_ID);
@@ -2033,7 +2000,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testStartUpdateFailsForCronJob() throws Exception {
     JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
+    expectCronJob();
 
     control.replay();
     assertEquals(invalidResponse(NO_CRON), thrift.startJobUpdate(request, SESSION));
@@ -2052,7 +2019,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartNoopUpdate() throws Exception {
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
     ITaskConfig newTask = buildTaskForJobUpdate(0).getAssignedTask().getTask();
 
@@ -2076,7 +2043,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartUpdateInvalidScope() throws Exception {
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
 
     IScheduledTask oldTask = buildTaskForJobUpdate(0);
@@ -2101,7 +2068,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     request.setInstanceCount(4001);
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active());
     expect(quotaManager.checkJobUpdate(anyObject(IJobUpdate.class))).andReturn(ENOUGH_QUOTA);
@@ -2115,7 +2082,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testStartUpdateFailsTaskIdLength() throws Exception {
     JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active());
     expect(quotaManager.checkJobUpdate(anyObject(IJobUpdate.class))).andReturn(ENOUGH_QUOTA);
@@ -2131,7 +2098,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testStartUpdateFailsQuotaCheck() throws Exception {
     JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
 
     IScheduledTask oldTask = buildTaskForJobUpdate(0);
@@ -2153,7 +2120,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartUpdateFailsInController() throws Exception {
     expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expectNoCronJob();
 
     IScheduledTask oldTask = buildTaskForJobUpdate(0, "old");
     ITaskConfig newTask = buildTaskForJobUpdate(0, "new").getAssignedTask().getTask();
@@ -2495,5 +2462,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
                 .setTask(newConfig.newBuilder())
                 .setInstances(ImmutableSet.of(new Range(0, instanceCount - 1))))
             .setInitialState(builder.build())));
+  }
+
+  private IExpectationSetters<?> expectCronJob() {
+    return expect(storageUtil.jobStore.fetchJob(JOB_KEY))
+        .andReturn(Optional.of(IJobConfiguration.build(CRON_JOB)));
+  }
+
+  private IExpectationSetters<?> expectNoCronJob() {
+    return expect(storageUtil.jobStore.fetchJob(JOB_KEY))
+        .andReturn(Optional.<IJobConfiguration>absent());
   }
 }

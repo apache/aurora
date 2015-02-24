@@ -34,7 +34,6 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.cron.CronException;
-import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -75,19 +74,16 @@ class AuroraCronJob implements Job {
 
   private final Storage storage;
   private final StateManager stateManager;
-  private final CronJobManager cronJobManager;
   private final BackoffHelper delayedStartBackoff;
 
   @Inject
   AuroraCronJob(
       Config config,
       Storage storage,
-      StateManager stateManager,
-      CronJobManager cronJobManager) {
+      StateManager stateManager) {
 
     this.storage = requireNonNull(storage);
     this.stateManager = requireNonNull(stateManager);
-    this.cronJobManager = requireNonNull(cronJobManager);
     this.delayedStartBackoff = requireNonNull(config.getDelayedStartBackoff());
   }
 
@@ -120,8 +116,7 @@ class AuroraCronJob implements Job {
         new Storage.MutateWork.Quiet<Optional<DeferredLaunch>>() {
           @Override
           public Optional<DeferredLaunch> apply(Storage.MutableStoreProvider storeProvider) {
-            Optional<IJobConfiguration> config =
-                storeProvider.getJobStore().fetchJob(cronJobManager.getManagerKey(), key);
+            Optional<IJobConfiguration> config = storeProvider.getJobStore().fetchJob(key);
             if (!config.isPresent()) {
               LOG.warning(String.format(
                   "Cron was triggered for %s but no job with that key was found in storage.",

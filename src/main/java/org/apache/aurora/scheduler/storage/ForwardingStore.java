@@ -95,18 +95,13 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Iterable<IJobConfiguration> fetchJobs(String managerId) {
-    return jobStore.fetchJobs(managerId);
+  public Iterable<IJobConfiguration> fetchJobs() {
+    return jobStore.fetchJobs();
   }
 
   @Override
-  public Optional<IJobConfiguration> fetchJob(String managerId, IJobKey jobKey) {
-    return jobStore.fetchJob(managerId, jobKey);
-  }
-
-  @Override
-  public Set<String> fetchManagerIds() {
-    return jobStore.fetchManagerIds();
+  public Optional<IJobConfiguration> fetchJob(IJobKey jobKey) {
+    return jobStore.fetchJob(jobKey);
   }
 
   @Override

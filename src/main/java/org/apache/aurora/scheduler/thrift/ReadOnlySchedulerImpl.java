@@ -71,7 +71,6 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
-import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
@@ -112,7 +111,6 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   private final Storage storage;
   private final NearestFit nearestFit;
   private final CronPredictor cronPredictor;
-  private final CronJobManager cronJobManager;
   private final QuotaManager quotaManager;
   private final LockManager lockManager;
 
@@ -121,14 +119,12 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
       Storage storage,
       NearestFit nearestFit,
       CronPredictor cronPredictor,
-      CronJobManager cronJobManager,
       QuotaManager quotaManager,
       LockManager lockManager) {
 
     this.storage = requireNonNull(storage);
     this.nearestFit = requireNonNull(nearestFit);
     this.cronPredictor = requireNonNull(cronPredictor);
-    this.cronJobManager = requireNonNull(cronJobManager);
     this.quotaManager = requireNonNull(quotaManager);
     this.lockManager = requireNonNull(lockManager);
   }
@@ -237,7 +233,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
         Tasks.SCHEDULED_TO_JOB_KEY);
 
     Multimap<String, IJobKey> cronJobsByRole = mapByRole(
-        cronJobManager.getJobs(),
+        Storage.Util.fetchCronJobs(storage),
         JobKeys.FROM_CONFIG);
 
     Set<RoleSummary> summaries = Sets.newHashSet();
@@ -396,7 +392,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
         ? Predicates.compose(Predicates.equalTo(ownerRole.get()), JobKeys.CONFIG_TO_ROLE)
         : Predicates.<IJobConfiguration>alwaysTrue();
     jobs.putAll(Maps.uniqueIndex(
-        FluentIterable.from(cronJobManager.getJobs()).filter(configFilter),
+        FluentIterable.from(Storage.Util.fetchCronJobs(storage)).filter(configFilter),
         JobKeys.FROM_CONFIG));
 
     return jobs;

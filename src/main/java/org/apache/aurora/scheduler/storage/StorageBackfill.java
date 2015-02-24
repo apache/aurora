@@ -17,7 +17,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 import com.twitter.common.stats.Stats;
-import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
@@ -49,12 +48,10 @@ public final class StorageBackfill {
   }
 
   private static void backfillJobDefaults(JobStore.Mutable jobStore) {
-    for (String id : jobStore.fetchManagerIds()) {
-      for (JobConfiguration job : IJobConfiguration.toBuildersList(jobStore.fetchJobs(id))) {
-        populateJobKey(job.getTaskConfig(), BACKFILLED_JOB_CONFIG_KEYS);
-        ConfigurationManager.applyDefaultsIfUnset(job);
-        jobStore.saveAcceptedJob(id, IJobConfiguration.build(job));
-      }
+    for (JobConfiguration job : IJobConfiguration.toBuildersList(jobStore.fetchJobs())) {
+      populateJobKey(job.getTaskConfig(), BACKFILLED_JOB_CONFIG_KEYS);
+      ConfigurationManager.applyDefaultsIfUnset(job);
+      jobStore.saveAcceptedJob(IJobConfiguration.build(job));
     }
   }
 
@@ -74,9 +71,8 @@ public final class StorageBackfill {
    * the structs were first written.
    *
    * @param storeProvider Storage provider.
-   * @param clock Clock, used for timestamping backfilled task events.
    */
-  public static void backfill(final MutableStoreProvider storeProvider, final Clock clock) {
+  public static void backfill(final MutableStoreProvider storeProvider) {
     backfillJobDefaults(storeProvider.getJobStore());
 
     // Backfilling job keys has to be done in a separate transaction to ensure follow up scoped

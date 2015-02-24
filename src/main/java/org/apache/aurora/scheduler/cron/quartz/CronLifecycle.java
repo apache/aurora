@@ -26,6 +26,7 @@ import com.twitter.common.stats.Stats;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
+import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
@@ -44,11 +45,13 @@ class CronLifecycle extends AbstractIdleService {
 
   private final Scheduler scheduler;
   private final CronJobManagerImpl cronJobManager;
+  private final Storage storage;
 
   @Inject
-  CronLifecycle(Scheduler scheduler, CronJobManagerImpl cronJobManager) {
+  CronLifecycle(Scheduler scheduler, CronJobManagerImpl cronJobManager, Storage storage) {
     this.scheduler = requireNonNull(scheduler);
     this.cronJobManager = requireNonNull(cronJobManager);
+    this.storage = requireNonNull(storage);
   }
 
   @Override
@@ -57,8 +60,7 @@ class CronLifecycle extends AbstractIdleService {
     scheduler.start();
     RUNNING_FLAG.set(1);
 
-    // TODO(ksweeney): Refactor the interface - we really only need the job keys here.
-    for (IJobConfiguration job : cronJobManager.getJobs()) {
+    for (IJobConfiguration job : Storage.Util.fetchCronJobs(storage)) {
       try {
         SanitizedCronJob cronJob = SanitizedCronJob.fromUnsanitized(job);
         cronJobManager.scheduleJob(

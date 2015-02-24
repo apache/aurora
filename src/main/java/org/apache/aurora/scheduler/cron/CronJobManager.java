@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.cron;
 
 import java.util.Map;
 
-import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 /**
@@ -49,25 +48,6 @@ public interface CronJobManager {
   void createJob(SanitizedCronJob config) throws CronException;
 
   /**
-   * Get all cron jobs.
-   *
-   * TODO(ksweeney): Consider deprecating this and letting caller query storage directly.
-   *
-   * @return An immutable snapshot of cron jobs at some instant.
-   */
-  Iterable<IJobConfiguration> getJobs();
-
-  /**
-   * Test whether a job exists.
-   *
-   * TODO(ksweeney): Consider deprecating this and letting caller query storage directly.
-   *
-   * @param jobKey Key of the job to check.
-   * @return false when a job does not exist in storage.
-   */
-  boolean hasJob(IJobKey jobKey);
-
-  /**
    * Remove a job and deschedule it.
    *
    * @param jobKey Key of the job to delete.
@@ -82,14 +62,4 @@ public interface CronJobManager {
    * @return A map from job to the cron schedule in use for that job.
    */
   Map<IJobKey, CrontabEntry> getScheduledJobs();
-
-  /**
-   * The unique ID of this cron job manager, used as a prefix in the JobStore.
-   *
-   * TODO(ksweeney): Consider removing this from storage entirely since the JobManager abstraction
-   * is gone.
-   *
-   * @return The unique ID of the manager.
-   */
-  String getManagerKey();
 }

@@ -20,8 +20,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.twitter.common.util.Clock;
-import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Constraint;
@@ -31,7 +29,6 @@ import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MesosContainer;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
@@ -64,12 +61,10 @@ public class StorageBackfillTest {
       new ExecutorConfig("AuroraExecutor", "executorConfig");
 
   private Storage storage;
-  private Clock clock;
 
   @Before
   public void setUp() {
     storage = MemStorage.newEmptyStorage();
-    clock = new FakeClock();
   }
 
   @Test
@@ -115,7 +110,7 @@ public class StorageBackfillTest {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().saveAcceptedJob("CRON", IJobConfiguration.build(config));
+        storeProvider.getJobStore().saveAcceptedJob(IJobConfiguration.build(config));
       }
     });
 
@@ -125,7 +120,7 @@ public class StorageBackfillTest {
         storage.read(new Storage.Work.Quiet<Iterable<IJobConfiguration>>() {
           @Override
           public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
-            return storeProvider.getJobStore().fetchJobs("CRON");
+            return storeProvider.getJobStore().fetchJobs();
           }
         }));
 
@@ -179,7 +174,7 @@ public class StorageBackfillTest {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) {
-        StorageBackfill.backfill(storeProvider, clock);
+        StorageBackfill.backfill(storeProvider);
       }
     });
   }
@@ -193,13 +188,6 @@ public class StorageBackfillTest {
             .setOwner(OWNER)
             .setEnvironment(jobKey.getEnvironment())
             .setJobName(jobKey.getName()));
-  }
-
-  private static SanitizedConfiguration makeJob(IJobKey jobKey, TaskConfig task, int numTasks)
-      throws Exception {
-
-    return SanitizedConfiguration.fromUnsanitized(
-        IJobConfiguration.build(makeJobConfig(jobKey, task, numTasks)));
   }
 
   private static TaskConfig defaultTask() {
@@ -220,9 +208,5 @@ public class StorageBackfillTest {
     return Iterables.getOnlyElement(Storage.Util.fetchTasks(
         storage,
         Query.taskScoped(taskId)));
-  }
-
-  private Set<IScheduledTask> getTasksByStatus(ScheduleStatus status) {
-    return Storage.Util.fetchTasks(storage, Query.unscoped().byStatus(status));
   }
 }

@@ -25,7 +25,6 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -53,18 +52,14 @@ public class AuroraCronJobTest extends EasyMockTest {
 
   private AuroraCronJob auroraCronJob;
 
-  private static final String MANAGER_ID = "MANAGER_ID";
-
   @Before
   public void setUp() {
     storage = MemStorage.newEmptyStorage();
     stateManager = createMock(StateManager.class);
-    CronJobManager cronJobManager = createMock(CronJobManager.class);
     backoffHelper = createMock(BackoffHelper.class);
 
     auroraCronJob = new AuroraCronJob(
-        new AuroraCronJob.Config(backoffHelper), storage, stateManager, cronJobManager);
-    expect(cronJobManager.getManagerKey()).andStubReturn(MANAGER_ID);
+        new AuroraCronJob.Config(backoffHelper), storage, stateManager);
   }
 
   @Test
@@ -81,7 +76,6 @@ public class AuroraCronJobTest extends EasyMockTest {
       @Override
       protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(
-            MANAGER_ID,
             IJobConfiguration.build(QuartzTestUtil.JOB.newBuilder().setCronSchedule(null)));
       }
     });
@@ -172,7 +166,6 @@ public class AuroraCronJobTest extends EasyMockTest {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(
-            MANAGER_ID,
             QuartzTestUtil.makeSanitizedCronJob(policy).getSanitizedConfig().getJobConfig());
       }
     });

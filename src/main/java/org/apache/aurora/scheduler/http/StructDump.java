@@ -31,7 +31,6 @@ import org.antlr.stringtemplate.StringTemplate;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
@@ -49,13 +48,11 @@ import static java.util.Objects.requireNonNull;
 public class StructDump extends JerseyTemplateServlet {
 
   private final Storage storage;
-  private final CronJobManager cronJobManager;
 
   @Inject
-  public StructDump(Storage storage, CronJobManager cronJobManager) {
+  public StructDump(Storage storage) {
     super("structdump");
     this.storage = requireNonNull(storage);
-    this.cronJobManager = requireNonNull(cronJobManager);
   }
 
   private static final String USAGE =
@@ -111,7 +108,7 @@ public class StructDump extends JerseyTemplateServlet {
         new Work.Quiet<Optional<? extends TBase<?, ?>>>() {
           @Override
           public Optional<JobConfiguration> apply(StoreProvider storeProvider) {
-            return storeProvider.getJobStore().fetchJob(cronJobManager.getManagerKey(), jobKey)
+            return storeProvider.getJobStore().fetchJob(jobKey)
                 .transform(IJobConfiguration.TO_BUILDER);
           }
         });

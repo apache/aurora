@@ -34,7 +34,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -70,14 +69,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private JobUpdateStore jobUpdateStore;
   private QuotaManagerImpl quotaManager;
-  private CronJobManager cronJobManager;
 
   @Before
   public void setUp() throws Exception {
     storageUtil = new StorageTestUtil(this);
     jobUpdateStore = storageUtil.jobUpdateStore;
-    cronJobManager = createMock(CronJobManager.class);
-    quotaManager = new QuotaManagerImpl(storageUtil.storage, cronJobManager);
+    quotaManager = new QuotaManagerImpl(storageUtil.storage);
     storageUtil.expectOperations();
   }
 
@@ -727,7 +724,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   }
 
   private IExpectationSetters<?> expectNoCronJobs() {
-    return expect(cronJobManager.getJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
+    return expect(storageUtil.jobStore.fetchJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
   }
 
   private IExpectationSetters<?> expectCronJobs(IJobConfiguration... jobs) {
@@ -736,7 +733,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
       builder.add(job);
     }
 
-    return expect(cronJobManager.getJobs()).andReturn(builder.build());
+    return expect(storageUtil.jobStore.fetchJobs()).andReturn(builder.build());
   }
 
   private IExpectationSetters<Optional<IResourceAggregate>> expectQuota(IResourceAggregate quota) {

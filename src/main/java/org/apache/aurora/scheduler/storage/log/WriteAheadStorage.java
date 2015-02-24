@@ -235,12 +235,11 @@ class WriteAheadStorage extends ForwardingStore implements
   }
 
   @Override
-  public void saveAcceptedJob(final String managerId, final IJobConfiguration jobConfig) {
-    requireNonNull(managerId);
+  public void saveAcceptedJob(final IJobConfiguration jobConfig) {
     requireNonNull(jobConfig);
 
-    write(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())));
-    jobStore.saveAcceptedJob(managerId, jobConfig);
+    write(Op.saveAcceptedJob(new SaveAcceptedJob(jobConfig.newBuilder())));
+    jobStore.saveAcceptedJob(jobConfig);
   }
 
   @Override
