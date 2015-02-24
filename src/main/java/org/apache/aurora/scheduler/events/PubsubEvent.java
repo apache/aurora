@@ -23,6 +23,8 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.TaskStatus;
 
 import static java.util.Objects.requireNonNull;
 
@@ -261,4 +263,56 @@ public interface PubsubEvent {
     }
   }
 
+  class TaskStatusReceived implements PubsubEvent {
+    private final Protos.TaskState state;
+    private final Optional<TaskStatus.Source> source;
+    private final Optional<TaskStatus.Reason> reason;
+    private final Optional<Long> epochTimestampMicros;
+
+    public TaskStatusReceived(
+        Protos.TaskState state,
+        Optional<TaskStatus.Source> source,
+        Optional<TaskStatus.Reason> reason,
+        Optional<Long> epochTimestampMicros) {
+
+      this.state = requireNonNull(state);
+      this.source = requireNonNull(source);
+      this.reason = requireNonNull(reason);
+      this.epochTimestampMicros = requireNonNull(epochTimestampMicros);
+    }
+
+    public Protos.TaskState getState() {
+      return state;
+    }
+
+    public Optional<TaskStatus.Source> getSource() {
+      return source;
+    }
+
+    public Optional<TaskStatus.Reason> getReason() {
+      return reason;
+    }
+
+    public Optional<Long> getEpochTimestampMicros() {
+      return epochTimestampMicros;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof TaskStatusReceived)) {
+        return false;
+      }
+
+      TaskStatusReceived other = (TaskStatusReceived) o;
+      return Objects.equals(state, other.state)
+          && Objects.equals(source, other.source)
+          && Objects.equals(reason, other.reason)
+          && Objects.equals(epochTimestampMicros, other.epochTimestampMicros);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(state, source, reason, epochTimestampMicros);
+    }
+  }
 }

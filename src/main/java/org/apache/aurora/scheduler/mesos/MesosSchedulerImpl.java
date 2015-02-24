@@ -24,6 +24,8 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
+import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -36,6 +38,7 @@ import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import org.apache.aurora.scheduler.events.PubsubEvent.TaskStatusReceived;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -192,15 +195,40 @@ class MesosSchedulerImpl implements Scheduler {
     }
   }
 
+  private static void logStatusUpdate(TaskStatus status) {
+    StringBuilder message = new StringBuilder("Received status update for task ")
+        .append(status.getTaskId().getValue())
+        .append(" in state ")
+        .append(status.getState());
+    if (status.hasSource()) {
+      message.append(" from ").append(status.getSource());
+    }
+    if (status.hasReason()) {
+      message.append(" with ").append(status.getReason());
+    }
+    if (status.hasMessage()) {
+      message.append(": ").append(status.getMessage());
+    }
+    LOG.info(message.toString());
+  }
+
+  private static final Function<Double, Long> SECONDS_TO_MICROS = new Function<Double, Long>() {
+    @Override
+    public Long apply(Double seconds) {
+      return (long) (seconds * 1E6);
+    }
+  };
+
   @AllowUnchecked
   @Timed("scheduler_status_update")
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
-    String info = status.hasData() ? status.getData().toStringUtf8() : null;
-    String infoMsg = info == null ? "" : " with info " + info;
-    String coreMsg = status.hasMessage() ? " with core message " + status.getMessage() : "";
-    LOG.info("Received status update for task " + status.getTaskId().getValue()
-        + " in state " + status.getState() + infoMsg + coreMsg);
+    logStatusUpdate(status);
+    eventSink.post(new TaskStatusReceived(
+        status.getState(),
+        Optional.fromNullable(status.getSource()),
+        Optional.fromNullable(status.getReason()),
+        Optional.fromNullable(status.getTimestamp()).transform(SECONDS_TO_MICROS)));
 
     try {
       for (TaskLauncher launcher : taskLaunchers) {

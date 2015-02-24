@@ -43,6 +43,7 @@ import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import org.apache.aurora.scheduler.events.PubsubEvent.TaskStatusReceived;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -55,6 +56,8 @@ import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
+import org.apache.mesos.Protos.TaskStatus.Reason;
+import org.apache.mesos.Protos.TaskStatus.Source;
 import org.apache.mesos.SchedulerDriver;
 import org.junit.Before;
 import org.junit.Test;
@@ -108,8 +111,19 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   private static final TaskStatus STATUS = TaskStatus.newBuilder()
       .setState(TaskState.TASK_RUNNING)
+      .setSource(Source.SOURCE_SLAVE)
+      // Only testing data plumbing, this field with TASK_RUNNING would not normally happen,
+      .setReason(Reason.REASON_COMMAND_EXECUTOR_FAILED)
+      .setTimestamp(1D)
       .setTaskId(TaskID.newBuilder().setValue("task-id").build())
       .build();
+
+  private static final TaskStatusReceived PUBSUB_EVENT = new TaskStatusReceived(
+      STATUS.getState(),
+      Optional.of(STATUS.getSource()),
+      Optional.of(STATUS.getReason()),
+      Optional.of(1000000L)
+  );
 
   private StorageTestUtil storageUtil;
   private TaskLauncher systemLauncher;
@@ -222,6 +236,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new StatusFixture() {
       @Override
       void expectations() throws Exception {
+        eventSink.post(PUBSUB_EVENT);
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
         expect(userLauncher.statusUpdate(STATUS)).andReturn(false);
       }
@@ -233,6 +248,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new StatusFixture() {
       @Override
       void expectations() throws Exception {
+        eventSink.post(PUBSUB_EVENT);
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(true);
       }
     }.run();
@@ -243,6 +259,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new StatusFixture() {
       @Override
       void expectations() throws Exception {
+        eventSink.post(PUBSUB_EVENT);
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
         expect(userLauncher.statusUpdate(STATUS)).andReturn(true);
       }
@@ -254,6 +271,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new StatusFixture() {
       @Override
       void expectations() throws Exception {
+        eventSink.post(PUBSUB_EVENT);
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
         expect(userLauncher.statusUpdate(STATUS)).andThrow(new StorageException("Injected."));
       }

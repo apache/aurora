@@ -18,28 +18,38 @@ import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
+import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.mesos.Scheduler;
 
 /**
  * A module that creates a {@link Driver} binding.
  */
-public class SchedulerDriverModule extends PrivateModule {
+public class SchedulerDriverModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(SchedulerDriverModule.class.getName());
 
   @Override
   protected void configure() {
-    bind(Driver.class).to(SchedulerDriverService.class);
-    bind(SchedulerDriverService.class).in(Singleton.class);
-    expose(Driver.class);
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(Driver.class).to(SchedulerDriverService.class);
+        bind(SchedulerDriverService.class).in(Singleton.class);
+        expose(Driver.class);
 
-    bind(Scheduler.class).to(MesosSchedulerImpl.class);
-    bind(MesosSchedulerImpl.class).in(Singleton.class);
+        bind(Scheduler.class).to(MesosSchedulerImpl.class);
+        bind(MesosSchedulerImpl.class).in(Singleton.class);
 
-    // TODO(zmanji): Create singleThreadedExecutor (non-scheduled) variant.
-    bind(Executor.class).annotatedWith(MesosSchedulerImpl.SchedulerExecutor.class)
-        .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SchedulerImpl-%d", LOG));
+        // TODO(zmanji): Create singleThreadedExecutor (non-scheduled) variant.
+        bind(Executor.class).annotatedWith(MesosSchedulerImpl.SchedulerExecutor.class)
+            .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SchedulerImpl-%d", LOG));
+      }
+    });
+
+    PubsubEventModule.bindSubscriber(binder(), TaskStatusStats.class);
+    bind(TaskStatusStats.class).in(Singleton.class);
   }
 }
