@@ -25,7 +25,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 /**
  * A cached view of cluster state, kept up to date by pubsub notifications.
  */
-public class CachedClusterState implements ClusterState, PubsubEvent.EventSubscriber {
+public class ClusterStateImpl implements ClusterState, PubsubEvent.EventSubscriber {
 
   private final Multimap<String, PreemptionVictim> victims =
       Multimaps.synchronizedMultimap(HashMultimap.<String, PreemptionVictim>create());

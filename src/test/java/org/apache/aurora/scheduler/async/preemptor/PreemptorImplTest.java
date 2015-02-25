@@ -25,6 +25,8 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
@@ -56,12 +58,9 @@ import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.AttributeStore;
-import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.EasyMock;
@@ -73,13 +72,11 @@ import org.junit.Test;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import static org.apache.mesos.Protos.Offer;
 import static org.apache.mesos.Protos.Resource;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertEquals;
 
 public class PreemptorImplTest extends EasyMockTest {
 
@@ -106,6 +103,7 @@ public class PreemptorImplTest extends EasyMockTest {
   private SchedulingFilter schedulingFilter;
   private FakeClock clock;
   private StatsProvider statsProvider;
+  private ClusterState clusterState;
   private OfferManager offerManager;
   private AttributeAggregate emptyJob;
 
@@ -116,6 +114,7 @@ public class PreemptorImplTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
     clock = new FakeClock();
     statsProvider = new FakeStatsProvider();
+    clusterState = createMock(ClusterState.class);
     offerManager = createMock(OfferManager.class);
     emptyJob = new AttributeAggregate(
         Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
@@ -131,7 +130,7 @@ public class PreemptorImplTest extends EasyMockTest {
         PREEMPTION_DELAY,
         clock,
         statsProvider,
-        new LiveClusterState(storageUtil.storage),
+        clusterState,
         TaskExecutors.NO_OVERHEAD_EXECUTOR);
 
     preemptor.findPreemptionSlotFor(pendingTask.getAssignedTask().getTaskId(), emptyJob);
@@ -148,10 +147,26 @@ public class PreemptorImplTest extends EasyMockTest {
         IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 
-  private void expectGetActiveTasks(ScheduledTask... returnedTasks) {
-    storageUtil.expectTaskFetch(
-        LiveClusterState.CANDIDATE_QUERY,
-        IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
+  private static final Function<ScheduledTask, String> GET_SLAVE_ID =
+      new Function<ScheduledTask, String>() {
+        @Override
+        public String apply(ScheduledTask task) {
+          return task.getAssignedTask().getSlaveId();
+        }
+      };
+
+  private void expectGetClusterState(ScheduledTask... returnedTasks) {
+    Multimap<String, PreemptionVictim> state = Multimaps.transformValues(
+        Multimaps.index(Arrays.asList(returnedTasks), GET_SLAVE_ID),
+        new Function<ScheduledTask, PreemptionVictim>() {
+          @Override
+          public PreemptionVictim apply(ScheduledTask task) {
+            return PreemptionVictim.fromTask(IAssignedTask.build(task.getAssignedTask()));
+          }
+        }
+    );
+
+    expect(clusterState.getSlavesToActiveTasks()).andReturn(state);
   }
 
   @Test
@@ -168,7 +183,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectNoOffers();
 
     expectGetPendingTasks(highPriority);
-    expectGetActiveTasks(lowPriority);
+    expectGetClusterState(lowPriority);
 
     expectFiltering();
     expectPreempted(lowPriority);
@@ -194,7 +209,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectNoOffers();
 
     expectGetPendingTasks(highPriority);
-    expectGetActiveTasks(lowerPriority, lowerPriority);
+    expectGetClusterState(lowerPriority, lowerPriority);
 
     expectFiltering();
     expectPreempted(lowerPriority);
@@ -223,7 +238,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectNoOffers();
 
     expectGetPendingTasks(pendingPriority);
-    expectGetActiveTasks(highPriority, lowerPriority, lowestPriority);
+    expectGetClusterState(highPriority, lowerPriority, lowestPriority);
 
     expectFiltering();
     expectPreempted(lowestPriority);
@@ -244,7 +259,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectNoOffers();
 
     expectGetPendingTasks(task);
-    expectGetActiveTasks(highPriority);
+    expectGetClusterState(highPriority);
 
     control.replay();
     runPreemptor(task);
@@ -265,7 +280,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectNoOffers();
 
     expectGetPendingTasks(p1);
-    expectGetActiveTasks(a1);
+    expectGetClusterState(a1);
 
     expectFiltering();
     expectPreempted(a1);
@@ -289,7 +304,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectNoOffers();
 
     expectGetPendingTasks(p1);
-    expectGetActiveTasks(a1);
+    expectGetClusterState(a1);
 
     expectFiltering();
     expectPreempted(a1);
@@ -310,7 +325,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectNoOffers();
 
     expectGetPendingTasks(p1);
-    expectGetActiveTasks(a1);
+    expectGetClusterState(a1);
 
     control.replay();
     runPreemptor(p1);
@@ -339,7 +354,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectNoOffers();
 
     expectGetPendingTasks(p1);
-    expectGetActiveTasks(a1, b1);
+    expectGetClusterState(a1, b1);
 
     expectPreempted(a1);
     expectPreempted(b1);
@@ -375,7 +390,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectNoOffers();
 
     expectGetPendingTasks(p1);
-    expectGetActiveTasks(b1, b2, a1);
+    expectGetClusterState(b1, b2, a1);
 
     expectPreempted(a1);
 
@@ -401,7 +416,7 @@ public class PreemptorImplTest extends EasyMockTest {
 
     expectNoOffers();
 
-    expectGetActiveTasks(p1);
+    expectGetClusterState(p1);
     expectGetPendingTasks(p2);
 
     control.replay();
@@ -427,7 +442,7 @@ public class PreemptorImplTest extends EasyMockTest {
 
     clock.advance(PREEMPTION_DELAY);
 
-    expectGetActiveTasks(a1);
+    expectGetClusterState(a1);
     expectGetPendingTasks(p1);
 
     expectPreempted(a1);
@@ -459,7 +474,7 @@ public class PreemptorImplTest extends EasyMockTest {
 
     clock.advance(PREEMPTION_DELAY);
 
-    expectGetActiveTasks(a1, a2);
+    expectGetClusterState(a1, a2);
     expectGetPendingTasks(p1);
 
     expectPreempted(a1);
@@ -488,53 +503,11 @@ public class PreemptorImplTest extends EasyMockTest {
 
     clock.advance(PREEMPTION_DELAY);
 
-    expectGetActiveTasks(a1);
+    expectGetClusterState(a1);
     expectGetPendingTasks(p1);
 
     control.replay();
     runPreemptor(p1);
-  }
-
-  @Test
-  public void testIgnoresThrottledTasks() throws Exception {
-    // Ensures that the preemptor does not consider a throttled task to be a preemption candidate.
-    schedulingFilter = createMock(SchedulingFilter.class);
-
-    Storage storage = MemStorage.newEmptyStorage();
-
-    final ScheduledTask throttled = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1").setStatus(THROTTLED);
-    throttled.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
-
-    final ScheduledTask pending = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
-    pending.getAssignedTask().getTask().setNumCpus(1).setRamMb(1024);
-
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider store) {
-        store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
-            IScheduledTask.build(pending),
-            IScheduledTask.build(throttled)));
-      }
-    });
-
-    clock.advance(PREEMPTION_DELAY);
-
-    control.replay();
-
-    PreemptorImpl preemptor = new PreemptorImpl(
-        storage,
-        stateManager,
-        offerManager,
-        schedulingFilter,
-        PREEMPTION_DELAY,
-        clock,
-        statsProvider,
-        new LiveClusterState(storage),
-        TaskExecutors.NO_OVERHEAD_EXECUTOR);
-
-    assertEquals(
-        Optional.<String>absent(),
-        preemptor.findPreemptionSlotFor(pending.getAssignedTask().getTaskId(), emptyJob));
   }
 
   // TODO(zmanji) spread tasks across slave ids on the same host and see if preemption fails.

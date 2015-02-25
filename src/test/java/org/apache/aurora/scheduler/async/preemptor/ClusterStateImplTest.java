@@ -37,13 +37,13 @@ import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.junit.Assert.assertEquals;
 
-public class CachedClusterStateTest {
+public class ClusterStateImplTest {
 
-  private CachedClusterState state;
+  private ClusterStateImpl state;
 
   @Before
   public void setUp() {
-    state = new CachedClusterState();
+    state = new ClusterStateImpl();
   }
 
   @Test(expected = UnsupportedOperationException.class)

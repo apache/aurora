@@ -45,8 +45,8 @@ import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.TaskScheduler;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
-import org.apache.aurora.scheduler.async.preemptor.CachedClusterState;
 import org.apache.aurora.scheduler.async.preemptor.ClusterState;
+import org.apache.aurora.scheduler.async.preemptor.ClusterStateImpl;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.async.preemptor.PreemptorImpl;
 import org.apache.aurora.scheduler.configuration.Resources;
@@ -136,8 +136,8 @@ public class SchedulingBenchmarks {
               bind(new TypeLiteral<Amount<Long, Time>>() { })
                   .annotatedWith(PreemptorImpl.PreemptionDelay.class)
                   .toInstance(Amount.of(0L, Time.MILLISECONDS));
-              bind(ClusterState.class).to(CachedClusterState.class);
-              bind(CachedClusterState.class).in(Singleton.class);
+              bind(ClusterState.class).to(ClusterStateImpl.class);
+              bind(ClusterStateImpl.class).in(Singleton.class);
 
               bind(Storage.class).toInstance(storage);
               bind(Driver.class).toInstance(new FakeDriver());
@@ -156,7 +156,7 @@ public class SchedulingBenchmarks {
 
       taskScheduler = injector.getInstance(TaskScheduler.class);
       offerManager = injector.getInstance(OfferManager.class);
-      eventBus.register(injector.getInstance(CachedClusterState.class));
+      eventBus.register(injector.getInstance(ClusterStateImpl.class));
 
       settings = getSettings();
       saveHostAttributes(settings.getHostAttributes());

@@ -39,11 +39,6 @@ public class PreemptorModule extends AbstractModule {
       help = "Enable the preemptor and preemption")
   private static final Arg<Boolean> ENABLE_PREEMPTOR = Arg.create(true);
 
-  @CmdLine(name = "enable_preemptor_caching",
-      help = "Cache the state consumed by the preemptor to improve scheduling throughput at the "
-          + "cost of higher memory consumption.")
-  private static final Arg<Boolean> ENABLE_PREEMPTOR_CACHING = Arg.create(true);
-
   @CmdLine(name = "preemption_delay",
       help = "Time interval after which a pending task becomes eligible to preempt other tasks")
   private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
@@ -71,14 +66,9 @@ public class PreemptorModule extends AbstractModule {
           bind(PreemptorImpl.class).in(Singleton.class);
           bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
               .toInstance(PREEMPTION_DELAY.get());
-          if (ENABLE_PREEMPTOR_CACHING.get()) {
-            bind(ClusterState.class).to(CachedClusterState.class);
-            bind(CachedClusterState.class).in(Singleton.class);
-            expose(CachedClusterState.class);
-          } else {
-            bind(ClusterState.class).to(LiveClusterState.class);
-            bind(LiveClusterState.class).in(Singleton.class);
-          }
+          bind(ClusterState.class).to(ClusterStateImpl.class);
+          bind(ClusterStateImpl.class).in(Singleton.class);
+          expose(ClusterStateImpl.class);
         } else {
           bind(Preemptor.class).toInstance(NULL_PREEMPTOR);
           LOG.warning("Preemptor Disabled.");
@@ -91,9 +81,7 @@ public class PreemptorModule extends AbstractModule {
     // We can't do this in the private module due to the known conflict between multibindings
     // and private modules due to multiple injectors.  We accept the added complexity here to keep
     // the other bindings private.
-    if (enablePreemptor && ENABLE_PREEMPTOR_CACHING.get()) {
-      PubsubEventModule.bindSubscriber(binder(), CachedClusterState.class);
-    }
+    PubsubEventModule.bindSubscriber(binder(), ClusterStateImpl.class);
   }
 
   private static final Preemptor NULL_PREEMPTOR = new Preemptor() {
