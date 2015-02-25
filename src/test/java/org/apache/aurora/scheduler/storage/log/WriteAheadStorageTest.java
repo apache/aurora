@@ -36,7 +36,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
-import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
@@ -58,7 +58,7 @@ public class WriteAheadStorageTest extends EasyMockTest {
 
   private LogStorage.TransactionManager transactionManager;
   private SchedulerStore.Mutable schedulerStore;
-  private JobStore.Mutable jobStore;
+  private CronJobStore.Mutable jobStore;
   private TaskStore.Mutable taskStore;
   private LockStore.Mutable lockStore;
   private QuotaStore.Mutable quotaStore;
@@ -72,7 +72,7 @@ public class WriteAheadStorageTest extends EasyMockTest {
   public void setUp() {
     transactionManager = createMock(LogStorage.TransactionManager.class);
     schedulerStore = createMock(SchedulerStore.Mutable.class);
-    jobStore = createMock(JobStore.Mutable.class);
+    jobStore = createMock(CronJobStore.Mutable.class);
     taskStore = createMock(TaskStore.Mutable.class);
     lockStore = createMock(LockStore.Mutable.class);
     quotaStore = createMock(QuotaStore.Mutable.class);

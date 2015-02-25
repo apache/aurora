@@ -31,7 +31,7 @@ import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
-import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.Work;
@@ -72,7 +72,7 @@ class CronJobManagerImpl implements CronJobManager {
     storage.read(new Work<Void, CronException>() {
       @Override
       public Void apply(Storage.StoreProvider storeProvider) throws CronException {
-        checkCronExists(jobKey, storeProvider.getJobStore());
+        checkCronExists(jobKey, storeProvider.getCronJobStore());
         triggerJob(jobKey);
         return null;
       }
@@ -106,11 +106,11 @@ class CronJobManagerImpl implements CronJobManager {
     storage.write(new MutateWork.NoResult<CronException>() {
       @Override
       public void execute(Storage.MutableStoreProvider storeProvider) throws CronException {
-        checkCronExists(jobKey, storeProvider.getJobStore());
+        checkCronExists(jobKey, storeProvider.getCronJobStore());
 
-        removeJob(jobKey, storeProvider.getJobStore());
+        removeJob(jobKey, storeProvider.getCronJobStore());
         descheduleJob(jobKey);
-        saveJob(config, storeProvider.getJobStore());
+        saveJob(config, storeProvider.getCronJobStore());
         scheduleJob(config.getCrontabEntry(), jobKey);
       }
     });
@@ -125,32 +125,32 @@ class CronJobManagerImpl implements CronJobManager {
     storage.write(new MutateWork.NoResult<CronException>() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) throws CronException {
-        checkNotExists(jobKey, storeProvider.getJobStore());
+        checkNotExists(jobKey, storeProvider.getCronJobStore());
 
-        saveJob(cronJob, storeProvider.getJobStore());
+        saveJob(cronJob, storeProvider.getCronJobStore());
         scheduleJob(cronJob.getCrontabEntry(), jobKey);
       }
     });
   }
 
-  private void checkNotExists(IJobKey jobKey, JobStore jobStore) throws CronException {
-    if (jobStore.fetchJob(jobKey).isPresent()) {
+  private void checkNotExists(IJobKey jobKey, CronJobStore cronJobStore) throws CronException {
+    if (cronJobStore.fetchJob(jobKey).isPresent()) {
       throw new CronException(formatMessage("Job already exists for %s.", jobKey));
     }
   }
 
-  private void checkCronExists(IJobKey jobKey, JobStore jobStore) throws CronException {
-    if (!jobStore.fetchJob(jobKey).isPresent()) {
+  private void checkCronExists(IJobKey jobKey, CronJobStore cronJobStore) throws CronException {
+    if (!cronJobStore.fetchJob(jobKey).isPresent()) {
       throw new CronException(formatMessage("No cron job found for %s.", jobKey));
     }
   }
 
-  private void removeJob(IJobKey jobKey, JobStore.Mutable jobStore) {
+  private void removeJob(IJobKey jobKey, CronJobStore.Mutable jobStore) {
     jobStore.removeJob(jobKey);
     LOG.info(formatMessage("Deleted cron job %s from storage.", jobKey));
   }
 
-  private void saveJob(SanitizedCronJob cronJob, JobStore.Mutable jobStore) {
+  private void saveJob(SanitizedCronJob cronJob, CronJobStore.Mutable jobStore) {
     IJobConfiguration config = cronJob.getSanitizedConfig().getJobConfig();
 
     jobStore.saveAcceptedJob(config);
@@ -176,11 +176,11 @@ class CronJobManagerImpl implements CronJobManager {
     return storage.write(new MutateWork.Quiet<Boolean>() {
       @Override
       public Boolean apply(Storage.MutableStoreProvider storeProvider) {
-        if (!storeProvider.getJobStore().fetchJob(jobKey).isPresent()) {
+        if (!storeProvider.getCronJobStore().fetchJob(jobKey).isPresent()) {
           return false;
         }
 
-        removeJob(jobKey, storeProvider.getJobStore());
+        removeJob(jobKey, storeProvider.getCronJobStore());
         descheduleJob(jobKey);
         return true;
       }

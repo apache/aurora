@@ -306,7 +306,7 @@ class StreamManagerImpl implements StreamManager {
           prior.setSaveFrameworkId(next.getSaveFrameworkId());
           return true;
 
-        case SAVE_ACCEPTED_JOB:
+        case SAVE_CRON_JOB:
         case REMOVE_JOB:
         case SAVE_QUOTA:
         case REMOVE_QUOTA:

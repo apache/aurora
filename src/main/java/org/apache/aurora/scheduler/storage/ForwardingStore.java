@@ -45,7 +45,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class ForwardingStore implements
     SchedulerStore,
-    JobStore,
+    CronJobStore,
     TaskStore,
     LockStore,
     QuotaStore,
@@ -53,7 +53,7 @@ public class ForwardingStore implements
     JobUpdateStore {
 
   private final SchedulerStore schedulerStore;
-  private final JobStore jobStore;
+  private final CronJobStore cronJobStore;
   private final TaskStore taskStore;
   private final LockStore lockStore;
   private final QuotaStore quotaStore;
@@ -64,7 +64,7 @@ public class ForwardingStore implements
    * Creates a new forwarding store that delegates to the providing default stores.
    *
    * @param schedulerStore Delegate.
-   * @param jobStore Delegate.
+   * @param cronJobStore Delegate.
    * @param taskStore Delegate.
    * @param lockStore Delegate.
    * @param quotaStore Delegate.
@@ -73,7 +73,7 @@ public class ForwardingStore implements
    */
   public ForwardingStore(
       SchedulerStore schedulerStore,
-      JobStore jobStore,
+      CronJobStore cronJobStore,
       TaskStore taskStore,
       LockStore lockStore,
       QuotaStore quotaStore,
@@ -81,7 +81,7 @@ public class ForwardingStore implements
       JobUpdateStore jobUpdateStore) {
 
     this.schedulerStore = requireNonNull(schedulerStore);
-    this.jobStore = requireNonNull(jobStore);
+    this.cronJobStore = requireNonNull(cronJobStore);
     this.taskStore = requireNonNull(taskStore);
     this.lockStore = requireNonNull(lockStore);
     this.quotaStore = requireNonNull(quotaStore);
@@ -96,12 +96,12 @@ public class ForwardingStore implements
 
   @Override
   public Iterable<IJobConfiguration> fetchJobs() {
-    return jobStore.fetchJobs();
+    return cronJobStore.fetchJobs();
   }
 
   @Override
   public Optional<IJobConfiguration> fetchJob(IJobKey jobKey) {
-    return jobStore.fetchJob(jobKey);
+    return cronJobStore.fetchJob(jobKey);
   }
 
   @Override

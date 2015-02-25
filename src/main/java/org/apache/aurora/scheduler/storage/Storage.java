@@ -34,7 +34,7 @@ public interface Storage {
 
   interface StoreProvider {
     SchedulerStore getSchedulerStore();
-    JobStore getJobStore();
+    CronJobStore getCronJobStore();
     TaskStore getTaskStore();
     LockStore getLockStore();
     QuotaStore getQuotaStore();
@@ -44,7 +44,7 @@ public interface Storage {
 
   interface MutableStoreProvider extends StoreProvider {
     SchedulerStore.Mutable getSchedulerStore();
-    JobStore.Mutable getJobStore();
+    CronJobStore.Mutable getCronJobStore();
 
     /**
      * Gets access to the mutable task store.
@@ -288,7 +288,7 @@ public interface Storage {
       return storage.read(new Work.Quiet<Iterable<IJobConfiguration>>() {
         @Override
         public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
-          return storeProvider.getJobStore().fetchJobs();
+          return storeProvider.getCronJobStore().fetchJobs();
         }
       });
     }

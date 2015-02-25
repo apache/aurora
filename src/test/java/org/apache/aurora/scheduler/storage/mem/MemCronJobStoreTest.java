@@ -17,7 +17,7 @@ import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.junit.Before;
@@ -26,14 +26,14 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-public class MemJobStoreTest {
+public class MemCronJobStoreTest {
   private static final IJobConfiguration JOB_A = makeJob("a");
   private static final IJobConfiguration JOB_B = makeJob("b");
 
   private static final IJobKey KEY_A = JOB_A.getKey();
   private static final IJobKey KEY_B = JOB_B.getKey();
 
-  private JobStore.Mutable store;
+  private CronJobStore.Mutable store;
 
   @Before
   public void setUp() {

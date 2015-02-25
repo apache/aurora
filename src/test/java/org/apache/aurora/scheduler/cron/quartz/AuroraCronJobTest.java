@@ -75,7 +75,7 @@ public class AuroraCronJobTest extends EasyMockTest {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().saveAcceptedJob(
+        storeProvider.getCronJobStore().saveAcceptedJob(
             IJobConfiguration.build(QuartzTestUtil.JOB.newBuilder().setCronSchedule(null)));
       }
     });
@@ -165,7 +165,7 @@ public class AuroraCronJobTest extends EasyMockTest {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().saveAcceptedJob(
+        storeProvider.getCronJobStore().saveAcceptedJob(
             QuartzTestUtil.makeSanitizedCronJob(policy).getSanitizedConfig().getJobConfig());
       }
     });

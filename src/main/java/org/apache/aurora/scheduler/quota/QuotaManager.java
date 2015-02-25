@@ -212,7 +212,7 @@ public interface QuotaManager {
       }
 
       Map<IJobKey, IJobConfiguration> cronTemplates =
-          FluentIterable.from(storeProvider.getJobStore().fetchJobs())
+          FluentIterable.from(storeProvider.getCronJobStore().fetchJobs())
               .filter(Predicates.compose(Predicates.equalTo(role), JobKeys.CONFIG_TO_ROLE))
               .uniqueIndex(JobKeys.FROM_CONFIG);
 

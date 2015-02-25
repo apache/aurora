@@ -108,7 +108,7 @@ public class StructDump extends JerseyTemplateServlet {
         new Work.Quiet<Optional<? extends TBase<?, ?>>>() {
           @Override
           public Optional<JobConfiguration> apply(StoreProvider storeProvider) {
-            return storeProvider.getJobStore().fetchJob(jobKey)
+            return storeProvider.getCronJobStore().fetchJob(jobKey)
                 .transform(IJobConfiguration.TO_BUILDER);
           }
         });

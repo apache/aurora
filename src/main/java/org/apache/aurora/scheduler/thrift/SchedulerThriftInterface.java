@@ -105,7 +105,7 @@ import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
-import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -828,7 +828,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     });
   }
 
-  private Optional<String> rewriteJob(JobConfigRewrite jobRewrite, JobStore.Mutable jobStore) {
+  private Optional<String> rewriteJob(JobConfigRewrite jobRewrite, CronJobStore.Mutable jobStore) {
     IJobConfiguration existingJob = IJobConfiguration.build(jobRewrite.getOldJob());
     IJobConfiguration rewrittenJob;
     Optional<String> error = Optional.absent();
@@ -902,7 +902,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     Optional<String> error;
     switch (command.getSetField()) {
       case JOB_REWRITE:
-        error = rewriteJob(command.getJobRewrite(), storeProvider.getJobStore());
+        error = rewriteJob(command.getJobRewrite(), storeProvider.getCronJobStore());
         break;
 
       case INSTANCE_REWRITE:
@@ -980,7 +980,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   public Optional<IJobConfiguration> getCronJob(StoreProvider storeProvider, final IJobKey jobKey) {
     requireNonNull(jobKey);
-    return storeProvider.getJobStore().fetchJob(jobKey);
+    return storeProvider.getCronJobStore().fetchJob(jobKey);
   }
 
   private String getRoleFromLockKey(ILockKey lockKey) {

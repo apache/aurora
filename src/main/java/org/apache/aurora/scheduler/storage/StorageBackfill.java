@@ -47,7 +47,7 @@ public final class StorageBackfill {
     // Utility class.
   }
 
-  private static void backfillJobDefaults(JobStore.Mutable jobStore) {
+  private static void backfillJobDefaults(CronJobStore.Mutable jobStore) {
     for (JobConfiguration job : IJobConfiguration.toBuildersList(jobStore.fetchJobs())) {
       populateJobKey(job.getTaskConfig(), BACKFILLED_JOB_CONFIG_KEYS);
       ConfigurationManager.applyDefaultsIfUnset(job);
@@ -73,7 +73,7 @@ public final class StorageBackfill {
    * @param storeProvider Storage provider.
    */
   public static void backfill(final MutableStoreProvider storeProvider) {
-    backfillJobDefaults(storeProvider.getJobStore());
+    backfillJobDefaults(storeProvider.getCronJobStore());
 
     // Backfilling job keys has to be done in a separate transaction to ensure follow up scoped
     // Query calls work against upgraded MemTaskStore, which does not support deprecated fields.

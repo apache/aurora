@@ -31,7 +31,7 @@ import org.apache.aurora.gen.storage.RemoveLock;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.RewriteTask;
-import org.apache.aurora.gen.storage.SaveAcceptedJob;
+import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
@@ -45,8 +45,8 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.ForwardingStore;
-import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
@@ -78,7 +78,7 @@ import static org.apache.aurora.scheduler.storage.log.LogStorage.TransactionMana
 class WriteAheadStorage extends ForwardingStore implements
     MutableStoreProvider,
     SchedulerStore.Mutable,
-    JobStore.Mutable,
+    CronJobStore.Mutable,
     TaskStore.Mutable,
     LockStore.Mutable,
     QuotaStore.Mutable,
@@ -87,7 +87,7 @@ class WriteAheadStorage extends ForwardingStore implements
 
   private final TransactionManager transactionManager;
   private final SchedulerStore.Mutable schedulerStore;
-  private final JobStore.Mutable jobStore;
+  private final CronJobStore.Mutable jobStore;
   private final TaskStore.Mutable taskStore;
   private final LockStore.Mutable lockStore;
   private final QuotaStore.Mutable quotaStore;
@@ -111,7 +111,7 @@ class WriteAheadStorage extends ForwardingStore implements
   WriteAheadStorage(
       TransactionManager transactionManager,
       SchedulerStore.Mutable schedulerStore,
-      JobStore.Mutable jobStore,
+      CronJobStore.Mutable jobStore,
       TaskStore.Mutable taskStore,
       LockStore.Mutable lockStore,
       QuotaStore.Mutable quotaStore,
@@ -238,7 +238,7 @@ class WriteAheadStorage extends ForwardingStore implements
   public void saveAcceptedJob(final IJobConfiguration jobConfig) {
     requireNonNull(jobConfig);
 
-    write(Op.saveAcceptedJob(new SaveAcceptedJob(jobConfig.newBuilder())));
+    write(Op.saveCronJob(new SaveCronJob(jobConfig.newBuilder())));
     jobStore.saveAcceptedJob(jobConfig);
   }
 
@@ -354,7 +354,7 @@ class WriteAheadStorage extends ForwardingStore implements
   }
 
   @Override
-  public JobStore.Mutable getJobStore() {
+  public CronJobStore.Mutable getCronJobStore() {
     return this;
   }
 

@@ -110,7 +110,7 @@ public class StorageBackfillTest {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().saveAcceptedJob(IJobConfiguration.build(config));
+        storeProvider.getCronJobStore().saveAcceptedJob(IJobConfiguration.build(config));
       }
     });
 
@@ -120,7 +120,7 @@ public class StorageBackfillTest {
         storage.read(new Storage.Work.Quiet<Iterable<IJobConfiguration>>() {
           @Override
           public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
-            return storeProvider.getJobStore().fetchJobs();
+            return storeProvider.getCronJobStore().fetchJobs();
           }
         }));
 

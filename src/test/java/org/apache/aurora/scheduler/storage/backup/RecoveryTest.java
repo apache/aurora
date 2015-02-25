@@ -34,7 +34,7 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
-import org.apache.aurora.gen.storage.StoredJob;
+import org.apache.aurora.gen.storage.StoredCronJob;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -167,7 +167,7 @@ public class RecoveryTest extends EasyMockTest {
   private static Snapshot makeSnapshot(ScheduledTask... tasks) {
     return new Snapshot()
         .setHostAttributes(ImmutableSet.<HostAttributes>of())
-        .setJobs(ImmutableSet.<StoredJob>of())
+        .setCronJobs(ImmutableSet.<StoredCronJob>of())
         .setSchedulerMetadata(new SchedulerMetadata().setVersion(CURRENT_API_VERSION))
         .setQuotaConfigurations(ImmutableSet.<QuotaConfiguration>of())
         .setTasks(ImmutableSet.<ScheduledTask>builder().add(tasks).build())

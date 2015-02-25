@@ -29,7 +29,7 @@ import com.twitter.common.inject.Bindings;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 
 import org.apache.aurora.scheduler.storage.AttributeStore;
-import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
@@ -61,7 +61,7 @@ public class MemStorage implements Storage {
   @Inject
   MemStorage(
       @Delegated final SchedulerStore.Mutable schedulerStore,
-      final JobStore.Mutable jobStore,
+      final CronJobStore.Mutable jobStore,
       final TaskStore.Mutable taskStore,
       @Delegated final LockStore.Mutable lockStore,
       @Delegated final Storage delegated,
@@ -77,7 +77,7 @@ public class MemStorage implements Storage {
       }
 
       @Override
-      public JobStore.Mutable getJobStore() {
+      public CronJobStore.Mutable getCronJobStore() {
         return jobStore;
       }
 

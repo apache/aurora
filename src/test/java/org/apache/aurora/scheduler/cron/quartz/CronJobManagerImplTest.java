@@ -250,7 +250,7 @@ public class CronJobManagerImplTest extends EasyMockTest {
     storage.write(new Storage.MutateWork.NoResult<Exception>() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) throws Exception {
-        storeProvider.getJobStore().saveAcceptedJob(
+        storeProvider.getCronJobStore().saveAcceptedJob(
             QuartzTestUtil.makeSanitizedCronJob().getSanitizedConfig().getJobConfig());
       }
     });
@@ -260,7 +260,7 @@ public class CronJobManagerImplTest extends EasyMockTest {
     return storage.read(new Storage.Work.Quiet<Optional<IJobConfiguration>>() {
       @Override
       public Optional<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobStore().fetchJob(QuartzTestUtil.AURORA_JOB_KEY);
+        return storeProvider.getCronJobStore().fetchJob(QuartzTestUtil.AURORA_JOB_KEY);
       }
     });
   }

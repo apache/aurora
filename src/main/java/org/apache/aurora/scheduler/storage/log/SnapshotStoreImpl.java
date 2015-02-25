@@ -34,7 +34,7 @@ import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
-import org.apache.aurora.gen.storage.StoredJob;
+import org.apache.aurora.gen.storage.StoredCronJob;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -132,21 +132,21 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       new SnapshotField() {
         @Override
         public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
-          ImmutableSet.Builder<StoredJob> jobs = ImmutableSet.builder();
+          ImmutableSet.Builder<StoredCronJob> jobs = ImmutableSet.builder();
 
-          for (IJobConfiguration config : store.getJobStore().fetchJobs()) {
-            jobs.add(new StoredJob(config.newBuilder()));
+          for (IJobConfiguration config : store.getCronJobStore().fetchJobs()) {
+            jobs.add(new StoredCronJob(config.newBuilder()));
           }
-          snapshot.setJobs(jobs.build());
+          snapshot.setCronJobs(jobs.build());
         }
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-          store.getJobStore().deleteJobs();
+          store.getCronJobStore().deleteJobs();
 
-          if (snapshot.isSetJobs()) {
-            for (StoredJob job : snapshot.getJobs()) {
-              store.getJobStore().saveAcceptedJob(
+          if (snapshot.isSetCronJobs()) {
+            for (StoredCronJob job : snapshot.getCronJobs()) {
+              store.getCronJobStore().saveAcceptedJob(
                   IJobConfiguration.build(job.getJobConfiguration()));
             }
           }

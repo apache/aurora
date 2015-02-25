@@ -19,7 +19,7 @@ import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.twitter.common.inject.Bindings.KeyFactory;
 
-import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
 import org.apache.aurora.scheduler.storage.TaskStore;
@@ -35,7 +35,7 @@ import static java.util.Objects.requireNonNull;
  *   <li>Keyed with keys provided by the provided{@code keyFactory}:</li>
  *     <ul>
  *       <li>{@link org.apache.aurora.scheduler.storage.SchedulerStore}</li>
- *       <li>{@link org.apache.aurora.scheduler.storage.JobStore}</li>
+ *       <li>{@link org.apache.aurora.scheduler.storage.CronJobStore}</li>
  *       <li>{@link org.apache.aurora.scheduler.storage.TaskStore}</li>
  *       <li>{@link org.apache.aurora.scheduler.storage.LockStore}</li>
  *       <li>{@link org.apache.aurora.scheduler.storage.QuotaStore}</li>
@@ -69,7 +69,7 @@ public final class MemStorageModule extends PrivateModule {
     expose(exposedMemStorageKey);
     bind(MemStorage.class).in(Singleton.class);
 
-    bindStore(JobStore.Mutable.class, MemJobStore.class);
+    bindStore(CronJobStore.Mutable.class, MemJobStore.class);
     bindStore(TaskStore.Mutable.class, MemTaskStore.class);
   }
 }

@@ -138,7 +138,7 @@ public class CronIT extends EasyMockTest {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().saveAcceptedJob(CRON_JOB);
+        storeProvider.getCronJobStore().saveAcceptedJob(CRON_JOB);
       }
     });
 

@@ -41,7 +41,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
-import org.apache.aurora.gen.storage.StoredJob;
+import org.apache.aurora.gen.storage.StoredCronJob;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
@@ -96,7 +96,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     // dropped.
     IHostAttributes legacyAttribute = IHostAttributes.build(
         new HostAttributes("host", ImmutableSet.<Attribute>of()));
-    StoredJob job = new StoredJob(
+    StoredCronJob job = new StoredCronJob(
         new JobConfiguration().setKey(new JobKey("owner", "env", "name")));
     String frameworkId = "framework_id";
     ILock lock = ILock.build(new Lock()
@@ -171,7 +171,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setTasks(IScheduledTask.toBuildersSet(tasks))
         .setQuotaConfigurations(quotas)
         .setHostAttributes(ImmutableSet.of(attribute.newBuilder(), legacyAttribute.newBuilder()))
-        .setJobs(ImmutableSet.of(job))
+        .setCronJobs(ImmutableSet.of(job))
         .setSchedulerMetadata(metadata)
         .setLocks(ImmutableSet.of(lock.newBuilder()))
         .setJobUpdateDetails(ImmutableSet.of(

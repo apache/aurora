@@ -24,8 +24,7 @@ struct SaveFrameworkId {
   1: string id
 }
 
-// TODO(maxim): Rename this into SaveCronJob.
-struct SaveAcceptedJob {
+struct SaveCronJob {
   2: api.JobConfiguration jobConfig
 }
 
@@ -99,7 +98,7 @@ struct PruneJobUpdateHistory {
 
 union Op {
   1: SaveFrameworkId saveFrameworkId
-  2: SaveAcceptedJob saveAcceptedJob
+  2: SaveCronJob saveCronJob
   5: RemoveJob removeJob
   6: SaveTasks saveTasks
   7: RemoveTasks removeTasks
@@ -126,8 +125,7 @@ struct Transaction {
   2: i32 schemaVersion
 }
 
-// TODO(maxim): rename this into StoredCronJob.
-struct StoredJob {
+struct StoredCronJob {
   3: api.JobConfiguration jobConfiguration
 }
 
@@ -160,7 +158,7 @@ struct Snapshot {
 
   3: set<api.HostAttributes> hostAttributes
   4: set<api.ScheduledTask> tasks
-  5: set<StoredJob> jobs
+  5: set<StoredCronJob> cronJobs
   6: SchedulerMetadata schedulerMetadata
   8: set<QuotaConfiguration> quotaConfigurations
   9: set<api.Lock> locks

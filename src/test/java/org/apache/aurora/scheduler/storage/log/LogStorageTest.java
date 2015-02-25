@@ -65,7 +65,7 @@ import org.apache.aurora.gen.storage.RemoveLock;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.RewriteTask;
-import org.apache.aurora.gen.storage.SaveAcceptedJob;
+import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
@@ -294,9 +294,9 @@ public class LogStorageTest extends EasyMockTest {
     builder.add(createTransaction(Op.saveFrameworkId(new SaveFrameworkId("bob"))));
     storageUtil.schedulerStore.saveFrameworkId("bob");
 
-    SaveAcceptedJob acceptedJob = new SaveAcceptedJob().setJobConfig(new JobConfiguration());
-    builder.add(createTransaction(Op.saveAcceptedJob(acceptedJob)));
-    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(acceptedJob.getJobConfig()));
+    SaveCronJob cronJob = new SaveCronJob().setJobConfig(new JobConfiguration());
+    builder.add(createTransaction(Op.saveCronJob(cronJob)));
+    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(cronJob.getJobConfig()));
 
     RemoveJob removeJob = new RemoveJob(JOB_KEY.newBuilder());
     builder.add(createTransaction(Op.removeJob(removeJob)));
@@ -544,13 +544,13 @@ public class LogStorageTest extends EasyMockTest {
         storageUtil.expectWrite();
         storageUtil.jobStore.saveAcceptedJob(jobConfig);
         streamMatcher.expectTransaction(
-            Op.saveAcceptedJob(new SaveAcceptedJob(jobConfig.newBuilder())))
+            Op.saveCronJob(new SaveCronJob(jobConfig.newBuilder())))
             .andReturn(position);
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().saveAcceptedJob(jobConfig);
+        storeProvider.getCronJobStore().saveAcceptedJob(jobConfig);
       }
     }.run();
   }
@@ -569,7 +569,7 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().removeJob(JOB_KEY);
+        storeProvider.getCronJobStore().removeJob(JOB_KEY);
       }
     }.run();
   }

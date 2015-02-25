@@ -25,7 +25,7 @@ import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.AttributeStore;
-import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
@@ -84,7 +84,7 @@ class DbStorage extends AbstractIdleService implements Storage {
       }
 
       @Override
-      public JobStore.Mutable getJobStore() {
+      public CronJobStore.Mutable getCronJobStore() {
         throw new UnsupportedOperationException("Not yet implemented.");
       }
 

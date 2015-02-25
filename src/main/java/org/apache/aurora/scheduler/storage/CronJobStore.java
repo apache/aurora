@@ -19,9 +19,9 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 /**
- * Stores job configuration data.
+ * Stores cron job configuration data.
  */
-public interface JobStore {
+public interface CronJobStore {
 
   /**
    * Fetches all {@code JobConfiguration} instances.
@@ -38,7 +38,7 @@ public interface JobStore {
    */
   Optional<IJobConfiguration> fetchJob(IJobKey jobKey);
 
-  interface Mutable extends JobStore {
+  interface Mutable extends CronJobStore {
     /**
      * Saves the job configuration for a job that has been accepted by the scheduler.
      * TODO(William Farner): Consider accepting SanitizedConfiguration here to require that

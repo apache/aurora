@@ -49,7 +49,7 @@ import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.RewriteTask;
-import org.apache.aurora.gen.storage.SaveAcceptedJob;
+import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
 import org.apache.aurora.gen.storage.SaveQuota;
@@ -60,8 +60,8 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.log.Log.Stream.InvalidPositionException;
 import org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
-import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
@@ -190,7 +190,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   private final Amount<Long, Time> snapshotInterval;
   private final Storage writeBehindStorage;
   private final SchedulerStore.Mutable writeBehindSchedulerStore;
-  private final JobStore.Mutable writeBehindJobStore;
+  private final CronJobStore.Mutable writeBehindJobStore;
   private final TaskStore.Mutable writeBehindTaskStore;
   private final LockStore.Mutable writeBehindLockStore;
   private final QuotaStore.Mutable writeBehindQuotaStore;
@@ -232,7 +232,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       SnapshotStore<Snapshot> snapshotStore,
       @WriteBehind Storage storage,
       @WriteBehind SchedulerStore.Mutable schedulerStore,
-      @WriteBehind JobStore.Mutable jobStore,
+      @WriteBehind CronJobStore.Mutable jobStore,
       @WriteBehind TaskStore.Mutable taskStore,
       @WriteBehind LockStore.Mutable lockStore,
       @WriteBehind QuotaStore.Mutable quotaStore,
@@ -265,7 +265,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       Amount<Long, Time> snapshotInterval,
       Storage delegateStorage,
       SchedulerStore.Mutable schedulerStore,
-      JobStore.Mutable jobStore,
+      CronJobStore.Mutable jobStore,
       TaskStore.Mutable taskStore,
       LockStore.Mutable lockStore,
       QuotaStore.Mutable quotaStore,
@@ -361,12 +361,12 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
             writeBehindSchedulerStore.saveFrameworkId(op.getSaveFrameworkId().getId());
           }
         })
-        .put(Op._Fields.SAVE_ACCEPTED_JOB, new Closure<Op>() {
+        .put(Op._Fields.SAVE_CRON_JOB, new Closure<Op>() {
           @Override
           public void execute(Op op) {
-            SaveAcceptedJob acceptedJob = op.getSaveAcceptedJob();
+            SaveCronJob cronJob = op.getSaveCronJob();
             writeBehindJobStore.saveAcceptedJob(
-                IJobConfiguration.build(acceptedJob.getJobConfig()));
+                IJobConfiguration.build(cronJob.getJobConfig()));
           }
         })
         .put(Op._Fields.REMOVE_JOB, new Closure<Op>() {
@@ -612,7 +612,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         persist(snapshot);
         LOG.info("Snapshot complete."
             + " host attrs: " + snapshot.getHostAttributesSize()
-            + ", jobs: " + snapshot.getJobsSize()
+            + ", cron jobs: " + snapshot.getCronJobsSize()
             + ", locks: " + snapshot.getLocksSize()
             + ", quota confs: " + snapshot.getQuotaConfigurationsSize()
             + ", tasks: " + snapshot.getTasksSize());

@@ -20,14 +20,14 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 /**
  * An in-memory job store.
  */
-class MemJobStore implements JobStore.Mutable {
+class MemJobStore implements CronJobStore.Mutable {
   private final Map<IJobKey, IJobConfiguration> jobs = Maps.newConcurrentMap();
 
   @Override
