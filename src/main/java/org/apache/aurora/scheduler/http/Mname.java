@@ -59,7 +59,7 @@ import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 public class Mname {
 
   private static final Set<String> HTTP_PORT_NAMES = ImmutableSet.of(
-      "health", "http", "HTTP", "web");
+      "health", "http", "HTTP", "web", "admin");
 
   private final Storage storage;
 

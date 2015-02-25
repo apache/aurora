@@ -156,6 +156,7 @@ public class MnameTest extends JettyServerModuleTest {
     assertEquals(Optional.of(6), getRedirectPort(ImmutableMap.of("http", 6)));
     assertEquals(Optional.of(7), getRedirectPort(ImmutableMap.of("HTTP", 7)));
     assertEquals(Optional.of(8), getRedirectPort(ImmutableMap.of("web", 8)));
+    assertEquals(Optional.of(9), getRedirectPort(ImmutableMap.of("admin", 9)));
   }
 
   private Optional<Integer> getRedirectPort(Map<String, Integer> ports) {
