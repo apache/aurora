@@ -12,13 +12,10 @@
 # limitations under the License.
 #
 
-python_binary(
-  name = 'thermos_executor',
-  source = 'thermos_executor_main.py',
-  entry_point = 'apache.aurora.executor.bin.thermos_executor_main:proxy_main',
-  always_write_cache = True,
+python_library(
+  name = 'thermos_executor_source',
+  sources = ['thermos_executor_main.py'],
   dependencies = [
-    '3rdparty/python:mesos.native',
     # To prevent an alpha version of protobuf from being pulled down by pants we
     # specify protobuf here. See AURORA-1128 for more details.
     '3rdparty/python:protobuf',
@@ -39,21 +36,39 @@ python_binary(
 )
 
 python_binary(
-  name = 'gc_executor',
-  source = 'gc_executor_main.py',
-  entry_point = 'apache.aurora.executor.bin.gc_executor_main:proxy_main',
+  name = 'thermos_executor',
+  entry_point = 'apache.aurora.executor.bin.thermos_executor_main:proxy_main',
   always_write_cache = True,
   dependencies = [
     '3rdparty/python:mesos.native',
+    ':thermos_executor_source',
+  ]
+)
+
+python_library(
+  name = 'gc_executor_source',
+  sources = ['gc_executor_main.py'],
+  dependencies = [
     # To prevent an alpha version of protobuf from being pulled down by pants we
     # specify protobuf here. See AURORA-1128 for more details.
     '3rdparty/python:protobuf',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.metrics',
-    'src/main/python/apache/thermos/common:path',
+    'src/main/python/apache/thermos/common:constants',
+    'src/main/python/apache/thermos/monitoring:detector',
     'src/main/python/apache/aurora/executor/common:executor_detector',
     'src/main/python/apache/aurora/executor:executor_vars',
     'src/main/python/apache/aurora/executor:gc_executor',
+  ]
+)
+
+python_binary(
+  name = 'gc_executor',
+  entry_point = 'apache.aurora.executor.bin.gc_executor_main:proxy_main',
+  always_write_cache = True,
+  dependencies = [
+    '3rdparty/python:mesos.native',
+    ':gc_executor_source',
   ]
 )

@@ -19,14 +19,19 @@ slave.
 
 """
 
-from mesos.native import MesosExecutorDriver
+try:
+  from mesos.native import MesosExecutorDriver
+except ImportError:
+  MesosExecutorDriver = None
+
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.metrics.sampler import DiskMetricWriter
 
-from apache.aurora.executor.executor_detector import ExecutorDetector
+from apache.aurora.executor.common.executor_detector import ExecutorDetector
 from apache.aurora.executor.gc_executor import ThermosGCExecutor
 from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
+from apache.thermos.monitoring.detector import FixedPathDetector
 
 app.configure(debug=True)
 
@@ -39,8 +44,11 @@ LogOptions.set_log_dir(ExecutorDetector.LOG_PATH)
 
 def proxy_main():
   def main():
+    if MesosExecutorDriver is None:
+      app.error('Could not load MesosExecutorDriver!')
+
     # Create executor stub
-    thermos_gc_executor = ThermosGCExecutor(checkpoint_root=DEFAULT_CHECKPOINT_ROOT)
+    thermos_gc_executor = ThermosGCExecutor(FixedPathDetector(DEFAULT_CHECKPOINT_ROOT))
     thermos_gc_executor.start()
 
     # Start metrics collection

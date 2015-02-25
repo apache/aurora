@@ -41,7 +41,7 @@ from apache.thermos.config.schema import Process, Resources, Task
 from apache.thermos.core.helper import TaskRunnerHelper
 from apache.thermos.core.runner import TaskRunner
 from apache.thermos.monitoring.detector import TaskDetector
-from apache.thermos.monitoring.garbage import DefaultCollector, TaskGarbageCollector
+from apache.thermos.monitoring.garbage import GarbageCollectionPolicy, TaskGarbageCollector
 from apache.thermos.monitoring.monitor import TaskMonitor
 
 from gen.apache.thermos.ttypes import ProcessState, RunnerCkpt, RunnerState, TaskState
@@ -434,13 +434,13 @@ def gc(args, options):
                     include_logs=not options.keep_logs,
                     verbose=True,
                     logger=print)
-  tgc = TaskGarbageCollector(root=options.root)
-
   if args:
-    gc_tasks = tasks_from_re(args, options.root, state='finished')
+    gc_tasks = [(options.root, task_id)
+        for task_id in tasks_from_re(args, options.root, state='finished')]
   else:
     print('No task ids specified, using default collector.')
-    gc_tasks = [task.task_id for task in DefaultCollector(tgc, **gc_options).run()]
+    gc_tasks = [(task.checkpoint_root, task.task_id)
+        for task in GarbageCollectionPolicy(**gc_options).run()]
 
   if not gc_tasks:
     print('No tasks to garbage collect.  Exiting')
@@ -457,18 +457,19 @@ def gc(args, options):
     value = raw_input("Continue [y/N]? ") or 'N'
   if value.lower() == 'y':
     print('Running gc...')
-    tgc = TaskGarbageCollector(root=options.root)
-    for task in gc_tasks:
-      print('  Task %s ' % task, end='')
+
+    for checkpoint_root, task_id in gc_tasks:
+      tgc = TaskGarbageCollector(checkpoint_root, task_id)
+      print('  Task %s ' % task_id, end='')
       print('data (%s) ' % ('keeping' if options.keep_data else 'deleting'), end='')
       print('logs (%s) ' % ('keeping' if options.keep_logs else 'deleting'), end='')
       print('metadata (%s) ' % ('keeping' if options.keep_metadata else 'deleting'))
       if not options.keep_data:
-        maybe(tgc.erase_data, task)
+        maybe(tgc.erase_data)
       if not options.keep_logs:
-        maybe(tgc.erase_logs, task)
+        maybe(tgc.erase_logs)
       if not options.keep_metadata:
-        maybe(tgc.erase_metadata, task)
+        maybe(tgc.erase_metadata)
       print('done.')
   else:
     print('Cancelling gc.')

@@ -32,25 +32,34 @@ from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 
-from apache.aurora.executor.gc_executor import ThermosGCExecutor
+from apache.aurora.executor.gc_executor import RootedTask, ThermosGCExecutor
 from apache.thermos.common.path import TaskPath
 from apache.thermos.config.schema import SimpleTask
 from apache.thermos.core.runner import TaskRunner
+from apache.thermos.monitoring.detector import FixedPathDetector
 
 from gen.apache.aurora.api.constants import LIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import ScheduleStatus
 from gen.apache.aurora.comm.ttypes import AdjustRetainedTasks
 from gen.apache.thermos.ttypes import ProcessState, TaskState
 
-ACTIVE_TASKS = ('sleep60-lost',)
+FAKE_ROOT = 'fake_root'
+
+
+def make_task(task_id):
+  return RootedTask(FAKE_ROOT, task_id)
+
+
+ACTIVE_TASKS = (make_task('sleep60-lost'),)
+
 
 FINISHED_TASKS = {
-  'failure': ProcessState.SUCCESS,
-  'failure_limit': ProcessState.FAILED,
-  'hello_world': ProcessState.SUCCESS,
-  'ordering': ProcessState.SUCCESS,
-  'ports': ProcessState.SUCCESS,
-  'sleep60': ProcessState.KILLED
+  make_task('failure'): ProcessState.SUCCESS,
+  make_task('failure_limit'): ProcessState.FAILED,
+  make_task('hello_world'): ProcessState.SUCCESS,
+  make_task('ordering'): ProcessState.SUCCESS,
+  make_task('ports'): ProcessState.SUCCESS,
+  make_task('sleep60'): ProcessState.KILLED
 }
 
 # TODO(wickman) These should be constant sets in the Thermos thrift
@@ -138,21 +147,24 @@ class ThinTestThermosGCExecutor(ThermosGCExecutor):
     self._kills = set()
     self._losses = set()
     self._gcs = set()
-    ThermosGCExecutor.__init__(self, checkpoint_root, clock=ThreadedClock(time.time()),
+    ThermosGCExecutor.__init__(
+        self,
+        FixedPathDetector(checkpoint_root),
+        clock=ThreadedClock(time.time()),
         executor_detector=lambda: list)
 
   @property
   def gcs(self):
     return self._gcs
 
-  def _gc(self, task_id):
-    self._gcs.add(task_id)
+  def _gc(self, task):
+    self._gcs.add(task)
 
-  def _terminate_task(self, task_id, kill=True):
+  def _terminate_task(self, task, kill=True):
     if kill:
-      self._kills.add(task_id)
+      self._kills.add(task)
     else:
-      self._losses.add(task_id)
+      self._losses.add(task)
     return True
 
   @property
@@ -166,7 +178,7 @@ class ThickTestThermosGCExecutor(ThinTestThermosGCExecutor):
     self._finished_tasks = finished_tasks
     self._corrupt_tasks = corrupt_tasks
     self._maybe_terminate = set()
-    ThinTestThermosGCExecutor.__init__(self, None, active_executors)
+    ThinTestThermosGCExecutor.__init__(self, FAKE_ROOT, active_executors)
 
   @property
   def results(self):
@@ -179,20 +191,20 @@ class ThickTestThermosGCExecutor(ThinTestThermosGCExecutor):
   def partition_tasks(self):
     return set(self._active_tasks.keys()), set(self._finished_tasks.keys())
 
-  def maybe_terminate_unknown_task(self, task_id):
-    self._maybe_terminate.add(task_id)
+  def maybe_terminate_unknown_task(self, task):
+    self._maybe_terminate.add(task)
 
-  def get_states(self, task_id):
-    if task_id not in self._corrupt_tasks:
-      if task_id in self._active_tasks:
-        return [(self._clock.time(), self._active_tasks[task_id])]
-      elif task_id in self._finished_tasks:
-        return [(self._clock.time(), self._finished_tasks[task_id])]
+  def get_states(self, task):
+    if task not in self._corrupt_tasks:
+      if task in self._active_tasks:
+        return [(self._clock.time(), self._active_tasks[task])]
+      elif task in self._finished_tasks:
+        return [(self._clock.time(), self._finished_tasks[task])]
     return []
 
-  def should_gc_task(self, task_id):
-    if task_id in self._corrupt_tasks:
-      return set([task_id])
+  def should_gc_task(self, task):
+    if task in self._corrupt_tasks:
+      return set([task])
     return set()
 
 
@@ -207,21 +219,21 @@ def llen(*iterables):
 def test_state_reconciliation_no_ops():
   # active vs. active
   for st0, st1 in product(THERMOS_LIVES, LIVE_STATES):
-    tgc, driver = make_pair({'foo': st0}, {})
+    tgc, driver = make_pair({make_task('foo'): st0}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
 
   # terminal vs. terminal
   for st0, st1 in product(THERMOS_TERMINALS, TERMINAL_STATES):
-    tgc, driver = make_pair({}, {'foo': st0})
+    tgc, driver = make_pair({}, {make_task('foo'): st0})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
 
   # active vs. starting
   for st0, st1 in product(THERMOS_LIVES, STARTING_STATES):
-    tgc, driver = make_pair({'foo': st0}, {})
+    tgc, driver = make_pair({make_task('foo'): st0}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
@@ -236,7 +248,7 @@ def test_state_reconciliation_no_ops():
 
 def test_state_reconciliation_active_terminal():
   for st0, st1 in product(THERMOS_LIVES, TERMINAL_STATES):
-    tgc, driver = make_pair({'foo': st0}, {})
+    tgc, driver = make_pair({make_task('foo'): st0}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 1)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
@@ -244,7 +256,7 @@ def test_state_reconciliation_active_terminal():
 
 def test_state_reconciliation_active_nexist():
   for st0 in THERMOS_LIVES:
-    tgc, driver = make_pair({'foo': st0}, {})
+    tgc, driver = make_pair({make_task('foo'): st0}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {})
     assert tgc.len_results == (0, 0, 0, 1)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
@@ -252,7 +264,7 @@ def test_state_reconciliation_active_nexist():
 
 def test_state_reconciliation_terminal_active():
   for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
-    tgc, driver = make_pair({}, {'foo': st0})
+    tgc, driver = make_pair({}, {make_task('foo'): st0})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 1)
@@ -260,7 +272,7 @@ def test_state_reconciliation_terminal_active():
 
 def test_state_reconciliation_corrupt_tasks():
   for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
-    tgc, driver = make_pair({}, {'foo': st0}, corrupt_tasks=['foo'])
+    tgc, driver = make_pair({}, {make_task('foo'): st0}, corrupt_tasks=[make_task('foo')])
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (1, 0, 0)
@@ -268,11 +280,11 @@ def test_state_reconciliation_corrupt_tasks():
 
 def test_state_reconciliation_terminal_nexist():
   for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
-    tgc, driver = make_pair({}, {'foo': st0})
+    tgc, driver = make_pair({}, {make_task('foo'): st0})
     lgc, rgc, updates = tgc.reconcile_states(driver, {})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (1, 0, 0)
-    assert lgc == set(['foo'])
+    assert lgc == set([make_task('foo')])
 
 
 def test_state_reconciliation_nexist_active():
@@ -297,9 +309,10 @@ def test_real_get_states():
     setup_tree(td)
     executor = ThinTestThermosGCExecutor(td)
     for task in FINISHED_TASKS:
-      states = executor.get_states(task)
+      real_task = RootedTask(td, task.task_id)
+      states = executor.get_states(real_task)
       assert isinstance(states, list) and len(states) > 0
-      assert executor.get_sandbox(task) is not None
+      assert executor.get_sandbox(real_task) is not None
 
 
 def wait_until_not(thing, timeout=EVENT_WAIT_TIMEOUT_SECS):
@@ -339,46 +352,54 @@ def run_gc_with(active_executors, retained_tasks, lose=False):
 
 
 def test_gc_with_loss():
-  executor, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS), retained_tasks={},
+  executor, proxy_driver = run_gc_with(
+      active_executors=set(task.task_id for task in ACTIVE_TASKS),
+      retained_tasks={},
       lose=True)
   assert len(executor._kills) == len(ACTIVE_TASKS)
   assert len(executor.gcs) == len(FINISHED_TASKS)
   assert len(proxy_driver.updates) >= 1
-  assert StatusUpdate(mesos_pb2.TASK_LOST, ACTIVE_TASKS[0]) in proxy_driver.updates
+  assert StatusUpdate(mesos_pb2.TASK_LOST, ACTIVE_TASKS[0].task_id) in proxy_driver.updates
 
 
 def test_gc_with_starting_task():
   executor, proxy_driver = run_gc_with(
-    active_executors=set(ACTIVE_TASKS), retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.STARTING})
+    active_executors=set(task.task_id for task in ACTIVE_TASKS),
+    retained_tasks={ACTIVE_TASKS[0].task_id: ScheduleStatus.STARTING})
   assert len(executor._kills) == 0
   assert len(executor.gcs) == len(FINISHED_TASKS)
 
 
 def test_gc_without_task_missing():
-  executor, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS), retained_tasks={},
+  executor, proxy_driver = run_gc_with(
+      active_executors=set(task.task_id for task in ACTIVE_TASKS),
+      retained_tasks={},
       lose=False)
   assert len(executor._kills) == len(ACTIVE_TASKS)
   assert len(executor.gcs) == len(FINISHED_TASKS)
 
 
 def test_gc_without_loss():
-  executor, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS),
-      retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.RUNNING})
+  executor, proxy_driver = run_gc_with(
+      active_executors=set(task.task_id for task in ACTIVE_TASKS),
+      retained_tasks={ACTIVE_TASKS[0].task_id: ScheduleStatus.RUNNING})
   assert len(executor._kills) == 0
   assert len(executor.gcs) == len(FINISHED_TASKS)
 
 
 def test_gc_withheld():
-  executor, proxy_driver = run_gc_with(active_executors=set([ACTIVE_TASKS[0], 'failure']),
-      retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.RUNNING,
+  executor, proxy_driver = run_gc_with(
+      active_executors=set([ACTIVE_TASKS[0].task_id, 'failure']),
+      retained_tasks={ACTIVE_TASKS[0].task_id: ScheduleStatus.RUNNING,
                       'failure': ScheduleStatus.FAILED})
   assert len(executor._kills) == 0
   assert len(executor.gcs) == len(FINISHED_TASKS) - 1
 
 
 def test_gc_withheld_and_executor_missing():
-  executor, proxy_driver = run_gc_with(active_executors=set(ACTIVE_TASKS),
-      retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.RUNNING,
+  executor, proxy_driver = run_gc_with(
+      active_executors=set(task.task_id for task in ACTIVE_TASKS),
+      retained_tasks={ACTIVE_TASKS[0].task_id: ScheduleStatus.RUNNING,
                       'failure': ScheduleStatus.FAILED})
   assert len(executor._kills) == 0
   assert len(executor.gcs) == len(FINISHED_TASKS)
@@ -573,13 +594,13 @@ class TestRealGC(unittest.TestCase):
         pass
 
     class FakeTaskGarbageCollector(object):
-      def __init__(self, root):
+      def __init__(self, root, task_id):
         pass
 
-      def erase_logs(self, task_id):
+      def erase_logs(self):
         pass
 
-      def erase_metadata(self, task_id):
+      def erase_metadata(self):
         pass
 
     class FastThermosGCExecutor(ThermosGCExecutor):
@@ -587,7 +608,7 @@ class TestRealGC(unittest.TestCase):
 
     detector = functools.partial(FakeExecutorDetector, task_id) if retain else FakeExecutorDetector
     executor = FastThermosGCExecutor(
-        checkpoint_root=root,
+        path_detector=FixedPathDetector(root),
         task_killer=FakeTaskKiller,
         executor_detector=detector,
         task_garbage_collector=FakeTaskGarbageCollector,

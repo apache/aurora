@@ -23,6 +23,7 @@ slaves utilising the Thermos executor.
 import os
 import threading
 import time
+from collections import namedtuple
 
 import psutil
 from mesos.interface import mesos_pb2
@@ -37,7 +38,7 @@ from apache.thermos.common.ckpt import CheckpointDispatcher
 from apache.thermos.common.path import TaskPath
 from apache.thermos.core.helper import TaskKiller
 from apache.thermos.core.inspector import CheckpointInspector
-from apache.thermos.monitoring.detector import TaskDetector
+from apache.thermos.monitoring.detector import PathDetector, TaskDetector
 from apache.thermos.monitoring.garbage import TaskGarbageCollector
 
 from .common.executor_detector import ExecutorDetector
@@ -69,6 +70,13 @@ THERMOS_TO_MESOS_STATES = {
 }
 
 
+# RootedTask is a (checkpoint_root, task_id) tuple.  Before, checkpoint_root was assumed to be a
+# globally defined location e.g. '/var/run/thermos'.  We are trying to move checkpoints into
+# sandboxes, which mean that each task will have its own checkpoint_root, so we can no longer rely
+# upon a single invariant checkpoint root passed into the GC executor constructor.
+RootedTask = namedtuple('RootedTask', 'checkpoint_root task_id')
+
+
 class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
   """
     Thermos GC Executor, responsible for:
@@ -95,7 +103,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
   PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
 
   def __init__(self,
-               checkpoint_root,
+               path_detector,
                verbose=True,
                task_killer=TaskKiller,
                executor_detector=ExecutorDetector,
@@ -116,22 +124,29 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     self._slave_id = None  # cache the slave ID provided by the slave
     self._task_id = None  # the task_id currently being executed by the ThermosGCExecutor, if any
     self._start_time = None  # the start time of a task currently being executed, if any
-    self._detector = executor_detector()
-    self._collector = task_garbage_collector(root=checkpoint_root)
+    self._executor_detector = executor_detector()
+    self._collector_class = task_garbage_collector
     self._clock = clock
     self._task_killer = task_killer
-    self._checkpoint_root = checkpoint_root
+    if not isinstance(path_detector, PathDetector):
+      raise TypeError('ThermosGCExecutor expects a path_detector of type PathDetector, got %s' %
+          type(path_detector))
+    self._path_detector = path_detector
     self._dropped_tasks = AtomicGauge('dropped_tasks')
     self.metrics.register(self._dropped_tasks)
 
-  def _runner_ckpt(self, task_id):
-    """Return the runner checkpoint file for a given task_id."""
-    return TaskPath(root=self._checkpoint_root, task_id=task_id).getpath('runner_checkpoint')
+  def _runner_ckpt(self, task):
+    """Return the runner checkpoint file for a given task.
 
-  def _terminate_task(self, task_id, kill=True):
+    :param task: An instance of a task to retrieve checkpoint path
+    :type task: :class:`RootedTask` instance
+    """
+    return TaskPath(root=task.checkpoint_root, task_id=task.task_id).getpath('runner_checkpoint')
+
+  def _terminate_task(self, task, kill=True):
     """Terminate a task using the associated task killer. Returns a boolean indicating success."""
-    killer = self._task_killer(task_id, self._checkpoint_root)
-    self.log('Terminating %s...' % task_id)
+    killer = self._task_killer(task.task_id, task.checkpoint_root)
+    self.log('Terminating %s...' % task.task_id)
     runner_terminate = killer.kill if kill else killer.lose
     try:
       runner_terminate(force=True)
@@ -141,30 +156,37 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       return False
 
   def partition_tasks(self):
-    """Return active/finished tasks as discovered from the checkpoint root."""
-    detector = TaskDetector(root=self._checkpoint_root)
-    active_tasks = set(t_id for _, t_id in detector.get_task_ids(state='active'))
-    finished_tasks = set(t_id for _, t_id in detector.get_task_ids(state='finished'))
+    """Return active/finished tasks as discovered from the checkpoint roots."""
+    active_tasks, finished_tasks = set(), set()
+
+    for checkpoint_root in self._path_detector.get_paths():
+      detector = TaskDetector(root=checkpoint_root)
+
+      active_tasks.update(RootedTask(checkpoint_root, task_id)
+          for _, task_id in detector.get_task_ids(state='active'))
+      finished_tasks.update(RootedTask(checkpoint_root, task_id)
+          for _, task_id in detector.get_task_ids(state='finished'))
+
     return active_tasks, finished_tasks
 
-  def get_states(self, task_id):
+  def get_states(self, task):
     """Returns the (timestamp, status) tuples of the task or [] if could not replay."""
-    statuses = CheckpointDispatcher.iter_statuses(self._runner_ckpt(task_id))
+    statuses = CheckpointDispatcher.iter_statuses(self._runner_ckpt(task))
     try:
       return [(state.timestamp_ms / 1000.0, state.state) for state in statuses]
     except CheckpointDispatcher.ErrorRecoveringState:
       return []
 
-  def get_sandbox(self, task_id):
+  def get_sandbox(self, task):
     """Returns the sandbox of the task, or None if it has not yet been initialized."""
     try:
-      for update in CheckpointDispatcher.iter_updates(self._runner_ckpt(task_id)):
+      for update in CheckpointDispatcher.iter_updates(self._runner_ckpt(task)):
         if update.runner_header and update.runner_header.sandbox:
           return update.runner_header.sandbox
     except CheckpointDispatcher.ErrorRecoveringState:
       return None
 
-  def maybe_terminate_unknown_task(self, task_id):
+  def maybe_terminate_unknown_task(self, task):
     """Terminate a task if we believe the scheduler doesn't know about it.
 
        It's possible for the scheduler to queue a GC and launch a task afterwards, in which
@@ -174,29 +196,29 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
        Returns:
          boolean indicating whether the task was terminated
     """
-    states = self.get_states(task_id)
+    states = self.get_states(task)
     if states:
       task_start_time, _ = states[0]
       if self._start_time - task_start_time > self.MINIMUM_KILL_AGE.as_(Time.SECONDS):
-        return self._terminate_task(task_id)
+        return self._terminate_task(task)
     return False
 
-  def should_gc_task(self, task_id):
+  def should_gc_task(self, task):
     """Check if a possibly-corrupt task should be locally GCed
 
       A task should be GCed if its checkpoint stream appears to be corrupted and the kill age
       threshold is exceeded.
 
        Returns:
-         set, containing the task_id if it should be marked for local GC, or empty otherwise
+         set, containing the task if it should be marked for local GC, or empty otherwise
     """
-    runner_ckpt = self._runner_ckpt(task_id)
+    runner_ckpt = self._runner_ckpt(task)
     if not os.path.exists(runner_ckpt):
       return set()
     latest_update = os.path.getmtime(runner_ckpt)
     if self._start_time - latest_update > self.MINIMUM_KILL_AGE.as_(Time.SECONDS):
-      self.log('Got corrupt checkpoint file for %s - marking for local GC' % task_id)
-      return set([task_id])
+      self.log('Got corrupt checkpoint file for %s - marking for local GC' % task.task_id)
+      return set([task])
     else:
       self.log('Checkpoint file unreadable, but not yet beyond MINIMUM_KILL_AGE threshold')
       return set()
@@ -227,27 +249,26 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
          !EXISTS  | TERMINAL             => delete
 
       Returns tuple of (local_gc, remote_gc, updates), where:
-        local_gc - set of task_ids to be GCed locally
+        local_gc - set of RootedTasks to be GCed locally
         remote_gc - set of task_ids to be deleted on the scheduler
         updates - dictionary of updates sent to the scheduler (task_id: ScheduleStatus)
     """
     def partition(rt):
       active, starting, finished = set(), set(), set()
-      for task_id, schedule_status in rt.items():
+      for task, schedule_status in rt.items():
         if schedule_status in TERMINAL_STATES:
-          finished.add(task_id)
+          finished.add(task)
         elif (schedule_status == ScheduleStatus.STARTING or
               schedule_status == ScheduleStatus.ASSIGNED):
-          starting.add(task_id)
+          starting.add(task)
         else:
-          active.add(task_id)
+          active.add(task)
       return active, starting, finished
 
     local_active, local_finished = self.partition_tasks()
     sched_active, sched_starting, sched_finished = partition(retained_tasks)
-    local_task_ids = local_active | local_finished
-    sched_task_ids = sched_active | sched_starting | sched_finished
-    all_task_ids = local_task_ids | sched_task_ids
+    local_tasks = local_active | local_finished
+    sched_tasks = sched_active | sched_starting | sched_finished
 
     self.log('Told to retain the following task ids:')
     for task_id, schedule_status in retained_tasks.items():
@@ -255,51 +276,59 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
           (task_id, ScheduleStatus._VALUES_TO_NAMES.get(schedule_status, 'UNKNOWN')))
 
     self.log('Local active tasks:')
-    for task_id in local_active:
-      self.log('  => %s' % task_id)
+    for task in local_active:
+      self.log('  => %s' % task.task_id)
 
     self.log('Local finished tasks:')
-    for task_id in local_finished:
-      self.log('  => %s' % task_id)
+    for task in local_finished:
+      self.log('  => %s' % task.task_id)
 
-    local_gc, remote_gc = set(), set()
+    local_gc, remote_gc_ids = set(), set()
     updates = {}
 
-    for task_id in all_task_ids:
-      if task_id in local_active and task_id not in (sched_active | sched_starting):
-        self.log('Inspecting task %s for termination.' % task_id)
-        if not self.maybe_terminate_unknown_task(task_id):
-          local_gc.update(self.should_gc_task(task_id))
-      if task_id in local_finished and task_id not in sched_task_ids:
-        self.log('Queueing task %s for local deletion.' % task_id)
-        local_gc.add(task_id)
-      if task_id in local_finished and task_id in (sched_active | sched_starting):
-        self.log('Task %s finished but scheduler thinks active/starting.' % task_id)
-        states = self.get_states(task_id)
+    for task in local_active:
+      if task.task_id not in (sched_active | sched_starting):
+        self.log('Inspecting task %s for termination.' % task.task_id)
+        if not self.maybe_terminate_unknown_task(task):
+          local_gc.update(self.should_gc_task(task))
+
+    for task in local_finished:
+      if task.task_id not in sched_tasks:
+        self.log('Queueing task %s for local deletion.' % task.task_id)
+        local_gc.add(task)
+      if task.task_id in (sched_active | sched_starting):
+        self.log('Task %s finished but scheduler thinks active/starting.' % task.task_id)
+        states = self.get_states(task)
         if states:
           _, last_state = states[-1]
-          updates[task_id] = THERMOS_TO_TWITTER_STATES.get(
-              last_state,
-              ScheduleStatus.LOST)
+          updates[task.task_id] = THERMOS_TO_TWITTER_STATES.get(last_state, ScheduleStatus.LOST)
           self.send_update(
               driver,
-              task_id,
+              task.task_id,
               THERMOS_TO_MESOS_STATES.get(last_state, mesos_pb2.TASK_LOST),
               'Task finish detected by GC executor.')
         else:
-          local_gc.update(self.should_gc_task(task_id))
-      if task_id in sched_finished and task_id not in local_task_ids:
+          local_gc.update(self.should_gc_task(task))
+
+    local_task_ids = set(task.task_id for task in local_tasks)
+
+    for task_id in sched_finished:
+      if task_id not in local_task_ids:
         self.log('Queueing task %s for remote deletion.' % task_id)
-        remote_gc.add(task_id)
-      if task_id not in local_task_ids and task_id in sched_active:
+        remote_gc_ids.add(task_id)
+
+    for task_id in sched_active:
+      if task_id not in local_task_ids:
         self.log('Know nothing about task %s, telling scheduler of LOSS.' % task_id)
         updates[task_id] = ScheduleStatus.LOST
         self.send_update(
             driver, task_id, mesos_pb2.TASK_LOST, 'GC executor found no trace of task.')
-      if task_id not in local_task_ids and task_id in sched_starting:
+
+    for task_id in sched_starting:
+      if task_id not in local_task_ids:
         self.log('Know nothing about task %s, but scheduler says STARTING - passing' % task_id)
 
-    return local_gc, remote_gc, updates
+    return local_gc, remote_gc_ids, updates
 
   def clean_orphans(self, driver):
     """Inspect checkpoints for trees that have been kill -9'ed but not properly cleaned up."""
@@ -307,17 +336,17 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     active_tasks, _ = self.partition_tasks()
     updates = {}
 
-    inspector = CheckpointInspector(self._checkpoint_root)
-
     def is_our_process(process, uid, timestamp):
       if process.uids().real != uid:
         return False
       estimated_start_time = self._clock.time() - process.create_time()
       return abs(timestamp - estimated_start_time) < self.MAX_PID_TIME_DRIFT.as_(Time.SECONDS)
 
-    for task_id in active_tasks:
-      self.log('Inspecting running task: %s' % task_id)
-      inspection = inspector.inspect(task_id)
+    for task in active_tasks:
+      inspector = CheckpointInspector(task.checkpoint_root)
+
+      self.log('Inspecting running task: %s' % task.task_id)
+      inspection = inspector.inspect(task.task_id)
       if not inspection:
         self.log('  - Error inspecting task runner')
         continue
@@ -339,7 +368,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         self.log('  - Error sampling runner process [pid=%s]: %s' % (runner_pid, err))
         continue
       try:
-        latest_update = os.path.getmtime(self._runner_ckpt(task_id))
+        latest_update = os.path.getmtime(self._runner_ckpt(task))
       except (IOError, OSError) as err:
         self.log('  - Error accessing runner ckpt: %s' % err)
         continue
@@ -348,34 +377,38 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         continue
       self.log('  - Runner is dead but beyond LOST threshold: %.1fs' % (
           self._clock.time() - latest_update))
-      if self._terminate_task(task_id, kill=False):
-        updates[task_id] = ScheduleStatus.LOST
+      if self._terminate_task(task, kill=False):
+        updates[task.task_id] = ScheduleStatus.LOST
         self.send_update(
-            driver, task_id, mesos_pb2.TASK_LOST, 'GC executor detected failed task runner.')
+            driver, task.task_id, mesos_pb2.TASK_LOST, 'GC executor detected failed task runner.')
 
     return updates
 
-  def _erase_sandbox(self, task_id):
-    # TODO(wickman) Only mesos should be in the business of garbage collecting sandboxes.
-    header_sandbox = self.get_sandbox(task_id)
+  def _erase_sandbox(self, task):
+    header_sandbox = self.get_sandbox(task)
     directory_sandbox = DirectorySandbox(header_sandbox) if header_sandbox else None
     if directory_sandbox and directory_sandbox.exists():
-      self.log('Destroying DirectorySandbox for %s' % task_id)
+      self.log('Destroying DirectorySandbox for %s' % task.task_id)
       try:
         directory_sandbox.destroy()
       except DirectorySandbox.Error as e:
         self.log('Failed to destroy DirectorySandbox: %s' % e)
     else:
-      self.log('Found no sandboxes for %s' % task_id)
+      self.log('Found no sandboxes for %s' % task.task_id)
 
-  def _gc(self, task_id):
+  def _gc(self, task):
     """Erase the sandbox, logs and metadata of the given task."""
-    self.log('Erasing sandbox for %s' % task_id)
-    self._erase_sandbox(task_id)
-    self.log('Erasing logs for %s' % task_id)
-    self._collector.erase_logs(task_id)
-    self.log('Erasing metadata for %s' % task_id)
-    self._collector.erase_metadata(task_id)
+
+    self.log('Erasing sandbox for %s' % task.task_id)
+    self._erase_sandbox(task)
+
+    collector = self._collector_class(task.checkpoint_root, task.task_id)
+
+    self.log('Erasing logs for %s' % task.task_id)
+    collector.erase_logs()
+
+    self.log('Erasing metadata for %s' % task.task_id)
+    collector.erase_metadata()
 
   def garbage_collect(self, force_delete=frozenset()):
     """Garbage collect tasks on the system no longer active or in the supplied force_delete.
@@ -390,18 +423,23 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         self.log('  %s' % r_e)
     else:
       self.log('  None')
-    for task_id in (active_tasks - retained_executors):
-      self.log('ERROR: Active task %s had its executor sandbox pulled.' % task_id)
-    gc_tasks = (finished_tasks - retained_executors) | force_delete
+    for task in active_tasks:
+      if task.task_id not in retained_executors:
+        self.log('ERROR: Active task %s had its executor sandbox pulled.' % task.task_id)
+    gc_tasks = set()
+    for task in finished_tasks:
+      if task.task_id not in retained_executors:
+        gc_tasks.add(task)
+    gc_tasks.update(force_delete)
     for gc_task in gc_tasks:
       self._gc(gc_task)
-    return gc_tasks
+    return set(task.task_id for task in gc_tasks)
 
   @property
   def linked_executors(self):
     """Generator yielding the executor sandboxes detected on the system."""
     thermos_executor_prefix = 'thermos-'
-    for executor in self._detector:
+    for executor in self._executor_detector:
       # It's possible for just the 'latest' symlink to be present but no run directories.
       # This indicates that the task has been fully garbage collected.
       if executor.executor_id.startswith(thermos_executor_prefix) and executor.run != 'latest':

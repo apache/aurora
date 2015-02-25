@@ -21,7 +21,6 @@ slave.
 
 import os
 
-from mesos.native import MesosExecutorDriver
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
@@ -36,6 +35,12 @@ from apache.aurora.executor.thermos_task_runner import (
     UserOverrideThermosTaskRunnerProvider
 )
 from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
+
+try:
+  from mesos.native import MesosExecutorDriver
+except ImportError:
+  MesosExecutorDriver = None
+
 
 CWD = os.environ.get('MESOS_SANDBOX', '.')
 
@@ -119,6 +124,9 @@ class UserOverrideDirectorySandboxProvider(DefaultSandboxProvider):
 
 def proxy_main():
   def main(args, options):
+    if MesosExecutorDriver is None:
+      app.error('Could not load MesosExecutorDriver!')
+
     # status providers:
     status_providers = [
         HealthCheckerProvider(),
