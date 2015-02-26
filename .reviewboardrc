@@ -1,3 +1,4 @@
 REPOSITORY = "aurora"
 REVIEWBOARD_URL = "https://reviews.apache.org"
 TARGET_GROUPS = "Aurora"
+TARGET_PEOPLE = "wfarner, jcohen"
