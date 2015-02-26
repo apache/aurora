@@ -17,7 +17,7 @@ import sys
 import time
 from collections import namedtuple
 
-from twitter.common.dirutil import safe_bsize, safe_delete, safe_rmtree
+from twitter.common.dirutil import safe_bsize, safe_delete, safe_mtime, safe_rmtree
 from twitter.common.quantity import Amount, Data, Time
 
 from apache.thermos.common.ckpt import CheckpointDispatcher
@@ -37,16 +37,17 @@ class TaskGarbageCollector(object):
 
     self._detector = TaskDetector(checkpoint_root)
     self._task_id = task_id
+    self._pathspec = TaskPath(root=checkpoint_root, task_id=task_id)
     self._state = CheckpointDispatcher.from_file(self._detector.get_checkpoint(task_id))
 
   def get_age(self):
-    return os.path.getmtime(self._detector.get_checkpoint(self._task_id))
+    return safe_mtime(self._detector.get_checkpoint(self._task_id))
 
   def get_metadata(self, with_size=True):
     runner_ckpt = self._detector.get_checkpoint(self._task_id)
     process_ckpts = [ckpt for ckpt in self._detector.get_process_checkpoints(self._task_id)]
-    json_spec = TaskPath(
-        root=self._root, task_id=self._task_id, state='finished').getpath('task_path')
+    # assumes task is in finished state.
+    json_spec = self._pathspec.given(state='finished').getpath('task_path')
     for path in [json_spec, runner_ckpt] + process_ckpts:
       if with_size:
         yield path, safe_bsize(path)
@@ -54,7 +55,7 @@ class TaskGarbageCollector(object):
         yield path
 
   def get_logs(self, with_size=True):
-    if self._state.header:
+    if self._state and self._state.header and self._state.header.log_dir:
       for path in self._detector.get_process_logs(self._task_id, self._state.header.log_dir):
         if with_size:
           yield path, safe_bsize(path)
@@ -62,7 +63,7 @@ class TaskGarbageCollector(object):
           yield path
 
   def get_data(self, with_size=True):
-    if self._state.header and self._state.header.sandbox:
+    if self._state and self._state.header and self._state.header.sandbox:
       for root, dirs, files in os.walk(self._state.header.sandbox):
         for file in files:
           filename = os.path.join(root, file)
@@ -79,19 +80,19 @@ class TaskGarbageCollector(object):
   def erase_metadata(self):
     for fn in self.get_metadata(with_size=False):
       safe_delete(fn)
-    safe_rmtree(TaskPath(root=self._root, task_id=self._task_id).getpath('checkpoint_path'))
+    safe_rmtree(self._pathspec.getpath('checkpoint_path'))
 
   def erase_logs(self):
     for fn in self.get_logs(with_size=False):
       safe_delete(fn)
-    if self._state.header:
-      path = TaskPath(root=self._root, task_id=self._task_id, log_dir=self._state.header.log_dir)
-      safe_rmtree(path.getpath('process_logbase'))
+    if self._state and self._state.header:
+      path = self._pathspec.given(log_dir=self._state.header.log_dir).getpath('process_logbase')
+      safe_rmtree(path)
 
   def erase_data(self):
     for fn in self.get_data(with_size=False):
-      os.unlink(fn)
-    if self._state.header and self._state.header.sandbox:
+      safe_delete(fn)
+    if self._state and self._state.header and self._state.header.sandbox:
       safe_rmtree(self._state.header.sandbox)
 
 
