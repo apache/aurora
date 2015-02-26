@@ -214,8 +214,6 @@ public class PreemptorImpl implements Preemptor {
         .addAll(Iterables.transform(possibleVictims, VICTIM_TO_HOST))
         .addAll(Iterables.transform(offers, OFFER_TO_HOST)).build();
 
-    String host = Iterables.getOnlyElement(hosts);
-
     ResourceSlot slackResources =
         ResourceSlot.sum(Iterables.transform(offers, OFFER_TO_RESOURCE_SLOT));
 
@@ -249,18 +247,18 @@ public class PreemptorImpl implements Preemptor {
 
     Iterable<PreemptionVictim> sortedVictims = resourceOrder.immutableSortedCopy(preemptableTasks);
 
+    Optional<IHostAttributes> attributes = getHostAttributes(Iterables.getOnlyElement(hosts));
+    if (!attributes.isPresent()) {
+      missingAttributes.incrementAndGet();
+      return Optional.absent();
+    }
+
     for (PreemptionVictim victim : sortedVictims) {
       toPreemptTasks.add(victim);
 
       ResourceSlot totalResource = ResourceSlot.sum(
           ResourceSlot.sum(Iterables.transform(toPreemptTasks, victimToResources)),
           slackResources);
-
-      Optional<IHostAttributes> attributes = getHostAttributes(host);
-      if (!attributes.isPresent()) {
-        missingAttributes.incrementAndGet();
-        continue;
-      }
 
       Set<SchedulingFilter.Veto> vetoes = schedulingFilter.filter(
           new UnusedResource(totalResource, attributes.get()),
