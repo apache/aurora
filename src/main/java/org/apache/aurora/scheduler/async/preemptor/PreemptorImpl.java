@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.async.preemptor;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -29,13 +28,12 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
+import com.google.common.collect.Sets;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.Stats;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
@@ -51,6 +49,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -86,11 +85,71 @@ public class PreemptorImpl implements Preemptor {
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface PreemptionDelay { }
 
-  private final AtomicLong tasksPreempted = Stats.exportLong("preemptor_tasks_preempted");
-  // Incremented every time the preemptor is invoked and finds tasks pending and preemptable tasks
-  private final AtomicLong attemptedPreemptions = Stats.exportLong("preemptor_attempts");
-  // Incremented every time we fail to find tasks to preempt for a pending task.
-  private final AtomicLong noSlotsFound = Stats.exportLong("preemptor_no_slots_found");
+  @VisibleForTesting
+  static class Metrics {
+    private volatile boolean exported = false;
+    private final CachedCounters counters;
+
+    Metrics(CachedCounters counters) {
+      this.counters = requireNonNull(counters);
+    }
+
+    private static String name(boolean production) {
+      return production ? "prod" : "non_prod";
+    }
+
+    private void assertFullyExported() {
+      if (exported) {
+        return;
+      }
+
+      // Dummy-read all stats to ensure they are exported.
+      Set<String> allStats = ImmutableSet.of(
+          attemptsStatName(false),
+          attemptsStatName(true),
+          successStatName(false),
+          successStatName(true),
+          failureStatName(false),
+          failureStatName(true));
+      for (String stat : allStats) {
+        counters.get(stat);
+      }
+
+      exported = true;
+    }
+
+    private void increment(String stat) {
+      assertFullyExported();
+      counters.get(stat).incrementAndGet();
+    }
+
+    @VisibleForTesting
+    static String attemptsStatName(boolean production) {
+      return "preemptor_attempts_for_" + name(production);
+    }
+
+    void recordPreemptionAttemptFor(ITaskConfig task) {
+      increment(attemptsStatName(task.isProduction()));
+    }
+
+    @VisibleForTesting
+    static String successStatName(boolean production) {
+      return "preemptor_tasks_preempted_" + name(production);
+    }
+
+    void recordTaskPreemption(PreemptionVictim victim) {
+      increment(successStatName(victim.isProduction()));
+    }
+
+    @VisibleForTesting
+    static String failureStatName(boolean production) {
+      return "preemptor_no_slots_found_for_" + name(production);
+    }
+
+    void recordPreemptionFailure(ITaskConfig task) {
+      increment(failureStatName(task.isProduction()));
+    }
+  }
 
   private final Predicate<IScheduledTask> isIdleTask = new Predicate<IScheduledTask>() {
     @Override
@@ -109,6 +168,7 @@ public class PreemptorImpl implements Preemptor {
   private final AtomicLong missingAttributes;
   private final ClusterState clusterState;
   private final ExecutorSettings executorSettings;
+  private final Metrics metrics;
 
   /**
    * Creates a new preemptor.
@@ -142,6 +202,7 @@ public class PreemptorImpl implements Preemptor {
     missingAttributes = statsProvider.makeCounter("preemptor_missing_attributes");
     this.clusterState = requireNonNull(clusterState);
     this.executorSettings = requireNonNull(executorSettings);
+    this.metrics = new Metrics(new CachedCounters(statsProvider));
   }
 
   private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
@@ -176,14 +237,6 @@ public class PreemptorImpl implements Preemptor {
         }
       };
 
-  private static final Function<PreemptionVictim, String> VICTIM_TO_TASK_ID =
-      new Function<PreemptionVictim, String>() {
-        @Override
-        public String apply(PreemptionVictim victim) {
-          return victim.getTaskId();
-        }
-      };
-
   // TODO(zmanji) Consider using Dominant Resource Fairness for ordering instead of the vector
   // ordering
   private final Ordering<PreemptionVictim> resourceOrder =
@@ -202,7 +255,7 @@ public class PreemptorImpl implements Preemptor {
    * The empty set indicates the offers (slack) are enough.
    * A set with elements indicates those tasks and the offers are enough.
    */
-  private Optional<Set<String>> getTasksToPreempt(
+  private Optional<Set<PreemptionVictim>> getTasksToPreempt(
       Iterable<PreemptionVictim> possibleVictims,
       Iterable<HostOffer> offers,
       IAssignedTask pendingTask,
@@ -232,7 +285,7 @@ public class PreemptorImpl implements Preemptor {
           new ResourceRequest(pendingTask.getTask(), pendingTask.getTaskId(), jobState));
 
       if (vetoes.isEmpty()) {
-        return Optional.<Set<String>>of(ImmutableSet.<String>of());
+        return Optional.<Set<PreemptionVictim>>of(ImmutableSet.<PreemptionVictim>of());
       }
     }
 
@@ -243,7 +296,7 @@ public class PreemptorImpl implements Preemptor {
       return Optional.absent();
     }
 
-    List<PreemptionVictim> toPreemptTasks = Lists.newArrayList();
+    Set<PreemptionVictim> toPreemptTasks = Sets.newHashSet();
 
     Iterable<PreemptionVictim> sortedVictims = resourceOrder.immutableSortedCopy(preemptableTasks);
 
@@ -265,9 +318,7 @@ public class PreemptorImpl implements Preemptor {
           new ResourceRequest(pendingTask.getTask(), pendingTask.getTaskId(), jobState));
 
       if (vetoes.isEmpty()) {
-        Set<String> taskIds =
-            FluentIterable.from(toPreemptTasks).transform(VICTIM_TO_TASK_ID).toSet();
-        return Optional.of(taskIds);
+        return Optional.<Set<PreemptionVictim>>of(ImmutableSet.copyOf(toPreemptTasks));
       }
     }
     return Optional.absent();
@@ -317,7 +368,7 @@ public class PreemptorImpl implements Preemptor {
       return Optional.absent();
     }
 
-    attemptedPreemptions.incrementAndGet();
+    metrics.recordPreemptionAttemptFor(pendingTask.get().getTask());
 
     // Group the offers by slave id so they can be paired with active tasks from the same slave.
     Multimap<String, HostOffer> slavesToOffers =
@@ -329,7 +380,7 @@ public class PreemptorImpl implements Preemptor {
         .build();
 
     for (String slaveID : allSlaves) {
-      final Optional<Set<String>> toPreemptTasks = getTasksToPreempt(
+      final Optional<Set<PreemptionVictim>> toPreemptTasks = getTasksToPreempt(
           slavesToActiveTasks.get(slaveID),
           slavesToOffers.get(slaveID),
           pendingTask.get(),
@@ -339,14 +390,14 @@ public class PreemptorImpl implements Preemptor {
         storage.write(new Storage.MutateWork.NoResult.Quiet() {
           @Override
           protected void execute(Storage.MutableStoreProvider storeProvider) {
-            for (String toPreempt : toPreemptTasks.get()) {
+            for (PreemptionVictim toPreempt : toPreemptTasks.get()) {
+              metrics.recordTaskPreemption(toPreempt);
               stateManager.changeState(
                   storeProvider,
-                  toPreempt,
+                  toPreempt.getTaskId(),
                   Optional.<ScheduleStatus>absent(),
                   PREEMPTING,
                   Optional.of("Preempting in favor of " + taskId));
-              tasksPreempted.incrementAndGet();
             }
           }
         });
@@ -354,7 +405,7 @@ public class PreemptorImpl implements Preemptor {
       }
     }
 
-    noSlotsFound.incrementAndGet();
+    metrics.recordPreemptionFailure(pendingTask.get().getTask());
     return Optional.absent();
   }
 

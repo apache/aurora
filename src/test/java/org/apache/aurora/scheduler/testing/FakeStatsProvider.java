@@ -55,6 +55,16 @@ public class FakeStatsProvider implements StatsProvider {
       }));
   }
 
+  /**
+   * Gets the value of a stat as a long.
+   *
+   * @param name Stat name.
+   * @return Value, as a long.
+   */
+  public long getLongValue(String name) {
+    return stats.get(name).get().longValue();
+  }
+
   @Override
   public AtomicLong makeCounter(String name) {
     final AtomicLong counter = new AtomicLong();

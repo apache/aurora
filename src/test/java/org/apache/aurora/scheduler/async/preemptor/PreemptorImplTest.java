@@ -30,7 +30,6 @@ import com.google.common.collect.Multimaps;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -72,11 +71,15 @@ import org.junit.Test;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.async.preemptor.PreemptorImpl.Metrics.attemptsStatName;
+import static org.apache.aurora.scheduler.async.preemptor.PreemptorImpl.Metrics.failureStatName;
+import static org.apache.aurora.scheduler.async.preemptor.PreemptorImpl.Metrics.successStatName;
 import static org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import static org.apache.mesos.Protos.Offer;
 import static org.apache.mesos.Protos.Resource;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertEquals;
 
 public class PreemptorImplTest extends EasyMockTest {
 
@@ -102,7 +105,7 @@ public class PreemptorImplTest extends EasyMockTest {
   private StateManager stateManager;
   private SchedulingFilter schedulingFilter;
   private FakeClock clock;
-  private StatsProvider statsProvider;
+  private FakeStatsProvider statsProvider;
   private ClusterState clusterState;
   private OfferManager offerManager;
   private AttributeAggregate emptyJob;
@@ -190,6 +193,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(highPriority);
+
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -216,6 +226,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(highPriority);
+
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -245,6 +262,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(pendingPriority);
+
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -263,6 +287,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(task);
+
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -287,6 +318,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(p1);
+
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -311,6 +349,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(p1);
+
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -329,6 +374,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(p1);
+
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures a production task can preempt 2 tasks on the same host.
@@ -361,6 +413,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(p1);
+
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(2L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures we select the minimal number of tasks to preempt
@@ -396,6 +455,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(p1);
+
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures a production task *never* preempts a production task from another job.
@@ -421,6 +487,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(p2);
+
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures that we can preempt if a task + offer can satisfy a pending task.
@@ -449,6 +522,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(p1);
+
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures we can preempt if two tasks and an offer can satisfy a pending task.
@@ -482,6 +562,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(p1);
+
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(2L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures we don't preempt if a host has enough slack to satisfy a pending task.
@@ -508,6 +595,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
     control.replay();
     runPreemptor(p1);
+
+    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // TODO(zmanji) spread tasks across slave ids on the same host and see if preemption fails.
