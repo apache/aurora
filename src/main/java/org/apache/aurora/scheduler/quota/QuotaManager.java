@@ -55,6 +55,7 @@ import org.apache.aurora.scheduler.updater.Updates;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.base.ResourceAggregates.EMPTY;
 import static org.apache.aurora.scheduler.base.Tasks.INFO_TO_JOB_KEY;
 import static org.apache.aurora.scheduler.base.Tasks.IS_PRODUCTION;
 import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_INFO;
@@ -110,6 +111,16 @@ public interface QuotaManager {
   QuotaCheckResult checkJobUpdate(IJobUpdate jobUpdate, StoreProvider storeProvider);
 
   /**
+   * Check if there is enough resource quota available for creating or updating a cron job
+   * represented by the {@code cronConfig}. The quota is defined at the task owner (role) level.
+   *
+   * @param cronConfig Cron job configuration.
+   * @param storeProvider A store provider to access quota data.
+   * @return{@code QuotaComparisonResult} instance with quota check result details.
+   */
+  QuotaCheckResult checkCronUpdate(IJobConfiguration cronConfig, StoreProvider storeProvider);
+
+  /**
    * Thrown when quota related operation failed.
    */
   class QuotaException extends Exception {
@@ -157,9 +168,8 @@ public interface QuotaManager {
       }
 
       QuotaInfo quotaInfo = getQuotaInfo(template.getJob().getRole(), storeProvider);
-      IResourceAggregate requestedTotal = add(
-          quotaInfo.getProdConsumption(),
-          ResourceAggregates.scale(fromTasks(ImmutableSet.of(template)), instances));
+      IResourceAggregate requestedTotal =
+          add(quotaInfo.getProdConsumption(), scale(template, instances));
 
       return QuotaCheckResult.greaterOrEqual(quotaInfo.getQuota(), requestedTotal);
     }
@@ -179,6 +189,32 @@ public interface QuotaManager {
           storeProvider);
 
       return QuotaCheckResult.greaterOrEqual(quotaInfo.getQuota(), quotaInfo.getProdConsumption());
+    }
+
+    @Override
+    public QuotaCheckResult checkCronUpdate(
+        IJobConfiguration cronConfig,
+        StoreProvider storeProvider) {
+
+      if (!cronConfig.getTaskConfig().isProduction()) {
+        return new QuotaCheckResult(SUFFICIENT_QUOTA);
+      }
+
+      QuotaInfo quotaInfo =
+          getQuotaInfo(cronConfig.getKey().getRole(), Optional.<IJobUpdate>absent(), storeProvider);
+
+      Optional<IJobConfiguration> oldCron =
+          storeProvider.getCronJobStore().fetchJob(cronConfig.getKey());
+
+      IResourceAggregate oldResource = oldCron.isPresent() ? scale(oldCron.get()) : EMPTY;
+
+      // Calculate requested total as a sum of current prod consumption and a delta between
+      // new and old cron templates.
+      IResourceAggregate requestedTotal = add(
+          quotaInfo.getProdConsumption(),
+          subtract(scale(cronConfig), oldResource));
+
+      return QuotaCheckResult.greaterOrEqual(quotaInfo.getQuota(), requestedTotal);
     }
 
     /**
@@ -268,7 +304,7 @@ public interface QuotaManager {
           .filter(buildNonUpdatingTasksFilter(updatesByKey))
           .transform(SCHEDULED_TO_INFO));
 
-      IResourceAggregate updateConsumption = ResourceAggregates.EMPTY;
+      IResourceAggregate updateConsumption = EMPTY;
       for (IJobUpdate update : updatesByKey.values()) {
         updateConsumption =
             add(updateConsumption, instructionsToResources(update.getInstructions(), isProd));
@@ -293,11 +329,11 @@ public interface QuotaManager {
       Multimap<IJobKey, ITaskConfig> taskConfigsByKey =
           tasks.transform(SCHEDULED_TO_INFO).index(INFO_TO_JOB_KEY);
 
-      IResourceAggregate totalConsumption = ResourceAggregates.EMPTY;
+      IResourceAggregate totalConsumption = EMPTY;
       for (IJobConfiguration config : cronTemplates.values()) {
         if (isProd == config.getTaskConfig().isProduction()) {
-          IResourceAggregate templateConsumption = ResourceAggregates.scale(
-              fromTasks(ImmutableSet.of(config.getTaskConfig())), config.getInstanceCount());
+          IResourceAggregate templateConsumption =
+              scale(config.getTaskConfig(), config.getInstanceCount());
 
           IResourceAggregate taskConsumption = fromTasks(taskConfigsByKey.get(config.getKey()));
 
@@ -396,14 +432,12 @@ public interface QuotaManager {
         final boolean isProd) {
 
       // Calculate initial state consumption.
-      IResourceAggregate initial = ResourceAggregates.EMPTY;
+      IResourceAggregate initial = EMPTY;
       for (IInstanceTaskConfig group : instructions.getInitialState()) {
         ITaskConfig task = group.getTask();
         if (isProd == task.isProduction()) {
           for (IRange range : group.getInstances()) {
-            initial = add(initial, ResourceAggregates.scale(
-                fromTasks(ImmutableSet.of(task)),
-                instanceCountFromRange(range)));
+            initial = add(initial, scale(task, instanceCountFromRange(range)));
           }
         }
       }
@@ -414,12 +448,10 @@ public interface QuotaManager {
             @Override
             public IResourceAggregate apply(IInstanceTaskConfig input) {
               return isProd == input.getTask().isProduction()
-                  ? ResourceAggregates.scale(
-                  fromTasks(ImmutableSet.of(input.getTask())),
-                  getUpdateInstanceCount(input.getInstances()))
-                  : ResourceAggregates.EMPTY;
+                  ? scale(input.getTask(), getUpdateInstanceCount(input.getInstances()))
+                  : EMPTY;
             }
-          }).or(ResourceAggregates.EMPTY);
+          }).or(EMPTY);
 
       // Calculate result as max(existing, desired) per resource type.
       return max(initial, desired);
@@ -432,11 +464,26 @@ public interface QuotaManager {
           .setDiskMb(a.getDiskMb() + b.getDiskMb()));
     }
 
+    private static IResourceAggregate subtract(IResourceAggregate a, IResourceAggregate b) {
+      return IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(a.getNumCpus() - b.getNumCpus())
+          .setRamMb(a.getRamMb() - b.getRamMb())
+          .setDiskMb(a.getDiskMb() - b.getDiskMb()));
+    }
+
     private static IResourceAggregate max(IResourceAggregate a, IResourceAggregate b) {
       return IResourceAggregate.build(new ResourceAggregate()
           .setNumCpus(Math.max(a.getNumCpus(), b.getNumCpus()))
           .setRamMb(Math.max(a.getRamMb(), b.getRamMb()))
           .setDiskMb(Math.max(a.getDiskMb(), b.getDiskMb())));
+    }
+
+    private static IResourceAggregate scale(ITaskConfig taskConfig, int instanceCount) {
+      return ResourceAggregates.scale(fromTasks(ImmutableSet.of(taskConfig)), instanceCount);
+    }
+
+    private static IResourceAggregate scale(IJobConfiguration jobConfiguration) {
+      return scale(jobConfiguration.getTaskConfig(), jobConfiguration.getInstanceCount());
     }
 
     private static IResourceAggregate fromTasks(Iterable<ITaskConfig> tasks) {

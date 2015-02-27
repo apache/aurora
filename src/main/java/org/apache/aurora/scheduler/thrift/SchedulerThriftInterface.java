@@ -353,7 +353,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           validateTaskLimits(
               template,
               count,
-              quotaManager.checkInstanceAddition(template, count, storeProvider));
+              quotaManager.checkCronUpdate(sanitized.getJobConfig(), storeProvider));
 
           // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
           if (updateOnly || getCronJob(storeProvider, jobKey).isPresent()) {

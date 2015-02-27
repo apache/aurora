@@ -1051,7 +1051,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
-    expectInstanceQuotaCheck(sanitized.getJobConfig().getTaskConfig(), ENOUGH_QUOTA);
+    expectCronQuotaCheck(sanitized.getJobConfig(), ENOUGH_QUOTA);
     cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
     control.replay();
 
@@ -1089,7 +1089,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
-    expectInstanceQuotaCheck(sanitized.getJobConfig().getTaskConfig(), ENOUGH_QUOTA);
+    expectCronQuotaCheck(sanitized.getJobConfig(), ENOUGH_QUOTA);
     cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
     expectLastCall().andThrow(new CronException("Nope"));
 
@@ -1131,7 +1131,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
-    expectInstanceQuotaCheck(sanitized.getJobConfig().getTaskConfig(), ENOUGH_QUOTA);
+    expectCronQuotaCheck(sanitized.getJobConfig(), ENOUGH_QUOTA);
 
     expectNoCronJob().times(2);
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
@@ -1149,7 +1149,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
-    expectInstanceQuotaCheck(sanitized.getJobConfig().getTaskConfig(), ENOUGH_QUOTA);
+    expectCronQuotaCheck(sanitized.getJobConfig(), ENOUGH_QUOTA);
 
     expectNoCronJob();
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active(), buildScheduledTask());
@@ -1168,7 +1168,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
-    expectInstanceQuotaCheck(sanitized.getJobConfig().getTaskConfig(), ENOUGH_QUOTA);
+    expectCronQuotaCheck(sanitized.getJobConfig(), ENOUGH_QUOTA);
 
     expectCronJob();
     cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
@@ -1225,7 +1225,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
-    expectInstanceQuotaCheck(sanitized.getJobConfig().getTaskConfig(), NOT_ENOUGH_QUOTA);
+    expectCronQuotaCheck(sanitized.getJobConfig(), NOT_ENOUGH_QUOTA);
 
     control.replay();
     assertResponse(INVALID_REQUEST, thrift.scheduleCronJob(CRON_JOB, null, SESSION));
@@ -2513,5 +2513,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         config,
         1,
         storageUtil.mutableStoreProvider)).andReturn(result);
+  }
+
+  private IExpectationSetters<?> expectCronQuotaCheck(
+      IJobConfiguration config,
+      QuotaCheckResult result) {
+
+    return expect(quotaManager.checkCronUpdate(config, storageUtil.mutableStoreProvider))
+        .andReturn(result);
   }
 }
