@@ -17,7 +17,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.List;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -29,7 +28,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.inject.TimedInterceptor.Timed;
-import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
 import org.apache.aurora.scheduler.HostOffer;
@@ -39,6 +37,7 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStatusReceived;
+import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -65,22 +64,14 @@ import static org.apache.mesos.Protos.Offer;
  * Location for communication with mesos.
  */
 class MesosSchedulerImpl implements Scheduler {
-  private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
-
-  private final AtomicLong totalResourceOffers = Stats.exportLong("scheduler_resource_offers");
-  private final AtomicLong totalFailedStatusUpdates = Stats.exportLong("scheduler_status_updates");
-  private final AtomicLong totalFrameworkDisconnects =
-      Stats.exportLong("scheduler_framework_disconnects");
-  private final AtomicLong totalFrameworkReregisters =
-      Stats.exportLong("scheduler_framework_reregisters");
-  private final AtomicLong totalLostExecutors = Stats.exportLong("scheduler_lost_executors");
-
   private final List<TaskLauncher> taskLaunchers;
 
   private final Storage storage;
   private final Lifecycle lifecycle;
   private final EventSink eventSink;
   private final Executor executor;
+  private final Logger log;
+  private final CachedCounters counters;
   private volatile boolean isRegistered = false;
 
   /**
@@ -109,18 +100,22 @@ class MesosSchedulerImpl implements Scheduler {
       final Lifecycle lifecycle,
       List<TaskLauncher> taskLaunchers,
       EventSink eventSink,
-      @SchedulerExecutor Executor executor) {
+      @SchedulerExecutor Executor executor,
+      Logger log,
+      CachedCounters counters) {
 
     this.storage = requireNonNull(storage);
     this.lifecycle = requireNonNull(lifecycle);
     this.taskLaunchers = requireNonNull(taskLaunchers);
     this.eventSink = requireNonNull(eventSink);
     this.executor = requireNonNull(executor);
+    this.log = requireNonNull(log);
+    this.counters = requireNonNull(counters);
   }
 
   @Override
   public void slaveLost(SchedulerDriver schedulerDriver, SlaveID slaveId) {
-    LOG.info("Received notification of lost slave: " + slaveId);
+    log.info("Received notification of lost slave: " + slaveId);
   }
 
   @Override
@@ -129,7 +124,7 @@ class MesosSchedulerImpl implements Scheduler {
       final FrameworkID frameworkId,
       MasterInfo masterInfo) {
 
-    LOG.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
+    log.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
@@ -143,15 +138,15 @@ class MesosSchedulerImpl implements Scheduler {
 
   @Override
   public void disconnected(SchedulerDriver schedulerDriver) {
-    LOG.warning("Framework disconnected.");
-    totalFrameworkDisconnects.incrementAndGet();
+    log.warning("Framework disconnected.");
+    counters.get("scheduler_framework_disconnects").get();
     eventSink.post(new DriverDisconnected());
   }
 
   @Override
   public void reregistered(SchedulerDriver schedulerDriver, MasterInfo masterInfo) {
-    LOG.info("Framework re-registered with master " + masterInfo);
-    totalFrameworkReregisters.incrementAndGet();
+    log.info("Framework re-registered with master " + masterInfo);
+    counters.get("scheduler_framework_reregisters").incrementAndGet();
   }
 
   @Timed("scheduler_resource_offers")
@@ -171,10 +166,10 @@ class MesosSchedulerImpl implements Scheduler {
               IHostAttributes attributes =
                   AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);
               storeProvider.getAttributeStore().saveHostAttributes(attributes);
-              if (LOG.isLoggable(Level.FINE)) {
-                LOG.log(Level.FINE, String.format("Received offer: %s", offer));
+              if (log.isLoggable(Level.FINE)) {
+                log.log(Level.FINE, String.format("Received offer: %s", offer));
               }
-              totalResourceOffers.incrementAndGet();
+              counters.get("scheduler_resource_offers").incrementAndGet();
               for (TaskLauncher launcher : taskLaunchers) {
                 if (launcher.willUse(new HostOffer(offer, attributes))) {
                   break;
@@ -189,13 +184,13 @@ class MesosSchedulerImpl implements Scheduler {
 
   @Override
   public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerId) {
-    LOG.info("Offer rescinded: " + offerId);
+    log.info("Offer rescinded: " + offerId);
     for (TaskLauncher launcher : taskLaunchers) {
       launcher.cancelOffer(offerId);
     }
   }
 
-  private static void logStatusUpdate(TaskStatus status) {
+  private static void logStatusUpdate(Logger log, TaskStatus status) {
     StringBuilder message = new StringBuilder("Received status update for task ")
         .append(status.getTaskId().getValue())
         .append(" in state ")
@@ -209,7 +204,7 @@ class MesosSchedulerImpl implements Scheduler {
     if (status.hasMessage()) {
       message.append(": ").append(status.getMessage());
     }
-    LOG.info(message.toString());
+    log.info(message.toString());
   }
 
   private static final Function<Double, Long> SECONDS_TO_MICROS = new Function<Double, Long>() {
@@ -223,7 +218,7 @@ class MesosSchedulerImpl implements Scheduler {
   @Timed("scheduler_status_update")
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
-    logStatusUpdate(status);
+    logStatusUpdate(log, status);
     eventSink.post(new TaskStatusReceived(
         status.getState(),
         Optional.fromNullable(status.getSource()),
@@ -237,7 +232,7 @@ class MesosSchedulerImpl implements Scheduler {
         }
       }
     } catch (SchedulerException e) {
-      LOG.log(Level.SEVERE, "Status update failed due to scheduler exception: " + e, e);
+      log.log(Level.SEVERE, "Status update failed due to scheduler exception: " + e, e);
       // We re-throw the exception here in an effort to NACK the status update and trigger an
       // abort of the driver.  Previously we directly issued driver.abort(), but the re-entrancy
       // guarantees of that are uncertain (and we believe it was not working).  However, this
@@ -246,13 +241,13 @@ class MesosSchedulerImpl implements Scheduler {
       throw e;
     }
 
-    LOG.warning("Unhandled status update " + status);
-    totalFailedStatusUpdates.incrementAndGet();
+    log.warning("Unhandled status update " + status);
+    counters.get("scheduler_status_updates").incrementAndGet();
   }
 
   @Override
   public void error(SchedulerDriver driver, String message) {
-    LOG.severe("Received error message: " + message);
+    log.severe("Received error message: " + message);
     lifecycle.shutdown();
   }
 
@@ -260,8 +255,8 @@ class MesosSchedulerImpl implements Scheduler {
   public void executorLost(SchedulerDriver schedulerDriver, ExecutorID executorID, SlaveID slaveID,
       int status) {
 
-    LOG.info("Lost executor " + executorID);
-    totalLostExecutors.incrementAndGet();
+    log.info("Lost executor " + executorID);
+    counters.get("scheduler_lost_executors").incrementAndGet();
   }
 
   @Timed("scheduler_framework_message")
@@ -272,6 +267,6 @@ class MesosSchedulerImpl implements Scheduler {
       SlaveID slave,
       byte[] data) {
 
-    LOG.warning("Ignoring framework message.");
+    log.warning("Ignoring framework message.");
   }
 }
