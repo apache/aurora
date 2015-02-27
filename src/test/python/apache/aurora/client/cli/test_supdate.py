@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 import contextlib
+import json
 import textwrap
 
 import pytest
@@ -37,10 +38,12 @@ from gen.apache.aurora.api.ttypes import (
     GetJobUpdateDetailsResult,
     GetJobUpdateSummariesResult,
     JobInstanceUpdateEvent,
+    JobKey,
     JobUpdate,
     JobUpdateAction,
     JobUpdateDetails,
     JobUpdateEvent,
+    JobUpdateKey,
     JobUpdateState,
     JobUpdateStatus,
     JobUpdateSummary,
@@ -141,7 +144,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
   def test_start_update_command_line_succeeds(self):
     mock_context = FakeAuroraCommandContext()
     resp = self.create_simple_success_response()
-    resp.result = Result(startJobUpdateResult=StartJobUpdateResult(updateId="id"))
+    resp.result = Result(startJobUpdateResult=StartJobUpdateResult(
+      key=JobUpdateKey(job=JobKey(role="role", environment="env", name="name"), id="id")))
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
@@ -155,7 +159,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         assert result == EXIT_OK
 
       update_url_msg = StartUpdate.UPDATE_MSG_TEMPLATE % (
-          mock_context.get_update_page(mock_api, AuroraJobKey.from_path(self.TEST_JOBSPEC), "id"))
+          'http://something_or_other/scheduler/role/env/name/id')
 
       assert mock_api.start_job_update.call_count == 1
       args, kwargs = mock_api.start_job_update.call_args
@@ -309,20 +313,22 @@ class TestUpdateCommand(AuroraClientCommandTest):
       assert mock_context.get_err() == ["Failed to pause update due to error:", "\tDamn"]
 
   def get_status_query_response(self, count=3):
-    query_response = Response()
-    query_response.responseCode = ResponseCode.OK
-    query_response.result = Result()
-    summaries = GetJobUpdateSummariesResult()
-    query_response.result.getJobUpdateSummariesResult = summaries
-    summaries.updateSummaries = [JobUpdateSummary(
-        updateId="%s" % i,
-        jobKey=self.TEST_JOBKEY.to_thrift(),
-        user="me",
-        state=JobUpdateState(
-            status=JobUpdateStatus.ROLLED_FORWARD,
-            createdTimestampMs=1411404927,
-            lastModifiedTimestampMs=14114056030)) for i in range(count)]
-    return query_response
+    return Response(
+        responseCode=ResponseCode.OK,
+        result=Result(
+            getJobUpdateSummariesResult=GetJobUpdateSummariesResult(
+                updateSummaries=[
+                    JobUpdateSummary(
+                        key=JobUpdateKey(job=self.TEST_JOBKEY.to_thrift(), id="%s" % i),
+                        user="me",
+                        state=JobUpdateState(
+                            status=JobUpdateStatus.ROLLED_FORWARD,
+                            createdTimestampMs=1411404927,
+                            lastModifiedTimestampMs=14114056030)) for i in range(count)
+                ]
+            )
+        )
+    )
 
   def test_list_updates_command(self):
     mock_context = FakeAuroraCommandContext()
@@ -350,33 +356,34 @@ class TestUpdateCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       result = cmd.execute(["beta-update", "list", self.TEST_CLUSTER, "--user=me", '--write-json'])
       assert result == EXIT_OK
-      assert mock_context.get_out_str() == textwrap.dedent("""\
-          [
-            {
+      # TODO(wfarner): We really should not be performing string equality matching on JSON data,
+      # as it is sensitive to field ordering.
+      assert json.loads(mock_context.get_out_str()) == [
+          {
               "status": "ROLLED_FORWARD",
               "started": 1411404927,
               "lastModified": 14114056030,
               "user": "me",
               "jobkey": "west/bozo/test/hello",
               "id": "0"
-            },
-            {
+          },
+          {
               "status": "ROLLED_FORWARD",
               "started": 1411404927,
               "lastModified": 14114056030,
               "user": "me",
               "jobkey": "west/bozo/test/hello",
               "id": "1"
-            },
-            {
+          },
+          {
               "status": "ROLLED_FORWARD",
               "started": 1411404927,
               "lastModified": 14114056030,
               "user": "me",
               "jobkey": "west/bozo/test/hello",
               "id": "2"
-            }
-          ]""")
+          }
+      ]
 
   def get_update_details_response(self):
     query_response = Response()
@@ -385,8 +392,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     details = JobUpdateDetails(
         update=JobUpdate(
             summary=JobUpdateSummary(
-                jobKey=self.TEST_JOBKEY.to_thrift(),
-                updateId="0",
+                key=JobUpdateKey(self.TEST_JOBKEY.to_thrift(), "0"),
                 user="me",
                 state=JobUpdateState(
                   status=JobUpdateStatus.ROLLING_FORWARD,
@@ -453,7 +459,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
   def test_update_status_json(self):
     mock_context = FakeAuroraCommandContext()
     api = mock_context.get_api(self.TEST_CLUSTER)
-    api.query_job_updates.return_value = self.get_status_query_response(count=1)
+    update_status_response = self.get_status_query_response(count=1)
+    api.query_job_updates.return_value = update_status_response
     api.get_job_update_details.return_value = self.get_update_details_response()
 
     with contextlib.nested(
@@ -464,48 +471,48 @@ class TestUpdateCommand(AuroraClientCommandTest):
       assert result == EXIT_OK
       mock_context.get_api(self.TEST_CLUSTER).query_job_updates.assert_called_with(
           job_key=self.TEST_JOBKEY)
-      mock_context.get_api(self.TEST_CLUSTER).get_job_update_details.assert_called_with("0")
-      assert mock_context.get_out_str() == textwrap.dedent("""\
-        {
+      mock_context.get_api(self.TEST_CLUSTER).get_job_update_details.assert_called_with(
+          update_status_response.result.getJobUpdateSummariesResult.updateSummaries[0].key)
+      assert json.loads(mock_context.get_out_str()) == {
           "status": "ROLLING_FORWARD",
           "last_updated": 14114056030,
           "started": 1411404927,
           "update_events": [
-            {
-              "status": "ROLLING_FORWARD",
-              "timestampMs": 1411404927
-            },
-            {
-              "status": "ROLL_FORWARD_PAUSED",
-              "timestampMs": 1411405000
-            },
-            {
-              "status": "ROLLING_FORWARD",
-              "timestampMs": 1411405100
-            }
+              {
+                "status": "ROLLING_FORWARD",
+                "timestampMs": 1411404927
+              },
+              {
+                  "status": "ROLL_FORWARD_PAUSED",
+                  "timestampMs": 1411405000
+              },
+              {
+                  "status": "ROLLING_FORWARD",
+                  "timestampMs": 1411405100
+              }
           ],
           "job": "west/bozo/test/hello",
           "updateId": "0",
           "instance_update_events": [
-            {
-              "action": "INSTANCE_UPDATING",
-              "instance": 1,
-              "timestamp": 1411404930
-            },
-            {
-              "action": "INSTANCE_UPDATING",
-              "instance": 2,
-              "timestamp": 1411404940
-            },
-            {
-              "action": "INSTANCE_UPDATED",
-              "instance": 1,
-              "timestamp": 1411404950
-            },
-            {
-              "action": "INSTANCE_UPDATED",
-              "instance": 2,
-              "timestamp": 1411404960
-            }
+              {
+                  "action": "INSTANCE_UPDATING",
+                  "instance": 1,
+                  "timestamp": 1411404930
+              },
+              {
+                  "action": "INSTANCE_UPDATING",
+                  "instance": 2,
+                  "timestamp": 1411404940
+              },
+              {
+                  "action": "INSTANCE_UPDATED",
+                  "instance": 1,
+                  "timestamp": 1411404950
+              },
+              {
+                  "action": "INSTANCE_UPDATED",
+                  "instance": 2,
+                  "timestamp": 1411404960
+              }
           ]
-        }""")
+      }

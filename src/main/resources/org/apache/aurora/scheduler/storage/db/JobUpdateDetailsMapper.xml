@@ -285,9 +285,8 @@
   </sql>
 
   <sql id="query_filter">
-    <if test="updateId != null || key != null || role != null || user != null || jobKey != null || updateStatuses != null || limit != 0 || offset != 0">
+    <if test="key != null || role != null || user != null || jobKey != null || updateStatuses != null || limit != 0 || offset != 0">
       WHERE TRUE
-      <if test="updateId != null">AND u.update_id = #{updateId}</if>
       <if test="key != null">
         AND <include refid="filter_by_update_key"/>
       </if>

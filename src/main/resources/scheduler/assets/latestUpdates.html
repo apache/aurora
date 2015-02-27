@@ -26,8 +26,8 @@
   </tr>
   <tr ng-repeat="update in updates">
     <td>
-      <a href="/scheduler/{{update.jobKey.role}}/{{update.jobKey.environment}}/{{update.jobKey.name}}/{{update.updateId}}">
-        {{update.jobKey.role}}/{{update.jobKey.environment}}/{{update.jobKey.name}}
+      <a href="/scheduler/{{update.key.job.role}}/{{update.key.job.environment}}/{{update.key.job.name}}/{{update.key.id}}">
+        {{update.key.job.role}}/{{update.key.job.environment}}/{{update.key.job.name}}
       </a>
     </td>
     <td>

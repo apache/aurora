@@ -21,11 +21,7 @@ import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.apiConstants;
-import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * Utility functions for job updates.
@@ -40,13 +36,6 @@ public final class Updates {
    */
   public static final Set<JobUpdateStatus> ACTIVE_JOB_UPDATE_STATES =
       Sets.immutableEnumSet(apiConstants.ACTIVE_JOB_UPDATE_STATES);
-
-  public static IJobUpdateKey getKey(IJobUpdateSummary summary) {
-    return IJobUpdateKey.build(
-        new JobUpdateKey(
-            JobKeys.assertValid(summary.getJobKey()).newBuilder(),
-            requireNonNull(summary.getUpdateId())));
-  }
 
   /**
    * Populates the {@link IJobUpdateSummary#getKey()} if it is not set by cloning other fields.

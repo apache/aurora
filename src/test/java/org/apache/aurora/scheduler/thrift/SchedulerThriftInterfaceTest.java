@@ -78,6 +78,7 @@ import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskQuery;
@@ -1845,7 +1846,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     request.getTaskConfig().unsetJob();
 
     Response response = assertOkResponse(thrift.startJobUpdate(request, SESSION));
-    assertEquals(UPDATE_KEY.getId(), response.getResult().getStartJobUpdateResult().getUpdateId());
+    assertEquals(
+        new StartJobUpdateResult(UPDATE_KEY.newBuilder()),
+        response.getResult().getStartJobUpdateResult());
   }
 
   @Test
@@ -1887,7 +1890,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Response response =
         assertOkResponse(thrift.startJobUpdate(buildJobUpdateRequest(update), SESSION));
-    assertEquals(UPDATE_KEY.getId(), response.getResult().getStartJobUpdateResult().getUpdateId());
+    assertEquals(
+        new StartJobUpdateResult(UPDATE_KEY.newBuilder()),
+        response.getResult().getStartJobUpdateResult());
   }
 
   @Test(expected = NullPointerException.class)

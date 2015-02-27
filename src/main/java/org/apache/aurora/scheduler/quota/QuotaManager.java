@@ -174,7 +174,7 @@ public interface QuotaManager {
       }
 
       QuotaInfo quotaInfo = getQuotaInfo(
-          jobUpdate.getSummary().getJobKey().getRole(),
+          jobUpdate.getSummary().getKey().getJob().getRole(),
           Optional.of(jobUpdate),
           storeProvider);
 
@@ -208,7 +208,7 @@ public interface QuotaManager {
       // This would be an update that is not saved in the store yet (i.e. the one quota is
       // checked for).
       if (requestedUpdate.isPresent()) {
-        updates.put(requestedUpdate.get().getSummary().getJobKey(), requestedUpdate.get());
+        updates.put(requestedUpdate.get().getSummary().getKey().getJob(), requestedUpdate.get());
       }
 
       Map<IJobKey, IJobConfiguration> cronTemplates =
@@ -351,7 +351,7 @@ public interface QuotaManager {
 
       Set<IJobUpdate> updates = Sets.newHashSet();
       for (IJobUpdateSummary summary : summaries) {
-        updates.add(jobUpdateStore.fetchJobUpdate(summary.getUpdateId()).get());
+        updates.add(jobUpdateStore.fetchJobUpdate(summary.getKey()).get());
       }
 
       return FluentIterable.from(updates);
@@ -459,7 +459,7 @@ public interface QuotaManager {
         new Function<IJobUpdate, IJobKey>() {
           @Override
           public IJobKey apply(IJobUpdate input) {
-            return input.getSummary().getJobKey();
+            return input.getSummary().getKey().getJob();
           }
         };
 

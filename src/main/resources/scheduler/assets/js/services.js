@@ -169,9 +169,9 @@
             });
           },
 
-          getJobUpdateDetails: function (id) {
+          getJobUpdateDetails: function (updateKey) {
             return async(function (deferred) {
-              auroraClient.getSchedulerClient().getJobUpdateDetails(id, function (response) {
+              auroraClient.getSchedulerClient().getJobUpdateDetails(updateKey, function (response) {
                 var result = auroraClient.processResponse(response);
                 result.details = response.result !== null ?
                   response.result.getJobUpdateDetailsResult.details : {};

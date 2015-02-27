@@ -280,7 +280,7 @@ public class JobUpdaterIT extends EasyMockTest {
     IJobUpdateDetails details = storage.read(new Work.Quiet<IJobUpdateDetails>() {
       @Override
       public IJobUpdateDetails apply(StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(UPDATE_ID.getId()).get();
+        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(UPDATE_ID).get();
       }
     });
     Iterable<IJobInstanceUpdateEvent> orderedEvents =

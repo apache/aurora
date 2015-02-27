@@ -93,7 +93,7 @@ class StartUpdate(Verb):
         err_msg="Failed to start update due to error:")
 
     if resp.result:
-      url = context.get_update_page(api, job, resp.result.startJobUpdateResult.updateId)
+      url = context.get_update_page(api, config.cluster(), resp.result.startJobUpdateResult.key)
       context.print_out(self.UPDATE_MSG_TEMPLATE % url)
     else:
       context.print_out(combine_messages(resp))
@@ -210,8 +210,8 @@ class ListUpdates(Verb):
       result = []
       for summary in response.result.getJobUpdateSummariesResult.updateSummaries:
         job_entry = {
-            "jobkey": AuroraJobKey.from_thrift(cluster, summary.jobKey).to_path(),
-            "id": summary.updateId,
+            "jobkey": AuroraJobKey.from_thrift(cluster, summary.key.job).to_path(),
+            "id": summary.key.id,
             "user": summary.user,
             "started": summary.state.createdTimestampMs,
             "lastModified": summary.state.lastModifiedTimestampMs,
@@ -224,8 +224,8 @@ class ListUpdates(Verb):
         created = summary.state.createdTimestampMs
         lastMod = summary.state.lastModifiedTimestampMs
         context.print_out("Job: %s, Id: %s, User: %s, Status: %s" % (
-            AuroraJobKey.from_thrift(cluster, summary.jobKey).to_path(),
-            summary.updateId,
+            AuroraJobKey.from_thrift(cluster, summary.key.job).to_path(),
+            summary.key.id,
             summary.user,
             JobUpdateStatus._VALUES_TO_NAMES[summary.state.status]))
         context.print_out("Created: %s, Last Modified %s" % (created, lastMod), indent=2)
@@ -244,43 +244,44 @@ class UpdateStatus(Verb):
   def help(self):
     return """Display detailed status information about a scheduler-driven in-progress update."""
 
-  def _get_update_id(self, context, job_key):
+  def _get_update_key(self, context, job_key):
     api = context.get_api(context.options.jobspec.cluster)
     response = api.query_job_updates(job_key=context.options.jobspec)
     context.log_response_and_raise(response)
     for summary in response.result.getJobUpdateSummariesResult.updateSummaries:
-      if summary.jobKey == job_key.to_thrift():
-        return summary.updateId
+      if summary.key.job == job_key.to_thrift():
+        return summary.key
     else:
       return None
 
   def execute(self, context):
-    id = self._get_update_id(context, context.options.jobspec)
-    if not id:
+    key = self._get_update_key(context, context.options.jobspec)
+    if not key:
       context.print_err("No updates found for job %s" % context.options.jobspec)
       return EXIT_INVALID_PARAMETER
 
     api = context.get_api(context.options.jobspec.cluster)
-    response = api.get_job_update_details(id)
+    response = api.get_job_update_details(key)
     context.log_response_and_raise(response)
     details = response.result.getJobUpdateDetailsResult.details
     if context.options.write_json:
-      result = {}
-      # the following looks odd, but it's needed to convince the json renderer
-      # to render correctly.
-      result["updateId"] = ("%s" % details.update.summary.updateId)
-      result["job"] = str(context.options.jobspec)
-      result["started"] = details.update.summary.state.createdTimestampMs
-      result["last_updated"] = details.update.summary.state.lastModifiedTimestampMs
-      result["status"] = JobUpdateStatus._VALUES_TO_NAMES[details.update.summary.state.status]
-      result["update_events"] = []
+      result = {
+        "updateId": ("%s" % details.update.summary.key.id),
+        "job": str(context.options.jobspec),
+        "started": details.update.summary.state.createdTimestampMs,
+        "last_updated": details.update.summary.state.lastModifiedTimestampMs,
+        "status": JobUpdateStatus._VALUES_TO_NAMES[details.update.summary.state.status],
+        "update_events": [],
+        "instance_update_events": []
+      }
+
       update_events = details.updateEvents
       if update_events is not None and len(update_events) > 0:
         for event in update_events:
           result["update_events"].append({
               "status": JobUpdateStatus._VALUES_TO_NAMES[event.status],
               "timestampMs": event.timestampMs})
-      result["instance_update_events"] = []
+
       instance_events = details.instanceEvents
       if instance_events is not None and len(instance_events) > 0:
         for event in instance_events:
@@ -293,7 +294,7 @@ class UpdateStatus(Verb):
 
     else:
       context.print_out("Job: %s, UpdateID: %s" % (context.options.jobspec,
-          details.update.summary.updateId))
+          details.update.summary.key.id))
       context.print_out("Started %s, last updated: %s" %
           (time.ctime(details.update.summary.state.createdTimestampMs),
           time.ctime(details.update.summary.state.lastModifiedTimestampMs)))

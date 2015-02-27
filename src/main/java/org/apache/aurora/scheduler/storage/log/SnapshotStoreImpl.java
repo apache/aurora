@@ -49,6 +49,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -229,7 +230,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
               if (details.getUpdateEventsSize() > 0) {
                 for (JobUpdateEvent updateEvent : details.getUpdateEvents()) {
                   updateStore.saveJobUpdateEvent(
-                      Updates.getKey(IJobUpdateSummary.build(details.getUpdate().getSummary())),
+                      IJobUpdateKey.build(details.getUpdate().getSummary().getKey()),
                       IJobUpdateEvent.build(updateEvent));
                 }
               }
@@ -237,7 +238,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
               if (details.getInstanceEventsSize() > 0) {
                 for (JobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
                   updateStore.saveJobInstanceUpdateEvent(
-                      Updates.getKey(IJobUpdateSummary.build(details.getUpdate().getSummary())),
+                      IJobUpdateKey.build(details.getUpdate().getSummary().getKey()),
                       IJobInstanceUpdateEvent.build(instanceEvent));
                 }
               }

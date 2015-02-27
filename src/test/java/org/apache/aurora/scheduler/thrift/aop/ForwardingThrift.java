@@ -295,7 +295,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response getJobUpdateDetails(String updateId) throws TException {
-    return delegate.getJobUpdateDetails(updateId);
+  public Response getJobUpdateDetails(JobUpdateKey key) throws TException {
+    return delegate.getJobUpdateDetails(key);
   }
 }

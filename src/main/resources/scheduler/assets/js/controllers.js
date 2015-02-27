@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 (function () {
-  /* global ScheduleStatus:false, JobUpdateQuery:false, JobKey:false */
+  /* global ScheduleStatus:false, JobUpdateKey:false, JobUpdateQuery:false, JobKey:false */
   'use strict';
 
   /* Controllers */
@@ -267,7 +267,12 @@
 
   auroraUIControllers.controller('UpdateController',
     function ($scope, $routeParams, $timeout, auroraClient, updateUtil) {
-      var updateId = $routeParams.update;
+      var updateKey = new JobUpdateKey();
+      updateKey.job = new JobKey();
+      updateKey.job.role = $routeParams.role;
+      updateKey.job.environment = $routeParams.environment;
+      updateKey.job.name = $routeParams.job;
+      updateKey.id = $routeParams.update;
 
       $scope.role = $routeParams.role;
       $scope.environment = $routeParams.environment;
@@ -276,7 +281,7 @@
       $scope.instanceSummary = [];
 
       var getUpdateProgress = function () {
-        auroraClient.getJobUpdateDetails(updateId).then(function (response) {
+        auroraClient.getJobUpdateDetails(updateKey).then(function (response) {
           $scope.update = response.details;
           $scope.inProgress = updateUtil.isInProgress($scope.update.update.summary.state.status);
 
@@ -453,7 +458,7 @@
         $scope.updates = response.summaries;
 
         function getUpdateInProgress() {
-          auroraClient.getJobUpdateDetails($scope.updates[0].updateId).then(function (response) {
+          auroraClient.getJobUpdateDetails($scope.updates[0].key).then(function (response) {
             $scope.updateInProgress = response.details;
 
             $scope.updateStats = updateUtil.getUpdateStats($scope.updateInProgress);

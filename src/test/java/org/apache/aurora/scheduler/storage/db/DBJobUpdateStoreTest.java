@@ -57,7 +57,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.updater.Updates;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -81,6 +80,10 @@ import static org.junit.Assert.fail;
 public class DBJobUpdateStoreTest {
 
   private static final IJobKey JOB = JobKeys.from("testRole", "testEnv", "job");
+  private static final IJobUpdateKey UPDATE1 =
+      IJobUpdateKey.build(new JobUpdateKey(JOB.newBuilder(), "update1"));
+  private static final IJobUpdateKey UPDATE2 = IJobUpdateKey.build(
+      new JobUpdateKey(JobKeys.from("testRole", "testEnv", "job2").newBuilder(), "update2"));
   private static final long CREATED_MS = 111L;
   private static final IJobUpdateEvent FIRST_EVENT =
       makeJobUpdateEvent(ROLLING_FORWARD, CREATED_MS);
@@ -557,7 +560,7 @@ public class DBJobUpdateStoreTest {
 
     assertEquals(
         ImmutableList.of(populateExpected(update).getSummary()),
-        getSummaries(new JobUpdateQuery().setUpdateId("update1")));
+        getSummaries(new JobUpdateQuery().setKey(UPDATE1.newBuilder())));
 
     // If the lock has been released for this job, we can start another update.
     saveUpdate(makeJobUpdate(makeKey("update2")), Optional.of("lock2"));
@@ -570,35 +573,33 @@ public class DBJobUpdateStoreTest {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
-        final IJobUpdate update1 =
-            makeJobUpdate(makeKey(JobKeys.from("role", "env", "name1"), "update1"));
-        final IJobUpdate update2 =
-            makeJobUpdate(makeKey(JobKeys.from("role", "env", "name2"), "update2"));
+        final IJobUpdate update1 = makeJobUpdate(UPDATE1);
+        final IJobUpdate update2 = makeJobUpdate(UPDATE2);
         saveUpdate(update1, Optional.of("lock1"));
         assertEquals(
             Optional.of("lock1"),
-            storeProvider.getJobUpdateStore().getLockToken("update1"));
-        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken("update2"));
+            storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
+        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
 
         saveUpdate(update2, Optional.of("lock2"));
         assertEquals(
             Optional.of("lock1"),
-            storeProvider.getJobUpdateStore().getLockToken("update1"));
+            storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
         assertEquals(
             Optional.of("lock2"),
-            storeProvider.getJobUpdateStore().getLockToken("update2"));
+            storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
 
         storeProvider.getLockStore().removeLock(
             makeLock(update1.getSummary().getJobKey(), "lock1").getKey());
-        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken("update1"));
+        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
         assertEquals(
             Optional.of("lock2"),
-            storeProvider.getJobUpdateStore().getLockToken("update2"));
+            storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
 
         storeProvider.getLockStore().removeLock(
             makeLock(update2.getSummary().getJobKey(), "lock2").getKey());
-        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken("update1"));
-        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken("update2"));
+        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
+        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
       }
     });
   }
@@ -626,7 +627,9 @@ public class DBJobUpdateStoreTest {
     assertEquals(ImmutableList.of(s3, s5, s4, s2, s1), getSummaries(new JobUpdateQuery()));
 
     // Test query by updateId.
-    assertEquals(ImmutableList.of(s1), getSummaries(new JobUpdateQuery().setUpdateId("u1")));
+    assertEquals(
+        ImmutableList.of(s1),
+        getSummaries(new JobUpdateQuery().setKey(new JobUpdateKey(job1.newBuilder(), "u1"))));
 
     // Test query by role.
     assertEquals(
@@ -735,7 +738,7 @@ public class DBJobUpdateStoreTest {
     // Test query by update ID.
     assertEquals(
         ImmutableList.of(details1),
-        queryDetails(new JobUpdateQuery().setUpdateId(updateId1.getId())));
+        queryDetails(new JobUpdateQuery().setKey(updateId1.newBuilder())));
 
     // Test query by role.
     assertEquals(
@@ -767,7 +770,7 @@ public class DBJobUpdateStoreTest {
   }
 
   private void assertUpdate(IJobUpdate expected) {
-    IJobUpdateKey key = Updates.getKey(expected.getSummary());
+    IJobUpdateKey key = expected.getSummary().getKey();
     assertEquals(populateExpected(expected), getUpdate(key).get());
     assertEquals(getUpdate(key).get(), getUpdateDetails(key).get().getUpdate());
     assertEquals(getUpdateInstructions(key).get(), expected.getInstructions());
@@ -777,7 +780,7 @@ public class DBJobUpdateStoreTest {
     return storage.read(new Quiet<Optional<IJobUpdate>>() {
       @Override
       public Optional<IJobUpdate> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdate(key.getId());
+        return storeProvider.getJobUpdateStore().fetchJobUpdate(key);
       }
     });
   }
@@ -786,7 +789,7 @@ public class DBJobUpdateStoreTest {
     return storage.read(new Quiet<List<IJobInstanceUpdateEvent>>() {
       @Override
       public List<IJobInstanceUpdateEvent> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchInstanceEvents(key.getId(), id);
+        return storeProvider.getJobUpdateStore().fetchInstanceEvents(key, id);
       }
     });
   }
@@ -795,7 +798,7 @@ public class DBJobUpdateStoreTest {
     return storage.read(new Quiet<Optional<IJobUpdateInstructions>>() {
       @Override
       public Optional<IJobUpdateInstructions> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdateInstructions(key.getId());
+        return storeProvider.getJobUpdateStore().fetchJobUpdateInstructions(key);
       }
     });
   }
@@ -804,7 +807,7 @@ public class DBJobUpdateStoreTest {
     return storage.read(new Quiet<Optional<IJobUpdateDetails>>() {
       @Override
       public Optional<IJobUpdateDetails> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(key.getId());
+        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(key);
       }
     });
   }
@@ -856,7 +859,7 @@ public class DBJobUpdateStoreTest {
         }
         storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
         storeProvider.getJobUpdateStore().saveJobUpdateEvent(
-            Updates.getKey(update.getSummary()),
+            update.getSummary().getKey(),
             FIRST_EVENT);
       }
     });

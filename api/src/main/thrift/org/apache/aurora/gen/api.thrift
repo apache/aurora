@@ -783,9 +783,6 @@ struct JobUpdateRequest {
  * (terms are AND'ed together).
  */
 struct JobUpdateQuery {
-  /** Update ID. */
-  1: string updateId
-
   /** Job role. */
   2: string role
 
@@ -854,8 +851,8 @@ struct GetPendingReasonResult {
 
 /** Result of the startUpdate call. */
 struct StartJobUpdateResult {
-  /** Job update ID. */
-  1: string updateId
+  /** Unique identifier for the job update. */
+  1: JobUpdateKey key
 }
 
 /** Result of the getJobUpdateSummaries call. */
@@ -966,7 +963,7 @@ service ReadOnlyScheduler {
   Response getJobUpdateSummaries(1: JobUpdateQuery jobUpdateQuery)
 
   /** Gets job update details. Not implemented yet. */
-  Response getJobUpdateDetails(1: string updateId)
+  Response getJobUpdateDetails(1: JobUpdateKey key)
 }
 
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their
@@ -1047,7 +1044,7 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   /**
    * Allows progress of the job update in case blockIfNoPulsesAfterMs is specified in
    * JobUpdateSettings. Unblocks progress if the update was previously blocked.
-   * Responds with ResponseCode.INVALID_REQUEST in case an unknown updateId is specified.
+   * Responds with ResponseCode.INVALID_REQUEST in case an unknown update key is specified.
    */
   Response pulseJobUpdate(1: JobUpdateKey key, 2: SessionKey session)
 }

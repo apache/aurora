@@ -13,6 +13,7 @@
 #
 
 import contextlib
+import json
 import re
 import textwrap
 
@@ -442,15 +443,14 @@ class TestJobStatus(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', '--write-json', 'west/bozo/test/hello'])
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
-      expected = textwrap.dedent("""\
-        [
+      expected = [
           {
             "active": [
               {
                 "status": "RUNNING",
                 "assignedTask": {
                   "task": {
-                    "isService": false,
+                    "isService": False,
                     "environment": "prod",
                     "container": {
                       "mesos": {}
@@ -468,7 +468,7 @@ class TestJobStatus(AuroraClientCommandTest):
                       "role": "nobody",
                       "name": "flibber"
                     },
-                    "production": false,
+                    "production": False,
                     "diskMb": 4096,
                     "ramMb": 2048,
                     "maxTaskFailures": 3,
@@ -506,7 +506,7 @@ class TestJobStatus(AuroraClientCommandTest):
                 "status": "RUNNING",
                 "assignedTask": {
                   "task": {
-                    "isService": false,
+                    "isService": False,
                     "environment": "prod",
                     "container": {
                       "mesos": {}
@@ -524,7 +524,7 @@ class TestJobStatus(AuroraClientCommandTest):
                       "role": "nobody",
                       "name": "flibber"
                     },
-                    "production": false,
+                    "production": False,
                     "diskMb": 4096,
                     "ramMb": 2048,
                     "maxTaskFailures": 3,
@@ -562,8 +562,8 @@ class TestJobStatus(AuroraClientCommandTest):
             "job": "west/bozo/test/hello",
             "inactive": []
           }
-        ]""")
-      assert actual == expected
+      ]
+      assert json.loads(actual) == expected
 
   def test_status_job_not_found(self):
     """Regression test: there was a crasher bug when metadata was None."""

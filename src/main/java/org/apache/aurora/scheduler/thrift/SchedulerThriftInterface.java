@@ -1216,6 +1216,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                 .setKey(new JobUpdateKey(job.newBuilder(), updateId))
                 .setJobKey(job.newBuilder())
                 .setUpdateId(updateId)
+                .setKey(new JobUpdateKey(job.newBuilder(), updateId))
                 .setUser(context.getIdentity()))
             .setInstructions(instructions));
         try {
@@ -1225,7 +1226,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               quotaManager.checkJobUpdate(update, storeProvider));
 
           jobUpdateController.start(update, context.getIdentity());
-          return ok(Result.startJobUpdateResult(new StartJobUpdateResult(updateId)));
+          return ok(Result.startJobUpdateResult(
+              new StartJobUpdateResult(update.getSummary().getKey().newBuilder())));
         } catch (UpdateStateException | TaskValidationException e) {
           return error(INVALID_REQUEST, e);
         }
@@ -1327,8 +1329,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response getJobUpdateDetails(String updateId) throws TException {
-    return readOnlyScheduler.getJobUpdateDetails(updateId);
+  public Response getJobUpdateDetails(JobUpdateKey key) throws TException {
+    return readOnlyScheduler.getJobUpdateDetails(key);
   }
 
   private Optional<SessionContext> isUpdateCoordinator(SessionKey session) {

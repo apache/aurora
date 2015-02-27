@@ -108,7 +108,7 @@ CREATE TABLE job_updates(
   wait_for_batch_completion BOOLEAN NOT NULL,
   block_if_no_pulses_after_ms INT NULL,
 
-  -- TODO(wfarner): Convert this to UNIQUE(job_key_id, update_id) to complete AURORA-1093.
+  -- TODO(wfarner): Convert this to UNIQUE(job_key_id, update_id) to complete AURORA-1139.
   UNIQUE(update_id)
 );
 

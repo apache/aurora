@@ -21,7 +21,6 @@ import javax.inject.Inject;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.base.MorePreconditions;
 
@@ -200,53 +199,38 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
 
   @Timed("job_update_store_fetch_details")
   @Override
-  public Optional<IJobUpdateDetails> fetchJobUpdateDetails(final String updateId) {
-    Optional<IJobUpdateKey> key = fetchUpdateKey(updateId);
-    if (key.isPresent()) {
-      return Optional.fromNullable(detailsMapper.selectDetails(key.get()))
-          .transform(new Function<StoredJobUpdateDetails, IJobUpdateDetails>() {
-            @Override
-            public IJobUpdateDetails apply(StoredJobUpdateDetails input) {
-              return IJobUpdateDetails.build(input.getDetails());
-            }
-          });
-    } else {
-      return Optional.absent();
-    }
+  public Optional<IJobUpdateDetails> fetchJobUpdateDetails(final IJobUpdateKey key) {
+    return Optional.fromNullable(detailsMapper.selectDetails(key))
+        .transform(new Function<StoredJobUpdateDetails, IJobUpdateDetails>() {
+          @Override
+          public IJobUpdateDetails apply(StoredJobUpdateDetails input) {
+            return IJobUpdateDetails.build(input.getDetails());
+          }
+        });
   }
 
   @Timed("job_update_store_fetch_update")
   @Override
-  public Optional<IJobUpdate> fetchJobUpdate(String updateId) {
-    Optional<IJobUpdateKey> key = fetchUpdateKey(updateId);
-    if (key.isPresent()) {
-      return Optional.fromNullable(detailsMapper.selectUpdate(key.get()))
-          .transform(new Function<JobUpdate, IJobUpdate>() {
-            @Override
-            public IJobUpdate apply(JobUpdate input) {
-              return IJobUpdate.build(input);
-            }
-          });
-    } else {
-      return Optional.absent();
-    }
+  public Optional<IJobUpdate> fetchJobUpdate(IJobUpdateKey key) {
+    return Optional.fromNullable(detailsMapper.selectUpdate(key))
+        .transform(new Function<JobUpdate, IJobUpdate>() {
+          @Override
+          public IJobUpdate apply(JobUpdate input) {
+            return IJobUpdate.build(input);
+          }
+        });
   }
 
   @Timed("job_update_store_fetch_instructions")
   @Override
-  public Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(String updateId) {
-    Optional<IJobUpdateKey> key = fetchUpdateKey(updateId);
-    if (key.isPresent()) {
-      return Optional.fromNullable(detailsMapper.selectInstructions(key.get()))
-          .transform(new Function<JobUpdateInstructions, IJobUpdateInstructions>() {
-            @Override
-            public IJobUpdateInstructions apply(JobUpdateInstructions input) {
-              return IJobUpdateInstructions.build(input);
-            }
-          });
-    } else {
-      return Optional.absent();
-    }
+  public Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(IJobUpdateKey key) {
+    return Optional.fromNullable(detailsMapper.selectInstructions(key))
+        .transform(new Function<JobUpdateInstructions, IJobUpdateInstructions>() {
+          @Override
+          public IJobUpdateInstructions apply(JobUpdateInstructions input) {
+            return IJobUpdateInstructions.build(input);
+          }
+        });
   }
 
   @Timed("job_update_store_fetch_all_details")
@@ -264,27 +248,17 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
 
   @Timed("job_update_store_get_lock_token")
   @Override
-  public Optional<String> getLockToken(String updateId) {
-    Optional<IJobUpdateKey> key = fetchUpdateKey(updateId);
-    if (key.isPresent()) {
-      // We assume here that cascading deletes will cause a lock-update associative row to disappear
-      // when the lock is invalidated.  This further assumes that a lock row is deleted when a lock
-      // is no longer valid.
-      return Optional.fromNullable(detailsMapper.selectLockToken(key.get()));
-    } else {
-      return Optional.absent();
-    }
+  public Optional<String> getLockToken(IJobUpdateKey key) {
+    // We assume here that cascading deletes will cause a lock-update associative row to disappear
+    // when the lock is invalidated.  This further assumes that a lock row is deleted when a lock
+    // is no longer valid.
+    return Optional.fromNullable(detailsMapper.selectLockToken(key));
   }
 
   @Timed("job_update_store_fetch_instance_events")
   @Override
-  public List<IJobInstanceUpdateEvent> fetchInstanceEvents(String updateId, int instanceId) {
-    Optional<IJobUpdateKey> key = fetchUpdateKey(updateId);
-    if (key.isPresent()) {
-      return IJobInstanceUpdateEvent.listFromBuilders(
-          detailsMapper.selectInstanceUpdateEvents(key.get(), instanceId));
-    } else {
-      return ImmutableList.of();
-    }
+  public List<IJobInstanceUpdateEvent> fetchInstanceEvents(IJobUpdateKey key, int instanceId) {
+    return IJobInstanceUpdateEvent.listFromBuilders(
+        detailsMapper.selectInstanceUpdateEvents(key, instanceId));
   }
 }

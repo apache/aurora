@@ -150,8 +150,8 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Optional<IJobUpdateDetails> fetchJobUpdateDetails(String updateId) {
-    return jobUpdateStore.fetchJobUpdateDetails(updateId);
+  public Optional<IJobUpdateDetails> fetchJobUpdateDetails(IJobUpdateKey key) {
+    return jobUpdateStore.fetchJobUpdateDetails(key);
   }
 
   @Override
@@ -160,13 +160,13 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Optional<IJobUpdate> fetchJobUpdate(String updateId) {
-    return jobUpdateStore.fetchJobUpdate(updateId);
+  public Optional<IJobUpdate> fetchJobUpdate(IJobUpdateKey key) {
+    return jobUpdateStore.fetchJobUpdate(key);
   }
 
   @Override
-  public Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(String updateId) {
-    return jobUpdateStore.fetchJobUpdateInstructions(updateId);
+  public Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(IJobUpdateKey key) {
+    return jobUpdateStore.fetchJobUpdateInstructions(key);
   }
 
   @Override
@@ -175,12 +175,12 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Optional<String> getLockToken(String updateId) {
-    return jobUpdateStore.getLockToken(updateId);
+  public Optional<String> getLockToken(IJobUpdateKey key) {
+    return jobUpdateStore.getLockToken(key);
   }
 
   @Override
-  public List<IJobInstanceUpdateEvent> fetchInstanceEvents(String updateId, int instanceId) {
-    return jobUpdateStore.fetchInstanceEvents(updateId, instanceId);
+  public List<IJobInstanceUpdateEvent> fetchInstanceEvents(IJobUpdateKey key, int instanceId) {
+    return jobUpdateStore.fetchInstanceEvents(key, instanceId);
   }
 }

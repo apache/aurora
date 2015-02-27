@@ -81,6 +81,7 @@ import static org.apache.aurora.scheduler.thrift.Fixtures.LOCK;
 import static org.apache.aurora.scheduler.thrift.Fixtures.QUOTA;
 import static org.apache.aurora.scheduler.thrift.Fixtures.ROLE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.ROLE_IDENTITY;
+import static org.apache.aurora.scheduler.thrift.Fixtures.UPDATE_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.USER;
 import static org.apache.aurora.scheduler.thrift.Fixtures.assertOkResponse;
 import static org.apache.aurora.scheduler.thrift.Fixtures.assertResponse;
@@ -550,14 +551,13 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testGetJobUpdateDetails() throws Exception {
-    String id = "id";
     JobUpdateDetails details = createJobUpdateDetails();
-    expect(storageUtil.jobUpdateStore.fetchJobUpdateDetails(id))
+    expect(storageUtil.jobUpdateStore.fetchJobUpdateDetails(UPDATE_KEY))
         .andReturn(Optional.of(IJobUpdateDetails.build(details)));
 
     control.replay();
 
-    Response response = assertOkResponse(thrift.getJobUpdateDetails(id));
+    Response response = assertOkResponse(thrift.getJobUpdateDetails(UPDATE_KEY.newBuilder()));
     assertEquals(
         details,
         response.getResult().getGetJobUpdateDetailsResult().getDetails());
@@ -660,12 +660,11 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testGetJobUpdateDetailsInvalidId() throws Exception {
-    String id = "id";
-    expect(storageUtil.jobUpdateStore.fetchJobUpdateDetails(id))
+    expect(storageUtil.jobUpdateStore.fetchJobUpdateDetails(UPDATE_KEY))
         .andReturn(Optional.<IJobUpdateDetails>absent());
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.getJobUpdateDetails(id));
+    assertResponse(INVALID_REQUEST, thrift.getJobUpdateDetails(UPDATE_KEY.newBuilder()));
   }
 }

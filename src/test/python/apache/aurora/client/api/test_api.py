@@ -25,6 +25,8 @@ from ...api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     JobConfiguration,
+    JobKey,
+    JobUpdateKey,
     JobUpdateQuery,
     JobUpdateRequest,
     JobUpdateSettings,
@@ -188,5 +190,6 @@ class TestJobUpdateApis(unittest.TestCase):
   def test_get_job_update_details(self):
     """Test getting job update details."""
     api, mock_proxy = self.mock_api()
-    api.get_job_update_details("id")
-    mock_proxy.getJobUpdateDetails.assert_called_once_with("id")
+    key = JobUpdateKey(job=JobKey(role="role", environment="env", name="name"), id="id")
+    api.get_job_update_details(key)
+    mock_proxy.getJobUpdateDetails.assert_called_once_with(key)

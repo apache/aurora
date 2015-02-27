@@ -39,7 +39,7 @@
     <div ng-if="updateInProgress" class="content-box in-progress-alert">
       <div class="row">
         <div class="col-md-4">
-          <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{updateInProgress.update.summary.updateId}}">Update In Progress</a>
+          <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{updateInProgress.update.summary.key.id}}">Update In Progress</a>
         </div>
         <div class="col-md-4">
           <progressbar class="progress" max="updateStats.totalInstancesToBeUpdated" value="updateStats.instancesUpdatedSoFar" type="success"><i>{{updateStats.instancesUpdatedSoFar}} of {{updateStats.totalInstancesToBeUpdated}}</i></progressbar>
@@ -146,7 +146,8 @@
             </tr>
             <tr ng-repeat="update in updates">
               <td>
-                <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{update.updateId}}">  {{update.updateId}}
+                <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{update.key.id}}">
+                  {{update.key.id}}
                 </a>
               </td>
               <td>

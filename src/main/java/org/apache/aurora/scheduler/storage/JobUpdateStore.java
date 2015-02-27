@@ -52,26 +52,26 @@ public interface JobUpdateStore {
   /**
    * Fetches a read-only view of job update details.
    *
-   * @param updateId Update ID to fetch details for.
+   * @param key Update identifier.
    * @return A read-only view of job update details.
    */
-  Optional<IJobUpdateDetails> fetchJobUpdateDetails(String updateId);
+  Optional<IJobUpdateDetails> fetchJobUpdateDetails(IJobUpdateKey key);
 
   /**
    * Fetches a read-only view of a job update.
    *
-   * @param updateId Update ID to fetch.
+   * @param key Update identifier.
    * @return A read-only view of job update.
    */
-  Optional<IJobUpdate> fetchJobUpdate(String updateId);
+  Optional<IJobUpdate> fetchJobUpdate(IJobUpdateKey key);
 
   /**
    * Fetches a read-only view of the instructions for a job update.
    *
-   * @param updateId Update ID to fetch instructions for.
+   * @param key Update identifier.
    * @return A read-only view of job update instructions.
    */
-  Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(String updateId);
+  Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(IJobUpdateKey key);
 
   /**
    * Fetches a read-only view of all job update details available in the store.
@@ -97,19 +97,19 @@ public interface JobUpdateStore {
   /**
    * Gets the lock token associated with a job update.
    *
-   * @param updateId Job update ID.
+   * @param key Update identifier.
    * @return the token associated with the update id, if it exists.
    */
-  Optional<String> getLockToken(String updateId);
+  Optional<String> getLockToken(IJobUpdateKey key);
 
   /**
    * Fetches the events that have affected an instance within a job update.
    *
-   * @param updateId Update to fetch events from.
+   * @param key Update identifier.
    * @param instanceId Instance to fetch events for.
-   * @return Instance events in {@code updateId} that affected {@code instanceId}.
+   * @return Instance events in {@code key} that affected {@code instanceId}.
    */
-  List<IJobInstanceUpdateEvent> fetchInstanceEvents(String updateId, int instanceId);
+  List<IJobInstanceUpdateEvent> fetchInstanceEvents(IJobUpdateKey key, int instanceId);
 
   interface Mutable extends JobUpdateStore {
 

@@ -30,6 +30,7 @@ from .updater_util import UpdaterConfig
 from gen.apache.aurora.api.constants import LIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     JobKey,
+    JobUpdateKey,
     JobUpdateQuery,
     JobUpdateRequest,
     Lock,
@@ -208,12 +209,10 @@ class AuroraClientAPI(object):
     log.info("Aborting update for: %s" % job_key.to_path())
     return self._scheduler_proxy.abortJobUpdate(job_key.to_thrift())
 
-  def query_job_updates(self, update_id=None, role=None, job_key=None, user=None,
-                        update_statuses=None):
+  def query_job_updates(self, role=None, job_key=None, user=None, update_statuses=None):
     """Returns all job updates matching the query.
 
     Arguments:
-    update_id -- job update ID.
     role -- job role.
     job_key -- job key.
     user -- user who initiated an update.
@@ -223,13 +222,12 @@ class AuroraClientAPI(object):
     """
     return self._scheduler_proxy.getJobUpdateSummaries(
         JobUpdateQuery(
-            updateId=update_id,
             role=role,
             jobKey=job_key.to_thrift() if job_key else None,
             user=user,
             updateStatuses=update_statuses))
 
-  def get_job_update_details(self, id):
+  def get_job_update_details(self, key):
     """Gets JobUpdateDetails for the specified job update ID.
 
     Arguments:
@@ -237,7 +235,10 @@ class AuroraClientAPI(object):
 
     Returns a response object with JobUpdateDetails.
     """
-    return self._scheduler_proxy.getJobUpdateDetails(id)
+    if not isinstance(key, JobUpdateKey):
+      raise self.TypeError('Invalid key %r: expected %s but got %s'
+                           % (key, JobUpdateKey.__name__, key.__class__.__name__))
+    return self._scheduler_proxy.getJobUpdateDetails(key)
 
   def cancel_update(self, job_key):
     """Cancel the update represented by job_key. Returns whether or not the cancellation was

@@ -28,7 +28,7 @@
 
     <li ng-if='job && update'><a href='/scheduler/{{role}}/{{environment}}/{{job}}'>Job: {{job}}</a></li>
 
-    <li ng-if='update' class='active'>Update: {{update.update.summary.updateId}}</li>
+    <li ng-if='update' class='active'>Update: {{update.update.summary.key.id}}</li>
   </ul>
   </div>
 </div>

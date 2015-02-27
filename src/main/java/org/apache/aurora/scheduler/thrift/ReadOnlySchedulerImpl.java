@@ -52,6 +52,7 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
+import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.PopulateJobResult;
@@ -85,6 +86,7 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -322,13 +324,13 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   }
 
   @Override
-  public Response getJobUpdateDetails(final String updateId) {
-    requireNonNull(updateId);
+  public Response getJobUpdateDetails(JobUpdateKey mutableKey) {
+    final IJobUpdateKey key = IJobUpdateKey.build(mutableKey);
     Optional<IJobUpdateDetails> details =
         storage.read(new Quiet<Optional<IJobUpdateDetails>>() {
           @Override
           public Optional<IJobUpdateDetails> apply(StoreProvider storeProvider) {
-            return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(updateId);
+            return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(key);
           }
         });
 
@@ -336,7 +338,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
       return ok(Result.getJobUpdateDetailsResult(
           new GetJobUpdateDetailsResult().setDetails(details.get().newBuilder())));
     } else {
-      return invalidRequest("Invalid update ID:" + updateId);
+      return invalidRequest("Invalid update: " + key);
     }
   }
 
