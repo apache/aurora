@@ -17,7 +17,7 @@ plugins {
   id 'com.eriwen.gradle.js' version '1.12.1'
   id 'com.github.ben-manes.versions' version '0.5'
   id 'com.github.hierynomus.license' version '0.11.0'
-  id 'me.champeau.gradle.jmh' version '0.1.3'
+  id 'me.champeau.gradle.jmh' version '0.2.0'
 }
 
 apply plugin: 'application'
@@ -443,6 +443,8 @@ jacocoTestReport.finalizedBy analyzeReport
 
 def jmhHumanOutputPath = "$buildDir/reports/jmh/human.txt"
 jmh {
+  jmhVersion = '1.6.1'
+  jvmArgsPrepend = '-Xmx1024m'
   humanOutputFile = project.file("$jmhHumanOutputPath")
   resultsFile = project.file("$buildDir/reports/jmh/results.txt")
 
