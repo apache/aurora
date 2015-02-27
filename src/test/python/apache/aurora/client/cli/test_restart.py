@@ -55,8 +55,7 @@ class TestRestartJobCommand(AuroraClientCommandTest):
       mock_options.restart_threshold,
       mock_options.watch_secs,
       mock_options.max_per_instance_failures,
-      mock_options.max_total_failures,
-      mock_options.rollback_on_failure)
+      mock_options.max_total_failures)
 
     mock_api.restart.assert_called_once_with(jobkey, mock_options.instance_spec.instance,
       updater_config, mock_options.healthcheck_interval_seconds, config=None)

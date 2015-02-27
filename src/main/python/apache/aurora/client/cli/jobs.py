@@ -480,20 +480,24 @@ class RestartCommand(Verb):
     return "restart"
 
   def get_options(self):
-    return [BATCH_OPTION, BIND_OPTION, BROWSER_OPTION, FORCE_OPTION, HEALTHCHECK_OPTION,
-        JSON_READ_OPTION, WATCH_OPTION,
+    return [
+        BATCH_OPTION,
+        BIND_OPTION,
+        BROWSER_OPTION,
+        CONFIG_OPTION,
+        FORCE_OPTION,
+        HEALTHCHECK_OPTION,
+        INSTANCES_SPEC_ARGUMENT,
+        JSON_READ_OPTION,
+        MAX_TOTAL_FAILURES_OPTION,
+        STRICT_OPTION,
+        WATCH_OPTION,
         CommandOption("--max-per-instance-failures", type=int, default=0,
              help="Maximum number of restarts per instance during restart. Increments total "
                   "failure count when this limit is exceeded."),
         CommandOption("--restart-threshold", type=int, default=60,
              help="Maximum number of seconds before an instance must move into the RUNNING state "
-                  "before considered a failure."),
-        CONFIG_OPTION,
-        MAX_TOTAL_FAILURES_OPTION,
-        STRICT_OPTION,
-        CommandOption("--rollback-on-failure", default=True, action="store_false",
-            help="If false, prevent update from performing a rollback."),
-        INSTANCES_SPEC_ARGUMENT]
+                  "before considered a failure.")]
 
   @property
   def help(self):
@@ -522,8 +526,7 @@ class RestartCommand(Verb):
         context.options.restart_threshold,
         context.options.watch_secs,
         context.options.max_per_instance_failures,
-        context.options.max_total_failures,
-        context.options.rollback_on_failure)
+        context.options.max_total_failures)
     resp = api.restart(job, instances, updater_config,
         context.options.healthcheck_interval_seconds, config=config)
 
