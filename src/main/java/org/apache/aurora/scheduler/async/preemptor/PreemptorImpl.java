@@ -221,14 +221,6 @@ public class PreemptorImpl implements Preemptor {
         }
       };
 
-  private static final Function<HostOffer, IHostAttributes> OFFER_TO_ATTRIBUTES =
-      new Function<HostOffer, IHostAttributes>() {
-        @Override
-        public IHostAttributes apply(HostOffer offer) {
-          return offer.getAttributes();
-        }
-      };
-
   private final Function<PreemptionVictim, ResourceSlot> victimToResources =
       new Function<PreemptionVictim, ResourceSlot>() {
         @Override
@@ -269,25 +261,6 @@ public class PreemptorImpl implements Preemptor {
 
     ResourceSlot slackResources =
         ResourceSlot.sum(Iterables.transform(offers, OFFER_TO_RESOURCE_SLOT));
-
-    if (!Iterables.isEmpty(offers)) {
-      if (Iterables.size(offers) > 1) {
-        // There are multiple offers for the same host. Since both have maintenance information
-        // we don't preempt with this information and wait for mesos to merge the two offers for
-        // us.
-        return Optional.absent();
-      }
-      IHostAttributes attributes = Iterables.getOnlyElement(
-          FluentIterable.from(offers).transform(OFFER_TO_ATTRIBUTES).toSet());
-
-      Set<SchedulingFilter.Veto> vetoes = schedulingFilter.filter(
-          new UnusedResource(slackResources, attributes),
-          new ResourceRequest(pendingTask.getTask(), pendingTask.getTaskId(), jobState));
-
-      if (vetoes.isEmpty()) {
-        return Optional.<Set<PreemptionVictim>>of(ImmutableSet.<PreemptionVictim>of());
-      }
-    }
 
     FluentIterable<PreemptionVictim> preemptableTasks = FluentIterable.from(possibleVictims)
         .filter(preemptionFilter(pendingTask.getTask()));

@@ -571,39 +571,6 @@ public class PreemptorImplTest extends EasyMockTest {
     assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
-  // Ensures we don't preempt if a host has enough slack to satisfy a pending task.
-  @Test
-  public void testPreemptWithLargeOffer() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-
-    setUpHost(HOST_A, RACK_A);
-
-    ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
-    runOnHost(a1, HOST_A);
-
-    Offer o1 = makeOffer(OFFER_A, HOST_A, 2, Amount.of(2048L, Data.MB), Amount.of(1L, Data.MB), 1);
-    expectOffers(o1);
-
-    ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(1).setRamMb(1024);
-
-    clock.advance(PREEMPTION_DELAY);
-
-    expectGetClusterState(a1);
-    expectGetPendingTasks(p1);
-
-    control.replay();
-    runPreemptor(p1);
-
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(successStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
-  }
-
   // TODO(zmanji) spread tasks across slave ids on the same host and see if preemption fails.
 
   private Offer makeOffer(String offerId,
