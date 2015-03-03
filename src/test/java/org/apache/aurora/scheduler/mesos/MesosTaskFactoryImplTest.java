@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -25,12 +24,15 @@ import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MesosContainer;
+import org.apache.aurora.gen.Mode;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;
 import org.apache.mesos.Protos.ExecutorInfo;
@@ -43,6 +45,7 @@ import static org.apache.aurora.scheduler.ResourceSlot.MIN_THERMOS_RESOURCES;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.NO_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.SOME_OVERHEAD_EXECUTOR;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class MesosTaskFactoryImplTest {
 
@@ -171,25 +174,42 @@ public class MesosTaskFactoryImplTest {
 
   @Test(expected = NullPointerException.class)
   public void testInvalidExecutorSettings() {
-    new ExecutorSettings(
-        null,
-        ImmutableList.<String>of(),
-        "",
-        Optional.<String>absent(),
-        Resources.NONE);
+    ExecutorSettings.newBuilder()
+        .setExecutorPath(null)
+        .setThermosObserverRoot("")
+        .build();
   }
 
   @Test
   public void testExecutorAndWrapper() {
-    config = new ExecutorSettings(
-        EXECUTOR_WRAPPER_PATH,
-        ImmutableList.of(SOME_OVERHEAD_EXECUTOR.getExecutorPath()),
-        "/var/run/thermos",
-        Optional.<String>absent(),
-        SOME_OVERHEAD_EXECUTOR.getExecutorOverhead());
+    config = ExecutorSettings.newBuilder()
+        .setExecutorPath(EXECUTOR_WRAPPER_PATH)
+        .setExecutorResources(ImmutableList.of(SOME_OVERHEAD_EXECUTOR.getExecutorPath()))
+        .setThermosObserverRoot("/var/run/thermos")
+        .setExecutorOverhead(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())
+        .build();
     taskFactory = new MesosTaskFactoryImpl(config);
     TaskInfo taskInfo = taskFactory.createFrom(TASK, SLAVE);
     assertEquals(EXECUTOR_WITH_WRAPPER, taskInfo.getExecutor());
+  }
+
+  @Test
+  public void testGlobalMounts() {
+    config = ExecutorSettings.newBuilder()
+        .setExecutorPath(EXECUTOR_WRAPPER_PATH)
+        .setExecutorResources(ImmutableList.of(SOME_OVERHEAD_EXECUTOR.getExecutorPath()))
+        .setThermosObserverRoot("/var/run/thermos")
+        .setExecutorOverhead(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())
+        .setGlobalContainerMounts(ImmutableList.of(new Volume("/container", "/host", Mode.RO)))
+        .build();
+    taskFactory = new MesosTaskFactoryImpl(config);
+    TaskInfo taskInfo = taskFactory.createFrom(TASK_WITH_DOCKER, SLAVE);
+    Protos.Volume expected = Protos.Volume.newBuilder()
+        .setHostPath("/host")
+        .setContainerPath("/container")
+        .setMode(Protos.Volume.Mode.RO)
+        .build();
+    assertTrue(taskInfo.getExecutor().getContainer().getVolumesList().contains(expected));
   }
 
   private static Resources getTotalTaskResources(TaskInfo task) {

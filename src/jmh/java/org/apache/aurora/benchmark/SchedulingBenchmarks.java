@@ -19,8 +19,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import javax.inject.Singleton;
 
-import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.EventBus;
@@ -30,7 +28,6 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
@@ -49,7 +46,6 @@ import org.apache.aurora.scheduler.async.preemptor.ClusterState;
 import org.apache.aurora.scheduler.async.preemptor.ClusterStateImpl;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.async.preemptor.PreemptorImpl;
-import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -124,12 +120,10 @@ public class SchedulingBenchmarks {
               bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
               bind(SchedulingFilterImpl.class).in(Singleton.class);
               bind(ExecutorSettings.class)
-                  .toInstance(new ExecutorSettings(
-                      "/executor/thermos",
-                      ImmutableList.<String>of(),
-                      "/var/run/thermos",
-                      Optional.<String>absent(),
-                      new Resources(0.0, Amount.of(0L, Data.MB), Amount.of(0L, Data.MB), 0)));
+                  .toInstance(ExecutorSettings.newBuilder()
+                      .setExecutorPath("/executor/thermos")
+                      .setThermosObserverRoot("/var/run/thermos")
+                      .build());
 
               bind(Preemptor.class).to(PreemptorImpl.class);
               bind(PreemptorImpl.class).in(Singleton.class);

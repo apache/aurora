@@ -17,6 +17,9 @@ import java.util.List;
 
 import com.google.common.base.Optional;
 
+import com.google.common.collect.ImmutableList;
+
+import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.configuration.Resources;
 
 import static java.util.Objects.requireNonNull;
@@ -24,25 +27,28 @@ import static java.util.Objects.requireNonNull;
 /**
  * Configuration for the executor to run, and resource overhead required for it.
  */
-public class ExecutorSettings {
+public final class ExecutorSettings {
   private final String executorPath;
   private final List<String> executorResources;
   private final String thermosObserverRoot;
   private final Optional<String> executorFlags;
   private final Resources executorOverhead;
+  private final List<Volume> globalContainerMounts;
 
-  public ExecutorSettings(
+  ExecutorSettings(
       String executorPath,
       List<String> executorResources,
       String thermosObserverRoot,
       Optional<String> executorFlags,
-      Resources executorOverhead) {
+      Resources executorOverhead,
+      List<Volume> globalContainerMounts) {
 
     this.executorPath = requireNonNull(executorPath);
     this.executorResources = requireNonNull(executorResources);
     this.thermosObserverRoot = requireNonNull(thermosObserverRoot);
     this.executorFlags = requireNonNull(executorFlags);
     this.executorOverhead = requireNonNull(executorOverhead);
+    this.globalContainerMounts = requireNonNull(globalContainerMounts);
   }
 
   public String getExecutorPath() {
@@ -63,5 +69,69 @@ public class ExecutorSettings {
 
   public Resources getExecutorOverhead() {
     return executorOverhead;
+  }
+
+  public List<Volume> getGlobalContainerMounts() {
+    return globalContainerMounts;
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  public static final class Builder {
+    private String executorPath;
+    private List<String> executorResources;
+    private String thermosObserverRoot;
+    private Optional<String> executorFlags;
+    private Resources executorOverhead;
+    private List<Volume> globalContainerMounts;
+
+    Builder() {
+      executorResources = ImmutableList.of();
+      executorFlags = Optional.absent();
+      executorOverhead = Resources.NONE;
+      globalContainerMounts = ImmutableList.of();
+    }
+
+    public Builder setExecutorPath(String executorPath) {
+      this.executorPath = executorPath;
+      return this;
+    }
+
+    public Builder setExecutorResources(List<String> executorResources) {
+      this.executorResources = executorResources;
+      return this;
+    }
+
+    public Builder setThermosObserverRoot(String thermosObserverRoot) {
+      this.thermosObserverRoot = thermosObserverRoot;
+      return this;
+    }
+
+    public Builder setExecutorFlags(Optional<String> executorFlags) {
+      this.executorFlags = executorFlags;
+      return this;
+    }
+
+    public Builder setExecutorOverhead(Resources executorOverhead) {
+      this.executorOverhead = executorOverhead;
+      return this;
+    }
+
+    public Builder setGlobalContainerMounts(List<Volume> globalContainerMounts) {
+      this.globalContainerMounts = globalContainerMounts;
+      return this;
+    }
+
+    public ExecutorSettings build() {
+      return new ExecutorSettings(
+          executorPath,
+          executorResources,
+          thermosObserverRoot,
+          executorFlags,
+          executorOverhead,
+          globalContainerMounts);
+    }
   }
 }

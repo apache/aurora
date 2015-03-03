@@ -223,6 +223,16 @@ public interface MesosTaskFactory {
               .setHostPath(executorSettings.getThermosObserverRoot())
               .setMode(Volume.Mode.RW)
               .build());
+
+      for (org.apache.aurora.gen.Volume v : executorSettings.getGlobalContainerMounts()) {
+        // This has already been validated to be correct in ExecutorSettings().
+        containerBuilder.addVolumes(
+            Volume.newBuilder()
+                .setHostPath(v.getHostPath())
+                .setContainerPath(v.getContainerPath())
+                .setMode(Volume.Mode.valueOf(v.getMode().getValue()))
+                .build());
+      }
     }
   }
 }

@@ -46,6 +46,7 @@ import com.twitter.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.SessionValidator;
 import org.apache.aurora.auth.UnsecureAuthModule;
+import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
@@ -137,6 +138,12 @@ public class SchedulerMain extends AbstractApplication {
       help = "The hostname to advertise in ZooKeeper instead of the locally-resolved hostname.")
   private static final Arg<String> HOSTNAME_OVERRIDE = Arg.create(null);
 
+  @CmdLine(name = "global_container_mounts",
+      help = "A comma seperated list of mount points (in host:container form) to mount "
+          + "into all (non-mesos) containers.")
+  private static final Arg<List<Volume>> GLOBAL_CONTAINER_MOUNTS =
+      Arg.<List<Volume>>create(ImmutableList.<Volume>of());
+
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistryWithOverrides serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
@@ -227,12 +234,14 @@ public class SchedulerMain extends AbstractApplication {
                 0);
 
             bind(ExecutorSettings.class)
-                .toInstance(new ExecutorSettings(
-                    THERMOS_EXECUTOR_PATH.get(),
-                    THERMOS_EXECUTOR_RESOURCES.get(),
-                    THERMOS_OBSERVER_ROOT.get(),
-                    Optional.fromNullable(THERMOS_EXECUTOR_FLAGS.get()),
-                    executorOverhead));
+                .toInstance(ExecutorSettings.newBuilder()
+                    .setExecutorPath(THERMOS_EXECUTOR_PATH.get())
+                    .setExecutorResources(THERMOS_EXECUTOR_RESOURCES.get())
+                    .setThermosObserverRoot(THERMOS_OBSERVER_ROOT.get())
+                    .setExecutorFlags(Optional.fromNullable(THERMOS_EXECUTOR_FLAGS.get()))
+                    .setExecutorOverhead(executorOverhead)
+                    .setGlobalContainerMounts(GLOBAL_CONTAINER_MOUNTS.get())
+                    .build());
           }
         })
         .add(getMesosModules())

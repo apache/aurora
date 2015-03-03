@@ -186,6 +186,24 @@ struct ExecutorConfig {
   2: string data
 }
 
+/** The mode for a volume mount */
+enum Mode {
+  /** Read Write */
+  RW = 1
+  /** Read Only */
+  RO = 2
+}
+
+/** A volume mount point within a container */
+struct Volume {
+  /** The path inside the container where the mount will be created. */
+  1: string containerPath
+  /** The path on the host that will serve as the source for the mount. */
+  2: string hostPath
+  /** The access mode */
+  3: Mode mode
+}
+
 /** Describes a mesos container, this is the default */
 struct MesosContainer {
 }

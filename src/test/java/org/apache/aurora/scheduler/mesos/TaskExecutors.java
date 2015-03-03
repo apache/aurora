@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
@@ -31,17 +29,17 @@ public final class TaskExecutors {
 
   private static final String EXECUTOR_PATH = "/fake/executor.pex";
 
-  public static final ExecutorSettings NO_OVERHEAD_EXECUTOR = new ExecutorSettings(
-      EXECUTOR_PATH,
-      ImmutableList.<String>of(),
-      "/var/run/thermos",
-      Optional.<String>absent(),
-      Resources.NONE);
+  public static final ExecutorSettings NO_OVERHEAD_EXECUTOR =
+      ExecutorSettings.newBuilder()
+          .setExecutorPath(EXECUTOR_PATH)
+          .setThermosObserverRoot("/var/run/thermos")
+          .build();
 
-  public static final ExecutorSettings SOME_OVERHEAD_EXECUTOR = new ExecutorSettings(
-      EXECUTOR_PATH,
-      ImmutableList.<String>of(),
-      "/var/run/thermos",
-      Optional.<String>absent(),
-      new Resources(0.01, Amount.of(256L, Data.MB), Amount.of(0L, Data.MB), 0));
+  public static final ExecutorSettings SOME_OVERHEAD_EXECUTOR =
+      ExecutorSettings.newBuilder()
+          .setExecutorPath(EXECUTOR_PATH)
+          .setThermosObserverRoot("/var/run/thermos")
+          .setExecutorOverhead(
+              new Resources(0.01, Amount.of(256L, Data.MB), Amount.of(0L, Data.MB), 0))
+          .build();
 }

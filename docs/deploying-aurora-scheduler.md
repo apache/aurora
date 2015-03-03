@@ -160,6 +160,11 @@ and executor are correctly copied into the sandbox.  In addition, ensure the wra
 access resources outside of the sandbox, because when running inside a docker container they will not
 exist.
 
+A scheduler flag, `-global_container_mounts` allows mounting paths from the host (the slave) into all
+containers on that host.  The format is a comma seperated list of host_path:container_path[:mode] tuples.
+For example `-global_container_moints=/opt/secret_keys_dir:/mnt/secret_keys_dir:ro` mounts
+`/opt/secret_keys_dir` from the slaves into all containers that launch on them.  Valid modes are `ro` and `rw`.
+
 In order to correctly execute processes inside a job, the docker container must have python 2.7 installed.
 
 ## Running Aurora
