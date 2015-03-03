@@ -322,7 +322,7 @@ Job Schema
   ```service``` | Boolean | If True, restart tasks regardless of success or failure. (Default: False)
   ```max_task_failures``` | Integer | Maximum number of failures after which the task is considered to have failed (Default: 1) Set to -1 to allow for infinite failures
   ```priority``` | Integer | Preemption priority to give the task (Default 0). Tasks with higher priorities may preempt tasks at lower priorities.
-  ```production``` | Boolean |  Whether or not this is a production task backed by quota (Default: False). Production jobs may preempt any non-production job, and may only be preempted by production jobs in the same role and of higher priority. To run jobs at this level, the job role must have the appropriate quota.
+  ```production``` | Boolean |  Whether or not this is a production task backed by quota (Default: False). Production jobs may preempt any non-production job, and may only be preempted by production jobs in the same role and of higher priority. To run jobs at this level, the job role must have the appropriate quota. To grant quota to a particular role in production, operators use the ``aurora_admin set_quota`` command.
   ```health_check_config``` | ```heath_check_config``` object | Parameters for controlling a task's health checks via HTTP. Only used if a  health port was assigned with a command line wildcard.
   ```container``` | ```Container``` object | An optional container to run all processes inside of.
 

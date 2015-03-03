@@ -585,7 +585,8 @@ Three attributes deal with configuring the Job's Task:
     preempt tasks from any non-production job, and may only be preempted
     by tasks from production jobs in the same role with higher
     priority. **WARNING**: To run Jobs at this level, the Job role must
-    have the appropriate quota.
+    have the appropriate quota. To grant quota to a particular role in
+    production, operators use the ``aurora_admin set_quota`` command.
 
 The final three Job attributes each take an object as their value.
 
