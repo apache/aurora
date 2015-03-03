@@ -30,11 +30,11 @@ from twitter.common.lang import Lockable
 from twitter.common.quantity import Amount, Time
 
 from apache.thermos.common.path import TaskPath
-from apache.thermos.monitoring.detector import TaskDetector
 from apache.thermos.monitoring.monitor import TaskMonitor
 from apache.thermos.monitoring.process import ProcessSample
 from apache.thermos.monitoring.resource import ResourceMonitorBase, TaskResourceMonitor
 
+from .detector import ObserverTaskDetector
 from .observed_task import ActiveObservedTask, FinishedObservedTask
 
 from gen.apache.thermos.ttypes import ProcessState, TaskState
@@ -52,14 +52,17 @@ class TaskObserver(ExceptionalThread, Lockable):
   class UnexpectedError(Exception): pass
   class UnexpectedState(Exception): pass
 
-  POLLING_INTERVAL = Amount(1, Time.SECONDS)
+  POLLING_INTERVAL = Amount(5, Time.SECONDS)
 
-  def __init__(self, root, resource_monitor_class=TaskResourceMonitor):
-    self._pathspec = TaskPath(root=root)
-    self._detector = TaskDetector(root)
+  def __init__(self, path_detector, resource_monitor_class=TaskResourceMonitor):
+    self._detector = ObserverTaskDetector(
+        path_detector,
+        self.__on_active,
+        self.__on_finished,
+        self.__on_removed)
     if not issubclass(resource_monitor_class, ResourceMonitorBase):
       raise ValueError("resource monitor class must implement ResourceMonitorBase!")
-    self._resource_monitor = resource_monitor_class
+    self._resource_monitor_class = resource_monitor_class
     self._active_tasks = {}    # task_id => ActiveObservedTask
     self._finished_tasks = {}  # task_id => FinishedObservedTask
     self._stop_event = threading.Event()
@@ -88,42 +91,34 @@ class TaskObserver(ExceptionalThread, Lockable):
   def start(self):
     ExceptionalThread.start(self)
 
-  @Lockable.sync
-  def add_active_task(self, task_id):
+  def __on_active(self, root, task_id):
+    log.debug('on_active(%r, %r)' % (root, task_id))
     if task_id in self.finished_tasks:
       log.error('Found an active task (%s) in finished tasks?' % task_id)
       return
-    task_monitor = TaskMonitor(self._pathspec, task_id)
-    if not task_monitor.get_state().header:
-      log.info('Unable to load task "%s"' % task_id)
-      return
-    sandbox = task_monitor.get_state().header.sandbox
-    resource_monitor = self._resource_monitor(task_monitor, sandbox)
+    task_monitor = TaskMonitor(root, task_id)
+    resource_monitor = self._resource_monitor_class(task_id, task_monitor)
     resource_monitor.start()
     self._active_tasks[task_id] = ActiveObservedTask(
-      task_id=task_id, pathspec=self._pathspec,
-      task_monitor=task_monitor, resource_monitor=resource_monitor
+        root,
+        task_id,
+        task_monitor,
+        resource_monitor
     )
 
-  @Lockable.sync
-  def add_finished_task(self, task_id):
-    self._finished_tasks[task_id] = FinishedObservedTask(
-      task_id=task_id, pathspec=self._pathspec
-    )
+  def __on_finished(self, root, task_id):
+    log.debug('on_finished(%r, %r)' % (root, task_id))
+    active_task = self._active_tasks.pop(task_id, None)
+    if active_task:
+      active_task.resource_monitor.kill()
+    self._finished_tasks[task_id] = FinishedObservedTask(root, task_id)
 
-  @Lockable.sync
-  def active_to_finished(self, task_id):
-    self.remove_active_task(task_id)
-    self.add_finished_task(task_id)
-
-  @Lockable.sync
-  def remove_active_task(self, task_id):
-    task = self.active_tasks.pop(task_id)
-    task.resource_monitor.kill()
-
-  @Lockable.sync
-  def remove_finished_task(self, task_id):
-    self.finished_tasks.pop(task_id)
+  def __on_removed(self, root, task_id):
+    log.debug('on_removed(%r, %r)' % (root, task_id))
+    active_task = self._active_tasks.pop(task_id, None)
+    if active_task:
+      active_task.resource_monitor.kill()
+    self._finished_tasks.pop(task_id, None)
 
   def run(self):
     """
@@ -133,32 +128,8 @@ class TaskObserver(ExceptionalThread, Lockable):
     """
     while not self._stop_event.is_set():
       time.sleep(self.POLLING_INTERVAL.as_(Time.SECONDS))
-
-      active_tasks = [task_id for _, task_id in self._detector.get_task_ids(state='active')]
-      finished_tasks = [task_id for _, task_id in self._detector.get_task_ids(state='finished')]
-
       with self.lock:
-
-        # Ensure all tasks currently detected on the system are observed appropriately
-        for active in active_tasks:
-          if active not in self.active_tasks:
-            log.debug('task_id %s (unknown) -> active' % active)
-            self.add_active_task(active)
-        for finished in finished_tasks:
-          if finished in self.active_tasks:
-            log.debug('task_id %s active -> finished' % finished)
-            self.active_to_finished(finished)
-          elif finished not in self.finished_tasks:
-            log.debug('task_id %s (unknown) -> finished' % finished)
-            self.add_finished_task(finished)
-
-        # Remove ObservedTasks for tasks no longer detected on the system
-        for unknown in set(self.active_tasks) - set(active_tasks + finished_tasks):
-          log.debug('task_id %s active -> (unknown)' % unknown)
-          self.remove_active_task(unknown)
-        for unknown in set(self.finished_tasks) - set(active_tasks + finished_tasks):
-          log.debug('task_id %s finished -> (unknown)' % unknown)
-          self.remove_finished_task(unknown)
+        self._detector.refresh()
 
   @Lockable.sync
   def process_from_name(self, task_id, process_id):
@@ -183,11 +154,9 @@ class TaskObserver(ExceptionalThread, Lockable):
 
   @Lockable.sync
   def task_id_count(self):
-    """
-      Return the raw count of active and finished task_ids from the TaskDetector.
-    """
-    num_active = len(list(self._detector.get_task_ids(state='active')))
-    num_finished = len(list(self._detector.get_task_ids(state='finished')))
+    """Return the raw count of active and finished task_ids."""
+    num_active = len(self._detector.active_tasks)
+    num_finished = len(self._detector.finished_tasks)
     return dict(active=num_active, finished=num_finished, all=num_active + num_finished)
 
   def _get_tasks_of_type(self, type):
@@ -581,8 +550,18 @@ class TaskObserver(ExceptionalThread, Lockable):
     run = self.get_run_number(runner_state, process, run)
     if run is None:
       return {}
-    log_path = self._pathspec.given(task_id=task_id, process=process, run=run,
-                                    log_dir=runner_state.header.log_dir).getpath('process_logdir')
+    observed_task = self.all_tasks.get(task_id, None)
+    if not observed_task:
+      return {}
+
+    log_path = TaskPath(
+        root=observed_task.root,
+        task_id=task_id,
+        process=process,
+        run=run,
+        log_dir=runner_state.header.log_dir,
+    ).getpath('process_logdir')
+
     return dict(
       stdout=[log_path, 'stdout'],
       stderr=[log_path, 'stderr']
@@ -628,7 +607,7 @@ class TaskObserver(ExceptionalThread, Lockable):
     except AttributeError:
       return None, None
     chroot, path = self._sanitize_path(chroot, path)
-    if chroot and path:
+    if chroot and path and os.path.exists(os.path.join(chroot, path)):
       return chroot, path
     return None, None
 

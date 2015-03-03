@@ -22,6 +22,7 @@ import pprint
 import pwd
 import re
 import sys
+import tempfile
 import time
 
 from pystachio.naming import frozendict
@@ -285,7 +286,7 @@ def simplerun(args, options):
 
   _really_run(thermos_task,
               options.root,
-              None,
+              tempfile.mkdtemp(),
               task_id=options.task_id,
               user=options.user,
               prebound_ports=options.prebound_ports,
@@ -594,7 +595,7 @@ def tail(args, options):
      run=run, log_dir=log_dir).getpath('process_logdir')
   logfile = os.path.join(logdir, 'stderr' if options.use_stderr else 'stdout')
 
-  monitor = TaskMonitor(TaskPath(root=options.root), args[0])
+  monitor = TaskMonitor(options.root, args[0])
   def log_is_active():
     active_processes = monitor.get_active_processes()
     for process_status, process_run in active_processes:

@@ -18,11 +18,14 @@ import threading
 import mock
 from mesos.interface import mesos_pb2
 from twitter.common.contextutil import temporary_dir
-from twitter.common.quantity import Amount, Time
 
 from apache.aurora.executor.common.resource_manager import ResourceManagerProvider
 from apache.aurora.executor.common.sandbox import DirectorySandbox
+from apache.thermos.common.path import TaskPath
+from apache.thermos.core.helper import TaskRunnerHelper
 from apache.thermos.monitoring.disk import DiskCollector
+
+from gen.apache.thermos.ttypes import RunnerCkpt, RunnerHeader
 
 
 # TODO(jcohen): There should really be a single canonical source for creating test jobs/tasks
@@ -67,10 +70,22 @@ def make_job(role, environment, name, primary_port, portmap):
   return job
 
 
+def write_header(root, sandbox, task_id):
+  log_dir = os.path.join(sandbox, '.logs')
+  path = TaskPath(root=root, task_id=task_id, log_dir=log_dir)
+  header = RunnerHeader(task_id=task_id, sandbox=sandbox, log_dir=log_dir)
+  ckpt = TaskRunnerHelper.open_checkpoint(path.getpath('runner_checkpoint'))
+  ckpt.write(RunnerCkpt(runner_header=header))
+  ckpt.close()
+
+
 def test_resource_manager():
   with temporary_dir() as td:
+    assigned_task = make_assigned_task(
+        make_job('some-role', 'some-env', 'some-job', 'http', portmap={'http': 80}))
     sandbox = os.path.join(td, 'sandbox')
     root = os.path.join(td, 'thermos')
+    write_header(root, sandbox, assigned_task.taskId)
 
     mock_disk_collector_class = mock.create_autospec(DiskCollector, spec_set=True)
     mock_disk_collector = mock_disk_collector_class.return_value
@@ -80,18 +95,11 @@ def test_resource_manager():
     type(mock_disk_collector).value = value_mock
 
     completed_event = threading.Event()
-    completed_event.set()
-    completed_mock = mock.PropertyMock(completed_event)
+    completed_mock = mock.PropertyMock(return_value=completed_event)
     type(mock_disk_collector).completed_event = completed_mock
 
-    rmp = ResourceManagerProvider(
-        root,
-        disk_collector=mock_disk_collector_class,
-        disk_collection_interval=Amount(1, Time.SECONDS))
-    rm = rmp.from_assigned_task(
-        make_assigned_task(
-            make_job('some-role', 'some-env', 'some-job', 'http', portmap={'http': 80})),
-        DirectorySandbox(sandbox))
+    rmp = ResourceManagerProvider(root, disk_collector=mock_disk_collector_class)
+    rm = rmp.from_assigned_task(assigned_task, DirectorySandbox(sandbox))
 
     assert rm.status is None
 

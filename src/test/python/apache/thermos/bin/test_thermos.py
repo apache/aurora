@@ -12,4 +12,7 @@
 # limitations under the License.
 #
 
-from apache.thermos.bin import thermos  # noqa
+
+def test_thermos_binary_import():
+  from apache.thermos.bin import thermos  # noqa
+  assert thermos is not None

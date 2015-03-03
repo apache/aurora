@@ -56,9 +56,10 @@ class DiskCollectorThread(ExceptionalThread):
     self.daemon = True
 
   def run(self):
-    log.debug("DiskCollectorThread: starting collection of %s" % self.path)
+    start = time.time()
     self.value = du(self.path)
-    log.debug("DiskCollectorThread: finished collection of %s" % self.path)
+    log.debug("DiskCollectorThread: finished collection of %s in %.1fms" % (
+        self.path, 1000.0 * (time.time() - start)))
     self.event.set()
 
   def finished(self):

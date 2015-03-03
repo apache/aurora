@@ -31,7 +31,6 @@ from twitter.common.quantity import Amount, Time
 
 from apache.aurora.common.http_signaler import HttpSignaler
 from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
-from apache.thermos.common.path import TaskPath
 from apache.thermos.common.statuses import (
     INTERNAL_ERROR,
     INVALID_TASK,
@@ -271,7 +270,7 @@ class ThermosTaskRunner(TaskRunner):
     """Fork the task runner and return once the underlying task is running, up to timeout."""
     self.forking.set()
 
-    self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
+    self._monitor = TaskMonitor(self._checkpoint_root, self._task_id)
 
     cmdline_args = self._cmdline()
     log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))

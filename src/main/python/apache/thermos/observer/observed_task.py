@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import copy
 import os
 from abc import abstractproperty
 
@@ -20,8 +21,11 @@ from twitter.common import log
 from twitter.common.lang import AbstractClass
 
 from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.path import TaskPath
 from apache.thermos.config.loader import ThermosTaskWrapper
 from apache.thermos.config.schema import ThermosContext
+
+from gen.apache.thermos.ttypes import RunnerState
 
 
 class ObservedTask(AbstractClass):
@@ -34,10 +38,15 @@ class ObservedTask(AbstractClass):
     except OSError:
       return None
 
-  def __init__(self, task_id, pathspec):
+  def __init__(self, root, task_id):
+    self._root = root
     self._task_id = task_id
-    self._pathspec = pathspec
+    self._pathspec = TaskPath(root=self._root, task_id=self._task_id)
     self._mtime = self._get_mtime()
+
+  @property
+  def root(self):
+    return self._root
 
   @abstractproperty
   def type(self):
@@ -47,7 +56,7 @@ class ObservedTask(AbstractClass):
     """Read the corresponding task from disk and return a ThermosTask.  Memoizes already-read tasks.
     """
     if self._task_id not in memoized:
-      path = self._pathspec.given(task_id=self._task_id, state=self.type).getpath('task_path')
+      path = self._pathspec.given(state=self.type).getpath('task_path')
       if os.path.exists(path):
         task = ThermosTaskWrapper.from_file(path)
         if task is None:
@@ -63,8 +72,7 @@ class ObservedTask(AbstractClass):
 
   def _get_mtime(self):
     """Retrieve the mtime of the task's state directory"""
-    get_path = lambda state: self._pathspec.given(
-      task_id=self._task_id, state=state).getpath('task_path')
+    get_path = lambda state: self._pathspec.given(state=state).getpath('task_path')
     mtime = self.safe_mtime(get_path('active'))
     if mtime is None:
       mtime = self.safe_mtime(get_path('finished'))
@@ -105,8 +113,8 @@ class ObservedTask(AbstractClass):
 class ActiveObservedTask(ObservedTask):
   """An active Task known by the TaskObserver"""
 
-  def __init__(self, task_id, pathspec, task_monitor, resource_monitor):
-    super(ActiveObservedTask, self).__init__(task_id, pathspec)
+  def __init__(self, root, task_id, task_monitor, resource_monitor):
+    super(ActiveObservedTask, self).__init__(root, task_id)
     self._task_monitor = task_monitor
     self._resource_monitor = resource_monitor
 
@@ -133,8 +141,8 @@ class ActiveObservedTask(ObservedTask):
 class FinishedObservedTask(ObservedTask):
   """A finished Task known by the TaskObserver"""
 
-  def __init__(self, task_id, pathspec):
-    super(FinishedObservedTask, self).__init__(task_id, pathspec)
+  def __init__(self, root, task_id):
+    super(FinishedObservedTask, self).__init__(root, task_id)
     self._state = None
 
   @property
@@ -145,6 +153,6 @@ class FinishedObservedTask(ObservedTask):
   def state(self):
     """Return final state of Task (RunnerState, read from disk and cached for future access)"""
     if self._state is None:
-      path = self._pathspec.given(task_id=self._task_id).getpath('runner_checkpoint')
+      path = self._pathspec.getpath('runner_checkpoint')
       self._state = CheckpointDispatcher.from_file(path)
-    return self._state
+    return copy.deepcopy(self._state) if self._state else RunnerState(processes={})

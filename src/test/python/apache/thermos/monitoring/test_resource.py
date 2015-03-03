@@ -17,7 +17,6 @@ from unittest import TestCase
 
 import mock
 
-from apache.thermos.common.path import TaskPath
 from apache.thermos.monitoring.monitor import TaskMonitor
 from apache.thermos.monitoring.process import ProcessSample
 from apache.thermos.monitoring.resource import (
@@ -64,14 +63,14 @@ class TestTaskResouceMonitor(TestCase):
       autospec=True, spec_set=True)
   def test_sample_by_process(self, mock_get_active_processes, mock_sample):
     fake_process_name = 'fake-process-name'
-    task_path = TaskPath(root='.')
+    task_path = '.'
     task_monitor = TaskMonitor(task_path, 'fake-task-id')
     fake_process_status = ProcessStatus(process=fake_process_name)
     mock_get_active_processes.return_value = [(fake_process_status, 1)]
     fake_process_sample = ProcessSample.empty()
     mock_sample.return_value = fake_process_sample
 
-    task_resource_monitor = TaskResourceMonitor(task_monitor, '.')
+    task_resource_monitor = TaskResourceMonitor('fake-task-id', task_monitor)
 
     assert fake_process_sample == task_resource_monitor.sample_by_process(fake_process_name)
     assert mock_get_active_processes.mock_calls == [mock.call(task_monitor)]
@@ -81,12 +80,12 @@ class TestTaskResouceMonitor(TestCase):
   @mock.patch('apache.thermos.monitoring.monitor.TaskMonitor.get_active_processes',
       autospec=True, spec_set=True)
   def test_sample_by_process_no_process(self, mock_get_active_processes):
-    task_path = TaskPath(root='.')
+    task_path = '.'
 
     task_monitor = TaskMonitor(task_path, 'fake-task-id')
     mock_get_active_processes.return_value = []
 
-    task_resource_monitor = TaskResourceMonitor(task_monitor, '.')
+    task_resource_monitor = TaskResourceMonitor('fake-task-id', task_monitor)
 
     with self.assertRaises(ValueError):
       task_resource_monitor.sample_by_process('fake-process-name')

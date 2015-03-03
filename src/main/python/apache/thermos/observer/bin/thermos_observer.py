@@ -22,6 +22,7 @@ from twitter.common.http import HttpServer
 from twitter.common.http.diagnostics import DiagnosticsEndpoints
 
 from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
+from apache.thermos.monitoring.detector import FixedPathDetector
 from apache.thermos.observer.http.http_observer import BottleObserver
 from apache.thermos.observer.task_observer import TaskObserver
 
@@ -49,7 +50,7 @@ def proxy_main():
     root_server = HttpServer()
     root_server.mount_routes(DiagnosticsEndpoints())
 
-    task_observer = TaskObserver(opts.root)
+    task_observer = TaskObserver(FixedPathDetector(opts.root))
     task_observer.start()
 
     bottle_wrapper = BottleObserver(task_observer)

@@ -134,7 +134,6 @@ python_library(
     '3rdparty/python:twitter.common.dirutil',
     '3rdparty/python:twitter.common.exceptions',
     '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.quantity',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
     'src/main/python/apache/aurora/executor/common:status_checker',
     'src/main/python/apache/aurora/executor/common:task_info',

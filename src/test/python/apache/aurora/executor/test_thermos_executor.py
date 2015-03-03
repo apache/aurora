@@ -53,7 +53,6 @@ from apache.aurora.executor.thermos_task_runner import (
     DefaultThermosTaskRunnerProvider,
     ThermosTaskRunner
 )
-from apache.thermos.common.path import TaskPath
 from apache.thermos.core.runner import TaskRunner
 from apache.thermos.monitoring.monitor import TaskMonitor
 
@@ -288,7 +287,7 @@ class TestThermosExecutor(object):
           sandbox_provider=DefaultTestSandboxProvider())
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
       te.terminated.wait()
-      tm = TaskMonitor(TaskPath(root=tempdir), task_id=HELLO_WORLD_TASK_ID)
+      tm = TaskMonitor(tempdir, task_id=HELLO_WORLD_TASK_ID)
       runner_state = tm.get_state()
 
     assert 'hello_world_hello_world-001' in runner_state.processes, (
@@ -313,7 +312,7 @@ class TestThermosExecutor(object):
       while te._status_manager is None:
         time.sleep(0.1)
       te.terminated.wait()
-      tm = TaskMonitor(TaskPath(root=tempdir), task_id=HELLO_WORLD_TASK_ID)
+      tm = TaskMonitor(tempdir, task_id=HELLO_WORLD_TASK_ID)
       runner_state = tm.get_state()
 
     assert 'hello_world_hello_world-001' in runner_state.processes, (

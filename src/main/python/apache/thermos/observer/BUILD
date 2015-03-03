@@ -21,8 +21,18 @@ python_library(
     '3rdparty/python:pystachio',
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
     'src/main/python/apache/thermos/common:ckpt',
+    'src/main/python/apache/thermos/common:path',
     'src/main/python/apache/thermos/config',
+  ]
+)
+
+python_library(
+  name = 'detector',
+  sources = ['detector.py'],
+  dependencies = [
+    'src/main/python/apache/thermos/monitoring:detector',
   ]
 )
 
@@ -30,13 +40,13 @@ python_library(
   name = 'task_observer',
   sources = ['task_observer.py'],
   dependencies = [
+    ':detector',
     ':observed_task',
     '3rdparty/python:twitter.common.exceptions',
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
     'src/main/python/apache/thermos/common:path',
-    'src/main/python/apache/thermos/monitoring:detector',
     'src/main/python/apache/thermos/monitoring:monitor',
     'src/main/python/apache/thermos/monitoring:process',
     'src/main/python/apache/thermos/monitoring:resource',

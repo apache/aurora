@@ -83,6 +83,9 @@ class TaskPath(object):
     self._data = dict((key, '%%(%s)s' % key) for key in keys)
     self._data.update(kw)
 
+  def __hash__(self):
+    return hash(tuple(self._data.items()))
+
   def given(self, **kw):
     """ Perform further interpolation of the templates given the kwargs """
     eval_dict = dict(self._data)

@@ -124,6 +124,8 @@ class TaskObserverFileBrowser(object):
     if path == "":
       path = None
     chroot, path = self._observer.valid_path(task_id, path)
+    if chroot is None or path is None:
+      bottle.abort(404, "Sandbox does not exist.")
     return dict(task_id=task_id, chroot=chroot, path=path)
 
   @HttpServer.route("/download/:task_id/:path#.+#")

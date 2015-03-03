@@ -154,5 +154,6 @@ python_tests(
     'src/main/python/apache/aurora/config:schema',
     'src/main/python/apache/aurora/executor/common:sandbox',
     'src/main/python/apache/aurora/executor/common:resource_manager',
+    'src/main/python/apache/thermos/core:helper',
   ]
 )

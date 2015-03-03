@@ -79,7 +79,7 @@ class RunnerBase(object):
 class ProcessPidTestCase(object):
   def test_process_kill(self):
     runner = self.start_runner()
-    tm = TaskMonitor(runner.pathspec, runner.task_id)
+    tm = TaskMonitor(runner.tempdir, runner.task_id)
     self.wait_until_running(tm)
 
     process_state, run_number = tm.get_active_processes()[0]
@@ -109,7 +109,7 @@ class TestRunnerKill(RunnerBase, ProcessPidTestCase):
 
   def test_coordinator_kill(self):
     runner = self.start_runner()
-    tm = TaskMonitor(runner.pathspec, runner.task_id)
+    tm = TaskMonitor(runner.tempdir, runner.task_id)
     self.wait_until_running(tm)
 
     process_state, run_number = tm.get_active_processes()[0]
@@ -140,7 +140,7 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
 
   def test_coordinator_kill(self):
     runner = self.start_runner()
-    tm = TaskMonitor(runner.pathspec, runner.task_id)
+    tm = TaskMonitor(runner.tempdir, runner.task_id)
     self.wait_until_running(tm)
     process_state, run_number = tm.get_active_processes()[0]
     assert process_state.process == 'ignorant_process'
@@ -179,7 +179,7 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
 
   def test_coordinator_dead_kill(self):
     runner = self.start_runner()
-    tm = TaskMonitor(runner.pathspec, runner.task_id)
+    tm = TaskMonitor(runner.tempdir, runner.task_id)
     self.wait_until_running(tm)
     process_state, run_number = tm.get_active_processes()[0]
     assert process_state.process == 'ignorant_process'
@@ -201,7 +201,7 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
   @pytest.mark.skipif('True')
   def test_preemption_wait(self):
     runner = self.start_runner()
-    tm = TaskMonitor(runner.pathspec, runner.task_id)
+    tm = TaskMonitor(runner.tempdir, runner.task_id)
     self.wait_until_running(tm)
     process_state, run_number = tm.get_active_processes()[0]
     assert process_state.process == 'ignorant_process'
@@ -251,7 +251,7 @@ class TestRunnerKillProcessGroup(RunnerBase):
 
   def test_pg_is_killed(self):
     runner = self.start_runner()
-    tm = TaskMonitor(runner.pathspec, runner.task_id)
+    tm = TaskMonitor(runner.tempdir, runner.task_id)
     self.wait_until_running(tm)
     process_state, run_number = tm.get_active_processes()[0]
     assert process_state.process == 'process'
