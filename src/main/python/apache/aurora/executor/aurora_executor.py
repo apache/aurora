@@ -186,14 +186,14 @@ class AuroraExecutor(ExecutorBase, Observable):
     runner_status = self._runner.status
 
     try:
-      deadline(self._runner.stop, timeout=self.STOP_TIMEOUT)
-    except Timeout:
-      log.error('Failed to stop runner within deadline.')
-
-    try:
       deadline(self._chained_checker.stop, timeout=self.STOP_TIMEOUT)
     except Timeout:
       log.error('Failed to stop all checkers within deadline.')
+
+    try:
+      deadline(self._runner.stop, timeout=self.STOP_TIMEOUT)
+    except Timeout:
+      log.error('Failed to stop runner within deadline.')
 
     # If the runner was alive when _shutdown was called, defer to the status_result,
     # otherwise the runner's terminal state is the preferred state.

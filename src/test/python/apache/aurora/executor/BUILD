@@ -62,6 +62,7 @@ python_tests(name = 'thermos_executor',
   sources = ['test_thermos_executor.py'],
 #  timeout = Amount(5, Time.MINUTES),
   dependencies = [
+    '3rdparty/python:mock',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.exceptions',
     '3rdparty/python:twitter.common.quantity',

@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import contextlib
 import getpass
 import os
 import signal
@@ -22,6 +23,7 @@ import time
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from collections import defaultdict
 
+import mock
 from mesos.interface import mesos_pb2
 from thrift.TSerialization import serialize
 from twitter.common import log
@@ -44,6 +46,7 @@ from apache.aurora.executor.aurora_executor import AuroraExecutor
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
 from apache.aurora.executor.common.health_checker import HealthCheckerProvider
 from apache.aurora.executor.common.sandbox import DirectorySandbox, SandboxProvider
+from apache.aurora.executor.common.status_checker import ChainedStatusChecker
 from apache.aurora.executor.common.task_runner import TaskError
 from apache.aurora.executor.status_manager import StatusManager
 from apache.aurora.executor.thermos_task_runner import (
@@ -375,6 +378,31 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb2.TASK_KILLED
+
+  def test_shutdown_order(self):
+    proxy_driver = ProxyDriver()
+
+    with contextlib.nested(
+        temporary_dir(),
+        mock.patch.object(ChainedStatusChecker, 'stop'),
+        mock.patch.object(ThermosTaskRunner, 'stop')) as (
+            checkpoint_root,
+            status_check_stop,
+            runner_stop):
+
+      parent = mock.MagicMock()
+      parent.attach_mock(status_check_stop, 'status_check_stop')
+      parent.attach_mock(runner_stop, 'runner_stop')
+
+      _, executor = make_executor(proxy_driver,
+          checkpoint_root,
+          SLEEP60_MTI)
+      executor.shutdown(proxy_driver)
+      executor.terminated.wait()
+
+      parent.assert_has_calls(
+          [mock.call.status_check_stop(), mock.call.runner_stop()],
+          any_order=False)
 
   def test_task_health_failed(self):
     proxy_driver = ProxyDriver()
