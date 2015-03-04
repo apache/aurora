@@ -16,7 +16,7 @@ import json
 import textwrap
 
 import pytest
-from mock import create_autospec, Mock, patch
+from mock import call, create_autospec, Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import (
@@ -34,6 +34,7 @@ from apache.aurora.config import AuroraConfig
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 
+from gen.apache.aurora.api.constants import ACTIVE_JOB_UPDATE_STATES
 from gen.apache.aurora.api.ttypes import (
     GetJobUpdateDetailsResult,
     GetJobUpdateSummariesResult,
@@ -84,9 +85,9 @@ class TestStartUpdateCommand(AuroraClientCommandTest):
     with pytest.raises(Context.CommandError):
       self._command.execute(self._fake_context)
 
-    self._mock_api.start_job_update.assert_called_once_with(
-        mock_config,
-        self._mock_options.instance_spec.instance)
+    assert self._mock_api.start_job_update.mock_calls == [
+        call(mock_config, self._mock_options.instance_spec.instance)
+    ]
 
     self.assert_lock_message(self._fake_context)
 
@@ -107,9 +108,9 @@ class TestStartUpdateCommand(AuroraClientCommandTest):
 
     self._command.execute(self._fake_context)
 
-    self._mock_api.start_job_update.assert_called_once_with(
-      mock_config,
-      self._mock_options.instance_spec.instance)
+    assert self._mock_api.start_job_update.mock_calls == [
+        call(mock_config, self._mock_options.instance_spec.instance)
+    ]
 
 
 class TestUpdateStatusCommand(AuroraClientCommandTest):
@@ -135,11 +136,13 @@ class TestUpdateStatusCommand(AuroraClientCommandTest):
 
 class TestUpdateCommand(AuroraClientCommandTest):
 
+  CTIME = "$TIME"
+
   def setUp(self):
     patcher = patch("time.ctime")
     self.addCleanup(patcher.stop)
-    mock_ctime = patcher.start()
-    mock_ctime.return_value = "YYYY-MM-DD HH:MM:SS"
+    self.mock_ctime = patcher.start()
+    self.mock_ctime.return_value = TestUpdateCommand.CTIME
 
   def test_start_update_command_line_succeeds(self):
     mock_context = FakeAuroraCommandContext()
@@ -205,7 +208,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         result = cmd.execute(['beta-update', 'pause', self.TEST_JOBSPEC])
         assert result == EXIT_OK
 
-      mock_api.pause_job_update.assert_called_with(self.TEST_JOBKEY)
+      assert mock_api.pause_job_update.mock_calls == [call(self.TEST_JOBKEY)]
       assert mock_context.get_out() == ["Update has been paused."]
       assert mock_context.get_err() == []
 
@@ -223,7 +226,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         result = cmd.execute(['beta-update', 'abort', self.TEST_JOBSPEC])
         assert result == EXIT_OK
 
-      mock_api.abort_job_update.assert_called_with(self.TEST_JOBKEY)
+      assert mock_api.abort_job_update.mock_calls == [call(self.TEST_JOBKEY)]
       assert mock_context.get_out() == ["Update has been aborted."]
       assert mock_context.get_err() == []
 
@@ -241,7 +244,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         result = cmd.execute(['beta-update', 'resume', self.TEST_JOBSPEC])
         assert result == EXIT_OK
 
-      mock_api.resume_job_update.assert_called_with(self.TEST_JOBKEY)
+      assert mock_api.resume_job_update.mock_calls == [call(self.TEST_JOBKEY)]
       assert mock_context.get_out() == ["Update has been resumed."]
 
   def test_update_invalid_config(self):
@@ -256,7 +259,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         cmd = AuroraCommandLine()
         result = cmd.execute(['beta-update', 'start', self.TEST_JOBSPEC, fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
-        assert mock_api.start_job_update.call_count == 0
+        assert mock_api.start_job_update.mock_calls == []
 
   def test_resume_update_command_line_error(self):
     mock_context = FakeAuroraCommandContext()
@@ -272,7 +275,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         result = cmd.execute(['beta-update', 'resume', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
-      mock_api.resume_job_update.assert_called_with(self.TEST_JOBKEY)
+      assert mock_api.resume_job_update.mock_calls == [call(self.TEST_JOBKEY)]
       assert mock_context.get_out() == []
       assert mock_context.get_err() == ["Failed to resume update due to error:", "\tDamn"]
 
@@ -290,7 +293,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         result = cmd.execute(['beta-update', 'abort', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
-      mock_api.abort_job_update.assert_called_with(self.TEST_JOBKEY)
+      assert mock_api.abort_job_update.mock_calls == [call(self.TEST_JOBKEY)]
       assert mock_context.get_out() == []
       assert mock_context.get_err() == ["Failed to abort update due to error:", "\tDamn"]
 
@@ -308,7 +311,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         result = cmd.execute(['beta-update', 'pause', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
-      mock_api.pause_job_update.assert_called_with(self.TEST_JOBKEY)
+      assert mock_api.pause_job_update.mock_calls == [call(self.TEST_JOBKEY)]
       assert mock_context.get_out() == []
       assert mock_context.get_err() == ["Failed to pause update due to error:", "\tDamn"]
 
@@ -396,34 +399,34 @@ class TestUpdateCommand(AuroraClientCommandTest):
                 user="me",
                 state=JobUpdateState(
                   status=JobUpdateStatus.ROLLING_FORWARD,
-                  createdTimestampMs=1411404927,
-                  lastModifiedTimestampMs=14114056030))),
+                  createdTimestampMs=1000,
+                  lastModifiedTimestampMs=2000))),
         updateEvents=[
             JobUpdateEvent(
                 status=JobUpdateStatus.ROLLING_FORWARD,
-                timestampMs=1411404927),
+                timestampMs=3000),
             JobUpdateEvent(
                 status=JobUpdateStatus.ROLL_FORWARD_PAUSED,
-                timestampMs=1411405000),
+                timestampMs=4000),
             JobUpdateEvent(
                 status=JobUpdateStatus.ROLLING_FORWARD,
-                timestampMs=1411405100)],
+                timestampMs=5000)],
         instanceEvents=[
             JobInstanceUpdateEvent(
                 instanceId=1,
-                timestampMs=1411404930,
+                timestampMs=6000,
                 action=JobUpdateAction.INSTANCE_UPDATING),
             JobInstanceUpdateEvent(
                 instanceId=2,
-                timestampMs=1411404940,
+                timestampMs=7000,
                 action=JobUpdateAction.INSTANCE_UPDATING),
             JobInstanceUpdateEvent(
                 instanceId=1,
-                timestampMs=1411404950,
+                timestampMs=8000,
                 action=JobUpdateAction.INSTANCE_UPDATED),
             JobInstanceUpdateEvent(
                 instanceId=2,
-                timestampMs=1411404960,
+                timestampMs=9000,
                 action=JobUpdateAction.INSTANCE_UPDATED)])
     query_response.result.getJobUpdateDetailsResult = GetJobUpdateDetailsResult(details=details)
     return query_response
@@ -440,21 +443,23 @@ class TestUpdateCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       result = cmd.execute(["beta-update", "status", self.TEST_JOBSPEC])
       assert result == EXIT_OK
-      assert mock_context.get_out() == [
-          "Job: west/bozo/test/hello, UpdateID: 0",
-          "Started YYYY-MM-DD HH:MM:SS, last updated: YYYY-MM-DD HH:MM:SS",
-          "Current status: ROLLING_FORWARD",
-          "Update events:",
-          "  Status: ROLLING_FORWARD at YYYY-MM-DD HH:MM:SS",
-          "  Status: ROLL_FORWARD_PAUSED at YYYY-MM-DD HH:MM:SS",
-          "  Status: ROLLING_FORWARD at YYYY-MM-DD HH:MM:SS",
-          "Instance events:",
-          "  Instance 1 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATING",
-          "  Instance 2 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATING",
-          "  Instance 1 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATED",
-          "  Instance 2 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATED"]
-      mock_context.get_api(self.TEST_CLUSTER).query_job_updates.assert_called_with(
-          job_key=self.TEST_JOBKEY)
+      assert ('\n'.join(mock_context.get_out()) ==
+          """Job: west/bozo/test/hello, UpdateID: 0
+Started %(ctime)s, last activity: %(ctime)s
+Current status: ROLLING_FORWARD
+Update events:
+  Status: ROLLING_FORWARD at %(ctime)s
+  Status: ROLL_FORWARD_PAUSED at %(ctime)s
+  Status: ROLLING_FORWARD at %(ctime)s
+Instance events:
+  Instance 1 at %(ctime)s: INSTANCE_UPDATING
+  Instance 2 at %(ctime)s: INSTANCE_UPDATING
+  Instance 1 at %(ctime)s: INSTANCE_UPDATED
+  Instance 2 at %(ctime)s: INSTANCE_UPDATED""" % {'ctime': TestUpdateCommand.CTIME})
+      assert self.mock_ctime.mock_calls == [call(n) for n in range(1, 10)]
+      assert mock_context.get_api(self.TEST_CLUSTER).query_job_updates.mock_calls == [
+          call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)
+      ]
 
   def test_update_status_json(self):
     mock_context = FakeAuroraCommandContext()
@@ -469,26 +474,28 @@ class TestUpdateCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       result = cmd.execute(["beta-update", "status", "--write-json", self.TEST_JOBSPEC])
       assert result == EXIT_OK
-      mock_context.get_api(self.TEST_CLUSTER).query_job_updates.assert_called_with(
-          job_key=self.TEST_JOBKEY)
-      mock_context.get_api(self.TEST_CLUSTER).get_job_update_details.assert_called_with(
-          update_status_response.result.getJobUpdateSummariesResult.updateSummaries[0].key)
+      assert mock_context.get_api(self.TEST_CLUSTER).query_job_updates.mock_calls == [
+          call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)
+      ]
+      assert mock_context.get_api(self.TEST_CLUSTER).get_job_update_details.mock_calls == [
+          call(update_status_response.result.getJobUpdateSummariesResult.updateSummaries[0].key)
+      ]
       assert json.loads(mock_context.get_out_str()) == {
           "status": "ROLLING_FORWARD",
-          "last_updated": 14114056030,
-          "started": 1411404927,
+          "last_updated": 2000,
+          "started": 1000,
           "update_events": [
               {
                 "status": "ROLLING_FORWARD",
-                "timestampMs": 1411404927
+                "timestampMs": 3000
               },
               {
                   "status": "ROLL_FORWARD_PAUSED",
-                  "timestampMs": 1411405000
+                  "timestampMs": 4000
               },
               {
                   "status": "ROLLING_FORWARD",
-                  "timestampMs": 1411405100
+                  "timestampMs": 5000
               }
           ],
           "job": "west/bozo/test/hello",
@@ -497,22 +504,22 @@ class TestUpdateCommand(AuroraClientCommandTest):
               {
                   "action": "INSTANCE_UPDATING",
                   "instance": 1,
-                  "timestamp": 1411404930
+                  "timestamp": 6000
               },
               {
                   "action": "INSTANCE_UPDATING",
                   "instance": 2,
-                  "timestamp": 1411404940
+                  "timestamp": 7000
               },
               {
                   "action": "INSTANCE_UPDATED",
                   "instance": 1,
-                  "timestamp": 1411404950
+                  "timestamp": 8000
               },
               {
                   "action": "INSTANCE_UPDATED",
                   "instance": 2,
-                  "timestamp": 1411404960
+                  "timestamp": 9000
               }
           ]
       }

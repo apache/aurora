@@ -45,6 +45,7 @@ from apache.aurora.client.cli.options import (
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
+from gen.apache.aurora.api.constants import ACTIVE_JOB_UPDATE_STATES
 from gen.apache.aurora.api.ttypes import JobUpdateAction, JobUpdateStatus
 
 
@@ -246,7 +247,9 @@ class UpdateStatus(Verb):
 
   def _get_update_key(self, context, job_key):
     api = context.get_api(context.options.jobspec.cluster)
-    response = api.query_job_updates(job_key=context.options.jobspec)
+    response = api.query_job_updates(
+        update_statuses=ACTIVE_JOB_UPDATE_STATES,
+        job_key=context.options.jobspec)
     context.log_response_and_raise(response)
     for summary in response.result.getJobUpdateSummariesResult.updateSummaries:
       if summary.key.job == job_key.to_thrift():
@@ -293,11 +296,14 @@ class UpdateStatus(Verb):
       context.print_out(json.dumps(result, indent=2, separators=[',', ': '], sort_keys=False))
 
     else:
+      def timestamp(time_ms):
+        return time.ctime(time_ms / 1000)
+
       context.print_out("Job: %s, UpdateID: %s" % (context.options.jobspec,
           details.update.summary.key.id))
-      context.print_out("Started %s, last updated: %s" %
-          (time.ctime(details.update.summary.state.createdTimestampMs),
-          time.ctime(details.update.summary.state.lastModifiedTimestampMs)))
+      context.print_out("Started %s, last activity: %s" %
+          (timestamp(details.update.summary.state.createdTimestampMs),
+          timestamp(details.update.summary.state.lastModifiedTimestampMs)))
       context.print_out("Current status: %s" %
           JobUpdateStatus._VALUES_TO_NAMES[details.update.summary.state.status])
       update_events = details.updateEvents
@@ -306,14 +312,14 @@ class UpdateStatus(Verb):
         for event in update_events:
           context.print_out("Status: %s at %s" % (
               JobUpdateStatus._VALUES_TO_NAMES[event.status],
-              time.ctime(event.timestampMs)
+              timestamp(event.timestampMs)
           ), indent=2)
       instance_events = details.instanceEvents
       if instance_events is not None and len(instance_events) > 0:
         context.print_out("Instance events:")
         for event in instance_events:
           context.print_out("Instance %s at %s: %s" % (
-            event.instanceId, time.ctime(event.timestampMs),
+            event.instanceId, timestamp(event.timestampMs),
             JobUpdateAction._VALUES_TO_NAMES[event.action]
           ), indent=2)
     return EXIT_OK
