@@ -109,7 +109,9 @@ class AuroraCommandContext(Context):
 
   def log_response_and_raise(self, resp, err_code=EXIT_API_ERROR, err_msg="Command failure:"):
     if resp.responseCode == ResponseCode.OK:
-      logging.info(combine_messages(resp))
+      msg = combine_messages(resp)
+      if msg:
+        logging.info(msg)
     else:
       self.print_err(err_msg)
       self.print_err("\t%s" % combine_messages(resp))
