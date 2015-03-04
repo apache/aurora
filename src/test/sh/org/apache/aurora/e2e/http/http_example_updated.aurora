@@ -29,7 +29,7 @@ test_task = Task(
   processes = [stage_server, run_server],
   constraints = order(stage_server, run_server))
 
-update_config = UpdateConfig(watch_secs=10, batch_size=2)
+update_config = UpdateConfig(watch_secs=10, batch_size=3)
 health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)
 
 job = Service(
