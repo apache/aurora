@@ -12,22 +12,28 @@
 # limitations under the License.
 #
 
-python_test_suite(name = 'all',
+target(
+  name = 'all',
   dependencies = [
-    ':small',
+    ':common',
+    ':main',
+    'src/test/python/apache/thermos/cli/commands',
   ]
 )
 
-python_test_suite(name = 'small',
+python_tests(
+  name = 'common',
+  sources = ['test_common.py'],
   dependencies = [
-    ':test_thermos',
+    '3rdparty/python:mock',
+    'src/main/python/apache/thermos/cli:common',
   ]
 )
 
-python_tests(name = 'test_thermos',
-  sources = ['test_thermos.py'],
+python_tests(
+  name = 'main',
+  sources = ['test_main.py'],
   dependencies = [
-     'src/main/python/apache/thermos/bin:thermos',
-     'src/main/python/apache/thermos/testing:runner',
+    'src/main/python/apache/thermos/cli:main',
   ]
 )

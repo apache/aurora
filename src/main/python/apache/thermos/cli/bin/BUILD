@@ -12,13 +12,10 @@
 # limitations under the License.
 #
 
-python_test_suite(
-  name = 'all',
+python_binary(
+  name = 'thermos',
+  source = 'thermos.py',
   dependencies = [
-    'src/test/python/apache/thermos/common:all',
-    'src/test/python/apache/thermos/config:all',
-    'src/test/python/apache/thermos/core:all',
-    'src/test/python/apache/thermos/cli:all',
-    'src/test/python/apache/thermos/monitoring:all',
+    'src/main/python/apache/thermos/cli:main',
   ]
 )

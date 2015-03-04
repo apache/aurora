@@ -23,17 +23,10 @@ python_binary(
   ]
 )
 
-python_binary(
+target(
   name = 'thermos',
-  source = 'thermos.py',
   dependencies = [
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.log',
-    'src/main/python/apache/thermos/common',
-    'src/main/python/apache/thermos/config:schema',
-    'src/main/python/apache/thermos/core',
-    'src/main/python/apache/thermos/monitoring',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
+    'src/main/python/apache/thermos/cli/bin:thermos',
   ],
 )
 

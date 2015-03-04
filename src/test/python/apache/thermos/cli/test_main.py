@@ -12,13 +12,7 @@
 # limitations under the License.
 #
 
-python_test_suite(
-  name = 'all',
-  dependencies = [
-    'src/test/python/apache/thermos/common:all',
-    'src/test/python/apache/thermos/config:all',
-    'src/test/python/apache/thermos/core:all',
-    'src/test/python/apache/thermos/cli:all',
-    'src/test/python/apache/thermos/monitoring:all',
-  ]
-)
+
+def test_noop():
+  from apache.thermos.cli import main
+  assert main is not None

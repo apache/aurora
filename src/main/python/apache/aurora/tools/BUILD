@@ -12,7 +12,12 @@
 # limitations under the License.
 #
 
-
-def test_thermos_binary_import():
-  from apache.thermos.bin import thermos  # noqa
-  assert thermos is not None
+python_binary(
+  name = 'thermos',
+  source = 'thermos.py',
+  dependencies = [
+    'src/main/python/apache/thermos/cli:common',
+    'src/main/python/apache/thermos/cli:main',
+    'src/main/python/apache/aurora/executor/common:path_detector',
+  ]
+)

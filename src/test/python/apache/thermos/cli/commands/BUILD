@@ -12,13 +12,11 @@
 # limitations under the License.
 #
 
-python_test_suite(
-  name = 'all',
+python_tests(
+  name = 'commands',
+  sources = globs('*.py'),
   dependencies = [
-    'src/test/python/apache/thermos/common:all',
-    'src/test/python/apache/thermos/config:all',
-    'src/test/python/apache/thermos/core:all',
-    'src/test/python/apache/thermos/cli:all',
-    'src/test/python/apache/thermos/monitoring:all',
+    '3rdparty/python:mock',
+    'src/main/python/apache/thermos/cli/commands',
   ]
 )

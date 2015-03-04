@@ -12,13 +12,12 @@
 # limitations under the License.
 #
 
-python_test_suite(
-  name = 'all',
-  dependencies = [
-    'src/test/python/apache/thermos/common:all',
-    'src/test/python/apache/thermos/config:all',
-    'src/test/python/apache/thermos/core:all',
-    'src/test/python/apache/thermos/cli:all',
-    'src/test/python/apache/thermos/monitoring:all',
-  ]
-)
+from twitter.common import app
+
+from apache.thermos.cli.main import register_commands, register_options
+
+register_commands(app)
+register_options(app)
+
+
+app.main()
