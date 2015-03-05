@@ -21,12 +21,16 @@ import javax.ws.rs.core.Response.Status;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.AbstractModule;
+import com.google.inject.Module;
+import com.google.inject.util.Modules;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.ExecutorConfig;
@@ -51,6 +55,7 @@ import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.http.JettyServerModuleTest;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ResponseCode.OK;
@@ -59,6 +64,25 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class ApiBetaTest extends JettyServerModuleTest {
+  private AuroraAdmin.Iface thrift;
+
+  @Before
+  public void setUp() {
+    thrift = createMock(AuroraAdmin.Iface.class);
+  }
+
+  @Override
+  protected Module getChildServletModule() {
+    return Modules.combine(
+        new ApiModule(),
+        new AbstractModule() {
+          @Override
+          protected void configure() {
+            bind(AuroraAdmin.Iface.class).toInstance(thrift);
+          }
+        }
+    );
+  }
 
   private static final ITaskConfig TASK_CONFIG = ITaskConfig.build(
       new TaskConfig()

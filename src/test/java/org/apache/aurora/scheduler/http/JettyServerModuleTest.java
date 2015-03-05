@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.http;
 
 import java.net.InetSocketAddress;
 
+import javax.servlet.ServletContextListener;
 import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Optional;
@@ -24,7 +25,10 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Module;
+import com.google.inject.Provider;
 import com.google.inject.TypeLiteral;
+import com.google.inject.util.Modules;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.config.ClientConfig;
@@ -44,7 +48,6 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.thrift.ServiceInstance;
 
-import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.app.LocalServiceRegistryWithOverrides;
@@ -54,7 +57,6 @@ import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.async.TaskScheduler;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler;
-import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
@@ -62,6 +64,7 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.Capture;
 import org.junit.Before;
 
+import static org.apache.aurora.scheduler.http.JettyServerModule.makeServletContextListener;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertNotNull;
@@ -73,22 +76,27 @@ import static org.junit.Assert.assertNotNull;
  *
  */
 public abstract class JettyServerModuleTest extends EasyMockTest {
-
   private Injector injector;
   protected StorageTestUtil storage;
   protected InetSocketAddress httpServer;
   protected Capture<HostChangeMonitor<ServiceInstance>> schedulerWatcher;
-  protected AuroraAdmin.Iface thrift;
+
+  /**
+   * Subclasses should override with a module that configures the servlets they are testing.
+   *
+   * @return A module used in the creation of the servlet container's child injector.
+   */
+  protected Module getChildServletModule() {
+    return Modules.EMPTY_MODULE;
+  }
 
   @Before
-  public void setUp() throws Exception {
+  public void setUpBase() throws Exception {
     storage = new StorageTestUtil(this);
     final DynamicHostSet<ServiceInstance> schedulers =
-        createMock(new Clazz<DynamicHostSet<ServiceInstance>>() {
-        });
+        createMock(new Clazz<DynamicHostSet<ServiceInstance>>() { });
 
     injector = Guice.createInjector(
-        new JettyServerModule(),
         new StatsModule(),
         new LifecycleModule(),
         new SchedulerServicesModule(),
@@ -114,17 +122,22 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
             bind(LocalServiceRegistryWithOverrides.Settings.class).toInstance(
                 new LocalServiceRegistryWithOverrides.Settings(Optional.<String>absent()));
             bind(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }).toInstance(schedulers);
-            thrift = bindMock(AuroraAdmin.Iface.class);
             bindMock(CronJobManager.class);
             bindMock(LockManager.class);
             bindMock(OfferManager.class);
-            bindMock(QuotaManager.class);
             bindMock(RescheduleCalculator.class);
             bindMock(TaskScheduler.class);
             bindMock(Thread.UncaughtExceptionHandler.class);
-          }
-        });
 
+            bind(ServletContextListener.class).toProvider(new Provider<ServletContextListener>() {
+              @Override
+              public ServletContextListener get() {
+                return makeServletContextListener(injector, getChildServletModule());
+              }
+            });
+          }
+        },
+        new JettyServerModule(false));
     schedulerWatcher = createCapture();
     expect(schedulers.watch(capture(schedulerWatcher))).andReturn(createMock(Command.class));
   }

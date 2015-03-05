@@ -21,15 +21,16 @@ import java.util.logging.Logger;
 import javax.annotation.Nonnegative;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.servlet.ServletContextListener;
 import javax.servlet.http.HttpServlet;
-import javax.ws.rs.HttpMethod;
 
-import com.google.common.base.Joiner;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
+import com.google.inject.Module;
+import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 import com.google.inject.servlet.GuiceFilter;
@@ -57,7 +58,7 @@ import com.twitter.common.net.http.handlers.VarsJsonHandler;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
-import org.apache.aurora.scheduler.http.api.ApiBeta;
+import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.eclipse.jetty.rewrite.handler.RewriteHandler;
 import org.eclipse.jetty.rewrite.handler.RewriteRegexRule;
 import org.eclipse.jetty.server.Connector;
@@ -97,26 +98,26 @@ public class JettyServerModule extends AbstractModule {
       help = "The port to start an HTTP server on.  Default value will choose a random port.")
   protected static final Arg<Integer> HTTP_PORT = Arg.create(0);
 
-  @CmdLine(name = "enable_cors_support", help = "Enable CORS support for thrift end points.")
-  private static final Arg<Boolean> ENABLE_CORS_SUPPORT = Arg.create(false);
-
-  // More info on CORS can be found at http://enable-cors.org/index.html
-  @CmdLine(name = "enable_cors_for",
-      help = "List of domains for which CORS support should be enabled.")
-  private static final Arg<String> ENABLE_CORS_FOR = Arg.create("*");
-
-  private static final Map<String, String> CONTAINER_PARAMS = ImmutableMap.of(
+  public static final Map<String, String> GUICE_CONTAINER_PARAMS = ImmutableMap.of(
       FEATURE_POJO_MAPPING, Boolean.TRUE.toString(),
       PROPERTY_CONTAINER_REQUEST_FILTERS, GZIPContentEncodingFilter.class.getName(),
       PROPERTY_CONTAINER_RESPONSE_FILTERS, GZIPContentEncodingFilter.class.getName());
 
-  private static final String API_CLIENT_ROOT = Resource
-      .newClassPathResource("org/apache/aurora/scheduler/gen/client")
-      .toString();
   private static final String STATIC_ASSETS_ROOT = Resource
       .newClassPathResource("scheduler/assets/index.html")
       .toString()
       .replace("assets/index.html", "");
+
+  private final boolean production;
+
+  public JettyServerModule() {
+    this(true);
+  }
+
+  @VisibleForTesting
+  JettyServerModule(boolean production) {
+    this.production = production;
+  }
 
   @Override
   protected void configure() {
@@ -137,6 +138,88 @@ public class JettyServerModule extends AbstractModule {
 
     bind(LeaderRedirect.class).in(Singleton.class);
     SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RedirectMonitor.class);
+
+    if (production) {
+      install(PRODUCTION_SERVLET_CONTEXT_LISTENER);
+    }
+  }
+
+  private static final Module PRODUCTION_SERVLET_CONTEXT_LISTENER = new AbstractModule() {
+    @Override
+    protected void configure() {
+      // Provider binding only.
+    }
+
+    @Provides
+    @Singleton
+    ServletContextListener provideServletContextListener(Injector parentInjector) {
+      return makeServletContextListener(parentInjector, new ApiModule());
+    };
+  };
+
+  // TODO(ksweeney): Factor individual servlet configurations to their own ServletModules.
+  @VisibleForTesting
+  static ServletContextListener makeServletContextListener(
+      final Injector parentInjector,
+      final Module childModule) {
+
+    return new GuiceServletContextListener() {
+      @Override
+      protected Injector getInjector() {
+        return parentInjector.createChildInjector(
+            childModule,
+            new JerseyServletModule() {
+              private void registerJerseyEndpoint(String indexPath, Class<?> servlet) {
+                filter(indexPath + "*").through(LeaderRedirectFilter.class);
+                filter(indexPath + "*").through(GuiceContainer.class, GUICE_CONTAINER_PARAMS);
+                bind(servlet);
+              }
+
+              private void registerServlet(String pathSpec, Class<? extends HttpServlet> servlet) {
+                bind(servlet).in(Singleton.class);
+                serve(pathSpec).with(servlet);
+              }
+
+              @Override
+              protected void configureServlets() {
+                bind(HttpStatsFilter.class).in(Singleton.class);
+                filter("*").through(HttpStatsFilter.class);
+                bind(LeaderRedirectFilter.class).in(Singleton.class);
+
+                filterRegex("/assets/.*").through(new GzipFilter());
+                filterRegex("/assets/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
+
+                serve("/assets", "/assets/*")
+                    .with(new DefaultServlet(), ImmutableMap.of(
+                        "resourceBase", STATIC_ASSETS_ROOT,
+                        "dirAllowed", "false"));
+
+                bind(GuiceContainer.class).in(Singleton.class);
+                registerJerseyEndpoint("/cron", Cron.class);
+                registerJerseyEndpoint("/locks", Locks.class);
+                registerJerseyEndpoint("/maintenance", Maintenance.class);
+                registerJerseyEndpoint("/mname", Mname.class);
+                registerJerseyEndpoint("/offers", Offers.class);
+                registerJerseyEndpoint("/pendingtasks", PendingTasks.class);
+                registerJerseyEndpoint("/quotas", Quotas.class);
+                registerJerseyEndpoint("/services", Services.class);
+                registerJerseyEndpoint("/slaves", Slaves.class);
+                registerJerseyEndpoint("/structdump", StructDump.class);
+                registerJerseyEndpoint("/utilization", Utilization.class);
+
+                registerServlet("/abortabortabort", AbortHandler.class);
+                registerServlet("/contention", ContentionPrinter.class);
+                registerServlet("/health", HealthHandler.class);
+                registerServlet("/logconfig", LogConfig.class);
+                registerServlet("/quitquitquit", QuitHandler.class);
+                registerServlet("/threads", ThreadStackPrinter.class);
+                registerServlet("/graphdata/", TimeSeriesDataSource.class);
+                registerServlet("/vars", VarsHandler.class);
+                registerServlet("/vars.json", VarsJsonHandler.class);
+              }
+            });
+      }
+    };
   }
 
   static class RedirectMonitor extends AbstractIdleService {
@@ -160,11 +243,11 @@ public class JettyServerModule extends AbstractModule {
 
   // TODO(wfarner): Use guava's Service to enforce the lifecycle of this.
   public static final class HttpServerLauncher implements LifecycleModule.ServiceRunner {
-    private final Injector parentInjector;
+    private final ServletContextListener servletContextListener;
 
     @Inject
-    HttpServerLauncher(Injector parentInjector) {
-      this.parentInjector = requireNonNull(parentInjector);
+    HttpServerLauncher(ServletContextListener servletContextListener) {
+      this.servletContextListener = requireNonNull(servletContextListener);
     }
 
     private static final Map<String, String> REGEX_REWRITE_RULES =
@@ -193,11 +276,6 @@ public class JettyServerModule extends AbstractModule {
       return rewrites;
     }
 
-    @Singleton
-    static class ApiClientServlet extends DefaultServlet {
-      // Subclass to allow extra instance of DefaultServlet.
-    }
-
     @Override
     public LocalService launch() throws LaunchException {
       // N.B. we explicitly disable the resource cache here due to a bug serving content out of the
@@ -210,6 +288,7 @@ public class JettyServerModule extends AbstractModule {
 
       servletHandler.addServlet(DefaultServlet.class, "/");
       servletHandler.addFilter(GuiceFilter.class,  "/*", EnumSet.allOf(DispatcherType.class));
+      servletHandler.addEventListener(servletContextListener);
 
       HandlerCollection rootHandler = new HandlerCollection();
 
@@ -218,87 +297,6 @@ public class JettyServerModule extends AbstractModule {
 
       rootHandler.addHandler(logHandler);
       rootHandler.addHandler(servletHandler);
-
-      servletHandler.addEventListener(new GuiceServletContextListener() {
-        @Override
-        protected Injector getInjector() {
-          return parentInjector.createChildInjector(new JerseyServletModule() {
-            private void registerJerseyEndpoint(String indexPath, Class<?> servlet) {
-              filter(indexPath + "*").through(LeaderRedirectFilter.class);
-              filter(indexPath + "*").through(GuiceContainer.class, CONTAINER_PARAMS);
-              bind(servlet);
-            }
-
-            private void registerServlet(String pathSpec, Class<? extends HttpServlet> servlet) {
-              bind(servlet).in(Singleton.class);
-              serve(pathSpec).with(servlet);
-            }
-
-            @Override
-            protected void configureServlets() {
-              bind(HttpStatsFilter.class).in(Singleton.class);
-              filter("*").through(HttpStatsFilter.class);
-              bind(LeaderRedirectFilter.class).in(Singleton.class);
-              filterRegex("/assets/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
-
-              // Add CORS support for all /api endpoints.
-              if (ENABLE_CORS_SUPPORT.get()) {
-                bind(CorsFilter.class).toInstance(new CorsFilter(ENABLE_CORS_FOR.get()));
-                filter("/api*").through(CorsFilter.class);
-              }
-
-              // NOTE: GzipFilter is applied only to /api instead of globally because the
-              // Jersey-managed servlets have a conflicting filter applied to them.
-              bind(GzipFilter.class).in(Singleton.class);
-              filterRegex("/api(?:/.*)?").through(GzipFilter.class, ImmutableMap.of(
-                  "methods", Joiner.on(',').join(ImmutableSet.of(
-                      HttpMethod.GET,
-                      HttpMethod.POST))));
-              filterRegex("/assets/.*").through(
-                  GzipFilter.class,
-                  ImmutableMap.of("methods", HttpMethod.GET));
-
-              bind(DefaultServlet.class).in(Singleton.class);
-              serve("/assets", "/assets/*")
-                  .with(DefaultServlet.class, ImmutableMap.of(
-                      "resourceBase", STATIC_ASSETS_ROOT,
-                      "dirAllowed", "false"));
-
-              serve("/apiclient", "/apiclient/*")
-                  .with(ApiClientServlet.class, ImmutableMap.<String, String>builder()
-                      .put("resourceBase", API_CLIENT_ROOT)
-                      .put("pathInfoOnly", "true")
-                      .put("dirAllowed", "false")
-                      .build());
-
-              bind(GuiceContainer.class).in(Singleton.class);
-              registerJerseyEndpoint("/apibeta", ApiBeta.class);
-              registerJerseyEndpoint("/cron", Cron.class);
-              registerJerseyEndpoint("/locks", Locks.class);
-              registerJerseyEndpoint("/maintenance", Maintenance.class);
-              registerJerseyEndpoint("/mname", Mname.class);
-              registerJerseyEndpoint("/offers", Offers.class);
-              registerJerseyEndpoint("/pendingtasks", PendingTasks.class);
-              registerJerseyEndpoint("/quotas", Quotas.class);
-              registerJerseyEndpoint("/services", Services.class);
-              registerJerseyEndpoint("/slaves", Slaves.class);
-              registerJerseyEndpoint("/structdump", StructDump.class);
-              registerJerseyEndpoint("/utilization", Utilization.class);
-
-              registerServlet("/abortabortabort", AbortHandler.class);
-              registerServlet("/contention", ContentionPrinter.class);
-              registerServlet("/health", HealthHandler.class);
-              registerServlet("/logconfig", LogConfig.class);
-              registerServlet("/quitquitquit", QuitHandler.class);
-              registerServlet("/api", SchedulerAPIServlet.class);
-              registerServlet("/threads", ThreadStackPrinter.class);
-              registerServlet("/graphdata/", TimeSeriesDataSource.class);
-              registerServlet("/vars", VarsHandler.class);
-              registerServlet("/vars.json", VarsJsonHandler.class);
-            }
-          });
-        }
-      });
 
       Connector connector = new SelectChannelConnector();
       connector.setPort(HTTP_PORT.get());

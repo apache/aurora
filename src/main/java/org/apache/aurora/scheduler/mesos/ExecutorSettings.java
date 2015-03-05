@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.mesos;
 import java.util.List;
 
 import com.google.common.base.Optional;
-
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.gen.Volume;

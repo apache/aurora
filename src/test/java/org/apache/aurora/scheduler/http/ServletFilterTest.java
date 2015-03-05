@@ -24,10 +24,8 @@ import com.sun.jersey.api.client.ClientResponse.Status;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
-import org.apache.aurora.gen.Response;
 import org.junit.Test;
 
-import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class ServletFilterTest extends JettyServerModuleTest {
@@ -59,7 +57,6 @@ public class ServletFilterTest extends JettyServerModuleTest {
 
   @Test
   public void testGzipEncoding() throws Exception {
-    expect(thrift.getJobSummary("www-data")).andReturn(new Response()).times(2);
     replayAndStart();
 
     assertGzipEncodedGet("/");
@@ -76,8 +73,6 @@ public class ServletFilterTest extends JettyServerModuleTest {
 
     assertGzipEncodedGet("/assets/bower_components/angular/angular.js");
 
-    assertGzipEncodedPost("/api", "[1,\"getJobSummary\",1,0,{\"1\":{\"str\":\"www-data\"}}]");
-    assertGzipEncodedPost("/apibeta/getJobSummary", "{\"role\":\"www-data\"}");
   }
 
   private void assertResponseStatus(String path, Status expectedStatus) {

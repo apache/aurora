@@ -57,8 +57,9 @@ import static org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler.GSON;
  * A scheduler interface that allows interaction with the thrift API via traditional JSON,
  * rather than thrift's preferred means which uses field IDs.
  */
-@Path("/apibeta")
+@Path(ApiBeta.PATH)
 public class ApiBeta {
+  static final String PATH = "/apibeta";
 
   private static final Logger LOG = Logger.getLogger(ApiBeta.class.getName());
 
