@@ -698,6 +698,12 @@ struct JobUpdateEvent {
 
   /** User who performed this event (if user-initiated). */
   3: optional string user
+
+  /**
+   * Message from the user (for user-initiated transitions) or the scheduler about why the state was
+   * changed.
+   */
+  4: optional string message
 }
 
 /** Event marking a state transition in job instance update lifecycle. */

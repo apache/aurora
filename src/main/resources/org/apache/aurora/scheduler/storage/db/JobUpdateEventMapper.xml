@@ -22,12 +22,14 @@
       update_row_id,
       status,
       user,
-      timestamp_ms
+      timestamp_ms,
+      message
     ) VALUES (
       <include refid="org.apache.aurora.scheduler.storage.db.JobUpdateDetailsMapper.select_update_row_id"/>,
       #{event.status, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler},
       #{event.user},
-      #{event.timestampMs}
+      #{event.timestampMs},
+      #{event.message}
     )
   </insert>
 </mapper>

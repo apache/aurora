@@ -237,10 +237,9 @@ public class DBJobUpdateStoreTest {
   @Test
   public void testSaveJobEvents() {
     IJobUpdateKey updateId = makeKey("u3");
-    String user = "test";
     IJobUpdate update = makeJobUpdate(updateId);
-    IJobUpdateEvent event1 = makeJobUpdateEvent(ROLLING_FORWARD, 124L, user);
-    IJobUpdateEvent event2 = makeJobUpdateEvent(ROLL_FORWARD_PAUSED, 125L, user);
+    IJobUpdateEvent event1 = makeJobUpdateEvent(ROLLING_FORWARD, 124L);
+    IJobUpdateEvent event2 = makeJobUpdateEvent(ROLL_FORWARD_PAUSED, 125L);
 
     saveUpdate(update, Optional.of("lock1"));
     assertUpdate(update);
@@ -388,12 +387,11 @@ public class DBJobUpdateStoreTest {
   public void testTruncateJobUpdates() {
     IJobUpdateKey updateId = makeKey("u5");
     IJobUpdate update = makeJobUpdate(updateId);
-    IJobUpdateEvent updateEvent = IJobUpdateEvent.build(new JobUpdateEvent(ROLLING_FORWARD, 123L));
     IJobInstanceUpdateEvent instanceEvent = IJobInstanceUpdateEvent.build(
         new JobInstanceUpdateEvent(0, 125L, INSTANCE_ROLLBACK_FAILED));
 
     saveUpdate(update, Optional.of("lock"));
-    saveJobEvent(updateEvent, updateId);
+    saveJobEvent(makeJobUpdateEvent(ROLLING_FORWARD, 123L), updateId);
     saveJobInstanceEvent(instanceEvent, updateId);
     assertEquals(
         populateExpected(update, ROLLING_FORWARD, CREATED_MS, 125L),
@@ -424,13 +422,13 @@ public class DBJobUpdateStoreTest {
     IJobUpdate update6 = makeJobUpdate(updateId6);
     IJobUpdate update7 = makeJobUpdate(updateId7);
 
-    IJobUpdateEvent updateEvent1 = IJobUpdateEvent.build(new JobUpdateEvent(ROLLING_BACK, 123L));
-    IJobUpdateEvent updateEvent2 = IJobUpdateEvent.build(new JobUpdateEvent(ABORTED, 124L));
-    IJobUpdateEvent updateEvent3 = IJobUpdateEvent.build(new JobUpdateEvent(ROLLED_BACK, 125L));
-    IJobUpdateEvent updateEvent4 = IJobUpdateEvent.build(new JobUpdateEvent(FAILED, 126L));
-    IJobUpdateEvent updateEvent5 = IJobUpdateEvent.build(new JobUpdateEvent(ERROR, 123L));
-    IJobUpdateEvent updateEvent6 = IJobUpdateEvent.build(new JobUpdateEvent(FAILED, 125L));
-    IJobUpdateEvent updateEvent7 = IJobUpdateEvent.build(new JobUpdateEvent(ROLLING_FORWARD, 126L));
+    IJobUpdateEvent updateEvent1 = makeJobUpdateEvent(ROLLING_BACK, 123L);
+    IJobUpdateEvent updateEvent2 = makeJobUpdateEvent(ABORTED, 124L);
+    IJobUpdateEvent updateEvent3 = makeJobUpdateEvent(ROLLED_BACK, 125L);
+    IJobUpdateEvent updateEvent4 = makeJobUpdateEvent(FAILED, 126L);
+    IJobUpdateEvent updateEvent5 = makeJobUpdateEvent(ERROR, 123L);
+    IJobUpdateEvent updateEvent6 = makeJobUpdateEvent(FAILED, 125L);
+    IJobUpdateEvent updateEvent7 = makeJobUpdateEvent(ROLLING_FORWARD, 126L);
 
     update1 = populateExpected(
         saveUpdateNoEvent(update1, Optional.of("lock1")), ROLLING_BACK, 123L, 123L);
@@ -949,16 +947,9 @@ public class DBJobUpdateStoreTest {
 
   private static IJobUpdateEvent makeJobUpdateEvent(JobUpdateStatus status, long timestampMs) {
     return IJobUpdateEvent.build(
-        new JobUpdateEvent(status, timestampMs));
-  }
-
-  private static IJobUpdateEvent makeJobUpdateEvent(
-      JobUpdateStatus status,
-      long timestampMs,
-      String user) {
-
-    return IJobUpdateEvent.build(
-        new JobUpdateEvent(status, timestampMs).setUser(user));
+        new JobUpdateEvent(status, timestampMs)
+            .setUser("user")
+            .setMessage("message"));
   }
 
   private IJobInstanceUpdateEvent makeJobInstanceEvent(

@@ -397,6 +397,7 @@
       e.status AS e_status,
       e.user AS e_user,
       e.timestamp_ms AS e_timestamp_ms,
+      e.message AS e_message,
       i.id AS i_id,
       i.action AS i_action,
       i.instance_id AS i_instance_id,

@@ -160,7 +160,8 @@ CREATE TABLE job_update_events(
   update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
   status INT NOT NULL REFERENCES job_update_statuses(id),
   timestamp_ms BIGINT NOT NULL,
-  user VARCHAR
+  user VARCHAR,
+  message VARCHAR
 );
 
 CREATE TABLE job_instance_update_events(
