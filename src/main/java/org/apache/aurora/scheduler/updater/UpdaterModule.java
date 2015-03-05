@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 
 /**
@@ -60,5 +61,7 @@ public class UpdaterModule extends AbstractModule {
     });
 
     PubsubEventModule.bindSubscriber(binder(), JobUpdateEventSubscriber.class);
+    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder())
+        .to(JobUpdateEventSubscriber.class);
   }
 }
