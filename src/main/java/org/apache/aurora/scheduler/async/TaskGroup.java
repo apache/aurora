@@ -20,24 +20,24 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
-import org.apache.aurora.scheduler.async.TaskGroups.GroupKey;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 
 /**
  * A group of task IDs that are eligible for scheduling, but may be waiting for a backoff to expire.
  */
 class TaskGroup {
-  private final GroupKey key;
+  private final TaskGroupKey key;
   private long penaltyMs;
   private final Queue<String> tasks;
 
-  TaskGroup(GroupKey key, String initialTaskId) {
+  TaskGroup(TaskGroupKey key, String initialTaskId) {
     this.key = key;
     this.penaltyMs = 0;
     this.tasks = Lists.newLinkedList();
     this.tasks.add(initialTaskId);
   }
 
-  synchronized GroupKey getKey() {
+  synchronized TaskGroupKey getKey() {
     return key;
   }
 

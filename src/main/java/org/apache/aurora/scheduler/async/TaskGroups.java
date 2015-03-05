@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.async;
 
-import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -39,14 +38,13 @@ import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.scheduler.base.AsyncUtil;
-import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -56,7 +54,8 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 /**
  * A collection of task groups, where a task group is a collection of tasks that are known to be
  * equal in the way they schedule. This is expected to be tasks associated with the same job key,
- * who also have {@code equal()} {@link ITaskConfig} values.
+ * who also have {@code equal()} {@link org.apache.aurora.scheduler.storage.entities.ITaskConfig}
+ * values.
  * <p>
  * This is used to prevent redundant work in trying to schedule tasks as well as to provide
  * nearly-equal responsiveness when scheduling across jobs.  In other words, a 1000 instance job
@@ -66,7 +65,7 @@ public class TaskGroups implements EventSubscriber {
 
   private static final Logger LOG = Logger.getLogger(TaskGroups.class.getName());
 
-  private final ConcurrentMap<GroupKey, TaskGroup> groups = Maps.newConcurrentMap();
+  private final ConcurrentMap<TaskGroupKey, TaskGroup> groups = Maps.newConcurrentMap();
   private final ScheduledExecutorService executor;
   private final TaskScheduler taskScheduler;
   private final long firstScheduleDelay;
@@ -199,7 +198,7 @@ public class TaskGroups implements EventSubscriber {
   public synchronized void taskChangedState(TaskStateChange stateChange) {
     if (stateChange.getNewState() == PENDING) {
       IScheduledTask task = stateChange.getTask();
-      GroupKey key = new GroupKey(task.getAssignedTask().getTask());
+      TaskGroupKey key = TaskGroupKey.from(task.getAssignedTask().getTask());
       TaskGroup newGroup = new TaskGroup(key, Tasks.id(task));
       TaskGroup existing = groups.putIfAbsent(key, newGroup);
       if (existing == null) {
@@ -226,7 +225,7 @@ public class TaskGroups implements EventSubscriber {
   public synchronized void tasksDeleted(TasksDeleted deleted) {
     for (IAssignedTask task
         : Iterables.transform(deleted.getTasks(), Tasks.SCHEDULED_TO_ASSIGNED)) {
-      TaskGroup group = groups.get(new GroupKey(task.getTask()));
+      TaskGroup group = groups.get(TaskGroupKey.from(task.getTask()));
       if (group != null) {
         group.remove(task.getTaskId());
       }
@@ -237,30 +236,4 @@ public class TaskGroups implements EventSubscriber {
     return ImmutableSet.copyOf(groups.values());
   }
 
-  static class GroupKey {
-    private final ITaskConfig canonicalTask;
-
-    GroupKey(ITaskConfig task) {
-      this.canonicalTask = task;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(canonicalTask);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof GroupKey)) {
-        return false;
-      }
-      GroupKey other = (GroupKey) o;
-      return Objects.equals(canonicalTask, other.canonicalTask);
-    }
-
-    @Override
-    public String toString() {
-      return JobKeys.canonicalString(Tasks.INFO_TO_JOB_KEY.apply(canonicalTask));
-    }
-  }
 }

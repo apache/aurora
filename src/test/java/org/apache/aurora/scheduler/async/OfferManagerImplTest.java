@@ -31,7 +31,7 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.OfferManager.OfferManagerImpl;
 import org.apache.aurora.scheduler.async.OfferManager.OfferReturnDelay;
-import org.apache.aurora.scheduler.async.TaskGroups.GroupKey;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -65,8 +65,8 @@ public class OfferManagerImplTest extends EasyMockTest {
   private static final HostOffer OFFER_C = new HostOffer(
       Offers.makeOffer("OFFER_C", HOST_C),
       IHostAttributes.build(new HostAttributes().setMode(NONE)));
-  private static final GroupKey GROUP_KEY =
-      new GroupKey(ITaskConfig.build(new TaskConfig().setJob(new JobKey("role", "env", "name"))));
+  private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(
+      ITaskConfig.build(new TaskConfig().setJob(new JobKey("role", "env", "name"))));
 
   private Driver driver;
   private FakeScheduledExecutor clock;

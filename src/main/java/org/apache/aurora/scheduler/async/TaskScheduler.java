@@ -42,9 +42,9 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.TaskGroups.GroupKey;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -218,7 +218,7 @@ public interface TaskScheduler extends EventSubscriber {
         try {
           boolean launched = offerManager.launchFirst(
               getAssignerFunction(store, new ResourceRequest(task, taskId, aggregate)),
-              new GroupKey(task));
+              TaskGroupKey.from(task));
 
           if (!launched) {
             // Task could not be scheduled.

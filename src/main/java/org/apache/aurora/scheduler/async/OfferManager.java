@@ -42,7 +42,7 @@ import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.TaskGroups.GroupKey;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -89,7 +89,7 @@ public interface OfferManager extends EventSubscriber {
    * @throws LaunchException If the acceptor accepted an offer, but there was an error launching the
    *                         task.
    */
-  boolean launchFirst(Function<HostOffer, Assignment> acceptor, GroupKey groupKey)
+  boolean launchFirst(Function<HostOffer, Assignment> acceptor, TaskGroupKey groupKey)
       throws LaunchException;
 
   /**
@@ -254,7 +254,7 @@ public interface OfferManager extends EventSubscriber {
       // TODO(maxim): Expose via a debug endpoint. AURORA-1136.
       // Keep track of offer->groupKey mappings that will never be matched to avoid redundant
       // scheduling attempts. See Assignment.Result for more details on static ban.
-      private final Multimap<OfferID, GroupKey> staticallyBannedOffers = HashMultimap.create();
+      private final Multimap<OfferID, TaskGroupKey> staticallyBannedOffers = HashMultimap.create();
 
       HostOffers() {
         // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
@@ -297,7 +297,7 @@ public interface OfferManager extends EventSubscriber {
         return Iterables.unmodifiableIterable(offers);
       }
 
-      synchronized boolean isStaticallyBanned(HostOffer offer, GroupKey groupKey) {
+      synchronized boolean isStaticallyBanned(HostOffer offer, TaskGroupKey groupKey) {
         boolean result = staticallyBannedOffers.containsEntry(offer.getOffer().getId(), groupKey);
         if (LOG.isLoggable(Level.FINE)) {
           LOG.fine(String.format(
@@ -309,7 +309,7 @@ public interface OfferManager extends EventSubscriber {
         return result;
       }
 
-      synchronized void addStaticGroupBan(HostOffer offer, GroupKey groupKey) {
+      synchronized void addStaticGroupBan(HostOffer offer, TaskGroupKey groupKey) {
         OfferID offerId = offer.getOffer().getId();
         if (offersById.containsKey(offerId)) {
           staticallyBannedOffers.put(offerId, groupKey);
@@ -332,7 +332,7 @@ public interface OfferManager extends EventSubscriber {
 
     @Timed("offer_queue_launch_first")
     @Override
-    public boolean launchFirst(Function<HostOffer, Assignment> acceptor, GroupKey groupKey)
+    public boolean launchFirst(Function<HostOffer, Assignment> acceptor, TaskGroupKey groupKey)
         throws LaunchException {
 
       // It's important that this method is not called concurrently - doing so would open up the
@@ -352,7 +352,7 @@ public interface OfferManager extends EventSubscriber {
     protected boolean acceptOffer(
         HostOffer offer,
         Function<HostOffer, Assignment> acceptor,
-        GroupKey groupKey) throws LaunchException {
+        TaskGroupKey groupKey) throws LaunchException {
 
       Assignment assignment = acceptor.apply(offer);
       switch (assignment.getResult()) {

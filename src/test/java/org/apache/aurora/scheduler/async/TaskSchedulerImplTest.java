@@ -36,10 +36,10 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.TaskGroups.GroupKey;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -82,8 +82,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
       Offers.makeOffer("OFFER_A", "HOST_A"),
       IHostAttributes.build(new HostAttributes().setMode(MaintenanceMode.NONE)));
 
-  private static final GroupKey GROUP_A = new GroupKey(TASK_A.getAssignedTask().getTask());
-  private static final GroupKey GROUP_B = new GroupKey(TASK_B.getAssignedTask().getTask());
+  private static final TaskGroupKey GROUP_A = TaskGroupKey.from(TASK_A.getAssignedTask().getTask());
+  private static final TaskGroupKey GROUP_B = TaskGroupKey.from(TASK_B.getAssignedTask().getTask());
 
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
@@ -344,7 +344,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private static class AssignmentCapture {
     public Capture<Function<HostOffer, Assignment>> assigner = createCapture();
-    public Capture<GroupKey> groupKey = createCapture();
+    public Capture<TaskGroupKey> groupKey = createCapture();
   }
 
   private AssignmentCapture expectLaunchAttempt(boolean taskLaunched)
@@ -358,7 +358,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private void assignAndAssert(
       Result result,
-      GroupKey groupKey,
+      TaskGroupKey groupKey,
       HostOffer offer,
       AssignmentCapture capture) {
 
