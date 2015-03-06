@@ -152,20 +152,21 @@ In order for Aurora to launch jobs using docker containers, a few extra configur
 must be set.  The [docker containerizer](http://mesos.apache.org/documentation/latest/docker-containerizer/)
 must be enabled on the mesos slaves by launching them with the `--containerizers=docker,mesos` option.
 
-By default, aurora will configure mesos to copy the file specified in `-thermos_executor_path`
+By default, Aurora will configure Mesos to copy the file specified in `-thermos_executor_path`
 into the container's sandbox.  If using a wrapper script to launch the thermos executor,
-specify the path to the wrapper in that arguement.  In addition, the executor pex itself must be
-included in `-thermos_executor_resources` option.  Doing so will ensure that both the wrapper script
-and executor are correctly copied into the sandbox.  In addition, ensure the wrapper script does not
-access resources outside of the sandbox, because when running inside a docker container they will not
-exist.
+specify the path to the wrapper in that argument. In addition, the path to the executor pex itself
+must be included in the `-thermos_executor_resources` option. Doing so will ensure that both the
+wrapper script and executor are correctly copied into the sandbox. Finally, ensure the wrapper
+script does not access resources outside of the sandbox, as when the script is run from within a
+docker container those resources will not exist.
 
-A scheduler flag, `-global_container_mounts` allows mounting paths from the host (the slave) into all
-containers on that host.  The format is a comma seperated list of host_path:container_path[:mode] tuples.
-For example `-global_container_moints=/opt/secret_keys_dir:/mnt/secret_keys_dir:ro` mounts
-`/opt/secret_keys_dir` from the slaves into all containers that launch on them.  Valid modes are `ro` and `rw`.
+A scheduler flag, `-global_container_mounts` allows mounting paths from the host (i.e., the slave)
+into all containers on that host. The format is a comma seperated list of host_path:container_path[:mode]
+tuples. For example `-global_container_mounts=/opt/secret_keys_dir:/mnt/secret_keys_dir:ro` mounts
+`/opt/secret_keys_dir` from the slaves into all launched containers. Valid modes are `ro` and `rw`.
 
-In order to correctly execute processes inside a job, the docker container must have python 2.7 installed.
+In order to correctly execute processes inside a job, the docker container must have python 2.7
+installed.
 
 ## Running Aurora
 Configure a supervisor like [Monit](http://mmonit.com/monit/) or
