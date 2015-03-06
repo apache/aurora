@@ -54,6 +54,7 @@ import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Query.Builder;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
@@ -69,6 +70,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.junit.Before;
 import org.junit.Test;
@@ -219,25 +221,34 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   public void testGetPendingReason() throws Exception {
     Builder query = Query.unscoped().byJob(JOB_KEY);
     Builder filterQuery = Query.unscoped().byJob(JOB_KEY).byStatus(ScheduleStatus.PENDING);
-    String taskId = "task_id_test";
+    String taskId1 = "task_id_test1";
+    String taskId2 = "task_id_test2";
     ImmutableSet<Veto> result = ImmutableSet.of(
         Veto.constraintMismatch("first"),
         Veto.constraintMismatch("second"));
 
-    IScheduledTask pendingTask = IScheduledTask.build(new ScheduledTask()
+    ITaskConfig taskConfig = ITaskConfig.build(defaultTask(true));
+    IScheduledTask pendingTask1 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
-            .setTask(defaultTask(true))
-            .setTaskId(taskId))
+            .setTaskId(taskId1)
+            .setTask(taskConfig.newBuilder()))
         .setStatus(ScheduleStatus.PENDING));
 
-    storageUtil.expectTaskFetch(filterQuery, pendingTask);
-    expect(nearestFit.getNearestFit(taskId)).andReturn(result);
+    IScheduledTask pendingTask2 = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask()
+            .setTaskId(taskId2)
+            .setTask(taskConfig.newBuilder()))
+        .setStatus(ScheduleStatus.PENDING));
+
+    storageUtil.expectTaskFetch(filterQuery, pendingTask1, pendingTask2);
+    expect(nearestFit.getNearestFit(TaskGroupKey.from(taskConfig))).andReturn(result).times(2);
 
     control.replay();
 
-    Set<PendingReason> expected = ImmutableSet.of(new PendingReason()
-        .setTaskId(taskId)
-        .setReason("Constraint not satisfied: first,Constraint not satisfied: second"));
+    String reason = "Constraint not satisfied: first,Constraint not satisfied: second";
+    Set<PendingReason> expected = ImmutableSet.of(
+        new PendingReason().setTaskId(taskId1).setReason(reason),
+        new PendingReason().setTaskId(taskId2).setReason(reason));
 
     Response response = assertOkResponse(thrift.getPendingReason(query.get()));
     assertEquals(expected, response.getResult().getGetPendingReasonResult().getReasons());

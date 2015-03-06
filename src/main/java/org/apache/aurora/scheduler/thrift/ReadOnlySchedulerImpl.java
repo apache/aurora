@@ -69,6 +69,7 @@ import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
@@ -187,9 +188,11 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
         .transform(new Function<ScheduledTask, PendingReason>() {
           @Override
           public PendingReason apply(ScheduledTask scheduledTask) {
-            String taskId = scheduledTask.getAssignedTask().getTaskId();
+            TaskGroupKey groupKey = TaskGroupKey.from(
+                ITaskConfig.build(scheduledTask.getAssignedTask().getTask()));
+
             String reason = Joiner.on(',').join(Iterables.transform(
-                nearestFit.getNearestFit(taskId),
+                nearestFit.getNearestFit(groupKey),
                 new Function<Veto, String>() {
                   @Override
                   public String apply(Veto veto) {
@@ -198,7 +201,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
                 }));
 
             return new PendingReason()
-                .setTaskId(taskId)
+                .setTaskId(scheduledTask.getAssignedTask().getTaskId())
                 .setReason(reason);
           }
         }).toSet();

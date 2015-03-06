@@ -32,6 +32,7 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -126,7 +127,7 @@ public class TaskVarsTest extends EasyMockTest {
 
   private void applyVeto(IScheduledTask task, Veto... vetoes) {
     vars.taskVetoed(new PubsubEvent.Vetoed(
-        task.getAssignedTask().getTaskId(),
+        TaskGroupKey.from(task.getAssignedTask().getTask()),
         ImmutableSet.copyOf(vetoes)));
   }
 

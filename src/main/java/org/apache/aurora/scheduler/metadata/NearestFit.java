@@ -19,6 +19,8 @@ import java.util.Set;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Ticker;
 import com.google.common.cache.CacheBuilder;
@@ -31,6 +33,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -38,6 +41,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Tracks vetoes against scheduling decisions and maintains the closest fit among all the vetoes
@@ -50,16 +54,16 @@ public class NearestFit implements EventSubscriber {
   @VisibleForTesting
   static final ImmutableSet<Veto> NO_VETO = ImmutableSet.of();
 
-  private final LoadingCache<String, Fit> fitByTask;
+  private final LoadingCache<TaskGroupKey, Fit> fitByGroupKey;
 
   @VisibleForTesting
   NearestFit(Ticker ticker) {
-    fitByTask = CacheBuilder.newBuilder()
+    fitByGroupKey = CacheBuilder.newBuilder()
         .expireAfterWrite(EXPIRATION.getValue(), EXPIRATION.getUnit().getTimeUnit())
         .ticker(ticker)
-        .build(new CacheLoader<String, Fit>() {
+        .build(new CacheLoader<TaskGroupKey, Fit>() {
           @Override
-          public Fit load(String taskId) {
+          public Fit load(TaskGroupKey groupKey) {
             return new Fit();
           }
         });
@@ -73,12 +77,12 @@ public class NearestFit implements EventSubscriber {
   /**
    * Gets the vetoes that represent the nearest fit for the given task.
    *
-   * @param taskId The task to look up.
+   * @param groupKey The task group key to look up.
    * @return The nearest fit vetoes for the given task.  This will return an empty set if
    *         no vetoes have been recorded for the task.
    */
-  public synchronized ImmutableSet<Veto> getNearestFit(String taskId) {
-    Fit fit = fitByTask.getIfPresent(taskId);
+  public synchronized ImmutableSet<Veto> getNearestFit(TaskGroupKey groupKey) {
+    Fit fit = fitByGroupKey.getIfPresent(groupKey);
     return (fit == null) ? NO_VETO : fit.vetoes;
   }
 
@@ -89,7 +93,14 @@ public class NearestFit implements EventSubscriber {
    */
   @Subscribe
   public synchronized void remove(TasksDeleted deletedEvent) {
-    fitByTask.invalidateAll(Tasks.ids(deletedEvent.getTasks()));
+    fitByGroupKey.invalidateAll(Iterables.transform(deletedEvent.getTasks(), Functions.compose(
+        new Function<ITaskConfig, TaskGroupKey>() {
+          @Override
+          public TaskGroupKey apply(ITaskConfig task) {
+            return TaskGroupKey.from(task);
+          }
+        },
+        Tasks.SCHEDULED_TO_INFO)));
   }
 
   /**
@@ -101,7 +112,7 @@ public class NearestFit implements EventSubscriber {
   @Subscribe
   public synchronized void stateChanged(TaskStateChange event) {
     if (event.isTransition() && event.getOldState().get() == ScheduleStatus.PENDING) {
-      fitByTask.invalidate(event.getTaskId());
+      fitByGroupKey.invalidate(TaskGroupKey.from(event.getTask().getAssignedTask().getTask()));
     }
   }
 
@@ -122,7 +133,7 @@ public class NearestFit implements EventSubscriber {
   @Subscribe
   public synchronized void vetoed(Vetoed vetoEvent) {
     Objects.requireNonNull(vetoEvent);
-    fitByTask.getUnchecked(vetoEvent.getTaskId()).maybeUpdate(vetoEvent.getVetoes());
+    fitByGroupKey.getUnchecked(vetoEvent.getGroupKey()).maybeUpdate(vetoEvent.getVetoes());
   }
 
   private static class Fit {

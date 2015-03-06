@@ -20,6 +20,7 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 
@@ -57,7 +58,7 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   public Set<Veto> filter(UnusedResource resource, ResourceRequest request) {
     Set<Veto> vetoes = delegate.filter(resource, request);
     if (!vetoes.isEmpty()) {
-      eventSink.post(new Vetoed(request.getTaskId(), vetoes));
+      eventSink.post(new Vetoed(TaskGroupKey.from(request.getTask()), vetoes));
     }
 
     return vetoes;

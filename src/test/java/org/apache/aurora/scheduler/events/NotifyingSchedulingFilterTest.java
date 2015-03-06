@@ -23,6 +23,7 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -46,7 +47,7 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
       .setNumCpus(1)
       .setRamMb(1024)
       .setDiskMb(1024));
-  private static final String TASK_ID = "taskId";
+  private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(TASK);
   private static final UnusedResource RESOURCE = new UnusedResource(
       ResourceSlot.from(TASK, TaskExecutors.NO_OVERHEAD_EXECUTOR),
       IHostAttributes.build(new HostAttributes().setHost("host").setMode(MaintenanceMode.NONE)));
@@ -74,7 +75,7 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
   public void testEvents() {
     Set<Veto> vetoes = ImmutableSet.of(VETO_1, VETO_2);
     expect(delegate.filter(RESOURCE, request)).andReturn(vetoes);
-    eventSink.post(new Vetoed(TASK_ID, vetoes));
+    eventSink.post(new Vetoed(GROUP_KEY, vetoes));
 
     control.replay();
 

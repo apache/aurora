@@ -19,6 +19,7 @@ import java.util.Set;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -198,16 +199,16 @@ public interface PubsubEvent {
    * Event sent when a scheduling assignment was vetoed.
    */
   class Vetoed implements PubsubEvent {
-    private final String taskId;
+    private final TaskGroupKey groupKey;
     private final Set<Veto> vetoes;
 
-    public Vetoed(String taskId, Set<Veto> vetoes) {
-      this.taskId = requireNonNull(taskId);
+    public Vetoed(TaskGroupKey groupKey, Set<Veto> vetoes) {
+      this.groupKey = requireNonNull(groupKey);
       this.vetoes = requireNonNull(vetoes);
     }
 
-    public String getTaskId() {
-      return taskId;
+    public TaskGroupKey getGroupKey() {
+      return groupKey;
     }
 
     public Set<Veto> getVetoes() {
@@ -221,19 +222,19 @@ public interface PubsubEvent {
       }
 
       Vetoed other = (Vetoed) o;
-      return Objects.equals(taskId, other.taskId)
+      return Objects.equals(groupKey, other.groupKey)
           && Objects.equals(vetoes, other.vetoes);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(taskId, vetoes);
+      return Objects.hash(groupKey, vetoes);
     }
 
     @Override
     public String toString() {
       return com.google.common.base.Objects.toStringHelper(this)
-          .add("taskId", taskId)
+          .add("groupKey", groupKey)
           .add("vetoes", vetoes)
           .toString();
     }

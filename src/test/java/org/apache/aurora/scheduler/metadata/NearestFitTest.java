@@ -23,11 +23,14 @@ import com.twitter.common.util.testing.FakeTicker;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -40,7 +43,8 @@ public class NearestFitTest {
   private static final Veto NO_CHANCE = Veto.insufficientResources("No chance", 1000);
   private static final Veto KERNEL = Veto.constraintMismatch("2.6.39");
 
-  private static final String TASK = "taskId";
+  private static final ITaskConfig TASK = ITaskConfig.build(new TaskConfig().setNumCpus(1.0));
+  private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(TASK);
 
   private FakeTicker ticker;
   private NearestFit nearest;
@@ -86,7 +90,7 @@ public class NearestFitTest {
 
   private IScheduledTask makeTask() {
     return IScheduledTask.build(
-        new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(TASK)));
+        new ScheduledTask().setAssignedTask(new AssignedTask().setTask(TASK.newBuilder())));
   }
 
   @Test
@@ -104,7 +108,7 @@ public class NearestFitTest {
     assertNearest(ALMOST);
     IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.ASSIGNED)
-        .setAssignedTask(new AssignedTask().setTaskId(TASK)));
+        .setAssignedTask(new AssignedTask().setTask(TASK.newBuilder())));
     nearest.stateChanged(TaskStateChange.transition(task, ScheduleStatus.PENDING));
     assertNearest();
   }
@@ -124,10 +128,10 @@ public class NearestFitTest {
   }
 
   private void vetoed(Veto... vetoes) {
-    nearest.vetoed(new Vetoed(TASK, ImmutableSet.<Veto>builder().add(vetoes).build()));
+    nearest.vetoed(new Vetoed(GROUP_KEY, ImmutableSet.<Veto>builder().add(vetoes).build()));
   }
 
   private void assertNearest(Veto... vetoes) {
-    assertEquals(vetoes(vetoes), nearest.getNearestFit(TASK));
+    assertEquals(vetoes(vetoes), nearest.getNearestFit(GROUP_KEY));
   }
 }
