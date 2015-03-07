@@ -18,6 +18,7 @@ import os
 import pytest
 from twitter.common.contextutil import temporary_dir
 
+from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
 
 
@@ -75,3 +76,14 @@ def test_load_invalid_syntax():
       fp.write(json.dumps({'cluster1': ['not', 'cluster', 'values']}))
     with pytest.raises(Clusters.ParseError):
       Clusters.from_file(clusters_json)
+
+
+def test_patch_cleanup_on_error():
+  clusters = Clusters([Cluster(name='original')])
+
+  with pytest.raises(RuntimeError):
+    with clusters.patch([Cluster(name='replacement')]):
+      assert list(clusters) == ['replacement']
+      raise RuntimeError("exit contextmanager scope")
+
+  assert list(clusters) == ['original']

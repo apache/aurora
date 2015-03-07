@@ -89,9 +89,11 @@ class Clusters(Mapping):
     """Patch this Clusters instance with a new list of clusters in a
        contextmanager.  Intended for testing purposes."""
     old_clusters = self._clusters.copy()
-    self.replace(cluster_list)
-    yield self
-    self._clusters = old_clusters
+    try:
+      self.replace(cluster_list)
+      yield self
+    finally:
+      self._clusters = old_clusters
 
   def __iter__(self):
     return iter(self._clusters)
