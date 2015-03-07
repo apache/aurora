@@ -233,8 +233,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         assert result == EXIT_API_ERROR
         # Error message should be written to log, and it should be what was returned
         # by the getTasksWithoutConfigs call.
-        assert mock_io.get() == ["Error restarting job west/bozo/test/hello:",
-                                 "\tDamn"]
+        assert mock_io.get() == ["Error restarting job west/bozo/test/hello:", "\tWhoops"]
 
   def test_restart_failed_restart(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()

@@ -173,41 +173,35 @@ class AuroraClientAPI(object):
 
     return self._scheduler_proxy.startJobUpdate(request)
 
-  def pause_job_update(self, job_key):
+  def pause_job_update(self, update_key):
     """Requests Scheduler to pause active job update.
 
     Arguments:
-    job_key -- Job key identifying the update to pause.
+    update_key -- Update identifier.
 
     Returns response object.
     """
-    self._assert_valid_job_key(job_key)
-    log.info("Pausing update for: %s" % job_key.to_path())
-    return self._scheduler_proxy.pauseJobUpdate(job_key.to_thrift())
+    return self._scheduler_proxy.pauseJobUpdate(update_key)
 
-  def resume_job_update(self, job_key):
+  def resume_job_update(self, update_key):
     """Requests Scheduler to resume a job update paused previously.
 
     Arguments:
-    job_key -- Job key identifying the update to resume.
+    update_key -- Update identifier.
 
     Returns response object.
     """
-    self._assert_valid_job_key(job_key)
-    log.info("Resuming update for: %s" % job_key.to_path())
-    return self._scheduler_proxy.resumeJobUpdate(job_key.to_thrift())
+    return self._scheduler_proxy.resumeJobUpdate(update_key)
 
-  def abort_job_update(self, job_key):
+  def abort_job_update(self, update_key):
     """Requests Scheduler to abort active or paused job update.
 
     Arguments:
-    job_key -- Job key identifying the update to abort.
+    update_key -- Update identifier.
 
     Returns response object.
     """
-    self._assert_valid_job_key(job_key)
-    log.info("Aborting update for: %s" % job_key.to_path())
-    return self._scheduler_proxy.abortJobUpdate(job_key.to_thrift())
+    return self._scheduler_proxy.abortJobUpdate(update_key)
 
   def query_job_updates(self, role=None, job_key=None, user=None, update_statuses=None):
     """Returns all job updates matching the query.

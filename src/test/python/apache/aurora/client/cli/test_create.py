@@ -355,7 +355,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       assert mock_context.get_out() == []
       assert mock_context.get_err() == [
-        'Job creation failed due to error:', '\tDamn']
+        'Job creation failed due to error:', '\tWhoops']
 
   def test_simple_successful_create_job_with_bindings(self):
     """Run a test of the "create" command against a mocked-out API:

@@ -356,14 +356,14 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Updates may be paused for arbitrarily-long amounts of time, and the updater should not
     // take action while paused.
-    updater.pause(JOB, USER);
-    updater.pause(JOB, USER);  // Pausing again is a no-op.
+    updater.pause(UPDATE_ID, USER);
+    updater.pause(UPDATE_ID, USER);  // Pausing again is a no-op.
     assertState(ROLL_FORWARD_PAUSED, actions.build());
     clock.advance(ONE_DAY);
     changeState(JOB, 1, FAILED, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 2, FAILED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
-    updater.resume(JOB, USER);
+    updater.resume(UPDATE_ID, USER);
 
     actions.putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED)
         .put(2, INSTANCE_UPDATING);
@@ -381,6 +381,14 @@ public class JobUpdaterIT extends EasyMockTest {
     assertJobState(
         JOB,
         ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, NEW_CONFIG, 100, NEW_CONFIG));
+
+    // Attempting to abort a finished update should fail.
+    try {
+      updater.abort(UPDATE_ID, USER);
+      fail("It should not be possible to abort a completed update.");
+    } catch (UpdateStateException e) {
+      // Expected.
+    }
   }
 
   @Test
@@ -502,11 +510,11 @@ public class JobUpdaterIT extends EasyMockTest {
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
 
     // Pause the awaiting pulse update.
-    updater.pause(JOB, USER);
+    updater.pause(UPDATE_ID, USER);
     assertState(ROLL_FORWARD_PAUSED, actions.build());
 
     // Resume into awaiting pulse state.
-    updater.resume(JOB, USER);
+    updater.resume(UPDATE_ID, USER);
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
 
     assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
@@ -562,14 +570,14 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(Amount.of(PULSE_TIMEOUT_MS, Time.MILLISECONDS));
 
     // Update is paused
-    updater.pause(JOB, USER);
+    updater.pause(UPDATE_ID, USER);
     assertState(ROLL_FORWARD_PAUSED, actions.build());
 
     // A paused update is pulsed.
     assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
 
     // Update is resumed
-    updater.resume(JOB, USER);
+    updater.resume(UPDATE_ID, USER);
     actions.putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED);
     actions.put(2, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
@@ -756,10 +764,10 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(WATCH_TIMEOUT);
 
     // A rollback may be paused.
-    updater.pause(JOB, USER);
+    updater.pause(UPDATE_ID, USER);
     assertState(ROLL_BACK_PAUSED, actions.build());
     clock.advance(ONE_DAY);
-    updater.resume(JOB, USER);
+    updater.resume(UPDATE_ID, USER);
     actions.putAll(1, INSTANCE_ROLLING_BACK)
         .putAll(2, INSTANCE_ROLLING_BACK, INSTANCE_ROLLED_BACK);
     assertState(ROLLING_BACK, actions.build());
@@ -845,7 +853,7 @@ public class JobUpdaterIT extends EasyMockTest {
     actions.putAll(0, INSTANCE_UPDATING, INSTANCE_UPDATED)
         .putAll(1, INSTANCE_UPDATING);
 
-    updater.abort(JOB, USER);
+    updater.abort(UPDATE_ID, USER);
     assertState(ABORTED, actions.build());
     clock.advance(WATCH_TIMEOUT);
     assertJobState(JOB, ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, OLD_CONFIG));
@@ -1215,7 +1223,7 @@ public class JobUpdaterIT extends EasyMockTest {
   public void testPauseUnknownUpdate() throws Exception {
     control.replay();
 
-    updater.pause(JOB, USER);
+    updater.pause(UPDATE_ID, USER);
   }
 
   @Test
@@ -1236,7 +1244,7 @@ public class JobUpdaterIT extends EasyMockTest {
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     releaseAllLocks();
-    updater.abort(update.getSummary().getJobKey(), "test");
+    updater.abort(update.getSummary().getKey(), "test");
     clock.advance(WATCH_TIMEOUT);
     assertState(ERROR, actions.build());
   }
@@ -1263,7 +1271,7 @@ public class JobUpdaterIT extends EasyMockTest {
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
 
-    updater.pause(update.getSummary().getJobKey(), "test");
+    updater.pause(update.getSummary().getKey(), "test");
     assertState(ROLL_FORWARD_PAUSED, actions.build());
     clock.advance(WATCH_TIMEOUT);
 
@@ -1285,7 +1293,7 @@ public class JobUpdaterIT extends EasyMockTest {
   public void testResumeUnknownUpdate() throws Exception {
     control.replay();
 
-    updater.resume(JOB, USER);
+    updater.resume(UPDATE_ID, USER);
   }
 
   private static IJobUpdateSummary makeUpdateSummary() {

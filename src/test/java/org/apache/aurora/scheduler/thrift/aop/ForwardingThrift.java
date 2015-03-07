@@ -268,20 +268,20 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response pauseJobUpdate(JobKey jobKey, SessionKey session) throws TException {
-    return delegate.pauseJobUpdate(jobKey, session);
+  public Response pauseJobUpdate(JobUpdateKey key, SessionKey session) throws TException {
+    return delegate.pauseJobUpdate(key, session);
   }
 
   @Override
-  public Response resumeJobUpdate(JobKey jobKey, SessionKey session)
+  public Response resumeJobUpdate(JobUpdateKey key, SessionKey session)
       throws TException {
 
-    return delegate.resumeJobUpdate(jobKey, session);
+    return delegate.resumeJobUpdate(key, session);
   }
 
   @Override
-  public Response abortJobUpdate(JobKey jobKey, SessionKey session) throws TException {
-    return delegate.abortJobUpdate(jobKey, session);
+  public Response abortJobUpdate(JobUpdateKey key, SessionKey session) throws TException {
+    return delegate.abortJobUpdate(key, session);
   }
 
   @Override

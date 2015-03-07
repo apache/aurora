@@ -144,7 +144,7 @@ class AuroraClientCommandTest(unittest.TestCase):
 
   @classmethod
   def create_error_response(cls):
-    return cls.create_blank_response(ResponseCode.ERROR, 'Damn')
+    return cls.create_blank_response(ResponseCode.ERROR, 'Whoops')
 
   @classmethod
   def create_mock_api(cls):

@@ -325,6 +325,7 @@ class CommandLine(AbstractClass):
       self.print_err("Error executing command: %s" % c.msg)
       return c.code
     except Exception:
+      # TODO(wfarner): Remove this block - it hides exceptions and complicates testing.
       print("Fatal error running command:", file=sys.stderr)
       print(traceback.format_exc(), file=sys.stderr)
       return EXIT_UNKNOWN_ERROR

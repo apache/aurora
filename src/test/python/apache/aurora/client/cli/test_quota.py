@@ -77,7 +77,7 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
 
     self._call_get_quota(fake_context, ['quota', 'get', 'west/bozo'])
 
-    assert fake_context.get_err() == ['Error retrieving quota for role bozo', '\tDamn']
+    assert fake_context.get_err() == ['Error retrieving quota for role bozo', '\tWhoops']
 
   def _get_quota(self, include_consumption, command_args):
     mock_context = FakeAuroraCommandContext()

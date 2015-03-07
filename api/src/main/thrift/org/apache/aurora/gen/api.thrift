@@ -983,10 +983,10 @@ service ReadOnlyScheduler {
   /** Returns all stored context specific resource/operation locks. */
   Response getLocks()
 
-  /** Gets job update summaries. Not implemented yet. */
+  /** Gets job update summaries. */
   Response getJobUpdateSummaries(1: JobUpdateQuery jobUpdateQuery)
 
-  /** Gets job update details. Not implemented yet. */
+  /** Gets job update details. */
   Response getJobUpdateDetails(1: JobUpdateKey key)
 }
 
@@ -1054,16 +1054,15 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   Response startJobUpdate(1: JobUpdateRequest request, 2: SessionKey session)
 
   /**
-   * Pauses the update progress for the specified job. Can be resumed by resumeUpdate call.
-   * Not implemented yet.
+   * Pauses the specified job update. Can be resumed by resumeUpdate call.
    */
-  Response pauseJobUpdate(1: JobKey jobKey, 2: SessionKey session)
+  Response pauseJobUpdate(1: JobUpdateKey key, 2: SessionKey session)
 
-  /** Resumes progress of a previously paused job update. Not implemented yet. */
-  Response resumeJobUpdate(1: JobKey jobKey, 2: SessionKey session)
+  /** Resumes progress of a previously paused job update. */
+  Response resumeJobUpdate(1: JobUpdateKey key, 2: SessionKey session)
 
-  /** Permanently aborts the job update. Does not remove the update history. Not implemented yet. */
-  Response abortJobUpdate(1: JobKey jobKey, 2: SessionKey session)
+  /** Permanently aborts the job update. Does not remove the update history. */
+  Response abortJobUpdate(1: JobUpdateKey key, 2: SessionKey session)
 
   /**
    * Allows progress of the job update in case blockIfNoPulsesAfterMs is specified in

@@ -179,11 +179,13 @@ final class JobUpdateStateMachine {
    *
    * @param from Starting state.
    * @param to Desired target state.
-   * @throws IllegalStateException if the requested transition is not allowed.
+   * @throws UpdateStateException if the requested transition is not allowed.
    */
-  static void assertTransitionAllowed(JobUpdateStatus from, JobUpdateStatus to) {
+  static void assertTransitionAllowed(JobUpdateStatus from, JobUpdateStatus to)
+      throws UpdateStateException {
+
     if (!ALLOWED_TRANSITIONS.containsEntry(from, to)) {
-      throw new IllegalStateException("Cannot transition update from " + from + " to " + to);
+      throw new UpdateStateException("Cannot transition update from " + from + " to " + to);
     }
   }
 

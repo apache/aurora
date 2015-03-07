@@ -53,6 +53,7 @@ class TestJobUpdateApis(unittest.TestCase):
   }
 
   JOB_KEY = AuroraJobKey("foo", "role", "env", "name")
+  UPDATE_KEY = JobUpdateKey(job=JOB_KEY.to_thrift(), id="id")
 
   @classmethod
   def create_blank_response(cls, code, msg):
@@ -136,39 +137,16 @@ class TestJobUpdateApis(unittest.TestCase):
     api, mock_proxy = self.mock_api()
     mock_proxy.pauseJobUpdate.return_value = self.create_simple_success_response()
 
-    api.pause_job_update(self.JOB_KEY)
-    mock_proxy.pauseJobUpdate.assert_called_once_with(self.JOB_KEY.to_thrift())
-
-  def test_pause_job_update_invalid_key(self):
-    """Test job update pause with invalid job key."""
-    api, mock_proxy = self.mock_api()
-    self.assertRaises(AuroraClientAPI.TypeError, api.pause_job_update, "invalid")
+    api.pause_job_update(self.UPDATE_KEY)
+    mock_proxy.pauseJobUpdate.assert_called_once_with(self.UPDATE_KEY)
 
   def test_resume_job_update(self):
     """Test successful job update resume."""
     api, mock_proxy = self.mock_api()
     mock_proxy.resumeJobUpdate.return_value = self.create_simple_success_response()
 
-    api.resume_job_update(self.JOB_KEY)
-    mock_proxy.resumeJobUpdate.assert_called_once_with(self.JOB_KEY.to_thrift())
-
-  def test_resume_job_update_invalid_key(self):
-    """Test job update resume with invalid job key."""
-    api, mock_proxy = self.mock_api()
-    self.assertRaises(AuroraClientAPI.TypeError, api.resume_job_update, "invalid")
-
-  def test_abort_job_update(self):
-    """Test successful job update abort."""
-    api, mock_proxy = self.mock_api()
-    mock_proxy.abortJobUpdate.return_value = self.create_simple_success_response()
-
-    api.abort_job_update(self.JOB_KEY)
-    mock_proxy.abortJobUpdate.assert_called_once_with(self.JOB_KEY.to_thrift())
-
-  def test_abort_job_update_invalid_key(self):
-    """Test job update abort with invalid job key."""
-    api, mock_proxy = self.mock_api()
-    self.assertRaises(AuroraClientAPI.TypeError, api.abort_job_update, "invalid")
+    api.resume_job_update(self.UPDATE_KEY)
+    mock_proxy.resumeJobUpdate.assert_called_once_with(self.UPDATE_KEY)
 
   def test_query_job_updates(self):
     """Test querying job updates."""

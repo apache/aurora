@@ -87,7 +87,7 @@ public class JobUpdateStateMachineTest {
             fail("Transition " + key + " should have been disallowed, but got result " + actual);
           }
           assertEquals("Failed transition " + key, expected, actual);
-        } catch (IllegalStateException e) {
+        } catch (UpdateStateException e) {
           if (expected != null) {
             fail("Expected " + expected + " for transition " + key
                 + " but the transition was disallowed: " + e);

@@ -1215,7 +1215,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                 .setKey(new JobUpdateKey(job.newBuilder(), updateId))
                 .setJobKey(job.newBuilder())
                 .setUpdateId(updateId)
-                .setKey(new JobUpdateKey(job.newBuilder(), updateId))
                 .setUser(context.getIdentity()))
             .setInstructions(instructions));
         try {
@@ -1235,16 +1234,15 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   private Response changeJobUpdateState(
-      JobKey mutableJobKey,
+      JobUpdateKey mutableKey,
       SessionKey session,
       final JobUpdateStateChange change) {
 
-    final IJobKey jobKey = JobKeys.assertValid(IJobKey.build(requireNonNull(mutableJobKey)));
+    final IJobUpdateKey key = IJobUpdateKey.build(mutableKey);
+    JobKeys.assertValid(key.getJob());
     final SessionContext context;
     try {
-      // TODO(maxim): pass a JobUpdateKey here instead of generating a fake one. AURORA-1093.
-      IJobUpdateKey updateKey = IJobUpdateKey.build(new JobUpdateKey().setJob(mutableJobKey));
-      context = authorizeJobUpdateAction(updateKey, session);
+      context = authorizeJobUpdateAction(key, session);
     } catch (AuthFailedException e) {
       return error(AUTH_FAILED, e);
     }
@@ -1252,7 +1250,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
         try {
-          change.modifyUpdate(jobUpdateController, jobKey, context.getIdentity());
+          change.modifyUpdate(jobUpdateController, key, context.getIdentity());
           return ok();
         } catch (UpdateStateException e) {
           return error(INVALID_REQUEST, e);
@@ -1262,50 +1260,50 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   private interface JobUpdateStateChange {
-    void modifyUpdate(JobUpdateController controller, IJobKey job, String invokingUser)
+    void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, String invokingUser)
         throws UpdateStateException;
   }
 
   private static final JobUpdateStateChange PAUSE = new JobUpdateStateChange() {
     @Override
-    public void modifyUpdate(JobUpdateController controller, IJobKey job, String invokingUser)
+    public void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, String invokingUser)
         throws UpdateStateException {
 
-      controller.pause(job, invokingUser);
+      controller.pause(key, invokingUser);
     }
   };
 
   private static final JobUpdateStateChange RESUME = new JobUpdateStateChange() {
     @Override
-    public void modifyUpdate(JobUpdateController controller, IJobKey job, String invokingUser)
+    public void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, String invokingUser)
         throws UpdateStateException {
 
-      controller.resume(job, invokingUser);
+      controller.resume(key, invokingUser);
     }
   };
 
   private static final JobUpdateStateChange ABORT = new JobUpdateStateChange() {
     @Override
-    public void modifyUpdate(JobUpdateController controller, IJobKey job, String invokingUser)
+    public void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, String invokingUser)
         throws UpdateStateException {
 
-      controller.abort(job, invokingUser);
+      controller.abort(key, invokingUser);
     }
   };
 
   @Override
-  public Response pauseJobUpdate(JobKey mutableJobKey, SessionKey session) {
-    return changeJobUpdateState(mutableJobKey, session, PAUSE);
+  public Response pauseJobUpdate(JobUpdateKey mutableKey, SessionKey session) {
+    return changeJobUpdateState(mutableKey, session, PAUSE);
   }
 
   @Override
-  public Response resumeJobUpdate(final JobKey mutableJobKey, final SessionKey session) {
-    return changeJobUpdateState(mutableJobKey, session, RESUME);
+  public Response resumeJobUpdate(JobUpdateKey mutableKey, SessionKey session) {
+    return changeJobUpdateState(mutableKey, session, RESUME);
   }
 
   @Override
-  public Response abortJobUpdate(final JobKey mutableJobKey, final SessionKey session) {
-    return changeJobUpdateState(mutableJobKey, session, ABORT);
+  public Response abortJobUpdate(JobUpdateKey mutableKey, SessionKey session) {
+    return changeJobUpdateState(mutableKey, session, ABORT);
   }
 
   @Override

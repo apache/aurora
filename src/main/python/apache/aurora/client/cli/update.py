@@ -49,6 +49,57 @@ from gen.apache.aurora.api.constants import ACTIVE_JOB_UPDATE_STATES
 from gen.apache.aurora.api.ttypes import JobUpdateAction, JobUpdateStatus
 
 
+class UpdateController(object):
+  def __init__(self, api, context):
+    self.api = api
+    self.context = context
+
+  def get_update_key(self, job_key):
+    response = self.api.query_job_updates(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=job_key)
+    self.context.log_response_and_raise(response)
+    summaries = response.result.getJobUpdateSummariesResult.updateSummaries
+    if response.result.getJobUpdateSummariesResult.updateSummaries:
+      if len(summaries) == 1:
+        return summaries[0].key
+      else:
+        raise self.context.CommandError(
+            EXIT_API_ERROR,
+            "scheduler returned multiple active updates for this job.")
+    else:
+      return None
+
+  def _modify_update(self, job_key, mutate_fn, error_msg, success_msg):
+    update_key = self.get_update_key(job_key)
+    if update_key is None:
+      self.context.print_err("No active update found for this job.")
+      return EXIT_INVALID_PARAMETER
+    resp = mutate_fn(update_key)
+    self.context.log_response_and_raise(resp, err_code=EXIT_API_ERROR, err_msg=error_msg)
+    self.context.print_out(success_msg)
+    return EXIT_OK
+
+  def pause(self, job_key):
+    return self._modify_update(
+        job_key,
+        lambda key: self.api.pause_job_update(key),
+        "Failed to pause update due to error:",
+        "Update has been paused.")
+
+  def resume(self, job_key):
+    return self._modify_update(
+        job_key,
+        lambda key: self.api.resume_job_update(key),
+        "Failed to resume update due to error:",
+        "Update has been resumed.")
+
+  def abort(self, job_key):
+    return self._modify_update(
+        job_key,
+        lambda key: self.api.abort_job_update(key),
+        "Failed to abort update due to error:",
+        "Update has been aborted.")
+
+
 class StartUpdate(Verb):
 
   UPDATE_MSG_TEMPLATE = "Job update has started. View your update progress at %s"
@@ -116,13 +167,8 @@ class PauseUpdate(Verb):
     return """Pause a scheduler-driven rolling update."""
 
   def execute(self, context):
-    jobkey = context.options.jobspec
-    api = context.get_api(jobkey.cluster)
-    resp = api.pause_job_update(jobkey)
-    context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
-      err_msg="Failed to pause update due to error:")
-    context.print_out("Update has been paused.")
-    return EXIT_OK
+    job_key = context.options.jobspec
+    return UpdateController(context.get_api(job_key.cluster), context).pause(job_key)
 
 
 class ResumeUpdate(Verb):
@@ -140,13 +186,8 @@ class ResumeUpdate(Verb):
     return """Resume a paused scheduler-driven rolling update."""
 
   def execute(self, context):
-    jobkey = context.options.jobspec
-    api = context.get_api(jobkey.cluster)
-    resp = api.resume_job_update(jobkey)
-    context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
-      err_msg="Failed to resume update due to error:")
-    context.print_out("Update has been resumed.")
-    return EXIT_OK
+    job_key = context.options.jobspec
+    return UpdateController(context.get_api(job_key.cluster), context).resume(job_key)
 
 
 class AbortUpdate(Verb):
@@ -164,13 +205,8 @@ class AbortUpdate(Verb):
     return """Abort an in-progress scheduler-driven rolling update."""
 
   def execute(self, context):
-    jobkey = context.options.jobspec
-    api = context.get_api(jobkey.cluster)
-    resp = api.abort_job_update(jobkey)
-    context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
-      err_msg="Failed to abort update due to error:")
-    context.print_out("Update has been aborted.")
-    return EXIT_OK
+    job_key = context.options.jobspec
+    return UpdateController(context.get_api(job_key.cluster), context).abort(job_key)
 
 
 class ListUpdates(Verb):
@@ -245,21 +281,11 @@ class UpdateStatus(Verb):
   def help(self):
     return """Display detailed status information about a scheduler-driven in-progress update."""
 
-  def _get_update_key(self, context, job_key):
-    api = context.get_api(context.options.jobspec.cluster)
-    response = api.query_job_updates(
-        update_statuses=ACTIVE_JOB_UPDATE_STATES,
-        job_key=context.options.jobspec)
-    context.log_response_and_raise(response)
-    for summary in response.result.getJobUpdateSummariesResult.updateSummaries:
-      if summary.key.job == job_key.to_thrift():
-        return summary.key
-    else:
-      return None
-
   def execute(self, context):
-    key = self._get_update_key(context, context.options.jobspec)
-    if not key:
+    key = UpdateController(
+        context.get_api(context.options.jobspec.cluster),
+        context).get_update_key(context.options.jobspec)
+    if key is None:
       context.print_err("No updates found for job %s" % context.options.jobspec)
       return EXIT_INVALID_PARAMETER
 
