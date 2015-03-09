@@ -21,3 +21,19 @@ python_binary(
     'src/main/python/apache/aurora/executor/common:path_detector',
   ]
 )
+
+python_binary(
+  name = 'thermos_observer',
+  source = 'thermos_observer.py',
+  dependencies = [
+    '3rdparty/python:CherryPy',
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.exceptions',
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/executor/common:path_detector',
+    'src/main/python/apache/thermos/common:constants',
+    'src/main/python/apache/thermos/monitoring:detector',
+    'src/main/python/apache/thermos/observer:task_observer',
+    'src/main/python/apache/thermos/observer/http:configure',
+  ]
+)

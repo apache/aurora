@@ -297,7 +297,6 @@ class TaskObserver(ExceptionalThread, Lockable):
 
   def _sample(self, task_id):
     if task_id not in self.active_tasks:
-      log.debug("Task %s not found in active tasks" % task_id)
       sample = ProcessSample.empty().to_dict()
       sample['disk'] = 0
     else:
@@ -414,7 +413,6 @@ class TaskObserver(ExceptionalThread, Lockable):
   @Lockable.sync
   def _get_process_resource_consumption(self, task_id, process_name):
     if task_id not in self.active_tasks:
-      log.debug("Task %s not found in active tasks" % task_id)
       return ProcessSample.empty().to_dict()
     sample = self.active_tasks[task_id].resource_monitor.sample_by_process(process_name).to_dict()
     log.debug('Resource consumption (%s, %s) => %s' % (task_id, process_name, sample))

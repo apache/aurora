@@ -36,6 +36,35 @@ python_library(
 )
 
 python_library(
+  name = 'diagnostics',
+  sources = ['diagnostics.py'],
+  dependencies = [
+    '3rdparty/python:pex',
+    '3rdparty/python:twitter.common.metrics',
+  ]
+)
+
+python_library(
+  name = 'vars_endpoint',
+  sources = ['vars_endpoint.py'],
+  dependencies = [
+    '3rdparty/python:twitter.common.http',
+    '3rdparty/python:twitter.common.metrics',
+  ]
+)
+
+python_library(
+  name = 'configure',
+  sources = ['configure.py'],
+  dependencies = [
+    '3rdparty/python:twitter.common.http',
+    ':diagnostics',
+    ':http_observer',
+    ':vars_endpoint',
+  ]
+)
+
+python_library(
   name = 'file_browser',
   sources = ['file_browser.py'],
   dependencies = [

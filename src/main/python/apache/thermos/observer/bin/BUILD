@@ -15,15 +15,14 @@
 python_binary(
   name = 'thermos_observer',
   source = 'thermos_observer.py',
-  entry_point = 'apache.thermos.observer.bin.thermos_observer:proxy_main',
+  entry_point = 'apache.thermos.observer.bin.thermos_observer:run',
   dependencies = [
     '3rdparty/python:CherryPy',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.exceptions',
-    '3rdparty/python:twitter.common.http',
     'src/main/python/apache/thermos/common:constants',
     'src/main/python/apache/thermos/monitoring:detector',
-    'src/main/python/apache/thermos/observer/http:http_observer',
+    'src/main/python/apache/thermos/observer/http:configure',
     'src/main/python/apache/thermos/observer:task_observer',
   ],
 )
