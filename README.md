@@ -97,31 +97,34 @@ distribution the Gradle wrapper and JavaScript dependencies are provided.
 
 1. Install Gradle following the instructions on the [Gradle web site](http://gradle.org)
 2. From the root directory of the Apache Aurora project generate the gradle
-wrapper by running
-
+wrapper by running:
+```
     gradle wrapper
+```
 
 ### Testing
 To run the same tests that are run in the Apache Aurora continuous integration
 environment
 
 * From the root directory of the Apache Aurora project run:
-
+```
     ./build-support/jenkins/build.sh
+```
 
 * In addition, there is an end-to-end test that runs a suite of aurora commands
 using a virtual cluster. To run the end-to-end tests:
-
+```
     $ bash src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh
-
+```
 
 ### Compiling the source packages
 To compile the source packages into binary distributions
 
 * From the root directory of the Apache Aurora project run:
-
+```
     ./gradlew distTar
     ./build-support/release/make-python-sdists
+```
 
 For additional information see the [Developing Aurora](docs/developing-aurora-scheduler.md)
 guide.
