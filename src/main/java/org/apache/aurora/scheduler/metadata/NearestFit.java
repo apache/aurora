@@ -21,7 +21,6 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Predicate;
 import com.google.common.base.Ticker;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -39,7 +38,6 @@ import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
-import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -116,17 +114,8 @@ public class NearestFit implements EventSubscriber {
     }
   }
 
-  private static final Predicate<Veto> IS_CONSTRAINT_MISMATCH = new Predicate<Veto>() {
-    @Override
-    public boolean apply(Veto veto) {
-      return veto.getVetoType() == SchedulingFilter.VetoType.CONSTRAINT_MISMATCH;
-    }
-  };
-
   /**
    * Records a task veto event.
-   * This will ignore any veto events with a type of
-   * {@link SchedulingFilter.VetoType#CONSTRAINT_MISMATCH}
    *
    * @param vetoEvent Veto event.
    */
@@ -155,17 +144,8 @@ public class NearestFit implements EventSubscriber {
      * Updates the nearest fit if the provided vetoes represents a closer fit than the current
      * best fit.
      * <p>
-     * There are two classes of vetoes: those with and without constraint mismatches. A set of
-     * vetoes without a constraint mismatch is always a better fit than a set with constraint
-     * mismatches.
-     * <p>
-     * If two sets are equivalent in that they do or do not have constraint mismatches, they are
-     * compared by the following criteria:
-     * <ul>
-     *   <li> the one with fewer vetoes is a better fit, irrespective of scores
-     *   <li> if the veto count is equal, the one with the smaller aggregate score is a better fit
-     * </ul>
-     *
+     * Vetoes with a lower aggregate score are considered a better fit regardless of the total veto
+     * count. See {@link Veto} for more details on scoring differences.
      * @param newVetoes The vetoes for the scheduling assignment with {@code newHost}.
      */
     void maybeUpdate(Set<Veto> newVetoes) {
@@ -174,15 +154,7 @@ public class NearestFit implements EventSubscriber {
         return;
       }
 
-      boolean valueMismatchOld = Iterables.any(vetoes, IS_CONSTRAINT_MISMATCH);
-      boolean valueMismatchNew = Iterables.any(newVetoes, IS_CONSTRAINT_MISMATCH);
-      if (valueMismatchOld == valueMismatchNew) {
-        if (newVetoes.size() < vetoes.size()) {
-          update(newVetoes);
-        } else if (newVetoes.size() == vetoes.size() && score(newVetoes) < score(vetoes)) {
-          update(newVetoes);
-        }
-      } else if (valueMismatchOld) {
+      if (score(newVetoes) < score(vetoes)) {
         update(newVetoes);
       }
     }

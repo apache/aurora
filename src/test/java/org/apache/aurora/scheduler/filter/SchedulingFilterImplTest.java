@@ -42,6 +42,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType;
 import org.apache.aurora.scheduler.mesos.Offers;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -53,7 +54,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.DEDICATED_HOST_VETO;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
@@ -183,7 +183,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     IHostAttributes hostA = hostAttributes(HOST_A, dedicated(ROLE_A));
     checkConstraint(hostA, DEDICATED_ATTRIBUTE, true, ROLE_A);
-    assertVetoes(makeTask(OWNER_B, JOB_B), hostA, DEDICATED_HOST_VETO);
+    assertVetoes(makeTask(OWNER_B, JOB_B), hostA, Veto.dedicatedHostConstraintMismatch());
   }
 
   @Test
@@ -437,10 +437,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testVetoScaling() {
     control.replay();
 
-    assertEquals((int) (Veto.MAX_SCORE * 1.0 / CPU.getRange()), CPU.veto(1).getScore());
-    assertEquals(Veto.MAX_SCORE, CPU.veto(CPU.getRange() * 10).getScore());
-    assertEquals((int) (Veto.MAX_SCORE * 2.0 / RAM.getRange()), RAM.veto(2).getScore());
-    assertEquals((int) (Veto.MAX_SCORE * 200.0 / DISK.getRange()), DISK.veto(200).getScore());
+    int maxScore = VetoType.INSUFFICIENT_RESOURCES.getScore();
+    assertEquals((int) (maxScore * 1.0 / CPU.getRange()), CPU.veto(1).getScore());
+    assertEquals(maxScore, CPU.veto(CPU.getRange() * 10).getScore());
+    assertEquals((int) (maxScore * 2.0 / RAM.getRange()), RAM.veto(2).getScore());
+    assertEquals((int) (maxScore * 200.0 / DISK.getRange()), DISK.veto(200).getScore());
   }
 
   @Test

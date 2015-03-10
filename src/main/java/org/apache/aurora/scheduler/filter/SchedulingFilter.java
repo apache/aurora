@@ -60,29 +60,42 @@ public interface SchedulingFilter {
     /**
      * Not enough resources to satisfy a proposed scheduling assignment.
      */
-    INSUFFICIENT_RESOURCES("Insufficient: %s", VetoGroup.STATIC),
+    INSUFFICIENT_RESOURCES("Insufficient: %s", VetoGroup.STATIC, (int) Math.pow(10, 3)),
 
     /**
      * Unable to satisfy proposed scheduler assignment constraints.
      */
-    CONSTRAINT_MISMATCH("Constraint not satisfied: %s", VetoGroup.STATIC),
+    CONSTRAINT_MISMATCH("Constraint not satisfied: %s", VetoGroup.STATIC, (int) Math.pow(10, 4)),
 
     /**
      * Constraint limit is not satisfied for a proposed scheduling assignment.
      */
-    LIMIT_NOT_SATISFIED("Limit not satisfied: %s", VetoGroup.DYNAMIC),
+    LIMIT_NOT_SATISFIED("Limit not satisfied: %s", VetoGroup.DYNAMIC, (int) Math.pow(10, 4)),
 
     /**
      * Unable to satisfy a proposed scheduler assignment due to cluster maintenance.
      */
-    MAINTENANCE("Host %s for maintenance", VetoGroup.STATIC);
+    MAINTENANCE("Host %s for maintenance", VetoGroup.STATIC, (int) Math.pow(10, 5)),
+
+    /**
+     * Unable to satisfy proposed scheduler assignment dedicated host constraint.
+     */
+    DEDICATED_CONSTRAINT_MISMATCH("Host is dedicated", VetoGroup.STATIC, (int) Math.pow(10, 6));
 
     private final String reasonFormat;
     private final VetoGroup group;
+    private final int score;
 
-    VetoType(String reasonFormat, VetoGroup group) {
+    VetoType(String reasonFormat, VetoGroup group, int score) {
       this.reasonFormat = reasonFormat;
       this.group = group;
+
+      // Score ranges are chosen under assumption that no more than 9 same group score vetoes
+      // are applied per task/offer evaluation (e.g. 9 insufficient resource vetoes < 1 value
+      // constraint mismatch). This is a fair assumption given current "break early" constraint
+      // evaluation rules and a limited number of resource types (4). Should this ever change,
+      // consider more spread between score groups to ensure correct NearestFit operation.
+      this.score = score;
     }
 
     String formatReason(String reason) {
@@ -91,6 +104,10 @@ public interface SchedulingFilter {
 
     VetoGroup getGroup() {
       return group;
+    }
+
+    int getScore() {
+      return score;
     }
   }
 
@@ -101,8 +118,6 @@ public interface SchedulingFilter {
    * a scheduling assignment is 'weakest'.
    */
   final class Veto {
-    public static final int MAX_SCORE = 1000;
-
     private final VetoType vetoType;
     private final String reason;
     private final int score;
@@ -110,7 +125,20 @@ public interface SchedulingFilter {
     private Veto(VetoType vetoType, String reasonParameter, int score) {
       this.vetoType = vetoType;
       this.reason = vetoType.formatReason(reasonParameter);
-      this.score = Math.min(MAX_SCORE, score);
+      this.score = score;
+    }
+
+   /**
+    * Creates a veto that represents an dedicated host constraint mismatch between the server
+    * and task's configuration for an attribute.
+    *
+    * @return A dedicated host constraint mismatch veto.
+    */
+    public static Veto dedicatedHostConstraintMismatch() {
+      return new Veto(
+          VetoType.DEDICATED_CONSTRAINT_MISMATCH,
+          "",
+          VetoType.DEDICATED_CONSTRAINT_MISMATCH.getScore());
     }
 
     /**
@@ -121,7 +149,7 @@ public interface SchedulingFilter {
      * @return A constraint mismatch veto.
      */
     public static Veto constraintMismatch(String constraint) {
-      return new Veto(CONSTRAINT_MISMATCH, constraint, MAX_SCORE);
+      return new Veto(CONSTRAINT_MISMATCH, constraint, CONSTRAINT_MISMATCH.getScore());
     }
 
     /**
@@ -132,7 +160,7 @@ public interface SchedulingFilter {
      * @return A unsatisfied limit veto.
      */
     public static Veto unsatisfiedLimit(String limit) {
-      return new Veto(LIMIT_NOT_SATISFIED, limit, MAX_SCORE);
+      return new Veto(LIMIT_NOT_SATISFIED, limit, LIMIT_NOT_SATISFIED.getScore());
     }
 
     /**
@@ -155,7 +183,7 @@ public interface SchedulingFilter {
      * @return A maintenance veto.
      */
     public static Veto maintenance(String maintenanceMode) {
-      return new Veto(MAINTENANCE, maintenanceMode, MAX_SCORE);
+      return new Veto(MAINTENANCE, maintenanceMode, MAINTENANCE.getScore());
     }
 
     public String getReason() {

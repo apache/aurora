@@ -50,10 +50,6 @@ import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVe
  * fulfilled, and that tasks are allowed to run on the given machine.
  */
 public class SchedulingFilterImpl implements SchedulingFilter {
-
-  @VisibleForTesting static final Veto DEDICATED_HOST_VETO =
-      Veto.constraintMismatch("Host is dedicated");
-
   private static final Optional<Veto> NO_VETO = Optional.absent();
 
   private static final Set<MaintenanceMode> VETO_MODES = EnumSet.of(DRAINING, DRAINED);
@@ -90,7 +86,9 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     }
 
     private static int scale(double value, int range) {
-      return Math.min(Veto.MAX_SCORE, (int) (Veto.MAX_SCORE * value) / range);
+      return Math.min(
+          VetoType.INSUFFICIENT_RESOURCES.getScore(),
+          (int) (VetoType.INSUFFICIENT_RESOURCES.getScore() * value) / range);
     }
 
     @VisibleForTesting
@@ -143,25 +141,20 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     this.executorSettings = requireNonNull(executorSettings);
   }
 
-  private Set<Veto> getConstraintVetoes(
+  private Optional<Veto> getConstraintVeto(
       Iterable<IConstraint> taskConstraints,
       AttributeAggregate jobState,
       Iterable<IAttribute> offerAttributes) {
 
-    ImmutableSet.Builder<Veto> vetoes = ImmutableSet.builder();
     for (IConstraint constraint : VALUES_FIRST.sortedCopy(taskConstraints)) {
       Optional<Veto> veto = ConstraintMatcher.getVeto(jobState, offerAttributes, constraint);
       if (veto.isPresent()) {
-        vetoes.add(veto.get());
-        if (isValueConstraint(constraint)) {
-          // Break when a value constraint mismatch is found to avoid other
-          // potentially-expensive operations to satisfy other constraints.
-          break;
-        }
+        // Break early to avoid potentially-expensive operations to satisfy other constraints.
+        return veto;
       }
     }
 
-    return vetoes.build();
+    return Optional.absent();
   }
 
   private Optional<Veto> getMaintenanceVeto(MaintenanceMode mode) {
@@ -178,27 +171,36 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   @Override
   public Set<Veto> filter(UnusedResource resource, ResourceRequest request) {
+    // Apply veto filtering rules from higher to lower score making sure we cut over and return
+    // early any time a veto from a score group is applied. This helps to more accurately report
+    // a veto reason in the NearestFit.
+
+    // 1. Dedicated constraint check (highest score).
     if (!ConfigurationManager.isDedicated(request.getConstraints())
         && isDedicated(resource.getAttributes())) {
 
-      return ImmutableSet.of(DEDICATED_HOST_VETO);
+      return ImmutableSet.of(Veto.dedicatedHostConstraintMismatch());
     }
 
+    // 2. Host maintenance check.
     Optional<Veto> maintenanceVeto = getMaintenanceVeto(resource.getAttributes().getMode());
     if (maintenanceVeto.isPresent()) {
       return maintenanceVeto.asSet();
     }
 
-    Set<Veto> resourceVetoes = getResourceVetoes(
-        resource.getResourceSlot(),
-        ResourceSlot.from(request.getTask(), executorSettings));
-    if (!resourceVetoes.isEmpty()) {
-      return resourceVetoes;
-    }
-
-    return getConstraintVetoes(
+    // 3. Value and limit constraint check.
+    Optional<Veto> constraintVeto = getConstraintVeto(
         request.getConstraints(),
         request.getJobState(),
         resource.getAttributes().getAttributes());
+
+    if (constraintVeto.isPresent()) {
+      return constraintVeto.asSet();
+    }
+
+    // 4. Resource check (lowest score).
+    return getResourceVetoes(
+        resource.getResourceSlot(),
+        ResourceSlot.from(request.getTask(), executorSettings));
   }
 }

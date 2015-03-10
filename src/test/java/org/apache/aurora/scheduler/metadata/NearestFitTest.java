@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.metadata;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeTicker;
@@ -37,11 +38,18 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 public class NearestFitTest {
-
-  private static final Veto ALMOST = Veto.insufficientResources("Almost", 1);
-  private static final Veto NOPE = Veto.insufficientResources("Nope", 5);
-  private static final Veto NO_CHANCE = Veto.insufficientResources("No chance", 1000);
-  private static final Veto KERNEL = Veto.constraintMismatch("2.6.39");
+  private static final int RESOURCE_MAX_SCORE = 1000;
+  private static final Veto SEVERITY_1 = Veto.dedicatedHostConstraintMismatch();
+  private static final Veto SEVERITY_2 = Veto.maintenance("maintenance");
+  private static final Veto SEVERITY_3 = Veto.constraintMismatch("constraint");
+  private static final Veto SEVERITY_4_CPU =
+      Veto.insufficientResources("cpu", RESOURCE_MAX_SCORE);
+  private static final Veto SEVERITY_4_RAM =
+      Veto.insufficientResources("ram", RESOURCE_MAX_SCORE);
+  private static final Veto SEVERITY_4_DISK =
+      Veto.insufficientResources("disk", RESOURCE_MAX_SCORE);
+  private static final Veto SEVERITY_4_PORTS =
+      Veto.insufficientResources("ports", RESOURCE_MAX_SCORE);
 
   private static final ITaskConfig TASK = ITaskConfig.build(new TaskConfig().setNumCpus(1.0));
   private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(TASK);
@@ -61,29 +69,20 @@ public class NearestFitTest {
   }
 
   @Test
-  public void testMultipleVetoes() {
-    vetoed(ALMOST, NOPE);
-    assertNearest(ALMOST, NOPE);
-    // Even though the aggregate score for NO_CHANCE is higher than ALMOST and NOPE,
-    // NO_CHANCE becomes the pending reason since we consider one vector smaller than two
-    // (regardless of magnitude).
-    vetoed(NO_CHANCE);
-    assertNearest(NO_CHANCE);
-  }
-
-  @Test
   public void testScoring() {
-    vetoed(NO_CHANCE);
-    assertNearest(NO_CHANCE);
-    vetoed(ALMOST);
-    assertNearest(ALMOST);
-    vetoed(NO_CHANCE);
-    assertNearest(ALMOST);
+    vetoed(SEVERITY_1);
+    assertNearest(SEVERITY_1);
+    vetoed(SEVERITY_2);
+    assertNearest(SEVERITY_2);
+    vetoed(SEVERITY_3);
+    assertNearest(SEVERITY_3);
+    vetoed(SEVERITY_4_CPU, SEVERITY_4_RAM, SEVERITY_4_DISK, SEVERITY_4_PORTS);
+    assertNearest(SEVERITY_4_CPU, SEVERITY_4_RAM, SEVERITY_4_DISK, SEVERITY_4_PORTS);
   }
 
   @Test
   public void testRemove() {
-    vetoed(NO_CHANCE);
+    vetoed(SEVERITY_1);
     nearest.remove(new TasksDeleted(ImmutableSet.of(makeTask())));
     assertNearest();
   }
@@ -95,8 +94,8 @@ public class NearestFitTest {
 
   @Test
   public void testExpiration() {
-    vetoed(ALMOST);
-    assertNearest(ALMOST);
+    vetoed(SEVERITY_2);
+    assertNearest(SEVERITY_2);
     ticker.advance(NearestFit.EXPIRATION);
     ticker.advance(Amount.of(1L, Time.SECONDS));
     assertNearest();
@@ -104,23 +103,13 @@ public class NearestFitTest {
 
   @Test
   public void testStateChanged() {
-    vetoed(ALMOST);
-    assertNearest(ALMOST);
+    vetoed(SEVERITY_2);
+    assertNearest(SEVERITY_2);
     IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.ASSIGNED)
         .setAssignedTask(new AssignedTask().setTask(TASK.newBuilder())));
     nearest.stateChanged(TaskStateChange.transition(task, ScheduleStatus.PENDING));
     assertNearest();
-  }
-
-  @Test
-  public void testConstraintMismatch() {
-    vetoed(KERNEL);
-    assertNearest(KERNEL);
-    vetoed(ALMOST);
-    assertNearest(ALMOST);
-    vetoed(KERNEL);
-    assertNearest(ALMOST);
   }
 
   private Set<Veto> vetoes(Veto... vetoes) {
