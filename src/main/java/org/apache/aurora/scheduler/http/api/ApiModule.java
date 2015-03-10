@@ -35,7 +35,8 @@ import org.eclipse.jetty.servlets.GzipFilter;
 import org.eclipse.jetty.util.resource.Resource;
 
 public class ApiModule extends ServletModule {
-  static final String API_PATH = "/api";
+  public static final String API_PATH = "/api";
+
   @CmdLine(name = "enable_cors_support", help = "Enable CORS support for thrift end points.")
   private static final Arg<Boolean> ENABLE_CORS_SUPPORT = Arg.create(false);
 

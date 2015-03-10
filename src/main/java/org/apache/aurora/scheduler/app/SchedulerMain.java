@@ -62,8 +62,6 @@ import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.mem.MemStorage.Delegated;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
-import org.apache.aurora.scheduler.thrift.ThriftModule;
-import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 
 import static com.twitter.common.logging.RootLogConfig.Configuration;
 
@@ -185,8 +183,6 @@ public class SchedulerMain extends AbstractApplication {
             Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class),
             Bindings.annotatedKeyFactory(Delegated.class))
         )
-        .add(new ThriftModule())
-        .add(new ThriftAuthModule())
         .build();
   }
 

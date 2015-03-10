@@ -35,6 +35,7 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 import com.google.inject.servlet.GuiceFilter;
 import com.google.inject.servlet.GuiceServletContextListener;
+import com.google.inject.util.Modules;
 import com.sun.jersey.api.container.filter.GZIPContentEncodingFilter;
 import com.sun.jersey.guice.JerseyServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
@@ -59,6 +60,9 @@ import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.http.api.ApiModule;
+import org.apache.aurora.scheduler.http.api.security.ApiSecurityModule;
+import org.apache.aurora.scheduler.thrift.ThriftModule;
+import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import org.eclipse.jetty.rewrite.handler.RewriteHandler;
 import org.eclipse.jetty.rewrite.handler.RewriteRegexRule;
 import org.eclipse.jetty.server.Connector;
@@ -92,6 +96,8 @@ public class JettyServerModule extends AbstractModule {
   // The name of the request attribute where the path for the current request before it was
   // rewritten is stored.
   static final String ORIGINAL_PATH_ATTRIBUTE_NAME = "originalPath";
+
+  public static final String THRIFT_API_PATH_SPEC = "/api";
 
   @Nonnegative
   @CmdLine(name = "http_port",
@@ -153,8 +159,14 @@ public class JettyServerModule extends AbstractModule {
     @Provides
     @Singleton
     ServletContextListener provideServletContextListener(Injector parentInjector) {
-      return makeServletContextListener(parentInjector, new ApiModule());
-    };
+      return makeServletContextListener(
+          parentInjector,
+          Modules.combine(
+              new ApiModule(),
+              new ApiSecurityModule(),
+              new ThriftModule(),
+              new ThriftAuthModule()));
+    }
   };
 
   // TODO(ksweeney): Factor individual servlet configurations to their own ServletModules.

@@ -33,7 +33,7 @@ import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
  * https://code.google.com/p/google-guice/wiki/AOP#Limitations
  */
 @DecoratedThrift
-class MockDecoratedThrift extends ForwardingThrift {
+public class MockDecoratedThrift extends ForwardingThrift {
 
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ElementType.PARAMETER, ElementType.METHOD})
@@ -45,7 +45,7 @@ class MockDecoratedThrift extends ForwardingThrift {
     super(delegate);
   }
 
-  static void bindForwardedMock(Binder binder, AuroraAdmin.Iface mockThrift) {
+  public static void bindForwardedMock(Binder binder, AuroraAdmin.Iface mockThrift) {
     binder.bind(AuroraAdmin.Iface.class).annotatedWith(MockThrift.class).toInstance(mockThrift);
     binder.bind(AuroraAdmin.Iface.class).to(MockDecoratedThrift.class);
   }

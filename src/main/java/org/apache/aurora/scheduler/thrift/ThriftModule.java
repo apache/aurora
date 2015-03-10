@@ -37,6 +37,11 @@ public class ThriftModule extends AbstractModule {
   protected void configure() {
     bind(ReadOnlyScheduler.Iface.class).to(ReadOnlySchedulerImpl.class);
     bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
+
+    // Promote to an explicit binding so it's created in the servlet container child injector.
+    // See https://code.google.com/p/google-guice/issues/detail?id=461
+    bind(SchedulerThriftInterface.class);
+
     bind(Boolean.class).annotatedWith(EnableUpdater.class).toInstance(ENABLE_BETA_UPDATER.get());
 
     install(new AopModule());

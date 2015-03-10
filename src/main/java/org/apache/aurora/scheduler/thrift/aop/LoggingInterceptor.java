@@ -23,6 +23,7 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 
@@ -35,6 +36,7 @@ import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.thrift.Responses;
+import org.apache.shiro.ShiroException;
 
 import static java.util.Objects.requireNonNull;
 
@@ -102,6 +104,9 @@ class LoggingInterceptor implements MethodInterceptor {
       LOG.log(Level.WARNING, "Uncaught transient exception while handling " + message, e);
       return Responses.addMessage(Responses.empty(), ResponseCode.ERROR_TRANSIENT, e);
     } catch (RuntimeException e) {
+      // We need shiro's exceptions to bubble up to the Shiro servlet filter so we intentionally
+      // do not swallow them here.
+      Throwables.propagateIfInstanceOf(e, ShiroException.class);
       LOG.log(Level.WARNING, "Uncaught exception while handling " + message, e);
       return Responses.addMessage(Responses.empty(), ResponseCode.ERROR, e);
     }

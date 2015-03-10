@@ -38,6 +38,7 @@ import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.log.LogStorage;
 import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.shiro.io.ResourceUtils;
 
 /**
  * A main class that runs the scheduler in local mode, using fakes for external components.
@@ -97,6 +98,10 @@ public class LocalSchedulerMain extends SchedulerMain {
         .add("-mesos_master_address=fake")
         .add("-thermos_executor_path=fake")
         .add("-http_port=8081")
+        .add("-enable_api_security=true")
+        .add("-shiro_ini_path="
+            + ResourceUtils.CLASSPATH_PREFIX
+            + "org/apache/aurora/scheduler/http/api/security/shiro-example.ini")
         .build();
 
     AppLauncher.launch(LocalSchedulerMain.class, arguments.toArray(new String[0]));
