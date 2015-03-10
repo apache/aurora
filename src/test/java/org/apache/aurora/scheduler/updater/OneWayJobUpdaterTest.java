@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
 import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
 import org.junit.Before;
 import org.junit.Test;
@@ -35,7 +36,7 @@ import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatu
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
-import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED_TERMINATED;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.SUCCEEDED;
@@ -110,13 +111,15 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
   private static SideEffect sideEffect(InstanceAction action, InstanceUpdateStatus... statuses) {
     return new SideEffect(
         Optional.of(action),
-        ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build());
+        ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build(),
+        Optional.<Failure>absent());
   }
 
   private static SideEffect sideEffect(InstanceUpdateStatus... statuses) {
     return new SideEffect(
         Optional.<InstanceAction>absent(),
-        ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build());
+        ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build(),
+        Optional.<Failure>absent());
   }
 
   @Test
@@ -193,7 +196,7 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
         0,
         instance0,
         s0,
-        FAILED);
+        FAILED_TERMINATED);
     expectFetchAndEvaluate(
         1,
         instance1,

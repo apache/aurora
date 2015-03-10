@@ -18,6 +18,8 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 
+import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
+
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -27,16 +29,23 @@ import static java.util.Objects.requireNonNull;
 public class SideEffect {
   private final Optional<InstanceAction> action;
   private final Set<InstanceUpdateStatus> statusChanges;
+  private final Optional<Failure> failure;
 
   /**
    * Creates a new side-effect.
    *
    * @param action Action to be taken on the instance, if necessary.
    * @param statusChanges Any status changes to the instance monitor.
+   * @param failure The failure encountered, if any.
    */
-  public SideEffect(Optional<InstanceAction> action, Set<InstanceUpdateStatus> statusChanges) {
+  public SideEffect(
+      Optional<InstanceAction> action,
+      Set<InstanceUpdateStatus> statusChanges,
+      Optional<Failure> failure) {
+
     this.action = requireNonNull(action);
     this.statusChanges = requireNonNull(statusChanges);
+    this.failure = requireNonNull(failure);
   }
 
   /**
@@ -55,6 +64,15 @@ public class SideEffect {
    */
   public Set<InstanceUpdateStatus> getStatusChanges() {
     return statusChanges;
+  }
+
+  /**
+   * Gets the failure observed during evaluation, if there was one.
+   *
+   * @return Instance failure.
+   */
+  public Optional<Failure> getFailure() {
+    return failure;
   }
 
   /**

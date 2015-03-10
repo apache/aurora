@@ -13,17 +13,18 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import java.util.Objects;
-
 import com.google.common.base.Optional;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Determines actions that must be taken to change the configuration of a running task.
  * <p>
  * A state evaluator is expected to be used multiple times over the course of changing an active
- * task's configuration.  This should be invoked every time the state of an instance changes, to
+ * task's configuration.  This should be invoked every time the state of an instance changes to
  * determine what action to take next.  It's expected that it will eventually converge by
- * {@link Result#SUCCEEDED succeeding} or {@link Result#FAILED failing}.
+ * {@link Result#SUCCEEDED succeeding}, or failing with {@link Result#FAILED_STUCK} or
+ * {@link Result#FAILED_TERMINATED}.
  *
  * @param <T> Instance state type.
  */
@@ -47,22 +48,46 @@ interface StateEvaluator<T> {
    */
   Result evaluate(T actualState);
 
+  Optional<Failure> NO_FAILURE = Optional.absent();
+
   enum Result {
-    EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.AWAIT_STATE_CHANGE)),
-    REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.ADD_TASK)),
-    KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.KILL_TASK)),
-    EVALUATE_AFTER_MIN_RUNNING_MS(Optional.of(InstanceAction.WATCH_TASK)),
-    SUCCEEDED(Optional.<InstanceAction>absent()),
-    FAILED(Optional.<InstanceAction>absent());
+    EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.AWAIT_STATE_CHANGE), NO_FAILURE),
+    REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.ADD_TASK), NO_FAILURE),
+    KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.KILL_TASK), NO_FAILURE),
+    EVALUATE_AFTER_MIN_RUNNING_MS(Optional.of(InstanceAction.WATCH_TASK), NO_FAILURE),
+    SUCCEEDED(Optional.<InstanceAction>absent(), NO_FAILURE),
+    FAILED_STUCK(Optional.<InstanceAction>absent(), Optional.of(Failure.STUCK)),
+    FAILED_TERMINATED(Optional.<InstanceAction>absent(), Optional.of(Failure.EXITED));
 
     private final Optional<InstanceAction> action;
+    private final Optional<Failure> failure;
 
-    Result(Optional<InstanceAction> action) {
-      this.action = Objects.requireNonNull(action);
+    Result(Optional<InstanceAction> action, Optional<Failure> failure) {
+      this.action = requireNonNull(action);
+      this.failure = requireNonNull(failure);
     }
 
     public Optional<InstanceAction> getAction() {
       return action;
+    }
+
+    public Optional<Failure> getFailure() {
+      return failure;
+    }
+  }
+
+  enum Failure {
+    STUCK("took too long to transition from a transient state."),
+    EXITED("exited.");
+
+    private final String reason;
+
+    Failure(String reason) {
+      this.reason = reason;
+    }
+
+    public String getReason() {
+      return reason;
     }
   }
 }

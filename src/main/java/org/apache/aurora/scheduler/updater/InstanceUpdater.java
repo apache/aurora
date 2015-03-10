@@ -36,7 +36,8 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
-import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED_STUCK;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED_TERMINATED;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.SUCCEEDED;
@@ -131,10 +132,10 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
     }
   }
 
-  private StateEvaluator.Result addFailureAndCheckIfFailed() {
+  private boolean addFailureAndCheckIfFailed() {
     LOG.info("Observed updated task failure.");
     observedFailures++;
-    return observedFailures > toleratedFailures ? FAILED : EVALUATE_ON_STATE_CHANGE;
+    return observedFailures > toleratedFailures;
   }
 
   private StateEvaluator.Result handleActualAndDesiredPresent(IScheduledTask actualState) {
@@ -156,14 +157,13 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
       } else if (Tasks.isTerminated(status)) {
         // The desired task has terminated, this is a failure.
         LOG.info("Task is in terminal state " + status);
-        return addFailureAndCheckIfFailed();
+        return addFailureAndCheckIfFailed() ? FAILED_TERMINATED : EVALUATE_ON_STATE_CHANGE;
       } else if (appearsStuck(actualState)) {
         LOG.info("Task appears stuck.");
         // The task is not running, but not terminated, and appears to have been in this state
         // long enough that we should intervene.
-        StateEvaluator.Result updaterStatus = addFailureAndCheckIfFailed();
-        return (updaterStatus == FAILED)
-            ? updaterStatus
+        return addFailureAndCheckIfFailed()
+            ? FAILED_STUCK
             : KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       } else {
         // The task is in a transient state on the way into or out of running, check back later.

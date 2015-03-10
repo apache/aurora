@@ -249,17 +249,22 @@ class OneWayJobUpdater<K, T> {
       }
 
       Result result = evaluator.evaluate(actualState);
-      if (result == Result.SUCCEEDED) {
-        stateMachine.transition(SUCCEEDED);
-        statusChanges.add(SUCCEEDED);
-      } else if (result == Result.FAILED) {
-        stateMachine.transition(FAILED);
-        statusChanges.add(FAILED);
+      if (TERMINAL_RESULT_TO_STATUS.containsKey(result)) {
+        SideEffect.InstanceUpdateStatus status = TERMINAL_RESULT_TO_STATUS.get(result);
+        stateMachine.transition(status);
+        statusChanges.add(status);
       }
 
-      return new SideEffect(result.getAction(), statusChanges.build());
+      return new SideEffect(result.getAction(), statusChanges.build(), result.getFailure());
     }
   }
+
+  private static final Map<Result, SideEffect.InstanceUpdateStatus> TERMINAL_RESULT_TO_STATUS =
+      ImmutableMap.of(
+          Result.SUCCEEDED, SUCCEEDED,
+          Result.FAILED_STUCK, FAILED,
+          Result.FAILED_TERMINATED, FAILED
+  );
 
   /**
    * Status of the job update.

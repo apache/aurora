@@ -150,7 +150,7 @@ public class InstanceUpdaterTest {
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
     f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
-    f.evaluate(Result.FAILED, FAILED);
+    f.evaluate(Result.FAILED_TERMINATED, FAILED);
   }
 
   @Test
@@ -206,7 +206,7 @@ public class InstanceUpdaterTest {
     f.setActualState(NEW);
     f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING);
     f.advanceTime(MAX_NON_RUNNING_TIME);
-    f.evaluateCurrentState(Result.FAILED);
+    f.evaluateCurrentState(Result.FAILED_STUCK);
   }
 
   @Test
@@ -227,7 +227,7 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, ASSIGNED, STARTING, RUNNING);
     f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, KILLING);
     f.advanceTime(MAX_NON_RUNNING_TIME);
-    f.evaluateCurrentState(Result.FAILED);
+    f.evaluateCurrentState(Result.FAILED_STUCK);
   }
 
   @Test(expected = IllegalArgumentException.class)

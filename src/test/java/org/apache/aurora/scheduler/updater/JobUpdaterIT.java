@@ -98,6 +98,7 @@ import org.apache.aurora.scheduler.storage.mem.MemStorage.Delegated;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
+import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
 import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
 import org.junit.After;
@@ -273,16 +274,25 @@ public class JobUpdaterIT extends EasyMockTest {
         }
       };
 
-  private void assertState(
-      JobUpdateStatus expected,
-      Multimap<Integer, JobUpdateAction> expectedActions) {
-
-    IJobUpdateDetails details = storage.read(new Work.Quiet<IJobUpdateDetails>() {
+  private IJobUpdateDetails getDetails() {
+    return storage.read(new Work.Quiet<IJobUpdateDetails>() {
       @Override
       public IJobUpdateDetails apply(StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(UPDATE_ID).get();
       }
     });
+  }
+
+  private void assertLatestUpdateMessage(String expected) {
+    IJobUpdateDetails details = getDetails();
+    assertEquals(expected, Iterables.getLast(details.getUpdateEvents()).getMessage());
+  }
+
+  private void assertState(
+      JobUpdateStatus expected,
+      Multimap<Integer, JobUpdateAction> expectedActions) {
+
+    IJobUpdateDetails details = getDetails();
     Iterable<IJobInstanceUpdateEvent> orderedEvents =
         EVENT_ORDER.sortedCopy(details.getInstanceEvents());
     Multimap<Integer, IJobInstanceUpdateEvent> eventsByInstance =
@@ -429,6 +439,7 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(Amount.of(PULSE_TIMEOUT_MS, Time.MILLISECONDS));
     actions.put(2, INSTANCE_UPDATING);
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+    assertLatestUpdateMessage(JobUpdateControllerImpl.PULSE_TIMEOUT_MESSAGE);
 
     // Pulse arrives and instance 2 is updated.
     assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
@@ -758,6 +769,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Instance 2 is rolled back.
     assertState(ROLLING_BACK, actions.build());
+    assertLatestUpdateMessage(JobUpdateControllerImpl.failureMessage(2, Failure.EXITED));
     changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
     actions.putAll(1, INSTANCE_ROLLING_BACK)
         .putAll(2, INSTANCE_ROLLED_BACK);
@@ -928,6 +940,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ERROR, actions.build());
+    assertLatestUpdateMessage(JobUpdateControllerImpl.LOST_LOCK_MESSAGE);
   }
 
   private void expectInvalid(JobUpdate update)
@@ -1141,6 +1154,7 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(RUNNING_TIMEOUT);
     actions.putAll(1, INSTANCE_UPDATE_FAILED, INSTANCE_ROLLING_BACK);
     assertState(ROLLING_BACK, actions.build());
+    assertLatestUpdateMessage(JobUpdateControllerImpl.failureMessage(1, Failure.STUCK));
 
     // Instance 1 is reverted.
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
