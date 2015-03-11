@@ -1050,19 +1050,39 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
    */
   Response replaceCronTemplate(1: JobConfiguration config, 2: Lock lock, 3: SessionKey session)
 
-  /** Starts update of the existing service job. Not implemented yet. */
-  Response startJobUpdate(1: JobUpdateRequest request, 2: SessionKey session)
+  /** Starts update of the existing service job. */
+  Response startJobUpdate(
+      /** A description of how to change the job. */
+      1: JobUpdateRequest request,
+      /** A user-specified message to include with the induced job update state change. */
+      3: string message,
+      2: SessionKey session)
 
   /**
    * Pauses the specified job update. Can be resumed by resumeUpdate call.
    */
-  Response pauseJobUpdate(1: JobUpdateKey key, 2: SessionKey session)
+  Response pauseJobUpdate(
+      /** The update to pause. */
+      1: JobUpdateKey key,
+      /** A user-specified message to include with the induced job update state change. */
+      3: string message,
+      2: SessionKey session)
 
   /** Resumes progress of a previously paused job update. */
-  Response resumeJobUpdate(1: JobUpdateKey key, 2: SessionKey session)
+  Response resumeJobUpdate(
+      /** The update to resume. */
+      1: JobUpdateKey key,
+      /** A user-specified message to include with the induced job update state change. */
+      3: string message,
+      2: SessionKey session)
 
   /** Permanently aborts the job update. Does not remove the update history. */
-  Response abortJobUpdate(1: JobUpdateKey key, 2: SessionKey session)
+  Response abortJobUpdate(
+      /** The update to abort. */
+      1: JobUpdateKey key,
+      /** A user-specified message to include with the induced job update state change. */
+      3: string message,
+      2: SessionKey session)
 
   /**
    * Allows progress of the job update in case blockIfNoPulsesAfterMs is specified in

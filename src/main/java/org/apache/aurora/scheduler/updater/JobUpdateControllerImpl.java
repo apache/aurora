@@ -23,6 +23,7 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
@@ -138,11 +139,11 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   @Override
-  public void start(final IJobUpdate update, final String updatingUser)
+  public void start(final IJobUpdate update, final AuditData auditData)
       throws UpdateStateException {
 
     requireNonNull(update);
-    requireNonNull(updatingUser);
+    requireNonNull(auditData);
 
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
       @Override
@@ -171,8 +172,9 @@ class JobUpdateControllerImpl implements JobUpdateController {
         LOG.info("Starting update for job " + job);
         ILock lock;
         try {
-          lock =
-              lockManager.acquireLock(ILockKey.build(LockKey.job(job.newBuilder())), updatingUser);
+          lock = lockManager.acquireLock(
+              ILockKey.build(LockKey.job(job.newBuilder())),
+              auditData.getUser());
         } catch (LockException e) {
           throw new UpdateStateException(e.getMessage(), e);
         }
@@ -190,21 +192,26 @@ class JobUpdateControllerImpl implements JobUpdateController {
         recordAndChangeJobUpdateStatus(
             storeProvider,
             summary.getKey(),
-            newEvent(status).setUser(updatingUser));
+            addAuditData(newEvent(status), auditData));
       }
     });
   }
 
   @Override
-  public void pause(final IJobUpdateKey key, String user) throws UpdateStateException {
+  public void pause(final IJobUpdateKey key, AuditData auditData) throws UpdateStateException {
     requireNonNull(key);
     LOG.info("Attempting to pause update " + key);
-    unscopedChangeUpdateStatus(key, GET_PAUSE_STATE, Optional.of(user));
+    unscopedChangeUpdateStatus(
+        key,
+        Functions.compose(createAuditedEvent(auditData), GET_PAUSE_STATE));
   }
 
   @Override
-  public void resume(final IJobUpdateKey key, final String user) throws UpdateStateException {
+  public void resume(final IJobUpdateKey key, final AuditData auditData)
+      throws UpdateStateException {
+
     requireNonNull(key);
+    requireNonNull(auditData);
     LOG.info("Attempting to resume update " + key);
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
       @Override
@@ -224,20 +231,30 @@ class JobUpdateControllerImpl implements JobUpdateController {
                 : GET_ACTIVE_RESUME_STATE;
 
         JobUpdateStatus newStatus = stateChange.apply(update.getSummary().getState().getStatus());
-        changeUpdateStatus(storeProvider, update.getSummary(), newEvent(newStatus).setUser(user));
+        changeUpdateStatus(
+            storeProvider,
+            update.getSummary(),
+            addAuditData(newEvent(newStatus), auditData));
       }
     });
   }
 
   @Override
-  public void abort(IJobUpdateKey key, String user) throws UpdateStateException {
-    requireNonNull(key);
-    unscopedChangeUpdateStatus(key, new Function<JobUpdateStatus, JobUpdateStatus>() {
+  public void abort(IJobUpdateKey key, AuditData auditData) throws UpdateStateException {
+    unscopedChangeUpdateStatus(
+        key,
+        Functions.compose(createAuditedEvent(auditData), Functions.constant(ABORTED)));
+  }
+
+  private static Function<JobUpdateStatus, JobUpdateEvent> createAuditedEvent(
+      final AuditData auditData) {
+
+    return new Function<JobUpdateStatus, JobUpdateEvent>() {
       @Override
-      public JobUpdateStatus apply(JobUpdateStatus input) {
-        return ABORTED;
+      public JobUpdateEvent apply(JobUpdateStatus status) {
+        return addAuditData(newEvent(status), auditData);
       }
-    }, Optional.of(user));
+    };
   }
 
   @Override
@@ -290,8 +307,12 @@ class JobUpdateControllerImpl implements JobUpdateController {
           try {
             unscopedChangeUpdateStatus(
                 key,
-                GET_UNBLOCKED_STATE,
-                Optional.<String>absent());
+                new Function<JobUpdateStatus, JobUpdateEvent>() {
+                  @Override
+                  public JobUpdateEvent apply(JobUpdateStatus status) {
+                    return new JobUpdateEvent().setStatus(GET_UNBLOCKED_STATE.apply(status));
+                  }
+                });
           } catch (UpdateStateException e) {
             LOG.severe("Error while processing job update pulse: " + e);
           }
@@ -363,14 +384,12 @@ class JobUpdateControllerImpl implements JobUpdateController {
    *
    * @param key Update identifier.
    * @param stateChange State change computation, based on the current state of the update.
-   * @param user The user who is changing the state.
    * @throws UpdateStateException If no active update exists for the provided {@code job}, or
    *                              if the proposed state transition is not allowed.
    */
   private void unscopedChangeUpdateStatus(
       final IJobUpdateKey key,
-      final Function<JobUpdateStatus, JobUpdateStatus> stateChange,
-      final Optional<String> user)
+      final Function<? super JobUpdateStatus, JobUpdateEvent> stateChange)
       throws UpdateStateException {
 
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
@@ -384,9 +403,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
           throw new UpdateStateException("Update does not exist " + key);
         }
 
-        JobUpdateStatus newStatus =
-            requireNonNull(stateChange.apply(update.getState().getStatus()));
-        changeUpdateStatus(storeProvider, update, newEvent(newStatus).setUser(user.orNull()));
+        changeUpdateStatus(storeProvider, update, stateChange.apply(update.getState().getStatus()));
       }
     });
   }
@@ -704,8 +721,13 @@ class JobUpdateControllerImpl implements JobUpdateController {
     return IJobUpdateQuery.build(new JobUpdateQuery().setKey(key.newBuilder()));
   }
 
-  private JobUpdateEvent newEvent(JobUpdateStatus status) {
+  private static JobUpdateEvent newEvent(JobUpdateStatus status) {
     return new JobUpdateEvent().setStatus(status);
+  }
+
+  private static JobUpdateEvent addAuditData(JobUpdateEvent event, AuditData auditData) {
+    return event.setMessage(auditData.getMessage().orNull())
+        .setUser(auditData.getUser());
   }
 
   private Runnable getDeferredEvaluator(final IInstanceKey instance, final IJobUpdateKey key) {

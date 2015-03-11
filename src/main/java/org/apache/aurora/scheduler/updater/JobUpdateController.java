@@ -13,11 +13,19 @@
  */
 package org.apache.aurora.scheduler.updater;
 
+import java.util.Objects;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
+
 import org.apache.aurora.gen.JobUpdatePulseStatus;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * A controller that exposes commands to initiate and modify active job updates.
@@ -25,26 +33,69 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 public interface JobUpdateController {
 
   /**
+   * Metadata associated with a change to a job update.
+   */
+  class AuditData {
+    @VisibleForTesting
+    public static final int MAX_MESSAGE_LENGTH = 1024;
+
+    private final String user;
+    private final Optional<String> message;
+
+    public AuditData(String user, Optional<String> message) {
+      this.user = requireNonNull(user);
+      if (message.isPresent()) {
+        Preconditions.checkArgument(message.get().length() <= MAX_MESSAGE_LENGTH);
+      }
+      this.message = requireNonNull(message);
+    }
+
+    public String getUser() {
+      return user;
+    }
+
+    public Optional<String> getMessage() {
+      return message;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(user, message);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (!(obj instanceof AuditData)) {
+        return false;
+      }
+
+      AuditData other = (AuditData) obj;
+      return Objects.equals(user, other.user)
+          && Objects.equals(message, other.message);
+    }
+  }
+
+  /**
    * Initiates an update.
    *
    * @param update Instructions for what job to update, and how to update it.
-   * @param updatingUser User initiating the update.
+   * @param auditData Details about the origin of this state change.
    * @throws UpdateStateException If the update cannot be started, for example if the instructions
    *                              are invalid, or if there is already an in-progress update for the
    *                              job.
    */
-  void start(IJobUpdate update, String updatingUser) throws UpdateStateException;
+  void start(IJobUpdate update, AuditData auditData) throws UpdateStateException;
 
   /**
    * Pauses an in-progress update.
    * <p>
-   * A paused update may be resumed by invoking {@link #resume(IJobUpdateKey, String)}.
+   * A paused update may be resumed by invoking {@link #resume(IJobUpdateKey, AuditData)}.
    *
    * @param key Update to pause.
-   * @param pausingUser The name of the user who is pausing the update.
+   * @param auditData Details about the origin of this state change.
    * @throws UpdateStateException If the job update is not in a state that may be paused.
    */
-  void pause(IJobUpdateKey key, String pausingUser) throws UpdateStateException;
+  void pause(IJobUpdateKey key, AuditData auditData) throws UpdateStateException;
 
   /**
    * Resumes a paused in-progress update.
@@ -54,10 +105,10 @@ public interface JobUpdateController {
    * resume rolling back.
    *
    * @param key Update to resume.
-   * @param resumingUser The name of the user who is resuming the update.
+   * @param auditData Details about the origin of this state change.
    * @throws UpdateStateException If the job update is not in a state that may be resumed.
    */
-  void resume(IJobUpdateKey key, String resumingUser) throws UpdateStateException;
+  void resume(IJobUpdateKey key, AuditData auditData) throws UpdateStateException;
 
   /**
    * Aborts an in-progress update.
@@ -66,10 +117,10 @@ public interface JobUpdateController {
    * update. An aborted update may not be resumed.
    *
    * @param key Update to abort.
-   * @param abortingUser The name of the user who is aborting the update.
+   * @param auditData Details about the origin of this state change.
    * @throws UpdateStateException If there is no active update for the job.
    */
-  void abort(IJobUpdateKey key, String abortingUser) throws UpdateStateException;
+  void abort(IJobUpdateKey key, AuditData auditData) throws UpdateStateException;
 
   /**
    * Notifies the updater that the state of an instance has changed. A state change could also mean
@@ -88,7 +139,7 @@ public interface JobUpdateController {
 
   /**
    * Restores active updates that have been halted due to the scheduler restarting.
-   * This is distinct from {@link #resume(IJobUpdateKey, String)} in that it does not change the
+   * This is distinct from {@link #resume(IJobUpdateKey, AuditData)} in that it does not change the
    * state of updates, but resumes after a restart of the scheduler process.
    */
   void systemResume();

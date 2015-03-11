@@ -119,6 +119,7 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.EnableUpdater;
 import org.apache.aurora.scheduler.thrift.aop.AopModule;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
+import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.thrift.TException;
 import org.easymock.IExpectationSetters;
@@ -187,6 +188,8 @@ import static org.junit.Assert.fail;
 public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static final SessionKey SESSION = new SessionKey();
+  private static final String AUDIT_MESSAGE = "message";
+  private static final AuditData AUDIT = new AuditData(USER, Optional.of(AUDIT_MESSAGE));
 
   private StorageTestUtil storageUtil;
   private LockManager lockManager;
@@ -1837,7 +1840,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         oldTask6,
         oldTask7);
 
-    jobUpdateController.start(update, USER);
+    jobUpdateController.start(update, AUDIT);
 
     control.replay();
 
@@ -1845,7 +1848,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobUpdateRequest request = buildJobUpdateRequest(update);
     request.getTaskConfig().unsetJob();
 
-    Response response = assertOkResponse(thrift.startJobUpdate(request, SESSION));
+    Response response = assertOkResponse(thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
     assertEquals(
         new StartJobUpdateResult(UPDATE_KEY.newBuilder()),
         response.getResult().getStartJobUpdateResult());
@@ -1884,12 +1887,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         oldTask1,
         oldTask2);
 
-    jobUpdateController.start(IJobUpdate.build(expected), USER);
+    jobUpdateController.start(IJobUpdate.build(expected), AUDIT);
 
     control.replay();
 
-    Response response =
-        assertOkResponse(thrift.startJobUpdate(buildJobUpdateRequest(update), SESSION));
+    Response response = assertOkResponse(
+        thrift.startJobUpdate(buildJobUpdateRequest(update), AUDIT_MESSAGE, SESSION));
     assertEquals(
         new StartJobUpdateResult(UPDATE_KEY.newBuilder()),
         response.getResult().getStartJobUpdateResult());
@@ -1898,7 +1901,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test(expected = NullPointerException.class)
   public void testStartUpdateFailsNullRequest() throws Exception {
     control.replay();
-    thrift.startJobUpdate(null, SESSION);
+    thrift.startJobUpdate(null, AUDIT_MESSAGE, SESSION);
   }
 
   @Test(expected = NullPointerException.class)
@@ -1906,19 +1909,23 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
     thrift.startJobUpdate(
         new JobUpdateRequest(null, 5, buildJobUpdateSettings()),
+        AUDIT_MESSAGE,
         SESSION);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testStartUpdateFailsInvalidJobKey() throws Exception {
     control.replay();
-    thrift.startJobUpdate(new JobUpdateRequest(
-        new TaskConfig()
-            .setJobName("&")
-            .setEnvironment("devel")
-            .setOwner(new Identity(ROLE, null)),
-        5,
-        buildJobUpdateSettings()), SESSION);
+    thrift.startJobUpdate(
+        new JobUpdateRequest(
+            new TaskConfig()
+                .setJobName("&")
+                .setEnvironment("devel")
+                .setOwner(new Identity(ROLE, null)),
+            5,
+            buildJobUpdateSettings()),
+        AUDIT_MESSAGE,
+        SESSION);
   }
 
   @Test
@@ -1930,7 +1937,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertEquals(
         invalidResponse(SchedulerThriftInterface.INVALID_GROUP_SIZE),
-        thrift.startJobUpdate(updateRequest, SESSION));
+        thrift.startJobUpdate(updateRequest, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -1942,7 +1949,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertEquals(
         invalidResponse(SchedulerThriftInterface.INVALID_MAX_INSTANCE_FAILURES),
-        thrift.startJobUpdate(updateRequest, SESSION));
+        thrift.startJobUpdate(updateRequest, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -1954,7 +1961,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertEquals(
         invalidResponse(SchedulerThriftInterface.INVALID_MAX_FAILED_INSTANCES),
-        thrift.startJobUpdate(updateRequest, SESSION));
+        thrift.startJobUpdate(updateRequest, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -1966,7 +1973,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertEquals(
         invalidResponse(SchedulerThriftInterface.INVALID_MAX_WAIT_TO_RUNNING),
-        thrift.startJobUpdate(updateRequest, SESSION));
+        thrift.startJobUpdate(updateRequest, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -1978,14 +1985,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertEquals(
         invalidResponse(SchedulerThriftInterface.INVALID_MIN_WAIT_TO_RUNNING),
-        thrift.startJobUpdate(updateRequest, SESSION));
+        thrift.startJobUpdate(updateRequest, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
   public void testStartUpdateFailsNonServiceTask() throws Exception {
     control.replay();
     JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(false));
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -1997,7 +2004,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertEquals(
         invalidResponse(SchedulerThriftInterface.INVALID_PULSE_TIMEOUT),
-        thrift.startJobUpdate(updateRequest, SESSION));
+        thrift.startJobUpdate(updateRequest, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2006,7 +2013,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, false);
 
     control.replay();
-    assertResponse(AUTH_FAILED, thrift.startJobUpdate(request, SESSION));
+    assertResponse(AUTH_FAILED, thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2016,7 +2023,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectCronJob();
 
     control.replay();
-    assertEquals(invalidResponse(NO_CRON), thrift.startJobUpdate(request, SESSION));
+    assertEquals(invalidResponse(NO_CRON), thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2026,7 +2033,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
 
     control.replay();
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2046,7 +2053,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
     JobUpdateRequest request = buildJobUpdateRequest(update);
-    Response response = thrift.startJobUpdate(request, SESSION);
+    Response response = thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION);
     assertResponse(OK, response);
     assertEquals(
         NOOP_JOB_UPDATE_MESSAGE,
@@ -2073,7 +2080,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
     JobUpdateRequest request = buildJobUpdateRequest(IJobUpdate.build(builder));
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2090,7 +2097,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2109,7 +2116,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2134,7 +2141,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2157,12 +2164,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         storageUtil.mutableStoreProvider)).andReturn(ENOUGH_QUOTA);
 
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
-    jobUpdateController.start(update, USER);
+    jobUpdateController.start(update, AUDIT);
     expectLastCall().andThrow(new UpdateStateException("failed"));
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(buildJobUpdateRequest(update), SESSION));
+    assertResponse(
+        INVALID_REQUEST,
+        thrift.startJobUpdate(buildJobUpdateRequest(update), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2197,28 +2206,43 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         getResponseProxy(injector.getInstance(AuroraAdmin.Iface.class));
 
     control.replay();
-    assertResponse(INVALID_REQUEST, thriftInstance.startJobUpdate(null, null));
+    assertResponse(INVALID_REQUEST, thriftInstance.startJobUpdate(null, null, null));
   }
 
   @Test
   public void testPauseJobUpdateByCoordinator() throws Exception {
     expectAuth(UPDATE_COORDINATOR, true);
-    jobUpdateController.pause(UPDATE_KEY, USER);
+    jobUpdateController.pause(UPDATE_KEY, AUDIT);
 
     control.replay();
 
-    assertResponse(OK, thrift.pauseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(OK, thrift.pauseJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
   public void testPauseJobUpdateByUser() throws Exception {
     expectAuth(ROLE, true);
     expectAuth(UPDATE_COORDINATOR, false);
-    jobUpdateController.pause(UPDATE_KEY, USER);
+    jobUpdateController.pause(UPDATE_KEY, AUDIT);
 
     control.replay();
 
-    assertResponse(OK, thrift.pauseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(OK, thrift.pauseJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testPauseMessageTooLong() throws Exception {
+    expectAuth(ROLE, true);
+    expectAuth(UPDATE_COORDINATOR, false);
+
+    control.replay();
+
+    assertResponse(
+        OK,
+        thrift.pauseJobUpdate(
+            UPDATE_KEY.newBuilder(),
+            Strings.repeat("*", AuditData.MAX_MESSAGE_LENGTH + 1),
+            SESSION));
   }
 
   @Test
@@ -2228,39 +2252,43 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(AUTH_FAILED, thrift.pauseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(
+        AUTH_FAILED,
+        thrift.pauseJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
   public void testPauseJobUpdateFailsInController() throws Exception {
     expectAuth(UPDATE_COORDINATOR, true);
-    jobUpdateController.pause(UPDATE_KEY, USER);
+    jobUpdateController.pause(UPDATE_KEY, AUDIT);
     expectLastCall().andThrow(new UpdateStateException("failed"));
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.pauseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(
+        INVALID_REQUEST,
+        thrift.pauseJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
   public void testResumeJobUpdateByCoordinator() throws Exception {
     expectAuth(UPDATE_COORDINATOR, true);
-    jobUpdateController.resume(UPDATE_KEY, USER);
+    jobUpdateController.resume(UPDATE_KEY, AUDIT);
 
     control.replay();
 
-    assertResponse(OK, thrift.resumeJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(OK, thrift.resumeJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
   public void testResumeJobUpdateByUser() throws Exception {
     expectAuth(ROLE, true);
     expectAuth(UPDATE_COORDINATOR, false);
-    jobUpdateController.resume(UPDATE_KEY, USER);
+    jobUpdateController.resume(UPDATE_KEY, AUDIT);
 
     control.replay();
 
-    assertResponse(OK, thrift.resumeJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(OK, thrift.resumeJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2270,39 +2298,43 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(AUTH_FAILED, thrift.resumeJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(
+        AUTH_FAILED,
+        thrift.resumeJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
   public void testResumeJobUpdateFailsInController() throws Exception {
     expectAuth(UPDATE_COORDINATOR, true);
-    jobUpdateController.resume(UPDATE_KEY, USER);
+    jobUpdateController.resume(UPDATE_KEY, AUDIT);
     expectLastCall().andThrow(new UpdateStateException("failed"));
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.resumeJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(
+        INVALID_REQUEST,
+        thrift.resumeJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
   public void testAbortJobUpdateByCoordinator() throws Exception {
     expectAuth(UPDATE_COORDINATOR, true);
-    jobUpdateController.abort(UPDATE_KEY, USER);
+    jobUpdateController.abort(UPDATE_KEY, AUDIT);
 
     control.replay();
 
-    assertResponse(OK, thrift.abortJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(OK, thrift.abortJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
   public void testAbortJobUpdateByUser() throws Exception {
     expectAuth(ROLE, true);
     expectAuth(UPDATE_COORDINATOR, false);
-    jobUpdateController.abort(UPDATE_KEY, USER);
+    jobUpdateController.abort(UPDATE_KEY, AUDIT);
 
     control.replay();
 
-    assertResponse(OK, thrift.abortJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(OK, thrift.abortJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
@@ -2312,18 +2344,22 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(AUTH_FAILED, thrift.abortJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(
+        AUTH_FAILED,
+        thrift.abortJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test
   public void testAbortJobUpdateFailsInController() throws Exception {
     expectAuth(UPDATE_COORDINATOR, true);
-    jobUpdateController.abort(UPDATE_KEY, USER);
+    jobUpdateController.abort(UPDATE_KEY, AUDIT);
     expectLastCall().andThrow(new UpdateStateException("failed"));
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.abortJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+    assertResponse(
+        INVALID_REQUEST,
+        thrift.abortJobUpdate(UPDATE_KEY.newBuilder(), AUDIT_MESSAGE, SESSION));
   }
 
   @Test

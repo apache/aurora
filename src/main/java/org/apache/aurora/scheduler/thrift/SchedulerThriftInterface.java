@@ -128,6 +128,7 @@ import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 import org.apache.aurora.scheduler.thrift.auth.Requires;
 import org.apache.aurora.scheduler.updater.JobDiff;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
+import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.thrift.TException;
 
@@ -1115,7 +1116,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response startJobUpdate(JobUpdateRequest mutableRequest, SessionKey session) {
+  public Response startJobUpdate(
+      JobUpdateRequest mutableRequest,
+      @Nullable final String message,
+      SessionKey session) {
+
     if (!isUpdaterEnabled) {
       return invalidRequest("Server-side updates are disabled on this cluster.");
     }
@@ -1223,7 +1228,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               request.getInstanceCount(),
               quotaManager.checkJobUpdate(update, storeProvider));
 
-          jobUpdateController.start(update, context.getIdentity());
+          jobUpdateController.start(
+              update,
+              new AuditData(context.getIdentity(), Optional.fromNullable(message)));
           return ok(Result.startJobUpdateResult(
               new StartJobUpdateResult(update.getSummary().getKey().newBuilder())));
         } catch (UpdateStateException | TaskValidationException e) {
@@ -1236,7 +1243,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private Response changeJobUpdateState(
       JobUpdateKey mutableKey,
       SessionKey session,
-      final JobUpdateStateChange change) {
+      final JobUpdateStateChange change,
+      final Optional<String> message) {
 
     final IJobUpdateKey key = IJobUpdateKey.build(mutableKey);
     JobKeys.assertValid(key.getJob());
@@ -1250,7 +1258,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
         try {
-          change.modifyUpdate(jobUpdateController, key, context.getIdentity());
+          change.modifyUpdate(
+              jobUpdateController,
+              key,
+              new AuditData(context.getIdentity(), message));
           return ok();
         } catch (UpdateStateException e) {
           return error(INVALID_REQUEST, e);
@@ -1260,50 +1271,62 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   private interface JobUpdateStateChange {
-    void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, String invokingUser)
+    void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, AuditData auditData)
         throws UpdateStateException;
   }
 
   private static final JobUpdateStateChange PAUSE = new JobUpdateStateChange() {
     @Override
-    public void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, String invokingUser)
+    public void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, AuditData auditData)
         throws UpdateStateException {
 
-      controller.pause(key, invokingUser);
+      controller.pause(key, auditData);
     }
   };
 
   private static final JobUpdateStateChange RESUME = new JobUpdateStateChange() {
     @Override
-    public void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, String invokingUser)
+    public void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, AuditData auditData)
         throws UpdateStateException {
 
-      controller.resume(key, invokingUser);
+      controller.resume(key, auditData);
     }
   };
 
   private static final JobUpdateStateChange ABORT = new JobUpdateStateChange() {
     @Override
-    public void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, String invokingUser)
+    public void modifyUpdate(JobUpdateController controller, IJobUpdateKey key, AuditData auditData)
         throws UpdateStateException {
 
-      controller.abort(key, invokingUser);
+      controller.abort(key, auditData);
     }
   };
 
   @Override
-  public Response pauseJobUpdate(JobUpdateKey mutableKey, SessionKey session) {
-    return changeJobUpdateState(mutableKey, session, PAUSE);
+  public Response pauseJobUpdate(
+      JobUpdateKey mutableKey,
+      @Nullable String message,
+      SessionKey session) {
+
+    return changeJobUpdateState(mutableKey, session, PAUSE, Optional.fromNullable(message));
   }
 
   @Override
-  public Response resumeJobUpdate(JobUpdateKey mutableKey, SessionKey session) {
-    return changeJobUpdateState(mutableKey, session, RESUME);
+  public Response resumeJobUpdate(
+      JobUpdateKey mutableKey,
+      @Nullable String message,
+      SessionKey session) {
+
+    return changeJobUpdateState(mutableKey, session, RESUME, Optional.fromNullable(message));
   }
 
   @Override
-  public Response abortJobUpdate(JobUpdateKey mutableKey, SessionKey session) {
-    return changeJobUpdateState(mutableKey, session, ABORT);
+  public Response abortJobUpdate(
+      JobUpdateKey mutableKey,
+      @Nullable String message,
+      SessionKey session) {
+
+    return changeJobUpdateState(mutableKey, session, ABORT, Optional.fromNullable(message));
   }
 
   @Override

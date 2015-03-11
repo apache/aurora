@@ -98,6 +98,7 @@ import org.apache.aurora.scheduler.storage.mem.MemStorage.Delegated;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
+import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
 import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
 import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
@@ -136,6 +137,7 @@ import static org.junit.Assert.fail;
 public class JobUpdaterIT extends EasyMockTest {
 
   private static final String USER = "user";
+  private static final AuditData AUDIT = new AuditData(USER, Optional.of("message"));
   private static final IJobKey JOB = JobKeys.from("role", "env", "job1");
   private static final IJobUpdateKey UPDATE_ID =
       IJobUpdateKey.build(new JobUpdateKey(JOB.newBuilder(), "update_id"));
@@ -216,7 +218,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     ILock lock = lockManager.acquireLock(ILockKey.build(LockKey.job(JOB.newBuilder())), USER);
     try {
-      updater.start(makeJobUpdate(makeInstanceConfig(0, 0, NEW_CONFIG)), USER);
+      updater.start(makeJobUpdate(makeInstanceConfig(0, 0, NEW_CONFIG)), AUDIT);
     } finally {
       lockManager.releaseLock(lock);
     }
@@ -352,21 +354,21 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
     // Instance 1 is added
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(1, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
 
     // Updates may be paused for arbitrarily-long amounts of time, and the updater should not
     // take action while paused.
-    updater.pause(UPDATE_ID, USER);
-    updater.pause(UPDATE_ID, USER);  // Pausing again is a no-op.
+    updater.pause(UPDATE_ID, AUDIT);
+    updater.pause(UPDATE_ID, AUDIT);  // Pausing again is a no-op.
     assertState(ROLL_FORWARD_PAUSED, actions.build());
     clock.advance(ONE_DAY);
     changeState(JOB, 1, FAILED, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 2, FAILED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
-    updater.resume(UPDATE_ID, USER);
+    updater.resume(UPDATE_ID, AUDIT);
 
     actions.putAll(1, INSTANCE_UPDATED).put(2, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
@@ -386,7 +388,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Attempting to abort a finished update should fail.
     try {
-      updater.abort(UPDATE_ID, USER);
+      updater.abort(UPDATE_ID, AUDIT);
       fail("It should not be possible to abort a completed update.");
     } catch (UpdateStateException e) {
       // Expected.
@@ -414,7 +416,7 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(WATCH_TIMEOUT);
 
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
-    updater.start(IJobUpdate.build(builder), USER);
+    updater.start(IJobUpdate.build(builder), AUDIT);
 
     // The update is blocked initially waiting for a pulse.
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
@@ -505,17 +507,17 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(ONE_DAY);
 
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
-    updater.start(IJobUpdate.build(builder), USER);
+    updater.start(IJobUpdate.build(builder), AUDIT);
 
     // The update is blocked initially waiting for a pulse.
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
 
     // Pause the awaiting pulse update.
-    updater.pause(UPDATE_ID, USER);
+    updater.pause(UPDATE_ID, AUDIT);
     assertState(ROLL_FORWARD_PAUSED, actions.build());
 
     // Resume into awaiting pulse state.
-    updater.resume(UPDATE_ID, USER);
+    updater.resume(UPDATE_ID, AUDIT);
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
 
     assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
@@ -556,7 +558,7 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(WATCH_TIMEOUT);
 
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
-    updater.start(IJobUpdate.build(builder), USER);
+    updater.start(IJobUpdate.build(builder), AUDIT);
 
     // The update is blocked initially waiting for a pulse.
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
@@ -571,14 +573,14 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(Amount.of(PULSE_TIMEOUT_MS, Time.MILLISECONDS));
 
     // Update is paused
-    updater.pause(UPDATE_ID, USER);
+    updater.pause(UPDATE_ID, AUDIT);
     assertState(ROLL_FORWARD_PAUSED, actions.build());
 
     // A paused update is pulsed.
     assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
 
     // Update is resumed
-    updater.resume(UPDATE_ID, USER);
+    updater.resume(UPDATE_ID, AUDIT);
     assertState(ROLLING_FORWARD, actions.build());
 
     // Instance 2 is updated.
@@ -660,7 +662,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
     // Instances 0 and 1 are updated.
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(0, INSTANCE_UPDATING)
         .putAll(1, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
@@ -705,7 +707,7 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(WATCH_TIMEOUT);
 
     // Instance 0 is updated
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
 
@@ -737,7 +739,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
     // Instance 0 is updated.
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
@@ -764,10 +766,10 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(WATCH_TIMEOUT);
 
     // A rollback may be paused.
-    updater.pause(UPDATE_ID, USER);
+    updater.pause(UPDATE_ID, AUDIT);
     assertState(ROLL_BACK_PAUSED, actions.build());
     clock.advance(ONE_DAY);
-    updater.resume(UPDATE_ID, USER);
+    updater.resume(UPDATE_ID, AUDIT);
     assertState(ROLLING_BACK, actions.build());
 
     // Instance 1 is removed.
@@ -806,7 +808,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
     // Instance 0 is updated.
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
@@ -843,7 +845,7 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(WATCH_TIMEOUT);
 
     // Instance 0 is updated
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
 
@@ -851,7 +853,7 @@ public class JobUpdaterIT extends EasyMockTest {
     actions.putAll(0, INSTANCE_UPDATING, INSTANCE_UPDATED)
         .putAll(1, INSTANCE_UPDATING);
 
-    updater.abort(UPDATE_ID, USER);
+    updater.abort(UPDATE_ID, AUDIT);
     assertState(ABORTED, actions.build());
     clock.advance(WATCH_TIMEOUT);
     assertJobState(JOB, ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, OLD_CONFIG));
@@ -874,7 +876,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
     // Instance 0 is updated.
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
@@ -920,7 +922,7 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(WATCH_TIMEOUT);
 
     // Instance 0 is updated.
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     releaseAllLocks();
     clock.advance(RUNNING_TIMEOUT);
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
@@ -933,7 +935,7 @@ public class JobUpdaterIT extends EasyMockTest {
       throws UpdateStateException, UpdateConfigurationException {
 
     try {
-      updater.start(IJobUpdate.build(update), USER);
+      updater.start(IJobUpdate.build(update), AUDIT);
       fail();
     } catch (IllegalArgumentException e) {
       // Expected.
@@ -976,7 +978,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
     // Instance 0 is updated
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
 
@@ -1098,7 +1100,7 @@ public class JobUpdaterIT extends EasyMockTest {
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
     clock.advance(ONE_DAY);
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -1109,7 +1111,7 @@ public class JobUpdaterIT extends EasyMockTest {
     JobUpdate builder = update.newBuilder();
     builder.getInstructions().unsetDesiredState();
 
-    updater.start(IJobUpdate.build(builder), USER);
+    updater.start(IJobUpdate.build(builder), AUDIT);
   }
 
   @Test
@@ -1126,7 +1128,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
     // Instance 0 is updated.
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
@@ -1170,7 +1172,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
     // Instance 2 is added
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(2, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
@@ -1201,7 +1203,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
     // Instance 1 is removed.
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(1, INSTANCE_UPDATING);
     changeState(JOB, 1, KILLED);
     clock.advance(WATCH_TIMEOUT);
@@ -1223,7 +1225,7 @@ public class JobUpdaterIT extends EasyMockTest {
   public void testPauseUnknownUpdate() throws Exception {
     control.replay();
 
-    updater.pause(UPDATE_ID, USER);
+    updater.pause(UPDATE_ID, AUDIT);
   }
 
   @Test
@@ -1240,11 +1242,11 @@ public class JobUpdaterIT extends EasyMockTest {
 
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     releaseAllLocks();
-    updater.abort(update.getSummary().getKey(), "test");
+    updater.abort(update.getSummary().getKey(), AUDIT);
     clock.advance(WATCH_TIMEOUT);
     assertState(ERROR, actions.build());
   }
@@ -1267,11 +1269,11 @@ public class JobUpdaterIT extends EasyMockTest {
 
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
 
-    updater.start(update, USER);
+    updater.start(update, AUDIT);
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
 
-    updater.pause(update.getSummary().getKey(), "test");
+    updater.pause(update.getSummary().getKey(), AUDIT);
     assertState(ROLL_FORWARD_PAUSED, actions.build());
     clock.advance(WATCH_TIMEOUT);
 
@@ -1282,7 +1284,7 @@ public class JobUpdaterIT extends EasyMockTest {
     IJobUpdate update2 = IJobUpdate.build(builder);
 
     try {
-      updater.start(update2, USER);
+      updater.start(update2, AUDIT);
       fail();
     } catch (UpdateStateException e) {
       // Expected.
@@ -1293,7 +1295,7 @@ public class JobUpdaterIT extends EasyMockTest {
   public void testResumeUnknownUpdate() throws Exception {
     control.replay();
 
-    updater.resume(UPDATE_ID, USER);
+    updater.resume(UPDATE_ID, AUDIT);
   }
 
   private static IJobUpdateSummary makeUpdateSummary() {
