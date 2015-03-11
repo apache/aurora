@@ -44,7 +44,7 @@ class TaskStatusStats implements EventSubscriber {
   private final Clock clock;
 
   private final LoadingCache<Source, AtomicLong> lostSourceCounters;
-  private final LoadingCache<Reason, AtomicLong> lostReasonCounters;
+  private final LoadingCache<Reason, AtomicLong> reasonCounters;
 
   private final LoadingCache<Source, RequestTimer> latencyTimers;
 
@@ -60,11 +60,11 @@ class TaskStatusStats implements EventSubscriber {
             return statsProvider.makeCounter(lostCounterName(source));
           }
         });
-    lostReasonCounters = CacheBuilder.newBuilder()
+    reasonCounters = CacheBuilder.newBuilder()
         .build(new CacheLoader<Reason, AtomicLong>() {
           @Override
           public AtomicLong load(Reason reason) {
-            return statsProvider.makeCounter(lostReasonCounterName(reason));
+            return statsProvider.makeCounter(reasonCounterName(reason));
           }
         });
     latencyTimers = CacheBuilder.newBuilder()
@@ -82,8 +82,8 @@ class TaskStatusStats implements EventSubscriber {
   }
 
   @VisibleForTesting
-  static String lostReasonCounterName(Reason reason) {
-    return "task_lost_" + reason;
+  static String reasonCounterName(Reason reason) {
+    return "task_exit_" + reason;
   }
 
   @VisibleForTesting
@@ -93,13 +93,12 @@ class TaskStatusStats implements EventSubscriber {
 
   @Subscribe
   public void accumulate(TaskStatusReceived event) {
-    if (event.getState() == Protos.TaskState.TASK_LOST) {
-      if (event.getSource().isPresent()) {
-        lostSourceCounters.getUnchecked(event.getSource().get()).incrementAndGet();
-      }
-      if (event.getReason().isPresent()) {
-        lostReasonCounters.getUnchecked(event.getReason().get()).incrementAndGet();
-      }
+    if (event.getState() == Protos.TaskState.TASK_LOST && event.getSource().isPresent()) {
+      lostSourceCounters.getUnchecked(event.getSource().get()).incrementAndGet();
+    }
+
+    if (event.getReason().isPresent()) {
+      reasonCounters.getUnchecked(event.getReason().get()).incrementAndGet();
     }
 
     if (event.getSource().isPresent() && event.getEpochTimestampMicros().isPresent()) {

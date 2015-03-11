@@ -33,7 +33,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.scheduler.mesos.TaskStatusStats.latencyTimerName;
 import static org.apache.aurora.scheduler.mesos.TaskStatusStats.lostCounterName;
-import static org.apache.aurora.scheduler.mesos.TaskStatusStats.lostReasonCounterName;
+import static org.apache.aurora.scheduler.mesos.TaskStatusStats.reasonCounterName;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -64,15 +64,19 @@ public class TaskStatusStatsTest extends EasyMockTest {
     expect(statsProvider.makeRequestTimer(latencyTimerName(Source.SOURCE_MASTER)))
         .andReturn(masterDeliveryDelay);
     masterDeliveryDelay.requestComplete(ONE_SECOND.as(Time.MICROSECONDS));
-    expectLastCall().times(2);
+    expectLastCall().times(3);
 
     AtomicLong masterLostCounter = new AtomicLong();
     expect(statsProvider.makeCounter(lostCounterName(Source.SOURCE_MASTER)))
         .andReturn(masterLostCounter);
 
     AtomicLong slaveDisconnectedCounter = new AtomicLong();
-    expect(statsProvider.makeCounter(lostReasonCounterName(Reason.REASON_SLAVE_DISCONNECTED)))
+    expect(statsProvider.makeCounter(reasonCounterName(Reason.REASON_SLAVE_DISCONNECTED)))
         .andReturn(slaveDisconnectedCounter);
+
+    AtomicLong memoryLimitCounter = new AtomicLong();
+    expect(statsProvider.makeCounter(reasonCounterName(Reason.REASON_MEMORY_LIMIT)))
+        .andReturn(memoryLimitCounter);
 
     control.replay();
 
@@ -88,6 +92,11 @@ public class TaskStatusStatsTest extends EasyMockTest {
         TaskState.TASK_LOST,
         Optional.of(Source.SOURCE_MASTER),
         Optional.of(Reason.REASON_SLAVE_DISCONNECTED),
+        Optional.of(agoMicros(ONE_SECOND))));
+    eventBus.post(new TaskStatusReceived(
+        TaskState.TASK_FAILED,
+        Optional.of(Source.SOURCE_MASTER),
+        Optional.of(Reason.REASON_MEMORY_LIMIT),
         Optional.of(agoMicros(ONE_SECOND))));
 
     // No counting for these since they do not have both a source and timestamp.
@@ -117,5 +126,6 @@ public class TaskStatusStatsTest extends EasyMockTest {
 
     assertEquals(3L, masterLostCounter.get());
     assertEquals(3L, slaveDisconnectedCounter.get());
+    assertEquals(1L, memoryLimitCounter.get());
   }
 }
