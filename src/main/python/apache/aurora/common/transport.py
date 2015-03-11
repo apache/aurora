@@ -18,6 +18,7 @@ from io import BytesIO
 import requests
 from requests import exceptions as request_exceptions
 from thrift.transport.TTransport import TTransportBase, TTransportException
+from twitter.common import log
 
 try:
   from urlparse import urlparse
@@ -112,6 +113,7 @@ class TRequestsTransport(TTransportBase):
     self._session.headers['Content-Length'] = str(len(data))
     self._session.headers['Host'] = self.__urlparse.hostname
 
+    response = None
     try:
       response = self._session.post(
           self.__uri,
@@ -124,6 +126,10 @@ class TRequestsTransport(TTransportBase):
           type=TTransportException.TIMED_OUT,
           message='Timed out talking to %s' % self.__uri)
     except request_exceptions.RequestException as e:
+      if response:
+        log.debug('Error connecting, logging response headers:.')
+        for field_name, field_value in response.headers.items():
+          log.debug('  %s: %s' % (field_name, field_value))
       raise TTransportException(
           type=TTransportException.UNKNOWN,
           message='Unknown error talking to %s: %s' % (self.__uri, e))

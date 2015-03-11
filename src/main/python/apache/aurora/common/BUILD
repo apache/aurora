@@ -80,6 +80,7 @@ python_library(
   dependencies = [
     '3rdparty/python:requests',
     '3rdparty/python:thrift',
+    '3rdparty/python:twitter.common.log',
   ],
 )
 

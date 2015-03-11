@@ -78,6 +78,7 @@ def test_request_transport_timeout():
 
 def test_raise_for_status_causes_exception():
   response = create_autospec(spec=requests.Response, instance=True)
+  response.headers = {'header1': 'data', 'header2': 'data2'}
   response.raise_for_status.side_effect = requests.exceptions.HTTPError()
 
   session = create_autospec(spec=requests.Session, instance=True)
