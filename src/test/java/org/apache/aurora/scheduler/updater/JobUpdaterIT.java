@@ -266,13 +266,6 @@ public class JobUpdaterIT extends EasyMockTest {
           return event.getInstanceId();
         }
       };
-  private static final Function<IJobInstanceUpdateEvent, JobUpdateAction> EVENT_TO_ACTION =
-      new Function<IJobInstanceUpdateEvent, JobUpdateAction>() {
-        @Override
-        public JobUpdateAction apply(IJobInstanceUpdateEvent event) {
-          return event.getAction();
-        }
-      };
 
   private IJobUpdateDetails getDetails() {
     return storage.read(new Work.Quiet<IJobUpdateDetails>() {
@@ -298,7 +291,7 @@ public class JobUpdaterIT extends EasyMockTest {
     Multimap<Integer, IJobInstanceUpdateEvent> eventsByInstance =
         Multimaps.index(orderedEvents, EVENT_TO_INSTANCE);
     Multimap<Integer, JobUpdateAction> actionsByInstance =
-        Multimaps.transformValues(eventsByInstance, EVENT_TO_ACTION);
+        Multimaps.transformValues(eventsByInstance, JobUpdateControllerImpl.EVENT_TO_ACTION);
     assertEquals(expectedActions, actionsByInstance);
     assertEquals(expected, details.getUpdate().getSummary().getState().getStatus());
   }
@@ -375,8 +368,7 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(WATCH_TIMEOUT);
     updater.resume(UPDATE_ID, USER);
 
-    actions.putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED)
-        .put(2, INSTANCE_UPDATING);
+    actions.putAll(1, INSTANCE_UPDATED).put(2, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
 
     // A task outside the scope of the update should be ignored by the updater.
@@ -443,8 +435,6 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Pulse arrives and instance 2 is updated.
     assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
-    actions.putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED);
-    actions.putAll(2, INSTANCE_UPDATING);
     changeState(JOB, 2, KILLED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
     actions.put(2, INSTANCE_UPDATED);
@@ -589,8 +579,6 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Update is resumed
     updater.resume(UPDATE_ID, USER);
-    actions.putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED);
-    actions.put(2, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
 
     // Instance 2 is updated.
@@ -780,8 +768,6 @@ public class JobUpdaterIT extends EasyMockTest {
     assertState(ROLL_BACK_PAUSED, actions.build());
     clock.advance(ONE_DAY);
     updater.resume(UPDATE_ID, USER);
-    actions.putAll(1, INSTANCE_ROLLING_BACK)
-        .putAll(2, INSTANCE_ROLLING_BACK, INSTANCE_ROLLED_BACK);
     assertState(ROLLING_BACK, actions.build());
 
     // Instance 1 is removed.

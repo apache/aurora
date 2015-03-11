@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -571,19 +572,19 @@ class JobUpdateControllerImpl implements JobUpdateController {
     for (Map.Entry<Integer, SideEffect> entry : result.getSideEffects().entrySet()) {
       Iterable<InstanceUpdateStatus> statusChanges;
 
+      int instanceId = entry.getKey();
+      List<IJobInstanceUpdateEvent> savedEvents = updateStore.fetchInstanceEvents(key, instanceId);
+
+      Set<JobUpdateAction> savedActions =
+          FluentIterable.from(savedEvents).transform(EVENT_TO_ACTION).toSet();
+
       // Don't bother persisting a sequence of status changes that represents an instance that
       // was immediately recognized as being healthy and in the desired state.
-      if (entry.getValue().getStatusChanges().equals(NOOP_INSTANCE_UPDATE)) {
-        List<IJobInstanceUpdateEvent> savedEvents =
-            updateStore.fetchInstanceEvents(key, entry.getKey());
-        if (savedEvents.isEmpty()) {
-          LOG.info("Suppressing no-op update for instance " + entry.getKey());
-          statusChanges = ImmutableSet.of();
-        } else {
-          // We choose to risk redundant events in corner cases here (after failing over while
-          // updates are in-flight) to simplify the implementation.
-          statusChanges = entry.getValue().getStatusChanges();
-        }
+      if (entry.getValue().getStatusChanges().equals(NOOP_INSTANCE_UPDATE)
+          && savedEvents.isEmpty()) {
+
+        LOG.info("Suppressing no-op update for instance " + instanceId);
+        statusChanges = ImmutableSet.of();
       } else {
         statusChanges = entry.getValue().getStatusChanges();
       }
@@ -592,12 +593,20 @@ class JobUpdateControllerImpl implements JobUpdateController {
         JobUpdateAction action = STATE_MAP.get(Pair.of(statusChange, updaterStatus));
         requireNonNull(action);
 
-        IJobInstanceUpdateEvent event = IJobInstanceUpdateEvent.build(
-            new JobInstanceUpdateEvent()
-                .setInstanceId(entry.getKey())
-                .setTimestampMs(clock.nowMillis())
-                .setAction(action));
-        updateStore.saveJobInstanceUpdateEvent(summary.getKey(), event);
+        // A given instance update action may only be issued once during the update lifecycle.
+        // Suppress duplicate events due to pause/resume operations.
+        if (savedActions.contains(action)) {
+          LOG.info(String.format("Suppressing duplicate update %s for instance %s.",
+              action,
+              instanceId));
+        } else {
+          IJobInstanceUpdateEvent event = IJobInstanceUpdateEvent.build(
+              new JobInstanceUpdateEvent()
+                  .setInstanceId(instanceId)
+                  .setTimestampMs(clock.nowMillis())
+                  .setAction(action));
+          updateStore.saveJobInstanceUpdateEvent(summary.getKey(), event);
+        }
       }
     }
 
@@ -650,6 +659,15 @@ class JobUpdateControllerImpl implements JobUpdateController {
       }
     }
   }
+
+  @VisibleForTesting
+  static final Function<IJobInstanceUpdateEvent, JobUpdateAction> EVENT_TO_ACTION =
+      new Function<IJobInstanceUpdateEvent, JobUpdateAction>() {
+        @Override
+        public JobUpdateAction apply(IJobInstanceUpdateEvent event) {
+          return event.getAction();
+        }
+      };
 
   @VisibleForTesting
   static String failureMessage(int instanceId, Failure failure) {
