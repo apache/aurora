@@ -44,8 +44,11 @@ import org.apache.aurora.scheduler.async.TaskScheduler;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
 import org.apache.aurora.scheduler.async.preemptor.ClusterState;
 import org.apache.aurora.scheduler.async.preemptor.ClusterStateImpl;
+import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder;
+import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlotFinderImpl;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.async.preemptor.PreemptorImpl;
+import org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -89,6 +92,7 @@ public class SchedulingBenchmarks {
       final FakeClock clock = new FakeClock();
       clock.setNowMillis(System.currentTimeMillis());
 
+      // TODO(maxim): Find a way to DRY it and reuse existing modules instead.
       Injector injector = Guice.createInjector(
           new StateModule(),
           new AbstractModule() {
@@ -125,10 +129,13 @@ public class SchedulingBenchmarks {
                       .setThermosObserverRoot("/var/run/thermos")
                       .build());
 
+              bind(PreemptorMetrics.class).in(Singleton.class);
+              bind(PreemptionSlotFinder.class).to(PreemptionSlotFinderImpl.class);
+              bind(PreemptionSlotFinderImpl.class).in(Singleton.class);
               bind(Preemptor.class).to(PreemptorImpl.class);
               bind(PreemptorImpl.class).in(Singleton.class);
               bind(new TypeLiteral<Amount<Long, Time>>() { })
-                  .annotatedWith(PreemptorImpl.PreemptionDelay.class)
+                  .annotatedWith(PreemptionSlotFinderImpl.PreemptionDelay.class)
                   .toInstance(Amount.of(0L, Time.MILLISECONDS));
               bind(ClusterState.class).to(ClusterStateImpl.class);
               bind(ClusterStateImpl.class).in(Singleton.class);

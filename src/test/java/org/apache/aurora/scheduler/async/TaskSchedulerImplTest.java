@@ -157,13 +157,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
-    expect(preemptor.findPreemptionSlotFor("a", emptyJob))
+    expect(preemptor.attemptPreemptionFor("a", emptyJob))
         .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
     AssignmentCapture firstAssignment = expectLaunchAttempt(false);
-    expect(preemptor.findPreemptionSlotFor("b", emptyJob)).andReturn(Optional.<String>absent());
+    expect(preemptor.attemptPreemptionFor("b", emptyJob)).andReturn(Optional.<String>absent());
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
@@ -192,7 +192,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
-    expect(preemptor.findPreemptionSlotFor("a", emptyJob))
+    expect(preemptor.attemptPreemptionFor("a", emptyJob))
         .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_A);
@@ -228,7 +228,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
-    expect(preemptor.findPreemptionSlotFor("a", emptyJob))
+    expect(preemptor.attemptPreemptionFor("a", emptyJob))
         .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_A);
@@ -253,7 +253,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectLaunchAttempt(false);
 
     // Reserve "a" with offerA
-    expect(preemptor.findPreemptionSlotFor("a", emptyJob))
+    expect(preemptor.attemptPreemptionFor("a", emptyJob))
         .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_B);
@@ -278,7 +278,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_B);
     expectLaunchAttempt(false);
     // Reserve "b" with offer1
-    expect(preemptor.findPreemptionSlotFor("b", emptyJob))
+    expect(preemptor.attemptPreemptionFor("b", emptyJob))
         .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_A);

@@ -85,6 +85,6 @@ public class PreemptorModuleTest extends EasyMockTest {
     assertEquals(
         Optional.<String>absent(),
         injector.getInstance(Preemptor.class)
-            .findPreemptionSlotFor("a", new AttributeAggregate(taskSupplier, attributeStore)));
+            .attemptPreemptionFor("a", new AttributeAggregate(taskSupplier, attributeStore)));
   }
 }

@@ -17,7 +17,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMultimap;
 
 import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -121,8 +121,7 @@ public class ClusterStateImplTest {
         .setTaskId(taskId)
         .setSlaveId(slaveId)
         .setSlaveHost(slaveId + "host")
-        .setTask(new TaskConfig()
-            .setOwner(new Identity().setRole("role"))));
+        .setTask(new TaskConfig().setJob(new JobKey("role", "env", "job"))));
   }
 
   private void changeState(IAssignedTask assignedTask, ScheduleStatus status) {

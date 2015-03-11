@@ -16,7 +16,7 @@ package org.apache.aurora.scheduler.async.preemptor;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.junit.Test;
@@ -44,7 +44,6 @@ public class PreemptionVictimTest {
         .setTaskId(taskId)
         .setSlaveId(taskId + "slave")
         .setSlaveHost(taskId + "host")
-        .setTask(new TaskConfig()
-            .setOwner(new Identity().setRole("role")))));
+        .setTask(new TaskConfig().setJob(new JobKey("role", "env", "job")))));
   }
 }

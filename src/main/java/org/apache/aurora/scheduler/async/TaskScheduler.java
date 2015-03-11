@@ -251,7 +251,7 @@ public interface TaskScheduler extends EventSubscriber {
       if (reservations.hasReservationForTask(taskId)) {
         return;
       }
-      Optional<String> slaveId = preemptor.findPreemptionSlotFor(taskId, attributeAggregate);
+      Optional<String> slaveId = preemptor.attemptPreemptionFor(taskId, attributeAggregate);
       if (slaveId.isPresent()) {
         this.reservations.add(SlaveID.newBuilder().setValue(slaveId.get()).build(), taskId);
       }

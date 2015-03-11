@@ -51,7 +51,7 @@ public final class PreemptionVictim {
     return new PreemptionVictim(
         task.getSlaveHost(),
         config.isProduction(),
-        config.getOwner().getRole(),
+        config.getJob().getRole(),
         config.getPriority(),
         Resources.from(task.getTask()),
         task.getTaskId());

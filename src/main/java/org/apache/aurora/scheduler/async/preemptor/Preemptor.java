@@ -22,12 +22,13 @@ import org.apache.aurora.scheduler.filter.AttributeAggregate;
  */
 public interface Preemptor {
 
+  // TODO(maxim): Move AttributeAggregate creation into implementing class.
   /**
-   * Preempts active tasks in favor of the input task.
+   * Attempts to preempt active tasks in favor of the input task.
    *
    * @param taskId ID of the preempting task.
    * @param attributeAggregate Attribute information for tasks in the job containing {@code task}.
-   * @return ID of the slave where preemption occured.
+   * @return ID of the slave where preemption occurred.
    */
-  Optional<String> findPreemptionSlotFor(String taskId, AttributeAggregate attributeAggregate);
+  Optional<String> attemptPreemptionFor(String taskId, AttributeAggregate attributeAggregate);
 }

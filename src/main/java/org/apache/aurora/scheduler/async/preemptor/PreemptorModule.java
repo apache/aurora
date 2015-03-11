@@ -27,7 +27,7 @@ import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
-import org.apache.aurora.scheduler.async.preemptor.PreemptorImpl.PreemptionDelay;
+import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlotFinderImpl;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 
@@ -62,9 +62,13 @@ public class PreemptorModule extends AbstractModule {
       protected void configure() {
         if (enablePreemptor) {
           LOG.info("Preemptor Enabled.");
+          bind(PreemptorMetrics.class).in(Singleton.class);
+          bind(PreemptionSlotFinder.class).to(PreemptionSlotFinderImpl.class);
+          bind(PreemptionSlotFinderImpl.class).in(Singleton.class);
           bind(Preemptor.class).to(PreemptorImpl.class);
           bind(PreemptorImpl.class).in(Singleton.class);
-          bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
+          bind(new TypeLiteral<Amount<Long, Time>>() { })
+              .annotatedWith(PreemptionSlotFinderImpl.PreemptionDelay.class)
               .toInstance(PREEMPTION_DELAY.get());
           bind(ClusterState.class).to(ClusterStateImpl.class);
           bind(ClusterStateImpl.class).in(Singleton.class);
@@ -86,7 +90,7 @@ public class PreemptorModule extends AbstractModule {
 
   private static final Preemptor NULL_PREEMPTOR = new Preemptor() {
     @Override
-    public Optional<String> findPreemptionSlotFor(
+    public Optional<String> attemptPreemptionFor(
         String taskId,
         AttributeAggregate attributeAggregate) {
 
