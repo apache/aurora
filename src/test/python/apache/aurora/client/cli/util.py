@@ -17,7 +17,6 @@ import unittest
 
 from mock import create_autospec, Mock
 
-from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -25,7 +24,7 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from ...api_util import SchedulerProxyApiSpec, SchedulerThriftApiSpec
 from ..util import TEST_CLUSTER, TEST_CLUSTERS
 
-from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.constants import ACTIVE_STATES, CURRENT_API_VERSION
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     ExecutorConfig,
@@ -38,6 +37,7 @@ from gen.apache.aurora.api.ttypes import (
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
+    ServerInfo,
     TaskConfig,
     TaskEvent,
     TaskQuery
@@ -55,19 +55,6 @@ def mock_verb_options(verb):
     if 'default' in opt.kwargs:
       setattr(options, opt_name(opt), opt.kwargs.get('default'))
   return options
-
-
-class FakeAuroraCommandLine(AuroraCommandLine):
-  def __init__(self):
-    super(FakeAuroraCommandLine, self).__init__()
-    self.__err = []
-
-  def print_err(self, s, indent=0):
-    indent_str = " " * indent
-    self.__err.append("%s%s" % (indent_str, s))
-
-  def get_err(self):
-    return self.__err
 
 
 class FakeAuroraCommandContext(AuroraCommandContext):
@@ -136,7 +123,10 @@ class AuroraClientCommandTest(unittest.TestCase):
 
   @classmethod
   def create_blank_response(cls, code, msg):
-    return Response(responseCode=code, details=[ResponseDetail(message=msg)])
+    return Response(
+        responseCode=code,
+        details=[ResponseDetail(message=msg)],
+        serverInfo=ServerInfo(thriftAPIVersion=CURRENT_API_VERSION.major))
 
   @classmethod
   def create_simple_success_response(cls):

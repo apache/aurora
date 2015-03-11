@@ -23,20 +23,14 @@ from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INTERRUPTED,
     EXIT_INVALID_CONFIGURATION,
-    EXIT_OK,
-    EXIT_UNKNOWN_ERROR
+    EXIT_OK
 )
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.jobs import CreateJobCommand
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
-from .util import (
-    AuroraClientCommandTest,
-    FakeAuroraCommandContext,
-    FakeAuroraCommandLine,
-    mock_verb_options
-)
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 
 from gen.apache.aurora.api.ttypes import (
     JobKey,
@@ -266,18 +260,15 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('time.sleep'),
         patch('time.time', return_value=23),
-        patch('apache.aurora.client.cli.jobs.Job.create_context',
-            side_effect=Exception("Argh"))):
+        patch('apache.aurora.client.cli.jobs.Job.create_context', side_effect=UnknownException())):
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
-            fp.name])
-        assert result == EXIT_UNKNOWN_ERROR
-        assert api.create_job.call_count == 0
+        with pytest.raises(UnknownException):
+          cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello', fp.name])
 
   def test_simple_successful_create_job_output(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -394,20 +385,23 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     Verifies that the creation command sends the right API RPCs, and performs the correct
     tests on the result."""
 
+    mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('threading._Event.wait')):
+        patch('threading._Event.wait'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
 
       # This is the real test: invoke create as if it had been called by the command line.
       with temporary_file() as fp:
         fp.write(self.get_unbound_test_config())
         fp.flush()
-        cmd = FakeAuroraCommandLine()
+        cmd = AuroraCommandLine()
         result = cmd.execute(['job', 'create', '--wait-until=RUNNING',
             '--bind', 'cluster_binding=west',
            'west/bozo/test/hello',
             fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
-        assert cmd.get_err() == [
+      assert mock_context.get_out() == []
+      assert mock_context.get_err() == [
             "Error executing command: Error loading configuration: "
             "TypeCheck(FAILED): MesosJob[update_config] failed: "
             "UpdateConfig[batch_size] failed: u'{{TEST_BATCH}}' not an integer"]

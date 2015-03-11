@@ -26,12 +26,7 @@ from apache.aurora.client.cli.jobs import KillCommand
 from apache.aurora.client.cli.options import parse_instances, TaskInstanceKey
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from .util import (
-    AuroraClientCommandTest,
-    FakeAuroraCommandContext,
-    FakeAuroraCommandLine,
-    mock_verb_options
-)
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
@@ -421,14 +416,12 @@ class TestClientKillCommand(AuroraClientCommandTest):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        cmd = FakeAuroraCommandLine()
+        cmd = AuroraCommandLine()
         cmd.execute(['job', 'kill', '--max-total-failures=1', '--config=%s' % fp.name,
                      '--batch-size=5', self.get_instance_spec('0,2,4-13')])
 
       assert mock_context.get_out() == []
       assert mock_context.get_err() == [
          'Instances [0, 2, 4, 5, 6] were not killed in time',
-         'Instances [7, 8, 9, 10, 11] were not killed in time']
-
-      assert cmd.get_err() == [
-        'Error executing command: Exceeded maximum number of errors while killing instances']
+         'Instances [7, 8, 9, 10, 11] were not killed in time',
+         'Error executing command: Exceeded maximum number of errors while killing instances']

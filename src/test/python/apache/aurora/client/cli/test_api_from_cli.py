@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import create_autospec, patch
+from mock import call, create_autospec, patch
 
 from apache.aurora.client.api.scheduler_client import SchedulerClient
 from apache.aurora.client.cli import EXIT_UNKNOWN_ERROR
@@ -76,8 +76,8 @@ class TestApiFromCLI(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
-      mock_thrift_client.getTasksWithoutConfigs.assert_called_with(
-          TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))
+      assert mock_thrift_client.getTasksWithoutConfigs.mock_calls == [
+          call(TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))]
 
   def test_status_api_failure(self):
     mock_scheduler_client = create_autospec(spec=SchedulerClient, instance=True)
@@ -96,5 +96,5 @@ class TestApiFromCLI(AuroraClientCommandTest):
       # exception, which results in the command failing with an error code.
       result = cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       assert result == EXIT_UNKNOWN_ERROR
-      mock_thrift_client.getTasksWithoutConfigs.assert_called_with(
-        TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))
+      assert mock_thrift_client.getTasksWithoutConfigs.mock_calls == [
+        call(TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))]

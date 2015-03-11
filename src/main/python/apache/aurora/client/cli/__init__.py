@@ -39,6 +39,8 @@ from abc import abstractmethod, abstractproperty
 import pkg_resources
 from twitter.common.lang import AbstractClass, Compatibility
 
+from apache.aurora.client.api import AuroraClientAPI
+
 from .command_hooks import GlobalCommandHookRegistry
 from .options import CommandOption
 
@@ -191,14 +193,6 @@ class CommandLine(AbstractClass):
   def name(self):
     """Returns the name of this command-line tool"""
 
-  def print_out(self, s, indent=0):
-    indent_str = " " * indent
-    print("%s%s" % (indent_str, s))
-
-  def print_err(self, s, indent=0):
-    indent_str = " " * indent
-    print("%s%s" % (indent_str, s), file=sys.stderr)
-
   def __init__(self):
     self.nouns = None
     self.parser = None
@@ -277,7 +271,7 @@ class CommandLine(AbstractClass):
       for plugin in self.plugins:
         plugin.before_execution(context)
     except ConfigurationPlugin.Error as e:
-      print("Error in configuration plugin before execution: %s" % e.msg, file=sys.stderr)
+      context.print_err("Error in configuration plugin before execution: %s" % e.msg)
       return e.code
     plugin_result = GlobalCommandHookRegistry.run_pre_hooks(context, context.options.noun,
         context.options.verb)
@@ -322,12 +316,12 @@ class CommandLine(AbstractClass):
     except Context.CommandErrorLogged as c:
       return c.code
     except Context.CommandError as c:
-      self.print_err("Error executing command: %s" % c.msg)
+      context.print_err("Error executing command: %s" % c.msg)
       return c.code
-    except Exception:
-      # TODO(wfarner): Remove this block - it hides exceptions and complicates testing.
-      print("Fatal error running command:", file=sys.stderr)
-      print(traceback.format_exc(), file=sys.stderr)
+    except AuroraClientAPI.Error as e:
+      # TODO(wfarner): Generalize this error type in the contract of noun and verb implementations.
+      context.print_err("Fatal error running command: %s" % e.message)
+      context.print_err(traceback.format_exc())
       return EXIT_UNKNOWN_ERROR
 
   def execute(self, args):
@@ -336,9 +330,6 @@ class CommandLine(AbstractClass):
     except KeyboardInterrupt:
       logging.error("Command interrupted by user")
       return EXIT_INTERRUPTED
-    except Exception as e:
-      logging.error("Unknown error: %s" % e)
-      return EXIT_UNKNOWN_ERROR
 
 
 class Noun(AuroraCommand):

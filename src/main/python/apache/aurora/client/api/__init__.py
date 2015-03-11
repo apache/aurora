@@ -44,7 +44,6 @@ class AuroraClientAPI(object):
   """This class provides the API to talk to the twitter scheduler"""
 
   class Error(Exception): pass
-  class TypeError(Error, TypeError): pass
   class ClusterMismatch(Error, ValueError): pass
   class ThriftInternalError(Error): pass
   class UpdateConfigError(Error): pass
@@ -329,12 +328,12 @@ class AuroraClientAPI(object):
 
   def _assert_valid_lock(self, lock):
     if not isinstance(lock, Lock):
-      raise self.TypeError('Invalid lock %r: expected %s but got %s'
-                           % (lock, AuroraJobKey.__name__, lock.__class__.__name__))
+      raise TypeError('Invalid lock %r: expected %s but got %s'
+          % (lock, AuroraJobKey.__name__, lock.__class__.__name__))
 
   def _assert_valid_job_key(self, job_key):
     if not isinstance(job_key, AuroraJobKey):
-      raise self.TypeError('Invalid job_key %r: expected %s but got %s'
+      raise TypeError('Invalid job_key %r: expected %s but got %s'
           % (job_key, AuroraJobKey.__name__, job_key.__class__.__name__))
     if job_key.cluster != self.cluster.name:
       raise self.ClusterMismatch('job %s does not belong to cluster %s' % (job_key,

@@ -655,13 +655,15 @@ class StatusCommand(Verb):
     else:
       return "".join(result)
 
-  def _render_partial_jobkey(self, jobkey):
+  @classmethod
+  def _render_partial_jobkey(cls, jobkey):
     return "%s/%s/%s/%s" % jobkey
 
-  def _print_jobs_not_found(self, context):
+  @classmethod
+  def _print_jobs_not_found(cls, context):
     if context.options.write_json:
       context.print_out(json.dumps(
-        {"jobspec": self._render_partial_jobkey(context.options.jobspec),
+        {"jobspec": cls._render_partial_jobkey(context.options.jobspec),
          "error": "No matching jobs found"},
         separators=[",", ":"],
         sort_keys=False))
@@ -670,13 +672,13 @@ class StatusCommand(Verb):
       return EXIT_OK
     else:
       context.print_err("Found no jobs matching %s" %
-          self._render_partial_jobkey(context.options.jobspec))
+          cls._render_partial_jobkey(context.options.jobspec))
       return EXIT_INVALID_PARAMETER
 
   def execute(self, context):
     jobs = context.get_jobs_matching_key(context.options.jobspec)
     if not jobs:
-      return self._print_jobs_not_found()
+      return self._print_jobs_not_found(context)
 
     result = self.get_status_for_jobs(jobs, context)
     if result is not None:
