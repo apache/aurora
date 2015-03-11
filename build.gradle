@@ -15,7 +15,7 @@ import org.apache.aurora.build.CoverageReportCheck
 
 plugins {
   id 'com.eriwen.gradle.js' version '1.12.1'
-  id 'com.github.ben-manes.versions' version '0.5'
+  id 'com.github.ben-manes.versions' version '0.8'
   id 'com.github.hierynomus.license' version '0.11.0'
   id 'me.champeau.gradle.jmh' version '0.2.0'
 }
@@ -328,7 +328,7 @@ codeQualityTasks.each {
 
 checkstyle {
   sourceSets = [sourceSets.main , sourceSets.test, sourceSets.jmh]
-  toolVersion = 6.3
+  toolVersion = '6.4.1'
 }
 
 tasks.withType(FindBugs) {
