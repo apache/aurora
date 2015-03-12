@@ -124,9 +124,14 @@ def group_by_host(hostname):
   return hostname
 
 
+def no_grouping(hostname):
+  return '_all_hosts_'
+
+
 DEFAULT_GROUPING = 'by_host'
 GROUPING_FUNCTIONS = {
     'by_host': group_by_host,
+    'none': no_grouping,
 }
 
 

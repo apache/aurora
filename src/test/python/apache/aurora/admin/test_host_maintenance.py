@@ -263,6 +263,18 @@ def test_default_grouping():
   assert batches[2] == Hosts(set(['xyz321.example.com']))
 
 
+def test_none_grouping():
+  example_host_list = [
+    'xyz321.example.com',
+    'bar337.example.com',
+    'foo001.example.com',
+  ]
+
+  batches = list(HostMaintenance.iter_batches(example_host_list, 'none'))
+  assert batches[0] == Hosts(set(example_host_list))
+  assert len(batches) == 1
+
+
 @contextmanager
 def group_by_rack():
   add_grouping('by_rack', rack_grouping)
