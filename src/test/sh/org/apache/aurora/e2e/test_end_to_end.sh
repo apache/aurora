@@ -304,6 +304,7 @@ TEST_DOCKER_ARGS=(
 
 trap collect_result EXIT
 
+aurorabuild all
 test_version
 test_http_example "${TEST_ARGS[@]}"
 
