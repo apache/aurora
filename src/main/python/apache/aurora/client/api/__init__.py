@@ -149,11 +149,12 @@ class AuroraClientAPI(object):
 
     return updater.update(instances)
 
-  def start_job_update(self, config, instances=None):
+  def start_job_update(self, config, message, instances=None):
     """Requests Scheduler to start job update process.
 
     Arguments:
     config -- AuroraConfig instance with update details.
+    message -- Audit message to include with the change.
     instances -- Optional list of instances to restrict update to.
 
     Returns response object with update ID and acquired job lock.
@@ -170,37 +171,40 @@ class AuroraClientAPI(object):
         taskConfig=config.job().taskConfig
     )
 
-    return self._scheduler_proxy.startJobUpdate(request)
+    return self._scheduler_proxy.startJobUpdate(request, message)
 
-  def pause_job_update(self, update_key):
+  def pause_job_update(self, update_key, message):
     """Requests Scheduler to pause active job update.
 
     Arguments:
     update_key -- Update identifier.
+    message -- Audit message to include with the change.
 
     Returns response object.
     """
-    return self._scheduler_proxy.pauseJobUpdate(update_key)
+    return self._scheduler_proxy.pauseJobUpdate(update_key, message)
 
-  def resume_job_update(self, update_key):
+  def resume_job_update(self, update_key, message):
     """Requests Scheduler to resume a job update paused previously.
 
     Arguments:
     update_key -- Update identifier.
+    message -- Audit message to include with the change.
 
     Returns response object.
     """
-    return self._scheduler_proxy.resumeJobUpdate(update_key)
+    return self._scheduler_proxy.resumeJobUpdate(update_key, message)
 
-  def abort_job_update(self, update_key):
+  def abort_job_update(self, update_key, message):
     """Requests Scheduler to abort active or paused job update.
 
     Arguments:
     update_key -- Update identifier.
+    message -- Audit message to include with the change.
 
     Returns response object.
     """
-    return self._scheduler_proxy.abortJobUpdate(update_key)
+    return self._scheduler_proxy.abortJobUpdate(update_key, message)
 
   def query_job_updates(self, role=None, job_key=None, user=None, update_statuses=None):
     """Returns all job updates matching the query.

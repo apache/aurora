@@ -78,26 +78,34 @@ class UpdateController(object):
     self.context.print_out(success_msg)
     return EXIT_OK
 
-  def pause(self, job_key):
+  def pause(self, job_key, message):
     return self._modify_update(
         job_key,
-        lambda key: self.api.pause_job_update(key),
+        lambda key: self.api.pause_job_update(key, message),
         "Failed to pause update due to error:",
         "Update has been paused.")
 
-  def resume(self, job_key):
+  def resume(self, job_key, message):
     return self._modify_update(
         job_key,
-        lambda key: self.api.resume_job_update(key),
+        lambda key: self.api.resume_job_update(key, message),
         "Failed to resume update due to error:",
         "Update has been resumed.")
 
-  def abort(self, job_key):
+  def abort(self, job_key, message):
     return self._modify_update(
         job_key,
-        lambda key: self.api.abort_job_update(key),
+        lambda key: self.api.abort_job_update(key, message),
         "Failed to abort update due to error:",
         "Update has been aborted.")
+
+
+MESSAGE_OPTION = CommandOption(
+    '--message',
+    '-m',
+    type=str,
+    default=None,
+    help='Message to include with the update state transition')
 
 
 class StartUpdate(Verb):
@@ -110,8 +118,14 @@ class StartUpdate(Verb):
 
   def get_options(self):
     return [
-      BIND_OPTION, BROWSER_OPTION, JSON_READ_OPTION, HEALTHCHECK_OPTION, STRICT_OPTION,
-      INSTANCES_SPEC_ARGUMENT, CONFIG_ARGUMENT
+        BIND_OPTION,
+        BROWSER_OPTION,
+        HEALTHCHECK_OPTION,
+        JSON_READ_OPTION,
+        MESSAGE_OPTION,
+        STRICT_OPTION,
+        INSTANCES_SPEC_ARGUMENT,
+        CONFIG_ARGUMENT
     ]
 
   @property
@@ -127,7 +141,6 @@ class StartUpdate(Verb):
         You may want to consider using the 'aurora job diff' subcommand before updating,
         to preview what changes will take effect.
         """)
-  # TODO(mchucarroll): consider adding an "aurora update preview"?
 
   def execute(self, context):
     job = context.options.instance_spec.jobkey
@@ -140,7 +153,7 @@ class StartUpdate(Verb):
           "Cron jobs may only be updated with \"aurora cron schedule\" command")
 
     api = context.get_api(config.cluster())
-    resp = api.start_job_update(config, instances)
+    resp = api.start_job_update(config, context.options.message, instances)
     context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
         err_msg="Failed to start update due to error:")
 
@@ -158,9 +171,7 @@ class PauseUpdate(Verb):
     return 'pause'
 
   def get_options(self):
-    return [
-      JOBSPEC_ARGUMENT
-    ]
+    return [JOBSPEC_ARGUMENT, MESSAGE_OPTION]
 
   @property
   def help(self):
@@ -168,7 +179,9 @@ class PauseUpdate(Verb):
 
   def execute(self, context):
     job_key = context.options.jobspec
-    return UpdateController(context.get_api(job_key.cluster), context).pause(job_key)
+    return UpdateController(context.get_api(job_key.cluster), context).pause(
+        job_key,
+        context.options.message)
 
 
 class ResumeUpdate(Verb):
@@ -177,9 +190,7 @@ class ResumeUpdate(Verb):
     return 'resume'
 
   def get_options(self):
-    return [
-      JOBSPEC_ARGUMENT
-    ]
+    return [JOBSPEC_ARGUMENT, MESSAGE_OPTION]
 
   @property
   def help(self):
@@ -187,7 +198,9 @@ class ResumeUpdate(Verb):
 
   def execute(self, context):
     job_key = context.options.jobspec
-    return UpdateController(context.get_api(job_key.cluster), context).resume(job_key)
+    return UpdateController(context.get_api(job_key.cluster), context).resume(
+        job_key,
+        context.options.message)
 
 
 class AbortUpdate(Verb):
@@ -196,9 +209,7 @@ class AbortUpdate(Verb):
     return 'abort'
 
   def get_options(self):
-    return [
-      JOBSPEC_ARGUMENT
-    ]
+    return [JOBSPEC_ARGUMENT, MESSAGE_OPTION]
 
   @property
   def help(self):
@@ -206,7 +217,9 @@ class AbortUpdate(Verb):
 
   def execute(self, context):
     job_key = context.options.jobspec
-    return UpdateController(context.get_api(job_key.cluster), context).abort(job_key)
+    return UpdateController(context.get_api(job_key.cluster), context).abort(
+        job_key,
+        context.options.message)
 
 
 class ListUpdates(Verb):
@@ -307,9 +320,13 @@ class UpdateStatus(Verb):
       update_events = details.updateEvents
       if update_events is not None and len(update_events) > 0:
         for event in update_events:
-          result["update_events"].append({
+          event_data = {
               "status": JobUpdateStatus._VALUES_TO_NAMES[event.status],
-              "timestampMs": event.timestampMs})
+              "timestampMs": event.timestampMs
+          }
+          if event.message:
+            event_data["message"] = event.message
+          result["update_events"].append(event_data)
 
       instance_events = details.instanceEvents
       if instance_events is not None and len(instance_events) > 0:
@@ -340,6 +357,8 @@ class UpdateStatus(Verb):
               JobUpdateStatus._VALUES_TO_NAMES[event.status],
               timestamp(event.timestampMs)
           ), indent=2)
+          if event.message:
+            context.print_out("  message: %s" % event.message, indent=4)
       instance_events = details.instanceEvents
       if instance_events is not None and len(instance_events) > 0:
         context.print_out("Instance events:")

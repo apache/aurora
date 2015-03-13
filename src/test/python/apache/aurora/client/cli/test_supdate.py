@@ -88,7 +88,7 @@ class TestStartUpdateCommand(AuroraClientCommandTest):
       self._command.execute(self._fake_context)
 
     assert self._mock_api.start_job_update.mock_calls == [
-        call(mock_config, self._mock_options.instance_spec.instance)
+        call(mock_config, None, self._mock_options.instance_spec.instance)
     ]
 
     self.assert_lock_message(self._fake_context)
@@ -111,7 +111,7 @@ class TestStartUpdateCommand(AuroraClientCommandTest):
     self._command.execute(self._fake_context)
 
     assert self._mock_api.start_job_update.mock_calls == [
-        call(mock_config, self._mock_options.instance_spec.instance)
+        call(mock_config, None, self._mock_options.instance_spec.instance)
     ]
 
 
@@ -160,7 +160,12 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'start', self.TEST_JOBSPEC, fp.name])
+        result = cmd.execute([
+            'beta-update',
+            'start',
+            self.TEST_JOBSPEC,
+            fp.name,
+            '--message=hello'])
         assert result == EXIT_OK
 
       update_url_msg = StartUpdate.UPDATE_MSG_TEMPLATE % (
@@ -169,7 +174,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
       assert mock_api.start_job_update.call_count == 1
       args, kwargs = mock_api.start_job_update.call_args
       assert isinstance(args[0], AuroraConfig)
-      assert args[1] is None
+      assert args[1] == 'hello'
+      assert args[2] is None
       assert mock_context.get_out() == [update_url_msg]
       assert mock_context.get_err() == []
 
@@ -208,12 +214,12 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'pause', self.TEST_JOBSPEC])
+        result = cmd.execute(['beta-update', 'pause', self.TEST_JOBSPEC, '-m=hello'])
         assert result == EXIT_OK
 
       assert mock_api.query_job_updates.mock_calls == [
         call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]
-      assert mock_api.pause_job_update.mock_calls == [call(UPDATE_KEY)]
+      assert mock_api.pause_job_update.mock_calls == [call(UPDATE_KEY, 'hello')]
       assert mock_context.get_out() == ["Update has been paused."]
       assert mock_context.get_err() == []
 
@@ -229,12 +235,12 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'abort', self.TEST_JOBSPEC])
+        result = cmd.execute(['beta-update', 'abort', self.TEST_JOBSPEC, '-m=hello'])
         assert result == EXIT_OK
 
       assert mock_api.query_job_updates.mock_calls == [
         call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]
-      assert mock_api.abort_job_update.mock_calls == [call(UPDATE_KEY)]
+      assert mock_api.abort_job_update.mock_calls == [call(UPDATE_KEY, 'hello')]
       assert mock_context.get_out() == ["Update has been aborted."]
       assert mock_context.get_err() == []
 
@@ -250,12 +256,12 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'resume', self.TEST_JOBSPEC])
+        result = cmd.execute(['beta-update', 'resume', self.TEST_JOBSPEC, '--message=hello'])
         assert result == EXIT_OK
 
       assert mock_api.query_job_updates.mock_calls == [
         call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]
-      assert mock_api.resume_job_update.mock_calls == [call(UPDATE_KEY)]
+      assert mock_api.resume_job_update.mock_calls == [call(UPDATE_KEY, 'hello')]
       assert mock_context.get_out() == ["Update has been resumed."]
 
   def test_update_invalid_config(self):
@@ -289,7 +295,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
       assert mock_api.query_job_updates.mock_calls == [
         call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]
-      assert mock_api.resume_job_update.mock_calls == [call(UPDATE_KEY)]
+      assert mock_api.resume_job_update.mock_calls == [call(UPDATE_KEY, None)]
       assert mock_context.get_out() == []
       assert mock_context.get_err() == ["Failed to resume update due to error:", "\tWhoops"]
 
@@ -310,7 +316,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
       assert mock_api.query_job_updates.mock_calls == [
         call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]
-      assert mock_api.abort_job_update.mock_calls == [call(UPDATE_KEY)]
+      assert mock_api.abort_job_update.mock_calls == [call(UPDATE_KEY, None)]
       assert mock_context.get_out() == []
       assert mock_context.get_err() == ["Failed to abort update due to error:", "\tWhoops"]
 
@@ -355,7 +361,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
       assert mock_api.query_job_updates.mock_calls == [
         call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]
-      assert mock_api.pause_job_update.mock_calls == [call(UPDATE_KEY)]
+      assert mock_api.pause_job_update.mock_calls == [call(UPDATE_KEY, None)]
       assert mock_context.get_out() == []
       assert mock_context.get_err() == ["Failed to pause update due to error:", "\tWhoops"]
 
@@ -453,6 +459,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
                 timestampMs=3000),
             JobUpdateEvent(
                 status=JobUpdateStatus.ROLL_FORWARD_PAUSED,
+                message="Investigating issues",
                 timestampMs=4000),
             JobUpdateEvent(
                 status=JobUpdateStatus.ROLLING_FORWARD,
@@ -496,6 +503,7 @@ Current status: ROLLING_FORWARD
 Update events:
   Status: ROLLING_FORWARD at %(ctime)s
   Status: ROLL_FORWARD_PAUSED at %(ctime)s
+      message: Investigating issues
   Status: ROLLING_FORWARD at %(ctime)s
 Instance events:
   Instance 1 at %(ctime)s: INSTANCE_UPDATING
@@ -532,11 +540,12 @@ Instance events:
           "started": 1000,
           "update_events": [
               {
-                "status": "ROLLING_FORWARD",
-                "timestampMs": 3000
+                  "status": "ROLLING_FORWARD",
+                  "timestampMs": 3000
               },
               {
                   "status": "ROLL_FORWARD_PAUSED",
+                  "message": "Investigating issues",
                   "timestampMs": 4000
               },
               {

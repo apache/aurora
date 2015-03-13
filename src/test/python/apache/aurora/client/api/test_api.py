@@ -120,8 +120,10 @@ class TestJobUpdateApis(unittest.TestCase):
     task_config = TaskConfig()
     mock_proxy.startJobUpdate.return_value = self.create_simple_success_response()
 
-    api.start_job_update(self.mock_job_config())
-    mock_proxy.startJobUpdate.assert_called_once_with(self.create_update_request(task_config))
+    api.start_job_update(self.mock_job_config(), instances=None, message='hello')
+    mock_proxy.startJobUpdate.assert_called_once_with(
+        self.create_update_request(task_config),
+        'hello')
 
   def test_start_job_update_fails_parse_update_config(self):
     """Test start_job_update fails to parse invalid UpdateConfig."""
@@ -130,23 +132,24 @@ class TestJobUpdateApis(unittest.TestCase):
     self.assertRaises(
         AuroraClientAPI.UpdateConfigError,
         api.start_job_update,
-        self.mock_job_config(error=ValueError()))
+        self.mock_job_config(error=ValueError()),
+        None)
 
   def test_pause_job_update(self):
     """Test successful job update pause."""
     api, mock_proxy = self.mock_api()
     mock_proxy.pauseJobUpdate.return_value = self.create_simple_success_response()
 
-    api.pause_job_update(self.UPDATE_KEY)
-    mock_proxy.pauseJobUpdate.assert_called_once_with(self.UPDATE_KEY)
+    api.pause_job_update(self.UPDATE_KEY, message='hello')
+    mock_proxy.pauseJobUpdate.assert_called_once_with(self.UPDATE_KEY, 'hello')
 
   def test_resume_job_update(self):
     """Test successful job update resume."""
     api, mock_proxy = self.mock_api()
     mock_proxy.resumeJobUpdate.return_value = self.create_simple_success_response()
 
-    api.resume_job_update(self.UPDATE_KEY)
-    mock_proxy.resumeJobUpdate.assert_called_once_with(self.UPDATE_KEY)
+    api.resume_job_update(self.UPDATE_KEY, message='hello')
+    mock_proxy.resumeJobUpdate.assert_called_once_with(self.UPDATE_KEY, 'hello')
 
   def test_query_job_updates(self):
     """Test querying job updates."""

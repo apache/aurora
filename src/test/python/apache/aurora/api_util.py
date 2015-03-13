@@ -100,16 +100,16 @@ class SchedulerThriftApiSpec(ReadOnlyScheduler.Iface):
   def replaceCronTemplate(self, config, lock):
     pass
 
-  def startJobUpdate(self, request):
+  def startJobUpdate(self, request, message):
     pass
 
-  def pauseJobUpdate(self, jobKey):
+  def pauseJobUpdate(self, jobKey, message):
     pass
 
-  def resumeJobUpdate(self, jobKey):
+  def resumeJobUpdate(self, jobKey, message):
     pass
 
-  def abortJobUpdate(self, jobKey):
+  def abortJobUpdate(self, jobKey, message):
     pass
 
   def pulseJobUpdate(self, updateId):
