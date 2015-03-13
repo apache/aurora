@@ -48,6 +48,18 @@ allprojects {
 
   group 'org.apache.aurora'
   version = file("${rootDir}/.auroraversion").text.trim().toUpperCase()
+  if (version.contains('/')) {
+    throw new GradleException('''
+*******************************************************************************
+The application version string read by gradle is invalid.  This is known to
+happen when building on Windows, or within vagrant with a Windows host.
+You can work around this issue by cloning git _within_ vagrant and building
+from there.
+
+For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
+*******************************************************************************
+''')
+  }
 
   task sourceJar(type: Jar) {
     from sourceSets.main.allJava
