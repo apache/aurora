@@ -172,7 +172,7 @@ test_update() {
   assert_update_state $_jobkey 'ROLLING_FORWARD'
   sudo restart aurora-scheduler
   assert_update_state $_jobkey 'ROLLING_FORWARD'
-  aurora beta-update pause $_jobkey
+  aurora beta-update pause $_jobkey --message='hello'
   assert_update_state $_jobkey 'ROLL_FORWARD_PAUSED'
   aurora beta-update resume $_jobkey
   assert_update_state $_jobkey 'ROLLING_FORWARD'
