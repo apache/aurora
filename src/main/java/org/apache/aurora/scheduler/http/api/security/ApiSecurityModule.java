@@ -13,10 +13,13 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
+import java.util.Set;
+
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSet;
+import com.google.inject.Module;
 import com.google.inject.Provides;
 import com.google.inject.matcher.Matchers;
 import com.google.inject.name.Names;
@@ -31,12 +34,13 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraSchedulerManager;
 import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.config.Ini;
 import org.apache.shiro.guice.aop.ShiroAopModule;
 import org.apache.shiro.guice.web.ShiroWebModule;
 import org.apache.shiro.realm.text.IniRealm;
 import org.apache.shiro.subject.Subject;
 import org.apache.shiro.web.filter.authc.BasicHttpAuthenticationFilter;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Provides HTTP Basic Authentication for the API using Apache Shiro. When enabled, prevents
@@ -51,25 +55,26 @@ public class ApiSecurityModule extends ServletModule {
       help = "Enable security for the Thrift API (beta).")
   private static final Arg<Boolean> ENABLE_API_SECURITY = Arg.create(false);
 
-  @CmdLine(name = "shiro_ini_path",
-      help = "Path to shiro.ini for authentication and authorization configuration.")
-  private static final Arg<Ini> SHIRO_INI_PATH = Arg.create(null);
+  @CmdLine(name = "shiro_realm_modules",
+      help = "Guice modules for configuring Shiro Realms.")
+  private static final Arg<Set<Module>> SHIRO_REALM_MODULE =
+      Arg.<Set<Module>>create(ImmutableSet.<Module>of(new IniShiroRealmModule()));
 
   private final boolean enableApiSecurity;
-  private final Optional<Ini> shiroIni;
+  private final Set<Module> shiroConfigurationModules;
 
   public ApiSecurityModule() {
-    this(ENABLE_API_SECURITY.get(), Optional.fromNullable(SHIRO_INI_PATH.get()));
+    this(ENABLE_API_SECURITY.get(), SHIRO_REALM_MODULE.get());
   }
 
   @VisibleForTesting
-  ApiSecurityModule(Ini shiroIni) {
-    this(true, Optional.of(shiroIni));
+  ApiSecurityModule(Module shiroConfigurationModule) {
+    this(true, ImmutableSet.of(shiroConfigurationModule));
   }
 
-  private ApiSecurityModule(boolean enableApiSecurity, Optional<Ini> shiroIni) {
+  private ApiSecurityModule(boolean enableApiSecurity, Set<Module> shiroConfigurationModules) {
     this.enableApiSecurity = enableApiSecurity;
-    this.shiroIni = shiroIni;
+    this.shiroConfigurationModules = requireNonNull(shiroConfigurationModules);
   }
 
   @Override
@@ -85,10 +90,10 @@ public class ApiSecurityModule extends ServletModule {
       @Override
       @SuppressWarnings("unchecked")
       protected void configureShiroWeb() {
-        try {
-          bindRealm().toConstructor(IniRealm.class.getConstructor(Ini.class));
-        } catch (NoSuchMethodException e) {
-          addError(e);
+        for (Module module : shiroConfigurationModules) {
+          // We can't wrap this in a PrivateModule because Guice Multibindings don't work with them
+          // and we need a Set<Realm>.
+          install(module);
         }
 
         addFilterChain("/**",
@@ -97,11 +102,6 @@ public class ApiSecurityModule extends ServletModule {
       }
     });
 
-    if (shiroIni.isPresent()) {
-      bind(Ini.class).toInstance(shiroIni.get());
-    } else {
-      addError("shiro.ini is required.");
-    }
     bind(IniRealm.class).in(Singleton.class);
     bindConstant().annotatedWith(Names.named("shiro.applicationName")).to(HTTP_REALM_NAME);
 

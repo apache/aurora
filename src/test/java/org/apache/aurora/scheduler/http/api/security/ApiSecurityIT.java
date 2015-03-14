@@ -106,7 +106,7 @@ public class ApiSecurityIT extends JettyServerModuleTest {
   protected Module getChildServletModule() {
     return Modules.combine(
         new ApiModule(),
-        new ApiSecurityModule(ini),
+        new ApiSecurityModule(new IniShiroRealmModule(ini)),
         new AbstractModule() {
           @Override
           protected void configure() {
