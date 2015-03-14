@@ -71,11 +71,13 @@ class HostMaintenance(object):
       self._wait_event.wait(self.STATUS_POLL_INTERVAL.as_(Time.SECONDS))
 
       statuses = self.check_status(list(not_drained_hostnames))
-      not_drained_hostnames = set([h[0] for h in statuses if h[1] != 'DRAINED'])
+      not_drained_hostnames = set(h[0] for h in statuses if h[1] != 'DRAINED')
 
       total_wait += self.STATUS_POLL_INTERVAL
       if not_drained_hostnames and total_wait > self.MAX_STATUS_WAIT:
-        log.warning('Failed to move all hosts into DRAINED within %s' % self.MAX_STATUS_WAIT)
+        log.warning('Failed to move all hosts into DRAINED within %s:\n%s' %
+            (self.MAX_STATUS_WAIT,
+            '\n'.join("\tHost:%s\tStatus:%s" % h for h in sorted(statuses) if h[1] != 'DRAINED')))
         break
 
     return not_drained_hostnames

@@ -46,7 +46,7 @@ import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
-import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
+import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
 import static org.easymock.EasyMock.expect;
@@ -97,21 +97,23 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   @Test
   public void testMaintenanceCycle() {
-    ScheduledTask task = makeTask(HOST_A, "taskA");
+    ScheduledTask task1 = makeTask(HOST_A, "taskA");
+    ScheduledTask task2 = makeTask(HOST_A, "taskB");
 
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
-    expectFetchTasksByHost(HOST_A, ImmutableSet.of(task));
-    expect(stateManager.changeState(
-        storageUtil.mutableStoreProvider,
-        Tasks.id(task),
-        Optional.<ScheduleStatus>absent(),
-        ScheduleStatus.DRAINING,
-        MaintenanceControllerImpl.DRAINING_MESSAGE))
-        .andReturn(true);
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of(task1, task2));
+    expectTaskDraining(task1);
+    expectTaskDraining(task2);
     expectMaintenanceModeChange(HOST_A, DRAINING);
-    expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.of(
-        IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING))));
-    // TaskA is FINISHED and therefore no longer active
+    IHostAttributes attributes =
+        IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING));
+
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
+        .andReturn(Optional.of(attributes)).times(2);
+
+    expect(storageUtil.attributeStore.getHostAttributes()).andReturn(ImmutableSet.of(attributes));
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of(task2));
+    // TaskA is KILLED and therefore no longer active
     expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of());
     expectMaintenanceModeChange(HOST_A, DRAINED);
     expectMaintenanceModeChange(HOST_A, NONE);
@@ -120,8 +122,11 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     assertStatus(HOST_A, SCHEDULED, maintenance.startMaintenance(A));
     assertStatus(HOST_A, DRAINING, maintenance.drain(A));
+    assertStatus(HOST_A, DRAINING, maintenance.getStatus(A));
     eventSink.post(
-        TaskStateChange.transition(IScheduledTask.build(task.setStatus(FINISHED)), RUNNING));
+        TaskStateChange.transition(IScheduledTask.build(task1.setStatus(KILLED)), RUNNING));
+    eventSink.post(
+        TaskStateChange.transition(IScheduledTask.build(task2.setStatus(KILLED)), RUNNING));
     assertStatus(HOST_A, NONE, maintenance.endMaintenance(A));
   }
 
@@ -165,7 +170,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     // Make sure a later transition on the host does not cause any ill effects that could surface
     // from stale internal state.
     eventSink.post(TaskStateChange.transition(
-        IScheduledTask.build(makeTask(HOST_A, "taskA").setStatus(FINISHED)), RUNNING));
+        IScheduledTask.build(makeTask(HOST_A, "taskA").setStatus(KILLED)), RUNNING));
   }
 
   @Test
@@ -179,6 +184,16 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     assertEquals(DRAINING, maintenance.getMode(HOST_A));
     assertEquals(NONE, maintenance.getMode("unknown"));
+  }
+
+  private void expectTaskDraining(ScheduledTask task) {
+    expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
+        Tasks.id(task),
+        Optional.<ScheduleStatus>absent(),
+        ScheduleStatus.DRAINING,
+        MaintenanceControllerImpl.DRAINING_MESSAGE))
+        .andReturn(true);
   }
 
   private void expectFetchTasksByHost(String hostName, ImmutableSet<ScheduledTask> tasks) {

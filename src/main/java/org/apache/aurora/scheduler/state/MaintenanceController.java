@@ -166,8 +166,9 @@ public interface MaintenanceController {
                 LOG.info(String.format("Moving host %s into DRAINED", host));
                 setMaintenanceMode(store, ImmutableSet.of(host), DRAINED);
               } else {
-                LOG.info(
-                    String.format("Host %s is DRAINING with active tasks: %s", host, activeTasks));
+                LOG.info(String.format("Host %s is DRAINING with active tasks: %s",
+                    host,
+                    Tasks.ids(activeTasks)));
               }
             }
           }
@@ -268,9 +269,11 @@ public interface MaintenanceController {
       AttributeStore.Mutable store = storeProvider.getAttributeStore();
       ImmutableSet.Builder<HostStatus> statuses = ImmutableSet.builder();
       for (String host : hosts) {
+        LOG.info(String.format("Setting maintenance mode to %s for host %s", mode, host));
         Optional<IHostAttributes> toSave = AttributeStore.Util.mergeMode(store, host, mode);
         if (toSave.isPresent()) {
           store.saveHostAttributes(toSave.get());
+          LOG.info("Updated host attributes: " + toSave.get());
           HostStatus status = new HostStatus().setHost(host).setMode(mode);
           statuses.add(status);
         }

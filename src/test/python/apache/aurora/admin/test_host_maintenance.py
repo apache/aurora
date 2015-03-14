@@ -13,6 +13,7 @@
 #
 
 import copy
+import textwrap
 import unittest
 from contextlib import contextmanager
 
@@ -103,12 +104,13 @@ class TestHostMaintenance(unittest.TestCase):
         (Hosts(set(TEST_HOSTNAMES))),
         (Hosts(set([TEST_HOSTNAMES[0]])))]
 
+  @mock.patch("twitter.common.log.warning", spec=log.warning)
   @mock.patch("apache.aurora.client.api.AuroraClientAPI.maintenance_status",
               spec=AuroraClientAPI.maintenance_status)
   @mock.patch("apache.aurora.client.api.AuroraClientAPI.drain_hosts",
               spec=AuroraClientAPI.drain_hosts)
   @mock.patch("threading._Event.wait")
-  def test_drain_hosts_timed_out_wait(self, _, mock_drain_hosts, mock_maintenance_status):
+  def test_drain_hosts_timed_out_wait(self, _, mock_drain_hosts, mock_maintenance_status, mock_log):
     fake_maintenance_status_response = Response(
         responseCode=ResponseCode.OK,
         result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
@@ -128,6 +130,11 @@ class TestHostMaintenance(unittest.TestCase):
     assert mock_maintenance_status.call_count == 1
     mock_drain_hosts.assert_called_once_with(test_hosts)
     mock_maintenance_status.assert_called_once_with((Hosts(set(TEST_HOSTNAMES))))
+    assert mock_log.mock_calls == [mock.call(textwrap.dedent("""\
+        Failed to move all hosts into DRAINED within 1 ms:
+        \tHost:us-west-001.example.com\tStatus:SCHEDULED
+        \tHost:us-west-002.example.com\tStatus:SCHEDULED
+        \tHost:us-west-003.example.com\tStatus:SCHEDULED"""))]
 
   @mock.patch("twitter.common.log.warning", spec=log.warning)
   @mock.patch("apache.aurora.client.api.AuroraClientAPI.maintenance_status",
