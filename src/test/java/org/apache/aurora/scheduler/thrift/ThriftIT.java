@@ -139,7 +139,13 @@ public class ThriftIT extends EasyMockTest {
   private void createThrift(Map<Capability, String> capabilities) {
     Injector injector = Guice.createInjector(
         new ThriftModule(),
-        new ThriftAuthModule(capabilities),
+        new ThriftAuthModule(capabilities, new AbstractModule() {
+          @Override
+          protected void configure() {
+            bind(SessionValidator.class).toInstance(validator);
+            bind(CapabilityValidator.class).toInstance(new CapabilityValidatorFake(validator));
+          }
+        }),
         new AbstractModule() {
           private <T> T bindMock(Class<T> clazz) {
             T mock = createMock(clazz);
@@ -163,8 +169,6 @@ public class ThriftIT extends EasyMockTest {
             bind(NonVolatileStorage.class).toInstance(storageTestUtil.storage);
             bindMock(StorageBackup.class);
             bind(QuotaManager.class).toInstance(quotaManager);
-            bind(SessionValidator.class).toInstance(validator);
-            bind(CapabilityValidator.class).toInstance(new CapabilityValidatorFake(validator));
             bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo()));
             bindMock(CronPredictor.class);
           }

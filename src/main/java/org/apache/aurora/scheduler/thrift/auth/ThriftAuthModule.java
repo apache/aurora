@@ -14,12 +14,13 @@
 package org.apache.aurora.scheduler.thrift.auth;
 
 import java.util.Map;
-import java.util.Objects;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.AbstractModule;
+import com.google.inject.Module;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -28,6 +29,10 @@ import com.twitter.common.args.constraints.NotEmpty;
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator;
+import org.apache.aurora.auth.UnsecureAuthModule;
+import org.apache.aurora.scheduler.app.Modules;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Binding module for authentication of users with special capabilities for admin functions.
@@ -43,15 +48,24 @@ public class ThriftAuthModule extends AbstractModule {
   private static final Arg<Map<Capability, String>> USER_CAPABILITIES =
       Arg.create(DEFAULT_CAPABILITIES);
 
+  @CmdLine(name = "auth_module",
+      help = "A Guice module to provide auth bindings. NOTE: The default is unsecure.")
+  private static final Arg<Module> AUTH_MODULE = Arg.<Module>create(new UnsecureAuthModule());
+
+  private static final Iterable<Class<?>> AUTH_MODULE_CLASSES =
+      ImmutableList.<Class<?>>of(SessionValidator.class, CapabilityValidator.class);
+
   private Map<Capability, String> capabilities;
+  private final Module authModule;
 
   public ThriftAuthModule() {
-    this(USER_CAPABILITIES.get());
+    this(USER_CAPABILITIES.get(), AUTH_MODULE.get());
   }
 
   @VisibleForTesting
-  public ThriftAuthModule(Map<Capability, String> capabilities) {
-    this.capabilities = Objects.requireNonNull(capabilities);
+  public ThriftAuthModule(Map<Capability, String> capabilities, Module authModule) {
+    this.capabilities = requireNonNull(capabilities);
+    this.authModule = requireNonNull(authModule);
   }
 
   @Override
@@ -63,5 +77,7 @@ public class ThriftAuthModule extends AbstractModule {
 
     requireBinding(SessionValidator.class);
     requireBinding(CapabilityValidator.class);
+
+    install(Modules.wrapInPrivateModule(authModule, AUTH_MODULE_CLASSES));
   }
 }

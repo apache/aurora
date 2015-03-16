@@ -43,9 +43,6 @@ import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule;
 import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import com.twitter.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 
-import org.apache.aurora.auth.CapabilityValidator;
-import org.apache.aurora.auth.SessionValidator;
-import org.apache.aurora.auth.UnsecureAuthModule;
 import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
 import org.apache.aurora.scheduler.configuration.Resources;
@@ -97,11 +94,6 @@ public class SchedulerMain extends AbstractApplication {
       help = "Path to the thermos observer root (by default /var/run/thermos.)")
   private static final Arg<String> THERMOS_OBSERVER_ROOT = Arg.create("/var/run/thermos");
 
-  @CmdLine(name = "auth_module",
-      help = "A Guice module to provide auth bindings. NOTE: The default is unsecure.")
-  private static final Arg<? extends Class<? extends Module>> AUTH_MODULE =
-      Arg.create(UnsecureAuthModule.class);
-
   /**
    * Extra CPU allocated for each executor.
    */
@@ -117,12 +109,6 @@ public class SchedulerMain extends AbstractApplication {
   private static final Arg<Amount<Long, Data>> EXECUTOR_OVERHEAD_RAM =
       Arg.create(Amount.of(128L, Data.MB));
 
-  private static final Iterable<Class<?>> AUTH_MODULE_CLASSES = ImmutableList.<Class<?>>builder()
-      .add(SessionValidator.class)
-      .add(CapabilityValidator.class)
-      .build();
-
-  // TODO(Suman Karumuri): Pass in AUTH as extra module
   @CmdLine(name = "extra_modules",
       help = "A list of modules that provide additional functionality.")
   private static final Arg<List<Class<? extends Module>>> EXTRA_MODULES =
@@ -149,7 +135,6 @@ public class SchedulerMain extends AbstractApplication {
 
   private static Iterable<? extends Module> getExtraModules() {
     Builder<Module> modules = ImmutableList.builder();
-    modules.add(Modules.wrapInPrivateModule(AUTH_MODULE.get(), AUTH_MODULE_CLASSES));
 
     for (Class<? extends Module> moduleClass : EXTRA_MODULES.get()) {
       modules.add(Modules.getModule(moduleClass));

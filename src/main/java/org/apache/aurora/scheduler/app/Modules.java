@@ -16,10 +16,12 @@ package org.apache.aurora.scheduler.app;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * A utility class for managing guice modules.
  */
-final class Modules {
+public final class Modules {
 
   private Modules() {
     // Utility class
@@ -43,14 +45,21 @@ final class Modules {
     }
   }
 
-  // Defensively wrap each module provided on the command-line in a PrivateModule that only
-  // exposes requested classes to ensure that we don't depend on surprise extra bindings across
-  // different implementations.
-  static Module wrapInPrivateModule(
-      Class<? extends Module> moduleClass,
+  /**
+   * Defensively wrap a module in a PrivateModule that only exposes requested keys to ensure that
+   * we don't depend on surprise extra bindings across different implementations.
+   *
+   * @param module Module to wrap.
+   * @param exposedClasses Keys to expose.
+   * @return A private module that exposes the requested keys.
+   */
+  public static Module wrapInPrivateModule(
+      final Module module,
       final Iterable<Class<?>> exposedClasses) {
 
-    final Module module = instantiateModule(moduleClass);
+    requireNonNull(module);
+    requireNonNull(exposedClasses);
+
     return new PrivateModule() {
       @Override
       protected void configure() {
@@ -60,6 +69,13 @@ final class Modules {
         }
       }
     };
+  }
+
+  static Module wrapInPrivateModule(
+      Class<? extends Module> moduleClass,
+      final Iterable<Class<?>> exposedClasses) {
+
+    return wrapInPrivateModule(instantiateModule(moduleClass), exposedClasses);
   }
 
   static Module getModule(Class<? extends Module> moduleClass) {
