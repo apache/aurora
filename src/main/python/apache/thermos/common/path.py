@@ -52,7 +52,6 @@ class TaskPath(object):
   class UnderspecifiedPath(Exception): pass
 
   KNOWN_KEYS = ['root', 'task_id', 'state', 'process', 'run', 'log_dir']
-  LEGACY_KNOWN_KEYS = KNOWN_KEYS[:-1]
 
   DIR_TEMPLATE = {
       'task_path': ['%(root)s', 'tasks', '%(state)s', '%(task_id)s'],
@@ -63,20 +62,11 @@ class TaskPath(object):
       'process_logdir': ['%(log_dir)s', '%(process)s', '%(run)s']
   }
 
-  LEGACY_DIR_TEMPLATE = DIR_TEMPLATE.copy()
-  LEGACY_DIR_TEMPLATE.update(
-      process_logbase=['%(root)s', 'logs', '%(task_id)s'],
-      process_logdir=['%(root)s', 'logs', '%(task_id)s', '%(process)s', '%(run)s']
-  )
-
   def __init__(self, **kw):
     self._filename = None
     # initialize with self-interpolating values
     # Before log_dir was added explicitly to RunnerHeader, it resolved to %(root)s/logs
-    if kw.get('log_dir'):
-      self._template, keys = self.DIR_TEMPLATE, self.KNOWN_KEYS
-    else:
-      self._template, keys = self.LEGACY_DIR_TEMPLATE, self.LEGACY_KNOWN_KEYS
+    self._template, keys = self.DIR_TEMPLATE, self.KNOWN_KEYS
     for k, v in kw.items():
       if v is None:
         raise ValueError("Key %s is None" % k)

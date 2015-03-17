@@ -31,6 +31,8 @@ python_tests(name = 'test_disk',
 python_tests(name = 'test_detector',
   sources = ['test_detector.py'],
   dependencies = [
+    '3rdparty/python:twitter.common.contextutil',
+    '3rdparty/python:twitter.common.dirutil',
     'src/main/python/apache/thermos/common:constants',
     'src/main/python/apache/thermos/monitoring:detector',
   ]

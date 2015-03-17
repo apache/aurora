@@ -59,16 +59,26 @@ def get_other_nonroot_user():
   return user
 
 
+def make_taskpath(td):
+  return TaskPath(
+      root=td,
+      task_id='task',
+      process='process',
+      run=0,
+      log_dir=os.path.join(td, '.logs'))
+
+
 def setup_sandbox(td, taskpath):
   sandbox = os.path.join(td, 'sandbox')
   safe_mkdir(sandbox)
+  safe_mkdir(taskpath.getpath('process_logbase'))
   safe_mkdir(os.path.dirname(taskpath.getpath('process_checkpoint')))
   return sandbox
 
 
 def test_simple_process():
   with temporary_dir() as td:
-    taskpath = TaskPath(root=td, task_id='task', process='process', run=0)
+    taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
 
     p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox)
@@ -90,7 +100,7 @@ def test_simple_process():
 def test_simple_process_other_user(*args):
   with temporary_dir() as td:
     some_user = get_other_nonroot_user()
-    taskpath = TaskPath(root=td, task_id='task', process='process', run=0)
+    taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
 
     p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox, user=some_user.pw_name)
@@ -105,7 +115,7 @@ def test_simple_process_other_user(*args):
 
 def test_other_user_fails_nonroot():
   with temporary_dir() as td:
-    taskpath = TaskPath(root=td, task_id='task', process='process', run=0)
+    taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
     process = TestProcess(
         'process',
@@ -120,7 +130,7 @@ def test_other_user_fails_nonroot():
 
 def test_log_permissions():
   with temporary_dir() as td:
-    taskpath = TaskPath(root=td, task_id='task', process='process', run=0)
+    taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
 
     p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox)
@@ -143,7 +153,7 @@ def test_log_permissions():
 def test_log_permissions_other_user(*mocks):
   with temporary_dir() as td:
     some_user = get_other_nonroot_user()
-    taskpath = TaskPath(root=td, task_id='task', process='process', run=0)
+    taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
 
     p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox, user=some_user.pw_name)
@@ -162,7 +172,7 @@ def test_log_permissions_other_user(*mocks):
 def test_cloexec():
   def run_with_class(process_class):
     with temporary_dir() as td:
-      taskpath = TaskPath(root=td, task_id='task', process='process', run=0)
+      taskpath = make_taskpath(td)
       sandbox = setup_sandbox(td, taskpath)
       with open(os.path.join(sandbox, 'silly_pants'), 'w') as silly_pants:
         p = process_class('process', 'echo test >&%s' % silly_pants.fileno(),
