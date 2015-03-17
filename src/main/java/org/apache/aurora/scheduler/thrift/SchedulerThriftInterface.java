@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.thrift;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +21,6 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -132,10 +129,6 @@ import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.thrift.TException;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.CharMatcher.WHITESPACE;
@@ -200,13 +193,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final TaskIdGenerator taskIdGenerator;
   private final UUIDGenerator uuidGenerator;
   private final JobUpdateController jobUpdateController;
-  private final boolean isUpdaterEnabled;
   private final ReadOnlyScheduler.Iface readOnlyScheduler;
-
-  @Qualifier
-  @Target({FIELD, PARAMETER, METHOD})
-  @Retention(RUNTIME)
-  @interface EnableUpdater { }
 
   @Inject
   SchedulerThriftInterface(
@@ -222,7 +209,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       TaskIdGenerator taskIdGenerator,
       UUIDGenerator uuidGenerator,
       JobUpdateController jobUpdateController,
-      @EnableUpdater boolean isUpdaterEnabled,
       ReadOnlyScheduler.Iface readOnlyScheduler) {
 
     this.storage = requireNonNull(storage);
@@ -237,7 +223,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.taskIdGenerator = requireNonNull(taskIdGenerator);
     this.uuidGenerator = requireNonNull(uuidGenerator);
     this.jobUpdateController = requireNonNull(jobUpdateController);
-    this.isUpdaterEnabled = isUpdaterEnabled;
     this.readOnlyScheduler = requireNonNull(readOnlyScheduler);
   }
 
@@ -1120,10 +1105,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       JobUpdateRequest mutableRequest,
       @Nullable final String message,
       SessionKey session) {
-
-    if (!isUpdaterEnabled) {
-      return invalidRequest("Server-side updates are disabled on this cluster.");
-    }
 
     requireNonNull(mutableRequest);
     requireNonNull(session);

@@ -10,8 +10,8 @@ Aurora Client Commands
     - [Running a Command On a Running Job](#running-a-command-on-a-running-job)
     - [Killing a Job](#killing-a-job)
     - [Updating a Job](#updating-a-job)
-        - [Asynchronous job updates (beta)](#user-content-asynchronous-job-updates-beta)
-            - [Coordinated job updates (beta)](#user-content-coordinated-job-updates-beta)
+        - [Coordinated job updates](#user-content-coordinated-job-updates)
+        - [Client-orchestrated updates (deprecated)](#user-content-client-orchestrated-updates-deprecated)
     - [Renaming a Job](#renaming-a-job)
     - [Restarting Jobs](#restarting-jobs)
 - [Cron Jobs](#cron-jobs)
@@ -169,6 +169,55 @@ kill command.
 
 ### Updating a Job
 
+There are several sub-commands to manage job updates:
+
+    aurora update start <job key> <configuration file>
+    aurora update status <job key>
+    aurora update pause <job key>
+    aurora update resume <job key>
+    aurora update abort <job key>
+    aurora update list <cluster>
+
+When you `start` a job update, the command will return once it has sent the
+instructions to the scheduler.  At that point, you may view detailed
+progress for the update with the `status` subcommand, in addition to viewing
+graphical progress in the web browser.  You may also get a full listing of
+in-progress updates in a cluster with `list`.
+
+Once an update has been started, you can `pause` to keep the update but halt
+progress.  This can be useful for doing things like debug a  partially-updated
+job to determine whether you would like to proceed.  You can `resume` to
+proceed.
+
+You may `abort` a job update regardless of the state it is in. This will
+instruct the scheduler to completely abandon the job update and leave the job
+in the current (possibly partially-updated) state.
+
+#### Coordinated job updates
+
+Some Aurora services may benefit from having more control over updates by explicitly
+acknowledging ("heartbeating") job update progress. This may be helpful for mission-critical
+service updates where explicit job health monitoring is vital during the entire job update
+lifecycle. Such job updates would rely on an external service (or a custom client) periodically
+pulsing an active coordinated job update via a
+[pulseJobUpdate RPC](../api/src/main/thrift/org/apache/aurora/gen/api.thrift).
+
+A coordinated update is defined by setting a positive
+[pulse_interval_secs](configuration-reference.md#updateconfig-objects) value in job configuration
+file. If no pulses are received within specified interval the update will be blocked. A blocked
+update is unable to continue rolling forward (or rolling back) but retains its active status.
+It may only be unblocked by a fresh `pulseJobUpdate` call.
+
+NOTE: A coordinated update starts in `ROLL_FORWARD_AWAITING_PULSE` state and will not make any
+progress until the first pulse arrives. However, a paused update (`ROLL_FORWARD_PAUSED` or
+`ROLL_BACK_PAUSED`) is still considered active and upon resuming will immediately make progress
+provided the pulse interval has not expired.
+
+#### Client-orchestrated updates (deprecated)
+
+*Note: This feature is deprecated and will be removed in 0.9.0.
+Please use aurora update instead.*
+
     aurora job update CLUSTER/ROLE/ENV/NAME[/INSTANCES] <configuration file>
     aurora job cancel-update CLUSTER/ROLE/ENV/NAME
 
@@ -192,57 +241,6 @@ it only if it contains hook definitions and activations that affect the
 `cancel_update` command. The `<configuration file>` argument for
 `update` is required, but in addition to a new configuration it can be
 used to define and activate hooks for `job update`.
-
-#### Asynchronous job updates (beta)
-
-As of 0.6.0, Aurora will control and dispatch updates (and rollbacks) within the
-scheduler. Performing updates this way also allows the scheduler to display
-update progress and job update history in the browser.
-
-There are several sub-commands to manage job updates:
-
-    aurora beta-update start <job key> <configuration file>
-    aurora beta-update status <job key>
-    aurora beta-update pause <job key>
-    aurora beta-update resume <job key>
-    aurora beta-update abort <job key>
-    aurora beta-update list <cluster>
-
-When you `start` a job update, the command will return once it has sent the
-instructions to the scheduler.  At that point, you may view detailed
-progress for the update with the `status` subcommand, in addition to viewing
-graphical progress in the web browser.  You may also get a full listing of
-in-progress updates in a cluster with `list`.
-
-Once an update has been started, you can `pause` to keep the update but halt
-progress.  This can be useful for doing things like debug a  partially-updated
-job to determine whether you would like to proceed.  You can `resume` to
-proceed.
-
-You may `abort` a job update regardless of the state it is in. This will
-instruct the scheduler to completely abandon the job update and leave the job
-in the current (possibly partially-updated) state.
-
-##### Coordinated job updates (beta)
-
-Some Aurora services may benefit from having more control over the
-[asynchronous scheduler updater](#user-content-asynchronous-job-updates-beta) by explicitly
-acknowledging ("heartbeating") job update progress. This may be helpful for mission-critical
-service updates where explicit job health monitoring is vital during the entire job update
-lifecycle. Such job updates would rely on an external service (or a custom client) periodically
-pulsing an active coordinated job update via a
-[pulseJobUpdate RPC](../api/src/main/thrift/org/apache/aurora/gen/api.thrift).
-
-A coordinated update is defined by setting a positive
-[pulse_interval_secs](configuration-reference.md#updateconfig-objects) value in job configuration
-file. If no pulses are received within specified interval the update will be blocked. A blocked
-update is unable to continue rolling forward (or rolling back) but retains its active status.
-It may only be unblocked by a fresh `pulseJobUpdate` call.
-
-NOTE: A coordinated update starts in `ROLL_FORWARD_AWAITING_PULSE` state and will not make any
-progress until the first pulse arrives. However, a paused update (`ROLL_FORWARD_PAUSED` or
-`ROLL_BACK_PAUSED`) is still considered active and upon resuming will immediately make progress
-provided the pulse interval has not expired.
 
 ### Renaming a Job
 

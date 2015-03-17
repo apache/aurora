@@ -35,7 +35,7 @@ tear_down() {
 
   for job in http_example http_example_docker; do
     aurora job cancel-update devcluster/vagrant/test/$job >/dev/null 2>&1
-    aurora beta-update abort devcluster/vagrant/test/$job || true >/dev/null 2>&1
+    aurora update abort devcluster/vagrant/test/$job || true >/dev/null 2>&1
     aurora job killall --no-batching devcluster/vagrant/test/$job >/dev/null 2>&1
   done
 }
@@ -139,7 +139,7 @@ test_legacy_update() {
 assert_update_state() {
   local _jobkey=$1 _expected_state=$2
 
-  local _state=$(aurora beta-update status $_jobkey | grep 'Current status' | awk '{print $NF}')
+  local _state=$(aurora update status $_jobkey | grep 'Current status' | awk '{print $NF}')
   if [ $_state != $_expected_state ]; then
     echo "Expected update to be in state $_expected_state, but found $_state"
     exit 1
@@ -151,7 +151,7 @@ await_update_finished() {
 
   local _matched=0
   for i in $(seq 1 120); do
-    if [ $(aurora beta-update status $_jobkey | grep 'Current status' | wc -l) -eq 0 ]; then
+    if [ $(aurora update status $_jobkey | grep 'Current status' | wc -l) -eq 0 ]; then
       _matched=1
       break
     else
@@ -168,19 +168,19 @@ await_update_finished() {
 test_update() {
   local _jobkey=$1 _config=$2 _cluster=$3
 
-  aurora beta-update start $_jobkey $_config
+  aurora update start $_jobkey $_config
   assert_update_state $_jobkey 'ROLLING_FORWARD'
   sudo restart aurora-scheduler
   assert_update_state $_jobkey 'ROLLING_FORWARD'
-  aurora beta-update pause $_jobkey --message='hello'
+  aurora update pause $_jobkey --message='hello'
   assert_update_state $_jobkey 'ROLL_FORWARD_PAUSED'
-  aurora beta-update resume $_jobkey
+  aurora update resume $_jobkey
   assert_update_state $_jobkey 'ROLLING_FORWARD'
 
   await_update_finished $_jobkey
 
   # Check that the update ended in ROLLED_FORWARD state.  Assumes the status is the last column.
-  local status=$(aurora beta-update list --job $_jobkey $_cluster | grep -m 1 Status \
+  local status=$(aurora update list --job $_jobkey $_cluster | grep -m 1 Status \
       | awk '{print $NF}')
   if [ $status != "ROLLED_FORWARD" ]; then
     echo "Update should have completed in ROLLED_FORWARD state"

@@ -161,7 +161,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute([
-            'beta-update',
+            'update',
             'start',
             self.TEST_JOBSPEC,
             fp.name,
@@ -192,7 +192,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'start', self.TEST_JOBSPEC, fp.name])
+        result = cmd.execute(['update', 'start', self.TEST_JOBSPEC, fp.name])
         assert result == EXIT_OK
 
       assert mock_api.start_job_update.call_count == 1
@@ -214,7 +214,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'pause', self.TEST_JOBSPEC, '-m=hello'])
+        result = cmd.execute(['update', 'pause', self.TEST_JOBSPEC, '-m=hello'])
         assert result == EXIT_OK
 
       assert mock_api.query_job_updates.mock_calls == [
@@ -235,7 +235,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'abort', self.TEST_JOBSPEC, '-m=hello'])
+        result = cmd.execute(['update', 'abort', self.TEST_JOBSPEC, '-m=hello'])
         assert result == EXIT_OK
 
       assert mock_api.query_job_updates.mock_calls == [
@@ -256,7 +256,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'resume', self.TEST_JOBSPEC, '--message=hello'])
+        result = cmd.execute(['update', 'resume', self.TEST_JOBSPEC, '--message=hello'])
         assert result == EXIT_OK
 
       assert mock_api.query_job_updates.mock_calls == [
@@ -274,7 +274,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_invalid_config('invalid_field=False,'))
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'start', self.TEST_JOBSPEC, fp.name])
+        result = cmd.execute(['update', 'start', self.TEST_JOBSPEC, fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
         assert mock_api.start_job_update.mock_calls == []
 
@@ -290,7 +290,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'resume', self.TEST_JOBSPEC])
+        result = cmd.execute(['update', 'resume', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
       assert mock_api.query_job_updates.mock_calls == [
@@ -311,7 +311,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'abort', self.TEST_JOBSPEC])
+        result = cmd.execute(['update', 'abort', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
       assert mock_api.query_job_updates.mock_calls == [
@@ -334,7 +334,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'abort', self.TEST_JOBSPEC])
+        result = cmd.execute(['update', 'abort', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
       assert mock_api.query_job_updates.mock_calls == [
@@ -356,7 +356,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['beta-update', 'pause', self.TEST_JOBSPEC])
+        result = cmd.execute(['update', 'pause', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
       assert mock_api.query_job_updates.mock_calls == [
@@ -391,7 +391,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      result = cmd.execute(["beta-update", "list", self.TEST_CLUSTER, "--user=me"])
+      result = cmd.execute(["update", "list", self.TEST_CLUSTER, "--user=me"])
       assert result == EXIT_OK
       assert mock_context.get_out_str() == textwrap.dedent("""\
           Job: west/bozo/test/hello, Id: update_id, User: me, Status: ROLLED_FORWARD
@@ -409,7 +409,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      result = cmd.execute(["beta-update", "list", self.TEST_CLUSTER, "--user=me", '--write-json'])
+      result = cmd.execute(["update", "list", self.TEST_CLUSTER, "--user=me", '--write-json'])
       assert result == EXIT_OK
       # TODO(wfarner): We really should not be performing string equality matching on JSON data,
       # as it is sensitive to field ordering.
@@ -494,7 +494,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      result = cmd.execute(["beta-update", "status", self.TEST_JOBSPEC])
+      result = cmd.execute(["update", "status", self.TEST_JOBSPEC])
       assert result == EXIT_OK
       assert ('\n'.join(mock_context.get_out()) ==
           """Job: west/bozo/test/hello, UpdateID: update_id
@@ -526,7 +526,7 @@ Instance events:
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      result = cmd.execute(["beta-update", "status", "--write-json", self.TEST_JOBSPEC])
+      result = cmd.execute(["update", "status", "--write-json", self.TEST_JOBSPEC])
       assert result == EXIT_OK
       assert mock_context.get_api(self.TEST_CLUSTER).query_job_updates.mock_calls == [
           call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)

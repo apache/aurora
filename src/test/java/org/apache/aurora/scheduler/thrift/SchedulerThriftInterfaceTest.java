@@ -29,10 +29,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.Module;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.auth.CapabilityValidator;
@@ -90,9 +86,7 @@ import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.CronJobManager;
-import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
-import org.apache.aurora.scheduler.metadata.NearestFit;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
@@ -100,7 +94,6 @@ import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
-import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
@@ -113,11 +106,8 @@ import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-import org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.EnableUpdater;
-import org.apache.aurora.scheduler.thrift.aop.AopModule;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
 import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
@@ -151,7 +141,6 @@ import static org.apache.aurora.scheduler.thrift.Fixtures.LOCK_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.NOT_ENOUGH_QUOTA;
 import static org.apache.aurora.scheduler.thrift.Fixtures.ROLE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.ROLE_IDENTITY;
-import static org.apache.aurora.scheduler.thrift.Fixtures.SERVER_INFO;
 import static org.apache.aurora.scheduler.thrift.Fixtures.TASK_ID;
 import static org.apache.aurora.scheduler.thrift.Fixtures.UPDATE_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.USER;
@@ -240,7 +229,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             taskIdGenerator,
             uuidGenerator,
             jobUpdateController,
-            true,
             readOnlyScheduler));
   }
 
@@ -2172,41 +2160,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertResponse(
         INVALID_REQUEST,
         thrift.startJobUpdate(buildJobUpdateRequest(update), AUDIT_MESSAGE, SESSION));
-  }
-
-  @Test
-  public void testStartUpdateFailsInProd() throws Exception {
-    Module testModule = new AbstractModule() {
-      @Override
-      protected void configure() {
-        bind(NonVolatileStorage.class).toInstance(storageUtil.storage);
-        bind(LockManager.class).toInstance(createMock(LockManager.class));
-        bind(CapabilityValidator.class).toInstance(createMock(CapabilityValidator.class));
-        bind(StorageBackup.class).toInstance(createMock(StorageBackup.class));
-        bind(Recovery.class).toInstance(createMock(Recovery.class));
-        bind(MaintenanceController.class).toInstance(createMock(MaintenanceController.class));
-        bind(CronJobManager.class).toInstance(createMock(CronJobManager.class));
-        bind(QuotaManager.class).toInstance(createMock(QuotaManager.class));
-        bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
-        bind(IServerInfo.class).toInstance(SERVER_INFO);
-        bind(CronPredictor.class).toInstance(createMock(CronPredictor.class));
-        bind(NearestFit.class).toInstance(createMock(NearestFit.class));
-        bind(StateManager.class).toInstance(createMock(StateManager.class));
-        bind(TaskIdGenerator.class).toInstance(createMock(TaskIdGenerator.class));
-        bind(UUIDGenerator.class).toInstance(createMock(UUIDGenerator.class));
-        bind(JobUpdateController.class).toInstance(createMock(JobUpdateController.class));
-        bind(ReadOnlyScheduler.Iface.class).toInstance(createMock(ReadOnlyScheduler.Iface.class));
-        bind(Boolean.class)
-            .annotatedWith(EnableUpdater.class)
-            .toInstance(ThriftModule.ENABLE_BETA_UPDATER.get());
-      }
-    };
-    Injector injector = Guice.createInjector(testModule, new AopModule());
-    AuroraAdmin.Iface thriftInstance =
-        getResponseProxy(injector.getInstance(AuroraAdmin.Iface.class));
-
-    control.replay();
-    assertResponse(INVALID_REQUEST, thriftInstance.startJobUpdate(null, null, null));
   }
 
   @Test

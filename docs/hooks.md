@@ -92,7 +92,7 @@ You can associate `pre_`, `post_`, and `err_` hooks with the following methods. 
   ```update_job``` | ```self```, ```config```, ```health_check_interval_seconds=3```, ```shards=None``` | ```job update```
   ```kill_job``` | ```self```, ```job_key```, ```shards=None``` |  ```job kill```
   ```start_cronjob``` | ```self```, ```job_key``` | ```cron start```
-  ```start_job_update``` | ```self```, ```config```, ```instances=None``` | ```beta-update start```
+  ```start_job_update``` | ```self```, ```config```, ```instances=None``` | ```update start```
 
 Some specific examples:
 

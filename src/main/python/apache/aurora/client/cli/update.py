@@ -374,7 +374,7 @@ class Update(Noun):
 
   @property
   def name(self):
-    return "beta-update"
+    return "update"
 
   @property
   def help(self):
