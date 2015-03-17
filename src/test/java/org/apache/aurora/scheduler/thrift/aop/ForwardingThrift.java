@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.thrift.aop;
 import java.util.Set;
 
 import org.apache.aurora.gen.AddInstancesConfig;
-import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Hosts;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
@@ -40,11 +39,11 @@ import static java.util.Objects.requireNonNull;
  * A forwarding scheduler controller to make it easy to override specific behavior in an
  * implementation class.
  */
-abstract class ForwardingThrift implements AuroraAdmin.Iface {
+abstract class ForwardingThrift implements AnnotatedAuroraAdmin {
 
-  private final AuroraAdmin.Iface delegate;
+  private final AnnotatedAuroraAdmin delegate;
 
-  ForwardingThrift(AuroraAdmin.Iface delegate) {
+  ForwardingThrift(AnnotatedAuroraAdmin delegate) {
     this.delegate = requireNonNull(delegate);
   }
 

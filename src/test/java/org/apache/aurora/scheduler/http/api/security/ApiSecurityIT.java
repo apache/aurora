@@ -31,6 +31,7 @@ import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.scheduler.http.JettyServerModuleTest;
 import org.apache.aurora.scheduler.http.api.ApiModule;
+import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.aurora.scheduler.thrift.aop.MockDecoratedThrift;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
@@ -79,7 +80,7 @@ public class ApiSecurityIT extends JettyServerModuleTest {
       ImmutableSet.<Credentials>of(ROOT, WFARNER, UNPRIVILEGED, BACKUP_SERVICE);
 
   private Ini ini;
-  private AuroraAdmin.Iface auroraAdmin;
+  private AnnotatedAuroraAdmin auroraAdmin;
   private StatsProvider statsProvider;
 
   @Before
@@ -97,7 +98,7 @@ public class ApiSecurityIT extends JettyServerModuleTest {
     roles.put("eng", "thrift.AuroraSchedulerManager:*");
     roles.put("backupsvc", "thrift.AuroraAdmin:listBackups");
 
-    auroraAdmin = createMock(AuroraAdmin.Iface.class);
+    auroraAdmin = createMock(AnnotatedAuroraAdmin.class);
     statsProvider = createMock(StatsProvider.class);
     expect(statsProvider.makeCounter(anyString())).andStubReturn(new AtomicLong());
   }

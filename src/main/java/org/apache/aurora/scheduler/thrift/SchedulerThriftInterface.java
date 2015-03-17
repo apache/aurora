@@ -45,7 +45,6 @@ import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
 import org.apache.aurora.auth.SessionValidator.AuthFailedException;
 import org.apache.aurora.gen.AcquireLockResult;
 import org.apache.aurora.gen.AddInstancesConfig;
-import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
@@ -121,6 +120,7 @@ import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 import org.apache.aurora.scheduler.thrift.auth.Requires;
 import org.apache.aurora.scheduler.updater.JobDiff;
@@ -159,7 +159,7 @@ import static org.apache.aurora.scheduler.thrift.Responses.ok;
  * administration tasks.
  */
 @DecoratedThrift
-class SchedulerThriftInterface implements AuroraAdmin.Iface {
+class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   @Positive
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
   public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(4000);

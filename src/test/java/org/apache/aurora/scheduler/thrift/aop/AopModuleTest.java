@@ -43,7 +43,7 @@ public class AopModuleTest extends EasyMockTest {
   private static final SessionKey SESSION_KEY = new SessionKey();
 
   private CapabilityValidator capabilityValidator;
-  private Iface mockThrift;
+  private AnnotatedAuroraAdmin mockThrift;
 
   @Before
   public void setUp() throws Exception {
@@ -51,7 +51,7 @@ public class AopModuleTest extends EasyMockTest {
     expect(capabilityValidator.toString(SESSION_KEY))
         .andReturn("user")
         .anyTimes();
-    mockThrift = createMock(Iface.class);
+    mockThrift = createMock(AnnotatedAuroraAdmin.class);
   }
 
   private Iface getIface(Map<String, Boolean> toggledMethods) {
