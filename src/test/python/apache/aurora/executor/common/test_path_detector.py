@@ -40,17 +40,21 @@ def test_path_detector():
   )
 
   with mock.patch('glob.glob', return_value=(path1, path2)) as glob:
-    mpd = MesosPathDetector(root=FAKE_ROOT, sandbox_path=FAKE_CHECKPOINT_DIR)
-    paths = list(mpd.get_paths())
-    assert len(paths) == 2
-    assert os.path.join(path1, FAKE_CHECKPOINT_DIR) in paths
-    assert os.path.join(path2, FAKE_CHECKPOINT_DIR) in paths
+    with mock.patch('os.path.exists', side_effect=(True, False)) as exists:
+      mpd = MesosPathDetector(root=FAKE_ROOT, sandbox_path=FAKE_CHECKPOINT_DIR)
+      paths = list(mpd.get_paths())
+      assert len(paths) == 1
+      assert paths == [os.path.join(path1, FAKE_CHECKPOINT_DIR)]
 
-    expected_glob_pattern = os.path.join(*ExecutorDetector.PATTERN) % {
-      'root': FAKE_ROOT,
-      'slave_id': '*',
-      'framework_id': '*',
-      'executor_id': '*',
-      'run': '*'
-    }
-    glob.assert_called_once_with(expected_glob_pattern)
+      expected_glob_pattern = os.path.join(*ExecutorDetector.PATTERN) % {
+        'root': FAKE_ROOT,
+        'slave_id': '*',
+        'framework_id': '*',
+        'executor_id': '*',
+        'run': '*'
+      }
+      glob.assert_called_once_with(expected_glob_pattern)
+      assert exists.mock_calls == [
+          mock.call(os.path.join(path1, FAKE_CHECKPOINT_DIR)),
+          mock.call(os.path.join(path2, FAKE_CHECKPOINT_DIR)),
+      ]

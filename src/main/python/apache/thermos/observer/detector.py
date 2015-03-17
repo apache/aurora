@@ -41,6 +41,7 @@ class ObserverTaskDetector(object):
     self._path_detector = path_detector
     self._active_tasks = set()  # (root, task_id) tuple
     self._finished_tasks = set()  # (root, task_id) tuple
+    self._detectors = {}
     self._on_active = self.maybe_callback(on_active)
     self._on_finished = self.maybe_callback(on_finished)
     self._on_removed = self.maybe_callback(on_removed)
@@ -53,13 +54,25 @@ class ObserverTaskDetector(object):
   def finished_tasks(self):
     return self._finished_tasks.copy()
 
+  def _refresh_detectors(self):
+    new_paths = set(self._path_detector.get_paths())
+    old_paths = set(self._detectors)
+
+    for path in old_paths - new_paths:
+      self._detectors.pop(path)
+
+    for path in new_paths - old_paths:
+      self._detectors[path] = TaskDetector(root=path)
+
   def iter_tasks(self):
     # returns an iterator of root, task_id, active/finished
-    for root in self._path_detector.get_paths():
-      for status, task_id in TaskDetector(root=root).get_task_ids():
+    for root, detector in self._detectors.items():
+      for status, task_id in detector.get_task_ids():
         yield (root, task_id, status)
 
   def refresh(self):
+    self._refresh_detectors()
+
     all_active, all_finished = set(), set()
 
     for root, task_id, status in self.iter_tasks():
