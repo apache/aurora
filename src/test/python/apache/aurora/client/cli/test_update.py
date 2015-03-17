@@ -224,15 +224,12 @@ class TestUpdateCommand(AuroraClientCommandTest):
   @classmethod
   def setup_populate_job_config(cls, api, count=20):
     populate = cls.create_simple_success_response()
-    configs = [TaskConfig(
+    config = TaskConfig(
         numCpus=1.0,
         ramMb=1,
         diskMb=1,
-        job=JobKey(role='bozo', environment='test', name='hello')) for i in range(count)]
-    populate.result = Result(populateJobResult=PopulateJobResult(
-        populatedDEPRECATED=set(configs),
-        taskConfig=configs[0]
-    ))
+        job=JobKey(role='bozo', environment='test', name='hello'))
+    populate.result = Result(populateJobResult=PopulateJobResult(taskConfig=config))
     api.populateJobConfig.return_value = populate
     return populate
 

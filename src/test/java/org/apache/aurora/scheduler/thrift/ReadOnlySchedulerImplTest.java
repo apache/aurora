@@ -42,9 +42,11 @@ import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.PendingReason;
+import org.apache.aurora.gen.PopulateJobResult;
 import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.RoleSummary;
 import org.apache.aurora.gen.RoleSummaryResult;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -262,12 +264,9 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     Response response = assertOkResponse(thrift.populateJobConfig(job.newBuilder()));
     assertEquals(
-        ImmutableSet.of(sanitized.getJobConfig().getTaskConfig().newBuilder()),
-        response.getResult().getPopulateJobResult().getPopulatedDEPRECATED());
-
-    assertEquals(
-        sanitized.getJobConfig().getTaskConfig().newBuilder(),
-        response.getResult().getPopulateJobResult().getTaskConfig());
+        Result.populateJobResult(new PopulateJobResult(
+            sanitized.getJobConfig().getTaskConfig().newBuilder())),
+        response.getResult());
   }
 
   @Test

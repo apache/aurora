@@ -342,8 +342,6 @@ struct ConfigSummary {
 }
 
 struct PopulateJobResult {
-  // TODO(maxim): Remove populated field in 0.7.0. (AURORA-691)
-  1: set<TaskConfig> populatedDEPRECATED
   2: TaskConfig taskConfig
 }
 

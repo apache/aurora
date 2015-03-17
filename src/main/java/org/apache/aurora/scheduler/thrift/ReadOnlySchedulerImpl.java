@@ -139,12 +139,8 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
     try {
       ITaskConfig populatedTaskConfig = SanitizedConfiguration.fromUnsanitized(
           IJobConfiguration.build(description)).getJobConfig().getTaskConfig();
-
-      PopulateJobResult result = new PopulateJobResult()
-          .setPopulatedDEPRECATED(ImmutableSet.of(populatedTaskConfig.newBuilder()))
-          .setTaskConfig(populatedTaskConfig.newBuilder());
-
-      return ok(Result.populateJobResult(result));
+      return ok(Result.populateJobResult(
+          new PopulateJobResult().setTaskConfig(populatedTaskConfig.newBuilder())));
     } catch (TaskDescriptionException e) {
       return invalidRequest("Invalid configuration: " + e.getMessage());
     }

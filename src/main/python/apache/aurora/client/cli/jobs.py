@@ -31,7 +31,6 @@ from thrift.TSerialization import serialize
 
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.updater_util import UpdaterConfig
-from apache.aurora.client.base import get_populated_task_config
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
@@ -226,7 +225,9 @@ class DiffCommand(Verb):
     context.log_response_and_raise(resp, err_code=EXIT_INVALID_CONFIGURATION,
           err_msg="Error loading configuration")
     # Deepcopy is important here as tasks will be modified for printing.
-    local_tasks = [deepcopy(get_populated_task_config(resp)) for _ in range(config.instances())]
+    local_tasks = [
+      deepcopy(resp.result.populateJobResult.taskConfig) for _ in range(config.instances())
+    ]
     diff_program = os.environ.get("DIFF_VIEWER", "diff")
     with NamedTemporaryFile() as local:
       self.dump_tasks(local_tasks, local)

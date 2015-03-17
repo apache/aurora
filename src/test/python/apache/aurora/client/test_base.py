@@ -55,10 +55,4 @@ class TestBase(unittest.TestCase):
     config = TaskConfig()
     resp = Response(responseCode=ResponseCode.OK, result=Result(populateJobResult=PopulateJobResult(
         taskConfig=config)))
-    assert config == base.get_populated_task_config(resp)
-
-  def test_get_populated_task_config_deprecated_set(self):
-    config = TaskConfig()
-    resp = Response(responseCode=ResponseCode.OK, result=Result(populateJobResult=PopulateJobResult(
-        populatedDEPRECATED=set([config]))))
-    assert config == base.get_populated_task_config(resp)
+    assert config == resp.result.populateJobResult.taskConfig

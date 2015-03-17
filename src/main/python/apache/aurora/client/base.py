@@ -68,15 +68,6 @@ def check_and_log_locked_response(resp):
     log.info(LOCKED_WARNING)
 
 
-def get_populated_task_config(resp):
-  """Temporary dual read until AURORA-975 is addressed."""
-  result = resp.result.populateJobResult
-  if result.taskConfig:
-    return result.taskConfig
-  else:
-    return list(result.populatedDEPRECATED)[0] if result.populatedDEPRECATED else None
-
-
 def deprecation_warning(text):
   log.warning('')
   log.warning('*' * 80)
