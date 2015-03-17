@@ -23,13 +23,6 @@ python_binary(
   ]
 )
 
-target(
-  name = 'thermos',
-  dependencies = [
-    'src/main/python/apache/thermos/cli/bin:thermos',
-  ],
-)
-
 python_library(
   name = 'thermos_runner_source',
   sources = ['thermos_runner.py'],

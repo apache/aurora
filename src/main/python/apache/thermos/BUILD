@@ -27,7 +27,7 @@ python_library(
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
     descripton = 'The Apache Aurora Thermos runtime.',
   ).with_binaries(
-    thermos = 'src/main/python/apache/thermos/bin:thermos',
+    thermos = 'src/main/python/apache/thermos/cli/bin:thermos',
     thermos_runner = 'src/main/python/apache/thermos/bin:thermos_runner',
   )
 )

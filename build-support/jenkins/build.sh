@@ -36,3 +36,5 @@ export JUNIT_XML_BASE="$PWD/dist/test-results"
 mkdir -p "$JUNIT_XML_BASE"
 ./pants test.pytest --no-fast --options='-v' src/test/python::
 
+# Ensure we can build python sdists (AURORA-1174)
+./build-support/release/make-python-sdists
