@@ -195,7 +195,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     boolean sufficient =
         Resources.from(offer.getOffer()).greaterThanOrEqual(TOTAL_GC_EXECUTOR_RESOURCES);
     if (!sufficient) {
-      LOG.warning("Offer for host " + offer.getOffer().getHostname()
+      LOG.fine("Offer for host " + offer.getOffer().getHostname()
           + " is too small for a GC executor");
       insufficientOffers.incrementAndGet();
     }
