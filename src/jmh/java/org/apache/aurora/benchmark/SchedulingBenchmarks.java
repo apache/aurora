@@ -135,7 +135,7 @@ public class SchedulingBenchmarks {
               bind(Preemptor.class).to(PreemptorImpl.class);
               bind(PreemptorImpl.class).in(Singleton.class);
               bind(new TypeLiteral<Amount<Long, Time>>() { })
-                  .annotatedWith(PreemptionSlotFinderImpl.PreemptionDelay.class)
+                  .annotatedWith(PreemptorImpl.PreemptionDelay.class)
                   .toInstance(Amount.of(0L, Time.MILLISECONDS));
               bind(ClusterState.class).to(ClusterStateImpl.class);
               bind(ClusterStateImpl.class).in(Singleton.class);

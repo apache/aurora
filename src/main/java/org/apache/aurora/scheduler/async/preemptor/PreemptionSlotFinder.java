@@ -13,13 +13,10 @@
  */
 package org.apache.aurora.scheduler.async.preemptor;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 import java.util.Objects;
 import java.util.Set;
 
 import javax.inject.Inject;
-import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -32,15 +29,10 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.Clock;
 
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.async.OfferManager;
-import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
@@ -49,17 +41,9 @@ import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
-
-import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
 
 /**
  * Tries to find a slave with a combination of active tasks (victims) and available offer
@@ -124,13 +108,13 @@ public interface PreemptionSlotFinder {
   /**
    * Searches for a {@link PreemptionSlot} for a given {@code taskId}.
    *
-   * @param taskId Task to search preemption slot for.
+   * @param pendingTask Task to search preemption slot for.
    * @param attributeAggregate An {@link AttributeAggregate} instance for the task's job.
    * @param storeProvider A store provider to access task data.
    * @return An instance of {@link PreemptionSlot} if preemption is possible.
    */
   Optional<PreemptionSlot> findPreemptionSlotFor(
-      String taskId,
+      IAssignedTask pendingTask,
       AttributeAggregate attributeAggregate,
       StoreProvider storeProvider);
 
@@ -139,20 +123,7 @@ public interface PreemptionSlotFinder {
     private final ClusterState clusterState;
     private final SchedulingFilter schedulingFilter;
     private final ExecutorSettings executorSettings;
-    private final Amount<Long, Time> preemptionCandidacyDelay;
     private final PreemptorMetrics metrics;
-    private final Clock clock;
-
-    /**
-     * Binding annotation for the time interval after which a pending task becomes eligible to
-     * preempt other tasks. To avoid excessive churn, the preemptor requires that a task is PENDING
-     * for a duration (dictated by {@link #preemptionCandidacyDelay}) before it becomes eligible
-     * to preempt other tasks.
-     */
-    @VisibleForTesting
-    @Qualifier
-    @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-    public @interface PreemptionDelay { }
 
     @Inject
     PreemptionSlotFinderImpl(
@@ -160,17 +131,13 @@ public interface PreemptionSlotFinder {
         ClusterState clusterState,
         SchedulingFilter schedulingFilter,
         ExecutorSettings executorSettings,
-        @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
-        PreemptorMetrics metrics,
-        Clock clock) {
+        PreemptorMetrics metrics) {
 
       this.offerManager = requireNonNull(offerManager);
       this.clusterState = requireNonNull(clusterState);
       this.schedulingFilter = requireNonNull(schedulingFilter);
       this.executorSettings = requireNonNull(executorSettings);
-      this.preemptionCandidacyDelay = requireNonNull(preemptionCandidacyDelay);
       this.metrics = requireNonNull(metrics);
-      this.clock = requireNonNull(clock);
     }
 
     private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
@@ -218,20 +185,11 @@ public interface PreemptionSlotFinder {
           }
         };
 
-    // TODO(maxim): Consider accepting IAssignedTask instead of taskId. This will require moving
-    // #fetchIdlePendingTask upstream.
     @Override
     public Optional<PreemptionSlot> findPreemptionSlotFor(
-        final String taskId,
+        final IAssignedTask pendingTask,
         AttributeAggregate attributeAggregate,
         StoreProvider storeProvider) {
-
-      final Optional<IAssignedTask> pendingTask = fetchIdlePendingTask(taskId, storeProvider);
-
-      // Task is no longer PENDING no need to preempt.
-      if (!pendingTask.isPresent()) {
-        return Optional.absent();
-      }
 
       Multimap<String, PreemptionVictim> slavesToActiveTasks =
           clusterState.getSlavesToActiveTasks();
@@ -240,7 +198,7 @@ public interface PreemptionSlotFinder {
         return Optional.absent();
       }
 
-      metrics.recordPreemptionAttemptFor(pendingTask.get().getTask());
+      metrics.recordPreemptionAttemptFor(pendingTask.getTask());
 
       // Group the offers by slave id so they can be paired with active tasks from the same slave.
       Multimap<String, HostOffer> slavesToOffers =
@@ -255,7 +213,7 @@ public interface PreemptionSlotFinder {
         final Optional<ImmutableSet<PreemptionVictim>> preemptionVictims = getTasksToPreempt(
             slavesToActiveTasks.get(slaveId),
             slavesToOffers.get(slaveId),
-            pendingTask.get(),
+            pendingTask,
             attributeAggregate,
             storeProvider);
 
@@ -264,7 +222,7 @@ public interface PreemptionSlotFinder {
         }
       }
 
-      metrics.recordPreemptionFailure(pendingTask.get().getTask());
+      metrics.recordPreemptionFailure(pendingTask.getTask());
       return Optional.absent();
     }
 
@@ -324,23 +282,6 @@ public interface PreemptionSlotFinder {
         }
       }
       return Optional.absent();
-    }
-
-    private final Predicate<IScheduledTask> isIdleTask = new Predicate<IScheduledTask>() {
-      @Override
-      public boolean apply(IScheduledTask task) {
-        return (clock.nowMillis() - Tasks.getLatestEvent(task).getTimestamp())
-            >= preemptionCandidacyDelay.as(Time.MILLISECONDS);
-      }
-    };
-
-    private Optional<IAssignedTask> fetchIdlePendingTask(String taskId, StoreProvider store) {
-      Query.Builder query = Query.taskScoped(taskId).byStatus(PENDING);
-      Iterable<IAssignedTask> result = FluentIterable
-          .from(store.getTaskStore().fetchTasks(query))
-          .filter(isIdleTask)
-          .transform(SCHEDULED_TO_ASSIGNED);
-      return Optional.fromNullable(Iterables.getOnlyElement(result, null));
     }
 
     /**

@@ -68,7 +68,7 @@ public class PreemptorModule extends AbstractModule {
           bind(Preemptor.class).to(PreemptorImpl.class);
           bind(PreemptorImpl.class).in(Singleton.class);
           bind(new TypeLiteral<Amount<Long, Time>>() { })
-              .annotatedWith(PreemptionSlotFinderImpl.PreemptionDelay.class)
+              .annotatedWith(PreemptorImpl.PreemptionDelay.class)
               .toInstance(PREEMPTION_DELAY.get());
           bind(ClusterState.class).to(ClusterStateImpl.class);
           bind(ClusterStateImpl.class).in(Singleton.class);
