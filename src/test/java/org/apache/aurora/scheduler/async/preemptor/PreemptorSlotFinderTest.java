@@ -25,6 +25,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -59,6 +60,7 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
+import org.apache.mesos.Protos;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
@@ -68,8 +70,6 @@ import org.junit.Test;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.MISSING_ATTRIBUTES_NAME;
-import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.attemptsStatName;
-import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.failureStatName;
 import static org.apache.mesos.Protos.Offer;
 import static org.apache.mesos.Protos.Resource;
 import static org.easymock.EasyMock.expect;
@@ -144,11 +144,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertSlot(runSlotFinder(highPriority), lowPriority);
-
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -170,11 +165,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertSlot(runSlotFinder(highPriority), lowerPriority);
-
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -199,11 +189,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertSlot(runSlotFinder(pendingPriority), lowestPriority);
-
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -219,11 +204,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertNoSlot(runSlotFinder(task));
-
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(1L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -242,11 +222,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertSlot(runSlotFinder(p1), a1);
-
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -265,11 +240,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertSlot(runSlotFinder(p1), a1);
-
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   @Test
@@ -284,11 +254,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertNoSlot(runSlotFinder(p1));
-
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures a production task can preempt 2 tasks on the same host.
@@ -315,11 +280,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertSlot(runSlotFinder(p1), a1, b1);
-
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures we select the minimal number of tasks to preempt
@@ -349,11 +309,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertSlot(runSlotFinder(p1), a1);
-
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures a production task *never* preempts a production task from another job.
@@ -376,11 +331,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertNoSlot(runSlotFinder(p2));
-
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures that we can preempt if a task + offer can satisfy a pending task.
@@ -404,11 +354,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertSlot(runSlotFinder(p1), a1);
-
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
   }
 
   // Ensures we can preempt if two tasks and an offer can satisfy a pending task.
@@ -436,11 +381,50 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     control.replay();
     assertSlot(runSlotFinder(p1), a1, a2);
+  }
 
-    assertEquals(0L, statsProvider.getLongValue(attemptsStatName(false)));
-    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(false)));
-    assertEquals(0L, statsProvider.getLongValue(failureStatName(true)));
+  @Test
+  public void testPreemptionSlotValidation() {
+    schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
+
+    setUpHost();
+
+    ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
+    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    assignToHost(a1);
+
+    Offer o1 = makeOffer(OFFER, 1, Amount.of(512L, Data.MB), Amount.of(1L, Data.MB), 1);
+    expectOffers(o1);
+    expect(offerManager.getOffer(Protos.SlaveID.newBuilder().setValue(SLAVE_ID).build()))
+        .andReturn(Optional.of(Iterables.getOnlyElement(makeOffers(o1))));
+
+    ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
+    p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+
+    expectGetClusterState(a1);
+
+    control.replay();
+
+    Optional<PreemptionSlot> slot = runSlotFinder(p1);
+    assertSlot(slot, a1);
+
+    PreemptionSlotFinder slotFinder = new PreemptionSlotFinderImpl(
+        offerManager,
+        clusterState,
+        schedulingFilter,
+        TaskExecutors.NO_OVERHEAD_EXECUTOR,
+        preemptorMetrics);
+
+    Optional<ImmutableSet<PreemptionVictim>> victims = slotFinder.validatePreemptionSlotFor(
+        IAssignedTask.build(p1.getAssignedTask()),
+        emptyJob,
+        slot.get(),
+        storageUtil.mutableStoreProvider);
+
+    assertEquals(
+        Optional.of(ImmutableSet.of(PreemptionVictim.fromTask(
+            IAssignedTask.build(a1.getAssignedTask())))),
+        victims);
   }
 
   @Test
@@ -562,8 +546,8 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
     return builder.build();
   }
 
-  private void expectOffers(Offer... offers) {
-    Iterable<HostOffer> hostOffers = FluentIterable.from(Lists.newArrayList(offers))
+  private Iterable<HostOffer> makeOffers(Offer... offers) {
+    return FluentIterable.from(Lists.newArrayList(offers))
         .transform(new Function<Offer, HostOffer>() {
           @Override
           public HostOffer apply(Offer offer) {
@@ -572,7 +556,10 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
                 IHostAttributes.build(new HostAttributes().setMode(MaintenanceMode.NONE)));
           }
         });
-    expect(offerManager.getOffers()).andReturn(hostOffers);
+  }
+
+  private void expectOffers(Offer... offers) {
+    expect(offerManager.getOffers()).andReturn(makeOffers(offers));
   }
 
   private void expectNoOffers() {

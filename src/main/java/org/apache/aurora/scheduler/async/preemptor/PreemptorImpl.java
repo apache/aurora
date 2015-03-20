@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.async.preemptor;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.concurrent.ScheduledExecutorService;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -23,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -35,8 +37,10 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -60,6 +64,8 @@ public class PreemptorImpl implements Preemptor {
   private final PreemptionSlotFinder preemptionSlotFinder;
   private final PreemptorMetrics metrics;
   private final Amount<Long, Time> preemptionCandidacyDelay;
+  private final ScheduledExecutorService executor;
+  private final PreemptionSlotCache slotCache;
   private final Clock clock;
 
   /**
@@ -73,6 +79,11 @@ public class PreemptorImpl implements Preemptor {
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface PreemptionDelay { }
 
+  @VisibleForTesting
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  public @interface PreemptionExecutor { }
+
   @Inject
   PreemptorImpl(
       Storage storage,
@@ -80,6 +91,8 @@ public class PreemptorImpl implements Preemptor {
       PreemptionSlotFinder preemptionSlotFinder,
       PreemptorMetrics metrics,
       @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
+      @PreemptionExecutor ScheduledExecutorService executor,
+      PreemptionSlotCache slotCache,
       Clock clock) {
 
     this.storage = requireNonNull(storage);
@@ -87,12 +100,34 @@ public class PreemptorImpl implements Preemptor {
     this.preemptionSlotFinder = requireNonNull(preemptionSlotFinder);
     this.metrics = requireNonNull(metrics);
     this.preemptionCandidacyDelay = requireNonNull(preemptionCandidacyDelay);
+    this.executor = requireNonNull(executor);
+    this.slotCache = requireNonNull(slotCache);
     this.clock = requireNonNull(clock);
   }
 
   @Override
   public synchronized Optional<String> attemptPreemptionFor(
       final String taskId,
+      final AttributeAggregate attributeAggregate) {
+
+    final Optional<PreemptionSlot> preemptionSlot = slotCache.get(taskId);
+    if (preemptionSlot.isPresent()) {
+      // A preemption slot is available -> attempt to preempt tasks.
+      slotCache.remove(taskId);
+      return preemptTasks(taskId, preemptionSlot.get(), attributeAggregate);
+    } else {
+      // TODO(maxim): There is a potential race between preemption requests and async search.
+      // The side-effect of the race is benign as it only wastes CPU time and is unlikely to happen
+      // often given our schedule penalty >> slot search time. However, we may want to re-evaluate
+      // this when moving preemptor into background mode.
+      searchForPreemptionSlot(taskId, attributeAggregate);
+      return Optional.absent();
+    }
+  }
+
+  private Optional<String> preemptTasks(
+      final String taskId,
+      final PreemptionSlot preemptionSlot,
       final AttributeAggregate attributeAggregate) {
 
     return storage.write(new Storage.MutateWork.Quiet<Optional<String>>() {
@@ -102,29 +137,72 @@ public class PreemptorImpl implements Preemptor {
 
         // Task is no longer PENDING no need to preempt.
         if (!pendingTask.isPresent()) {
+            return Optional.absent();
+        }
+
+        // Validate a PreemptionSlot is still valid for the given task.
+        Optional<ImmutableSet<PreemptionVictim>> validatedVictims =
+            preemptionSlotFinder.validatePreemptionSlotFor(
+                pendingTask.get(),
+                attributeAggregate,
+                preemptionSlot,
+                storeProvider);
+
+        metrics.recordSlotValidationResult(validatedVictims);
+        if (!validatedVictims.isPresent()) {
+          // Previously found victims are no longer valid -> trigger a new search.
+          searchForPreemptionSlot(taskId, attributeAggregate);
           return Optional.absent();
         }
 
-        // TODO(maxim): Move preemption slot search into a read-only transaction and validate
-        //              weakly-consistent slot data before making a preemption.
-        Optional<PreemptionSlot> preemptionSlot = preemptionSlotFinder.findPreemptionSlotFor(
-            pendingTask.get(),
-            attributeAggregate,
-            storeProvider);
-
-        if (preemptionSlot.isPresent()) {
-          for (PreemptionVictim toPreempt : preemptionSlot.get().getVictims()) {
-            metrics.recordTaskPreemption(toPreempt);
-            stateManager.changeState(
-                storeProvider,
-                toPreempt.getTaskId(),
-                Optional.<ScheduleStatus>absent(),
-                PREEMPTING,
-                Optional.of("Preempting in favor of " + taskId));
-          }
-          return Optional.of(preemptionSlot.get().getSlaveId());
+        for (PreemptionVictim toPreempt : validatedVictims.get()) {
+          metrics.recordTaskPreemption(toPreempt);
+          stateManager.changeState(
+              storeProvider,
+              toPreempt.getTaskId(),
+              Optional.<ScheduleStatus>absent(),
+              PREEMPTING,
+              Optional.of("Preempting in favor of " + taskId));
         }
-        return Optional.absent();
+        return Optional.of(preemptionSlot.getSlaveId());
+      }
+    });
+  }
+
+  private void searchForPreemptionSlot(
+      final String taskId,
+      final AttributeAggregate attributeAggregate) {
+
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        Optional<PreemptionSlot> slot = storage.read(
+            new Storage.Work.Quiet<Optional<PreemptionSlot>>() {
+              @Override
+              public Optional<PreemptionSlot> apply(StoreProvider storeProvider) {
+                Optional<IAssignedTask> pendingTask = fetchIdlePendingTask(taskId, storeProvider);
+
+                // Task is no longer PENDING no need to search for preemption slot.
+                if (!pendingTask.isPresent()) {
+                  return Optional.absent();
+                }
+
+                ITaskConfig task = pendingTask.get().getTask();
+                metrics.recordPreemptionAttemptFor(task);
+
+                Optional<PreemptionSlot> result = preemptionSlotFinder.findPreemptionSlotFor(
+                    pendingTask.get(),
+                    attributeAggregate,
+                    storeProvider);
+
+                metrics.recordSlotSearchResult(result, task);
+                return result;
+              }
+            });
+
+        if (slot.isPresent()) {
+          slotCache.add(taskId, slot.get());
+        }
       }
     });
   }

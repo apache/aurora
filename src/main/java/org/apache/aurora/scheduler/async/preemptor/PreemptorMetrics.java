@@ -18,6 +18,7 @@ import java.util.Set;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.scheduler.stats.CachedCounters;
@@ -42,8 +43,12 @@ public class PreemptorMetrics {
     assertFullyExported();
   }
 
-  private static String name(boolean production) {
+  private static String prod(boolean production) {
     return production ? "prod" : "non_prod";
+  }
+
+  private static String result(boolean success) {
+    return success ? "successful" : "failed";
   }
 
   private void assertFullyExported() {
@@ -57,8 +62,12 @@ public class PreemptorMetrics {
         attemptsStatName(true),
         successStatName(false),
         successStatName(true),
-        failureStatName(false),
-        failureStatName(true),
+        slotSearchStatName(true, false),
+        slotSearchStatName(false, false),
+        slotSearchStatName(true, true),
+        slotSearchStatName(false, true),
+        slotValidationStatName(true),
+        slotValidationStatName(false),
         MISSING_ATTRIBUTES_NAME);
     for (String stat : allStats) {
       counters.get(stat);
@@ -74,32 +83,41 @@ public class PreemptorMetrics {
 
   @VisibleForTesting
   static String attemptsStatName(boolean production) {
-    return "preemptor_attempts_for_" + name(production);
+    return "preemptor_slot_search_attempts_for_" + prod(production);
+  }
+
+  @VisibleForTesting
+  static String successStatName(boolean production) {
+    return "preemptor_tasks_preempted_" + prod(production);
+  }
+
+  @VisibleForTesting
+  static String slotSearchStatName(boolean success, boolean production) {
+    return String.format("preemptor_slot_search_%s_for_%s", result(success), prod(production));
+  }
+
+  @VisibleForTesting
+  static String slotValidationStatName(boolean success) {
+    return "preemptor_slot_validation_" + result(success);
   }
 
   void recordPreemptionAttemptFor(ITaskConfig task) {
     increment(attemptsStatName(task.isProduction()));
   }
 
-  @VisibleForTesting
-  static String successStatName(boolean production) {
-    return "preemptor_tasks_preempted_" + name(production);
-  }
-
   void recordTaskPreemption(PreemptionVictim victim) {
     increment(successStatName(victim.isProduction()));
   }
 
-  @VisibleForTesting
-  static String failureStatName(boolean production) {
-    return "preemptor_no_slots_found_for_" + name(production);
+  void recordSlotSearchResult(Optional<?> result, ITaskConfig task) {
+    increment(slotSearchStatName(result.isPresent(), task.isProduction()));
+  }
+
+  void recordSlotValidationResult(Optional<?> result) {
+    increment(slotValidationStatName(result.isPresent()));
   }
 
   void recordMissingAttributes() {
     increment(MISSING_ATTRIBUTES_NAME);
-  }
-
-  void recordPreemptionFailure(ITaskConfig task) {
-    increment(failureStatName(task.isProduction()));
   }
 }

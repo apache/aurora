@@ -37,11 +37,13 @@ import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.mesos.Protos.SlaveID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -106,7 +108,7 @@ public interface PreemptionSlotFinder {
   }
 
   /**
-   * Searches for a {@link PreemptionSlot} for a given {@code taskId}.
+   * Searches for a {@link PreemptionSlot} for a given {@code pendingTask}.
    *
    * @param pendingTask Task to search preemption slot for.
    * @param attributeAggregate An {@link AttributeAggregate} instance for the task's job.
@@ -116,6 +118,21 @@ public interface PreemptionSlotFinder {
   Optional<PreemptionSlot> findPreemptionSlotFor(
       IAssignedTask pendingTask,
       AttributeAggregate attributeAggregate,
+      StoreProvider storeProvider);
+
+  /**
+   * Validates that a previously-found {@code preemptionSlot} can still accommodate a given task.
+   *
+   * @param pendingTask Task to validate preemption slot for.
+   * @param attributeAggregate An {@link AttributeAggregate} instance for the task's job.
+   * @param preemptionSlot A previously found preemption slot to validate.
+   * @param storeProvider A store provider to access task data.
+   * @return A finalized set of {@code PreemptionVictim} instances to preempt for a given task.
+   */
+  Optional<ImmutableSet<PreemptionVictim>> validatePreemptionSlotFor(
+      IAssignedTask pendingTask,
+      AttributeAggregate attributeAggregate,
+      PreemptionSlot preemptionSlot,
       StoreProvider storeProvider);
 
   class PreemptionSlotFinderImpl implements PreemptionSlotFinder {
@@ -198,8 +215,6 @@ public interface PreemptionSlotFinder {
         return Optional.absent();
       }
 
-      metrics.recordPreemptionAttemptFor(pendingTask.getTask());
-
       // Group the offers by slave id so they can be paired with active tasks from the same slave.
       Multimap<String, HostOffer> slavesToOffers =
           Multimaps.index(offerManager.getOffers(), OFFER_TO_SLAVE_ID);
@@ -222,8 +237,25 @@ public interface PreemptionSlotFinder {
         }
       }
 
-      metrics.recordPreemptionFailure(pendingTask.getTask());
       return Optional.absent();
+    }
+
+    @Override
+    public Optional<ImmutableSet<PreemptionVictim>> validatePreemptionSlotFor(
+        IAssignedTask pendingTask,
+        AttributeAggregate attributeAggregate,
+        PreemptionSlot preemptionSlot,
+        StoreProvider storeProvider) {
+
+      Optional<HostOffer> offer =
+          offerManager.getOffer(SlaveID.newBuilder().setValue(preemptionSlot.getSlaveId()).build());
+
+      return getTasksToPreempt(
+          preemptionSlot.getVictims(),
+          offer.asSet(),
+          pendingTask,
+          attributeAggregate,
+          storeProvider);
     }
 
     /**
@@ -273,7 +305,7 @@ public interface PreemptionSlotFinder {
             ResourceSlot.sum(Iterables.transform(toPreemptTasks, victimToResources)),
             slackResources);
 
-        Set<SchedulingFilter.Veto> vetoes = schedulingFilter.filter(
+        Set<Veto> vetoes = schedulingFilter.filter(
             new UnusedResource(totalResource, attributes.get()),
             new ResourceRequest(pendingTask.getTask(), pendingTask.getTaskId(), jobState));
 

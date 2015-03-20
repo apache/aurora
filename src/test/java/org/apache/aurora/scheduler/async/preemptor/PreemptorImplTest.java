@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.async.preemptor;
 
 import java.util.Arrays;
+import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Suppliers;
@@ -23,7 +24,6 @@ import com.google.common.collect.ImmutableSet;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
-import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.JobKey;
@@ -41,12 +41,16 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.attemptsStatName;
+import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.slotSearchStatName;
+import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.slotValidationStatName;
 import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.successStatName;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -58,13 +62,17 @@ public class PreemptorImplTest extends EasyMockTest {
 
   private static final Amount<Long, Time> PREEMPTION_DELAY = Amount.of(30L, Time.SECONDS);
 
+  private static final Optional<PreemptionSlot> EMPTY_SLOT = Optional.absent();
+  private static final Optional<String> EMPTY_RESULT = Optional.absent();
+
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private FakeStatsProvider statsProvider;
   private PreemptionSlotFinder preemptionSlotFinder;
   private PreemptorImpl preemptor;
   private AttributeAggregate attrAggregate;
-  private FakeClock clock;
+  private PreemptionSlotCache slotCache;
+  private FakeScheduledExecutor clock;
 
   @Before
   public void setUp() {
@@ -72,8 +80,10 @@ public class PreemptorImplTest extends EasyMockTest {
     storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
     preemptionSlotFinder = createMock(PreemptionSlotFinder.class);
+    slotCache = createMock(PreemptionSlotCache.class);
     statsProvider = new FakeStatsProvider();
-    clock = new FakeClock();
+    ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
+    clock = FakeScheduledExecutor.scheduleExecutor(executor);
     attrAggregate = new AttributeAggregate(
         Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
         createMock(AttributeStore.class));
@@ -84,18 +94,69 @@ public class PreemptorImplTest extends EasyMockTest {
         preemptionSlotFinder,
         new PreemptorMetrics(new CachedCounters(statsProvider)),
         PREEMPTION_DELAY,
+        executor,
+        slotCache,
         clock);
   }
 
   @Test
-  public void testPreemption() throws Exception {
+  public void testSearchSlotSuccessful() throws Exception {
+    ScheduledTask task = makeTask();
+    PreemptionSlot slot = createPreemptionSlot(task);
+
+    expect(slotCache.get(TASK_ID)).andReturn(EMPTY_SLOT);
+    expectGetPendingTasks(task);
+    expectSlotSearch(task, Optional.of(slot));
+    slotCache.add(TASK_ID, slot);
+
+    control.replay();
+
+    clock.advance(PREEMPTION_DELAY);
+
+    assertEquals(EMPTY_RESULT, preemptor.attemptPreemptionFor(TASK_ID, attrAggregate));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(slotSearchStatName(true, true)));
+    assertEquals(0L, statsProvider.getLongValue(slotSearchStatName(false, true)));
+  }
+
+  @Test
+  public void testSearchSlotFailed() throws Exception {
     ScheduledTask task = makeTask();
 
+    expect(slotCache.get(TASK_ID)).andReturn(EMPTY_SLOT);
     expectGetPendingTasks(task);
-    expect(preemptionSlotFinder.findPreemptionSlotFor(
-        IAssignedTask.build(task.getAssignedTask()),
-        attrAggregate,
-        storageUtil.mutableStoreProvider)).andReturn(Optional.of(createPreemptionSlot(task)));
+    expectSlotSearch(task, EMPTY_SLOT);
+
+    control.replay();
+
+    clock.advance(PREEMPTION_DELAY);
+
+    assertEquals(EMPTY_RESULT, preemptor.attemptPreemptionFor(TASK_ID, attrAggregate));
+    assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(slotSearchStatName(true, true)));
+    assertEquals(1L, statsProvider.getLongValue(slotSearchStatName(false, true)));
+  }
+
+  @Test
+  public void testSearchSlotTaskNoLongerPending() throws Exception {
+    expect(slotCache.get(TASK_ID)).andReturn(EMPTY_SLOT);
+    storageUtil.expectTaskFetch(Query.statusScoped(PENDING).byId(TASK_ID));
+
+    control.replay();
+
+    assertEquals(EMPTY_RESULT, preemptor.attemptPreemptionFor(TASK_ID, attrAggregate));
+  }
+
+  @Test
+  public void testPreemptTasksSuccessful() throws Exception {
+    ScheduledTask task = makeTask();
+    PreemptionSlot slot = createPreemptionSlot(task);
+
+    expect(slotCache.get(TASK_ID)).andReturn(Optional.of(slot));
+    slotCache.remove(TASK_ID);
+    expectGetPendingTasks(task);
+    expectSlotValidation(task, slot, Optional.of(ImmutableSet.of(
+        PreemptionVictim.fromTask(IAssignedTask.build(task.getAssignedTask())))));
 
     expectPreempted(task);
 
@@ -104,33 +165,60 @@ public class PreemptorImplTest extends EasyMockTest {
     clock.advance(PREEMPTION_DELAY);
 
     assertEquals(Optional.of(SLAVE_ID), preemptor.attemptPreemptionFor(TASK_ID, attrAggregate));
+    assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(true)));
     assertEquals(1L, statsProvider.getLongValue(successStatName(true)));
   }
 
   @Test
-  public void testNoPreemption() throws Exception {
+  public void testPreemptTasksValidationFailed() throws Exception {
     ScheduledTask task = makeTask();
+    PreemptionSlot slot = createPreemptionSlot(task);
+
+    expect(slotCache.get(TASK_ID)).andReturn(Optional.of(slot));
+    slotCache.remove(TASK_ID);
     expectGetPendingTasks(task);
-    expect(preemptionSlotFinder.findPreemptionSlotFor(
-        IAssignedTask.build(task.getAssignedTask()),
-        attrAggregate,
-        storageUtil.mutableStoreProvider)).andReturn(Optional.<PreemptionSlot>absent());
+    storageUtil.expectTaskFetch(Query.statusScoped(PENDING).byId(TASK_ID));
+    expectSlotValidation(task, slot, Optional.<ImmutableSet<PreemptionVictim>>absent());
 
     control.replay();
 
     clock.advance(PREEMPTION_DELAY);
 
-    assertEquals(Optional.<String>absent(), preemptor.attemptPreemptionFor(TASK_ID, attrAggregate));
+    assertEquals(EMPTY_RESULT, preemptor.attemptPreemptionFor(TASK_ID, attrAggregate));
+    assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(false)));
     assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
   }
 
   @Test
-  public void testNoPendingTasks() {
+  public void testPreemptTaskNoLongerPending() throws Exception {
+    ScheduledTask task = makeTask();
+    PreemptionSlot slot = createPreemptionSlot(task);
+    expect(slotCache.get(TASK_ID)).andReturn(Optional.of(slot));
+    slotCache.remove(TASK_ID);
     storageUtil.expectTaskFetch(Query.statusScoped(PENDING).byId(TASK_ID));
 
     control.replay();
 
-    assertEquals(Optional.<String>absent(), preemptor.attemptPreemptionFor(TASK_ID, attrAggregate));
+    assertEquals(EMPTY_RESULT, preemptor.attemptPreemptionFor(TASK_ID, attrAggregate));
+  }
+
+  private void expectSlotSearch(ScheduledTask task, Optional<PreemptionSlot> slot) {
+    expect(preemptionSlotFinder.findPreemptionSlotFor(
+        IAssignedTask.build(task.getAssignedTask()),
+        attrAggregate,
+        storageUtil.storeProvider)).andReturn(slot);
+  }
+
+  private void expectSlotValidation(
+      ScheduledTask task,
+      PreemptionSlot slot,
+      Optional<ImmutableSet<PreemptionVictim>> victims) {
+
+    expect(preemptionSlotFinder.validatePreemptionSlotFor(
+        IAssignedTask.build(task.getAssignedTask()),
+        attrAggregate,
+        slot,
+        storageUtil.mutableStoreProvider)).andReturn(victims);
   }
 
   private void expectPreempted(ScheduledTask preempted) throws Exception {

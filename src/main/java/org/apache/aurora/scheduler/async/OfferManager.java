@@ -107,6 +107,14 @@ public interface OfferManager extends EventSubscriber {
   Iterable<HostOffer> getOffers();
 
   /**
+   * Gets an offer for the given slave ID.
+   *
+   * @param slaveId Slave ID to get offer for.
+   * @return An offer for the slave ID.
+   */
+  Optional<HostOffer> getOffer(SlaveID slaveId);
+
+  /**
    * Calculates the amount of time before an offer should be 'returned' by declining it.
    * The delay is calculated for each offer that is received, so the return delay may be
    * fixed or variable.
@@ -205,6 +213,11 @@ public interface OfferManager extends EventSubscriber {
     @Override
     public Iterable<HostOffer> getOffers() {
       return hostOffers.getWeaklyConsistentOffers();
+    }
+
+    @Override
+    public Optional<HostOffer> getOffer(SlaveID slaveId) {
+      return hostOffers.get(slaveId);
     }
 
     /**

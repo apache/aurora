@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.async.preemptor;
 
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Logger;
 
 import javax.inject.Singleton;
@@ -31,6 +32,8 @@ import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.Preempti
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 
+import static org.apache.aurora.scheduler.base.AsyncUtil.singleThreadLoggingScheduledExecutor;
+
 public class PreemptorModule extends AbstractModule {
 
   private static final Logger LOG = Logger.getLogger(PreemptorModule.class.getName());
@@ -43,6 +46,11 @@ public class PreemptorModule extends AbstractModule {
       help = "Time interval after which a pending task becomes eligible to preempt other tasks")
   private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
       Arg.create(Amount.of(10L, Time.MINUTES));
+
+  @CmdLine(name = "preemption_slot_hold_time",
+      help = "Time to hold a preemption slot found before it is discarded.")
+  private static final Arg<Amount<Long, Time>> PREEMPTION_SLOT_HOLD_TIME =
+      Arg.create(Amount.of(3L, Time.MINUTES));
 
   private final boolean enablePreemptor;
 
@@ -62,6 +70,9 @@ public class PreemptorModule extends AbstractModule {
       protected void configure() {
         if (enablePreemptor) {
           LOG.info("Preemptor Enabled.");
+          bind(ScheduledExecutorService.class)
+              .annotatedWith(PreemptorImpl.PreemptionExecutor.class)
+              .toInstance(singleThreadLoggingScheduledExecutor("PreemptorProcessor-%d", LOG));
           bind(PreemptorMetrics.class).in(Singleton.class);
           bind(PreemptionSlotFinder.class).to(PreemptionSlotFinderImpl.class);
           bind(PreemptionSlotFinderImpl.class).in(Singleton.class);
@@ -70,6 +81,10 @@ public class PreemptorModule extends AbstractModule {
           bind(new TypeLiteral<Amount<Long, Time>>() { })
               .annotatedWith(PreemptorImpl.PreemptionDelay.class)
               .toInstance(PREEMPTION_DELAY.get());
+          bind(new TypeLiteral<Amount<Long, Time>>() { })
+              .annotatedWith(PreemptionSlotCache.PreemptionSlotHoldDuration.class)
+              .toInstance(PREEMPTION_SLOT_HOLD_TIME.get());
+          bind(PreemptionSlotCache.class).in(Singleton.class);
           bind(ClusterState.class).to(ClusterStateImpl.class);
           bind(ClusterStateImpl.class).in(Singleton.class);
           expose(ClusterStateImpl.class);
