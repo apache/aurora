@@ -117,10 +117,11 @@ See [this document](storage-config.md#scheduler-storage-configuration-flags) for
 log and storage configuration options.
 
 ## Initializing the Replicated Log
-Before you start Aurora you will also need to initialize the log on the first master.
+Before you start Aurora you will also need to initialize the log on a majority of the masters.
 
-    mesos-log initialize --path="$AURORA_HOME/scheduler/db"
+    mesos-log initialize --path="/path/to/native/log"
 
+The `--path` flag should match the `--native_log_file_path` flag to the scheduler.
 Failing to do this will result the following message when you try to start the scheduler.
 
     Replica in EMPTY status received a broadcasted recover request
