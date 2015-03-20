@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.async.preemptor;
 
+import java.util.concurrent.ScheduledExecutorService;
+
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
@@ -24,6 +26,8 @@ import com.google.inject.Module;
 import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.ExceptionalCommand;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
@@ -71,7 +75,10 @@ public class PreemptorModuleTest extends EasyMockTest {
 
   @Test
   public void testPreemptorDisabled() throws Exception {
-    Injector injector = createInjector(new PreemptorModule(false));
+    Injector injector = createInjector(new PreemptorModule(
+        false,
+        Amount.of(0L, Time.SECONDS),
+        createMock(ScheduledExecutorService.class)));
 
     Supplier<ImmutableSet<IScheduledTask>> taskSupplier =
         createMock(new EasyMockTest.Clazz<Supplier<ImmutableSet<IScheduledTask>>>() { });

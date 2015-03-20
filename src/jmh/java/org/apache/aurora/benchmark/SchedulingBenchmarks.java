@@ -19,6 +19,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import javax.inject.Singleton;
 
+import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.EventBus;
@@ -26,6 +29,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -42,21 +46,20 @@ import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.TaskScheduler;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
-import org.apache.aurora.scheduler.async.preemptor.ClusterState;
 import org.apache.aurora.scheduler.async.preemptor.ClusterStateImpl;
-import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder;
-import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlotFinderImpl;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
-import org.apache.aurora.scheduler.async.preemptor.PreemptorImpl;
-import org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics;
+import org.apache.aurora.scheduler.async.preemptor.PreemptorModule;
+import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
+import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
@@ -76,7 +79,9 @@ public class SchedulingBenchmarks {
    */
   @State(Scope.Thread)
   public abstract static class AbstractBase {
-    private Storage storage;
+    protected Storage storage;
+    protected Preemptor preemptor;
+    protected ScheduledThreadPoolExecutor executor;
     private TaskScheduler taskScheduler;
     private OfferManager offerManager;
     private EventBus eventBus;
@@ -86,25 +91,25 @@ public class SchedulingBenchmarks {
      * Runs once to setup up benchmark state.
      */
     @Setup(Level.Trial)
-    public void prepare() {
+    public void setUpBenchmark() {
       storage = MemStorage.newEmptyStorage();
       eventBus = new EventBus();
       final FakeClock clock = new FakeClock();
       clock.setNowMillis(System.currentTimeMillis());
+      executor = new ScheduledThreadPoolExecutor(
+          1,
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("TestProcessor-%d").build());
 
       // TODO(maxim): Find a way to DRY it and reuse existing modules instead.
       Injector injector = Guice.createInjector(
           new StateModule(),
-          new AbstractModule() {
+          new PreemptorModule(true, Amount.of(0L, Time.MILLISECONDS), executor),
+          new PrivateModule() {
             @Override
             protected void configure() {
-              final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
-                  1,
-                  new ThreadFactoryBuilder()
-                      .setDaemon(true)
-                      .setNameFormat("TestProcessor-%d").build());
               bind(ScheduledExecutorService.class).toInstance(executor);
-
               bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
               bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
               bind(OfferManager.OfferReturnDelay.class).toInstance(
@@ -115,6 +120,12 @@ public class SchedulingBenchmarks {
                     }
                   });
 
+              expose(OfferManager.class);
+            }
+          },
+          new AbstractModule() {
+            @Override
+            protected void configure() {
               bind(new TypeLiteral<Amount<Long, Time>>() { })
                   .annotatedWith(ReservationDuration.class)
                   .toInstance(Amount.of(30L, Time.DAYS));
@@ -128,17 +139,6 @@ public class SchedulingBenchmarks {
                       .setExecutorPath("/executor/thermos")
                       .setThermosObserverRoot("/var/run/thermos")
                       .build());
-
-              bind(PreemptorMetrics.class).in(Singleton.class);
-              bind(PreemptionSlotFinder.class).to(PreemptionSlotFinderImpl.class);
-              bind(PreemptionSlotFinderImpl.class).in(Singleton.class);
-              bind(Preemptor.class).to(PreemptorImpl.class);
-              bind(PreemptorImpl.class).in(Singleton.class);
-              bind(new TypeLiteral<Amount<Long, Time>>() { })
-                  .annotatedWith(PreemptorImpl.PreemptionDelay.class)
-                  .toInstance(Amount.of(0L, Time.MILLISECONDS));
-              bind(ClusterState.class).to(ClusterStateImpl.class);
-              bind(ClusterStateImpl.class).in(Singleton.class);
 
               bind(Storage.class).toInstance(storage);
               bind(Driver.class).toInstance(new FakeDriver());
@@ -157,6 +157,7 @@ public class SchedulingBenchmarks {
 
       taskScheduler = injector.getInstance(TaskScheduler.class);
       offerManager = injector.getInstance(OfferManager.class);
+      preemptor = injector.getInstance(Preemptor.class);
       eventBus.register(injector.getInstance(ClusterStateImpl.class));
 
       settings = getSettings();
@@ -167,6 +168,13 @@ public class SchedulingBenchmarks {
       fillUpCluster(offers.size());
 
       saveTasks(ImmutableSet.of(settings.getTask()));
+    }
+
+    @Setup(Level.Iteration)
+    public void setUpIteration() {
+      // Clear executor queue between iterations. Otherwise, executor tasks keep piling up and
+      // affect benchmark performance due to memory pressure and excessive GC.
+      executor.getQueue().clear();
     }
 
     private Set<IScheduledTask> buildClusterTasks(int numOffers) {
@@ -270,9 +278,9 @@ public class SchedulingBenchmarks {
 
   /**
    * Tests scheduling performance with a large number of tasks and slaves where the cluster
-   * is completely filled up and preemptor is invoked for all slaves in the cluster.
+   * is completely filled up.
    */
-  public static class PreemptorFallbackForLargeClusterBenchmark extends AbstractBase {
+  public static class ClusterFullUtilizationBenchmark extends AbstractBase {
     @Override
     protected BenchmarkSettings getSettings() {
       return new BenchmarkSettings.Builder()
@@ -284,6 +292,57 @@ public class SchedulingBenchmarks {
               .addLimitConstraint("host", 0)
               .setTaskIdFormat("test-%s")
               .build(1))).build();
+    }
+  }
+
+  /**
+   * Tests preemptor searching for a preemption slot in a completely filled up cluster.
+   */
+  public static class PreemptorSlotSearchBenchmark extends AbstractBase {
+
+    @Override
+    protected BenchmarkSettings getSettings() {
+      return new BenchmarkSettings.Builder()
+          .setClusterUtilization(1.0)
+          .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(1000))
+          .setTask(Iterables.getOnlyElement(new Tasks.Builder()
+              .setProduction(true)
+              .addValueConstraint("host", "denied")
+              .setTaskIdFormat("test-%s")
+              .build(1))).build();
+    }
+
+    @Override
+    public boolean runBenchmark() {
+      return storage.write(new Storage.MutateWork.Quiet<Boolean>() {
+        @Override
+        public Boolean apply(final Storage.MutableStoreProvider storeProvider) {
+          IAssignedTask assignedTask = getSettings().getTask().getAssignedTask();
+          final Query.Builder query = Query.jobScoped(assignedTask.getTask().getJob())
+              .byStatus(org.apache.aurora.scheduler.base.Tasks.SLAVE_ASSIGNED_STATES);
+
+          Supplier<ImmutableSet<IScheduledTask>> taskSupplier = Suppliers.memoize(
+              new Supplier<ImmutableSet<IScheduledTask>>() {
+                @Override
+                public ImmutableSet<IScheduledTask> get() {
+                  return storeProvider.getTaskStore().fetchTasks(query);
+                }
+              });
+
+          AttributeAggregate aggregate =
+              new AttributeAggregate(taskSupplier, storeProvider.getAttributeStore());
+
+          Optional<String> result =
+              preemptor.attemptPreemptionFor(assignedTask.getTaskId(), aggregate);
+
+          while (executor.getActiveCount() > 0) {
+            // Using a tight loop to wait for a search completion. This is executed on a benchmark
+            // main thread and does not affect test results.
+          }
+
+          return result.isPresent();
+        }
+      });
     }
   }
 }
