@@ -167,7 +167,7 @@ west/bozo/test/hello                            update_id                       
   me          1970-01-17T08:03:24 1970-06-13T08:34:16"""
 
   def test_list_updates_by_status(self):
-    self._mock_options.status = ['paused', 'ROLLING_FORWARD']
+    self._mock_options.status = ListUpdates.STATUS_GROUPS.keys()
     self._mock_api.query_job_updates.return_value = get_status_query_response(count=3)
     assert self._command.execute(self._fake_context) == EXIT_OK
     assert self._mock_api.query_job_updates.mock_calls == [
@@ -175,11 +175,7 @@ west/bozo/test/hello                            update_id                       
           role=None,
           user=None,
           job_key=None,
-          update_statuses=set([
-              JobUpdateStatus.ROLL_FORWARD_PAUSED,
-              JobUpdateStatus.ROLL_BACK_PAUSED,
-              JobUpdateStatus.ROLLING_FORWARD
-          ]))
+          update_statuses=set(JobUpdateStatus._VALUES_TO_NAMES.keys()))
     ]
 
   def test_list_updates_by_env(self):

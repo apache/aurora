@@ -246,14 +246,14 @@ class ListUpdates(Verb):
 
   STATUS_GROUPS = dict({
       'active': ACTIVE_JOB_UPDATE_STATES,
-      'all': JobUpdateStatus._VALUES_TO_NAMES.keys(),
-      'blocked': [
-          JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE, JobUpdateStatus.ROLL_BACK_AWAITING_PULSE],
-      'failed': [JobUpdateStatus.ERROR, JobUpdateStatus.FAILED, JobUpdateStatus.ROLLED_BACK],
-      'inactive': list(set(JobUpdateStatus._VALUES_TO_NAMES.keys()) - ACTIVE_JOB_UPDATE_STATES),
-      'paused': [JobUpdateStatus.ROLL_FORWARD_PAUSED, JobUpdateStatus.ROLL_BACK_PAUSED],
-      'succeeded': JobUpdateStatus.ROLLED_FORWARD,
-  }.items() + JobUpdateStatus._NAMES_TO_VALUES.items())
+      'all': set(JobUpdateStatus._VALUES_TO_NAMES.keys()),
+      'blocked': {
+          JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE, JobUpdateStatus.ROLL_BACK_AWAITING_PULSE},
+      'failed': {JobUpdateStatus.ERROR, JobUpdateStatus.FAILED, JobUpdateStatus.ROLLED_BACK},
+      'inactive': set(JobUpdateStatus._VALUES_TO_NAMES.keys()) - ACTIVE_JOB_UPDATE_STATES,
+      'paused': {JobUpdateStatus.ROLL_FORWARD_PAUSED, JobUpdateStatus.ROLL_BACK_PAUSED},
+      'succeeded': {JobUpdateStatus.ROLLED_FORWARD},
+  }.items() + [(k, {v}) for k, v in JobUpdateStatus._NAMES_TO_VALUES.items()])
 
   def get_options(self):
     return [
@@ -308,11 +308,7 @@ updates matching any of the specified statuses will be included."""),
 
     filter_statuses = set()
     for status in context.options.status:
-      group = self.STATUS_GROUPS[status]
-      if isinstance(group, list):
-        filter_statuses = filter_statuses.union(set(group))
-      else:
-        filter_statuses.add(group)
+      filter_statuses = filter_statuses.union(set(self.STATUS_GROUPS[status]))
 
     response = api.query_job_updates(
         role=update_filter.role if job_key is None else None,
