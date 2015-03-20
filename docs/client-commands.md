@@ -172,7 +172,7 @@ kill command.
 There are several sub-commands to manage job updates:
 
     aurora update start <job key> <configuration file>
-    aurora update status <job key>
+    aurora update info <job key>
     aurora update pause <job key>
     aurora update resume <job key>
     aurora update abort <job key>
@@ -180,7 +180,7 @@ There are several sub-commands to manage job updates:
 
 When you `start` a job update, the command will return once it has sent the
 instructions to the scheduler.  At that point, you may view detailed
-progress for the update with the `status` subcommand, in addition to viewing
+progress for the update with the `info` subcommand, in addition to viewing
 graphical progress in the web browser.  You may also get a full listing of
 in-progress updates in a cluster with `list`.
 

@@ -359,7 +359,7 @@ class Noun(AuroraCommand):
     self.setup_options_parser(argparser)
     subparser = argparser.add_subparsers(dest="verb", title='subcommands')
     for name, verb in self.verbs.items():
-      vparser = subparser.add_parser(name, help=verb.help)
+      vparser = subparser.add_parser(name, help=verb.help, description=verb.help)
       for opt in verb.get_options():
         opt.add_to_parser(vparser)
       for plugin in self.commandline.plugins:

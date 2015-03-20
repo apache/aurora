@@ -17,7 +17,7 @@
 
 # Determine if we are already in the vagrant environment.  If not, start it up and invoke the script
 # from within the environment.
-if [ "$USER" != "vagrant" ]; then
+if [[ "$USER" != "vagrant" ]]; then
   vagrant up
   vagrant ssh -c /vagrant/src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh "$@"
   exit $?
@@ -53,19 +53,19 @@ collect_result() {
 }
 
 check_url_live() {
-  test $(curl -sL -w '%{http_code}' $1 -o /dev/null) == 200
+  [[ $(curl -sL -w '%{http_code}' $1 -o /dev/null) == 200 ]]
 }
 
 test_version() {
   # The version number is written to stderr, making it necessary to redirect the output.
-  test $(aurora --version 2>&1) = $(cat /vagrant/.auroraversion)
+  [[ $(aurora --version 2>&1) = $(cat /vagrant/.auroraversion) ]]
 }
 
 test_config() {
   local _config=$1 _jobkey=$2
 
   joblist=$(aurora config list $_config | tr -dc '[[:print:]]')
-  test "$joblist" = "jobs=[$_jobkey]"
+  [[ "$joblist" = "jobs=[$_jobkey]" ]]
 }
 
 test_inspect() {
@@ -118,7 +118,7 @@ test_observer_ui() {
     fi
   done
 
-  if [ "$_success" -ne "1" ]; then
+  if [[ "$_success" -ne "1" ]]; then
     echo "Observer task detail page is not available."
     exit 1
   fi
@@ -139,8 +139,8 @@ test_legacy_update() {
 assert_update_state() {
   local _jobkey=$1 _expected_state=$2
 
-  local _state=$(aurora update status $_jobkey | grep 'Current status' | awk '{print $NF}')
-  if [ $_state != $_expected_state ]; then
+  local _state=$(aurora update list $_jobkey --status active | tail -n +2 | awk '{print $3}')
+  if [[ $_state != $_expected_state ]]; then
     echo "Expected update to be in state $_expected_state, but found $_state"
     exit 1
   fi
@@ -151,7 +151,7 @@ await_update_finished() {
 
   local _matched=0
   for i in $(seq 1 120); do
-    if [ $(aurora update status $_jobkey | grep 'Current status' | wc -l) -eq 0 ]; then
+    if [[ $(aurora update list $_jobkey --status active | wc -l) -eq 0 ]]; then
       _matched=1
       break
     else
@@ -159,7 +159,7 @@ await_update_finished() {
     fi
   done
 
-  if [ $_matched -ne 1 ]; then
+  if [[ $_matched -ne 1 ]]; then
     echo "Timed out while waiting for update $_jobkey"
     exit 1
   fi
@@ -170,6 +170,8 @@ test_update() {
 
   aurora update start $_jobkey $_config
   assert_update_state $_jobkey 'ROLLING_FORWARD'
+  local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
+      | tail -n +2 | awk '{print $2}')
   sudo restart aurora-scheduler
   assert_update_state $_jobkey 'ROLLING_FORWARD'
   aurora update pause $_jobkey --message='hello'
@@ -180,9 +182,8 @@ test_update() {
   await_update_finished $_jobkey
 
   # Check that the update ended in ROLLED_FORWARD state.  Assumes the status is the last column.
-  local status=$(aurora update list --job $_jobkey $_cluster | grep -m 1 Status \
-      | awk '{print $NF}')
-  if [ $status != "ROLLED_FORWARD" ]; then
+  local status=$(aurora update info $_jobkey $_update_id | grep 'Current status' | awk '{print $NF}')
+  if [[ $status != "ROLLED_FORWARD" ]]; then
     echo "Update should have completed in ROLLED_FORWARD state"
     exit 1
   fi
@@ -227,7 +228,7 @@ test_run() {
   # 3 instances of the same thing - our python script.
   sandbox_contents=$(aurora task run $_jobkey 'ls' | awk '{print $2}' | sort | uniq -c)
   echo "$sandbox_contents"
-  test "$sandbox_contents" = "      3 http_example.py"
+  [[ "$sandbox_contents" = "      3 http_example.py" ]]
 }
 
 test_kill() {

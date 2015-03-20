@@ -17,7 +17,6 @@ from __future__ import print_function
 import datetime
 import json
 import textwrap
-import time
 from collections import namedtuple
 
 from apache.aurora.client.base import combine_messages
@@ -46,7 +45,7 @@ from apache.aurora.client.cli.options import (
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.constants import ACTIVE_JOB_UPDATE_STATES
-from gen.apache.aurora.api.ttypes import JobUpdateAction, JobUpdateStatus
+from gen.apache.aurora.api.ttypes import JobUpdateAction, JobUpdateKey, JobUpdateStatus
 
 
 class UpdateController(object):
@@ -98,6 +97,10 @@ class UpdateController(object):
         lambda key: self.api.abort_job_update(key, message),
         "Failed to abort update due to error:",
         "Update has been aborted.")
+
+
+def format_timestamp(stamp_millis):
+  return datetime.datetime.utcfromtimestamp(stamp_millis / 1000).isoformat()
 
 
 MESSAGE_OPTION = CommandOption(
@@ -323,9 +326,6 @@ updates matching any of the specified statuses will be included."""),
     if job_key is None and update_filter.env is not None:
       summaries = [s for s in summaries if s.key.job.environment == update_filter.env]
 
-    def format_timestamp(stamp_millis):
-      return datetime.datetime.utcfromtimestamp(stamp_millis / 1000).isoformat()
-
     if context.options.write_json:
       result = []
       for summary in summaries:
@@ -354,25 +354,39 @@ updates matching any of the specified statuses will be included."""),
     return EXIT_OK
 
 
-class UpdateStatus(Verb):
+class UpdateInfo(Verb):
+
+  UPDATE_ID_ARGUMENT = CommandOption(
+      'id',
+      type=str,
+      nargs='?',
+      metavar='ID',
+      help='Update identifier provided by the scheduler when an update was started.')
+
   @property
   def name(self):
-    return 'status'
+    return 'info'
 
   def get_options(self):
-    return [JSON_WRITE_OPTION, JOBSPEC_ARGUMENT]
+    return [JSON_WRITE_OPTION, JOBSPEC_ARGUMENT, self.UPDATE_ID_ARGUMENT]
 
   @property
   def help(self):
-    return """Display detailed status information about an in-progress update."""
+    return """Display detailed status information about a scheduler-driven in-progress update.
+
+        If no update ID is provided, information will be displayed about the active
+        update for the job."""
 
   def execute(self, context):
-    key = UpdateController(
-        context.get_api(context.options.jobspec.cluster),
-        context).get_update_key(context.options.jobspec)
-    if key is None:
-      context.print_err("No updates found for job %s" % context.options.jobspec)
-      return EXIT_INVALID_PARAMETER
+    if context.options.id:
+      key = JobUpdateKey(job=context.options.jobspec.to_thrift(), id=context.options.id)
+    else:
+      key = UpdateController(
+          context.get_api(context.options.jobspec.cluster),
+          context).get_update_key(context.options.jobspec)
+      if key is None:
+        context.print_err("There is no active update for this job.")
+        return EXIT_INVALID_PARAMETER
 
     api = context.get_api(context.options.jobspec.cluster)
     response = api.get_job_update_details(key)
@@ -411,14 +425,11 @@ class UpdateStatus(Verb):
       context.print_out(json.dumps(result, indent=2, separators=[',', ': '], sort_keys=False))
 
     else:
-      def timestamp(time_ms):
-        return time.ctime(time_ms / 1000)
-
       context.print_out("Job: %s, UpdateID: %s" % (context.options.jobspec,
           details.update.summary.key.id))
       context.print_out("Started %s, last activity: %s" %
-          (timestamp(details.update.summary.state.createdTimestampMs),
-          timestamp(details.update.summary.state.lastModifiedTimestampMs)))
+          (format_timestamp(details.update.summary.state.createdTimestampMs),
+          format_timestamp(details.update.summary.state.lastModifiedTimestampMs)))
       context.print_out("Current status: %s" %
           JobUpdateStatus._VALUES_TO_NAMES[details.update.summary.state.status])
       update_events = details.updateEvents
@@ -427,7 +438,7 @@ class UpdateStatus(Verb):
         for event in update_events:
           context.print_out("Status: %s at %s" % (
               JobUpdateStatus._VALUES_TO_NAMES[event.status],
-              timestamp(event.timestampMs)
+              format_timestamp(event.timestampMs)
           ), indent=2)
           if event.message:
             context.print_out("  message: %s" % event.message, indent=4)
@@ -436,7 +447,7 @@ class UpdateStatus(Verb):
         context.print_out("Instance events:")
         for event in instance_events:
           context.print_out("Instance %s at %s: %s" % (
-            event.instanceId, timestamp(event.timestampMs),
+            event.instanceId, format_timestamp(event.timestampMs),
             JobUpdateAction._VALUES_TO_NAMES[event.action]
           ), indent=2)
     return EXIT_OK
@@ -463,4 +474,4 @@ class Update(Noun):
     self.register_verb(ResumeUpdate())
     self.register_verb(AbortUpdate())
     self.register_verb(ListUpdates())
-    self.register_verb(UpdateStatus())
+    self.register_verb(UpdateInfo())
