@@ -19,9 +19,52 @@ limitations under the License.
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
 
   <description>
-    Custom Aurora PMD rules.
+    Aurora PMD ruleset.
   </description>
 
+  <rule ref="rulesets/java/basic.xml"/>
+  <rule ref="rulesets/java/design.xml">
+    <!-- We're not currently focusing on localization. -->
+    <exclude name="SimpleDateFormatNeedsLocale"/>
+    <exclude name="UseLocaleWithCaseConversions"/>
+    <!-- We deliberately use method-level synchronization for simplicity in many cases. -->
+    <exclude name="AvoidSynchronizedAtMethodLevel"/>
+    <!-- Empty methods in abstract classes can save implementers from boilerplate. -->
+    <exclude name="EmptyMethodInAbstractClassShouldBeAbstract"/>
+    <!-- We don't follow this practice, as we often prefer to keep like constants closest to where
+         they are used. -->
+    <exclude name="FieldDeclarationsShouldBeAtStartOfClass"/>
+    <!-- Unfortunately we have several large classes that trip this rule.
+         TODO(wfarner): Break apart god classes. -->
+    <exclude name="GodClass"/>
+  </rule>
+  <rule ref="rulesets/java/empty.xml"/>
+  <rule ref="rulesets/java/imports.xml">
+    <!-- We frequently use static imports for enum fields (making other code more concise), but
+         those trip this rule. -->
+    <exclude name="TooManyStaticImports"/>
+  </rule>
+  <rule ref="rulesets/java/logging-java.xml">
+    <!-- It's valid to inject the logger, and in some cases preferable. -->
+    <exclude name="LoggerIsNotStaticFinal"/>
+    <!-- In practice, we don't have high enough log volume for this rule to be useful. -->
+    <exclude name="GuardLogStatementJavaUtil"/>
+  </rule>
+  <rule ref="rulesets/java/naming.xml">
+    <!-- Requiring longer variable names can be cumbersome when applied globally. -->
+    <exclude name="ShortVariable"/>
+    <!-- Requiring shorter variable names can be cumbersome when applied globally. -->
+    <exclude name="LongVariable"/>
+    <!-- Short method names are useful on occasion, such as with factory methods: Rate.of(...). -->
+    <exclude name="ShortMethodName"/>
+    <!-- TODO(wfarner): Enable this if/when we have automatic transaction management, rather than
+         the classes in org.apache.aurora.scheduler.storage.Storage (e.g. Work). -->
+    <exclude name="AbstractNaming"/>
+    <!-- There are rare, but valid, cases where short class names are useful. -->
+    <exclude name="ShortClassName"/>
+  </rule>
+
+  <!-- Custom rules -->
   <rule name="TimedAnnotationNonOverridableMethod"
         language="java"
         class="net.sourceforge.pmd.lang.rule.XPathRule"
@@ -82,5 +125,4 @@ limitations under the License.
        ]]>
     </example>
   </rule>
-
 </ruleset>

@@ -364,9 +364,7 @@ pmd {
   //    rulesets/java/codesize.xml
   // The format is straightforward: 'java-basic' refers to rulesets/java/basic.xml.
   ruleSets = [
-      'java-basic',
       'java-braces',
-      'java-empty',
       'java-junit',
       'java-typeresolution',
       'java-unnecessary',
