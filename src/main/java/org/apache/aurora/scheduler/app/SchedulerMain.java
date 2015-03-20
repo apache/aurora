@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.app;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -66,6 +67,8 @@ import static com.twitter.common.logging.RootLogConfig.Configuration;
  * Launcher for the aurora scheduler.
  */
 public class SchedulerMain extends AbstractApplication {
+
+  private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
   @NotNull
   @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
@@ -235,6 +238,21 @@ public class SchedulerMain extends AbstractApplication {
     Configuration logConfiguration = RootLogConfig.configurationFromFlags();
     logConfiguration.apply();
     Log4jConfigurator.configureConsole(logConfiguration);
+
+    String javaVersion = System.getProperty("java.version");
+    char javaVersionMinor = javaVersion.charAt(2);
+    if (javaVersionMinor < '8') {
+      LOG.warning(
+          "\n**************************************************************************\n"
+          + "*\n"
+          + "*\n"
+          + "*\tBeginning with Aurora 0.9.0, you'll need Java 1.8 to run aurora!\n"
+          + "*\tCurrently you're running \"" + javaVersion + "\"\n"
+          + "*\n"
+          + "*\n"
+          + "**************************************************************************"
+      );
+    }
 
     LeadershipListener leaderListener = schedulerLifecycle.prepare();
 
