@@ -355,7 +355,7 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def assert_lock_message(cls, context):
-    assert context.get_err()[2] == "\t%s" % context.LOCK_ERROR_MSG
+    assert [line for line in context.get_err() if line == "\t%s" % context.LOCK_ERROR_MSG]
 
 
 class IOMock(object):

@@ -87,31 +87,6 @@ WILDCARD_JOBKEY_OPTION = CommandOption("jobspec", type=arg_type_jobkey,
         help="A jobkey, optionally containing wildcards")
 
 
-class CancelUpdateCommand(Verb):
-  @property
-  def name(self):
-    return "cancel-update"
-
-  @property
-  def help(self):
-    return "Cancel an in-progress update operation, releasing the update lock"
-
-  def get_options(self):
-    return [JSON_READ_OPTION,
-        CommandOption("--config", type=str, default=None, dest="config_file",
-            metavar="pathname",
-            help="Config file for the job, possibly containing hooks"),
-        JOBSPEC_ARGUMENT]
-
-  def execute(self, context):
-    api = context.get_api(context.options.jobspec.cluster)
-    config = (context.get_job_config(context.options.jobspec, context.options.config_file)
-        if context.options.config_file else None)
-    resp = api.cancel_update(context.options.jobspec, config=config)
-    context.log_response_and_raise(resp)
-    return EXIT_OK
-
-
 class CreateJobCommand(Verb):
   @property
   def name(self):
@@ -689,6 +664,39 @@ class StatusCommand(Verb):
       return self._print_jobs_not_found(context)
 
 
+CLIENT_UPDATER_DEPRECATION = """\
+WARNING: The command you are using is deprecated, and will be removed in
+Aurora 0.9.0.
+Please see the new commands at 'aurora update -h'."""
+
+
+class CancelUpdateCommand(Verb):
+  @property
+  def name(self):
+    return "cancel-update"
+
+  @property
+  def help(self):
+    return ("%s\n\nCancel an in-progress update operation, releasing the update lock"
+        % CLIENT_UPDATER_DEPRECATION)
+
+  def get_options(self):
+    return [JSON_READ_OPTION,
+        CommandOption("--config", type=str, default=None, dest="config_file",
+            metavar="pathname",
+            help="Config file for the job, possibly containing hooks"),
+        JOBSPEC_ARGUMENT]
+
+  def execute(self, context):
+    context.print_err(CLIENT_UPDATER_DEPRECATION)
+    api = context.get_api(context.options.jobspec.cluster)
+    config = (context.get_job_config(context.options.jobspec, context.options.config_file)
+        if context.options.config_file else None)
+    resp = api.cancel_update(context.options.jobspec, config=config)
+    context.log_response_and_raise(resp)
+    return EXIT_OK
+
+
 class UpdateCommand(Verb):
   @property
   def name(self):
@@ -701,6 +709,8 @@ class UpdateCommand(Verb):
   @property
   def help(self):
     return textwrap.dedent("""\
+        %s
+
         Perform a rolling upgrade on a running job, using the update configuration
         within the config file as a control for update velocity and failure tolerance.
 
@@ -714,7 +724,7 @@ class UpdateCommand(Verb):
 
         You may want to consider using the 'diff' subcommand before updating,
         to preview what changes will take effect.
-        """)
+        """ % CLIENT_UPDATER_DEPRECATION)
 
   def warn_if_dangerous_change(self, context, api, job_spec, config):
     # Get the current job status, so that we can check if there's anything
@@ -746,6 +756,7 @@ class UpdateCommand(Verb):
       time.sleep(5)
 
   def execute(self, context):
+    context.print_err(CLIENT_UPDATER_DEPRECATION)
     job = context.options.instance_spec.jobkey
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)

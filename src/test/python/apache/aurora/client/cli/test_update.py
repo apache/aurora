@@ -25,7 +25,7 @@ from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.api.scheduler_mux import SchedulerMux
 from apache.aurora.client.cli import Context, EXIT_INVALID_CONFIGURATION, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.jobs import UpdateCommand
+from apache.aurora.client.cli.jobs import CLIENT_UPDATER_DEPRECATION, UpdateCommand
 from apache.aurora.client.cli.options import TaskInstanceKey
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.schema.base import Job
@@ -110,7 +110,10 @@ class TestJobUpdateCommand(AuroraClientCommandTest):
       config,
       self._mock_options.healthcheck_interval_seconds,
       self._mock_options.instance_spec.instance)
-    assert self._fake_context.get_err() == ["Update failed due to error:", "\t%s" % error]
+    assert self._fake_context.get_err() == [
+        CLIENT_UPDATER_DEPRECATION,
+        "Update failed due to error:", "\t%s" % error
+    ]
 
   def test_update_no_active_instance_check(self):
     self._mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [1])
@@ -406,7 +409,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'update', 'west/bozo/test/hello', fp.name])
       assert mock_out.get() == ['Update completed successfully']
-      assert mock_err.get() == []
+      assert mock_err.get() == [CLIENT_UPDATER_DEPRECATION]
 
   def test_updater_simple_large_does_warn(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
