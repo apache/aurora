@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.state;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -171,7 +170,7 @@ public class StateManagerImpl implements StateManager {
       String taskId,
       final String slaveHost,
       final SlaveID slaveId,
-      final Set<Integer> assignedPorts) {
+      final Map<String, Integer> assignedPorts) {
 
     checkNotBlank(taskId);
     checkNotBlank(slaveHost);
@@ -185,10 +184,9 @@ public class StateManagerImpl implements StateManager {
           @Override
           public IScheduledTask apply(IScheduledTask task) {
             ScheduledTask builder = task.newBuilder();
-            AssignedTask assigned = builder.getAssignedTask();
-            assigned.setAssignedPorts(
-                getNameMappedPorts(assigned.getTask().getRequestedPorts(), assignedPorts));
-            assigned.setSlaveHost(slaveHost)
+            builder.getAssignedTask()
+                .setAssignedPorts(assignedPorts)
+                .setSlaveHost(slaveHost)
                 .setSlaveId(slaveId.getValue());
             return IScheduledTask.build(builder);
           }
@@ -209,31 +207,6 @@ public class StateManagerImpl implements StateManager {
         Iterables.transform(
             storeProvider.getTaskStore().fetchTasks(query),
             Tasks.SCHEDULED_TO_ASSIGNED));
-  }
-
-  private static Map<String, Integer> getNameMappedPorts(
-      Set<String> portNames,
-      Set<Integer> allocatedPorts) {
-
-    requireNonNull(portNames);
-
-    // Expand ports.
-    Map<String, Integer> ports = Maps.newHashMap();
-    Set<Integer> portsRemaining = Sets.newHashSet(allocatedPorts);
-    Iterator<Integer> portConsumer = Iterables.consumingIterable(portsRemaining).iterator();
-
-    for (String portName : portNames) {
-      Preconditions.checkArgument(portConsumer.hasNext(),
-          "Allocated ports %s were not sufficient to expand task.", allocatedPorts);
-      int portNumber = portConsumer.next();
-      ports.put(portName, portNumber);
-    }
-
-    if (!portsRemaining.isEmpty()) {
-      LOG.warning("Not all allocated ports were used to map ports!");
-    }
-
-    return ports;
   }
 
   @VisibleForTesting

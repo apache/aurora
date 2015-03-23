@@ -307,8 +307,8 @@ public interface SchedulingFilter {
       return taskId;
     }
 
-    public int getNumRequestedPorts() {
-      return task.getRequestedPorts().size();
+    public Set<String> getRequestedPorts() {
+      return task.getRequestedPorts();
     }
 
     @Override

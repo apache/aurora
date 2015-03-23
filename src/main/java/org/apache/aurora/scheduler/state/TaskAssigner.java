@@ -13,13 +13,18 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.base.MorePreconditions;
 
@@ -190,17 +195,28 @@ public interface TaskAssigner {
     private TaskInfo assign(
         MutableStoreProvider storeProvider,
         Offer offer,
-        int numRequestedPorts,
+        Set<String> requestedPorts,
         String taskId) {
 
       String host = offer.getHostname();
-      Set<Integer> selectedPorts = Resources.getPorts(offer, numRequestedPorts);
+      Set<Integer> selectedPorts = Resources.getPorts(offer, requestedPorts.size());
+      Preconditions.checkState(selectedPorts.size() == requestedPorts.size());
+
+      final Iterator<String> names = requestedPorts.iterator();
+      Map<String, Integer> portsByName = FluentIterable.from(selectedPorts)
+          .uniqueIndex(new Function<Object, String>() {
+            @Override
+            public String apply(Object input) {
+              return names.next();
+            }
+          });
+
       IAssignedTask assigned = stateManager.assignTask(
           storeProvider,
           taskId,
           host,
           offer.getSlaveId(),
-          selectedPorts);
+          portsByName);
       LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
           host, offer.getSlaveId().getValue(), taskId));
       return taskFactory.createFrom(assigned, offer.getSlaveId());
@@ -219,7 +235,7 @@ public interface TaskAssigner {
         return Assignment.success(assign(
             storeProvider,
             offer.getOffer(),
-            resourceRequest.getNumRequestedPorts(),
+            resourceRequest.getRequestedPorts(),
             resourceRequest.getTaskId()));
       } else {
         LOG.fine("Slave " + offer.getOffer().getHostname()

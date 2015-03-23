@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.state;
 
 import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -69,13 +70,14 @@ public class TaskAssignerImplTest extends EasyMockTest {
       .build();
   private static final HostOffer OFFER =
       new HostOffer(MESOS_OFFER, IHostAttributes.build(new HostAttributes()));
+  private static final String PORT_NAME = "http";
   private static final IScheduledTask TASK = IScheduledTask.build(
       new ScheduledTask()
           .setAssignedTask(new AssignedTask()
               .setTaskId("taskId")
               .setTask(new TaskConfig()
                   .setExecutorConfig(new ExecutorConfig().setData("opaque data"))
-                  .setRequestedPorts(ImmutableSet.of("http")))));
+                  .setRequestedPorts(ImmutableSet.of(PORT_NAME)))));
   private static final TaskInfo TASK_INFO = TaskInfo.newBuilder()
       .setName("taskName")
       .setTaskId(TaskID.newBuilder().setValue(Tasks.id(TASK)))
@@ -112,7 +114,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         Tasks.id(TASK),
         MESOS_OFFER.getHostname(),
         MESOS_OFFER.getSlaveId(),
-        ImmutableSet.of(PORT)))
+        ImmutableMap.of(PORT_NAME, PORT)))
         .andReturn(TASK.getAssignedTask());
     expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER.getSlaveId()))
         .andReturn(TASK_INFO);

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.state;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
@@ -409,7 +410,7 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     insertTask(task, 0);
-    assignTask(taskId, HOST_A, ImmutableSet.of(80, 81, 82));
+    assignTask(taskId, HOST_A, ImmutableMap.of("one", 80, "two", 81, "three", 82));
 
     IScheduledTask actual = Iterables.getOnlyElement(
         Storage.Util.fetchTasks(storage, Query.taskScoped(taskId)));
@@ -437,11 +438,11 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     insertTask(task, 0);
-    assignTask(taskId, HOST_A, ImmutableSet.of(80));
+    assignTask(taskId, HOST_A, ImmutableMap.of("one", 80));
     changeState(taskId, RUNNING);
     changeState(taskId, LOST);
 
-    assignTask(newTaskId, HOST_A, ImmutableSet.of(86));
+    assignTask(newTaskId, HOST_A, ImmutableMap.of("one", 86));
 
     IScheduledTask actual = Iterables.getOnlyElement(
         Storage.Util.fetchTasks(storage, Query.taskScoped(newTaskId)));
@@ -570,10 +571,14 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   private void assignTask(String taskId, String host) {
-    assignTask(taskId, host, ImmutableSet.<Integer>of());
+    assignTask(taskId, host, ImmutableMap.<String, Integer>of());
   }
 
-  private void assignTask(final String taskId, final String host, final Set<Integer> ports) {
+  private void assignTask(
+      final String taskId,
+      final String host,
+      final Map<String, Integer> ports) {
+
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) {

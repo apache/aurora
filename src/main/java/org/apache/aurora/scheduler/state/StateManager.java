@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
@@ -71,7 +72,7 @@ public interface StateManager {
       String taskId,
       String slaveHost,
       SlaveID slaveId,
-      Set<Integer> assignedPorts);
+      Map<String, Integer> assignedPorts);
 
   /**
    * Inserts pending instances using {@code task} as their configuration. Tasks will immediately
