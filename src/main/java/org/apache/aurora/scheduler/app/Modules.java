@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.app;
 
+import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 
@@ -71,14 +72,27 @@ public final class Modules {
     };
   }
 
-  static Module wrapInPrivateModule(
-      Class<? extends Module> moduleClass,
-      final Iterable<Class<?>> exposedClasses) {
-
-    return wrapInPrivateModule(instantiateModule(moduleClass), exposedClasses);
-  }
-
   static Module getModule(Class<? extends Module> moduleClass) {
     return instantiateModule(moduleClass);
+  }
+
+  /**
+   * Creates a module that will lazily instantiate and install another module.
+   * <p/>
+   * This serves as an indirection between module procurement and installation, which is necessary
+   * in cases where a module is referenced within a static initializer.  In this scenario, a module
+   * must not be instantiated if it reads command line arguments, as the args system has not yet
+   * had a chance to populate them.
+   *
+   * @param moduleClass Module to install.
+   * @return An installer that will install {@code moduleClass}.
+   */
+  public static Module lazilyInstantiated(final Class<? extends Module> moduleClass) {
+    return new AbstractModule() {
+      @Override
+      protected void configure() {
+        install(getModule(moduleClass));
+      }
+    };
   }
 }

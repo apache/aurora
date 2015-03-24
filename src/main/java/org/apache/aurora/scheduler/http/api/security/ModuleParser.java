@@ -13,12 +13,11 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-
 import com.google.inject.Module;
 import com.twitter.common.args.ArgParser;
 import com.twitter.common.args.parsers.NonParameterizedTypeParser;
+
+import org.apache.aurora.scheduler.app.Modules;
 
 /**
  * ArgParser for Guice modules. Constructs an instance of a Module with a given FQCN if it has a
@@ -42,19 +41,6 @@ public class ModuleParser extends NonParameterizedTypeParser<Module> {
     @SuppressWarnings("unchecked")
     Class<? extends Module> moduleClass = (Class<? extends Module>) rawClass;
 
-    Constructor<? extends Module> moduleConstructor;
-    try {
-      moduleConstructor = moduleClass.getConstructor();
-    } catch (NoSuchMethodException e) {
-      throw new IllegalArgumentException(
-          "Module " + raw + " must have a public no-args constructor.",
-          e);
-    }
-
-    try {
-      return moduleConstructor.newInstance();
-    } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
-      throw new IllegalArgumentException(e);
-    }
+    return Modules.lazilyInstantiated(moduleClass);
   }
 }

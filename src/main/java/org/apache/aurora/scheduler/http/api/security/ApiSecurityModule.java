@@ -32,6 +32,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.apache.aurora.GuiceUtils;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraSchedulerManager;
+import org.apache.aurora.scheduler.app.Modules;
 import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.guice.aop.ShiroAopModule;
@@ -57,8 +58,8 @@ public class ApiSecurityModule extends ServletModule {
 
   @CmdLine(name = "shiro_realm_modules",
       help = "Guice modules for configuring Shiro Realms.")
-  private static final Arg<Set<Module>> SHIRO_REALM_MODULE =
-      Arg.<Set<Module>>create(ImmutableSet.<Module>of(new IniShiroRealmModule()));
+  private static final Arg<Set<Module>> SHIRO_REALM_MODULE = Arg.<Set<Module>>create(
+      ImmutableSet.of(Modules.lazilyInstantiated(IniShiroRealmModule.class)));
 
   private final boolean enableApiSecurity;
   private final Set<Module> shiroConfigurationModules;
