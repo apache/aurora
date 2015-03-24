@@ -13,14 +13,15 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
-import java.util.Properties;
+import java.util.Set;
 
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
-import com.google.inject.name.Names;
 import com.twitter.common.inject.Bindings;
 
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -33,13 +34,13 @@ import org.apache.aurora.scheduler.storage.db.typehandlers.TypeHandlers;
 import org.apache.ibatis.session.AutoMappingBehavior;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
-import org.h2.Driver;
 import org.mybatis.guice.MyBatisModule;
 import org.mybatis.guice.datasource.builtin.PooledDataSourceProvider;
+import org.mybatis.guice.datasource.helper.JdbcHelper;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.google.inject.name.Names.named;
+import static com.google.inject.name.Names.bindProperties;
 
 /**
  * Binding module for a relational database storage system.
@@ -60,16 +61,28 @@ import static com.google.inject.name.Names.named;
  */
 public class DbModule extends PrivateModule {
 
-  private final Bindings.KeyFactory keyFactory;
-  private final String jdbcUrl;
+  private static final Set<Class<?>> MAPPER_CLASSES = ImmutableSet.<Class<?>>builder()
+      .add(AttributeMapper.class)
+      .add(EnumValueMapper.class)
+      .add(FrameworkIdMapper.class)
+      .add(JobInstanceUpdateEventMapper.class)
+      .add(JobKeyMapper.class)
+      .add(JobUpdateEventMapper.class)
+      .add(JobUpdateDetailsMapper.class)
+      .add(LockMapper.class)
+      .add(QuotaMapper.class)
+      .build();
 
-  private DbModule(Bindings.KeyFactory keyFactory, String jdbcUrl) {
+  private final Bindings.KeyFactory keyFactory;
+  private final String jdbcSchema;
+
+  private DbModule(Bindings.KeyFactory keyFactory, String jdbcSchema) {
     this.keyFactory = requireNonNull(keyFactory);
-    this.jdbcUrl = requireNonNull(jdbcUrl);
+    this.jdbcSchema = requireNonNull(jdbcSchema);
   }
 
   public DbModule(Bindings.KeyFactory keyFactory) {
-    this(keyFactory, "jdbc:h2:mem:aurora;DB_CLOSE_DELAY=-1");
+    this(keyFactory, "aurora;DB_CLOSE_DELAY=-1");
   }
 
   /**
@@ -82,7 +95,7 @@ public class DbModule extends PrivateModule {
   public static DbModule testModule(Bindings.KeyFactory keyFactory) {
     // This creates a private in-memory database.  New connections will have a _new_ database,
     // and closing the database will expunge its data.
-    return new DbModule(keyFactory, "jdbc:h2:mem:");
+    return new DbModule(keyFactory, "");
   }
 
   private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {
@@ -98,37 +111,23 @@ public class DbModule extends PrivateModule {
     install(new MyBatisModule() {
       @Override
       protected void initialize() {
-        // Ideally, we would install h2 from org.mybatis.guice.datasource.helper.JdbcHelper
-        //     install(JdbcHelper.H2_IN_MEMORY_PRIVATE);
-        // But the in-memory URL is invalid as far as H2 is concerned, so we had to inline
-        // some of the constants here and bind it manually.
-        bindConstant().annotatedWith(named("JDBC.driver")).to(Driver.class.getName());
-        bind(Key.get(String.class, named("JDBC.url"))).toInstance(jdbcUrl);
+        bindProperties(binder(), ImmutableMap.of("JDBC.schema", jdbcSchema));
+        install(JdbcHelper.H2_IN_MEMORY_NAMED);
+
+        // We have no plans to take advantage of multiple DB environments. This is a
+        // required property though, so we use an unnamed environment.
+        environmentId("");
 
         bindTransactionFactoryType(JdbcTransactionFactory.class);
         bindDataSourceProviderType(PooledDataSourceProvider.class);
-        addMapperClass(AttributeMapper.class);
-        addMapperClass(EnumValueMapper.class);
-        addMapperClass(FrameworkIdMapper.class);
-        addMapperClass(JobInstanceUpdateEventMapper.class);
-        addMapperClass(JobKeyMapper.class);
-        addMapperClass(JobUpdateEventMapper.class);
-        addMapperClass(JobUpdateDetailsMapper.class);
-        addMapperClass(LockMapper.class);
-        addMapperClass(QuotaMapper.class);
-        Properties props = new Properties();
-        // We have no plans to take advantage of multiple DB environments. This is a required
-        // property though, so we use an unnamed environment.
-        props.setProperty("mybatis.environment.id", "");
-        Names.bindProperties(binder(), props);
+        addMapperClasses(MAPPER_CLASSES);
+
         // Full auto-mapping enables population of nested objects with minimal mapper configuration.
         // Docs on settings can be found here:
         // http://mybatis.github.io/mybatis-3/configuration.html#settings
         autoMappingBehavior(AutoMappingBehavior.FULL);
 
         addTypeHandlersClasses(TypeHandlers.getAll());
-
-        // TODO(davmclau): ensure that mybatis logging is configured correctly.
       }
     });
     bindStore(AttributeStore.Mutable.class, DbAttributeStore.class);
