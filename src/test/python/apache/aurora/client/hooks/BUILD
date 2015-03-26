@@ -26,7 +26,6 @@ python_tests(name = 'hooked_api',
     'src/main/python/apache/aurora/common:cluster',
     'src/main/python/apache/aurora/client:api',
     'src/main/python/apache/aurora/client/hooks',
-    'src/main/python/apache/aurora/client:config'
   ]
 )
 
@@ -35,6 +34,5 @@ python_tests(name = 'non_hooked_api',
   dependencies = [
     'src/main/python/apache/aurora/common:aurora_job_key',
     'src/main/python/apache/aurora/client/hooks',
-    'src/main/python/apache/aurora/client:config'
   ],
 )

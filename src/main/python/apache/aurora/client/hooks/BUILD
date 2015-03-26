@@ -18,6 +18,7 @@ python_library(
   dependencies = [
     '3rdparty/python:twitter.common.log',
     'src/main/python/apache/aurora/client:api',
+    'src/main/python/apache/aurora/client:config',
     'src/main/python/apache/aurora/common:aurora_job_key',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
