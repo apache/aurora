@@ -81,6 +81,14 @@ Host $(hostname)
 EOF
 }
 
+function enable_gradle_daemon {
+  install -o vagrant -g vagrant -d -m 0755 /home/vagrant/.gradle
+  cat > /home/vagrant/.gradle/gradle.properties <<EOF
+org.gradle.daemon=true
+EOF
+  chown vagrant:vagrant /home/vagrant/.gradle/gradle.properties
+}
+
 function start_services {
   #Executing true on failure to please bash -e in case services are already running
   start zookeeper    || true
@@ -106,4 +114,5 @@ prepare_extras
 install_cluster_config
 install_ssh_config
 start_services
+enable_gradle_daemon
 su vagrant -c "aurorabuild all"
