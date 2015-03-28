@@ -52,12 +52,10 @@ python_library(
   name = 'disk',
   sources = ['disk.py'],
   dependencies = [
-    '3rdparty/python:watchdog',
     '3rdparty/python:twitter.common.dirutil',
     '3rdparty/python:twitter.common.exceptions',
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.quantity',
   ]
 )
 

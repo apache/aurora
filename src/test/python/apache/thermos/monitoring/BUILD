@@ -25,6 +25,7 @@ python_tests(name = 'test_disk',
   sources = ['test_disk.py'],
   dependencies = [
     'src/main/python/apache/thermos/monitoring:disk',
+    '3rdparty/python:twitter.common.quantity',
   ]
 )
 

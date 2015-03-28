@@ -13,14 +13,12 @@
 #
 
 import os
-import time
 from tempfile import mkstemp
 
-import pytest
 from twitter.common.dirutil import safe_mkdtemp
-from twitter.common.quantity import Amount, Data, Time
+from twitter.common.quantity import Amount, Data
 
-from apache.thermos.monitoring.disk import DiskCollector, InotifyDiskCollector
+from apache.thermos.monitoring.disk import DiskCollector
 
 TEST_AMOUNT_1 = Amount(100, Data.MB)
 TEST_AMOUNT_2 = Amount(10, Data.MB)
@@ -62,19 +60,5 @@ def test_du_diskcollector():
     collector.sample()
     if collector._thread is not None:
       collector._thread.event.wait()
-
-  _run_collector_tests(collector, target, wait)
-
-
-# Flaky test, c.f. https://issues.apache.org/jira/browse/AURORA-916
-@pytest.mark.skipif('True')
-def test_inotify_diskcollector():
-  target = safe_mkdtemp()
-  INTERVAL = Amount(50, Time.MILLISECONDS)
-  collector = InotifyDiskCollector(target)
-  collector._thread.COLLECTION_INTERVAL = INTERVAL
-
-  def wait():
-    time.sleep((2 * INTERVAL).as_(Time.SECONDS))
 
   _run_collector_tests(collector, target, wait)
