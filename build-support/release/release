@@ -19,9 +19,9 @@
 set -e
 set -o nounset
 
-aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=incubator-aurora.git'
-aurora_svn_dist_url='https://dist.apache.org/repos/dist/release/incubator/aurora'
-aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/incubator/aurora'
+aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=aurora.git'
+aurora_svn_dist_url='https://dist.apache.org/repos/dist/release/aurora'
+aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/aurora'
 aurora_version_file='./src/main/resources/apache/aurora/client/cli/.auroraversion'
 
 function print_help_and_exit {
@@ -112,7 +112,7 @@ else
 fi
 
 previous_version_tag="${current_version}-rc${rc_tag_version}"
-current_version_tag="${current_version}-incubating"
+current_version_tag="${current_version}"
 
 # Make sure the tag does not exist
 if [[ $(git ls-remote --exit-code --tags origin refs/tags/${current_version} >/dev/null 2>&1) == 0 ]]; then
@@ -188,12 +188,12 @@ cd ${base_dir}
 
 echo
 echo "Done creating the release. The following draft email has been created"
-echo "to send to the dev@aurora.incubator.apache.org mailing list."
+echo "to send to the dev@aurora.apache.org mailing list."
 echo
 
 # Create the email template for the release to be sent to the mailing lists.
 MESSAGE=$(cat <<__EOF__
-To: dev@aurora.incubator.apache.org
+To: dev@aurora.apache.org
 Subject: [RESULT][VOTE] Release Apache Aurora ${current_version_tag} RC${rc_tag_version}
 
 All,

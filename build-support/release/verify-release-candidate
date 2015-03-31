@@ -18,7 +18,7 @@
 #
 set -e
 
-aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/incubator/aurora'
+aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/aurora'
 
 # Get the current version string
 if [[ ! -f .auroraversion ]]; then
@@ -27,7 +27,7 @@ else
   current_version=$(cat .auroraversion | tr '[a-z]' '[A-Z]')
 fi
 
-dist_name="aurora-${current_version}-incubating"
+dist_name="aurora-${current_version}"
 rc_dir=${dist_name}-verify
 mkdir -p $rc_dir
 cd $rc_dir

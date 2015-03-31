@@ -40,8 +40,8 @@ should have a JVM (Java 7 or higher) and libmesos (0.21.1) installed.
 To create a distribution for installation you will need build tools installed. On Ubuntu this can be
 done with `sudo apt-get install build-essential default-jdk`.
 
-    git clone http://git-wip-us.apache.org/repos/asf/incubator-aurora.git
-    cd incubator-aurora
+    git clone http://git-wip-us.apache.org/repos/asf/aurora.git
+    cd aurora
     ./gradlew distZip
 
 Copy the generated `dist/distributions/aurora-scheduler-*.zip` to each node that will run a scheduler.

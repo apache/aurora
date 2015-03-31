@@ -27,8 +27,8 @@ set -o errexit
 set -o nounset
 
 rc_tag_version=0
-aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=incubator-aurora.git'
-aurora_svn_dist_url='https://dist.apache.org/repos/dist/dev/incubator/aurora'
+aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=aurora.git'
+aurora_svn_dist_url='https://dist.apache.org/repos/dist/dev/aurora'
 aurora_version_file='./src/main/resources/apache/aurora/client/cli/.auroraversion'
 
 function print_help_and_exit {
@@ -188,7 +188,7 @@ git commit -m "Updating .auroraversion to ${current_version_tag}."
 
 echo "Building the source distribution"
 dist_dir=${base_dir}/dist
-dist_name="apache-aurora-${current_version_tag}-incubating"
+dist_name="apache-aurora-${current_version_tag}"
 
 mkdir -p ${dist_dir}
 git archive --prefix=${dist_name}/ -o ${dist_dir}/${dist_name}.tar.gz HEAD
@@ -222,7 +222,7 @@ fi
 cd ${base_dir}
 
 echo "Done creating the release candidate. The following draft email has been created"
-echo "to send to the dev@aurora.incubator.apache.org mailing list"
+echo "to send to the dev@aurora.apache.org mailing list"
 echo
 
 # Create the email template for the release candidate to be sent to the mailing lists.
@@ -233,8 +233,8 @@ else
 fi
 
 MESSAGE=$(cat <<__EOF__
-To: dev@aurora.incubator.apache.org
-Subject: [VOTE] Release Apache Aurora ${current_version} (incubating) RC${rc_tag_version}
+To: dev@aurora.apache.org
+Subject: [VOTE] Release Apache Aurora ${current_version} RC${rc_tag_version}
 
 All,
 

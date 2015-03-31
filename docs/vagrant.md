@@ -43,16 +43,16 @@ Clone the Aurora repository
 
 To obtain the Aurora source distribution, clone its Git repository using the following command:
 
-     git clone http://git.apache.org/incubator-aurora.git
+     git clone http://git.apache.org/aurora.git
 
 
 Start the local cluster
 -----------------------
 
-Now change into the `incubator-aurora/` directory, which contains the Aurora source code and
+Now change into the `aurora/` directory, which contains the Aurora source code and
 other scripts and tools:
 
-     cd incubator-aurora/
+     cd aurora/
 
 To start the local cluster, type the following command:
 
@@ -88,7 +88,7 @@ To SSH into the VM, run the following command in your development machine:
 To verify that Aurora is installed in the VM, type the `aurora` command. You should see a list
 of arguments and possible commands.
 
-The `/vagrant` directory on the VM is mapped to the `incubator-aurora/` local directory
+The `/vagrant` directory on the VM is mapped to the `aurora/` local directory
 from which you started the cluster. You can edit files inside this directory in your development
 machine and access them from the VM under `/vagrant`.
 

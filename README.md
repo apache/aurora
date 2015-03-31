@@ -1,6 +1,5 @@
 Apache Aurora lets you use an [Apache Mesos](http://mesos.apache.org) cluster as a private cloud.
-It supports running long-running services, cron jobs, and ad-hoc jobs. Aurora is currently a
-part of the Apache Incubator.
+It supports running long-running services, cron jobs, and ad-hoc jobs.
 
 Aurora aims to make it extremely quick and easy to take a built application and run it on machines
 in a cluster, with an emphasis on reliability. It provides basic operations to manage services
@@ -74,8 +73,8 @@ Are you using Aurora too?  Let us know, or submit a patch to join the list!
 * [Developing Aurora](docs/developing-aurora-scheduler.md)
 
 ## Getting Help
-If you have questions, you can reach out to our mailing list: dev@aurora.incubator.apache.org
-([archive](http://mail-archives.apache.org/mod_mbox/incubator-aurora-dev)).
+If you have questions, you can reach out to our mailing list: dev@aurora.apache.org
+([archive](http://mail-archives.apache.org/mod_mbox/aurora-dev)).
 We're also often available in IRC: #aurora on
 [irc.freenode.net](http://webchat.freenode.net/?channels=#aurora).
 

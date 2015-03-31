@@ -25,7 +25,7 @@ This is the recommended first Aurora users document to read to start
 getting up to speed on the system.
 
 To get help, email questions to the Aurora Developer List,
-[dev@aurora.incubator.apache.org](mailto:dev@aurora.incubator.apache.org)
+[dev@aurora.apache.org](mailto:dev@aurora.apache.org)
 
 ## Setup: Install Aurora
 

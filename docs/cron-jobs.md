@@ -100,7 +100,7 @@ tasks with `job kill` and `job restart`.
 `cron_schedule` uses a restricted subset of BSD crontab syntax. While the
 execution engine currently uses Quartz, the schedule parsing is custom, a subset of FreeBSD
 [crontab(5)](http://www.freebsd.org/cgi/man.cgi?crontab(5)) syntax. See
-[the source](https://github.com/apache/incubator-aurora/blob/master/src/main/java/org/apache/aurora/scheduler/cron/CrontabEntry.java#L106-L124)
+[the source](https://github.com/apache/aurora/blob/master/src/main/java/org/apache/aurora/scheduler/cron/CrontabEntry.java#L106-L124)
 for details.
 
 ## Caveats

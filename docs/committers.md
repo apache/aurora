@@ -24,7 +24,7 @@ and that key will need to be added to our KEYS file as well.
 
 2. Add your gpg key to the Apache Aurora KEYS file:
 
-               git clone https://git-wip-us.apache.org/repos/asf/incubator-aurora.git
+               git clone https://git-wip-us.apache.org/repos/asf/aurora.git
                (gpg --list-sigs <KEY ID> && gpg --armor --export <KEY ID>) >> KEYS
                git add KEYS && git commit -m "Adding gpg key for <APACHE ID>"
                ./rbt post -o -g
@@ -35,8 +35,8 @@ and that key will need to be added to our KEYS file as well.
 
 4. Update the changes to the KEYS file to the Apache Aurora svn dist locations listed below:
 
-               https://dist.apache.org/repos/dist/dev/incubator/aurora/KEYS
-               https://dist.apache.org/repos/dist/release/incubator/aurora/KEYS
+               https://dist.apache.org/repos/dist/dev/aurora/KEYS
+               https://dist.apache.org/repos/dist/release/aurora/KEYS
 
 5. Add your key to git config for use with the release scripts:
 
