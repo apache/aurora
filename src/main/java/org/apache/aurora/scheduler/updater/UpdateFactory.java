@@ -19,7 +19,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
@@ -147,14 +146,7 @@ interface UpdateFactory {
 
     @VisibleForTesting
     static Set<Integer> expandInstanceIds(Set<IInstanceTaskConfig> instanceGroups) {
-      ImmutableRangeSet.Builder<Integer> instanceIds = ImmutableRangeSet.builder();
-      for (IInstanceTaskConfig group : instanceGroups) {
-        for (IRange range : group.getInstances()) {
-          instanceIds.add(toRange(range));
-        }
-      }
-
-      return instanceIds.build().asSet(DiscreteDomain.integers());
+      return Updates.getInstanceIds(instanceGroups).asSet(DiscreteDomain.integers());
     }
 
     private static Optional<ITaskConfig> getConfig(

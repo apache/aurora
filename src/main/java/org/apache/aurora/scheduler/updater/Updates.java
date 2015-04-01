@@ -15,13 +15,17 @@ package org.apache.aurora.scheduler.updater;
 
 import java.util.Set;
 
+import com.google.common.collect.ImmutableRangeSet;
+import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.apiConstants;
+import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
+import org.apache.aurora.scheduler.storage.entities.IRange;
 
 /**
  * Utility functions for job updates.
@@ -52,5 +56,23 @@ public final class Updates {
           new JobUpdateKey(mutableSummary.getJobKey(), mutableSummary.getUpdateId()));
       return IJobUpdateSummary.build(mutableSummary);
     }
+  }
+
+  /**
+   * Creates a range set representing all instance IDs represented by a set of instance
+   * configurations included in a job update.
+   *
+   * @param configs Job update components.
+   * @return A range set representing the instance IDs mentioned in instance groupings.
+   */
+  public static ImmutableRangeSet<Integer> getInstanceIds(Set<IInstanceTaskConfig> configs) {
+    ImmutableRangeSet.Builder<Integer> builder = ImmutableRangeSet.builder();
+    for (IInstanceTaskConfig config : configs) {
+      for (IRange range : config.getInstances()) {
+        builder.add(Range.closed(range.getFirst(), range.getLast()));
+      }
+    }
+
+    return builder.build();
   }
 }
