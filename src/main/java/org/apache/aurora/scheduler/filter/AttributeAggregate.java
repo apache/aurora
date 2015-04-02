@@ -26,8 +26,12 @@ import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.AtomicLongMap;
 import com.twitter.common.collections.Pair;
 
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.util.Objects.requireNonNull;
@@ -49,6 +53,28 @@ public class AttributeAggregate {
    * further details.
    */
   private final Supplier<Map<Pair<String, String>, Long>> aggregate;
+
+  /**
+   * Initializes an {@link AttributeAggregate} instance from data store.
+   *
+   * @param storeProvider Store provider to get data from.
+   * @param jobKey Job key.
+   * @return An {@link AttributeAggregate} instance.
+   */
+  public static AttributeAggregate getJobActiveState(
+      final StoreProvider storeProvider,
+      final IJobKey jobKey) {
+
+    Supplier<ImmutableSet<IScheduledTask>> taskSupplier = Suppliers.memoize(
+        new Supplier<ImmutableSet<IScheduledTask>>() {
+          @Override
+          public ImmutableSet<IScheduledTask> get() {
+            return storeProvider.getTaskStore().fetchTasks(
+                Query.jobScoped(jobKey).byStatus(Tasks.SLAVE_ASSIGNED_STATES));
+          }
+        });
+    return new AttributeAggregate(taskSupplier, storeProvider.getAttributeStore());
+  }
 
   /**
    * Creates a new attribute aggregate, which will be computed from the provided external state.

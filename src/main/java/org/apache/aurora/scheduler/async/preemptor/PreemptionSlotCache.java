@@ -53,7 +53,7 @@ class PreemptionSlotCache {
   @VisibleForTesting
   static final String PREEMPTION_SLOT_CACHE_SIZE_STAT = "preemption_slot_cache_size";
 
-  private final Cache<String, PreemptionSlotFinder.PreemptionSlot> slots;
+  private final Cache<String, PreemptionSlot> slots;
 
   @Inject
   PreemptionSlotCache(

@@ -202,6 +202,8 @@ public interface PreemptionSlotFinder {
           }
         };
 
+    // TODO(maxim): This should take pre-computed mappings (e.g. slaveToOffers) to avoid
+    // unnecessary repeated work.
     @Override
     public Optional<PreemptionSlot> findPreemptionSlotFor(
         final IAssignedTask pendingTask,

@@ -36,7 +36,6 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
@@ -81,6 +80,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private static final HostOffer OFFER = new HostOffer(
       Offers.makeOffer("OFFER_A", "HOST_A"),
       IHostAttributes.build(new HostAttributes().setMode(MaintenanceMode.NONE)));
+
+  private static final String SLAVE_ID = OFFER.getOffer().getSlaveId().getValue();
 
   private static final TaskGroupKey GROUP_A = TaskGroupKey.from(TASK_A.getAssignedTask().getTask());
   private static final TaskGroupKey GROUP_B = TaskGroupKey.from(TASK_B.getAssignedTask().getTask());
@@ -157,13 +158,12 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
-    expect(preemptor.attemptPreemptionFor("a", emptyJob))
-        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
+    expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
     AssignmentCapture firstAssignment = expectLaunchAttempt(false);
-    expect(preemptor.attemptPreemptionFor("b", emptyJob)).andReturn(Optional.<String>absent());
+    expectPreemptorCall(TASK_B, Optional.<String>absent());
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
@@ -192,8 +192,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
-    expect(preemptor.attemptPreemptionFor("a", emptyJob))
-        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
+    expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
@@ -228,8 +227,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
-    expect(preemptor.attemptPreemptionFor("a", emptyJob))
-        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
+    expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
@@ -253,8 +251,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectLaunchAttempt(false);
 
     // Reserve "a" with offerA
-    expect(preemptor.attemptPreemptionFor("a", emptyJob))
-        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
+    expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
@@ -278,8 +275,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_B);
     expectLaunchAttempt(false);
     // Reserve "b" with offer1
-    expect(preemptor.attemptPreemptionFor("b", emptyJob))
-        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
+    expectPreemptorCall(TASK_B, Optional.of(SLAVE_ID));
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
@@ -347,6 +343,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     public Capture<TaskGroupKey> groupKey = createCapture();
   }
 
+  private void expectPreemptorCall(IScheduledTask task, Optional<String> result) {
+    expect(preemptor.attemptPreemptionFor(
+        task.getAssignedTask(),
+        emptyJob,
+        storageUtil.mutableStoreProvider)).andReturn(result);
+  }
+
   private AssignmentCapture expectLaunchAttempt(boolean taskLaunched)
       throws OfferManager.LaunchException {
 
@@ -366,9 +369,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     assertEquals(groupKey, capture.groupKey.getValue());
   }
 
-  private void expectActiveJobFetch(IScheduledTask taskInJob) {
+  private void expectActiveJobFetch(IScheduledTask task) {
     storageUtil.expectTaskFetch(
-        TaskSchedulerImpl.activeJobStateQuery(Tasks.SCHEDULED_TO_JOB_KEY.apply(taskInJob)),
+        Query.jobScoped(Tasks.SCHEDULED_TO_JOB_KEY.apply(task))
+            .byStatus(Tasks.SLAVE_ASSIGNED_STATES),
         ImmutableSet.<IScheduledTask>of());
   }
 }

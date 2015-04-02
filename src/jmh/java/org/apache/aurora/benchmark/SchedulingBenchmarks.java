@@ -79,6 +79,8 @@ public class SchedulingBenchmarks {
    */
   @State(Scope.Thread)
   public abstract static class AbstractBase {
+    private static final Amount<Long, Time> NO_DELAY = Amount.of(0L, Time.MILLISECONDS);
+    private static final Amount<Long, Time> DELAY_FOREVER = Amount.of(30L, Time.DAYS);
     protected Storage storage;
     protected Preemptor preemptor;
     protected ScheduledThreadPoolExecutor executor;
@@ -105,7 +107,7 @@ public class SchedulingBenchmarks {
       // TODO(maxim): Find a way to DRY it and reuse existing modules instead.
       Injector injector = Guice.createInjector(
           new StateModule(),
-          new PreemptorModule(true, Amount.of(0L, Time.MILLISECONDS), executor),
+          new PreemptorModule(true, NO_DELAY, NO_DELAY),
           new PrivateModule() {
             @Override
             protected void configure() {
@@ -116,7 +118,7 @@ public class SchedulingBenchmarks {
                   new OfferManager.OfferReturnDelay() {
                     @Override
                     public Amount<Long, Time> get() {
-                      return Amount.of(30L, Time.DAYS);
+                      return DELAY_FOREVER;
                     }
                   });
 
@@ -128,7 +130,7 @@ public class SchedulingBenchmarks {
             protected void configure() {
               bind(new TypeLiteral<Amount<Long, Time>>() { })
                   .annotatedWith(ReservationDuration.class)
-                  .toInstance(Amount.of(30L, Time.DAYS));
+                  .toInstance(DELAY_FOREVER);
               bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
               bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
               bind(TaskIdGenerator.class).to(TaskIdGenerator.TaskIdGeneratorImpl.class);
@@ -333,7 +335,7 @@ public class SchedulingBenchmarks {
               new AttributeAggregate(taskSupplier, storeProvider.getAttributeStore());
 
           Optional<String> result =
-              preemptor.attemptPreemptionFor(assignedTask.getTaskId(), aggregate);
+              preemptor.attemptPreemptionFor(assignedTask, aggregate, storeProvider);
 
           while (executor.getActiveCount() > 0) {
             // Using a tight loop to wait for a search completion. This is executed on a benchmark

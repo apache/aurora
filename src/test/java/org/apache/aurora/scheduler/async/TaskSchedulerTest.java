@@ -238,7 +238,7 @@ public class TaskSchedulerTest extends EasyMockTest {
   public void testNoOffers() {
     Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
-    expect(preemptor.attemptPreemptionFor("a", emptyJob)).andReturn(Optional.<String>absent());
+    expectPreemptorCall(makeTask("a"));
 
     replayAndCreateScheduler();
 
@@ -316,7 +316,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectMaybeAssign(OFFER_A, task, emptyJob).andReturn(Assignment.failure());
-    expect(preemptor.attemptPreemptionFor("a", emptyJob)).andReturn(Optional.<String>absent());
+    expectPreemptorCall(task);
 
     Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
     expectMaybeAssign(OFFER_A, task, emptyJob).andReturn(Assignment.success(mesosTask));
@@ -324,7 +324,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     Capture<Runnable> timeoutCapture3 = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
-    expect(preemptor.attemptPreemptionFor("b", emptyJob)).andReturn(Optional.<String>absent());
+    expectPreemptorCall(makeTask("b"));
 
     replayAndCreateScheduler();
 
@@ -404,10 +404,10 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectAnyMaintenanceCalls();
     expectMaybeAssign(OFFER_A, task, emptyJob).andReturn(Assignment.failure());
     Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
-    expect(preemptor.attemptPreemptionFor("a", emptyJob)).andReturn(Optional.<String>absent());
+    expectPreemptorCall(task);
     driver.declineOffer(OFFER_A.getOffer().getId());
     expectTaskGroupBackoff(10, 20);
-    expect(preemptor.attemptPreemptionFor("a", emptyJob)).andReturn(Optional.<String>absent());
+    expectPreemptorCall(task);
 
     replayAndCreateScheduler();
 
@@ -604,7 +604,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectMaybeAssign(OFFER_A, task, emptyJob).andReturn(Assignment.failure());
     expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 20);
-    expect(preemptor.attemptPreemptionFor("a", emptyJob)).andReturn(Optional.<String>absent());
+    expectPreemptorCall(task);
 
     replayAndCreateScheduler();
 
@@ -650,5 +650,12 @@ public class TaskSchedulerTest extends EasyMockTest {
             .setSlaveId(offer.getSlaveId().getValue())
             .setAttributes(ImmutableSet.<Attribute>of())
             .setMode(mode)));
+  }
+
+  private void expectPreemptorCall(IScheduledTask task) {
+    expect(preemptor.attemptPreemptionFor(
+        eq(task.getAssignedTask()),
+        eq(emptyJob),
+        EasyMock.<MutableStoreProvider>anyObject())).andReturn(Optional.<String>absent());
   }
 }

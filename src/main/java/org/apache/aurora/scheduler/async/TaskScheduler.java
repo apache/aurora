@@ -27,11 +27,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -56,9 +54,7 @@ import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.SlaveID;
 
@@ -164,25 +160,6 @@ public interface TaskScheduler extends EventSubscriber {
     static final Optional<String> LAUNCH_FAILED_MSG =
         Optional.of("Unknown exception attempting to schedule task.");
 
-    @VisibleForTesting
-    static Query.Builder activeJobStateQuery(IJobKey jobKey) {
-      return Query.jobScoped(jobKey).byStatus(Tasks.SLAVE_ASSIGNED_STATES);
-    }
-
-    private AttributeAggregate getJobState(
-        final StoreProvider storeProvider,
-        final IJobKey jobKey) {
-
-      Supplier<ImmutableSet<IScheduledTask>> taskSupplier = Suppliers.memoize(
-          new Supplier<ImmutableSet<IScheduledTask>>() {
-            @Override
-            public ImmutableSet<IScheduledTask> get() {
-              return storeProvider.getTaskStore().fetchTasks(activeJobStateQuery(jobKey));
-            }
-          });
-      return new AttributeAggregate(taskSupplier, storeProvider.getAttributeStore());
-    }
-
     @Timed("task_schedule_attempt")
     @Override
     public boolean schedule(final String taskId) {
@@ -206,15 +183,17 @@ public interface TaskScheduler extends EventSubscriber {
     @Timed("task_schedule_attempt_locked")
     protected boolean scheduleTask(MutableStoreProvider store, String taskId) {
       LOG.fine("Attempting to schedule task " + taskId);
-      final ITaskConfig task = Iterables.getOnlyElement(
+      IAssignedTask assignedTask = Iterables.getOnlyElement(
           Iterables.transform(
               store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
-              Tasks.SCHEDULED_TO_INFO),
+              Tasks.SCHEDULED_TO_ASSIGNED),
           null);
-      if (task == null) {
+
+      if (assignedTask == null) {
         LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");
       } else {
-        AttributeAggregate aggregate = getJobState(store, task.getJob());
+        ITaskConfig task = assignedTask.getTask();
+        AttributeAggregate aggregate = AttributeAggregate.getJobActiveState(store, task.getJob());
         try {
           boolean launched = offerManager.launchFirst(
               getAssignerFunction(store, new ResourceRequest(task, taskId, aggregate)),
@@ -222,7 +201,10 @@ public interface TaskScheduler extends EventSubscriber {
 
           if (!launched) {
             // Task could not be scheduled.
-            maybePreemptFor(taskId, aggregate);
+            // TODO(maxim): Now that preemption slots are searched asynchronously, consider
+            // retrying a launch attempt within the current scheduling round IFF a reservation is
+            // available.
+            maybePreemptFor(assignedTask, aggregate, store);
             attemptsNoMatch.incrementAndGet();
             return false;
           }
@@ -247,13 +229,17 @@ public interface TaskScheduler extends EventSubscriber {
       return true;
     }
 
-    private void maybePreemptFor(String taskId, AttributeAggregate attributeAggregate) {
-      if (reservations.hasReservationForTask(taskId)) {
+    private void maybePreemptFor(
+        IAssignedTask task,
+        AttributeAggregate jobState,
+        MutableStoreProvider storeProvider) {
+
+      if (reservations.hasReservationForTask(task.getTaskId())) {
         return;
       }
-      Optional<String> slaveId = preemptor.attemptPreemptionFor(taskId, attributeAggregate);
+      Optional<String> slaveId = preemptor.attemptPreemptionFor(task, jobState, storeProvider);
       if (slaveId.isPresent()) {
-        this.reservations.add(SlaveID.newBuilder().setValue(slaveId.get()).build(), taskId);
+        reservations.add(SlaveID.newBuilder().setValue(slaveId.get()).build(), task.getTaskId());
       }
     }
 
