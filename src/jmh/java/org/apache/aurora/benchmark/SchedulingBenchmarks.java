@@ -86,8 +86,8 @@ public class SchedulingBenchmarks {
    */
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.SECONDS)
-  @Warmup(iterations=1, time=10, timeUnit=TimeUnit.SECONDS)
-  @Measurement(iterations=10, time=10, timeUnit=TimeUnit.SECONDS)
+  @Warmup(iterations = 1, time = 10, timeUnit = TimeUnit.SECONDS)
+  @Measurement(iterations = 10, time = 10, timeUnit = TimeUnit.SECONDS)
   @Fork(1)
   @State(Scope.Thread)
   public abstract static class AbstractBase {

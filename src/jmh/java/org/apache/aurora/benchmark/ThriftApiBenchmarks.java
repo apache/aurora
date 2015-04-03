@@ -55,8 +55,8 @@ public class ThriftApiBenchmarks {
 
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.SECONDS)
-  @Warmup(iterations=1, time=10, timeUnit=TimeUnit.SECONDS)
-  @Measurement(iterations=5, time=5, timeUnit=TimeUnit.SECONDS)
+  @Warmup(iterations = 1, time = 10, timeUnit = TimeUnit.SECONDS)
+  @Measurement(iterations = 5, time = 5, timeUnit = TimeUnit.SECONDS)
   @Fork(1)
   @State(Scope.Thread)
   public static class GetRoleSummaryBenchmark {
