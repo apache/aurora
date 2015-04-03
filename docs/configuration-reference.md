@@ -359,8 +359,11 @@ Parameters for controlling a task's health checks via HTTP.
 | -------                        | :-------: | --------
 | ```initial_interval_secs```    | Integer   | Initial delay for performing an HTTP health check. (Default: 15)
 | ```interval_secs```            | Integer   | Interval on which to check the task's health via HTTP. (Default: 10)
-| ```timeout_secs```             | Integer   | HTTP request timeout. (Default: 1)
 | ```max_consecutive_failures``` | Integer   | Maximum number of consecutive failures that tolerated before considering a task unhealthy (Default: 0)
+| ```timeout_secs```             | Integer   | HTTP request timeout. (Default: 1)
+| ```endpoint```                 | String    | HTTP endpoint to check (Default: /health)
+| ```expected_response```        | String    | If not empty, fail the health check if the response differs. Case insensitive. (Default: ok)
+| ```expected_response_code```   | Integer   | If not zero, fail the health check if the response code differs. (Default: 0)
 
 ### Announcer Objects
 
