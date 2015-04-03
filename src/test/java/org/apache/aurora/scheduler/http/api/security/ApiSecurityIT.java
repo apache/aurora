@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.testing.TearDown;
@@ -29,8 +30,12 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.http.JettyServerModuleTest;
 import org.apache.aurora.scheduler.http.api.ApiModule;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.aurora.scheduler.thrift.aop.MockDecoratedThrift;
 import org.apache.http.auth.AuthScope;
@@ -67,6 +72,8 @@ public class ApiSecurityIT extends JettyServerModuleTest {
       new UsernamePasswordCredentials("ksweeney", "12345");
   private static final UsernamePasswordCredentials BACKUP_SERVICE =
       new UsernamePasswordCredentials("backupsvc", "s3cret!!1");
+  private static final UsernamePasswordCredentials DEPLOY_SERVICE =
+      new UsernamePasswordCredentials("deploysvc", "0_0-x_0");
 
   private static final UsernamePasswordCredentials INCORRECT =
       new UsernamePasswordCredentials("root", "wrong");
@@ -79,24 +86,45 @@ public class ApiSecurityIT extends JettyServerModuleTest {
   private static final Set<Credentials> VALID_CREDENTIALS =
       ImmutableSet.<Credentials>of(ROOT, WFARNER, UNPRIVILEGED, BACKUP_SERVICE);
 
+  private static final IJobKey ADS_STAGING_JOB = JobKeys.from("ads", "staging", "job");
+
   private Ini ini;
   private AnnotatedAuroraAdmin auroraAdmin;
   private StatsProvider statsProvider;
+
+  private static final Joiner COMMA_JOINER = Joiner.on(", ");
+  private static final String ADMIN_ROLE = "admin";
+  private static final String ENG_ROLE = "eng";
+  private static final String BACKUP_ROLE = "backup";
+  private static final String DEPLOY_ROLE = "deploy";
 
   @Before
   public void setUp() {
     ini = new Ini();
 
     Ini.Section users = ini.addSection(IniRealm.USERS_SECTION_NAME);
-    users.put(ROOT.getUserName(), ROOT.getPassword() + ", admin");
-    users.put(WFARNER.getUserName(), WFARNER.getPassword() + ", eng");
+    users.put(ROOT.getUserName(), COMMA_JOINER.join(ROOT.getPassword(), ADMIN_ROLE));
+    users.put(WFARNER.getUserName(), COMMA_JOINER.join(WFARNER.getPassword(), ENG_ROLE));
     users.put(UNPRIVILEGED.getUserName(), UNPRIVILEGED.getPassword());
-    users.put(BACKUP_SERVICE.getUserName(), BACKUP_SERVICE.getPassword() + ", backupsvc");
+    users.put(
+        BACKUP_SERVICE.getUserName(),
+        COMMA_JOINER.join(BACKUP_SERVICE.getPassword(), BACKUP_ROLE));
+    users.put(
+        DEPLOY_SERVICE.getUserName(),
+        COMMA_JOINER.join(DEPLOY_SERVICE.getPassword(), DEPLOY_ROLE));
 
     Ini.Section roles = ini.addSection(IniRealm.ROLES_SECTION_NAME);
-    roles.put("admin", "*");
-    roles.put("eng", "thrift.AuroraSchedulerManager:*");
-    roles.put("backupsvc", "thrift.AuroraAdmin:listBackups");
+    roles.put(ADMIN_ROLE, "*");
+    roles.put(ENG_ROLE, "thrift.AuroraSchedulerManager:*");
+    roles.put(BACKUP_ROLE, "thrift.AuroraAdmin:listBackups");
+    roles.put(
+        DEPLOY_ROLE,
+        "thrift.AuroraSchedulerManager:killTasks:"
+            + ADS_STAGING_JOB.getRole()
+            + ":"
+            + ADS_STAGING_JOB.getEnvironment()
+            + ":"
+            + ADS_STAGING_JOB.getName());
 
     auroraAdmin = createMock(AnnotatedAuroraAdmin.class);
     statsProvider = createMock(StatsProvider.class);
@@ -173,6 +201,10 @@ public class ApiSecurityIT extends JettyServerModuleTest {
     expect(auroraAdmin.killTasks(null, new Lock().setMessage("1"), null)).andReturn(OK);
     expect(auroraAdmin.killTasks(null, new Lock().setMessage("2"), null)).andReturn(OK);
 
+    TaskQuery jobScopedQuery = Query.jobScoped(JobKeys.from("role", "env", "name")).get();
+    TaskQuery adsScopedQuery = Query.jobScoped(ADS_STAGING_JOB).get();
+    expect(auroraAdmin.killTasks(adsScopedQuery, null, null)).andReturn(OK);
+
     replayAndStart();
 
     assertEquals(OK,
@@ -180,11 +212,29 @@ public class ApiSecurityIT extends JettyServerModuleTest {
     assertEquals(OK,
         getAuthenticatedClient(ROOT).killTasks(null, new Lock().setMessage("2"), null));
     assertEquals(
-        ResponseCode.AUTH_FAILED,
+        ResponseCode.INVALID_REQUEST,
         getAuthenticatedClient(UNPRIVILEGED).killTasks(null, null, null).getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
+        getAuthenticatedClient(UNPRIVILEGED)
+            .killTasks(jobScopedQuery, null, null)
+            .getResponseCode());
+    assertEquals(
+        ResponseCode.INVALID_REQUEST,
         getAuthenticatedClient(BACKUP_SERVICE).killTasks(null, null, null).getResponseCode());
+    assertEquals(
+        ResponseCode.AUTH_FAILED,
+        getAuthenticatedClient(BACKUP_SERVICE)
+            .killTasks(jobScopedQuery, null, null)
+            .getResponseCode());
+    assertEquals(
+        ResponseCode.AUTH_FAILED,
+        getAuthenticatedClient(DEPLOY_SERVICE)
+            .killTasks(jobScopedQuery, null, null)
+            .getResponseCode());
+    assertEquals(
+        OK,
+        getAuthenticatedClient(DEPLOY_SERVICE).killTasks(adsScopedQuery, null, null));
 
     assertKillTasksFails(getUnauthenticatedClient());
     assertKillTasksFails(getAuthenticatedClient(INCORRECT));

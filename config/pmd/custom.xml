@@ -22,7 +22,21 @@ limitations under the License.
     Aurora PMD ruleset.
   </description>
 
-  <rule ref="rulesets/java/basic.xml"/>
+  <rule ref="rulesets/java/basic.xml">
+    <!-- Duplicate definitions - defined in empty.xml below and marked deprecated.
+         See http://sourceforge.net/p/pmd/discussion/188193/thread/6e9c6017/ -->
+    <exclude name="EmptyCatchBlock"/>
+    <exclude name="EmptyIfStmt"/>
+    <exclude name="EmptyWhileStmt"/>
+    <exclude name="EmptyTryBlock"/>
+    <exclude name="EmptyFinallyBlock"/>
+    <exclude name="EmptySwitchStatements"/>
+    <exclude name="EmptySynchronizedBlock"/>
+    <exclude name="EmptyStatementNotInLoop"/>
+    <exclude name="EmptyInitializer"/>
+    <exclude name="EmptyStatementBlock"/>
+    <exclude name="EmptyStaticInitializer"/>
+  </rule>
   <rule ref="rulesets/java/design.xml">
     <!-- We're not currently focusing on localization. -->
     <exclude name="SimpleDateFormatNeedsLocale"/>
@@ -38,10 +52,20 @@ limitations under the License.
          TODO(wfarner): Break apart god classes. -->
     <exclude name="GodClass"/>
   </rule>
-  <rule ref="rulesets/java/empty.xml"/>
-  <rule ref="rulesets/java/imports.xml">
-    <!-- We frequently use static imports for enum fields (making other code more concise), but
-         those trip this rule. -->
+  <rule ref="rulesets/java/empty.xml">
+    <!-- Configured below -->
+    <exclude name="EmptyCatchBlock"/>
+  </rule>
+  <rule ref="rulesets/java/empty.xml/EmptyCatchBlock">
+    <properties>
+          <!-- Some APIs, like the Java Reflection API, use exceptions to indicate the absence of
+               a value and we legitimately want to ignore them. -->
+          <property name="allowCommentedBlocks" value="true"/>
+        </properties>
+      </rule>
+      <rule ref="rulesets/java/imports.xml">
+        <!-- We frequently use static imports for enum fields (making other code more concise), but
+             those trip this rule. -->
     <exclude name="TooManyStaticImports"/>
   </rule>
   <rule ref="rulesets/java/logging-java.xml">

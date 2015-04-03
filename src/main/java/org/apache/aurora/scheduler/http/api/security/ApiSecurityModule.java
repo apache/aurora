@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
+import java.lang.reflect.Method;
 import java.util.Set;
 
 import javax.inject.Singleton;
@@ -21,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Module;
 import com.google.inject.Provides;
+import com.google.inject.matcher.Matcher;
 import com.google.inject.matcher.Matchers;
 import com.google.inject.name.Names;
 import com.google.inject.servlet.RequestScoped;
@@ -34,6 +36,7 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraSchedulerManager;
 import org.apache.aurora.scheduler.app.Modules;
 import org.apache.aurora.scheduler.http.api.ApiModule;
+import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.guice.aop.ShiroAopModule;
 import org.apache.shiro.guice.web.ShiroWebModule;
@@ -50,6 +53,16 @@ import static java.util.Objects.requireNonNull;
  * this package.
  */
 public class ApiSecurityModule extends ServletModule {
+  /**
+   * Prefix for the permission protecting all AuroraSchedulerManager RPCs.
+   */
+  public static final String AURORA_SCHEDULER_MANAGER_PERMISSION = "thrift.AuroraSchedulerManager";
+
+  /**
+   * Prefix for the permission protecting all AuroraAdmin RPCs.
+   */
+  public static final String AURORA_ADMIN_PERMISSION = "thrift.AuroraAdmin";
+
   public static final String HTTP_REALM_NAME = "Apache Aurora Scheduler";
 
   @CmdLine(name = "enable_api_security",
@@ -60,6 +73,14 @@ public class ApiSecurityModule extends ServletModule {
       help = "Guice modules for configuring Shiro Realms.")
   private static final Arg<Set<Module>> SHIRO_REALM_MODULE = Arg.<Set<Module>>create(
       ImmutableSet.of(Modules.lazilyInstantiated(IniShiroRealmModule.class)));
+
+  @VisibleForTesting
+  static final Matcher<Method> AURORA_SCHEDULER_MANAGER_SERVICE =
+      GuiceUtils.interfaceMatcher(AuroraSchedulerManager.Iface.class, true);
+
+  @VisibleForTesting
+  static final Matcher<Method> AURORA_ADMIN_SERVICE =
+      GuiceUtils.interfaceMatcher(AuroraAdmin.Iface.class, true);
 
   private final boolean enableApiSecurity;
   private final Set<Module> shiroConfigurationModules;
@@ -110,18 +131,29 @@ public class ApiSecurityModule extends ServletModule {
     // TODO(ksweeney): Disable RememberMe cookie.
 
     install(new ShiroAopModule());
-    MethodInterceptor apiInterceptor = new ShiroThriftInterceptor("thrift.AuroraSchedulerManager");
+
+    // It is important that authentication happen before authorization is attempted, otherwise
+    // the authorizing interceptor will always fail.
+    MethodInterceptor authenticatingInterceptor = new ShiroAuthenticatingThriftInterceptor();
+    requestInjection(authenticatingInterceptor);
+    bindInterceptor(
+        Matchers.subclassesOf(AuroraSchedulerManager.Iface.class),
+        AURORA_SCHEDULER_MANAGER_SERVICE.or(AURORA_ADMIN_SERVICE),
+        authenticatingInterceptor);
+
+    MethodInterceptor apiInterceptor =
+        new ShiroAuthorizingParamInterceptor(AURORA_SCHEDULER_MANAGER_PERMISSION);
     requestInjection(apiInterceptor);
     bindInterceptor(
         Matchers.subclassesOf(AuroraSchedulerManager.Iface.class),
-        GuiceUtils.interfaceMatcher(AuroraSchedulerManager.Iface.class, true),
+        AURORA_SCHEDULER_MANAGER_SERVICE,
         apiInterceptor);
 
-    MethodInterceptor adminInterceptor = new ShiroThriftInterceptor("thrift.AuroraAdmin");
+    MethodInterceptor adminInterceptor = new ShiroAuthorizingInterceptor(AURORA_ADMIN_PERMISSION);
     requestInjection(adminInterceptor);
     bindInterceptor(
-        Matchers.subclassesOf(AuroraAdmin.Iface.class),
-        GuiceUtils.interfaceMatcher(AuroraAdmin.Iface.class, true),
+        Matchers.subclassesOf(AnnotatedAuroraAdmin.class),
+        AURORA_ADMIN_SERVICE,
         adminInterceptor);
   }
 

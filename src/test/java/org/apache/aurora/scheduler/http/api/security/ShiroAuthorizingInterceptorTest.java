@@ -26,37 +26,35 @@ import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.thrift.Responses;
-import org.apache.shiro.authz.UnauthenticatedException;
 import org.apache.shiro.authz.permission.WildcardPermission;
 import org.apache.shiro.subject.Subject;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.http.api.security.ShiroAuthorizingInterceptor.SHIRO_AUTHORIZATION_FAILURES;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
 
-public class ShiroThriftInterceptorTest extends EasyMockTest {
-  private static final String PERMISSION = "test";
-  private static final String PRINCIPAL = "test-user";
+public class ShiroAuthorizingInterceptorTest extends EasyMockTest {
+  private static final String PERMISSION_PREFIX = "adminRPC";
 
-  private ShiroThriftInterceptor interceptor;
   private Subject subject;
   private StatsProvider statsProvider;
-  private AtomicLong shiroAuthorizationFailures;
   private MethodInvocation methodInvocation;
   private Method interceptedMethod;
 
+  private ShiroAuthorizingInterceptor interceptor;
+
   @Before
-  public void setUp() throws Exception {
-    interceptor = new ShiroThriftInterceptor(PERMISSION);
+  public void setUp() throws NoSuchMethodException {
+    interceptor = new ShiroAuthorizingInterceptor(PERMISSION_PREFIX);
     subject = createMock(Subject.class);
     statsProvider = createMock(StatsProvider.class);
-    shiroAuthorizationFailures = new AtomicLong();
-    expect(statsProvider.makeCounter(ShiroThriftInterceptor.SHIRO_AUTHORIZATION_FAILURES))
-        .andReturn(shiroAuthorizationFailures);
     methodInvocation = createMock(MethodInvocation.class);
     interceptedMethod = AuroraAdmin.Iface.class.getMethod("snapshot", SessionKey.class);
+    expect(statsProvider.makeCounter(SHIRO_AUTHORIZATION_FAILURES)).andReturn(new AtomicLong());
   }
 
   private void replayAndInitialize() {
@@ -64,43 +62,33 @@ public class ShiroThriftInterceptorTest extends EasyMockTest {
     interceptor.initialize(Providers.of(subject), statsProvider);
   }
 
-  @Test(expected = UnauthenticatedException.class)
-  public void testInvokeNotAuthenticated() throws Throwable {
-    expect(subject.isAuthenticated()).andReturn(false);
-
-    replayAndInitialize();
-
-    interceptor.invoke(methodInvocation);
-  }
-
   private IExpectationSetters<Boolean> expectSubjectPermitted() {
     return expect(subject.isPermitted(
-        new WildcardPermission(PERMISSION + ":" + interceptedMethod.getName())));
+        new WildcardPermission(PERMISSION_PREFIX + ":" + interceptedMethod.getName())));
   }
 
   @Test
-  public void testInvokeNotAuthorized() throws Throwable {
-    expect(subject.isAuthenticated()).andReturn(true);
+  public void testAuthorized() throws Throwable {
+    Response response = Responses.ok();
+    expect(methodInvocation.getMethod()).andReturn(interceptedMethod);
+    expectSubjectPermitted().andReturn(true);
+    expect(methodInvocation.proceed()).andReturn(response);
+
+    replayAndInitialize();
+
+    assertSame(response, interceptor.invoke(methodInvocation));
+  }
+
+  @Test
+  public void testNotAuthorized() throws Throwable {
     expect(methodInvocation.getMethod()).andReturn(interceptedMethod);
     expectSubjectPermitted().andReturn(false);
-    expect(subject.getPrincipal()).andReturn(PRINCIPAL);
+    expect(subject.getPrincipal()).andReturn("ksweeney");
 
     replayAndInitialize();
 
     assertEquals(
         ResponseCode.AUTH_FAILED,
         ((Response) interceptor.invoke(methodInvocation)).getResponseCode());
-  }
-
-  @Test
-  public void testInvokeAuthorized() throws Throwable {
-    expect(subject.isAuthenticated()).andReturn(true);
-    expect(methodInvocation.getMethod()).andReturn(interceptedMethod);
-    expectSubjectPermitted().andReturn(true);
-    expect(methodInvocation.proceed()).andReturn(Responses.ok());
-
-    replayAndInitialize();
-
-    assertEquals(Responses.ok(), interceptor.invoke(methodInvocation));
   }
 }

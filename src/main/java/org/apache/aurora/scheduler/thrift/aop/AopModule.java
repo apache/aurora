@@ -59,7 +59,7 @@ public class AopModule extends AbstractModule {
   private static final Arg<Boolean> ENABLE_JOB_CREATION = Arg.create(true);
 
   private static final Matcher<? super Class<?>> THRIFT_IFACE_MATCHER =
-      Matchers.subclassesOf(AuroraAdmin.Iface.class)
+      Matchers.subclassesOf(AnnotatedAuroraAdmin.class)
           .and(Matchers.annotatedWith(DecoratedThrift.class));
 
   private final Map<String, Boolean> toggledMethods;

@@ -13,16 +13,17 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
+import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Signals to {@link org.apache.aurora.scheduler.http.api.security.ShiroThriftInterceptor} that this
- * parameter should be used to determine the instance the calling subject is attempting to operate
- * on. Methods using this parameter should ensure that the RPC cannot operate on an instance
- * outside the scope of this parameter, otherwise a privilege escalation vulnerability exists.
+ * Signals to {@link ShiroAuthorizingParamInterceptor} that this  parameter should be used to
+ * determine the instance the calling subject is attempting to operate on. Methods using this
+ * parameter should ensure that the RPC cannot operate on an instance outside the scope of this
+ * parameter, otherwise a privilege escalation vulnerability exists.
  *
  * <p>
  * A method intercepted by this interceptor that does not contain an AuthorizingParam or with
@@ -69,4 +70,5 @@ import java.lang.annotation.Target;
  */
 @Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
+@Documented
 public @interface AuthorizingParam { }

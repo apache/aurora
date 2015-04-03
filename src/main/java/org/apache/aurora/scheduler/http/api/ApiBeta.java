@@ -46,10 +46,10 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSyntaxException;
 
-import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraAdmin.Iface;
 import org.apache.aurora.scheduler.storage.entities.AuroraAdminMetadata;
 import org.apache.aurora.scheduler.thrift.Responses;
+import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 
 import static org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler.GSON;
 
@@ -66,7 +66,7 @@ public class ApiBeta {
   private final Iface api;
 
   @Inject
-  ApiBeta(AuroraAdmin.Iface api) {
+  ApiBeta(AnnotatedAuroraAdmin api) {
     this.api = Objects.requireNonNull(api);
   }
 

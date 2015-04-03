@@ -28,6 +28,7 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.scheduler.http.CorsFilter;
 import org.apache.aurora.scheduler.http.JettyServerModule;
 import org.apache.aurora.scheduler.http.LeaderRedirectFilter;
+import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.thrift.protocol.TJSONProtocol;
 import org.apache.thrift.server.TServlet;
 import org.eclipse.jetty.servlet.DefaultServlet;
@@ -80,7 +81,7 @@ public class ApiModule extends ServletModule {
 
   @Provides
   @Singleton
-  TServlet provideApiThriftServlet(AuroraAdmin.Iface schedulerThriftInterface) {
+  TServlet provideApiThriftServlet(AnnotatedAuroraAdmin schedulerThriftInterface) {
     return new TServlet(
         new AuroraAdmin.Processor<>(schedulerThriftInterface), new TJSONProtocol.Factory());
   }

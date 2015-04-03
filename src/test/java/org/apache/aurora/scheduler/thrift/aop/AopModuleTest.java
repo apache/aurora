@@ -65,7 +65,7 @@ public class AopModuleTest extends EasyMockTest {
           }
         },
         new AopModule(toggledMethods));
-    return injector.getInstance(Iface.class);
+    return injector.getInstance(AnnotatedAuroraAdmin.class);
   }
 
   @Test
