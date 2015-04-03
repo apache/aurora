@@ -49,7 +49,7 @@ final class Tasks {
     private static final String USER_FORMAT = "user-%s";
 
     private JobKey jobKey = new JobKey("jmh", "dev", "benchmark");
-    private String taskIdFormat = "default_task-%s";
+    private int uuidStart = 0;
     private boolean isProduction = false;
     private double cpu = 6.0;
     private Amount<Long, Data> ram = Amount.of(8L, Data.GB);
@@ -62,8 +62,18 @@ final class Tasks {
       return this;
     }
 
-    Builder setTaskIdFormat(String newTaskIdFormat) {
-      taskIdFormat = newTaskIdFormat;
+    Builder setEnv(String env) {
+      jobKey.setEnvironment(env);
+      return this;
+    }
+
+    Builder setJob(String job) {
+      jobKey.setName(job);
+      return this;
+    }
+
+    Builder setUuidStart(int uuidStart) {
+      this.uuidStart = uuidStart;
       return this;
     }
 
@@ -121,7 +131,8 @@ final class Tasks {
       ImmutableSet.Builder<IScheduledTask> tasks = ImmutableSet.builder();
 
       for (int i = 0; i < count; i++) {
-        String taskId = String.format(taskIdFormat, i);
+        String taskId =
+            jobKey.getRole() + "-" + jobKey.getEnvironment() + "-" + i + "-" + (uuidStart + i);
 
         tasks.add(IScheduledTask.build(new ScheduledTask()
             .setTaskEvents(Lists.newArrayList(new TaskEvent(0, ScheduleStatus.PENDING)))

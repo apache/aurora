@@ -459,17 +459,10 @@ jacocoTestReport.finalizedBy analyzeReport
 
 def jmhHumanOutputPath = "$buildDir/reports/jmh/human.txt"
 jmh {
-  jmhVersion = '1.6.1'
-  jvmArgsPrepend = '-Xmx1024m'
+  jmhVersion = '1.7.1'
+  jvmArgsPrepend = '-Xmx2g'
   humanOutputFile = project.file("$jmhHumanOutputPath")
   resultsFile = project.file("$buildDir/reports/jmh/results.txt")
-
-  // JMH run configuration parameters.
-  iterations = 100
-  fork = 1
-  warmupIterations = 10
-  benchmarkMode = 'avgt'
-  timeUnit = 'ns'
 }
 tasks.getByName('jmh').doLast() {
   println "Benchmark report generated: file://$jmhHumanOutputPath"

@@ -27,7 +27,7 @@ public class ThriftModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(ReadOnlyScheduler.Iface.class).to(ReadOnlySchedulerImpl.class);
+    install(new ReadOnly());
     bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
     bind(AnnotatedAuroraAdmin.class).to(SchedulerThriftInterface.class);
 
@@ -35,5 +35,15 @@ public class ThriftModule extends AbstractModule {
     // See https://code.google.com/p/google-guice/issues/detail?id=461
     bind(SchedulerThriftInterface.class);
     install(new AopModule());
+  }
+
+  /**
+   * Binding module for only the read-only scheduler interface.
+   */
+  public static class ReadOnly extends AbstractModule {
+    @Override
+    protected void configure() {
+      bind(ReadOnlyScheduler.Iface.class).to(ReadOnlySchedulerImpl.class);
+    }
   }
 }

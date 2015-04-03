@@ -16,6 +16,7 @@ package org.apache.aurora.benchmark;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
@@ -64,10 +65,16 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Measurement;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.Warmup;
 
 /**
  * Performance benchmarks for the task scheduling loop.
@@ -77,6 +84,11 @@ public class SchedulingBenchmarks {
   /**
    * Constructs scheduler objects and populates offers/tasks for the benchmark run.
    */
+  @BenchmarkMode(Mode.Throughput)
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  @Warmup(iterations=1, time=10, timeUnit=TimeUnit.SECONDS)
+  @Measurement(iterations=10, time=10, timeUnit=TimeUnit.SECONDS)
+  @Fork(1)
   @State(Scope.Thread)
   public abstract static class AbstractBase {
     private static final Amount<Long, Time> NO_DELAY = Amount.of(0L, Time.MILLISECONDS);
@@ -241,7 +253,6 @@ public class SchedulingBenchmarks {
           .setTask(Iterables.getOnlyElement(new Tasks.Builder()
               .setProduction(true)
               .setCpu(32)
-              .setTaskIdFormat("test-%s")
               .build(1))).build();
     }
   }
@@ -257,7 +268,6 @@ public class SchedulingBenchmarks {
           .setTask(Iterables.getOnlyElement(new Tasks.Builder()
               .setProduction(true)
               .addValueConstraint("host", "denied")
-              .setTaskIdFormat("test-%s")
               .build(1))).build();
     }
   }
@@ -273,7 +283,6 @@ public class SchedulingBenchmarks {
           .setTask(Iterables.getOnlyElement(new Tasks.Builder()
               .setProduction(true)
               .addLimitConstraint("host", 0)
-              .setTaskIdFormat("test-%s")
               .build(1))).build();
     }
   }
@@ -292,7 +301,6 @@ public class SchedulingBenchmarks {
           .setTask(Iterables.getOnlyElement(new Tasks.Builder()
               .setProduction(true)
               .addLimitConstraint("host", 0)
-              .setTaskIdFormat("test-%s")
               .build(1))).build();
     }
   }
@@ -310,7 +318,6 @@ public class SchedulingBenchmarks {
           .setTask(Iterables.getOnlyElement(new Tasks.Builder()
               .setProduction(true)
               .addValueConstraint("host", "denied")
-              .setTaskIdFormat("test-%s")
               .build(1))).build();
     }
 
