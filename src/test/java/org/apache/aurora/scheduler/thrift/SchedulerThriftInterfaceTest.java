@@ -125,7 +125,6 @@ import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
 import static org.apache.aurora.gen.ResponseCode.AUTH_FAILED;
-import static org.apache.aurora.gen.ResponseCode.ERROR;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
@@ -1512,11 +1511,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return response(OK, Optional.<Result>absent());
   }
 
-  private static Response errorResponse(String message) {
-    return response(ERROR, Optional.<Result>absent())
-        .setDetails(ImmutableList.of(new ResponseDetail().setMessage(message)));
-  }
-
   private static Response invalidResponse(String message) {
     return Responses.empty()
         .setResponseCode(INVALID_REQUEST)
@@ -2358,6 +2352,41 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertResponse(AUTH_FAILED, thrift.pulseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testMaxWaitToInstanceRunningMsDeprecationWarning() throws Exception {
+    expectAuth(ROLE, true);
+    expectNoCronJob();
+
+    ITaskConfig newTask = buildTaskForJobUpdate(0).getAssignedTask().getTask();
+    expect(taskIdGenerator.generate(newTask, 1)).andReturn(TASK_ID);
+
+    IJobUpdate update = buildJobUpdate(
+        1,
+        newTask,
+        ImmutableMap.<ITaskConfig, ImmutableSet<Range>>of());
+
+    expect(quotaManager.checkJobUpdate(
+        update,
+        storageUtil.mutableStoreProvider)).andReturn(ENOUGH_QUOTA);
+
+    expect(uuidGenerator.createNew()).andReturn(UU_ID);
+    storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active());
+
+    jobUpdateController.start(update, AUDIT);
+
+    control.replay();
+
+    // Validate key is populated during sanitizing.
+    JobUpdateRequest request = buildJobUpdateRequest(update);
+    request.getTaskConfig().unsetJob();
+
+    Response response = assertOkResponse(thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
+    assertEquals(
+        ImmutableList.of(
+            new ResponseDetail(SchedulerThriftInterface.MAX_WAIT_TO_INSTANCE_FIELD_WARNING)),
+        response.getDetails());
   }
 
   private static final String AUTH_DENIED_MESSAGE = "Denied!";

@@ -23,8 +23,7 @@ import static java.util.Objects.requireNonNull;
  * A state evaluator is expected to be used multiple times over the course of changing an active
  * task's configuration.  This should be invoked every time the state of an instance changes to
  * determine what action to take next.  It's expected that it will eventually converge by
- * {@link Result#SUCCEEDED succeeding}, or failing with {@link Result#FAILED_STUCK} or
- * {@link Result#FAILED_TERMINATED}.
+ * {@link Result#SUCCEEDED succeeding}, or failing with {@link Result#FAILED_TERMINATED}.
  *
  * @param <T> Instance state type.
  */
@@ -56,7 +55,6 @@ interface StateEvaluator<T> {
     KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.KILL_TASK), NO_FAILURE),
     EVALUATE_AFTER_MIN_RUNNING_MS(Optional.of(InstanceAction.WATCH_TASK), NO_FAILURE),
     SUCCEEDED(Optional.<InstanceAction>absent(), NO_FAILURE),
-    FAILED_STUCK(Optional.<InstanceAction>absent(), Optional.of(Failure.STUCK)),
     FAILED_TERMINATED(Optional.<InstanceAction>absent(), Optional.of(Failure.EXITED));
 
     private final Optional<InstanceAction> action;
@@ -77,7 +75,6 @@ interface StateEvaluator<T> {
   }
 
   enum Failure {
-    STUCK("took too long to transition from a transient state."),
     EXITED("exited.");
 
     private final String reason;

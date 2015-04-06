@@ -1115,8 +1115,8 @@ public class JobUpdaterIT extends EasyMockTest {
   }
 
   @Test
-  public void testStuckTask() throws Exception {
-    expectTaskKilled().times(3);
+  public void testSlowToScheduleTask() throws Exception {
+    expectTaskKilled().times(2);
 
     control.replay();
 
@@ -1134,28 +1134,16 @@ public class JobUpdaterIT extends EasyMockTest {
     changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
 
-    // Instance 1 is stuck in PENDING.
+    // Instance 1 is not advancing past PENDING.
     changeState(JOB, 1, KILLED);
     actions.putAll(0, INSTANCE_UPDATED)
         .putAll(1, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     clock.advance(RUNNING_TIMEOUT);
-    actions.putAll(1, INSTANCE_UPDATE_FAILED, INSTANCE_ROLLING_BACK);
-    assertState(ROLLING_BACK, actions.build());
-    assertLatestUpdateMessage(JobUpdateControllerImpl.failureMessage(1, Failure.STUCK));
+    assertState(ROLLING_FORWARD, actions.build());
 
-    // Instance 1 is reverted.
-    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
-    clock.advance(WATCH_TIMEOUT);
-
-    // Instance 0 is reverted.
-    changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
-    clock.advance(WATCH_TIMEOUT);
-
-    actions.putAll(0, INSTANCE_ROLLING_BACK, INSTANCE_ROLLED_BACK)
-        .putAll(1, INSTANCE_ROLLED_BACK);
-    assertState(ROLLED_BACK, actions.build());
-    assertJobState(JOB, ImmutableMap.of(0, OLD_CONFIG, 1, OLD_CONFIG));
+    updater.abort(update.getSummary().getKey(), AUDIT);
+    assertState(ABORTED, actions.build());
   }
 
   @Test

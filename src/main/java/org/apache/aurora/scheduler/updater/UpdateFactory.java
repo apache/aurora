@@ -118,7 +118,6 @@ interface UpdateFactory {
                 desiredStateConfig,
                 settings.getMaxPerInstanceFailures(),
                 Amount.of((long) settings.getMinWaitInInstanceRunningMs(), Time.MILLISECONDS),
-                Amount.of((long) settings.getMaxWaitToInstanceRunningMs(), Time.MILLISECONDS),
                 clock));
       }
 

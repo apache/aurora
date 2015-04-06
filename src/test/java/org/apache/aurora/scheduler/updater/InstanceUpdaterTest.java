@@ -49,7 +49,7 @@ public class InstanceUpdaterTest {
   private static final ITaskConfig NEW = ITaskConfig.build(new TaskConfig().setNumCpus(2.0));
 
   private static final Amount<Long, Time> MIN_RUNNING_TIME = Amount.of(1L, Time.MINUTES);
-  private static final Amount<Long, Time> MAX_NON_RUNNING_TIME = Amount.of(5L, Time.MINUTES);
+  private static final Amount<Long, Time> A_LONG_TIME = Amount.of(1L, Time.DAYS);
 
   private static class TestFixture {
     private final FakeClock clock;
@@ -59,12 +59,7 @@ public class InstanceUpdaterTest {
 
     TestFixture(Optional<ITaskConfig> newConfig, int maxToleratedFailures) {
       this.clock = new FakeClock();
-      this.updater = new InstanceUpdater(
-          newConfig,
-          maxToleratedFailures,
-          MIN_RUNNING_TIME,
-          MAX_NON_RUNNING_TIME,
-          clock);
+      this.updater = new InstanceUpdater(newConfig, maxToleratedFailures, MIN_RUNNING_TIME, clock);
       this.taskUtil = new TaskUtil(clock);
     }
 
@@ -120,7 +115,8 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluateCurrentState(SUCCEEDED);
   }
@@ -133,9 +129,10 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.evaluate(EVALUATE_ON_STATE_CHANGE, FAILED);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING, ASSIGNED, STARTING);
     f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluateCurrentState(SUCCEEDED);
@@ -149,7 +146,8 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.evaluate(Result.FAILED_TERMINATED, FAILED);
   }
 
@@ -175,7 +173,8 @@ public class InstanceUpdaterTest {
     f.setActualStateAbsent();
     f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluateCurrentState(SUCCEEDED);
   }
@@ -198,36 +197,31 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING);
-    f.advanceTime(MAX_NON_RUNNING_TIME);
-    f.evaluateCurrentState(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE);
-    f.setActualStateAbsent();
-    f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
-    f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING);
-    f.advanceTime(MAX_NON_RUNNING_TIME);
-    f.evaluateCurrentState(Result.FAILED_STUCK);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING);
+    f.advanceTime(A_LONG_TIME);
+    f.evaluateCurrentState(EVALUATE_ON_STATE_CHANGE);
   }
 
   @Test
-  public void testStuckInKilling() {
+  public void testSlowToKill() {
     TestFixture f = new TestFixture(NEW, 1);
     f.setActualState(OLD);
     f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, RUNNING);
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING);
-    f.advanceTime(MAX_NON_RUNNING_TIME);
-    f.evaluateCurrentState(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING);
+    f.advanceTime(A_LONG_TIME);
+    f.evaluateCurrentState(EVALUATE_ON_STATE_CHANGE);
     f.setActualStateAbsent();
     f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, ASSIGNED, STARTING, RUNNING);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, KILLING);
-    f.advanceTime(MAX_NON_RUNNING_TIME);
-    f.evaluateCurrentState(Result.FAILED_STUCK);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
+    f.advanceTime(A_LONG_TIME);
+    f.evaluateCurrentState(EVALUATE_ON_STATE_CHANGE);
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -264,7 +258,8 @@ public class InstanceUpdaterTest {
     f.setActualStateAbsent();
     f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluateCurrentState(SUCCEEDED);
   }

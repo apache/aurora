@@ -1100,6 +1100,10 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return builder.build();
   }
 
+  @VisibleForTesting
+  static final String MAX_WAIT_TO_INSTANCE_FIELD_WARNING =
+      "Warning: the maxWaitToInstanceRunningMs setting is deprecated and will be removed in 0.9.0.";
+
   @Override
   public Response startJobUpdate(
       JobUpdateRequest mutableRequest,
@@ -1130,6 +1134,13 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
     if (settings.getMaxFailedInstances() < 0) {
       return invalidRequest(INVALID_MAX_FAILED_INSTANCES);
+    }
+
+    final Response response = ok();
+    if (settings.isSetMaxWaitToInstanceRunningMs()) {
+      addMessage(
+          response,
+          MAX_WAIT_TO_INSTANCE_FIELD_WARNING);
     }
 
     if (settings.getMaxWaitToInstanceRunningMs() < 0) {
@@ -1212,10 +1223,10 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
           jobUpdateController.start(
               update,
               new AuditData(context.getIdentity(), Optional.fromNullable(message)));
-          return ok(Result.startJobUpdateResult(
+          return response.setResult(Result.startJobUpdateResult(
               new StartJobUpdateResult(update.getSummary().getKey().newBuilder())));
         } catch (UpdateStateException | TaskValidationException e) {
-          return error(INVALID_REQUEST, e);
+          return addMessage(response, INVALID_REQUEST, e);
         }
       }
     });

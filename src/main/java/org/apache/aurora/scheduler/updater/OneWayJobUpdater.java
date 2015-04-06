@@ -262,7 +262,6 @@ class OneWayJobUpdater<K, T> {
   private static final Map<Result, SideEffect.InstanceUpdateStatus> TERMINAL_RESULT_TO_STATUS =
       ImmutableMap.of(
           Result.SUCCEEDED, SUCCEEDED,
-          Result.FAILED_STUCK, FAILED,
           Result.FAILED_TERMINATED, FAILED
   );
 

@@ -19,7 +19,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
@@ -28,7 +27,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 import static java.util.Objects.requireNonNull;
 
@@ -36,7 +34,6 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
-import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED_STUCK;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED_TERMINATED;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
@@ -53,7 +50,6 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
   private final Optional<ITaskConfig> desiredState;
   private final int toleratedFailures;
   private final Amount<Long, Time> minRunningTime;
-  private final Amount<Long, Time> maxNonRunningTime;
   private final Clock clock;
 
   private int observedFailures = 0;
@@ -62,36 +58,17 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
       Optional<ITaskConfig> desiredState,
       int toleratedFailures,
       Amount<Long, Time> minRunningTime,
-      Amount<Long, Time> maxNonRunningTime,
       Clock clock) {
 
     this.desiredState = requireNonNull(desiredState);
     this.toleratedFailures = toleratedFailures;
     this.minRunningTime = requireNonNull(minRunningTime);
-    this.maxNonRunningTime = requireNonNull(maxNonRunningTime);
     this.clock = requireNonNull(clock);
   }
 
-  private long millisSince(ITaskEvent event) {
-    return clock.nowMillis() - event.getTimestamp();
-  }
-
   private boolean appearsStable(IScheduledTask task) {
-    return millisSince(Tasks.getLatestEvent(task)) >= minRunningTime.as(Time.MILLISECONDS);
-  }
-
-  private boolean appearsStuck(IScheduledTask task) {
-    // Walk task events backwards to find the first event, or first non-running event.
-    ITaskEvent earliestNonRunningEvent = task.getTaskEvents().get(0);
-    for (ITaskEvent event : Lists.reverse(task.getTaskEvents())) {
-      if (event.getStatus() == RUNNING) {
-        break;
-      } else {
-        earliestNonRunningEvent = event;
-      }
-    }
-
-    return millisSince(earliestNonRunningEvent) >= maxNonRunningTime.as(Time.MILLISECONDS);
+    return (clock.nowMillis() - Tasks.getLatestEvent(task).getTimestamp())
+        >= minRunningTime.as(Time.MILLISECONDS);
   }
 
   private static boolean isPermanentlyKilled(IScheduledTask task) {
@@ -158,16 +135,9 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
         // The desired task has terminated, this is a failure.
         LOG.info("Task is in terminal state " + status);
         return addFailureAndCheckIfFailed() ? FAILED_TERMINATED : EVALUATE_ON_STATE_CHANGE;
-      } else if (appearsStuck(actualState)) {
-        LOG.info("Task appears stuck.");
-        // The task is not running, but not terminated, and appears to have been in this state
-        // long enough that we should intervene.
-        return addFailureAndCheckIfFailed()
-            ? FAILED_STUCK
-            : KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       } else {
-        // The task is in a transient state on the way into or out of running, check back later.
-        return EVALUATE_AFTER_MIN_RUNNING_MS;
+        // The task is in the process of being restarted, check back later.
+        return EVALUATE_ON_STATE_CHANGE;
       }
     } else {
       // This is not the configuration that we would like to run.
