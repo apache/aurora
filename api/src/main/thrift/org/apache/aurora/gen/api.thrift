@@ -659,7 +659,10 @@ struct JobUpdateSettings {
   /** Max number of FAILED instances to tolerate before terminating the update. */
   3: i32 maxFailedInstances
 
-  /** Max time to wait until an instance reaches RUNNING state. */
+  /**
+   * Max time to wait until an instance reaches RUNNING state.
+   * Note: Deprecated in 0.8.0.
+   */
   4: i32 maxWaitToInstanceRunningMs
 
   /** Min time to watch a RUNNING instance. */

@@ -1947,18 +1947,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testStartUpdateFailsInvalidMaxWaitToRunning() throws Exception {
-    control.replay();
-
-    JobUpdateRequest updateRequest = buildServiceJobUpdateRequest();
-    updateRequest.getSettings().setMaxWaitToInstanceRunningMs(-1);
-
-    assertEquals(
-        invalidResponse(SchedulerThriftInterface.INVALID_MAX_WAIT_TO_RUNNING),
-        thrift.startJobUpdate(updateRequest, AUDIT_MESSAGE, SESSION));
-  }
-
-  @Test
   public void testStartUpdateFailsInvalidMinWaitInRunning() throws Exception {
     control.replay();
 
@@ -2352,41 +2340,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertResponse(AUTH_FAILED, thrift.pulseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
-  }
-
-  @Test
-  public void testMaxWaitToInstanceRunningMsDeprecationWarning() throws Exception {
-    expectAuth(ROLE, true);
-    expectNoCronJob();
-
-    ITaskConfig newTask = buildTaskForJobUpdate(0).getAssignedTask().getTask();
-    expect(taskIdGenerator.generate(newTask, 1)).andReturn(TASK_ID);
-
-    IJobUpdate update = buildJobUpdate(
-        1,
-        newTask,
-        ImmutableMap.<ITaskConfig, ImmutableSet<Range>>of());
-
-    expect(quotaManager.checkJobUpdate(
-        update,
-        storageUtil.mutableStoreProvider)).andReturn(ENOUGH_QUOTA);
-
-    expect(uuidGenerator.createNew()).andReturn(UU_ID);
-    storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active());
-
-    jobUpdateController.start(update, AUDIT);
-
-    control.replay();
-
-    // Validate key is populated during sanitizing.
-    JobUpdateRequest request = buildJobUpdateRequest(update);
-    request.getTaskConfig().unsetJob();
-
-    Response response = assertOkResponse(thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
-    assertEquals(
-        ImmutableList.of(
-            new ResponseDetail(SchedulerThriftInterface.MAX_WAIT_TO_INSTANCE_FIELD_WARNING)),
-        response.getDetails());
   }
 
   private static final String AUTH_DENIED_MESSAGE = "Denied!";
