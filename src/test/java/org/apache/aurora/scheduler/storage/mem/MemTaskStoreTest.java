@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -32,19 +33,25 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -70,6 +77,7 @@ public class MemTaskStoreTest {
 
   @Test
   public void testSave() {
+    StorageEntityUtil.assertFullyPopulated(TASK_A.newBuilder());
     store.saveTasks(ImmutableSet.of(TASK_A, TASK_B));
     assertStoreContents(TASK_A, TASK_B);
 
@@ -453,15 +461,39 @@ public class MemTaskStoreTest {
   private static IScheduledTask makeTask(String id, String role, String env, String jobName) {
     return IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.PENDING)
+        .setTaskEvents(ImmutableList.of(
+            new TaskEvent(100L, ScheduleStatus.ASSIGNED)
+                .setMessage("message")
+                .setScheduler("scheduler")))
+        .setAncestorId("ancestor")
         .setAssignedTask(new AssignedTask()
             .setInstanceId(0)
             .setTaskId(id)
+            .setSlaveId("slave")
+            .setSlaveHost("slavehost")
+            .setAssignedPorts(ImmutableMap.of("http", 1000))
             .setTask(new TaskConfig()
                 .setJob(new JobKey(role, env, jobName))
                 .setJobName(jobName)
                 .setEnvironment(env)
                 .setOwner(new Identity(role, role))
-                .setExecutorConfig(new ExecutorConfig().setData("executor config")))));
+                .setIsService(true)
+                .setNumCpus(1.0)
+                .setRamMb(1024)
+                .setDiskMb(1024)
+                .setPriority(1)
+                .setMaxTaskFailures(-1)
+                .setProduction(true)
+                .setConstraints(ImmutableSet.of(
+                    new Constraint(
+                        "name",
+                        TaskConstraint.value(
+                            new ValueConstraint(false, ImmutableSet.of("value"))))))
+                .setRequestedPorts(ImmutableSet.of("http"))
+                .setTaskLinks(ImmutableMap.of("http", "link"))
+                .setContactEmail("foo@bar.com")
+                .setMetadata(ImmutableSet.of(new Metadata("key", "value")))
+                .setExecutorConfig(new ExecutorConfig("name", "config")))));
   }
 
   private static IScheduledTask makeTask(String id) {

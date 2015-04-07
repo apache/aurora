@@ -26,6 +26,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
+import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -52,7 +53,7 @@ public class DbQuotaStoreTest {
     assertEquals(Optional.<IResourceAggregate>absent(), select(ROLE_A));
     assertQuotas(ImmutableMap.<String, IResourceAggregate>of());
 
-    save(ROLE_A, QUOTA_A);
+    save(ROLE_A, StorageEntityUtil.assertFullyPopulated(QUOTA_A));
     save(ROLE_B, QUOTA_B);
 
     assertEquals(Optional.of(QUOTA_A), select(ROLE_A));

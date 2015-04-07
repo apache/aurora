@@ -31,6 +31,7 @@ import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
+import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -169,7 +170,7 @@ public class DbLockStoreTest {
     assertEquals(Optional.<ILock>absent(), getLock(lock1.getKey()));
     assertEquals(Optional.<ILock>absent(), getLock(lock2.getKey()));
 
-    saveLocks(lock1);
+    saveLocks(StorageEntityUtil.assertFullyPopulated(lock1));
     assertEquals(Optional.of(lock1), getLock(lock1.getKey()));
     assertEquals(Optional.<ILock>absent(), getLock(lock2.getKey()));
     saveLocks(lock2);

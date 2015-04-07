@@ -19,12 +19,16 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
+import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateDetails;
@@ -38,8 +42,11 @@ import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -57,6 +64,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
+import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -111,6 +119,10 @@ public class DBJobUpdateStoreTest {
     assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId1));
     assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId2));
 
+    StorageEntityUtil.assertFullyPopulated(
+        update1,
+        StorageEntityUtil.getField(JobUpdateSummary.class, "state"),
+        StorageEntityUtil.getField(IJobUpdateSummary.class, "state"));
     saveUpdate(update1, Optional.of("lock1"));
     assertUpdate(update1);
 
@@ -1049,6 +1061,16 @@ public class DBJobUpdateStoreTest {
         .setJobName(JOB.getName())
         .setEnvironment(JOB.getEnvironment())
         .setOwner(new Identity(JOB.getRole(), "user"))
-        .setIsService(true);
+        .setJob(new JobKey("role", "env", "job"))
+        .setIsService(true)
+        .setConstraints(ImmutableSet.of(
+            new Constraint(
+                "name",
+                TaskConstraint.value(new ValueConstraint(true, ImmutableSet.of("x86"))))))
+        .setRequestedPorts(ImmutableSet.of("http"))
+        .setTaskLinks(ImmutableMap.of("key", "url"))
+        .setContactEmail("foo@bar.com")
+        .setExecutorConfig(new ExecutorConfig("name", "data"))
+        .setMetadata(ImmutableSet.of(new Metadata("name", "value")));
   }
 }
