@@ -19,7 +19,7 @@ import json
 import textwrap
 from collections import namedtuple
 
-from apache.aurora.client.base import combine_messages
+from apache.aurora.client.base import combine_messages, get_update_page
 from apache.aurora.client.cli import (
     EXIT_API_ERROR,
     EXIT_COMMAND_FAILURE,
@@ -160,7 +160,10 @@ class StartUpdate(Verb):
         err_msg="Failed to start update due to error:")
 
     if resp.result:
-      url = context.get_update_page(api, config.cluster(), resp.result.startJobUpdateResult.key)
+      url = get_update_page(
+        api,
+        AuroraJobKey.from_thrift(config.cluster(), resp.result.startJobUpdateResult.key.job),
+        resp.result.startJobUpdateResult.key.id)
       context.print_out(self.UPDATE_MSG_TEMPLATE % url)
     else:
       context.print_out(combine_messages(resp))

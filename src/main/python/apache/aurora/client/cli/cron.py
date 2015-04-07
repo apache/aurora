@@ -17,7 +17,9 @@
 from __future__ import print_function
 
 import textwrap
+import webbrowser
 
+from apache.aurora.client.base import get_job_page
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_PARAMETER,
@@ -63,7 +65,7 @@ class Schedule(Verb):
         err_msg=("Error scheduling cron job %s:" % context.options.jobspec))
 
     context.print_out("Cron job scheduled, status can be viewed at %s"
-        % context.get_job_page(api, context.options.jobspec))
+        % get_job_page(api, context.options.jobspec))
 
     return EXIT_OK
 
@@ -111,7 +113,7 @@ class Start(Verb):
     context.log_response_and_raise(resp,
         err_msg=("Error starting cron job %s:" % context.options.jobspec))
     if context.options.open_browser:
-      context.open_job_page(api, context.options.jobspec)
+      webbrowser.open_new_tab(get_job_page(api, context.options.jobspec))
     return EXIT_OK
 
 

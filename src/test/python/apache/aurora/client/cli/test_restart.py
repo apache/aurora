@@ -15,7 +15,7 @@ import contextlib
 import functools
 
 import pytest
-from mock import create_autospec, patch
+from mock import call, create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api import UpdaterConfig
@@ -77,6 +77,27 @@ class TestRestartJobCommand(AuroraClientCommandTest):
     with pytest.raises(Context.CommandError) as e:
       command.execute(fake_context)
       assert e.message == "Invalid instance parameter: [1]"
+
+  def test_restart_opens_url(self):
+    command = RestartCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, None)
+    mock_options.strict = True
+    mock_options.open_browser = True
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+    fake_api = fake_context.fake_api
+
+    fake_api.restart.return_value = AuroraClientCommandTest.create_simple_success_response()
+
+    command.execute(fake_context)
+
+    assert self.mock_webbrowser.mock_calls == [
+        call("http://something_or_other/scheduler/role/env/job")
+    ]
 
 
 class TestRestartCommand(AuroraClientCommandTest):

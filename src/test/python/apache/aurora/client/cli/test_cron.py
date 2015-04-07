@@ -16,9 +16,10 @@
 
 import contextlib
 
-from mock import patch
+from mock import call, patch
 from twitter.common.contextutil import temporary_file
 
+from apache.aurora.client.base import get_job_page
 from apache.aurora.client.cli import (
     EXIT_API_ERROR,
     EXIT_COMMAND_FAILURE,
@@ -54,7 +55,7 @@ class TestCronNoun(AuroraClientCommandTest):
       assert isinstance(api.schedule_cron.call_args[0][0], AuroraConfig)
 
       # The last text printed out to the user should contain a url to the job
-      assert mock_context.get_job_page(api, self.TEST_JOBKEY) in mock_context.out[-1]
+      assert get_job_page(api, self.TEST_JOBKEY) in mock_context.out[-1]
 
   def test_schedule_failed(self):
     mock_context = FakeAuroraCommandContext()
@@ -144,7 +145,9 @@ class TestCronNoun(AuroraClientCommandTest):
       result = cmd.execute(['cron', 'start', self.TEST_JOBSPEC, '--open-browser'])
       assert result == EXIT_OK
       api.start_cronjob.assert_called_once_with(self.TEST_JOBKEY, config=None)
-      assert mock_context.showed_urls == ["http://something_or_other/scheduler/bozo/test/hello"]
+      assert self.mock_webbrowser.mock_calls == [
+          call("http://something_or_other/scheduler/bozo/test/hello")
+      ]
 
   @classmethod
   def _create_getjobs_response(cls):

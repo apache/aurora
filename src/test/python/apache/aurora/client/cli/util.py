@@ -15,7 +15,7 @@
 import textwrap
 import unittest
 
-from mock import create_autospec, Mock
+from mock import create_autospec, Mock, patch
 
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
@@ -63,7 +63,6 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     self.status = []
     self.fake_api = self.create_mock_api()
     self.task_result = []
-    self.showed_urls = []
     self.out = []
     self.err = []
 
@@ -98,9 +97,6 @@ class FakeAuroraCommandContext(AuroraCommandContext):
   def get_err(self):
     return self.err
 
-  def open_page(self, url):
-    self.showed_urls.append(url)
-
   def add_expected_status_query_result(self, expected_result):
     self.add_task_result(expected_result)
     self.fake_api.check_status.side_effect = self.task_result
@@ -120,6 +116,11 @@ class FakeAuroraCommandContext(AuroraCommandContext):
 
 class AuroraClientCommandTest(unittest.TestCase):
   FAKE_TIME = 42131
+
+  def setUp(self):
+    patcher = patch('webbrowser.open_new_tab')
+    self.mock_webbrowser = patcher.start()
+    self.addCleanup(patcher.stop)
 
   @classmethod
   def create_blank_response(cls, code, msg):

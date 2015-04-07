@@ -15,7 +15,7 @@
 import contextlib
 
 import pytest
-from mock import create_autospec, Mock, patch
+from mock import call, create_autospec, Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import (
@@ -174,7 +174,9 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
       self.assert_create_job_called(api)
       self.assert_scheduler_called(api, mock_query, 2)
-      assert mock_context.showed_urls == ["http://something_or_other/scheduler/bozo/test/hello"]
+      assert self.mock_webbrowser.mock_calls == [
+          call("http://something_or_other/scheduler/bozo/test/hello")
+      ]
 
   def test_create_job_delayed(self):
     """Run a test of the "create" command against a mocked-out API:

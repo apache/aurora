@@ -140,6 +140,27 @@ class TestKillCommand(AuroraClientCommandTest):
     command.execute(fake_context)
     assert fake_context.get_err()[0] == "No tasks to kill found for job cluster/role/env/job"
 
+  def test_kill_opens_url(self):
+    """Verify the kill commands opens the job page if requested"""
+    command = KillCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, [1])
+    mock_options.open_browser = True
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    fake_context.add_expected_query_result(AuroraClientCommandTest.create_empty_task_result())
+
+    command.execute(fake_context)
+
+    assert self.mock_webbrowser.mock_calls == [
+        call("http://something_or_other/scheduler/role/env/job")
+    ]
+
 
 class TestClientKillCommand(AuroraClientCommandTest):
   @classmethod

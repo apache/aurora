@@ -21,6 +21,7 @@ import pprint
 import subprocess
 import textwrap
 import time
+import webbrowser
 from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime
@@ -31,6 +32,7 @@ from thrift.TSerialization import serialize
 
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.updater_util import UpdaterConfig
+from apache.aurora.client.base import get_job_page, synthesize_url
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
@@ -119,7 +121,7 @@ class CreateJobCommand(Verb):
     context.log_response_and_raise(resp, err_code=EXIT_COMMAND_FAILURE,
                                    err_msg="Job creation failed due to error:")
     if context.options.open_browser:
-      context.open_job_page(api, context.options.jobspec)
+      webbrowser.open_new_tab(get_job_page(api, context.options.jobspec))
     if context.options.wait_until == "RUNNING":
       JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
     elif context.options.wait_until == "FINISHED":
@@ -133,7 +135,7 @@ class CreateJobCommand(Verb):
       return EXIT_COMMAND_FAILURE
     else:
       context.print_out("Job create succeeded: job url=%s" %
-                        context.get_job_page(api, context.options.jobspec))
+                        get_job_page(api, context.options.jobspec))
     return EXIT_OK
 
 
@@ -372,7 +374,7 @@ class KillCommand(AbstractKillCommand):
     else:
       self.kill_in_batches(context, job, instances_arg)
     if context.options.open_browser:
-      context.open_job_page(api, context.options.jobspec)
+      webbrowser.open_new_tab(get_job_page(api, job))
     context.print_out("Job kill succeeded")
     return EXIT_OK
 
@@ -401,7 +403,7 @@ class KillAllJobCommand(AbstractKillCommand):
     else:
       self.kill_in_batches(context, job, None)
     if context.options.open_browser:
-      context.open_job_page(api, job)
+      webbrowser.open_new_tab(get_job_page(api, job))
     context.print_out("Job killall succeeded")
     return EXIT_OK
 
@@ -446,7 +448,10 @@ class OpenCommand(Verb):
     while len(key_parts) < 4:
       key_parts.append(None)
     (cluster, role, env, name) = key_parts
-    context.open_scheduler_page(cluster, role, env, name)
+    api = context.get_api(cluster)
+    webbrowser.open_new_tab(
+      synthesize_url(api.scheduler_proxy.scheduler_client().url, role, env, name)
+    )
     return EXIT_OK
 
 
@@ -510,7 +515,7 @@ class RestartCommand(Verb):
                                    err_msg="Error restarting job %s:" % str(job))
     context.print_out("Job %s restarted successfully" % str(job))
     if context.options.open_browser:
-      context.open_job_page(api, context.options.jobspec)
+      webbrowser.open_new_tab(get_job_page(api, job))
     return EXIT_OK
 
 

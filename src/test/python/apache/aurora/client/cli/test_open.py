@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-from mock import patch
+from mock import call, patch
 
 from apache.aurora.client.cli import EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
@@ -27,7 +27,7 @@ class TestClientOpenCommand(AuroraClientCommandTest):
     with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       result = cmd.execute(['job', 'open', 'west'])
-      assert mock_context.showed_urls == ['http://something_or_other/scheduler']
+      assert self.mock_webbrowser.mock_calls == [call("http://something_or_other/scheduler")]
       assert result == EXIT_OK
 
   def test_open_role(self):
@@ -35,7 +35,7 @@ class TestClientOpenCommand(AuroraClientCommandTest):
     with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       result = cmd.execute(['job', 'open', 'west/bozo'])
-      assert mock_context.showed_urls == ['http://something_or_other/scheduler/bozo']
+      assert self.mock_webbrowser.mock_calls == [call("http://something_or_other/scheduler/bozo")]
       assert result == EXIT_OK
 
   def test_open_env(self):
@@ -43,7 +43,9 @@ class TestClientOpenCommand(AuroraClientCommandTest):
     with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       result = cmd.execute(['job', 'open', 'west/bozo/devel'])
-      assert mock_context.showed_urls == ['http://something_or_other/scheduler/bozo/devel']
+      assert self.mock_webbrowser.mock_calls == [
+          call("http://something_or_other/scheduler/bozo/devel")
+      ]
       assert result == EXIT_OK
 
   def test_open_job(self):
@@ -51,7 +53,9 @@ class TestClientOpenCommand(AuroraClientCommandTest):
     with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       result = cmd.execute(['job', 'open', 'west/bozo/devel/foo'])
-      assert mock_context.showed_urls == ['http://something_or_other/scheduler/bozo/devel/foo']
+      assert self.mock_webbrowser.mock_calls == [
+          call("http://something_or_other/scheduler/bozo/devel/foo")
+      ]
       assert result == EXIT_OK
 
   def test_open_noparam(self):
@@ -59,4 +63,4 @@ class TestClientOpenCommand(AuroraClientCommandTest):
     with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       self.assertRaises(SystemExit, cmd.execute, (['job', 'open']))
-      assert mock_context.showed_urls == []
+      assert self.mock_webbrowser.mock_calls == []

@@ -17,7 +17,7 @@ from __future__ import print_function
 import logging
 from fnmatch import fnmatch
 
-from apache.aurora.client.base import AURORA_V2_USER_AGENT_NAME, combine_messages, synthesize_url
+from apache.aurora.client.base import AURORA_V2_USER_AGENT_NAME, combine_messages
 from apache.aurora.client.cli import (
     Context,
     EXIT_API_ERROR,
@@ -83,29 +83,6 @@ class AuroraCommandContext(Context):
       return result
     except Exception as e:
       raise self.CommandError(EXIT_INVALID_CONFIGURATION, 'Error loading configuration: %s' % e)
-
-  def open_page(self, url):
-    import webbrowser
-    webbrowser.open_new_tab(url)
-
-  def open_job_page(self, api, jobkey):
-    """Opens the page for a job in the system web browser."""
-    self.open_page(self.get_job_page(api, jobkey))
-
-  def get_job_page(self, api, jobkey):
-    return synthesize_url(api.scheduler_proxy.scheduler_client().url, jobkey.role,
-        jobkey.env, jobkey.name)
-
-  def get_update_page(self, api, cluster, update_key):
-    return "%s/%s" % (
-        self.get_job_page(api, AuroraJobKey.from_thrift(cluster, update_key.job)),
-        update_key.id)
-
-  def open_scheduler_page(self, cluster, role, env, name):
-    """Open a scheduler page"""
-    api = self.get_api(cluster)
-    self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url,
-        role, env, name))
 
   def log_response_and_raise(self, resp, err_code=EXIT_API_ERROR, err_msg="Command failure:"):
     if resp.responseCode == ResponseCode.OK:
