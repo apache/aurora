@@ -109,7 +109,7 @@ public interface MesosTaskFactory {
     @VisibleForTesting
     static final Resources RESOURCES_EPSILON = new Resources(
         0.01,
-        Amount.of(1L, Data.MB),
+        Amount.of(32L, Data.MB),
         Amount.of(1L, Data.MB),
         0);
 

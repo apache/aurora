@@ -79,7 +79,7 @@ public class GcExecutorLauncher implements TaskLauncher {
   // An epsilon is used because we are required to supply executor and task resources.
   @VisibleForTesting
   static final Resources EPSILON =
-      new Resources(0.01, Amount.of(1L, Data.MB), Amount.of(1L, Data.MB), 0);
+      new Resources(0.01, Amount.of(32L, Data.MB), Amount.of(1L, Data.MB), 0);
 
   private static final Resources GC_EXECUTOR_TASK_RESOURCES =
       Resources.subtract(TOTAL_GC_EXECUTOR_RESOURCES, EPSILON);
