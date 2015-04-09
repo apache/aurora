@@ -20,9 +20,10 @@ from mock import create_autospec, Mock, patch
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import CLUSTERS, Clusters
 
 from ...api_util import SchedulerProxyApiSpec, SchedulerThriftApiSpec
-from ..util import TEST_CLUSTER, TEST_CLUSTERS
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, CURRENT_API_VERSION
 from gen.apache.aurora.api.ttypes import (
@@ -121,6 +122,12 @@ class AuroraClientCommandTest(unittest.TestCase):
     patcher = patch('webbrowser.open_new_tab')
     self.mock_webbrowser = patcher.start()
     self.addCleanup(patcher.stop)
+
+  def run(self, result=None):
+    # Since CLUSTERS is a global value that evaluates code on import this is the best way to
+    # ensure it does not pollute any tests.
+    with CLUSTERS.patch(self.TEST_CLUSTERS._clusters.values()):
+      super(AuroraClientCommandTest, self).run()
 
   @classmethod
   def create_blank_response(cls, code, msg):
@@ -292,13 +299,17 @@ jobs = [HELLO_WORLD]
 
   TEST_JOB = 'hello'
 
-  TEST_CLUSTER = TEST_CLUSTER
+  TEST_CLUSTER = 'west'
 
   TEST_JOBSPEC = 'west/bozo/test/hello'
 
   TEST_JOBKEY = AuroraJobKey('west', 'bozo', 'test', 'hello')
 
-  TEST_CLUSTERS = TEST_CLUSTERS
+  TEST_CLUSTERS = Clusters([Cluster(
+    name=TEST_CLUSTER,
+    zk='zookeeper.example.com',
+    scheduler_zk_path='/foo/bar',
+    auth_mechanism='UNAUTHENTICATED')])
 
   @classmethod
   def get_instance_spec(cls, instances_spec):

@@ -163,9 +163,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
   # that the client makes the right API call to the updated.
   def test_update_command_line_succeeds(self):
     mock_context = FakeAuroraCommandContext()
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       mock_api = mock_context.get_api('west')
       mock_api.update_job.return_value = self.create_simple_success_response()
       with temporary_file() as fp:
@@ -182,9 +180,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
   def test_update_invalid_config(self):
     mock_context = FakeAuroraCommandContext()
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       mock_api = mock_context.get_api('west')
       with temporary_file() as fp:
         fp.write(self.get_invalid_config('invalid_field=False,'))
@@ -317,7 +313,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
     # - The mock_context stubs out the API.
     # - the test relies on using live code in the API.
     with contextlib.nested(
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
@@ -356,7 +351,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
     fake_mux = self.FakeSchedulerMux()
     self.setup_mock_scheduler_for_simple_update(mock_api)
     with contextlib.nested(
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
@@ -393,7 +387,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
             side_effect=mock_out.put),
         patch('apache.aurora.client.cli.jobs.AuroraCommandContext.print_err',
             side_effect=mock_err.put),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
@@ -421,7 +414,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
     config = self.get_service_config()
     config = config.replace("instances = 20", "instances = 2")
     with contextlib.nested(
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
@@ -450,7 +442,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
     config = self.get_service_config()
     config = config.replace("instances = 20", "instances = 200")
     with contextlib.nested(
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
@@ -477,7 +468,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
     config = self.get_valid_config()
     config = config.replace("instances = 20", "instances = 200")
     with contextlib.nested(
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),

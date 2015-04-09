@@ -223,9 +223,7 @@ class TestJobStatus(AuroraClientCommandTest):
     job, it should end up doing a query using getTasksWithoutConfigs."""
     _, mock_scheduler_proxy = self.create_mock_api()
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_null_metadata()
-    with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
@@ -236,9 +234,7 @@ class TestJobStatus(AuroraClientCommandTest):
     job, it should end up doing a query using getTasksWithoutConfigs."""
     mock_context = FakeAuroraCommandContext()
     mock_context.add_expected_status_query_result(self.create_status_null_metadata())
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
@@ -265,9 +261,7 @@ class TestJobStatus(AuroraClientCommandTest):
     job, it should end up doing a query using getTasksWithoutConfigs."""
     mock_context = FakeAuroraCommandContext()
     mock_context.add_expected_status_query_result(self.create_status_with_inactives())
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
@@ -314,9 +308,7 @@ class TestJobStatus(AuroraClientCommandTest):
     job, it should end up doing a query using getTasksWithoutConfigs."""
     mock_context = FakeAuroraCommandContext()
     mock_context.add_expected_status_query_result(self.create_status_with_metadata())
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
@@ -352,9 +344,7 @@ class TestJobStatus(AuroraClientCommandTest):
   def test_successful_status_deep_null_metadata(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_null_metadata()
-    with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
@@ -367,9 +357,7 @@ class TestJobStatus(AuroraClientCommandTest):
     mock_api = mock_context.get_api('west')
     mock_api.check_status.return_value = self.create_status_response()
     mock_api.get_jobs.return_value = self.create_getjobs_response()
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.context.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', '*'])
 
@@ -437,9 +425,7 @@ class TestJobStatus(AuroraClientCommandTest):
     job, it should end up doing a query using getTasksWithoutConfigs."""
     mock_context = FakeAuroraCommandContext()
     mock_context.add_expected_status_query_result(self.get_task_status_json())
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', '--write-json', 'west/bozo/test/hello'])
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))

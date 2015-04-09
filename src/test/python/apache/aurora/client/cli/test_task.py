@@ -72,8 +72,6 @@ class TestRunCommand(AuroraClientCommandTest):
     sandbox_args = {'slave_root': '/slaveroot', 'slave_run_directory': 'slaverun'}
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.cli.task.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.command_runner.'
               'InstanceDistributedCommandRunner.sandbox_args',
             return_value=sandbox_args),
@@ -128,7 +126,6 @@ class TestSshCommand(AuroraClientCommandTest):
     sandbox_args = {'slave_root': '/slaveroot', 'slave_run_directory': 'slaverun'}
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
             return_value=sandbox_args),
         patch('subprocess.call', return_value=0)) as (
@@ -157,7 +154,6 @@ class TestSshCommand(AuroraClientCommandTest):
     mock_scheduler_proxy.getTasksStatus.return_value = self.create_nojob_status_response()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('subprocess.call', return_value=0)) as (
             mock_scheduler_proxy_class,
             mock_clusters,

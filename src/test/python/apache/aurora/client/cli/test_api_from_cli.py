@@ -12,8 +12,6 @@
 # limitations under the License.
 #
 
-import contextlib
-
 from mock import call, create_autospec, patch
 
 from apache.aurora.client.api.scheduler_client import SchedulerClient
@@ -70,10 +68,8 @@ class TestApiFromCLI(AuroraClientCommandTest):
     mock_thrift_client = create_autospec(spec=AuroraAdmin.Client, instance=True)
     mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
     mock_thrift_client.getTasksWithoutConfigs.return_value = self.create_status_response()
-    with contextlib.nested(
-        patch('apache.aurora.client.api.scheduler_client.SchedulerClient.get',
-            return_value=mock_scheduler_client),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.api.scheduler_client.SchedulerClient.get',
+               return_value=mock_scheduler_client):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       assert mock_thrift_client.getTasksWithoutConfigs.mock_calls == [
@@ -85,11 +81,8 @@ class TestApiFromCLI(AuroraClientCommandTest):
     mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
 
     mock_thrift_client.getTasksWithoutConfigs.side_effect = IOError("Uh-Oh")
-    with contextlib.nested(
-        patch('apache.aurora.client.api.scheduler_client.SchedulerClient.get',
-            return_value=mock_scheduler_client),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-
+    with patch('apache.aurora.client.api.scheduler_client.SchedulerClient.get',
+            return_value=mock_scheduler_client):
       cmd = AuroraCommandLine()
       # This should create a scheduler client, set everything up, and then issue a
       # getTasksWithoutConfigs call against the mock_scheduler_client. That should raise an

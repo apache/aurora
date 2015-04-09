@@ -39,7 +39,6 @@ python_library(
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/client/cli',
-    'src/test/python/apache/aurora/client:util',
   ]
 )
 
@@ -222,6 +221,5 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client:factory',
   ]
 )

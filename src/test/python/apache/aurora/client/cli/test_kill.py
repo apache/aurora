@@ -209,8 +209,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_monitor = self.get_monitor_mock()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)) as (_, m, _):
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)) as (_, m):
 
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
@@ -231,8 +230,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_monitor = self.get_monitor_mock()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)) as (_, m, _):
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)) as (_, m):
 
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
@@ -255,8 +253,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_monitor = self.get_monitor_mock()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)) as (_, m, _):
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)) as (_, m):
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
 
@@ -275,8 +272,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
 
@@ -295,8 +291,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_monitor = self.get_monitor_mock()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)) as (_, m, _):
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)) as (_, m):
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
 
@@ -317,8 +312,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_monitor = self.get_monitor_mock()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)) as (_, m, _):
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)) as (_, m):
       api = mock_context.get_api('west')
       mock_context.add_expected_query_result(
           self.create_query_call_result(), job_key=self.TEST_JOBKEY)
@@ -341,8 +335,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_monitor = self.get_monitor_mock(result=False)
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)):
       api = mock_context.get_api('west')
       mock_context.add_expected_query_result(
           self.create_query_call_result(), job_key=self.TEST_JOBKEY)
@@ -364,8 +357,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       api = mock_context.get_api('west')
       # set up an empty instance list in the getTasksWithoutConfigs response
       status_response = self.create_simple_success_response()
@@ -386,8 +378,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=self.get_monitor_mock()),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=self.get_monitor_mock())):
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
 
@@ -405,8 +396,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=self.get_monitor_mock()),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=self.get_monitor_mock())):
       api = mock_context.get_api('west')
       mock_context.add_expected_query_result(self.create_query_call_result())
       api.kill_job.return_value = self.create_simple_success_response()
@@ -428,8 +418,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_monitor = self.get_monitor_mock(result=False)
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)):
       api = mock_context.get_api('west')
       mock_context.add_expected_query_result(self.create_query_call_result())
       api.kill_job.return_value = self.create_simple_success_response()

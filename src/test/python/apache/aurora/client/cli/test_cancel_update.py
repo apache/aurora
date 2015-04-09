@@ -12,8 +12,6 @@
 # limitations under the License.
 #
 
-import contextlib
-
 from mock import patch
 from twitter.common.contextutil import temporary_file
 
@@ -66,9 +64,7 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_scheduler_proxy.releaseLock.return_value = self.get_release_lock_response()
-    with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()

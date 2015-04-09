@@ -12,34 +12,34 @@
 # limitations under the License.
 #
 
-from mock import call, Mock, patch
-
-from apache.aurora.client.base import AURORA_V2_USER_AGENT_NAME
+from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.cli.context import AuroraCommandContext
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import CLUSTERS
+
+TEST_CLUSTER = Cluster(name='some-cluster')
 
 
 def test_get_api_defaults_to_hooks_enabled():
-  with patch('apache.aurora.client.cli.context.make_client') as mock_make_client:
-    cluster = 'some-cluster'
+  with CLUSTERS.patch([TEST_CLUSTER]):
+    api = AuroraCommandContext().get_api(TEST_CLUSTER.name)
+    assert isinstance(api, HookedAuroraClientAPI)
+    assert api._cluster == TEST_CLUSTER
 
-    AuroraCommandContext().get_api(cluster)
-    assert mock_make_client.mock_calls == [call(cluster, AURORA_V2_USER_AGENT_NAME, True)]
+
+def test_get_api_forwards_hooks_disabled():
+  with CLUSTERS.patch([TEST_CLUSTER]):
+    api = AuroraCommandContext().get_api(TEST_CLUSTER.name, enable_hooks=False)
+    assert isinstance(api, AuroraClientAPI)
+    assert api._cluster == TEST_CLUSTER
 
 
 def test_get_api_caches_hook_enabled_apis_separately():
-  with patch('apache.aurora.client.cli.context.make_client') as mock_make_client:
-    # return a new Mock instance for each call of the two calls we're expecting.
-    mock_make_client.side_effect = [Mock(), Mock()]
-
-    cluster = 'some-cluster'
-
+  with CLUSTERS.patch([TEST_CLUSTER]):
     context = AuroraCommandContext()
-    hooked_api = context.get_api(cluster)
-    unhooked_api = context.get_api(cluster, False)
-
-    assert mock_make_client.mock_calls == [
-      call(cluster, AURORA_V2_USER_AGENT_NAME, True),
-      call(cluster, AURORA_V2_USER_AGENT_NAME, False)]
+    hooked_api = context.get_api(TEST_CLUSTER.name)
+    unhooked_api = context.get_api(TEST_CLUSTER.name, enable_hooks=False)
 
     assert hooked_api != unhooked_api
 
@@ -48,11 +48,3 @@ def test_get_api_caches_hook_enabled_apis_separately():
 
     assert unhooked_api in context.unhooked_apis.values()
     assert unhooked_api not in context.apis.values()
-
-
-def test_get_api_forwards_hooks_disabled():
-  with patch('apache.aurora.client.cli.context.make_client') as mock_make_client:
-    cluster = 'some-cluster'
-
-    AuroraCommandContext().get_api(cluster, enable_hooks=False)
-    assert mock_make_client.mock_calls == [call(cluster, AURORA_V2_USER_AGENT_NAME, False)]

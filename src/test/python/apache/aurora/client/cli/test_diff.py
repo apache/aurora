@@ -72,7 +72,6 @@ class TestDiffCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (_, _, subprocess_patch, _):
 
@@ -105,7 +104,6 @@ class TestDiffCommand(AuroraClientCommandTest):
     self.setup_populate_job_config(mock_scheduler_proxy)
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (
@@ -132,7 +130,6 @@ class TestDiffCommand(AuroraClientCommandTest):
     self.setup_populate_job_config(mock_scheduler_proxy)
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (

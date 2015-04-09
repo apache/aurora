@@ -17,6 +17,7 @@ from __future__ import print_function
 import logging
 from fnmatch import fnmatch
 
+from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.base import AURORA_V2_USER_AGENT_NAME, combine_messages
 from apache.aurora.client.cli import (
     Context,
@@ -26,7 +27,7 @@ from apache.aurora.client.cli import (
     EXIT_INVALID_PARAMETER
 )
 from apache.aurora.client.config import get_config
-from apache.aurora.client.factory import make_client
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 
@@ -54,10 +55,14 @@ class AuroraCommandContext(Context):
     Keeps the API handle cached, so that only one handle for each cluster will be created in a
     session.
     """
+    if cluster not in CLUSTERS:
+      raise self.CommandError(EXIT_INVALID_CONFIGURATION, "Unknown cluster: %s" % cluster)
+
     apis = self.apis if enable_hooks else self.unhooked_apis
+    base_class = HookedAuroraClientAPI if enable_hooks else AuroraClientAPI
 
     if cluster not in apis:
-      api = make_client(cluster, AURORA_V2_USER_AGENT_NAME, enable_hooks)
+      api = base_class(CLUSTERS[cluster], AURORA_V2_USER_AGENT_NAME, verbose=True)
       apis[cluster] = api
     return apis[cluster]
 

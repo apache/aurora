@@ -17,7 +17,6 @@ python_test_suite(name = 'all',
     ':base',
     ':binding_helper',
     ':config',
-    ':factory',
     'src/test/python/apache/aurora/client/api:all',
     'src/test/python/apache/aurora/client/cli:all',
     'src/test/python/apache/aurora/client/hooks:all',
@@ -50,31 +49,10 @@ python_tests(name = 'config',
   ],
 )
 
-python_tests(name = 'factory',
-  sources = ['test_factory.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    ':util',
-    'src/main/python/apache/aurora/client/api',
-    'src/main/python/apache/aurora/client:factory',
-    'src/main/python/apache/aurora/client/hooks',
-    'src/test/python/apache/aurora/client/cli:util',
-  ],
-)
-
 python_library(
   name = 'fake_scheduler_proxy',
   sources = ['fake_scheduler_proxy.py'],
   dependencies = [
     'src/main/python/apache/aurora/client/api:scheduler_client',
-  ]
-)
-
-python_library(
-  name = 'util',
-  sources = ['util.py'],
-  dependencies = [
-    'src/main/python/apache/aurora/common:cluster',
-    'src/main/python/apache/aurora/common:clusters',
   ]
 )

@@ -23,6 +23,7 @@ from twitter.common import app, log
 from twitter.common.quantity import Amount, Data, Time
 from twitter.common.quantity.parse_simple import parse_data, parse_time
 
+from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import JobUpTimeLimit
 from apache.aurora.client.base import (
     AURORA_ADMIN_USER_AGENT_NAME,
@@ -33,7 +34,6 @@ from apache.aurora.client.base import (
     GROUPING_OPTION,
     requires
 )
-from apache.aurora.client.factory import make_client
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 from apache.aurora.common.shellify import shellify
@@ -64,7 +64,11 @@ MIN_SLA_INSTANCE_COUNT = optparse.Option(
 
 
 def make_admin_client(cluster):
-  return make_client(cluster, AURORA_ADMIN_USER_AGENT_NAME)
+  if cluster not in CLUSTERS:
+    die('Unknown cluster: %s. Known clusters: %s' % (cluster, ", ".join(CLUSTERS.keys())))
+
+  verbose = getattr(app.get_options(), 'verbosity', 'normal') == 'verbose'
+  return AuroraClientAPI(CLUSTERS[cluster], AURORA_ADMIN_USER_AGENT_NAME, verbose=verbose)
 
 
 @app.command

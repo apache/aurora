@@ -12,7 +12,6 @@
 # limitations under the License.
 #
 
-import contextlib
 import json
 
 from mock import patch
@@ -89,9 +88,7 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     return self._call_get_quota(mock_context, command_args)
 
   def _call_get_quota(self, mock_context, command_args):
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.quota.Quota.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+    with patch('apache.aurora.client.cli.quota.Quota.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
       cmd.execute(command_args)
       out = '\n'.join(mock_context.get_out())

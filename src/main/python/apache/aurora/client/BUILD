@@ -56,18 +56,6 @@ python_library(
 )
 
 python_library(
-  name = 'factory',
-  sources = ['factory.py'],
-  dependencies = [
-    ':base',
-    '3rdparty/python:twitter.common.app',
-    'src/main/python/apache/aurora/client/hooks',
-    'src/main/python/apache/aurora/common:cluster',
-    'src/main/python/apache/aurora/common:clusters',
-  ]
-)
-
-python_library(
   name = 'client-packaged',
   dependencies = [
     'src/main/python/apache/aurora/common',
