@@ -211,10 +211,7 @@ class HealthCheckerProvider(StatusCheckerProvider):
         portmap['health'],
         timeout_secs=health_check_config.get('timeout_secs'))
     health_checker = HealthChecker(
-        lambda: http_signaler(
-            endpoint=health_check_config.get('endpoint'),
-            expected_response=health_check_config.get('expected_response'),
-            expected_response_code=health_check_config.get('expected_response_code')),
+        http_signaler.health,
         sandbox,
         interval_secs=health_check_config.get('interval_secs'),
         initial_interval_secs=health_check_config.get('initial_interval_secs'),

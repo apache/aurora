@@ -25,20 +25,7 @@ if Compatibility.PY3:
 else:
   import urllib2 as urllib_request
 
-
-class OpenedURL(object):
-  def __init__(self, content, code=200):
-    self.content = content
-    self.code = code
-
-  def read(self):
-    return self.content
-
-  def close(self):
-    pass
-
-  def getcode(self):
-    return self.code
+StringIO = Compatibility.StringIO
 
 
 class TestHttpSignaler(unittest.TestCase):
@@ -54,51 +41,29 @@ class TestHttpSignaler(unittest.TestCase):
   def test_all_calls_ok(self):
     self._mox.StubOutWithMock(urllib_request, 'urlopen')
     urllib_request.urlopen(
-      'http://localhost:%s/quitquitquit' % self.PORT, '', timeout=1.0).AndReturn(OpenedURL(''))
+      'http://localhost:%s/health' % self.PORT, None, timeout=1.0).AndReturn(StringIO('ok'))
     urllib_request.urlopen(
-      'http://localhost:%s/abortabortabort' % self.PORT, '', timeout=1.0).AndReturn(OpenedURL(''))
+      'http://localhost:%s/quitquitquit' % self.PORT, '', timeout=1.0).AndReturn(StringIO(''))
+    urllib_request.urlopen(
+      'http://localhost:%s/abortabortabort' % self.PORT, '', timeout=1.0).AndReturn(StringIO(''))
 
     self._mox.ReplayAll()
 
     signaler = HttpSignaler(self.PORT)
+    assert signaler.health() == (True, None)
     assert signaler.quitquitquit() == (True, None)
     assert signaler.abortabortabort() == (True, None)
 
-  def test_health_checks(self):
+  def test_health_not_ok(self):
     self._mox.StubOutWithMock(urllib_request, 'urlopen')
     urllib_request.urlopen(
-      'http://localhost:%s/health' % self.PORT, None, timeout=1.0).AndReturn(OpenedURL('ok'))
-    urllib_request.urlopen(
-      'http://localhost:%s/health' % self.PORT, None, timeout=1.0).AndReturn(OpenedURL('not ok'))
-    urllib_request.urlopen(
-      'http://localhost:%s/health' % self.PORT, None, timeout=1.0).AndReturn(
-          OpenedURL('not ok', code=200))
-    urllib_request.urlopen(
-      'http://localhost:%s/health' % self.PORT, None, timeout=1.0).AndReturn(
-          OpenedURL('ok', code=400))
-    urllib_request.urlopen(
-      'http://localhost:%s/health' % self.PORT, None, timeout=1.0).AndRaise(
-          urllib_request.HTTPError('', 501, '', None, None))
-    urllib_request.urlopen(
-      'http://localhost:%s/health' % self.PORT, None, timeout=1.0).AndReturn(
-          OpenedURL('ok', code=200))
-    urllib_request.urlopen(
-      'http://localhost:%s/random/endpoint' % self.PORT, None, timeout=1.0).AndReturn(
-          OpenedURL('ok'))
+        'http://localhost:%s/health' % self.PORT, None, timeout=1.0).AndReturn(StringIO('not ok'))
 
     self._mox.ReplayAll()
 
-    signaler = HttpSignaler(self.PORT)
-    assert signaler('/health', expected_response='ok') == (True, None)
-    assert signaler('/health', expected_response='ok') == (
-        False, 'Response differs from expected response (expected "ok", got "not ok")')
-    assert signaler('/health', expected_response_code=200) == (True, None)
-    assert signaler('/health', expected_response_code=200) == (
-        False, 'Response code differs from expected response (expected 200, got 400)')
-    assert signaler('/health', expected_response_code=200) == (
-        False, 'Response code differs from expected response (expected 200, got 501)')
-    assert signaler('/health', expected_response='ok', expected_response_code=200) == (True, None)
-    assert signaler('/random/endpoint', expected_response='ok') == (True, None)
+    health, reason = HttpSignaler(self.PORT).health()
+    assert not health
+    assert reason.startswith('Response differs from expected response')
 
   def test_exception(self):
     self._mox.StubOutWithMock(urllib_request, 'urlopen')
@@ -108,4 +73,4 @@ class TestHttpSignaler(unittest.TestCase):
 
     self._mox.ReplayAll()
 
-    assert not HttpSignaler(self.PORT)('/health', expected_response='ok')[0]
+    assert not HttpSignaler(self.PORT).health()[0]

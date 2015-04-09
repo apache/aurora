@@ -44,7 +44,7 @@ class TestHealthChecker(unittest.TestCase):
     self.fake_health_checks = []
     def mock_health_check():
       return self.fake_health_checks.pop(0)
-    self._checker.health = mock.Mock(spec=self._checker.__call__)
+    self._checker.health = mock.Mock(spec=self._checker.health)
     self._checker.health.side_effect = mock_health_check
 
   def append_health_checks(self, status, num_calls=1):
@@ -209,8 +209,8 @@ class TestHealthCheckerProvider(unittest.TestCase):
 
 class TestThreadedHealthChecker(unittest.TestCase):
   def setUp(self):
-    self.health = mock.Mock()
-    self.health.return_value = (True, 'Fake')
+    self.signaler = mock.Mock(spec=HttpSignaler)
+    self.signaler.health.return_value = (True, 'Fake')
 
     self.sandbox = mock.Mock(spec_set=SandboxInterface)
     self.sandbox.exists.return_value = True
@@ -222,14 +222,14 @@ class TestThreadedHealthChecker(unittest.TestCase):
     self.clock = mock.Mock(spec=time)
     self.clock.time.return_value = 1.0
     self.health_checker = HealthChecker(
-        self.health,
+        self.signaler.health,
         None,
         self.interval_secs,
         self.initial_interval_secs,
         self.max_consecutive_failures,
         self.clock)
     self.health_checker_sandbox_exists = HealthChecker(
-        self.health,
+        self.signaler.health,
         self.sandbox,
         self.interval_secs,
         self.initial_interval_secs,
@@ -238,29 +238,29 @@ class TestThreadedHealthChecker(unittest.TestCase):
 
   def test_perform_check_if_not_disabled_snooze_file_is_none(self):
     self.health_checker.threaded_health_checker.snooze_file = None
-    assert self.health.call_count == 0
+    assert self.signaler.health.call_count == 0
     assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
     self.health_checker.threaded_health_checker._perform_check_if_not_disabled()
-    assert self.health.call_count == 1
+    assert self.signaler.health.call_count == 1
     assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
 
   @mock.patch('os.path', spec_set=os.path)
   def test_perform_check_if_not_disabled_no_snooze_file(self, mock_os_path):
     mock_os_path.isfile.return_value = False
-    assert self.health.call_count == 0
+    assert self.signaler.health.call_count == 0
     assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
     self.health_checker_sandbox_exists.threaded_health_checker._perform_check_if_not_disabled()
-    assert self.health.call_count == 1
+    assert self.signaler.health.call_count == 1
     assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
 
   @mock.patch('os.path', spec_set=os.path)
   def test_perform_check_if_not_disabled_snooze_file_exists(self, mock_os_path):
     mock_os_path.isfile.return_value = True
-    assert self.health.call_count == 0
+    assert self.signaler.health.call_count == 0
     assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 0
     result = (
         self.health_checker_sandbox_exists.threaded_health_checker._perform_check_if_not_disabled())
-    assert self.health.call_count == 0
+    assert self.signaler.health.call_count == 0
     assert self.health_checker_sandbox_exists.metrics.sample()['snoozed'] == 1
     assert result == (True, None)
 

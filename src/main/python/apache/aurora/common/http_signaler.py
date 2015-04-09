@@ -39,7 +39,7 @@ class HttpSignaler(object):
 
   def __init__(self, port, host='localhost', timeout_secs=None):
     self._host = host
-    self._url_base = 'http://%s:%d' % (host, port)
+    self._url_base = 'http://%s:%d/' % (host, port)
     if timeout_secs is None:
       env_timeout = os.getenv('AURORA_HTTP_SIGNALER_TIMEOUT_SECS')
       if env_timeout is not None:
@@ -70,42 +70,37 @@ class HttpSignaler(object):
     try:
       with contextlib.closing(
           self.opener(url, data, timeout=self._timeout_secs)) as fp:
-        return (fp.read(), fp.getcode())
+        return fp.read()
     except (HTTPException, SocketTimeout) as e:
       # the type of an HTTPException is typically more useful than its contents (since for example
       # BadStatusLines are often empty). likewise with socket.timeout.
       raise_error('Error within %s' % e.__class__.__name__)
-    except HTTPError as e:
-      return ('', e.code)
-    except URLError as e:
+    except (URLError, HTTPError) as e:
       raise_error(e)
     except Exception as e:
       raise_error('Unexpected error: %s' % e)
 
-  def __call__(self, endpoint, use_post_method=False, expected_response=None,
-      expected_response_code=None):
+  def __call__(self, endpoint, use_post_method=False, expected_response=None):
     """Returns a (boolean, string|None) tuple of (call success, failure reason)"""
     try:
-      response, response_code = self.query(endpoint, '' if use_post_method else None)
-      response = response.strip().lower()
-      if expected_response and response != expected_response.lower():
-        reason = 'Response differs from expected response (expected "%s", got "%s")'
+      response = self.query(endpoint, '' if use_post_method else None).strip().lower()
+      if expected_response is not None and response != expected_response:
         def shorten(string):
           return (string if len(string) < self.FAILURE_REASON_LENGTH
                          else "%s..." % string[:self.FAILURE_REASON_LENGTH - 3])
+        reason = 'Response differs from expected response (expected "%s", got "%s")'
         log.warning(reason % (expected_response, response))
         return (False, reason % (shorten(str(expected_response)), shorten(str(response))))
-      elif expected_response_code and response_code != expected_response_code:
-        reason = 'Response code differs from expected response (expected %i, got %i)'
-        log.warning(reason % (expected_response_code, response_code))
-        return (False, reason % (expected_response_code, response_code))
       else:
         return (True, None)
     except self.QueryError as e:
       return (False, str(e))
 
+  def health(self):
+    return self('health', use_post_method=False, expected_response='ok')
+
   def quitquitquit(self):
-    return self('/quitquitquit', use_post_method=True)
+    return self('quitquitquit', use_post_method=True)
 
   def abortabortabort(self):
-    return self('/abortabortabort', use_post_method=True)
+    return self('abortabortabort', use_post_method=True)

@@ -40,9 +40,6 @@ class HealthCheckConfig(Struct):
   interval_secs            = Default(Float, 10.0)
   timeout_secs             = Default(Float, 1.0)
   max_consecutive_failures = Default(Integer, 0)
-  endpoint                 = Default(String, '/health')
-  expected_response        = Default(String, 'ok')
-  expected_response_code   = Default(Integer, 0)
 
 
 class Announcer(Struct):
