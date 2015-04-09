@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.logging.Level;
@@ -25,11 +27,16 @@ import javax.servlet.ServletContextListener;
 import javax.servlet.http.HttpServlet;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
 import com.google.inject.Module;
+import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
@@ -39,11 +46,8 @@ import com.google.inject.util.Modules;
 import com.sun.jersey.api.container.filter.GZIPContentEncodingFilter;
 import com.sun.jersey.guice.JerseyServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
-import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.application.modules.LifecycleModule.LaunchException;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalSupplier;
 import com.twitter.common.base.MoreSuppliers;
 import com.twitter.common.net.http.handlers.AbortHandler;
@@ -81,7 +85,6 @@ import static java.util.Objects.requireNonNull;
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_RESPONSE_FILTERS;
 import static com.sun.jersey.api.json.JSONConfiguration.FEATURE_POJO_MAPPING;
-import static com.twitter.common.application.modules.LocalServiceRegistry.LocalService;
 
 /**
  * Binding module for scheduler HTTP servlets.
@@ -97,7 +100,9 @@ public class JettyServerModule extends AbstractModule {
   // rewritten is stored.
   static final String ORIGINAL_PATH_ATTRIBUTE_NAME = "originalPath";
 
-  public static final String THRIFT_API_PATH_SPEC = "/api";
+  @CmdLine(name = "hostname",
+      help = "The hostname to advertise in ZooKeeper instead of the locally-resolved hostname.")
+  private static final Arg<String> HOSTNAME_OVERRIDE = Arg.create(null);
 
   @Nonnegative
   @CmdLine(name = "http_port",
@@ -140,7 +145,27 @@ public class JettyServerModule extends AbstractModule {
 
     bindConstant().annotatedWith(StringTemplateServlet.CacheTemplates.class).to(true);
 
-    LifecycleModule.bindServiceRunner(binder(), HttpServerLauncher.class);
+    final Optional<String> hostnameOverride = Optional.fromNullable(HOSTNAME_OVERRIDE.get());
+    if (hostnameOverride.isPresent()) {
+        /* Force resolution of the DNS address passed in to ensure it's valid */
+      try {
+        InetAddress.getByName(hostnameOverride.get());
+      } catch (UnknownHostException e) {
+        throw new IllegalStateException(
+            "Failed to resolve hostname supplied by -hostname", e);
+      }
+    }
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(new TypeLiteral<Optional<String>>() { }).toInstance(hostnameOverride);
+        bind(HttpService.class).to(HttpServerLauncher.class);
+        bind(HttpServerLauncher.class).in(Singleton.class);
+        expose(HttpServerLauncher.class);
+        expose(HttpService.class);
+      }
+    });
+    SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(HttpServerLauncher.class);
 
     bind(LeaderRedirect.class).in(Singleton.class);
     SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RedirectMonitor.class);
@@ -253,13 +278,18 @@ public class JettyServerModule extends AbstractModule {
     }
   }
 
-  // TODO(wfarner): Use guava's Service to enforce the lifecycle of this.
-  public static final class HttpServerLauncher implements LifecycleModule.ServiceRunner {
+  public static final class HttpServerLauncher extends AbstractIdleService implements HttpService {
     private final ServletContextListener servletContextListener;
+    private final Optional<String> advertisedHostOverride;
+    private volatile Server server;
 
     @Inject
-    HttpServerLauncher(ServletContextListener servletContextListener) {
+    HttpServerLauncher(
+        ServletContextListener servletContextListener,
+        Optional<String> advertisedHostOverride) {
+
       this.servletContextListener = requireNonNull(servletContextListener);
+      this.advertisedHostOverride = requireNonNull(advertisedHostOverride);
     }
 
     private static final Map<String, String> REGEX_REWRITE_RULES =
@@ -289,12 +319,35 @@ public class JettyServerModule extends AbstractModule {
     }
 
     @Override
-    public LocalService launch() throws LaunchException {
+    public HostAndPort getAddress() {
+      Preconditions.checkState(state() == State.RUNNING);
+      Connector connector = server.getConnectors()[0];
+
+      String host;
+      if (advertisedHostOverride.isPresent()) {
+        host = advertisedHostOverride.get();
+      } else if (connector.getHost() == null) {
+        // Resolve the local host name.
+        try {
+          host = InetAddress.getLocalHost().getHostAddress();
+        } catch (UnknownHostException e) {
+          throw new RuntimeException("Failed to resolve local host address: " + e, e);
+        }
+      } else {
+        // If jetty was configured with a specific host to bind to, use that.
+        host = connector.getHost();
+      }
+
+      return HostAndPort.fromParts(host, connector.getLocalPort());
+    }
+
+    @Override
+    protected void startUp() {
       // N.B. we explicitly disable the resource cache here due to a bug serving content out of the
       // jar under the vagrant image. C.f. https://bugs.eclipse.org/bugs/show_bug.cgi?id=364936
       Resource.setDefaultUseCaches(false);
 
-      final Server server = new Server();
+      server = new Server();
       ServletContextHandler servletHandler =
           new ServletContextHandler(server, "/", ServletContextHandler.NO_SESSIONS);
 
@@ -319,21 +372,18 @@ public class JettyServerModule extends AbstractModule {
         connector.open();
         server.start();
       } catch (Exception e) {
-        throw new LaunchException("Failed to start jetty server: " + e, e);
+        throw Throwables.propagate(e);
       }
+    }
 
-      Command shutdown = new Command() {
-        @Override public void execute() {
-          LOG.info("Shutting down embedded http server");
-          try {
-            server.stop();
-          } catch (Exception e) {
-            LOG.log(Level.INFO, "Failed to stop jetty server: " + e, e);
-          }
-        }
-      };
-
-      return LocalService.auxiliaryService("http", connector.getLocalPort(), shutdown);
+    @Override
+    protected void shutDown() {
+      LOG.info("Shutting down embedded http server");
+      try {
+        server.stop();
+      } catch (Exception e) {
+        LOG.log(Level.INFO, "Failed to stop jetty server: " + e, e);
+      }
     }
   }
 }

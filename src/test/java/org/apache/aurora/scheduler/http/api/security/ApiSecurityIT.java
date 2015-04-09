@@ -151,7 +151,7 @@ public class ApiSecurityIT extends JettyServerModuleTest {
 
   private AuroraAdmin.Client getClient(HttpClient httpClient) throws TTransportException {
     final TTransport httpClientTransport = new THttpClient(
-        "http://" + httpServer.getHostName() + ":" + httpServer.getPort() + API_PATH,
+        "http://" + httpServer.getHostText() + ":" + httpServer.getPort() + API_PATH,
         httpClient);
     addTearDown(new TearDown() {
       @Override

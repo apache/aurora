@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.http;
 
-import java.net.InetSocketAddress;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
@@ -33,7 +31,7 @@ import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
-import org.apache.aurora.scheduler.app.LocalServiceRegistryWithOverrides;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Redirect logic for finding the leading scheduler in the event that this process is not the
@@ -48,17 +46,15 @@ public class LeaderRedirect {
 
   private static final Logger LOG = Logger.getLogger(LeaderRedirect.class.getName());
 
-  private final LocalServiceRegistryWithOverrides serviceRegistry;
+  private final HttpService httpService;
   private final DynamicHostSet<ServiceInstance> schedulers;
 
   private final AtomicReference<ServiceInstance> leader = Atomics.newReference();
 
   @Inject
-  LeaderRedirect(
-      LocalServiceRegistryWithOverrides serviceRegistry,
-      DynamicHostSet<ServiceInstance> schedulers) {
-    this.serviceRegistry = Objects.requireNonNull(serviceRegistry);
-    this.schedulers = Objects.requireNonNull(schedulers);
+  LeaderRedirect(HttpService httpService, DynamicHostSet<ServiceInstance> schedulers) {
+    this.httpService = requireNonNull(httpService);
+    this.schedulers = requireNonNull(schedulers);
   }
 
   /**
@@ -88,9 +84,9 @@ public class LeaderRedirect {
   }
 
   private Optional<HostAndPort> getLocalHttp() {
-    InetSocketAddress localHttp = serviceRegistry.getAuxiliarySockets().get(HTTP_PORT_NAME);
+    HostAndPort localHttp = httpService.getAddress();
     return (localHttp == null) ? Optional.<HostAndPort>absent()
-        : Optional.of(HostAndPort.fromParts(localHttp.getHostName(), localHttp.getPort()));
+        : Optional.of(HostAndPort.fromParts(localHttp.getHostText(), localHttp.getPort()));
   }
 
   /**

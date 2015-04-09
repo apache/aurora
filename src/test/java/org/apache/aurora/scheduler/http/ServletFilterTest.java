@@ -108,7 +108,7 @@ public class ServletFilterTest extends JettyServerModuleTest {
     leaderRedirectSmokeTest(Status.OK);
 
     // This process is leading
-    setLeadingScheduler(httpServer.getHostName(), httpServer.getPort());
+    setLeadingScheduler(httpServer.getHostText(), httpServer.getPort());
     leaderRedirectSmokeTest(Status.OK);
 
     setLeadingScheduler("otherHost", 1234);

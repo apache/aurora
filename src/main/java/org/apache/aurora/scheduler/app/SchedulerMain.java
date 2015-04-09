@@ -23,6 +23,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.net.HostAndPort;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.twitter.common.application.AbstractApplication;
@@ -48,6 +50,7 @@ import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
+import org.apache.aurora.scheduler.http.HttpService;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
@@ -121,10 +124,6 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "viz_job_url_prefix", help = "URL prefix for job container stats.")
   private static final Arg<String> STATS_URL_PREFIX = Arg.create("");
 
-  @CmdLine(name = "hostname",
-      help = "The hostname to advertise in ZooKeeper instead of the locally-resolved hostname.")
-  private static final Arg<String> HOSTNAME_OVERRIDE = Arg.create(null);
-
   @CmdLine(name = "global_container_mounts",
       help = "A comma seperated list of mount points (in host:container form) to mount "
           + "into all (non-mesos) containers.")
@@ -132,7 +131,7 @@ public class SchedulerMain extends AbstractApplication {
       Arg.<List<Volume>>create(ImmutableList.<Volume>of());
 
   @Inject private SingletonService schedulerService;
-  @Inject private LocalServiceRegistryWithOverrides serviceRegistry;
+  @Inject private HttpService httpService;
   @Inject private SchedulerLifecycle schedulerLifecycle;
   @Inject private Lifecycle appLifecycle;
 
@@ -151,17 +150,11 @@ public class SchedulerMain extends AbstractApplication {
       String clusterName,
       String serverSetPath,
       ClientConfig zkClientConfig,
-      String statsURLPrefix,
-      Optional<String> zkLocalDnsNameOverride) {
+      String statsURLPrefix) {
 
     return ImmutableList.<Module>builder()
         .add(new StatsModule())
-        .add(new AppModule(
-            clusterName,
-            serverSetPath,
-            zkClientConfig,
-            statsURLPrefix,
-            zkLocalDnsNameOverride))
+        .add(new AppModule(clusterName, serverSetPath, zkClientConfig, statsURLPrefix))
         .addAll(getExtraModules())
         .add(getPersistentStorageModule())
         .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
@@ -205,8 +198,7 @@ public class SchedulerMain extends AbstractApplication {
                 CLUSTER_NAME.get(),
                 SERVERSET_PATH.get(),
                 zkClientConfig,
-                STATS_URL_PREFIX.get(),
-                Optional.fromNullable(HOSTNAME_OVERRIDE.get())))
+                STATS_URL_PREFIX.get()))
         .add(new ZooKeeperClientModule(zkClientConfig))
         .add(new AbstractModule() {
           @Override
@@ -256,16 +248,13 @@ public class SchedulerMain extends AbstractApplication {
 
     LeadershipListener leaderListener = schedulerLifecycle.prepare();
 
-    Optional<InetSocketAddress> httpSocket =
-        Optional.fromNullable(serviceRegistry.getAuxiliarySockets().get("http"));
-    if (!httpSocket.isPresent()) {
-      throw new IllegalStateException("No HTTP service registered with LocalServiceRegistry.");
-    }
-
+    HostAndPort httpAddress = httpService.getAddress();
+    InetSocketAddress httpSocketAddress =
+        InetSocketAddress.createUnresolved(httpAddress.getHostText(), httpAddress.getPort());
     try {
       schedulerService.lead(
-          httpSocket.get(),
-          serviceRegistry.getAuxiliarySockets(),
+          httpSocketAddress,
+          ImmutableMap.of("http", httpSocketAddress),
           leaderListener);
     } catch (Group.WatchException e) {
       throw new IllegalStateException("Failed to watch group and lead service.", e);

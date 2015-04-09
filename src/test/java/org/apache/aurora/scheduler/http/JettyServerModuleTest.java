@@ -13,13 +13,11 @@
  */
 package org.apache.aurora.scheduler.http;
 
-import java.net.InetSocketAddress;
-
 import javax.servlet.ServletContextListener;
 import javax.ws.rs.core.MediaType;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
+import com.google.common.net.HostAndPort;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
@@ -37,7 +35,6 @@ import com.sun.jersey.api.json.JSONConfiguration;
 import com.twitter.common.application.ShutdownRegistry.ShutdownRegistryImpl;
 import com.twitter.common.application.StartupRegistry;
 import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.base.Command;
 import com.twitter.common.net.pool.DynamicHostSet;
@@ -50,7 +47,6 @@ import com.twitter.thrift.ServiceInstance;
 
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
-import org.apache.aurora.scheduler.app.LocalServiceRegistryWithOverrides;
 import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
@@ -78,7 +74,7 @@ import static org.junit.Assert.assertNotNull;
 public abstract class JettyServerModuleTest extends EasyMockTest {
   private Injector injector;
   protected StorageTestUtil storage;
-  protected InetSocketAddress httpServer;
+  protected HostAndPort httpServer;
   protected Capture<HostChangeMonitor<ServiceInstance>> schedulerWatcher;
 
   /**
@@ -119,8 +115,6 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
                     Amount.of(1L, Time.MILLISECONDS),
                     bindMock(BackoffStrategy.class),
                     RateLimiter.create(1000)));
-            bind(LocalServiceRegistryWithOverrides.Settings.class).toInstance(
-                new LocalServiceRegistryWithOverrides.Settings(Optional.<String>absent()));
             bind(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }).toInstance(schedulers);
             bindMock(CronJobManager.class);
             bindMock(LockManager.class);
@@ -153,16 +147,16 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
       }
     });
     try {
+
       injector.getInstance(StartupRegistry.class).execute();
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
-    LocalServiceRegistry serviceRegistry = injector.getInstance(LocalServiceRegistry.class);
-    httpServer = serviceRegistry.getAuxiliarySockets().get("http");
+    httpServer = injector.getInstance(HttpService.class).getAddress();
   }
 
   protected String makeUrl(String path) {
-    return String.format("http://%s:%s%s", httpServer.getHostName(), httpServer.getPort(), path);
+    return String.format("http://%s:%s%s", httpServer.getHostText(), httpServer.getPort(), path);
   }
 
   protected WebResource.Builder getRequestBuilder(String path) {

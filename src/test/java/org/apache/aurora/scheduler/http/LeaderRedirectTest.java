@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.Arrays;
-import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -24,12 +23,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
-import com.google.inject.util.Providers;
-import com.twitter.common.application.ShutdownRegistry.ShutdownRegistryImpl;
-import com.twitter.common.application.modules.LifecycleModule.ServiceRunner;
-import com.twitter.common.application.modules.LocalServiceRegistry;
-import com.twitter.common.application.modules.LocalServiceRegistry.LocalService;
-import com.twitter.common.base.Commands;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
@@ -37,7 +30,6 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
-import org.apache.aurora.scheduler.app.LocalServiceRegistryWithOverrides;
 import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -71,20 +63,10 @@ public class LeaderRedirectTest extends EasyMockTest {
     DynamicHostSet<ServiceInstance> schedulers =
         createMock(new Clazz<DynamicHostSet<ServiceInstance>>() { });
 
-    ServiceRunner fakeRunner = new ServiceRunner() {
-      @Override
-      public LocalService launch() {
-        return LocalService.auxiliaryService(HTTP_PORT_NAME, HTTP_PORT, Commands.NOOP);
-      }
-    };
+    HttpService http = createMock(HttpService.class);
+    expect(http.getAddress()).andStubReturn(HostAndPort.fromParts("localhost", HTTP_PORT));
 
-    Set<ServiceRunner> services = ImmutableSet.of(fakeRunner);
-    LocalServiceRegistry serviceRegistry =
-        new LocalServiceRegistry(Providers.of(services), new ShutdownRegistryImpl());
-    LocalServiceRegistryWithOverrides withOverrides =
-        new LocalServiceRegistryWithOverrides(serviceRegistry,
-            new LocalServiceRegistryWithOverrides.Settings(Optional.<String>absent()));
-    leaderRedirector = new LeaderRedirect(withOverrides, schedulers);
+    leaderRedirector = new LeaderRedirect(http, schedulers);
 
     monitorCapture = new Capture<>();
     expect(schedulers.watch(capture(monitorCapture))).andReturn(null);
