@@ -37,6 +37,12 @@ limitations under the License.
     </Or>
   </Match>
 
+  <!-- We don't make use of Java serialization and this can prevent, for example, declaring an
+       HttpServlet as an anonymous inner class for testing. -->
+  <Match>
+    <Bug pattern="SE_BAD_FIELD" />
+  </Match>
+
   <!-- Method is intentionally only callable by EventBus. -->
   <Match>
     <Class name="org.apache.aurora.scheduler.events.PubsubEventModule$1" />

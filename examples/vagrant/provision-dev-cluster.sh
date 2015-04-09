@@ -17,6 +17,7 @@ apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8
 echo deb https://get.docker.com/ubuntu docker main > /etc/apt/sources.list.d/docker.list
 apt-get update
 apt-get -y install \
+    bison \
     curl \
     git \
     libapr1-dev \

@@ -16,10 +16,9 @@ package org.apache.aurora.scheduler.http.api.security;
 import java.lang.reflect.Method;
 import java.util.Set;
 
-import javax.inject.Singleton;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.Provides;
 import com.google.inject.matcher.Matcher;
@@ -40,7 +39,6 @@ import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.guice.aop.ShiroAopModule;
 import org.apache.shiro.guice.web.ShiroWebModule;
-import org.apache.shiro.realm.text.IniRealm;
 import org.apache.shiro.subject.Subject;
 import org.apache.shiro.web.filter.authc.BasicHttpAuthenticationFilter;
 
@@ -82,6 +80,22 @@ public class ApiSecurityModule extends ServletModule {
   static final Matcher<Method> AURORA_ADMIN_SERVICE =
       GuiceUtils.interfaceMatcher(AuroraAdmin.Iface.class, true);
 
+  public static enum HttpAuthenticationMechanism {
+    /**
+     * HTTP Basic Authentication, produces {@link org.apache.shiro.authc.UsernamePasswordToken}s.
+     */
+    BASIC,
+
+    /**
+     * Use GSS-Negotiate. Only Kerberos and SPNEGO-with-Kerberos GSS mechanisms are supported.
+     */
+    NEGOTIATE,
+  }
+
+  @CmdLine(name = "http_authentication_mechanism", help = "HTTP Authentication mechanism to use.")
+  private static final Arg<HttpAuthenticationMechanism> HTTP_AUTHENTICATION_MECHANISM =
+      Arg.create(HttpAuthenticationMechanism.BASIC);
+
   private final boolean enableApiSecurity;
   private final Set<Module> shiroConfigurationModules;
 
@@ -118,13 +132,26 @@ public class ApiSecurityModule extends ServletModule {
           install(module);
         }
 
-        addFilterChain("/**",
-            ShiroWebModule.NO_SESSION_CREATION,
-            config(ShiroWebModule.AUTHC_BASIC, BasicHttpAuthenticationFilter.PERMISSIVE));
+        switch (HTTP_AUTHENTICATION_MECHANISM.get()) {
+          case BASIC:
+            addFilterChain("/**",
+                ShiroWebModule.NO_SESSION_CREATION,
+                config(ShiroWebModule.AUTHC_BASIC, BasicHttpAuthenticationFilter.PERMISSIVE));
+            break;
+
+          case NEGOTIATE:
+            addFilterChain("/**",
+                ShiroWebModule.NO_SESSION_CREATION,
+                Key.get(ShiroKerberosAuthenticationFilter.class));
+            break;
+
+          default:
+            addError("Unrecognized HTTP authentication mechanism.");
+            break;
+        }
       }
     });
 
-    bind(IniRealm.class).in(Singleton.class);
     bindConstant().annotatedWith(Names.named("shiro.applicationName")).to(HTTP_REALM_NAME);
 
     // TODO(ksweeney): Disable session cookie.

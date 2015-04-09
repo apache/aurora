@@ -13,15 +13,15 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
+import javax.inject.Singleton;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
-import com.google.inject.multibindings.Multibinder;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 
 import org.apache.shiro.config.Ini;
-import org.apache.shiro.realm.Realm;
 import org.apache.shiro.realm.text.IniRealm;
 
 /**
@@ -29,6 +29,10 @@ import org.apache.shiro.realm.text.IniRealm;
  * authentication and authorization. Should be used in conjunction with the
  * {@link org.apache.shiro.web.filter.authc.BasicHttpAuthenticationFilter} or other filter that
  * produces {@link org.apache.shiro.authc.UsernamePasswordToken}s.
+ *
+ * <p>
+ * Another filter may still be used for authentication, in which case the ini file can still be
+ * used to provide authorization configuration and the passwords will be ignored.
  */
 public class IniShiroRealmModule extends AbstractModule {
   @CmdLine(name = "shiro_ini_path",
@@ -59,10 +63,10 @@ public class IniShiroRealmModule extends AbstractModule {
     }
 
     try {
-      Multibinder.newSetBinder(binder(), Realm.class).addBinding()
-          .toConstructor(IniRealm.class.getConstructor(Ini.class));
+      ShiroUtils.addRealmBinding(binder()).toConstructor(IniRealm.class.getConstructor(Ini.class));
     } catch (NoSuchMethodException e) {
       addError(e);
     }
+    bind(IniRealm.class).in(Singleton.class);
   }
 }

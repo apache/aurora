@@ -314,4 +314,6 @@ sudo docker build -t http_example ${TEST_ROOT}
 test_http_example "${TEST_DOCKER_ARGS[@]}"
 
 test_admin "${TEST_ADMIN_ARGS[@]}"
+
+/vagrant/src/test/sh/org/apache/aurora/e2e/test_kerberos_end_to_end.sh
 RETCODE=0
