@@ -74,133 +74,108 @@ recommend you start with a strict value after viewing a small amount of collecte
 adjust thresholds as you see fit. Feel free to ask us if you would like to validate that your alerts
 and thresholds make sense.
 
-#### `jvm_uptime_secs`
+## Important stats
+
+### `jvm_uptime_secs`
 Type: integer counter
 
-#### Description
 The number of seconds the JVM process has been running. Comes from
 [RuntimeMXBean#getUptime()](http://docs.oracle.com/javase/7/docs/api/java/lang/management/RuntimeMXBean.html#getUptime\(\))
 
-#### Alerting
 Detecting resets (decreasing values) on this stat will tell you that the scheduler is failing to
 stay alive.
 
-#### Triage
 Look at the scheduler logs to identify the reason the scheduler is exiting.
 
-#### `system_load_avg`
+### `system_load_avg`
 Type: double gauge
 
-#### Description
 The current load average of the system for the last minute. Comes from
 [OperatingSystemMXBean#getSystemLoadAverage()](http://docs.oracle.com/javase/7/docs/api/java/lang/management/OperatingSystemMXBean.html?is-external=true#getSystemLoadAverage\(\)).
 
-#### Alerting
 A high sustained value suggests that the scheduler machine may be over-utilized.
 
-#### Triage
 Use standard unix tools like `top` and `ps` to track down the offending process(es).
 
-#### `process_cpu_cores_utilized`
+### `process_cpu_cores_utilized`
 Type: double gauge
 
-#### Description
 The current number of CPU cores in use by the JVM process. This should not exceed the number of
 logical CPU cores on the machine. Derived from
 [OperatingSystemMXBean#getProcessCpuTime()](http://docs.oracle.com/javase/7/docs/jre/api/management/extension/com/sun/management/OperatingSystemMXBean.html)
 
-#### Alerting
 A high sustained value indicates that the scheduler is overworked. Due to current internal design
 limitations, if this value is sustained at `1`, there is a good chance the scheduler is under water.
 
-#### Triage
 There are two main inputs that tend to drive this figure: task scheduling attempts and status
 updates from Mesos.  You may see activity in the scheduler logs to give an indication of where
 time is being spent.  Beyond that, it really takes good familiarity with the code to effectively
 triage this.  We suggest engaging with an Aurora developer.
 
-#### `task_store_LOST`
+### `task_store_LOST`
 Type: integer gauge
 
-#### Description
 The number of tasks stored in the scheduler that are in the `LOST` state, and have been rescheduled.
 
-#### Alerting
 If this value is increasing at a high rate, it is a sign of trouble.
 
-#### Triage
 There are many sources of `LOST` tasks in Mesos: the scheduler, master, slave, and executor can all
 trigger this.  The first step is to look in the scheduler logs for `LOST` to identify where the
 state changes are originating.
 
-#### `scheduler_resource_offers`
+### `scheduler_resource_offers`
 Type: integer counter
 
-#### Description
 The number of resource offers that the scheduler has received.
 
-#### Alerting
 For a healthy scheduler, this value must be increasing over time.
 
-##### Triage
 Assuming the scheduler is up and otherwise healthy, you will want to check if the master thinks it
 is sending offers. You should also look at the master's web interface to see if it has a large
 number of outstanding offers that it is waiting to be returned.
 
-#### `framework_registered`
+### `framework_registered`
 Type: binary integer counter
 
-#### Description
 Will be `1` for the leading scheduler that is registered with the Mesos master, `0` for passive
 schedulers,
 
-#### Alerting
 A sustained period without a `1` (or where `sum() != 1`) warrants investigation.
 
-#### Triage
 If there is no leading scheduler, look in the scheduler and master logs for why.  If there are
 multiple schedulers claiming leadership, this suggests a split brain and warrants filing a critical
 bug.
 
-#### `rate(scheduler_log_native_append_nanos_total)/rate(scheduler_log_native_append_events)`
+### `rate(scheduler_log_native_append_nanos_total)/rate(scheduler_log_native_append_events)`
 Type: rate ratio of integer counters
 
-#### Description
 This composes two counters to compute a windowed figure for the latency of replicated log writes.
 
-#### Alerting
 A hike in this value suggests disk bandwidth contention.
 
-#### Triage
 Look in scheduler logs for any reported oddness with saving to the replicated log. Also use
 standard tools like `vmstat` and `iotop` to identify whether the disk has become slow or
 over-utilized. We suggest using a dedicated disk for the replicated log to mitigate this.
 
-#### `timed_out_tasks`
+### `timed_out_tasks`
 Type: integer counter
 
-#### Description
 Tracks the number of times the scheduler has given up while waiting
 (for `-transient_task_state_timeout`) to hear back about a task that is in a transient state
 (e.g. `ASSIGNED`, `KILLING`), and has moved to `LOST` before rescheduling.
 
-#### Alerting
 This value is currently known to increase occasionally when the scheduler fails over
 ([AURORA-740](https://issues.apache.org/jira/browse/AURORA-740)). However, any large spike in this
 value warrants investigation.
 
-#### Triage
 The scheduler will log when it times out a task. You should trace the task ID of the timed out
 task into the master, slave, and/or executors to determine where the message was dropped.
 
-#### `http_500_responses_events`
+### `http_500_responses_events`
 Type: integer counter
 
-#### Description
 The total number of HTTP 500 status responses sent by the scheduler. Includes API and asset serving.
 
-#### Alerting
 An increase warrants investigation.
 
-#### Triage
 Look in scheduler logs to identify why the scheduler returned a 500, there should be a stack trace.
