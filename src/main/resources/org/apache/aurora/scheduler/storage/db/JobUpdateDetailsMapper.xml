@@ -206,24 +206,26 @@
             typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateActionTypeHandler"/>
   </resultMap>
 
+  <resultMap id="jobUpdateEventMap" type="org.apache.aurora.gen.JobUpdateEvent">
+    <id column="id" />
+    <result property="status"
+            column="status"
+            typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler"/>
+  </resultMap>
+
+
   <resultMap id="jobUpdateDetailsMap" type="org.apache.aurora.gen.storage.StoredJobUpdateDetails">
     <id column="u_id" />
     <association property="details.update" resultMap="jobUpdateMap" />
-    <!--Using notNullColumn attribute is required below as LEFT JOIN with empty right side
-    will produce an empty row.-->
     <collection property="details.updateEvents"
-                ofType="org.apache.aurora.gen.JobUpdateEvent"
-                columnPrefix="e_"
-                notNullColumn="id">
-      <id column="id" />
-      <result property="status"
-              column="status"
-              typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler" />
+                select="selectUpdateEvents"
+                column="u_id"
+                foreignColumn="update_row_id">
     </collection>
     <collection property="details.instanceEvents"
-                resultMap="jobInstanceUpdateMap"
-                columnPrefix="i_"
-                notNullColumn="id">
+                select="selectInstanceEvents"
+                column="u_id"
+                foreignColumn="update_row_id">
     </collection>
   </resultMap>
 
@@ -393,22 +395,11 @@
   <sql id="unscoped_details_select">
     SELECT
       <include refid="job_update_columns" />,
-      e.id AS e_id,
-      e.status AS e_status,
-      e.user AS e_user,
-      e.timestamp_ms AS e_timestamp_ms,
-      e.message AS e_message,
-      i.id AS i_id,
-      i.action AS i_action,
-      i.instance_id AS i_instance_id,
-      i.timestamp_ms AS i_timestamp_ms,
       l.lock_token AS lock_token
     FROM job_updates AS u
     <include refid="job_key_inner_join" />
     <include refid="timestamps_inner_joins" />
     <include refid="job_update_outer_joins" />
-    LEFT OUTER JOIN job_update_events AS e ON e.update_row_id = u.id
-    LEFT OUTER JOIN job_instance_update_events AS i ON i.update_row_id = u.id
     <include refid="lock_outer_join" />
   </sql>
 
@@ -459,7 +450,6 @@
   <select id="selectDetails" resultMap="jobUpdateDetailsMap">
     <include refid="unscoped_details_select"/>
     WHERE <include refid="filter_by_update_key"/>
-    ORDER BY e_timestamp_ms, i_timestamp_ms
   </select>
 
   <select id="selectDetailsList" resultMap="jobUpdateDetailsMap">
@@ -491,6 +481,29 @@
     <include refid="job_key_inner_join" />
     WHERE <include refid="filter_by_update_key"/>
       AND e.instance_id = #{instanceId}
+    ORDER BY e.timestamp_ms
+  </select>
+
+  <select id="selectUpdateEvents" resultMap="jobUpdateEventMap">
+    SELECT
+      e.id,
+      status,
+      timestamp_ms,
+      e.user,
+      message
+    FROM job_update_events as e
+    WHERE update_row_id = #{id}
+    ORDER BY e.timestamp_ms
+  </select>
+
+  <select id="selectInstanceEvents" resultMap="jobInstanceUpdateMap">
+    SELECT
+      e.id,
+      instance_id,
+      timestamp_ms,
+      action
+    FROM job_instance_update_events as e
+    WHERE update_row_id = #{id}
     ORDER BY e.timestamp_ms
   </select>
 
