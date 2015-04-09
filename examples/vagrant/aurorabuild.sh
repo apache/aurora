@@ -44,7 +44,7 @@ function build_admin_client {
 }
 
 function build_scheduler {
-  ./gradlew installApp
+  ./gradlew installDist
 
   export LD_LIBRARY_PATH=/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server
   sudo mkdir -p $AURORA_HOME/scheduler
