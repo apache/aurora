@@ -22,7 +22,6 @@ set -o nounset
 
 REPO_DIR=/home/vagrant/aurora
 DIST_DIR=$REPO_DIR/dist
-AURORA_HOME=/usr/local/aurora
 
 function upstart_update {
   # Stop and start is necessary to update a the configuration of
@@ -47,8 +46,8 @@ function build_scheduler {
   ./gradlew installDist
 
   export LD_LIBRARY_PATH=/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server
-  sudo mkdir -p $AURORA_HOME/scheduler
-  if sudo mesos-log initialize --path="$AURORA_HOME/scheduler/db"
+  sudo mkdir -p /var/db/aurora
+  if sudo mesos-log initialize --path="/var/db/aurora"
   then
     echo "Replicated log initialized."
   else

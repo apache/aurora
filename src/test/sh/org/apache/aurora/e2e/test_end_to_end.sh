@@ -26,7 +26,7 @@ fi
 set -u -e -x
 set -o pipefail
 
-TEST_SCHEDULER_IP=192.168.33.7
+readonly TEST_SCHEDULER_IP=192.168.33.7
 
 _curl() { curl --silent --fail --retry 4 --retry-delay 10 "$@" ; }
 
@@ -271,6 +271,16 @@ test_admin() {
   aurora_admin get_scheduler $_cluster | grep ":8081"
 }
 
+readonly RPC_DATA="[1,\"snapshot\",1,0,{}]"
+test_basic_auth_unauthenticated() {
+  # TODO(ksweeney): Replace this with a call to the client removing the .netrc when AURORA-1248 is
+  # fixed.
+  [[ 401 == $(curl -w '%{http_code}\n' \
+    -o /dev/null \
+    -s 'http://localhost:8081/api' \
+    --data-binary "$RPC_DATA") ]]
+}
+
 RETCODE=1
 # Set up shorthands for test
 export TEST_ROOT=/vagrant/src/test/sh/org/apache/aurora/e2e
@@ -314,6 +324,7 @@ sudo docker build -t http_example ${TEST_ROOT}
 test_http_example "${TEST_DOCKER_ARGS[@]}"
 
 test_admin "${TEST_ADMIN_ARGS[@]}"
+test_basic_auth_unauthenticated
 
 /vagrant/src/test/sh/org/apache/aurora/e2e/test_kerberos_end_to_end.sh
 RETCODE=0

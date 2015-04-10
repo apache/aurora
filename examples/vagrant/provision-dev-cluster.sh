@@ -32,11 +32,13 @@ apt-get -y install \
 # Ensure java 7 is the default java.
 update-alternatives --set java /usr/lib/jvm/java-7-openjdk-amd64/jre/bin/java
 
+readonly IP_ADDRESS=192.168.33.7
+
 # Set the hostname to the IP address.  This simplifies things for components
 # that want to advertise the hostname to the user, or other components.
-hostname 192.168.33.7
+hostname $IP_ADDRESS
 
-MESOS_VERSION=0.21.1
+readonly MESOS_VERSION=0.21.1
 
 function prepare_extras() {
   pushd aurora
@@ -90,6 +92,15 @@ EOF
   chown vagrant:vagrant /home/vagrant/.gradle/gradle.properties
 }
 
+function configure_netrc {
+  cat > /home/vagrant/.netrc <<EOF
+machine $IP_ADDRESS
+login aurora
+password secret
+EOF
+  chown vagrant:vagrant /home/vagrant/.netrc
+}
+
 function start_services {
   #Executing true on failure to please bash -e in case services are already running
   start zookeeper    || true
@@ -116,4 +127,5 @@ install_cluster_config
 install_ssh_config
 start_services
 enable_gradle_daemon
+configure_netrc
 su vagrant -c "aurorabuild all"
