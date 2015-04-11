@@ -24,7 +24,7 @@ python_library(
     '3rdparty/python:twitter.common.quantity',
     'src/main/python/apache/aurora/client/api',
     'src/main/python/apache/aurora/client:base',
-    'src/main/python/apache/aurora/common:clusters',
+    'src/main/python/apache/aurora/common',
     'src/main/python/apache/aurora/client:config',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
@@ -81,6 +81,16 @@ python_binary(
   ]
 )
 
+# TODO(maxim): consider making this default ("aurora_admin") target along with kerberos auth.
+python_binary(
+  name = 'kaurora_admin',
+  entry_point = 'apache.aurora.admin.aurora_admin:proxy_main',
+  dependencies = [
+    ':aurora_admin_lib',
+    'src/main/python/apache/aurora/common/auth:kerberos',
+  ],
+)
+
 python_library(
   name = 'aurora_admin_lib',
   sources = [ 'aurora_admin.py' ],
@@ -94,7 +104,6 @@ python_library(
   name = 'admin-packaged',
   dependencies = [
     ':aurora_admin_lib',
-    'src/main/python/apache/aurora/common',
     'src/main/python/apache/aurora/config:config-packaged',
   ],
   provides = setup_py(

@@ -17,7 +17,7 @@ from threading import Thread
 
 import pytest
 import requests
-from mock import create_autospec, Mock
+from mock import ANY, call, create_autospec, Mock
 from requests import exceptions as request_exceptions
 from thrift.protocol import TJSONProtocol
 from thrift.server import THttpServer
@@ -135,3 +135,31 @@ def test_transport_applies_default_user_agent_if_no_factory_provided():
   transport = TRequestsTransport('http://localhost:12345')
   transport.open()
   assert transport._session.headers['User-Agent'] == DEFAULT_USER_AGENT
+
+
+def test_auth_type_valid():
+  response = create_autospec(spec=requests.Response, instance=True)
+  response.headers = {'header1': 'data', 'header2': 'data2'}
+  response.raise_for_status.side_effect = requests.exceptions.HTTPError()
+
+  session = create_autospec(spec=requests.Session, instance=True)
+  session.headers = {}
+  session.post.return_value = response
+
+  auth = requests.auth.AuthBase()
+  transport = TRequestsTransport('http://localhost:1', auth=auth, session_factory=lambda: session)
+  protocol = TJSONProtocol.TJSONProtocol(transport)
+  client = ReadOnlyScheduler.Client(protocol)
+
+  with pytest.raises(TTransport.TTransportException):
+    client.getRoleSummary()
+
+  transport.close()
+
+  session.post.mock_calls = (call(ANY, data=ANY, timeout=ANY, auth=auth))
+
+
+def test_auth_type_invalid():
+  with pytest.raises(TypeError) as e:
+    TRequestsTransport('http://localhost:1', auth="auth")
+  assert e.value.message == 'Invalid auth type. Expected: AuthBase but got str'

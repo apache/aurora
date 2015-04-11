@@ -1,4 +1,19 @@
 #!/bin/bash
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
+# An integration test for the client, using the vagrant environment as a testbed.
 set -eux
 
 readonly KRB5_MAJOR_MINOR=1.13
@@ -29,7 +44,7 @@ function enter_testrealm {
 }
 
 function await_scheduler_ready {
-  while ! curl -s localhost:8081/vars | grep framework_registered; do
+  while ! curl -s localhost:8081/vars | grep "framework_registered 1"; do
     sleep 3
   done
 }
@@ -41,19 +56,27 @@ function snapshot_as {
   kinit -k -t "testdir/${principal}.keytab" $principal
   curl -u : --negotiate -w '%{http_code}\n' \
     -o $(printf $SNAPSHOT_RESPONSE_OUTFILE $principal) \
-    -s 'http://localhost:8081/api' \
+    -s 'http://192.168.33.7:8081/api' \
     --data-binary "$SNAPSHOT_RPC_DATA"
   kdestroy
 }
 
-function test_snapshot {
+function setup {
   cat >> $KRB5_CONFIG <<EOF
 [domain_realm]
   .local = KRBTEST.COM
 EOF
-  kadmin.local -q "addprinc -randkey HTTP/localhost"
-  rm -f testdir/HTTP-localhost.keytab
-  kadmin.local -q "ktadd -keytab testdir/HTTP-localhost.keytab HTTP/localhost"
+
+  aurorabuild all
+  sudo cp /vagrant/examples/vagrant/upstart/aurora-scheduler-kerberos.conf \
+    /etc/init/aurora-scheduler-kerberos.conf
+  sudo stop aurora-scheduler || true
+  sudo start aurora-scheduler-kerberos
+  await_scheduler_ready
+
+  kadmin.local -q "addprinc -randkey HTTP/192.168.33.7"
+  rm -f testdir/HTTP-192.168.33.7.keytab.keytab
+  kadmin.local -q "ktadd -keytab testdir/HTTP-192.168.33.7.keytab HTTP/192.168.33.7"
 
   kadmin.local -q "addprinc -randkey vagrant"
   rm -f testdir/vagrant.keytab
@@ -66,13 +89,9 @@ EOF
   kadmin.local -q "addprinc -randkey root"
   rm -f testdir/root.keytab
   kadmin.local -q "ktadd -keytab testdir/root.keytab root"
+}
 
-  sudo cp /vagrant/examples/vagrant/upstart/aurora-scheduler-kerberos.conf \
-    /etc/init/aurora-scheduler-kerberos.conf
-  aurorabuild scheduler
-  sudo stop aurora-scheduler || true
-  sudo start aurora-scheduler-kerberos
-  await_scheduler_ready
+function test_snapshot {
   snapshot_as vagrant
   cat snapshot-response.vagrant.json
   grep -q 'lacks permission' snapshot-response.vagrant.json
@@ -84,7 +103,17 @@ EOF
   grep -qv 'lacks permission' snapshot-response.root.json
 }
 
+function test_clients {
+  sudo cp /vagrant/examples/vagrant/clusters_kerberos.json /etc/aurora/clusters.json
+
+  kinit -k -t "testdir/root.keytab" root
+  aurora_admin set_quota devcluster kerberos-test 0.0 0MB 0MB /dev/null 2>&1 | grep 'OK' | true
+  aurora update pause devcluster/role/env/job /dev/null 2>&1 | grep 'No active update found' | true
+  kdestroy
+}
+
 function tear_down {
+  sudo cp /vagrant/examples/vagrant/clusters.json /etc/aurora/clusters.json
   sudo stop aurora-scheduler-kerberos || true
   sudo rm -f /etc/init/aurora-scheduler-kerberos.conf
   sudo start aurora-scheduler || true
@@ -97,7 +126,9 @@ function main {
     enter_testrealm "$@"
   else
     trap tear_down EXIT
+    setup
     test_snapshot
+    test_clients
     set +x
     echo
     echo '*** OK (All tests passed) ***'

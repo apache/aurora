@@ -20,8 +20,9 @@ from gen.apache.aurora.api.ttypes import SessionKey
 
 _INSECURE_AUTH_MODULE = InsecureAuthModule()
 _AUTH_MODULES = {
-  _INSECURE_AUTH_MODULE.mechanism: _INSECURE_AUTH_MODULE
+  _INSECURE_AUTH_MODULE.mechanism: _INSECURE_AUTH_MODULE,
 }
+DEFAULT_AUTH_MECHANISM = 'UNAUTHENTICATED'
 
 
 class SessionKeyError(Exception): pass
@@ -43,7 +44,8 @@ def register_auth_module(auth_module):
   _AUTH_MODULES[auth_module.mechanism] = auth_module
 
 
-def make_session_key(auth_mechanism='UNAUTHENTICATED'):
+# TODO(maxim): drop in AURORA-1229
+def make_session_key(auth_mechanism=DEFAULT_AUTH_MECHANISM):
   """
     Attempts to create a session key by calling the auth module registered to the auth mechanism.
     If an auth module does not exist for an auth mechanism, an InsecureAuthModule will be used.
@@ -58,3 +60,13 @@ def make_session_key(auth_mechanism='UNAUTHENTICATED'):
     raise SessionKeyError('Expected %r but got %r from auth module %r' % (
       SessionKey, session_key.__class__, auth_module))
   return session_key
+
+
+def get_auth_handler(auth_mechanism=DEFAULT_AUTH_MECHANISM):
+  """Returns an auth handler to be used in Thrift transport layer."""
+  if not _AUTH_MODULES:
+    raise SessionKeyError('No auth modules have been registered. Please call register_auth_module.')
+
+  auth_module = _AUTH_MODULES.get(auth_mechanism) or _INSECURE_AUTH_MODULE
+  log.debug('Using auth module: %r' % auth_module)
+  return auth_module.auth()

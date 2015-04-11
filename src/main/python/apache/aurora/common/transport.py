@@ -54,9 +54,12 @@ class TRequestsTransport(TTransportBase):
 
     :param uri: The endpoint uri
     :type uri: str
-    :keyword auth: The requests authentication context.
-    :keyword session_factory: A callable that returns a requests session.
-    :keyword user_agent: The value to use for the User-Agent header.
+    :keyword auth: The requests authentication context
+    :type auth: requests.auth.AuthBase
+    :keyword session_factory: A callable that returns a requests session
+    :type session_factory: requests.Session
+    :keyword user_agent: The value to use for the User-Agent header
+    :type user_agent: str
     """
     self._session = None
     self.__session_factory = session_factory
@@ -71,6 +74,9 @@ class TRequestsTransport(TTransportBase):
     except ValueError:
       raise TTransportException('Failed to parse uri %r' % (uri,))
     self.__timeout = None
+    if auth is not None and not isinstance(auth, requests.auth.AuthBase):
+      raise TypeError('Invalid auth type. Expected: %s but got %s'
+                      % (requests.auth.AuthBase.__name__, auth.__class__.__name__))
     self.__auth = auth
 
     # Silence requests logs so we don't get messages for every HTTP connection.

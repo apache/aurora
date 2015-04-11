@@ -33,13 +33,13 @@ function upstart_update {
 }
 
 function build_client {
-  ./pants binary src/main/python/apache/aurora/client/cli:aurora
-  sudo ln -sf $DIST_DIR/aurora.pex /usr/local/bin/aurora
+  ./pants binary src/main/python/apache/aurora/client/cli:kaurora
+  sudo ln -sf $DIST_DIR/kaurora.pex /usr/local/bin/aurora
 }
 
 function build_admin_client {
-  ./pants binary src/main/python/apache/aurora/admin:aurora_admin
-  sudo ln -sf $DIST_DIR/aurora_admin.pex /usr/local/bin/aurora_admin
+  ./pants binary src/main/python/apache/aurora/admin:kaurora_admin
+  sudo ln -sf $DIST_DIR/kaurora_admin.pex /usr/local/bin/aurora_admin
 }
 
 function build_scheduler {

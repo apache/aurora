@@ -26,7 +26,11 @@ from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset import ServerSet
 
-from apache.aurora.common.auth import make_session_key, SessionKeyError
+from apache.aurora.common.auth.auth_module_manager import (
+    get_auth_handler,
+    make_session_key,
+    SessionKeyError
+)
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.transport import TRequestsTransport
 
@@ -60,19 +64,21 @@ class SchedulerClient(object):
   #   ZookeeperClientTrait
   #   DirectClientTrait
   @classmethod
-  def get(cls, cluster, **kwargs):
+  def get(cls, cluster, auth_factory=get_auth_handler, **kwargs):
     if not isinstance(cluster, Cluster):
       raise TypeError('"cluster" must be an instance of Cluster, got %s' % type(cluster))
     cluster = cluster.with_trait(SchedulerClientTrait)
+    auth_handler = auth_factory(cluster.auth_mechanism)
     if cluster.zk:
-      return ZookeeperSchedulerClient(cluster, port=cluster.zk_port, **kwargs)
+      return ZookeeperSchedulerClient(cluster, port=cluster.zk_port, auth=auth_handler, **kwargs)
     elif cluster.scheduler_uri:
-      return DirectSchedulerClient(cluster.scheduler_uri, **kwargs)
+      return DirectSchedulerClient(cluster.scheduler_uri, auth=auth_handler, **kwargs)
     else:
       raise ValueError('"cluster" does not specify zk or scheduler_uri')
 
-  def __init__(self, user_agent, verbose=False):
+  def __init__(self, auth, user_agent, verbose=False):
     self._client = None
+    self._auth = auth
     self._user_agent = user_agent
     self._verbose = verbose
 
@@ -87,7 +93,7 @@ class SchedulerClient(object):
     return None
 
   def _connect_scheduler(self, uri, clock=time):
-    transport = TRequestsTransport(uri, user_agent=self._user_agent)
+    transport = TRequestsTransport(uri, auth=self._auth, user_agent=self._user_agent)
     protocol = TJSONProtocol.TJSONProtocol(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
     for _ in range(self.THRIFT_RETRIES):

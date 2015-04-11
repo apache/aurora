@@ -18,7 +18,7 @@ from twitter.common import log
 
 from apache.aurora.client.base import combine_messages
 from apache.aurora.common.aurora_job_key import AuroraJobKey
-from apache.aurora.common.auth import make_session_key
+from apache.aurora.common.auth.auth_module_manager import make_session_key
 from apache.aurora.common.cluster import Cluster
 
 from .restarter import Restarter

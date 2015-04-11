@@ -14,10 +14,23 @@
 
 python_library(
   name = 'auth',
-  sources = globs('*.py'),
+  sources = [
+    '__init__.py',
+    'auth_module.py',
+    'auth_module_manager.py',
+  ],
   dependencies = [
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+  ]
+)
+
+python_library(
+  name = 'kerberos',
+  sources = ['kerberos.py'],
+  dependencies = [
+     '3rdparty/python:requests-kerberos',
+     ':auth'
   ]
 )

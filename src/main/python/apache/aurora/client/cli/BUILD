@@ -20,6 +20,16 @@ python_binary(
   ],
 )
 
+# TODO(maxim): consider making this default ("aurora") target along with kerberos auth.
+python_binary(
+  name='kaurora',
+  entry_point = 'apache.aurora.client.cli.client:proxy_main',
+  dependencies = [
+    ':client_lib',
+    'src/main/python/apache/aurora/common/auth:kerberos',
+  ],
+)
+
 python_library(
   name = 'client_lib',
   sources = [ 'client.py' ],

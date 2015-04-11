@@ -17,6 +17,7 @@ from twitter.common.log.options import LogOptions
 
 from apache.aurora.admin import help as help_commands
 from apache.aurora.admin import admin, maintenance
+from apache.aurora.common.auth.auth_module_manager import register_auth_module
 
 from .help import add_verbosity_options, generate_terse_usage
 
@@ -27,6 +28,12 @@ add_verbosity_options()
 def main():
   app.help()
 
+try:
+  from apache.aurora.common.auth.kerberos import KerberosAuthModule
+  register_auth_module(KerberosAuthModule())
+except ImportError:
+  # Use default auth implementation if kerberos is not available.
+  pass
 
 LogOptions.set_stderr_log_level('INFO')
 LogOptions.disable_disk_logging()

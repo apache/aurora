@@ -19,6 +19,7 @@ import unittest
 import mock
 import pytest
 from mox import IgnoreArg, IsA, Mox
+from requests.auth import AuthBase
 from thrift.transport import TTransport
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
@@ -329,6 +330,10 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.make_scheduler_proxy().rewriteConfigs(RewriteConfigsRequest())
 
 
+def mock_auth():
+  return mock.create_autospec(spec=AuthBase, instance=True)
+
+
 @pytest.mark.parametrize('scheme', ('http', 'https'))
 def test_url_when_not_connected_and_cluster_has_no_proxy_url(scheme):
   host = 'some-host.example.com'
@@ -356,6 +361,7 @@ def test_url_when_not_connected_and_cluster_has_no_proxy_url(scheme):
   def make_mock_client(proxy_url):
     client = scheduler_client.ZookeeperSchedulerClient(
         Cluster(proxy_url=proxy_url),
+        auth=None,
         user_agent='Some-User-Agent',
         _deadline=lambda x, **kws: x())
     client.get_scheduler_serverset = mock.MagicMock(return_value=(mock_zk, service_endpoints))
@@ -387,7 +393,7 @@ def test_connect_scheduler(mock_client):
   mock_client.return_value.open.side_effect = [TTransport.TTransportException, True]
   mock_time = mock.create_autospec(spec=time, instance=True)
 
-  client = scheduler_client.SchedulerClient('Some-User-Agent', verbose=True)
+  client = scheduler_client.SchedulerClient(mock_auth(), 'Some-User-Agent', verbose=True)
   client._connect_scheduler('https://scheduler.example.com:1337', mock_time)
 
   assert mock_client.return_value.open.has_calls(mock.call(), mock.call())
@@ -400,14 +406,15 @@ def test_connect_scheduler_with_user_agent(mock_transport):
   mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
   mock_time = mock.create_autospec(spec=time, instance=True)
 
+  auth = mock_auth()
   user_agent = 'Some-User-Agent'
 
-  client = scheduler_client.SchedulerClient(user_agent, verbose=True)
+  client = scheduler_client.SchedulerClient(auth, user_agent, verbose=True)
 
   uri = 'https://scheduler.example.com:1337'
   client._connect_scheduler(uri, mock_time)
 
-  mock_transport.assert_called_once_with(uri, user_agent=user_agent)
+  mock_transport.assert_called_once_with(uri, auth=auth, user_agent=user_agent)
 
 
 @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
@@ -445,7 +452,58 @@ def test_connect_direct_scheduler_with_user_agent(mock_transport):
   user_agent = 'Some-User-Agent'
   uri = 'https://scheduler.example.com:1337'
 
-  client = scheduler_client.DirectSchedulerClient(uri, verbose=True, user_agent=user_agent)
+  client = scheduler_client.DirectSchedulerClient(
+      uri,
+      auth=None,
+      verbose=True,
+      user_agent=user_agent)
+
   client._connect_scheduler(uri, mock_time)
 
-  mock_transport.assert_called_once_with(uri, user_agent=user_agent)
+  mock_transport.assert_called_once_with(uri, auth=None, user_agent=user_agent)
+
+
+@mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
+def test_connect_zookeeper_client_with_auth(mock_transport):
+  mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
+  mock_time = mock.create_autospec(spec=time, instance=True)
+
+  user_agent = 'Some-User-Agent'
+  uri = 'https://scheduler.example.com:1337'
+  auth = mock_auth()
+  cluster = Cluster(zk='zk', zk_port='2181')
+
+  def auth_factory(_):
+    return auth
+
+  client = scheduler_client.SchedulerClient.get(
+      cluster,
+      auth_factory=auth_factory,
+      user_agent=user_agent)
+
+  client._connect_scheduler(uri, mock_time)
+
+  mock_transport.assert_called_once_with(uri, auth=auth, user_agent=user_agent)
+
+
+@mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
+def test_connect_direct_client_with_auth(mock_transport):
+  mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
+  mock_time = mock.create_autospec(spec=time, instance=True)
+
+  user_agent = 'Some-User-Agent'
+  uri = 'https://scheduler.example.com:1337'
+  auth = mock_auth()
+  cluster = Cluster(scheduler_uri='uri')
+
+  def auth_factory(_):
+    return auth
+
+  client = scheduler_client.SchedulerClient.get(
+      cluster,
+      auth_factory=auth_factory,
+      user_agent=user_agent)
+
+  client._connect_scheduler(uri, mock_time)
+
+  mock_transport.assert_called_once_with(uri, auth=auth, user_agent=user_agent)
