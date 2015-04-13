@@ -21,6 +21,7 @@ import sys
 import tempfile
 import time
 
+import pytest
 from mesos.interface import mesos_pb2
 from twitter.common import log
 from twitter.common.contextutil import temporary_dir
@@ -163,6 +164,7 @@ class TestThermosTaskRunnerIntegration(object):
       assert task_runner.status is not None
       assert task_runner.status.status == mesos_pb2.TASK_FAILED
 
+  @pytest.mark.skipif('True', reason='Flaky test (AURORA-1054)')
   def test_integration_stop(self):
     with self.yield_sleepy(ThermosTaskRunner, sleep=1000, exit_code=0) as task_runner:
       task_runner.start()
@@ -188,6 +190,7 @@ class TestThermosTaskRunnerIntegration(object):
       assert task_runner.status is not None
       assert task_runner.status.status == mesos_pb2.TASK_LOST
 
+  @pytest.mark.skipif('True', reason='Flaky test (AURORA-1054)')
   def test_integration_quitquitquit(self):
     ignorant_script = ';'.join([
         'import time, signal',

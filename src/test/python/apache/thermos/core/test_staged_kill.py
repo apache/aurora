@@ -197,8 +197,7 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
     assert len(state.processes['ignorant_process']) == 1
     assert state.processes['ignorant_process'][0].state == ProcessState.LOST
 
-  # TODO(wickman) MESOS-4326
-  @pytest.mark.skipif('True')
+  @pytest.mark.skipif('True', reason='Flaky test (AURORA-161)')
   def test_preemption_wait(self):
     runner = self.start_runner()
     tm = TaskMonitor(runner.tempdir, runner.task_id)

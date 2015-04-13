@@ -109,8 +109,7 @@ def test_announcer_under_normal_circumstances():
       'Announcer should not advance disconnection time when stopped.')
 
 
-# TODO(wickman) https://issues.apache.org/jira/browse/AURORA-639
-@pytest.mark.skipif('True')
+@pytest.mark.skipif('True', reason='Flaky test (AURORA-639)')
 def test_announcer_on_expiration():
   joined = threading.Event()
   operations = []
@@ -157,8 +156,7 @@ def test_announcer_on_expiration():
     announcer.stop()
 
 
-# TODO(wickman) https://issues.apache.org/jira/browse/AURORA-639
-@pytest.mark.skipif('True')
+@pytest.mark.skipif('True', reason='Flaky test (AURORA-639)')
 def test_announcer_under_abnormal_circumstances():
   mock_serverset = create_autospec(spec=ServerSet, instance=True)
   mock_serverset.join = MagicMock()

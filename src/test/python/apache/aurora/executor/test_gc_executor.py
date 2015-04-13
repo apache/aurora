@@ -23,6 +23,7 @@ from collections import namedtuple
 from itertools import product
 
 import mock
+import pytest
 from mesos.interface import mesos_pb2
 from thrift.TSerialization import serialize as thrift_serialize
 from twitter.common import log
@@ -540,6 +541,7 @@ def run_gc_with_timeout(**kw):
     executor.shutdown(proxy_driver)
 
 
+@pytest.mark.skipif('True', reason='Flaky test (AURORA-1162)')
 def test_gc_lifetime():
   with run_gc_with_timeout(maximum_executor_lifetime=Amount(500, Time.MILLISECONDS)) as (
       proxy_driver, executor):
