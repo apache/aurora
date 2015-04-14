@@ -19,13 +19,11 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.Stats;
+import com.google.inject.TypeLiteral;
+
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
-import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.HostAttributes;
@@ -35,6 +33,8 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
+import org.apache.aurora.scheduler.async.preemptor.BiCache;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
@@ -58,10 +58,12 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.TaskInfo;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
+import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
 import static org.easymock.EasyMock.capture;
@@ -89,10 +91,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private TaskAssigner assigner;
   private OfferManager offerManager;
   private TaskScheduler scheduler;
-  private FakeClock clock;
   private Preemptor preemptor;
-  private Amount<Long, Time> reservationDuration;
-  private Amount<Long, Time> halfReservationDuration;
+  private BiCache<String, TaskGroupKey> reservations;
   private EventSink eventSink;
 
   @Before
@@ -101,11 +101,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
     assigner = createMock(TaskAssigner.class);
     offerManager = createMock(OfferManager.class);
-    reservationDuration = Amount.of(2L, Time.MINUTES);
-    halfReservationDuration = Amount.of(1L, Time.MINUTES);
-    clock = new FakeClock();
-    clock.setNowMillis(0);
     preemptor = createMock(Preemptor.class);
+    reservations = createMock(new Clazz<BiCache<String, TaskGroupKey>>() { });
 
     Injector injector = getInjector(storageUtil.storage);
     scheduler = injector.getInstance(TaskScheduler.class);
@@ -118,14 +115,16 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         new AbstractModule() {
           @Override
           protected void configure() {
+            bind(new TypeLiteral<BiCache<String, TaskGroupKey>>() { }).toInstance(reservations);
+            bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
             bind(Preemptor.class).toInstance(preemptor);
-            AsyncModule.bindTaskScheduler(binder(), reservationDuration);
             bind(OfferManager.class).toInstance(offerManager);
             bind(StateManager.class).toInstance(stateManager);
             bind(TaskAssigner.class).toInstance(assigner);
-            bind(Clock.class).toInstance(clock);
+            bind(Clock.class).toInstance(createMock(Clock.class));
+            bind(StatsProvider.class).toInstance(createMock(StatsProvider.class));
             bind(Storage.class).toInstance(storageImpl);
-            bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
+            PubsubEventModule.bindSubscriber(binder(), TaskScheduler.class);
           }
         });
   }
@@ -145,20 +144,56 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testReservationsDeniesTasksForTimePeriod() throws Exception {
+  public void testReservation() throws Exception {
     storageUtil.expectOperations();
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
+    expectReservationCheck(TASK_A);
     expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
+    expectAddReservation(SLAVE_ID, TASK_A);
 
+    // Use previously created reservation.
+    expectTaskStillPendingQuery(TASK_A);
+    expectActiveJobFetch(TASK_A);
+    expectGetReservation(SLAVE_ID, TASK_A);
+    expectAssigned(TASK_A);
+    AssignmentCapture assignment = expectLaunchAttempt(true);
+
+    control.replay();
+
+    assertFalse(scheduler.schedule("a"));
+    assertTrue(scheduler.schedule("a"));
+    assignAndAssert(Result.SUCCESS, GROUP_A, OFFER, assignment);
+  }
+
+  @Test
+  public void testReservationExpires() throws Exception {
+    storageUtil.expectOperations();
+
+    expectTaskStillPendingQuery(TASK_A);
+    expectActiveJobFetch(TASK_A);
+    expectLaunchAttempt(false);
+    // Reserve "a" with offerA
+    expectReservationCheck(TASK_A);
+    expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
+    expectAddReservation(SLAVE_ID, TASK_A);
+
+    // First attempt -> reservation is active.
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
     AssignmentCapture firstAssignment = expectLaunchAttempt(false);
+    expectGetReservation(SLAVE_ID, TASK_A);
+    expectReservationCheck(TASK_B);
     expectPreemptorCall(TASK_B, Optional.<String>absent());
 
+    // Status changed -> reservation removed.
+    reservations.remove(SLAVE_ID, TaskGroupKey.from(TASK_A.getAssignedTask().getTask()));
+
+    // Second attempt -> reservation expires.
+    expectGetNoReservation(SLAVE_ID);
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
     AssignmentCapture secondAssignment = expectLaunchAttempt(true);
@@ -168,120 +203,40 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     assertFalse(scheduler.schedule("a"));
     assertFalse(scheduler.schedule("b"));
-
     assignAndAssert(Result.FAILURE, GROUP_B, OFFER, firstAssignment);
 
-    clock.advance(reservationDuration);
-
-    assertTrue(scheduler.schedule("b"));
-
-    assignAndAssert(Result.SUCCESS, GROUP_B, OFFER, secondAssignment);
-  }
-
-  @Test
-  public void testReservationsExpireAfterAccepted() throws Exception {
-    storageUtil.expectOperations();
-
-    expectTaskStillPendingQuery(TASK_A);
-    expectActiveJobFetch(TASK_A);
-    expectLaunchAttempt(false);
-    // Reserve "a" with offerA
-    expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
-
-    expectTaskStillPendingQuery(TASK_A);
-    expectActiveJobFetch(TASK_A);
-    AssignmentCapture firstAssignment = expectLaunchAttempt(true);
-    expectAssigned(TASK_A);
-
-    expectTaskStillPendingQuery(TASK_B);
-    expectActiveJobFetch(TASK_B);
-
-    AssignmentCapture secondAssignment = expectLaunchAttempt(true);
-
-    expect(assigner.maybeAssign(
-        storageUtil.mutableStoreProvider,
-        OFFER,
-        new ResourceRequest(TASK_B.getAssignedTask().getTask(), Tasks.id(TASK_B), EMPTY)))
-        .andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
-
-    control.replay();
-    assertFalse(scheduler.schedule("a"));
-    assertTrue(scheduler.schedule("a"));
-    assignAndAssert(Result.SUCCESS, GROUP_A, OFFER, firstAssignment);
-    eventSink.post(TaskStateChange.transition(TASK_A, PENDING));
-    clock.advance(halfReservationDuration);
+    eventSink.post(TaskStateChange.transition(assign(TASK_A, SLAVE_ID), PENDING));
     assertTrue(scheduler.schedule("b"));
     assignAndAssert(Result.SUCCESS, GROUP_B, OFFER, secondAssignment);
   }
 
   @Test
-  public void testReservationsAcceptsWithInTimePeriod() throws Exception {
+  public void testReservationUnusable() throws Exception {
     storageUtil.expectOperations();
-    expectTaskStillPendingQuery(TASK_A);
-    expectActiveJobFetch(TASK_A);
-    expectLaunchAttempt(false);
-    // Reserve "a" with offerA
-    expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
 
     expectTaskStillPendingQuery(TASK_A);
-    expectActiveJobFetch(TASK_A);
-    AssignmentCapture assignment = expectLaunchAttempt(true);
-    expectAssigned(TASK_A);
+    expectLaunchAttempt(false);
+    expect(reservations.getByValue(TaskGroupKey.from(TASK_A.getAssignedTask().getTask())))
+        .andReturn(ImmutableSet.of(SLAVE_ID));
 
     control.replay();
-    assertFalse(scheduler.schedule("a"));
-    clock.advance(halfReservationDuration);
-    assertTrue(scheduler.schedule("a"));
 
-    assignAndAssert(Result.SUCCESS, GROUP_A, OFFER, assignment);
+    assertFalse(scheduler.schedule("a"));
   }
 
   @Test
-  public void testReservationsCancellation() throws Exception {
-    storageUtil.expectOperations();
-
-    expectTaskStillPendingQuery(TASK_A);
-    expectActiveJobFetch(TASK_A);
-    expectLaunchAttempt(false);
-
-    // Reserve "a" with offerA
-    expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
-
-    expectTaskStillPendingQuery(TASK_B);
-    expectActiveJobFetch(TASK_B);
-    AssignmentCapture assignment = expectLaunchAttempt(true);
-    expectAssigned(TASK_B);
-
+  public void testNonPendingIgnored() throws Exception {
     control.replay();
-    assertFalse(scheduler.schedule("a"));
-    clock.advance(halfReservationDuration);
-    // Task is killed by user before it is scheduled
-    eventSink.post(TaskStateChange.transition(TASK_A, PENDING));
-    assertTrue(scheduler.schedule("b"));
-    assignAndAssert(Result.SUCCESS, GROUP_B, OFFER, assignment);
+
+    eventSink.post(TaskStateChange.transition(TASK_A, RUNNING));
   }
 
   @Test
-  public void testReservationsExpire() throws Exception {
-    storageUtil.expectOperations();
-
-    expectTaskStillPendingQuery(TASK_B);
-    expectActiveJobFetch(TASK_B);
-    expectLaunchAttempt(false);
-    // Reserve "b" with offer1
-    expectPreemptorCall(TASK_B, Optional.of(SLAVE_ID));
-
-    expectTaskStillPendingQuery(TASK_A);
-    expectActiveJobFetch(TASK_A);
-    AssignmentCapture assignment = expectLaunchAttempt(true);
-    expectAssigned(TASK_A);
-
+  public void testPendingDeletedHandled() throws Exception {
     control.replay();
-    assertFalse(scheduler.schedule("b"));
-    // We don't act on the reservation made by b because we want to see timeout behaviour.
-    clock.advance(reservationDuration);
-    assertTrue(scheduler.schedule("a"));
-    assignAndAssert(Result.SUCCESS, GROUP_A, OFFER, assignment);
+
+    IScheduledTask task = IScheduledTask.build(TASK_A.newBuilder().setStatus(PENDING));
+    eventSink.post(TaskStateChange.transition(task, PENDING));
   }
 
   @Test
@@ -307,6 +262,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
       }
     });
 
+    expectGetNoReservation(SLAVE_ID);
     AssignmentCapture assignment = expectLaunchAttempt(true);
     expect(assigner.maybeAssign(
         EasyMock.<MutableStoreProvider>anyObject(),
@@ -353,6 +309,12 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     return capture;
   }
 
+  private IScheduledTask assign(IScheduledTask task, String slaveId) {
+    ScheduledTask result = task.newBuilder();
+    result.getAssignedTask().setSlaveId(slaveId);
+    return IScheduledTask.build(result);
+  }
+
   private void assignAndAssert(
       Result result,
       TaskGroupKey groupKey,
@@ -368,5 +330,23 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         Query.jobScoped(Tasks.SCHEDULED_TO_JOB_KEY.apply(task))
             .byStatus(Tasks.SLAVE_ASSIGNED_STATES),
         ImmutableSet.<IScheduledTask>of());
+  }
+
+  private void expectAddReservation(String slaveId, IScheduledTask task) {
+    reservations.put(slaveId, TaskGroupKey.from(task.getAssignedTask().getTask()));
+  }
+
+  private IExpectationSetters<?> expectGetReservation(String slaveId, IScheduledTask task) {
+    return expect(reservations.get(slaveId))
+        .andReturn(Optional.of(TaskGroupKey.from(task.getAssignedTask().getTask())));
+  }
+
+  private IExpectationSetters<?> expectGetNoReservation(String slaveId) {
+    return expect(reservations.get(slaveId)).andReturn(Optional.<TaskGroupKey>absent());
+  }
+
+  private IExpectationSetters<?> expectReservationCheck(IScheduledTask task) {
+    return expect(reservations.getByValue(TaskGroupKey.from(task.getAssignedTask().getTask())))
+        .andReturn(ImmutableSet.<String>of());
   }
 }

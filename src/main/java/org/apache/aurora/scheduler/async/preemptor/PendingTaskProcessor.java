@@ -32,6 +32,7 @@ import com.twitter.common.util.Clock;
 
 import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -58,7 +59,7 @@ class PendingTaskProcessor implements Runnable {
   private final PreemptionSlotFinder preemptionSlotFinder;
   private final PreemptorMetrics metrics;
   private final Amount<Long, Time> preemptionCandidacyDelay;
-  private final PreemptionSlotCache slotCache;
+  private final BiCache<PreemptionSlot, TaskGroupKey> slotCache;
   private final Clock clock;
 
   /**
@@ -78,7 +79,7 @@ class PendingTaskProcessor implements Runnable {
       PreemptionSlotFinder preemptionSlotFinder,
       PreemptorMetrics metrics,
       @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
-      PreemptionSlotCache slotCache,
+      BiCache<PreemptionSlot, TaskGroupKey> slotCache,
       Clock clock) {
 
     this.storage = requireNonNull(storage);
@@ -112,7 +113,7 @@ class PendingTaskProcessor implements Runnable {
             metrics.recordSlotSearchResult(slot, task);
 
             if (slot.isPresent()) {
-              slotCache.add(pendingTask.getTaskId(), slot.get());
+              slotCache.put(slot.get(), TaskGroupKey.from(task));
             }
           }
         }
@@ -132,8 +133,8 @@ class PendingTaskProcessor implements Runnable {
 
   private final Predicate<IScheduledTask> hasCachedSlot = new Predicate<IScheduledTask>() {
     @Override
-    public boolean apply(IScheduledTask input) {
-      return slotCache.get(input.getAssignedTask().getTaskId()).isPresent();
+    public boolean apply(IScheduledTask task) {
+      return !slotCache.getByValue(TaskGroupKey.from(task.getAssignedTask().getTask())).isEmpty();
     }
   };
 

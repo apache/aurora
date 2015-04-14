@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.async.preemptor;
 
 import java.util.Arrays;
+import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
@@ -29,12 +30,14 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.IExpectationSetters;
@@ -49,24 +52,26 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class PendingTaskProcessorTest extends EasyMockTest {
-  private static final String TASK_ID_A = "task_a";
-  private static final String TASK_ID_B = "task_b";
-  private static final ScheduledTask TASK_A = makeTask(TASK_ID_A);
-  private static final ScheduledTask TASK_B = makeTask(TASK_ID_B);
+  private static final ScheduledTask TASK_A = makeTask("task_a");
+  private static final ScheduledTask TASK_B = makeTask("task_b");
   private static final PreemptionSlot SLOT_A = createPreemptionSlot(TASK_A);
   private static final PreemptionSlot SLOT_B = createPreemptionSlot(TASK_B);
+  private static final TaskGroupKey GROUP_A =
+      TaskGroupKey.from(ITaskConfig.build(TASK_A.getAssignedTask().getTask()));
+  private static final TaskGroupKey GROUP_B =
+      TaskGroupKey.from(ITaskConfig.build(TASK_B.getAssignedTask().getTask()));
   private static final String SLAVE_ID = "slave_id";
   private static final IJobKey JOB_KEY = IJobKey.build(TASK_A.getAssignedTask().getTask().getJob());
 
   private static final Amount<Long, Time> PREEMPTION_DELAY = Amount.of(30L, Time.SECONDS);
 
-  private static final Optional<PreemptionSlot> EMPTY_SLOT = Optional.absent();
+  private static final Set<PreemptionSlot> NO_SLOTS = ImmutableSet.of();
 
   private StorageTestUtil storageUtil;
   private FakeStatsProvider statsProvider;
   private PreemptionSlotFinder preemptionSlotFinder;
   private PendingTaskProcessor slotFinder;
-  private PreemptionSlotCache slotCache;
+  private BiCache<PreemptionSlot, TaskGroupKey> slotCache;
   private FakeClock clock;
 
   @Before
@@ -74,7 +79,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     preemptionSlotFinder = createMock(PreemptionSlotFinder.class);
-    slotCache = createMock(PreemptionSlotCache.class);
+    slotCache = createMock(new Clazz<BiCache<PreemptionSlot, TaskGroupKey>>() { });
     statsProvider = new FakeStatsProvider();
     clock = new FakeClock();
 
@@ -88,14 +93,14 @@ public class PendingTaskProcessorTest extends EasyMockTest {
   }
   @Test
   public void testSearchSlotSuccessful() throws Exception {
-    expect(slotCache.get(TASK_ID_A)).andReturn(EMPTY_SLOT);
-    expect(slotCache.get(TASK_ID_B)).andReturn(EMPTY_SLOT);
+    expect(slotCache.getByValue(GROUP_A)).andReturn(NO_SLOTS);
+    expect(slotCache.getByValue(GROUP_B)).andReturn(NO_SLOTS);
     expectGetPendingTasks(TASK_A, TASK_B);
     expectAttributeAggegateFetchTasks();
     expectSlotSearch(TASK_A, Optional.of(SLOT_A));
     expectSlotSearch(TASK_B, Optional.of(SLOT_B));
-    slotCache.add(TASK_ID_A, SLOT_A);
-    slotCache.add(TASK_ID_B, SLOT_B);
+    slotCache.put(SLOT_A, GROUP_A);
+    slotCache.put(SLOT_B, GROUP_B);
 
     control.replay();
 
@@ -110,10 +115,10 @@ public class PendingTaskProcessorTest extends EasyMockTest {
 
   @Test
   public void testSearchSlotFailed() throws Exception {
-    expect(slotCache.get(TASK_ID_A)).andReturn(EMPTY_SLOT);
+    expect(slotCache.getByValue(GROUP_A)).andReturn(NO_SLOTS);
     expectGetPendingTasks(TASK_A);
     expectAttributeAggegateFetchTasks();
-    expectSlotSearch(TASK_A, EMPTY_SLOT);
+    expectSlotSearch(TASK_A, Optional.<PreemptionSlot>absent());
 
     control.replay();
 

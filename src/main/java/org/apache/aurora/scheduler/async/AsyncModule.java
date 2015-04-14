@@ -30,7 +30,6 @@ import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
-import com.google.inject.Binder;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.args.Arg;
@@ -53,7 +52,10 @@ import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculat
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.async.TaskHistoryPruner.HistoryPrunnerSettings;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
+import org.apache.aurora.scheduler.async.preemptor.BiCache;
+import org.apache.aurora.scheduler.async.preemptor.BiCache.BiCacheSettings;
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -61,8 +63,6 @@ import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
-
-import static org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
 
 /**
  * Binding module for async task management.
@@ -237,8 +237,20 @@ public class AsyncModule extends AbstractModule {
         expose(TaskGroups.class);
       }
     });
-    bindTaskScheduler(binder(), RESERVATION_DURATION.get());
     PubsubEventModule.bindSubscriber(binder(), TaskGroups.class);
+
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(new TypeLiteral<BiCache<String, TaskGroupKey>>() { }).in(Singleton.class);
+        bind(BiCacheSettings.class).toInstance(
+            new BiCacheSettings(RESERVATION_DURATION.get(), "reservation_cache_size"));
+        bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
+        bind(TaskSchedulerImpl.class).in(Singleton.class);
+        expose(TaskScheduler.class);
+      }
+    });
+    PubsubEventModule.bindSubscriber(binder(), TaskScheduler.class);
 
     install(new PrivateModule() {
       @Override
@@ -329,27 +341,6 @@ public class AsyncModule extends AbstractModule {
       }
     });
     PubsubEventModule.bindSubscriber(binder(), KillRetry.class);
-  }
-
-  /**
-   * This method exists because we want to test the wiring up of TaskSchedulerImpl class to the
-   * PubSub system in the TaskSchedulerImplTest class. The method has a complex signature because
-   * the binding of the TaskScheduler and friends occurs in a PrivateModule which does not interact
-   * well with the MultiBinder that backs the PubSub system.
-   */
-  @VisibleForTesting
-  static void bindTaskScheduler(Binder binder, final Amount<Long, Time> reservationDuration) {
-    binder.install(new PrivateModule() {
-      @Override
-      protected void configure() {
-        bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(ReservationDuration.class)
-            .toInstance(reservationDuration);
-        bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
-        bind(TaskSchedulerImpl.class).in(Singleton.class);
-        expose(TaskScheduler.class);
-      }
-    });
-    PubsubEventModule.bindSubscriber(binder, TaskScheduler.class);
   }
 
   static class RegisterGauges extends AbstractIdleService {

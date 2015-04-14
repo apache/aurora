@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.async.preemptor;
 
+import java.util.Set;
+
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
@@ -20,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -51,14 +54,14 @@ public interface Preemptor {
     private final StateManager stateManager;
     private final PreemptionSlotFinder preemptionSlotFinder;
     private final PreemptorMetrics metrics;
-    private final PreemptionSlotCache slotCache;
+    private final BiCache<PreemptionSlot, TaskGroupKey> slotCache;
 
     @Inject
     PreemptorImpl(
         StateManager stateManager,
         PreemptionSlotFinder preemptionSlotFinder,
         PreemptorMetrics metrics,
-        PreemptionSlotCache slotCache) {
+        BiCache<PreemptionSlot, TaskGroupKey> slotCache) {
 
       this.stateManager = requireNonNull(stateManager);
       this.preemptionSlotFinder = requireNonNull(preemptionSlotFinder);
@@ -70,21 +73,20 @@ public interface Preemptor {
     public Optional<String> attemptPreemptionFor(
         IAssignedTask pendingTask,
         AttributeAggregate jobState,
-        MutableStoreProvider storeProvider) {
+        MutableStoreProvider store) {
 
-      final Optional<PreemptionSlot> preemptionSlot = slotCache.get(pendingTask.getTaskId());
+      TaskGroupKey groupKey = TaskGroupKey.from(pendingTask.getTask());
+      Set<PreemptionSlot> preemptionSlots = slotCache.getByValue(groupKey);
 
       // A preemption slot is available -> attempt to preempt tasks.
-      if (preemptionSlot.isPresent()) {
-        slotCache.remove(pendingTask.getTaskId());
+      if (!preemptionSlots.isEmpty()) {
+        // Get the next available preemption slot.
+        PreemptionSlot slot = preemptionSlots.iterator().next();
+        slotCache.remove(slot, groupKey);
 
         // Validate a PreemptionSlot is still valid for the given task.
         Optional<ImmutableSet<PreemptionVictim>> validatedVictims =
-            preemptionSlotFinder.validatePreemptionSlotFor(
-                pendingTask,
-                jobState,
-                preemptionSlot.get(),
-                storeProvider);
+            preemptionSlotFinder.validatePreemptionSlotFor(pendingTask, jobState, slot, store);
 
         metrics.recordSlotValidationResult(validatedVictims);
         if (!validatedVictims.isPresent()) {
@@ -95,13 +97,13 @@ public interface Preemptor {
         for (PreemptionVictim toPreempt : validatedVictims.get()) {
           metrics.recordTaskPreemption(toPreempt);
           stateManager.changeState(
-              storeProvider,
+              store,
               toPreempt.getTaskId(),
               Optional.<ScheduleStatus>absent(),
               PREEMPTING,
               Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
         }
-        return Optional.of(preemptionSlot.get().getSlaveId());
+        return Optional.of(slot.getSlaveId());
       }
 
       return Optional.absent();

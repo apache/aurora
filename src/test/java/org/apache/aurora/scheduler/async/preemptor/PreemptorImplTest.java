@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.async.preemptor;
 
+import java.util.Set;
+
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -25,12 +27,14 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor.PreemptorImpl;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.EasyMock;
 import org.junit.Before;
@@ -46,19 +50,20 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class PreemptorImplTest extends EasyMockTest {
-  private static final String TASK_ID = "task_a";
   private static final String SLAVE_ID = "slave_id";
   private static final IScheduledTask TASK = IScheduledTask.build(makeTask());
   private static final PreemptionSlot SLOT = createPreemptionSlot(TASK);
+  private static final TaskGroupKey GROUP_KEY =
+      TaskGroupKey.from(ITaskConfig.build(makeTask().getAssignedTask().getTask()));
 
-  private static final Optional<PreemptionSlot> EMPTY_SLOT = Optional.absent();
+  private static final Set<PreemptionSlot> NO_SLOTS = ImmutableSet.of();
   private static final Optional<String> EMPTY_RESULT = Optional.absent();
 
   private StateManager stateManager;
   private FakeStatsProvider statsProvider;
   private PreemptionSlotFinder preemptionSlotFinder;
   private PreemptorImpl preemptor;
-  private PreemptionSlotCache slotCache;
+  private BiCache<PreemptionSlot, TaskGroupKey> slotCache;
   private Storage.MutableStoreProvider storeProvider;
 
   @Before
@@ -66,7 +71,7 @@ public class PreemptorImplTest extends EasyMockTest {
     storeProvider = createMock(Storage.MutableStoreProvider.class);
     stateManager = createMock(StateManager.class);
     preemptionSlotFinder = createMock(PreemptionSlotFinder.class);
-    slotCache = createMock(PreemptionSlotCache.class);
+    slotCache = createMock(new Clazz<BiCache<PreemptionSlot, TaskGroupKey>>() { });
     statsProvider = new FakeStatsProvider();
     preemptor = new PreemptorImpl(
         stateManager,
@@ -77,8 +82,8 @@ public class PreemptorImplTest extends EasyMockTest {
 
   @Test
   public void testPreemptTasksSuccessful() throws Exception {
-    expect(slotCache.get(TASK_ID)).andReturn(Optional.of(SLOT));
-    slotCache.remove(TASK_ID);
+    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(SLOT));
+    slotCache.remove(SLOT, GROUP_KEY);
     expectSlotValidation(Optional.of(ImmutableSet.of(
         PreemptionVictim.fromTask(TASK.getAssignedTask()))));
 
@@ -93,8 +98,8 @@ public class PreemptorImplTest extends EasyMockTest {
 
   @Test
   public void testPreemptTasksValidationFailed() throws Exception {
-    expect(slotCache.get(TASK_ID)).andReturn(Optional.of(SLOT));
-    slotCache.remove(TASK_ID);
+    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(SLOT));
+    slotCache.remove(SLOT, GROUP_KEY);
     expectSlotValidation(Optional.<ImmutableSet<PreemptionVictim>>absent());
 
     control.replay();
@@ -106,7 +111,7 @@ public class PreemptorImplTest extends EasyMockTest {
 
   @Test
   public void testNoCachedSlot() throws Exception {
-    expect(slotCache.get(TASK_ID)).andReturn(EMPTY_SLOT);
+    expect(slotCache.getByValue(GROUP_KEY)).andReturn(NO_SLOTS);
 
     control.replay();
 
@@ -145,7 +150,6 @@ public class PreemptorImplTest extends EasyMockTest {
   private static ScheduledTask makeTask() {
     ScheduledTask task = new ScheduledTask()
         .setAssignedTask(new AssignedTask()
-            .setTaskId(TASK_ID)
             .setTask(new TaskConfig()
                 .setPriority(1)
                 .setProduction(true)

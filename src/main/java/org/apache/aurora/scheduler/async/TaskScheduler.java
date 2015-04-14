@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.async;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -26,20 +25,13 @@ import javax.inject.Qualifier;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
-import com.google.common.base.Ticker;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
 import com.twitter.common.inject.TimedInterceptor.Timed;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.Clock;
 
 import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.async.preemptor.BiCache;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
@@ -56,7 +48,6 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.mesos.Protos.SlaveID;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -103,7 +94,7 @@ public interface TaskScheduler extends EventSubscriber {
     private final TaskAssigner assigner;
     private final OfferManager offerManager;
     private final Preemptor preemptor;
-    private final Reservations reservations;
+    private final BiCache<String, TaskGroupKey> reservations;
 
     private final AtomicLong attemptsFired = Stats.exportLong("schedule_attempts_fired");
     private final AtomicLong attemptsFailed = Stats.exportLong("schedule_attempts_failed");
@@ -116,16 +107,14 @@ public interface TaskScheduler extends EventSubscriber {
         TaskAssigner assigner,
         OfferManager offerManager,
         Preemptor preemptor,
-        @ReservationDuration Amount<Long, Time> reservationDuration,
-        final Clock clock,
-        StatsProvider statsProvider) {
+        BiCache<String, TaskGroupKey> reservations) {
 
       this.storage = requireNonNull(storage);
       this.stateManager = requireNonNull(stateManager);
       this.assigner = requireNonNull(assigner);
       this.offerManager = requireNonNull(offerManager);
       this.preemptor = requireNonNull(preemptor);
-      this.reservations = new Reservations(statsProvider, reservationDuration, clock);
+      this.reservations = requireNonNull(reservations);
     }
 
     private Function<HostOffer, Assignment> getAssignerFunction(
@@ -138,11 +127,12 @@ public interface TaskScheduler extends EventSubscriber {
       return new Function<HostOffer, Assignment>() {
         @Override
         public Assignment apply(HostOffer offer) {
-          Optional<String> reservedTaskId =
-              reservations.getSlaveReservation(offer.getOffer().getSlaveId());
-          if (reservedTaskId.isPresent()) {
-            if (resourceRequest.getTaskId().equals(reservedTaskId.get())) {
-              // Slave is reserved to satisfy this task.
+          Optional<TaskGroupKey> reservation =
+              reservations.get(offer.getOffer().getSlaveId().getValue());
+
+          if (reservation.isPresent()) {
+            if (TaskGroupKey.from(resourceRequest.getTask()).equals(reservation.get())) {
+              // Slave is reserved to satisfy this task group.
               return assigner.maybeAssign(storeProvider, offer, resourceRequest);
             } else {
               // Slave is reserved for another task.
@@ -234,67 +224,22 @@ public interface TaskScheduler extends EventSubscriber {
         AttributeAggregate jobState,
         MutableStoreProvider storeProvider) {
 
-      if (reservations.hasReservationForTask(task.getTaskId())) {
+      if (!reservations.getByValue(TaskGroupKey.from(task.getTask())).isEmpty()) {
         return;
       }
       Optional<String> slaveId = preemptor.attemptPreemptionFor(task, jobState, storeProvider);
       if (slaveId.isPresent()) {
-        reservations.add(SlaveID.newBuilder().setValue(slaveId.get()).build(), task.getTaskId());
+        reservations.put(slaveId.get(), TaskGroupKey.from(task.getTask()));
       }
     }
 
     @Subscribe
     public void taskChanged(final TaskStateChange stateChangeEvent) {
       if (Optional.of(PENDING).equals(stateChangeEvent.getOldState())) {
-        reservations.invalidateTask(stateChangeEvent.getTaskId());
-      }
-    }
-
-    @VisibleForTesting
-    static final String RESERVATIONS_CACHE_SIZE_STAT = "reservation_cache_size";
-
-    private static class Reservations {
-      private final Cache<SlaveID, String> reservations;
-
-      Reservations(
-          StatsProvider statsProvider,
-          Amount<Long, Time> duration,
-          final Clock clock) {
-        requireNonNull(duration);
-        requireNonNull(clock);
-        this.reservations = CacheBuilder.newBuilder()
-            .expireAfterWrite(duration.as(Time.MINUTES), TimeUnit.MINUTES)
-            .ticker(new Ticker() {
-              @Override
-              public long read() {
-                return clock.nowNanos();
-              }
-            })
-            .build();
-        statsProvider.makeGauge(
-            RESERVATIONS_CACHE_SIZE_STAT,
-            new Supplier<Long>() {
-              @Override
-              public Long get() {
-                return reservations.size();
-              }
-            });
-      }
-
-      private synchronized void add(SlaveID slaveId, String taskId) {
-        reservations.put(slaveId, taskId);
-      }
-
-      private synchronized boolean hasReservationForTask(String taskId) {
-        return reservations.asMap().containsValue(taskId);
-      }
-
-      private synchronized Optional<String> getSlaveReservation(SlaveID slaveID) {
-        return Optional.fromNullable(reservations.getIfPresent(slaveID));
-      }
-
-      private synchronized void invalidateTask(String taskId) {
-        reservations.asMap().values().remove(taskId);
+        IAssignedTask assigned = stateChangeEvent.getTask().getAssignedTask();
+        if (assigned.getSlaveId() != null) {
+          reservations.remove(assigned.getSlaveId(), TaskGroupKey.from(assigned.getTask()));
+        }
       }
     }
   }
