@@ -167,12 +167,14 @@ public interface TaskAssigner {
    * @param storeProvider Storage provider.
    * @param offer The resource offer.
    * @param resourceRequest The request for resources being scheduled.
+   * @param taskId Task id to assign.
    * @return {@link Assignment} with assignment result.
    */
   Assignment maybeAssign(
       MutableStoreProvider storeProvider,
       HostOffer offer,
-      ResourceRequest resourceRequest);
+      ResourceRequest resourceRequest,
+      String taskId);
 
   class TaskAssignerImpl implements TaskAssigner {
     private static final Logger LOG = Logger.getLogger(TaskAssignerImpl.class.getName());
@@ -226,7 +228,8 @@ public interface TaskAssigner {
     public Assignment maybeAssign(
         MutableStoreProvider storeProvider,
         HostOffer offer,
-        ResourceRequest resourceRequest) {
+        ResourceRequest resourceRequest,
+        String taskId) {
 
       Set<Veto> vetoes = filter.filter(
           new UnusedResource(ResourceSlot.from(offer.getOffer()), offer.getAttributes()),
@@ -236,10 +239,10 @@ public interface TaskAssigner {
             storeProvider,
             offer.getOffer(),
             resourceRequest.getRequestedPorts(),
-            resourceRequest.getTaskId()));
+            taskId));
       } else {
         LOG.fine("Slave " + offer.getOffer().getHostname()
-            + " vetoed task " + resourceRequest.getTaskId() + ": " + vetoes);
+            + " vetoed task " + taskId + ": " + vetoes);
         return Assignment.failure(vetoes);
       }
     }

@@ -101,7 +101,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
   public void testAssignNoVetoes() {
     expect(filter.filter(
         new UnusedResource(ResourceSlot.from(MESOS_OFFER), OFFER.getAttributes()),
-        new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), EMPTY)))
+        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
         .andReturn(ImmutableSet.<Veto>of());
     expect(stateManager.assignTask(
         storeProvider,
@@ -120,14 +120,15 @@ public class TaskAssignerImplTest extends EasyMockTest {
         assigner.maybeAssign(
             storeProvider,
             OFFER,
-            new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), EMPTY)));
+            new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+            Tasks.id(TASK)));
   }
 
   @Test
   public void testAssignVetoes() {
     expect(filter.filter(
         new UnusedResource(ResourceSlot.from(MESOS_OFFER), OFFER.getAttributes()),
-        new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), EMPTY)))
+        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("denied")));
 
     control.replay();
@@ -137,6 +138,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         assigner.maybeAssign(
             storeProvider,
             OFFER,
-            new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), EMPTY)));
+            new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+            Tasks.id(TASK)));
   }
 }

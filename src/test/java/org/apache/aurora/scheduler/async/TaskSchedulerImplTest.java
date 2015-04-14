@@ -139,8 +139,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expect(assigner.maybeAssign(
         storageUtil.mutableStoreProvider,
         OFFER,
-        new ResourceRequest(task.getAssignedTask().getTask(), Tasks.id(task), EMPTY)))
-        .andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
+        new ResourceRequest(task.getAssignedTask().getTask(), EMPTY),
+        Tasks.id(task))).andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
   }
 
   @Test
@@ -267,8 +267,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expect(assigner.maybeAssign(
         EasyMock.<MutableStoreProvider>anyObject(),
         eq(OFFER),
-        eq(new ResourceRequest(taskA.getAssignedTask().getTask(), Tasks.id(taskA), EMPTY))))
-        .andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
+        eq(new ResourceRequest(taskA.getAssignedTask().getTask(), EMPTY)),
+        eq(Tasks.id(taskA)))).andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
 
     control.replay();
 

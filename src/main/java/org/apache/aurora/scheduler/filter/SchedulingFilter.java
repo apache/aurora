@@ -282,12 +282,10 @@ public interface SchedulingFilter {
    */
   class ResourceRequest {
     private final ITaskConfig task;
-    private final String taskId;
     private final AttributeAggregate jobState;
 
-    public ResourceRequest(ITaskConfig task, String taskId, AttributeAggregate jobState) {
+    public ResourceRequest(ITaskConfig task, AttributeAggregate jobState) {
       this.task = task;
-      this.taskId = taskId;
       this.jobState = jobState;
     }
 
@@ -303,10 +301,6 @@ public interface SchedulingFilter {
       return jobState;
     }
 
-    public String getTaskId() {
-      return taskId;
-    }
-
     public Set<String> getRequestedPorts() {
       return task.getRequestedPorts();
     }
@@ -318,14 +312,12 @@ public interface SchedulingFilter {
       }
 
       ResourceRequest other = (ResourceRequest) o;
-      return Objects.equals(task, other.task)
-          && Objects.equals(getTaskId(), other.getTaskId())
-          && Objects.equals(getJobState(), other.getJobState());
+      return Objects.equals(task, other.task) && Objects.equals(getJobState(), other.getJobState());
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(task, taskId, jobState);
+      return Objects.hash(task, jobState);
     }
   }
 

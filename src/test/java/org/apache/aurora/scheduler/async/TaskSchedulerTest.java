@@ -288,7 +288,8 @@ public class TaskSchedulerTest extends EasyMockTest {
     return expect(assigner.maybeAssign(
         EasyMock.<MutableStoreProvider>anyObject(),
         eq(offer),
-        eq(new ResourceRequest(task.getAssignedTask().getTask(), Tasks.id(task), jobAggregate))));
+        eq(new ResourceRequest(task.getAssignedTask().getTask(), jobAggregate)),
+        eq(Tasks.id(task))));
   }
 
   private IExpectationSetters<?> expectNoReservation(String slaveId) {
@@ -534,16 +535,16 @@ public class TaskSchedulerTest extends EasyMockTest {
     captureB.getValue().run();
   }
 
-  private Capture<ResourceRequest> expectTaskScheduled(IScheduledTask task) {
+  private Capture<String> expectTaskScheduled(IScheduledTask task) {
     TaskInfo mesosTask = makeTaskInfo(task);
-    Capture<ResourceRequest> request = createCapture();
+    Capture<String> taskId = createCapture();
     expect(assigner.maybeAssign(
         EasyMock.<MutableStoreProvider>anyObject(),
         EasyMock.<HostOffer>anyObject(),
-        capture(request)))
-        .andReturn(Assignment.success(mesosTask));
+        EasyMock.<ResourceRequest>anyObject(),
+        capture(taskId))).andReturn(Assignment.success(mesosTask));
     driver.launchTask(EasyMock.<OfferID>anyObject(), eq(mesosTask));
-    return request;
+    return taskId;
   }
 
   @Test
@@ -578,8 +579,8 @@ public class TaskSchedulerTest extends EasyMockTest {
     Capture<Runnable> timeoutA = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     Capture<Runnable> timeoutB = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
-    Capture<ResourceRequest> firstScheduled = expectTaskScheduled(jobA0);
-    Capture<ResourceRequest> secondScheduled = expectTaskScheduled(jobB0);
+    Capture<String> firstScheduled = expectTaskScheduled(jobA0);
+    Capture<String> secondScheduled = expectTaskScheduled(jobB0);
 
     // Expect another watch of the task group for job A.
     expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
@@ -598,9 +599,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     timeoutB.getValue().run();
     assertEquals(
         ImmutableSet.of(Tasks.id(jobA0), Tasks.id(jobB0)),
-        ImmutableSet.of(
-            firstScheduled.getValue().getTaskId(),
-            secondScheduled.getValue().getTaskId()));
+        ImmutableSet.of(firstScheduled.getValue(), secondScheduled.getValue()));
   }
 
   @Test

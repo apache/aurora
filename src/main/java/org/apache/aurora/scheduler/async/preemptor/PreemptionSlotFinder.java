@@ -309,7 +309,7 @@ public interface PreemptionSlotFinder {
 
         Set<Veto> vetoes = schedulingFilter.filter(
             new UnusedResource(totalResource, attributes.get()),
-            new ResourceRequest(pendingTask.getTask(), pendingTask.getTaskId(), jobState));
+            new ResourceRequest(pendingTask.getTask(), jobState));
 
         if (vetoes.isEmpty()) {
           return Optional.of(ImmutableSet.copyOf(toPreemptTasks));

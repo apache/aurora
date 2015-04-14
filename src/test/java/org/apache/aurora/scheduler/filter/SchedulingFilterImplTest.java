@@ -131,22 +131,22 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         none,
         defaultFilter.filter(
             new UnusedResource(twoPorts, hostA),
-            new ResourceRequest(noPortTask, TASK_ID, EMPTY)));
+            new ResourceRequest(noPortTask, EMPTY)));
     assertEquals(
         none,
         defaultFilter.filter(
             new UnusedResource(twoPorts, hostA),
-            new ResourceRequest(onePortTask, TASK_ID, EMPTY)));
+            new ResourceRequest(onePortTask, EMPTY)));
     assertEquals(
         none,
         defaultFilter.filter(
             new UnusedResource(twoPorts, hostA),
-            new ResourceRequest(twoPortTask, TASK_ID, EMPTY)));
+            new ResourceRequest(twoPortTask, EMPTY)));
     assertEquals(
         ImmutableSet.of(PORTS.veto(1)),
         defaultFilter.filter(
             new UnusedResource(twoPorts, hostA),
-            new ResourceRequest(threePortTask, TASK_ID, EMPTY)));
+            new ResourceRequest(threePortTask, EMPTY)));
   }
 
   @Test
@@ -410,7 +410,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         ImmutableSet.<Veto>of(),
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostA),
-            new ResourceRequest(task, TASK_ID, EMPTY)));
+            new ResourceRequest(task, EMPTY)));
 
     Constraint jvmNegated = jvmConstraint.deepCopy();
     jvmNegated.getConstraint().getValue().setNegated(true);
@@ -524,7 +524,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         expected,
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostAttributes),
-            new ResourceRequest(task, TASK_ID, aggregate))
+            new ResourceRequest(task, aggregate))
             .isEmpty());
 
     Constraint negated = constraint.deepCopy();
@@ -534,7 +534,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         !expected,
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostAttributes),
-            new ResourceRequest(negatedTask, TASK_ID, aggregate))
+            new ResourceRequest(negatedTask, aggregate))
             .isEmpty());
     return task;
   }
@@ -565,7 +565,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         ImmutableSet.copyOf(vetoes),
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostAttributes),
-            new ResourceRequest(task, TASK_ID, jobState)));
+            new ResourceRequest(task, jobState)));
   }
 
   private static IHostAttributes hostAttributes(

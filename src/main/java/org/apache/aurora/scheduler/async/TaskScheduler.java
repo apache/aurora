@@ -119,7 +119,8 @@ public interface TaskScheduler extends EventSubscriber {
 
     private Function<HostOffer, Assignment> getAssignerFunction(
         final MutableStoreProvider storeProvider,
-        final ResourceRequest resourceRequest) {
+        final ResourceRequest resourceRequest,
+        final String taskId) {
 
       // TODO(wfarner): Turn this into Predicate<Offer>, and in the caller, find the first match
       // and perform the assignment at the very end.  This will allow us to use optimistic locking
@@ -133,14 +134,14 @@ public interface TaskScheduler extends EventSubscriber {
           if (reservation.isPresent()) {
             if (TaskGroupKey.from(resourceRequest.getTask()).equals(reservation.get())) {
               // Slave is reserved to satisfy this task group.
-              return assigner.maybeAssign(storeProvider, offer, resourceRequest);
+              return assigner.maybeAssign(storeProvider, offer, resourceRequest, taskId);
             } else {
               // Slave is reserved for another task.
               return Assignment.failure();
             }
           } else {
             // Slave is not reserved.
-            return assigner.maybeAssign(storeProvider, offer, resourceRequest);
+            return assigner.maybeAssign(storeProvider, offer, resourceRequest, taskId);
           }
         }
       };
@@ -186,7 +187,7 @@ public interface TaskScheduler extends EventSubscriber {
         AttributeAggregate aggregate = AttributeAggregate.getJobActiveState(store, task.getJob());
         try {
           boolean launched = offerManager.launchFirst(
-              getAssignerFunction(store, new ResourceRequest(task, taskId, aggregate)),
+              getAssignerFunction(store, new ResourceRequest(task, aggregate), taskId),
               TaskGroupKey.from(task));
 
           if (!launched) {
