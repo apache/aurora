@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -26,7 +25,6 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
@@ -34,7 +32,6 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
-import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos.FrameworkID;
@@ -49,6 +46,7 @@ import org.apache.mesos.Protos.Value.Type;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.expect;
@@ -89,7 +87,6 @@ public class TaskAssignerImplTest extends EasyMockTest {
   private SchedulingFilter filter;
   private MesosTaskFactory taskFactory;
   private TaskAssigner assigner;
-  private AttributeAggregate emptyJob;
 
   @Before
   public void setUp() throws Exception {
@@ -98,16 +95,13 @@ public class TaskAssignerImplTest extends EasyMockTest {
     filter = createMock(SchedulingFilter.class);
     taskFactory = createMock(MesosTaskFactory.class);
     assigner = new TaskAssignerImpl(stateManager, filter, taskFactory);
-    emptyJob = new AttributeAggregate(
-        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
-        createMock(AttributeStore.class));
   }
 
   @Test
   public void testAssignNoVetoes() {
     expect(filter.filter(
         new UnusedResource(ResourceSlot.from(MESOS_OFFER), OFFER.getAttributes()),
-        new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), emptyJob)))
+        new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), EMPTY)))
         .andReturn(ImmutableSet.<Veto>of());
     expect(stateManager.assignTask(
         storeProvider,
@@ -126,14 +120,14 @@ public class TaskAssignerImplTest extends EasyMockTest {
         assigner.maybeAssign(
             storeProvider,
             OFFER,
-            new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), emptyJob)));
+            new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), EMPTY)));
   }
 
   @Test
   public void testAssignVetoes() {
     expect(filter.filter(
         new UnusedResource(ResourceSlot.from(MESOS_OFFER), OFFER.getAttributes()),
-        new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), emptyJob)))
+        new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), EMPTY)))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("denied")));
 
     control.replay();
@@ -143,6 +137,6 @@ public class TaskAssignerImplTest extends EasyMockTest {
         assigner.maybeAssign(
             storeProvider,
             OFFER,
-            new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), emptyJob)));
+            new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), EMPTY)));
   }
 }

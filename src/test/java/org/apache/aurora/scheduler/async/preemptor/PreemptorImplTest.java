@@ -14,9 +14,7 @@
 package org.apache.aurora.scheduler.async.preemptor;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
-
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -28,10 +26,8 @@ import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor.PreemptorImpl;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.stats.CachedCounters;
-import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -43,6 +39,7 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.slotValidationStatName;
 import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.successStatName;
+import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -61,7 +58,6 @@ public class PreemptorImplTest extends EasyMockTest {
   private FakeStatsProvider statsProvider;
   private PreemptionSlotFinder preemptionSlotFinder;
   private PreemptorImpl preemptor;
-  private AttributeAggregate attrAggregate;
   private PreemptionSlotCache slotCache;
   private Storage.MutableStoreProvider storeProvider;
 
@@ -72,10 +68,6 @@ public class PreemptorImplTest extends EasyMockTest {
     preemptionSlotFinder = createMock(PreemptionSlotFinder.class);
     slotCache = createMock(PreemptionSlotCache.class);
     statsProvider = new FakeStatsProvider();
-    attrAggregate = new AttributeAggregate(
-        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
-        createMock(AttributeStore.class));
-
     preemptor = new PreemptorImpl(
         stateManager,
         preemptionSlotFinder,
@@ -124,15 +116,15 @@ public class PreemptorImplTest extends EasyMockTest {
   }
 
   private Optional<String> callPreemptor() {
-    return preemptor.attemptPreemptionFor(TASK.getAssignedTask(), attrAggregate, storeProvider);
+    return preemptor.attemptPreemptionFor(TASK.getAssignedTask(), EMPTY, storeProvider);
   }
 
   private void expectSlotValidation(Optional<ImmutableSet<PreemptionVictim>> victims) {
     expect(preemptionSlotFinder.validatePreemptionSlotFor(
-        eq(TASK.getAssignedTask()),
-        eq(attrAggregate),
-        eq(SLOT),
-        anyObject(Storage.MutableStoreProvider.class))).andReturn(victims);
+        TASK.getAssignedTask(),
+        EMPTY,
+        SLOT,
+        storeProvider)).andReturn(victims);
   }
 
   private void expectPreempted(IScheduledTask preempted) throws Exception {

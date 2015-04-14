@@ -13,12 +13,11 @@
  */
 package org.apache.aurora.scheduler.filter;
 
-import java.util.Map;
-
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multiset;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -37,65 +36,51 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class AttributeAggregateTest extends EasyMockTest {
-
-  private Supplier<ImmutableSet<IScheduledTask>> activeTaskSupplier;
   private AttributeStore attributeStore;
-  private AttributeAggregate aggregate;
 
   @Before
   public void setUp() throws Exception {
-    activeTaskSupplier = createMock(new Clazz<Supplier<ImmutableSet<IScheduledTask>>>() { });
     attributeStore = createMock(AttributeStore.class);
-    aggregate = new AttributeAggregate(activeTaskSupplier, attributeStore);
   }
 
   @Test
   public void testNoTasks() {
-    expectGetTasks();
-
     control.replay();
 
-    assertAggregates(ImmutableMap.<Pair<String, String>, Long>of());
-    assertAggregate("none", "alsoNone", 0);
+    AttributeAggregate aggregate = aggregate();
+    assertEquals(ImmutableMultiset.<Pair<String, String>>of(), aggregate.getAggregates());
+    assertAggregate(aggregate, "none", "alsoNone", 0);
   }
 
   @Test(expected = IllegalStateException.class)
   public void testAttributesMissing() {
-    expectGetTasks(task("1", "a"));
     expect(attributeStore.getHostAttributes("a")).andReturn(Optional.<IHostAttributes>absent());
 
     control.replay();
 
-    aggregate.getAggregates();
+    aggregate(task("1", "a")).getAggregates();
   }
 
   @Test(expected = NullPointerException.class)
   public void testTaskWithNoHost() {
-    expectGetTasks(task("1", null));
-
     control.replay();
 
-    aggregate.getAggregates();
+    aggregate(task("1", null)).getAggregates();
   }
 
   @Test
   public void testNoAttributes() {
-    expectGetTasks(task("1", "hostA"));
     expectGetAttributes("hostA");
 
     control.replay();
 
-    assertAggregates(ImmutableMap.<Pair<String, String>, Long>of());
+    assertEquals(
+        ImmutableMultiset.<Pair<String, String>>of(),
+        aggregate(task("1", "hostA")).getAggregates());
   }
 
   @Test
   public void testAggregate() {
-    expectGetTasks(
-        task("1", "a1"),
-        task("2", "b1"),
-        task("3", "b1"),
-        task("4", "b2"),
-        task("5", "c1"));
     expectGetAttributes(
         "a1",
         attribute("host", "a1"),
@@ -121,29 +106,37 @@ public class AttributeAggregateTest extends EasyMockTest {
 
     control.replay();
 
-    Map<Pair<String, String>, Long> expected = ImmutableMap.<Pair<String, String>, Long>builder()
-        .put(Pair.of("rack", "a"), 1L)
-        .put(Pair.of("rack", "b"), 3L)
-        .put(Pair.of("rack", "c"), 1L)
-        .put(Pair.of("host", "a1"), 1L)
-        .put(Pair.of("host", "b1"), 2L)
-        .put(Pair.of("host", "b2"), 1L)
-        .put(Pair.of("host", "c1"), 1L)
-        .put(Pair.of("pdu", "p1"), 4L)
-        .put(Pair.of("pdu", "p2"), 4L)
-        .put(Pair.of("ssd", "true"), 1L)
+    Multiset<Pair<String, String>> expected = ImmutableMultiset.<Pair<String, String>>builder()
+        .add(Pair.of("rack", "a"))
+        .addCopies(Pair.of("rack", "b"), 3)
+        .add(Pair.of("rack", "c"))
+        .add(Pair.of("host", "a1"))
+        .addCopies(Pair.of("host", "b1"), 2)
+        .add(Pair.of("host", "b2"))
+        .add(Pair.of("host", "c1"))
+        .addCopies(Pair.of("pdu", "p1"), 4)
+        .addCopies(Pair.of("pdu", "p2"), 4)
+        .add(Pair.of("ssd", "true"))
         .build();
-    assertAggregates(expected);
-    for (Map.Entry<Pair<String, String>, Long> entry : expected.entrySet()) {
-      assertAggregate(entry.getKey().getFirst(), entry.getKey().getSecond(), entry.getValue());
+    AttributeAggregate aggregate = aggregate(
+        task("1", "a1"),
+        task("2", "b1"),
+        task("3", "b1"),
+        task("4", "b2"),
+        task("5", "c1"));
+    assertEquals(expected, aggregate.getAggregates());
+    for (Multiset.Entry<Pair<String, String>> entry : expected.entrySet()) {
+      Pair<String, String> element = entry.getElement();
+      assertAggregate(aggregate, element.getFirst(), element.getSecond(), entry.getCount());
     }
-    assertAggregate("host", "c2", 0L);
-    assertAggregate("hostc", "2", 0L);
+    assertAggregate(aggregate, "host", "c2", 0L);
+    assertAggregate(aggregate, "hostc", "2", 0L);
   }
 
-  private void expectGetTasks(IScheduledTask... activeTasks) {
-    expect(activeTaskSupplier.get())
-        .andReturn(ImmutableSet.<IScheduledTask>builder().add(activeTasks).build());
+  private AttributeAggregate aggregate(IScheduledTask... activeTasks) {
+    return AttributeAggregate.create(
+        Suppliers.<Iterable<IScheduledTask>>ofInstance(ImmutableSet.copyOf(activeTasks)),
+        attributeStore);
   }
 
   private IExpectationSetters<?> expectGetAttributes(String host, Attribute... attributes) {
@@ -153,11 +146,12 @@ public class AttributeAggregateTest extends EasyMockTest {
             .setAttributes(ImmutableSet.<Attribute>builder().add(attributes).build()))));
   }
 
-  private void assertAggregates(Map<Pair<String, String>, Long> expected) {
-    assertEquals(expected, aggregate.getAggregates());
-  }
+  private void assertAggregate(
+      AttributeAggregate aggregate,
+      String name,
+      String value,
+      long expected) {
 
-  private void assertAggregate(String name, String value, long expected) {
     assertEquals(expected, aggregate.getNumTasksWithAttribute(name, value));
   }
 

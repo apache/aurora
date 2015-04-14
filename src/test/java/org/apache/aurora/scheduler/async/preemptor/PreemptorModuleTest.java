@@ -14,8 +14,6 @@
 package org.apache.aurora.scheduler.async.preemptor;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
-import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -33,10 +31,8 @@ import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
-import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.junit.Before;
 import org.junit.Test;
@@ -80,10 +76,6 @@ public class PreemptorModuleTest extends EasyMockTest {
         Amount.of(0L, Time.SECONDS),
         Amount.of(0L, Time.SECONDS)));
 
-    Supplier<ImmutableSet<IScheduledTask>> taskSupplier =
-        createMock(new EasyMockTest.Clazz<Supplier<ImmutableSet<IScheduledTask>>>() { });
-    AttributeStore attributeStore = createMock(AttributeStore.class);
-
     control.replay();
 
     injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
@@ -93,7 +85,7 @@ public class PreemptorModuleTest extends EasyMockTest {
         Optional.<String>absent(),
         injector.getInstance(Preemptor.class).attemptPreemptionFor(
             IAssignedTask.build(new AssignedTask()),
-            new AttributeAggregate(taskSupplier, attributeStore),
+            AttributeAggregate.EMPTY,
             storageUtil.mutableStoreProvider));
   }
 }

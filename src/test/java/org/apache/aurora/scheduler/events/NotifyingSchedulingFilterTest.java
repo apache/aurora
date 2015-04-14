@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.events;
 
 import java.util.Set;
 
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -31,9 +30,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
-import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
@@ -51,7 +48,8 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
   private static final UnusedResource RESOURCE = new UnusedResource(
       ResourceSlot.from(TASK, TaskExecutors.NO_OVERHEAD_EXECUTOR),
       IHostAttributes.build(new HostAttributes().setHost("host").setMode(MaintenanceMode.NONE)));
-  private ResourceRequest request;
+  private static final ResourceRequest REQUEST =
+      new ResourceRequest(TASK, "taskId", AttributeAggregate.EMPTY);
 
   private static final Veto VETO_1 = Veto.insufficientResources("ram", 1);
   private static final Veto VETO_2 = Veto.insufficientResources("ram", 2);
@@ -65,30 +63,26 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
     delegate = createMock(SchedulingFilter.class);
     eventSink = createMock(EventSink.class);
     filter = new NotifyingSchedulingFilter(delegate, eventSink);
-    AttributeAggregate emptyJob = new AttributeAggregate(
-        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
-        createMock(AttributeStore.class));
-    request = new ResourceRequest(TASK, "taskId", emptyJob);
   }
 
   @Test
   public void testEvents() {
     Set<Veto> vetoes = ImmutableSet.of(VETO_1, VETO_2);
-    expect(delegate.filter(RESOURCE, request)).andReturn(vetoes);
+    expect(delegate.filter(RESOURCE, REQUEST)).andReturn(vetoes);
     eventSink.post(new Vetoed(GROUP_KEY, vetoes));
 
     control.replay();
 
-    assertEquals(vetoes, filter.filter(RESOURCE, request));
+    assertEquals(vetoes, filter.filter(RESOURCE, REQUEST));
   }
 
   @Test
   public void testNoVetoes() {
     Set<Veto> vetoes = ImmutableSet.of();
-    expect(delegate.filter(RESOURCE, request)).andReturn(vetoes);
+    expect(delegate.filter(RESOURCE, REQUEST)).andReturn(vetoes);
 
     control.replay();
 
-    assertEquals(vetoes, filter.filter(RESOURCE, request));
+    assertEquals(vetoes, filter.filter(RESOURCE, REQUEST));
   }
 }

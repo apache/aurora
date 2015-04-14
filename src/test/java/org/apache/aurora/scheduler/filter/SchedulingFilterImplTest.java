@@ -15,16 +15,14 @@ package org.apache.aurora.scheduler.filter;
 
 import java.util.Arrays;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.ExecutorConfig;
@@ -32,7 +30,6 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.MaintenanceMode;
-import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
@@ -45,20 +42,18 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType;
 import org.apache.aurora.scheduler.mesos.Offers;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
-import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
-import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class SchedulingFilterImplTest extends EasyMockTest {
@@ -92,20 +87,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final ResourceSlot DEFAULT_OFFER = ResourceSlot.from(
       Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 80)));
 
-  private AttributeAggregate emptyJob;
-
-  private final AtomicLong taskIdCounter = new AtomicLong();
-
   private SchedulingFilter defaultFilter;
-  private AttributeStore.Mutable attributeStore;
 
   @Before
   public void setUp() {
     defaultFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-    attributeStore = createMock(AttributeStore.Mutable.class);
-    emptyJob = new AttributeAggregate(
-        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
-        attributeStore);
   }
 
   @Test
@@ -145,22 +131,22 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         none,
         defaultFilter.filter(
             new UnusedResource(twoPorts, hostA),
-            new ResourceRequest(noPortTask, TASK_ID, emptyJob)));
+            new ResourceRequest(noPortTask, TASK_ID, EMPTY)));
     assertEquals(
         none,
         defaultFilter.filter(
             new UnusedResource(twoPorts, hostA),
-            new ResourceRequest(onePortTask, TASK_ID, emptyJob)));
+            new ResourceRequest(onePortTask, TASK_ID, EMPTY)));
     assertEquals(
         none,
         defaultFilter.filter(
             new UnusedResource(twoPorts, hostA),
-            new ResourceRequest(twoPortTask, TASK_ID, emptyJob)));
+            new ResourceRequest(twoPortTask, TASK_ID, EMPTY)));
     assertEquals(
         ImmutableSet.of(PORTS.veto(1)),
         defaultFilter.filter(
             new UnusedResource(twoPorts, hostA),
-            new ResourceRequest(threePortTask, TASK_ID, emptyJob)));
+            new ResourceRequest(threePortTask, TASK_ID, EMPTY)));
   }
 
   @Test
@@ -296,37 +282,40 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertNoVetoes(hostLimitTask(2), hostAttributes(HOST_A, host(HOST_A)));
   }
 
-  private Attribute host(String host) {
+  private IAttribute host(String host) {
     return valueAttribute(HOST_ATTRIBUTE, host);
   }
 
-  private Attribute rack(String rack) {
+  private IAttribute rack(String rack) {
     return valueAttribute(RACK_ATTRIBUTE, rack);
   }
 
-  private Attribute dedicated(String value, String... values) {
+  private IAttribute dedicated(String value, String... values) {
     return valueAttribute(DEDICATED_ATTRIBUTE, value, values);
   }
 
   @Test
   public void testLimitWithinJob() throws Exception {
-    expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
-    expectGetHostAttributes(HOST_B, host(HOST_B), rack(RACK_A)).atLeastOnce();
-    expectGetHostAttributes(HOST_C, host(HOST_C), rack(RACK_B)).atLeastOnce();
-
-    AttributeAggregate stateA = new AttributeAggregate(Suppliers.ofInstance(ImmutableSet.of(
-        makeScheduledTask(OWNER_A, JOB_A, HOST_A),
-        makeScheduledTask(OWNER_A, JOB_A, HOST_B),
-        makeScheduledTask(OWNER_A, JOB_A, HOST_B),
-        makeScheduledTask(OWNER_A, JOB_A, HOST_C))),
-        attributeStore);
-    AttributeAggregate stateB = new AttributeAggregate(Suppliers.ofInstance(ImmutableSet.of(
-        makeScheduledTask(OWNER_B, JOB_A, HOST_A),
-        makeScheduledTask(OWNER_B, JOB_A, HOST_A),
-        makeScheduledTask(OWNER_B, JOB_A, HOST_B))),
-        attributeStore);
-
     control.replay();
+
+    AttributeAggregate stateA = AttributeAggregate.create(
+        Suppliers.<Iterable<IAttribute>>ofInstance(ImmutableList.of(
+            host(HOST_A),
+            rack(RACK_A),
+            host(HOST_B),
+            rack(RACK_A),
+            host(HOST_B),
+            rack(RACK_A),
+            host(HOST_C),
+            rack(RACK_B))));
+    AttributeAggregate stateB = AttributeAggregate.create(
+        Suppliers.<Iterable<IAttribute>>ofInstance(ImmutableList.of(
+            host(HOST_A),
+            rack(RACK_A),
+            host(HOST_A),
+            rack(RACK_A),
+            host(HOST_B),
+            rack(RACK_A))));
 
     IHostAttributes hostA = hostAttributes(HOST_A, host(HOST_A), rack(RACK_A));
     IHostAttributes hostB = hostAttributes(HOST_B, host(HOST_B), rack(RACK_A));
@@ -421,7 +410,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         ImmutableSet.<Veto>of(),
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostA),
-            new ResourceRequest(task, TASK_ID, emptyJob)));
+            new ResourceRequest(task, TASK_ID, EMPTY)));
 
     Constraint jvmNegated = jvmConstraint.deepCopy();
     jvmNegated.getConstraint().getValue().setNegated(true);
@@ -512,7 +501,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return checkConstraint(
         owner,
         jobName,
-        emptyJob,
+        EMPTY,
         hostAttributes,
         constraintName,
         expected,
@@ -551,7 +540,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   private void assertNoVetoes(ITaskConfig task, IHostAttributes hostAttributes) {
-    assertVetoes(task, hostAttributes, emptyJob);
+    assertVetoes(task, hostAttributes, EMPTY);
   }
 
   private void assertNoVetoes(
@@ -563,7 +552,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   private void assertVetoes(ITaskConfig task, IHostAttributes hostAttributes, Veto... vetoes) {
-    assertVetoes(task, hostAttributes, emptyJob, vetoes);
+    assertVetoes(task, hostAttributes, EMPTY, vetoes);
   }
 
   private void assertVetoes(
@@ -582,49 +571,30 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static IHostAttributes hostAttributes(
       String host,
       MaintenanceMode mode,
-      Attribute... attributes) {
+      IAttribute... attributes) {
 
     return IHostAttributes.build(
         new HostAttributes()
             .setHost(host)
             .setMode(mode)
-            .setAttributes(ImmutableSet.<Attribute>builder().add(attributes).build()));
+            .setAttributes(IAttribute.toBuildersSet(ImmutableSet.copyOf(attributes))));
   }
 
   private static IHostAttributes hostAttributes(
       String host,
-      Attribute... attributes) {
+      IAttribute... attributes) {
 
     return hostAttributes(host, MaintenanceMode.NONE, attributes);
   }
 
-  private Attribute valueAttribute(String name, String string, String... strings) {
-    return new Attribute(name,
-        ImmutableSet.<String>builder().add(string).addAll(Arrays.asList(strings)).build());
+  private IAttribute valueAttribute(String name, String string, String... strings) {
+    return IAttribute.build(new Attribute(name,
+        ImmutableSet.<String>builder().add(string).addAll(Arrays.asList(strings)).build()));
   }
 
   private static Constraint makeConstraint(String name, String... values) {
     return new Constraint(name,
         TaskConstraint.value(new ValueConstraint(false, ImmutableSet.copyOf(values))));
-  }
-
-  private IExpectationSetters<Optional<IHostAttributes>> expectGetHostAttributes(
-      String host,
-      Attribute... attributes) {
-
-    IHostAttributes hostAttributes = IHostAttributes.build(new HostAttributes()
-        .setHost(host)
-        .setAttributes(ImmutableSet.<Attribute>builder().add(attributes).build()));
-    return expect(attributeStore.getHostAttributes(host)).andReturn(Optional.of(hostAttributes));
-  }
-
-  private IScheduledTask makeScheduledTask(Identity owner, String jobName, String host) {
-    return IScheduledTask.build(new ScheduledTask().setAssignedTask(
-        new AssignedTask()
-            .setSlaveHost(host)
-            .setTaskId("Task-" + taskIdCounter.incrementAndGet())
-            .setTask(hostLimitTask(owner, jobName, 1 /* Max per host not used here. */)
-                .newBuilder())));
   }
 
   private Constraint limitConstraint(String name, int value) {

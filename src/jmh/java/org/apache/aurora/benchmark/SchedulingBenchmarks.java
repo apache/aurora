@@ -21,8 +21,6 @@ import java.util.concurrent.TimeUnit;
 import javax.inject.Singleton;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.EventBus;
@@ -50,7 +48,6 @@ import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.Reserva
 import org.apache.aurora.scheduler.async.preemptor.ClusterStateImpl;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.async.preemptor.PreemptorModule;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
@@ -309,7 +306,6 @@ public class SchedulingBenchmarks {
    * Tests preemptor searching for a preemption slot in a completely filled up cluster.
    */
   public static class PreemptorSlotSearchBenchmark extends AbstractBase {
-
     @Override
     protected BenchmarkSettings getSettings() {
       return new BenchmarkSettings.Builder()
@@ -327,20 +323,8 @@ public class SchedulingBenchmarks {
         @Override
         public Boolean apply(final Storage.MutableStoreProvider storeProvider) {
           IAssignedTask assignedTask = getSettings().getTask().getAssignedTask();
-          final Query.Builder query = Query.jobScoped(assignedTask.getTask().getJob())
-              .byStatus(org.apache.aurora.scheduler.base.Tasks.SLAVE_ASSIGNED_STATES);
-
-          Supplier<ImmutableSet<IScheduledTask>> taskSupplier = Suppliers.memoize(
-              new Supplier<ImmutableSet<IScheduledTask>>() {
-                @Override
-                public ImmutableSet<IScheduledTask> get() {
-                  return storeProvider.getTaskStore().fetchTasks(query);
-                }
-              });
-
           AttributeAggregate aggregate =
-              new AttributeAggregate(taskSupplier, storeProvider.getAttributeStore());
-
+              AttributeAggregate.getJobActiveState(storeProvider, assignedTask.getTask().getJob());
           Optional<String> result =
               preemptor.attemptPreemptionFor(assignedTask, aggregate, storeProvider);
 

@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.async;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -43,14 +42,12 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
-import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
 import org.apache.aurora.scheduler.state.TaskAssigner.Assignment.Result;
-import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -66,6 +63,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
+import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -96,7 +94,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private Amount<Long, Time> reservationDuration;
   private Amount<Long, Time> halfReservationDuration;
   private EventSink eventSink;
-  private AttributeAggregate emptyJob;
 
   @Before
   public void setUp() throws Exception {
@@ -113,9 +110,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     Injector injector = getInjector(storageUtil.storage);
     scheduler = injector.getInstance(TaskScheduler.class);
     eventSink = PubsubTestUtil.startPubsub(injector);
-    emptyJob = new AttributeAggregate(
-        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
-        createMock(AttributeStore.class));
   }
 
   private Injector getInjector(final Storage storageImpl) {
@@ -146,7 +140,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expect(assigner.maybeAssign(
         storageUtil.mutableStoreProvider,
         OFFER,
-        new ResourceRequest(task.getAssignedTask().getTask(), Tasks.id(task), emptyJob)))
+        new ResourceRequest(task.getAssignedTask().getTask(), Tasks.id(task), EMPTY)))
         .andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
   }
 
@@ -207,7 +201,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expect(assigner.maybeAssign(
         storageUtil.mutableStoreProvider,
         OFFER,
-        new ResourceRequest(TASK_B.getAssignedTask().getTask(), Tasks.id(TASK_B), emptyJob)))
+        new ResourceRequest(TASK_B.getAssignedTask().getTask(), Tasks.id(TASK_B), EMPTY)))
         .andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
 
     control.replay();
@@ -317,7 +311,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expect(assigner.maybeAssign(
         EasyMock.<MutableStoreProvider>anyObject(),
         eq(OFFER),
-        eq(new ResourceRequest(taskA.getAssignedTask().getTask(), Tasks.id(taskA), emptyJob))))
+        eq(new ResourceRequest(taskA.getAssignedTask().getTask(), Tasks.id(taskA), EMPTY))))
         .andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
 
     control.replay();
@@ -346,7 +340,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private void expectPreemptorCall(IScheduledTask task, Optional<String> result) {
     expect(preemptor.attemptPreemptionFor(
         task.getAssignedTask(),
-        emptyJob,
+        EMPTY,
         storageUtil.mutableStoreProvider)).andReturn(result);
   }
 

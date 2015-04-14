@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.async.preemptor;
 import java.util.Arrays;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -33,7 +32,6 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.stats.CachedCounters;
-import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -68,7 +66,6 @@ public class PendingTaskProcessorTest extends EasyMockTest {
   private FakeStatsProvider statsProvider;
   private PreemptionSlotFinder preemptionSlotFinder;
   private PendingTaskProcessor slotFinder;
-  private AttributeAggregate attrAggregate;
   private PreemptionSlotCache slotCache;
   private FakeClock clock;
 
@@ -80,9 +77,6 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     slotCache = createMock(PreemptionSlotCache.class);
     statsProvider = new FakeStatsProvider();
     clock = new FakeClock();
-    attrAggregate = new AttributeAggregate(
-        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
-        createMock(AttributeStore.class));
 
     slotFinder = new PendingTaskProcessor(
         storageUtil.storage,
@@ -135,7 +129,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
   private void expectSlotSearch(ScheduledTask task, Optional<PreemptionSlot> slot) {
     expect(preemptionSlotFinder.findPreemptionSlotFor(
         IAssignedTask.build(task.getAssignedTask()),
-        attrAggregate,
+        AttributeAggregate.EMPTY,
         storageUtil.storeProvider)).andReturn(slot);
   }
 

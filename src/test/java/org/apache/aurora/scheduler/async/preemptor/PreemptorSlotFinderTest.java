@@ -20,7 +20,6 @@ import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
@@ -48,16 +47,13 @@ import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
 import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlotFinderImpl;
 import org.apache.aurora.scheduler.configuration.Resources;
-import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.stats.CachedCounters;
-import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.Protos;
@@ -70,6 +66,7 @@ import org.junit.Test;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.async.preemptor.PreemptorMetrics.MISSING_ATTRIBUTES_NAME;
+import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
 import static org.apache.mesos.Protos.Offer;
 import static org.apache.mesos.Protos.Resource;
 import static org.easymock.EasyMock.expect;
@@ -98,7 +95,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
   private FakeStatsProvider statsProvider;
   private ClusterState clusterState;
   private OfferManager offerManager;
-  private AttributeAggregate emptyJob;
   private PreemptorMetrics preemptorMetrics;
 
   @Before
@@ -109,9 +105,6 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
     storageUtil.expectOperations();
     statsProvider = new FakeStatsProvider();
     preemptorMetrics = new PreemptorMetrics(new CachedCounters(statsProvider));
-    emptyJob = new AttributeAggregate(
-        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
-        createMock(AttributeStore.class));
   }
 
   private Optional<PreemptionSlot> runSlotFinder(ScheduledTask pendingTask) {
@@ -124,7 +117,7 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     return slotFinder.findPreemptionSlotFor(
         IAssignedTask.build(pendingTask.getAssignedTask()),
-        emptyJob,
+        EMPTY,
         storageUtil.mutableStoreProvider);
   }
 
@@ -417,7 +410,7 @@ public class PreemptorSlotFinderTest extends EasyMockTest {
 
     Optional<ImmutableSet<PreemptionVictim>> victims = slotFinder.validatePreemptionSlotFor(
         IAssignedTask.build(p1.getAssignedTask()),
-        emptyJob,
+        EMPTY,
         slot.get(),
         storageUtil.mutableStoreProvider);
 

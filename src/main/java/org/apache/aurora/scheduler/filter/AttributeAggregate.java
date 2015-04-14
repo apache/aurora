@@ -13,17 +13,13 @@
  */
 package org.apache.aurora.scheduler.filter;
 
-import java.util.Map;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import com.google.common.util.concurrent.AtomicLongMap;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableMultiset;
+import com.google.common.collect.Multiset;
 import com.twitter.common.collections.Pair;
 
 import org.apache.aurora.scheduler.base.Query;
@@ -41,18 +37,20 @@ import static java.util.Objects.requireNonNull;
  * once the job state may change (e.g. after exiting a write transaction). This is intended to
  * capture job state once and avoid redundant queries.
  * <p>
- * Note that while the state injected into this class is used lazily (to allow for queries to happen
- * only on-demand), calling {@link #equals(Object)} and {@link #hashCode()} rely on the aggregation
- * result, thus invoking the {@link Supplier} and {@link AttributeStore}.
+ * TODO(wfarner): Consider preserving this as only a helper class to compute the Multiset
+ * representing the aggregate, since this class is now a thin wrapper over a Multiset.
  */
-public class AttributeAggregate {
+public final class AttributeAggregate {
 
   /**
-   * A lazily-computed mapping from attribute name and value to the count of tasks with that
-   * name/value combination.  See doc for {@link #getNumTasksWithAttribute(String, String)} for
-   * further details.
+   * A mapping from attribute name and value to the count of tasks with that name/value combination.
+   * See doc for {@link #getNumTasksWithAttribute(String, String)} for further details.
    */
-  private final Supplier<Map<Pair<String, String>, Long>> aggregate;
+  private final Supplier<Multiset<Pair<String, String>>> aggregate;
+
+  private AttributeAggregate(Supplier<Multiset<Pair<String, String>>> aggregate) {
+    this.aggregate = Suppliers.memoize(aggregate);
+  }
 
   /**
    * Initializes an {@link AttributeAggregate} instance from data store.
@@ -65,57 +63,71 @@ public class AttributeAggregate {
       final StoreProvider storeProvider,
       final IJobKey jobKey) {
 
-    Supplier<ImmutableSet<IScheduledTask>> taskSupplier = Suppliers.memoize(
-        new Supplier<ImmutableSet<IScheduledTask>>() {
+    return create(
+        new Supplier<Iterable<IScheduledTask>>() {
           @Override
-          public ImmutableSet<IScheduledTask> get() {
-            return storeProvider.getTaskStore().fetchTasks(
-                Query.jobScoped(jobKey).byStatus(Tasks.SLAVE_ASSIGNED_STATES));
+          public Iterable<IScheduledTask> get() {
+            return storeProvider.getTaskStore()
+                .fetchTasks(Query.jobScoped(jobKey).byStatus(Tasks.SLAVE_ASSIGNED_STATES));
           }
-        });
-    return new AttributeAggregate(taskSupplier, storeProvider.getAttributeStore());
+        },
+        storeProvider.getAttributeStore());
   }
 
-  /**
-   * Creates a new attribute aggregate, which will be computed from the provided external state.
-   *
-   * @param activeTaskSupplier Supplier of active tasks within the aggregated scope.
-   * @param attributeStore Source of host attributes to associate with tasks.
-   */
-  public AttributeAggregate(
-      final Supplier<ImmutableSet<IScheduledTask>> activeTaskSupplier,
+  @VisibleForTesting
+  static AttributeAggregate create(
+      final Supplier<Iterable<IScheduledTask>> taskSupplier,
       final AttributeStore attributeStore) {
 
-    requireNonNull(activeTaskSupplier);
-    requireNonNull(attributeStore);
-
-    final Function<IScheduledTask, Iterable<IAttribute>> getHostAttributes =
-        new Function<IScheduledTask, Iterable<IAttribute>>() {
+    final Function<String, Iterable<IAttribute>> getHostAttributes =
+        new Function<String, Iterable<IAttribute>>() {
           @Override
-          public Iterable<IAttribute> apply(IScheduledTask task) {
+          public Iterable<IAttribute> apply(String host) {
             // Note: this assumes we have access to attributes for hosts where all active tasks
             // reside.
-            String host = requireNonNull(task.getAssignedTask().getSlaveHost());
+            requireNonNull(host);
             return attributeStore.getHostAttributes(host).get().getAttributes();
           }
         };
 
-    aggregate = Suppliers.memoize(new Supplier<Map<Pair<String, String>, Long>>() {
-      @Override
-      public Map<Pair<String, String>, Long> get() {
-        AtomicLongMap<Pair<String, String>> counts = AtomicLongMap.create();
-        Iterable<IAttribute> allAttributes =
-            Iterables.concat(Iterables.transform(activeTaskSupplier.get(), getHostAttributes));
-        for (IAttribute attribute : allAttributes) {
-          for (String value : attribute.getValues()) {
-            counts.incrementAndGet(Pair.of(attribute.getName(), value));
+    return create(Suppliers.compose(
+        new Function<Iterable<IScheduledTask>, Iterable<IAttribute>>() {
+          @Override
+          public Iterable<IAttribute> apply(Iterable<IScheduledTask> tasks) {
+            return FluentIterable.from(tasks)
+                .transform(Tasks.SCHEDULED_TO_SLAVE_HOST)
+                .transformAndConcat(getHostAttributes);
           }
-        }
-
-        return ImmutableMap.copyOf(counts.asMap());
-      }
-    });
+        },
+        taskSupplier));
   }
+
+  @VisibleForTesting
+  static AttributeAggregate create(Supplier<Iterable<IAttribute>> attributes) {
+    Supplier<Multiset<Pair<String, String>>> aggregator = Suppliers.compose(
+        new Function<Iterable<IAttribute>, Multiset<Pair<String, String>>>() {
+          @Override
+          public Multiset<Pair<String, String>> apply(Iterable<IAttribute> attributes) {
+            ImmutableMultiset.Builder<Pair<String, String>> builder = ImmutableMultiset.builder();
+            for (IAttribute attribute : attributes) {
+              for (String value : attribute.getValues()) {
+                builder.add(Pair.of(attribute.getName(), value));
+              }
+            }
+
+            return builder.build();
+          }
+        },
+        attributes
+    );
+
+    return new AttributeAggregate(aggregator);
+  }
+
+  @VisibleForTesting
+  public static final AttributeAggregate EMPTY =
+      new AttributeAggregate(Suppliers.<Multiset<Pair<String, String>>>ofInstance(
+          ImmutableMultiset.<Pair<String, String>>of()));
 
   /**
    * Gets the total number of tasks with a given attribute name and value combination.
@@ -135,12 +147,11 @@ public class AttributeAggregate {
    * @return Number of tasks in the job whose hosts have the provided attribute name and value.
    */
   public long getNumTasksWithAttribute(String name, String value) {
-    return Optional.fromNullable(aggregate.get().get(Pair.of(name, value)))
-        .or(0L);
+    return aggregate.get().count(Pair.of(name, value));
   }
 
   @VisibleForTesting
-  Map<Pair<String, String>, Long> getAggregates() {
+  Multiset<Pair<String, String>> getAggregates() {
     return aggregate.get();
   }
 
