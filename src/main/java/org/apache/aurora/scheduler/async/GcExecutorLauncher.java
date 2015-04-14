@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.async;
 
 import java.util.Collections;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
@@ -180,7 +179,8 @@ public class GcExecutorLauncher implements TaskLauncher {
   }
 
   private TaskInfo makeGcTask(String hostName, SlaveID slaveId) {
-    Set<IScheduledTask> tasksOnHost = Storage.Util.fetchTasks(storage, Query.slaveScoped(hostName));
+    Iterable<IScheduledTask> tasksOnHost =
+        Storage.Util.fetchTasks(storage, Query.slaveScoped(hostName));
     tasksCreated.incrementAndGet();
     return makeGcTask(
         hostName,

@@ -24,6 +24,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 
@@ -161,8 +162,8 @@ public interface MaintenanceController {
                 store.getAttributeStore().getHostAttributes(host);
             if (attributes.isPresent() && attributes.get().getMode() == DRAINING) {
               Query.Builder builder = Query.slaveScoped(host).active();
-              Set<IScheduledTask> activeTasks = store.getTaskStore().fetchTasks(builder);
-              if (activeTasks.isEmpty()) {
+              Iterable<IScheduledTask> activeTasks = store.getTaskStore().fetchTasks(builder);
+              if (Iterables.isEmpty(activeTasks)) {
                 LOG.info(String.format("Moving host %s into DRAINED", host));
                 setMaintenanceMode(store, ImmutableSet.of(host), DRAINED);
               } else {

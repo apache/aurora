@@ -23,6 +23,7 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.collect.Iterables;
 import com.twitter.common.base.Supplier;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffHelper;
@@ -200,7 +201,7 @@ class AuroraCronJob implements Job {
       delayedStartBackoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override
         public Boolean get() {
-          if (Storage.Util.fetchTasks(storage, query).isEmpty()) {
+          if (Iterables.isEmpty(Storage.Util.fetchTasks(storage, query))) {
             LOG.info("Initiating delayed launch of cron " + path);
             storage.write(new Storage.MutateWork.NoResult.Quiet() {
               @Override

@@ -67,7 +67,7 @@ public interface Recovery {
    * @return Tasks matching the query.
    * @throws RecoveryException If a backup is not staged, or could not be queried.
    */
-  Set<IScheduledTask> query(Query.Builder query) throws RecoveryException;
+  Iterable<IScheduledTask> query(Query.Builder query) throws RecoveryException;
 
   /**
    * Deletes tasks from a staged backup.
@@ -163,7 +163,7 @@ public interface Recovery {
     }
 
     @Override
-    public Set<IScheduledTask> query(Query.Builder query) throws RecoveryException {
+    public Iterable<IScheduledTask> query(Query.Builder query) throws RecoveryException {
       return getLoadedRecovery().query(query);
     }
 
@@ -203,7 +203,7 @@ public interface Recovery {
         });
       }
 
-      Set<IScheduledTask> query(final Query.Builder query) {
+      Iterable<IScheduledTask> query(final Query.Builder query) {
         return tempStorage.fetchTasks(query);
       }
 

@@ -209,11 +209,9 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   public Response getConfigSummary(JobKey job) throws TException {
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(job));
 
-    Set<IScheduledTask> activeTasks =
-        Storage.Util.fetchTasks(storage, Query.jobScoped(jobKey).active());
-
-    Iterable<IAssignedTask> assignedTasks =
-        Iterables.transform(activeTasks, Tasks.SCHEDULED_TO_ASSIGNED);
+    Iterable<IAssignedTask> assignedTasks = Iterables.transform(
+        Storage.Util.fetchTasks(storage, Query.jobScoped(jobKey).active()),
+        Tasks.SCHEDULED_TO_ASSIGNED);
     Map<Integer, ITaskConfig> tasksByInstance = Maps.transformValues(
         Maps.uniqueIndex(assignedTasks, Tasks.ASSIGNED_TO_INSTANCE_ID),
         Tasks.ASSIGNED_TO_INFO);

@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
@@ -105,7 +104,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public ImmutableSet<IScheduledTask> fetchTasks(Query.Builder querySupplier) {
+  public Iterable<IScheduledTask> fetchTasks(Query.Builder querySupplier) {
     return taskStore.fetchTasks(querySupplier);
   }
 

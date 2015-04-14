@@ -21,6 +21,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.RateLimiter;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -181,7 +182,7 @@ public class TaskSchedulerTest extends EasyMockTest {
       @Override
       protected void execute(MutableStoreProvider storeProvider) {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
-        if (taskStore.fetchTasks(Query.taskScoped(Tasks.id(copy))).isEmpty()) {
+        if (Iterables.isEmpty(taskStore.fetchTasks(Query.taskScoped(Tasks.id(copy))))) {
           taskStore.saveTasks(ImmutableSet.of(copy));
         }
       }

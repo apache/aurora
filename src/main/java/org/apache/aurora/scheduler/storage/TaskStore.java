@@ -34,7 +34,7 @@ public interface TaskStore {
    * @param query Builder of the query to identify tasks with.
    * @return A read-only view of matching tasks.
    */
-  ImmutableSet<IScheduledTask> fetchTasks(Query.Builder query);
+  Iterable<IScheduledTask> fetchTasks(Query.Builder query);
 
   interface Mutable extends TaskStore {
 

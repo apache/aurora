@@ -155,10 +155,11 @@ public class TaskHistoryPruner implements EventSubscriber {
     executor.submit(new Runnable() {
       @Override
       public void run() {
-        Set<IScheduledTask> inactiveTasks =
+        Iterable<IScheduledTask> inactiveTasks =
             Storage.Util.fetchTasks(storage, jobHistoryQuery(jobKey));
-        int tasksToPrune = inactiveTasks.size() - settings.perJobHistoryGoal;
-        if (tasksToPrune > 0 && inactiveTasks.size() > settings.perJobHistoryGoal) {
+        int numInactiveTasks = Iterables.size(inactiveTasks);
+        int tasksToPrune = numInactiveTasks - settings.perJobHistoryGoal;
+        if (tasksToPrune > 0 && numInactiveTasks > settings.perJobHistoryGoal) {
           Set<String> toPrune = FluentIterable
               .from(Tasks.LATEST_ACTIVITY.sortedCopy(inactiveTasks))
               .filter(safeToDelete)

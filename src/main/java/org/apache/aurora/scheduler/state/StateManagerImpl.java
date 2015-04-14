@@ -126,7 +126,7 @@ public class StateManagerImpl implements StateManager {
           }
         }).toSet();
 
-    ImmutableSet<IScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
+    Iterable<IScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
         Query.jobScoped(task.getJob()).active());
 
     Set<Integer> existingInstanceIds =

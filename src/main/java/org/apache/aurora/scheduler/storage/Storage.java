@@ -20,8 +20,6 @@ import java.lang.annotation.Target;
 
 import javax.inject.Qualifier;
 
-import com.google.common.collect.ImmutableSet;
-
 import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -275,10 +273,10 @@ public interface Storage {
      * @param query Builder of the query to perform.
      * @return Tasks returned from the query.
      */
-    public static ImmutableSet<IScheduledTask> fetchTasks(Storage storage, final Builder query) {
-      return storage.read(new Work.Quiet<ImmutableSet<IScheduledTask>>() {
+    public static Iterable<IScheduledTask> fetchTasks(Storage storage, final Builder query) {
+      return storage.read(new Work.Quiet<Iterable<IScheduledTask>>() {
         @Override
-        public ImmutableSet<IScheduledTask> apply(StoreProvider storeProvider) {
+        public Iterable<IScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);
         }
       });

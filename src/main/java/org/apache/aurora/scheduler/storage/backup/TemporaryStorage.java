@@ -51,7 +51,7 @@ interface TemporaryStorage {
    * @param query Query builder for tasks to fetch.
    * @return Matching tasks.
    */
-  Set<IScheduledTask> fetchTasks(Query.Builder query);
+  Iterable<IScheduledTask> fetchTasks(Query.Builder query);
 
   /**
    * Creates a snapshot of the contents of the temporary storage.
@@ -87,10 +87,10 @@ interface TemporaryStorage {
         }
 
         @Override
-        public Set<IScheduledTask> fetchTasks(final Query.Builder query) {
-          return storage.read(new Work.Quiet<Set<IScheduledTask>>() {
+        public Iterable<IScheduledTask> fetchTasks(final Query.Builder query) {
+          return storage.read(new Work.Quiet<Iterable<IScheduledTask>>() {
             @Override
-            public Set<IScheduledTask> apply(StoreProvider storeProvider) {
+            public Iterable<IScheduledTask> apply(StoreProvider storeProvider) {
               return storeProvider.getTaskStore().fetchTasks(query);
             }
           });

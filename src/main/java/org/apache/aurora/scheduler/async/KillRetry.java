@@ -21,6 +21,7 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.BackoffStrategy;
@@ -88,7 +89,7 @@ public class KillRetry implements EventSubscriber {
     @Override
     public void run() {
       Query.Builder query = Query.taskScoped(taskId).byStatus(ScheduleStatus.KILLING);
-      if (!Storage.Util.fetchTasks(storage, query).isEmpty()) {
+      if (!Iterables.isEmpty(Storage.Util.fetchTasks(storage, query))) {
         LOG.info("Task " + taskId + " not yet killed, retrying.");
 
         // Kill did not yet take effect, try again.

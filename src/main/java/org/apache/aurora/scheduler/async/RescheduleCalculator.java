@@ -146,7 +146,7 @@ public interface RescheduleCalculator {
         return Optional.absent();
       }
 
-      Set<IScheduledTask> res =
+      Iterable<IScheduledTask> res =
           Storage.Util.fetchTasks(storage, Query.taskScoped(task.getAncestorId()));
 
       return Optional.fromNullable(Iterables.getOnlyElement(res, null));

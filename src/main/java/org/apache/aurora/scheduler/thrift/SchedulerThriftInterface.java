@@ -293,7 +293,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   private void checkJobExists(StoreProvider store, IJobKey jobKey) throws JobExistsException {
-    if (!store.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()).isEmpty()
+    if (!Iterables.isEmpty(store.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()))
         || getCronJob(store, jobKey).isPresent()) {
 
       throw new JobExistsException(jobAlreadyExistsMessage(jobKey));
@@ -615,8 +615,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         }
 
         Query.Builder query = Query.instanceScoped(jobKey, shardIds).active();
-        final Set<IScheduledTask> matchingTasks = storeProvider.getTaskStore().fetchTasks(query);
-        if (matchingTasks.size() != shardIds.size()) {
+        final Iterable<IScheduledTask> matchingTasks =
+            storeProvider.getTaskStore().fetchTasks(query);
+        if (Iterables.size(matchingTasks) != shardIds.size()) {
           return invalidRequest("Not all requested shards are active.");
         }
 
@@ -935,12 +936,12 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
               ILockKey.build(LockKey.job(jobKey.newBuilder())),
               Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-          ImmutableSet<IScheduledTask> currentTasks = storeProvider.getTaskStore().fetchTasks(
+          Iterable<IScheduledTask> currentTasks = storeProvider.getTaskStore().fetchTasks(
               Query.jobScoped(task.getJob()).active());
 
           validateTaskLimits(
               task,
-              currentTasks.size() + config.getInstanceIdsSize(),
+              Iterables.size(currentTasks) + config.getInstanceIdsSize(),
               quotaManager.checkInstanceAddition(task, config.getInstanceIdsSize(), storeProvider));
 
           storage.write(new NoResult.Quiet() {
