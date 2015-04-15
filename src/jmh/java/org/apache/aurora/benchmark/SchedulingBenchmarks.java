@@ -45,6 +45,7 @@ import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.TaskScheduler;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
+import org.apache.aurora.scheduler.async.preemptor.BiCache;
 import org.apache.aurora.scheduler.async.preemptor.ClusterStateImpl;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.async.preemptor.PreemptorModule;
@@ -130,7 +131,11 @@ public class SchedulingBenchmarks {
                       return DELAY_FOREVER;
                     }
                   });
-
+              bind(BiCache.BiCacheSettings.class).toInstance(
+                  new BiCache.BiCacheSettings(DELAY_FOREVER, ""));
+              bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
+              bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
+              expose(TaskScheduler.class);
               expose(OfferManager.class);
             }
           },
@@ -140,8 +145,6 @@ public class SchedulingBenchmarks {
               bind(new TypeLiteral<Amount<Long, Time>>() { })
                   .annotatedWith(ReservationDuration.class)
                   .toInstance(DELAY_FOREVER);
-              bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
-              bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
               bind(TaskIdGenerator.class).to(TaskIdGenerator.TaskIdGeneratorImpl.class);
               bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
               bind(SchedulingFilterImpl.class).in(Singleton.class);
