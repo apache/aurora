@@ -106,6 +106,9 @@ class AuroraJobKey(object):
       return NotImplemented
     return self.to_path() == other.to_path()
 
+  def __ne__(self, other):
+    return not (self == other)
+
   def __lt__(self, other):
     if not isinstance(other, AuroraJobKey):
       return NotImplemented
