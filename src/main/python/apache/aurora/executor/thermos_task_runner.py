@@ -119,17 +119,12 @@ class ThermosTaskRunner(TaskRunner):
 
     http_signaler = HttpSignaler(self._ports['health'])
 
-    # pass 1
-    http_signaler.quitquitquit()
-    self._clock.sleep(self.ESCALATION_WAIT.as_(Time.SECONDS))
-    if self.status is not None:
-      return True
-
-    # pass 2
-    http_signaler.abortabortabort()
-    self._clock.sleep(self.ESCALATION_WAIT.as_(Time.SECONDS))
-    if self.status is not None:
-      return True
+    for exit_request in [http_signaler.quitquitquit, http_signaler.abortabortabort]:
+      handled, _ = exit_request()
+      if handled:
+        self._clock.sleep(self.ESCALATION_WAIT.as_(Time.SECONDS))
+        if self.status is not None:
+          return
 
   @property
   def artifact_dir(self):

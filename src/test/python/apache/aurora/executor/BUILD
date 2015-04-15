@@ -83,6 +83,7 @@ python_tests(name = 'thermos_task_runner',
   sources = ['test_thermos_task_runner.py'],
   dependencies = [
     '3rdparty/python:mesos.interface',
+    '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
     '3rdparty/python:twitter.common.dirutil',
     '3rdparty/python:twitter.common.log',

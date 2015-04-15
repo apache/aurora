@@ -23,6 +23,7 @@ import time
 
 import pytest
 from mesos.interface import mesos_pb2
+from mock import call, Mock, patch
 from twitter.common import log
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
@@ -78,7 +79,7 @@ class TestThermosTaskRunnerIntegration(object):
       print('Saving executor logs in %s' % cls.LOG_DIR)
 
   @contextlib.contextmanager
-  def yield_runner(self, runner_class, **bindings):
+  def yield_runner(self, runner_class, portmap={}, clock=time, **bindings):
     with contextlib.nested(temporary_dir(), temporary_dir()) as (td1, td2):
       sandbox = DirectorySandbox(td1)
       checkpoint_root = td2
@@ -88,16 +89,19 @@ class TestThermosTaskRunnerIntegration(object):
           task_id='hello_world',
           task=TASK.bind(**bindings).task(),
           role=getpass.getuser(),
-          portmap={},
+          portmap=portmap,
+          clock=clock,
           sandbox=sandbox,
           checkpoint_root=checkpoint_root,
       )
 
       yield task_runner
 
-  def yield_sleepy(self, runner_class, sleep, exit_code):
+  def yield_sleepy(self, runner_class, sleep, exit_code, portmap={}, clock=time):
     return self.yield_runner(
         runner_class,
+        portmap=portmap,
+        clock=clock,
         command='sleep {{__sleep}} && exit {{__exit_code}}',
         __sleep=sleep,
         __exit_code=exit_code)
@@ -210,6 +214,33 @@ class TestThermosTaskRunnerIntegration(object):
       task_runner.stop(timeout=Amount(5, Time.SECONDS))
       assert task_runner.status is not None
       assert task_runner.status.status == mesos_pb2.TASK_KILLED
+
+  @patch('apache.aurora.executor.thermos_task_runner.HttpSignaler')
+  def test_integration_http_teardown(self, SignalerClass):
+    signaler = SignalerClass.return_value
+    signaler.quitquitquit.return_value = (False, 'failed to dispatch')
+    signaler.abortabortabort.return_value = (True, None)
+
+    clock = Mock(wraps=time)
+
+    class ShortEscalationRunner(ThermosTaskRunner):
+      ESCALATION_WAIT = Amount(1, Time.MICROSECONDS)
+
+    with self.yield_sleepy(
+        ShortEscalationRunner,
+        portmap={'health': 3141},
+        clock=clock,
+        sleep=1000,
+        exit_code=0) as task_runner:
+
+      task_runner.start()
+      task_runner.forked.wait()
+
+      task_runner.stop()
+
+      escalation_wait = call(ShortEscalationRunner.ESCALATION_WAIT.as_(Time.SECONDS))
+      assert clock.sleep.mock_calls.count(escalation_wait) == 1
+      assert signaler.mock_calls == [call.quitquitquit(), call.abortabortabort()]
 
   def test_thermos_normal_exit_status(self):
     with self.exit_with_status(0, TaskState.SUCCESS) as task_runner:
