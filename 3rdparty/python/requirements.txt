@@ -8,7 +8,7 @@ mox==0.5.3
 pex==0.8.2
 protobuf==2.6.1
 psutil==2.1.3
-pystachio==0.7.4
+pystachio==0.8.0
 requests==2.3.0
 requests-kerberos==0.6.1
 thrift==0.9.1

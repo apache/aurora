@@ -13,6 +13,7 @@
 #
 
 import pytest
+from pystachio import Default, Float, String, Struct
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.config import AuroraConfig, PortResolver
@@ -200,3 +201,27 @@ def test_static_port_aliasing():
   assert make_config(announce, 'thrift', 'health').job().taskConfig.requestedPorts == set()
   assert make_config(announce, 'derp').ports() == set(['derp'])
   assert make_config(announce, 'derp').job().taskConfig.requestedPorts == set(['derp'])
+
+
+def test_pystachio_schema_regression():
+  class ChildOld(Struct):
+    interval = Default(Float, 1.0)  # noqa
+
+  class ChildNew(Struct):
+    interval = Default(Float, 1.0)  # noqa
+    endpoint = Default(String, '/health')  # noqa
+
+  class ParentOld(Struct):
+    child = Default(ChildOld, ChildOld())  # noqa
+
+  class ParentNew(Struct):
+    child = Default(ChildNew, ChildNew())  # noqa
+
+  new_parent = ParentNew()
+  old_parent = ParentOld.json_loads(new_parent.json_dumps())
+  assert old_parent.child().interval().get() == 1.0
+
+  old_parent = ParentOld()
+  new_parent = ParentNew.json_loads(old_parent.json_dumps())
+  assert new_parent.child().interval().get() == 1.0
+  assert new_parent.child().endpoint().get() == '/health'
