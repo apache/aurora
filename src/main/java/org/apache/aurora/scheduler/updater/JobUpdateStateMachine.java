@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -21,8 +22,8 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateStatus;
@@ -97,8 +98,10 @@ final class JobUpdateStateMachine {
           ROLL_BACK_AWAITING_PULSE, ROLL_BACK_PAUSED);
 
   static final IJobUpdateQuery ACTIVE_QUERY = IJobUpdateQuery.build(
-      new JobUpdateQuery()
-          .setUpdateStatuses(ImmutableSet.copyOf(ACTIVE_TO_PAUSED_STATES.keySet())));
+      new JobUpdateQuery().setUpdateStatuses(Updates.ACTIVE_JOB_UPDATE_STATES));
+
+  static final Set<JobUpdateStatus> AUTO_RESUME_STATES =
+      Sets.immutableEnumSet(ACTIVE_TO_PAUSED_STATES.keySet());
 
   private static final Map<JobUpdateStatus, JobUpdateStatus> PAUSE_BEHAVIOR =
       ImmutableMap.<JobUpdateStatus, JobUpdateStatus>builder()

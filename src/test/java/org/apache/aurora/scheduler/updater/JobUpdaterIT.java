@@ -496,6 +496,78 @@ public class JobUpdaterIT extends EasyMockTest {
   }
 
   @Test
+  public void testRecoverAwaitingPulseFromStorage() throws Exception {
+    expectTaskKilled();
+
+    control.replay();
+
+    JobUpdate builder =
+        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 0, OLD_CONFIG)), 1).newBuilder();
+    builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
+    final IJobUpdate update = IJobUpdate.build(builder);
+    insertInitialTasks(update);
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    clock.advance(ONE_DAY);
+
+    storage.write(new NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLL_FORWARD_AWAITING_PULSE);
+      }
+    });
+
+    subscriber.startAsync().awaitRunning();
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+
+    assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+
+    changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+    actions.putAll(0, INSTANCE_UPDATING, INSTANCE_UPDATED);
+
+    assertState(ROLLED_FORWARD, actions.build());
+    assertEquals(JobUpdatePulseStatus.FINISHED, updater.pulse(UPDATE_ID));
+  }
+
+  @Test
+  public void testRecoverCoordinatedPausedFromStorage() throws Exception {
+    expectTaskKilled();
+
+    control.replay();
+
+    JobUpdate builder =
+        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 0, OLD_CONFIG)), 1).newBuilder();
+    builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
+    final IJobUpdate update = IJobUpdate.build(builder);
+    insertInitialTasks(update);
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    clock.advance(ONE_DAY);
+
+    storage.write(new NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLL_FORWARD_PAUSED);
+      }
+    });
+
+    subscriber.startAsync().awaitRunning();
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+
+    assertState(ROLL_FORWARD_PAUSED, actions.build());
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+
+    updater.resume(UPDATE_ID, AUDIT);
+
+    changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+    actions.putAll(0, INSTANCE_UPDATING, INSTANCE_UPDATED);
+
+    assertState(ROLLED_FORWARD, actions.build());
+    assertEquals(JobUpdatePulseStatus.FINISHED, updater.pulse(UPDATE_ID));
+  }
+
+  @Test
   public void testResumeToAwaitingPulse() throws Exception {
     expectTaskKilled().times(2);
 

@@ -83,6 +83,7 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.ACTIVE_QUERY;
+import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.AUTO_RESUME_STATES;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.GET_ACTIVE_RESUME_STATE;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.GET_BLOCKED_RESUME_STATE;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.GET_PAUSE_STATE;
@@ -270,16 +271,19 @@ class JobUpdateControllerImpl implements JobUpdateController {
           IJobUpdateKey key = summary.getKey();
           JobUpdateStatus status = summary.getState().getStatus();
 
-          LOG.info("Automatically resuming update " + key);
-
           if (isCoordinatedUpdate(instructions)) {
+            LOG.info("Automatically restoring pulse state for " + key);
             pulseHandler.initializePulseState(details.getUpdate(), status);
           }
 
-          try {
-            changeJobUpdateStatus(storeProvider, key, newEvent(status), false);
-          } catch (UpdateStateException e) {
-            throw Throwables.propagate(e);
+          if (AUTO_RESUME_STATES.contains(status)) {
+            LOG.info("Automatically resuming update " + key);
+
+            try {
+              changeJobUpdateStatus(storeProvider, key, newEvent(status), false);
+            } catch (UpdateStateException e) {
+              throw Throwables.propagate(e);
+            }
           }
         }
       }
