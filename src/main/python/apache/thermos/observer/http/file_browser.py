@@ -77,7 +77,7 @@ class TaskObserverFileBrowser(object):
     if logtype not in types:
       bottle.abort(404, "No such log type: %s" % logtype)
     base, path = types[logtype]
-    filename = os.path.join(base, path)
+    _, filename = self._observer.valid_path(task_id, os.path.join(base, path))
     return {
       'task_id': task_id,
       'filename': filename,
