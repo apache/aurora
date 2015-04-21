@@ -38,7 +38,7 @@ readonly IP_ADDRESS=192.168.33.7
 # that want to advertise the hostname to the user, or other components.
 hostname $IP_ADDRESS
 
-readonly MESOS_VERSION=0.21.1
+readonly MESOS_VERSION=0.22.0
 
 function prepare_extras() {
   pushd aurora

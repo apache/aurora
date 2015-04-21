@@ -1,8 +1,8 @@
 bottle==0.11.6
 CherryPy==3.6.0
 mako==0.4.0
-mesos.interface==0.21.1
-mesos.native==0.21.1
+mesos.interface==0.22.0
+mesos.native==0.22.0
 mock==1.0.1
 mox==0.5.3
 pex==0.8.2

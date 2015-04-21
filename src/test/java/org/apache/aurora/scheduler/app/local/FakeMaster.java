@@ -294,6 +294,12 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
   }
 
   @Override
+  public Status acknowledgeStatusUpdate(TaskStatus status) {
+    assertNotStopped();
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public Status sendFrameworkMessage(ExecutorID executorId, SlaveID slaveId, byte[] data) {
     throw new UnsupportedOperationException();
   }
