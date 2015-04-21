@@ -15,50 +15,34 @@ package org.apache.aurora.scheduler.storage;
 
 import java.util.Set;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
-import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
-import org.apache.aurora.gen.ExecutorConfig;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.junit.Assert.assertEquals;
 
+/**
+ * TODO(wfarner): Data store constraints (not null, valid relations) have made this test of little
+ * value other than for coverage.  Rethink.
+ */
 public class StorageBackfillTest {
-  private static final String ROLE = "Test_Role_A";
-  private static final String USER = "Test_User_A";
-  private static final Identity OWNER = new Identity(ROLE, USER);
-  private static final String ENV = "Test_Env";
-  private static final String JOB_NAME = "Test_Job";
-  private static final IJobKey JOB_KEY = JobKeys.from(ROLE, ENV, JOB_NAME);
-  private static final int ONE_GB = 1024;
-  private static final String TASK_ID = "task_id";
-  private static final ExecutorConfig EXECUTOR_CONFIG =
-      new ExecutorConfig("AuroraExecutor", "executorConfig");
+  // By default, only the mesos container is allowed by ConfigurationManager.
+  private static final IScheduledTask TASK =
+      setMesosContainer(TaskTestUtil.makeTask("task_id", TaskTestUtil.JOB));
 
   private Storage storage;
 
@@ -68,40 +52,14 @@ public class StorageBackfillTest {
   }
 
   @Test
-  public void testLoadTasksFromStorage() throws Exception {
-    final TaskConfig storedTask = defaultTask();
-
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
-            IScheduledTask.build(new ScheduledTask()
-                .setStatus(PENDING)
-                .setTaskEvents(ImmutableList.of(new TaskEvent(100, PENDING)))
-                .setAssignedTask(new AssignedTask()
-                    .setTaskId(TASK_ID)
-                    .setInstanceId(0)
-                    .setTask(storedTask)))));
-      }
-    });
-
-    backfill();
-
-    // Since task fields are backfilled with defaults, additional flags should be filled.
-    ITaskConfig expected = ITaskConfig.build(new TaskConfig(storedTask)
-        .setJob(JOB_KEY.newBuilder())
-        .setProduction(false)
-        .setMaxTaskFailures(1)
-        .setExecutorConfig(EXECUTOR_CONFIG)
-        .setContainer(Container.mesos(new MesosContainer()))
-        .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1))));
-
-    assertEquals(expected, getTask(TASK_ID).getAssignedTask().getTask());
-  }
-
-  @Test
   public void testJobConfigurationBackfill() throws Exception {
-    final JobConfiguration config = makeJobConfig(JOB_KEY, defaultTask(), 1);
+    TaskConfig task = TASK.getAssignedTask().getTask().newBuilder();
+    final JobConfiguration config = new JobConfiguration()
+        .setOwner(task.getOwner())
+        .setKey(task.getJob())
+        .setInstanceCount(1)
+        .setTaskConfig(task);
+
     SanitizedConfiguration expected =
         SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(config));
 
@@ -128,25 +86,11 @@ public class StorageBackfillTest {
   }
 
   @Test
-  public void testBackfillTaskJob() throws Exception {
-    TaskConfig task = defaultTask();
-    ConfigurationManager.applyDefaultsIfUnset(task);
-    task.unsetJob();
+  public void testBackfillTask() throws Exception {
+    ScheduledTask task = TASK.newBuilder();
+    ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
 
-    IScheduledTask noJobKey = IScheduledTask.build(new ScheduledTask()
-        .setStatus(RUNNING)
-        .setAssignedTask(new AssignedTask()
-            .setInstanceId(0)
-            .setTaskId("nojobkey")
-            .setTask(task)));
-    IScheduledTask nullJobKeyFields = IScheduledTask.build(new ScheduledTask()
-        .setStatus(RUNNING)
-        .setAssignedTask(new AssignedTask()
-            .setInstanceId(1)
-            .setTaskId("nulled_fields")
-            .setTask(task.setJob(new JobKey()))));
-
-    final Set<IScheduledTask> backfilledTasks = ImmutableSet.of(noJobKey, nullJobKeyFields);
+    final Set<IScheduledTask> backfilledTasks = ImmutableSet.of(IScheduledTask.build(task));
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) {
@@ -155,18 +99,9 @@ public class StorageBackfillTest {
     });
 
     backfill();
-    ScheduledTask noJobKeyBackfilled = noJobKey.newBuilder();
-    noJobKeyBackfilled.getAssignedTask().getTask()
-        .setJob(new JobKey(OWNER.getRole(), ENV, JOB_NAME));
-
-    ScheduledTask nullJobKeyFieldsBackfilled = nullJobKeyFields.newBuilder();
-    nullJobKeyFieldsBackfilled.getAssignedTask().getTask()
-        .setJob(new JobKey(OWNER.getRole(), ENV, JOB_NAME));
 
     assertEquals(
-        ImmutableSet.of(
-            IScheduledTask.build(noJobKeyBackfilled),
-            IScheduledTask.build(nullJobKeyFieldsBackfilled)),
+        ImmutableSet.of(IScheduledTask.build(task)),
         Storage.Util.fetchTasks(storage, Query.unscoped()));
   }
 
@@ -179,34 +114,9 @@ public class StorageBackfillTest {
     });
   }
 
-  private static JobConfiguration makeJobConfig(IJobKey jobKey, TaskConfig task, int numTasks) {
-    return new JobConfiguration()
-        .setOwner(OWNER)
-        .setKey(jobKey.newBuilder())
-        .setInstanceCount(numTasks)
-        .setTaskConfig(new TaskConfig(task)
-            .setOwner(OWNER)
-            .setEnvironment(jobKey.getEnvironment())
-            .setJobName(jobKey.getName()));
-  }
-
-  private static TaskConfig defaultTask() {
-    return new TaskConfig()
-        .setOwner(OWNER)
-        .setJobName(JOB_NAME)
-        .setEnvironment(ENV)
-        .setNumCpus(1.0)
-        .setRamMb(ONE_GB)
-        .setDiskMb(500)
-        .setExecutorConfig(EXECUTOR_CONFIG)
-        .setRequestedPorts(Sets.<String>newHashSet())
-        .setConstraints(Sets.<Constraint>newHashSet())
-        .setTaskLinks(Maps.<String, String>newHashMap());
-  }
-
-  private IScheduledTask getTask(String taskId) {
-    return Iterables.getOnlyElement(Storage.Util.fetchTasks(
-        storage,
-        Query.taskScoped(taskId)));
+  private static IScheduledTask setMesosContainer(IScheduledTask task) {
+    ScheduledTask builder = task.newBuilder();
+    builder.getAssignedTask().getTask().setContainer(Container.mesos(new MesosContainer()));
+    return IScheduledTask.build(builder);
   }
 }

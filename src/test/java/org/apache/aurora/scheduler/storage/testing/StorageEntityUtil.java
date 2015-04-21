@@ -19,11 +19,13 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.base.Defaults;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.internal.Primitives;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 
 /**
@@ -49,20 +51,29 @@ public final class StorageEntityUtil {
         assertFullyPopulated(name + " key", entry.getKey(), ignoredFields);
         assertFullyPopulated(name + "[" + entry.getKey() + "]", entry.getValue(), ignoredFields);
       }
-    } else if (!Primitives.isPrimitive(object.getClass())
-        && !Primitives.isWrapperType(object.getClass())) {
-
+    } else if (!(object instanceof String) && !(object instanceof Enum)) {
       for (Field field : object.getClass().getDeclaredFields()) {
         if (!Modifier.isStatic(field.getModifiers())) {
           try {
             field.setAccessible(true);
             String fullName = name + "." + field.getName();
-            Object value = field.get(object);
-            if (!ignoredFields.contains(field)) {
-              assertNotNull(fullName + " is null", value);
+            Object fieldValue = field.get(object);
+            boolean mustBeSet = !ignoredFields.contains(field);
+            if (mustBeSet) {
+              assertNotNull(fullName + " is null", fieldValue);
             }
-            if (value != null) {
-              assertFullyPopulated(fullName, value, ignoredFields);
+            if (fieldValue != null) {
+              if (Primitives.isWrapperType(fieldValue.getClass())) {
+                // Special-case the mutable hash code field.
+                if (mustBeSet && !fullName.endsWith("cachedHashCode")) {
+                  assertNotEquals(
+                      "Primitive value must not be default: " + fullName,
+                      Defaults.defaultValue(Primitives.unwrap(fieldValue.getClass())),
+                      fieldValue);
+                }
+              } else {
+                assertFullyPopulated(fullName, fieldValue, ignoredFields);
+              }
             }
           } catch (IllegalAccessException e) {
             throw Throwables.propagate(e);

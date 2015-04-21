@@ -22,8 +22,6 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
-import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTaskEvents;
 import static org.apache.aurora.scheduler.base.Tasks.getLatestActiveTask;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -43,12 +41,12 @@ public class TasksTest {
 
   @Test
   public void testLatestTransitionedTasks() {
-    IScheduledTask f1 = makeTask(FINISHED, makeTaskEvents(100, FINISHED));
-    IScheduledTask f2 = makeTask(FINISHED, makeTaskEvents(200, FINISHED));
-    IScheduledTask f3 = makeTask(FINISHED, makeTaskEvents(300, FINISHED));
-    IScheduledTask r1 = makeTask(RUNNING, makeTaskEvents(400, RUNNING));
-    IScheduledTask r2 = makeTask(RUNNING, makeTaskEvents(500, RUNNING));
-    IScheduledTask r3 = makeTask(RUNNING, makeTaskEvents(600, RUNNING));
+    IScheduledTask f1 = makeTask(FINISHED, 100);
+    IScheduledTask f2 = makeTask(FINISHED, 200);
+    IScheduledTask f3 = makeTask(FINISHED, 300);
+    IScheduledTask r1 = makeTask(RUNNING, 400);
+    IScheduledTask r2 = makeTask(RUNNING, 500);
+    IScheduledTask r3 = makeTask(RUNNING, 600);
 
     try {
       getLatestActiveTask(ImmutableList.<IScheduledTask>of());
@@ -77,5 +75,12 @@ public class TasksTest {
 
   private void assertLatestTask(IScheduledTask expectedLatest, IScheduledTask... tasks) {
     assertEquals(expectedLatest, getLatestActiveTask(ImmutableList.copyOf(tasks)));
+  }
+
+  private IScheduledTask makeTask(ScheduleStatus status, long timestamp) {
+    return TaskTestUtil.addStateTransition(
+        TaskTestUtil.makeTask("id-" + timestamp, TaskTestUtil.JOB),
+        status,
+        timestamp);
   }
 }

@@ -25,18 +25,15 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.StoredCronJob;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
@@ -62,8 +59,8 @@ import static org.junit.Assert.assertEquals;
 public class RecoveryTest extends EasyMockTest {
 
   private static final Amount<Long, Time> INTERVAL = Amount.of(1L, Time.HOURS);
-  private static final ScheduledTask TASK1 = makeTask("task1");
-  private static final ScheduledTask TASK2 = makeTask("task2");
+  private static final IScheduledTask TASK1 = TaskTestUtil.makeTask("task1", TaskTestUtil.JOB);
+  private static final IScheduledTask TASK2 = TaskTestUtil.makeTask("task2", TaskTestUtil.JOB);
   private static final Snapshot SNAPSHOT1 = makeSnapshot(TASK1, TASK2);
 
   private SnapshotStore<Snapshot> snapshotStore;
@@ -129,7 +126,7 @@ public class RecoveryTest extends EasyMockTest {
   @Test
   public void testModifySnapshotBeforeCommit() throws Exception {
     expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT1);
-    Snapshot modified = SNAPSHOT1.deepCopy().setTasks(ImmutableSet.of(TASK1));
+    Snapshot modified = SNAPSHOT1.deepCopy().setTasks(ImmutableSet.of(TASK1.newBuilder()));
     Capture<MutateWork<Object, Exception>> transaction = createCapture();
     expect(primaryStorage.write(capture(transaction))).andReturn(null);
     distributedStore.persist(modified);
@@ -164,24 +161,14 @@ public class RecoveryTest extends EasyMockTest {
     recovery.commit();
   }
 
-  private static Snapshot makeSnapshot(ScheduledTask... tasks) {
+  private static Snapshot makeSnapshot(IScheduledTask... tasks) {
     return new Snapshot()
         .setHostAttributes(ImmutableSet.<HostAttributes>of())
         .setCronJobs(ImmutableSet.<StoredCronJob>of())
         .setSchedulerMetadata(new SchedulerMetadata().setVersion(CURRENT_API_VERSION))
         .setQuotaConfigurations(ImmutableSet.<QuotaConfiguration>of())
-        .setTasks(ImmutableSet.<ScheduledTask>builder().add(tasks).build())
+        .setTasks(IScheduledTask.toBuildersSet(ImmutableSet.copyOf(tasks)))
         .setLocks(ImmutableSet.<Lock>of())
         .setJobUpdateDetails(ImmutableSet.<StoredJobUpdateDetails>of());
-  }
-
-  private static ScheduledTask makeTask(String taskId) {
-    return new ScheduledTask().setAssignedTask(
-        new AssignedTask()
-            .setTaskId(taskId)
-            .setTask(new TaskConfig()
-                .setJobName("job-" + taskId)
-                .setEnvironment("test")
-                .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))));
   }
 }

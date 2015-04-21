@@ -17,6 +17,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -28,11 +30,8 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
 
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
@@ -43,8 +42,10 @@ import org.apache.aurora.scheduler.async.OfferManager.OfferReturnDelay;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.async.preemptor.BiCache;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -61,6 +62,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -85,6 +87,7 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
 import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.capture;
@@ -221,37 +224,33 @@ public class TaskSchedulerTest extends EasyMockTest {
   public void testNoOffers() {
     Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
-    IScheduledTask task = makeTask("a");
-    expectPreemptorCall(task);
+    IScheduledTask task = createTask("a");
+    expectPreemptorCall(task.getAssignedTask());
     expectReservationCheck(task);
 
     replayAndCreateScheduler();
 
-    changeState(makeTask("a"), INIT, PENDING);
+    changeState(task, INIT, PENDING);
     timeoutCapture.getValue().run();
   }
 
-  private IScheduledTask makeTask(String taskId) {
-    return IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask()
-            .setInstanceId(0)
-            .setTaskId(taskId)
-            .setTask(new TaskConfig()
-                .setJob(new JobKey("role-" + taskId, "env-" + taskId, "job-" + taskId))
-                .setJobName("job-" + taskId)
-                .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))
-                .setEnvironment("env-" + taskId))));
+  private IScheduledTask createTask(String taskId) {
+    return createTask(taskId, null);
   }
 
-  private IScheduledTask makeTask(String taskId, ScheduleStatus status) {
-    return IScheduledTask.build(makeTask(taskId).newBuilder().setStatus(status));
+  private IScheduledTask createTask(String taskId, @Nullable ScheduleStatus status) {
+    return setStatus(makeTask(taskId, TaskTestUtil.JOB), status);
+  }
+
+  private IScheduledTask setStatus(IScheduledTask task, @Nullable ScheduleStatus status) {
+    return IScheduledTask.build(task.newBuilder().setStatus(status));
   }
 
   @Test
   public void testLoadFromStorage() {
-    final IScheduledTask a = makeTask("a", KILLED);
-    final IScheduledTask b = makeTask("b", PENDING);
-    final IScheduledTask c = makeTask("c", RUNNING);
+    final IScheduledTask a = createTask("a", KILLED);
+    final IScheduledTask b = createTask("b", PENDING);
+    final IScheduledTask c = createTask("c", RUNNING);
 
     expect(rescheduleCalculator.getStartupScheduleDelayMs(b)).andReturn(10L);
     expectTaskRetryIn(10);
@@ -276,7 +275,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    taskGroups.taskChangedState(TaskStateChange.transition(makeTask("a", PENDING), INIT));
+    taskGroups.taskChangedState(TaskStateChange.transition(createTask("a", PENDING), INIT));
     timeoutCapture.getValue().run();
   }
 
@@ -306,40 +305,40 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
 
-    IScheduledTask task = makeTask("a", PENDING);
-    TaskInfo mesosTask = makeTaskInfo(task);
+    IScheduledTask taskA = createTask("a", PENDING);
+    TaskInfo mesosTask = makeTaskInfo(taskA);
 
     Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectNoReservation(SLAVE_A).times(2);
-    expectReservationCheck(task);
-    expectMaybeAssign(OFFER_A, task, EMPTY).andReturn(Assignment.failure());
-    expectPreemptorCall(task);
+    expectReservationCheck(taskA);
+    expectMaybeAssign(OFFER_A, taskA, EMPTY).andReturn(Assignment.failure());
+    expectPreemptorCall(taskA.getAssignedTask());
 
     Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
-    expectMaybeAssign(OFFER_A, task, EMPTY).andReturn(Assignment.success(mesosTask));
+    expectMaybeAssign(OFFER_A, taskA, EMPTY).andReturn(Assignment.success(mesosTask));
     driver.launchTask(OFFER_A.getOffer().getId(), mesosTask);
 
     Capture<Runnable> timeoutCapture3 = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
-    IScheduledTask taskB = makeTask("b");
+    IScheduledTask taskB = createTask("b");
     expectReservationCheck(taskB);
-    expectPreemptorCall(taskB);
+    expectPreemptorCall(taskB.getAssignedTask());
 
     replayAndCreateScheduler();
 
     offerManager.addOffer(OFFER_A);
-    changeState(task, INIT, PENDING);
+    changeState(taskA, INIT, PENDING);
     timeoutCapture.getValue().run();
     timeoutCapture2.getValue().run();
 
     // Ensure the offer was consumed.
-    changeState(makeTask("b"), INIT, PENDING);
+    changeState(taskB, INIT, PENDING);
     timeoutCapture3.getValue().run();
   }
 
   @Test
   public void testDriverNotReady() {
-    IScheduledTask task = makeTask("a", PENDING);
+    IScheduledTask task = createTask("a", PENDING);
     TaskInfo mesosTask = TaskInfo.newBuilder()
         .setName(Tasks.id(task))
         .setTaskId(TaskID.newBuilder().setValue(Tasks.id(task)))
@@ -370,7 +369,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testStorageException() {
-    IScheduledTask task = makeTask("a", PENDING);
+    IScheduledTask task = createTask("a", PENDING);
     TaskInfo mesosTask = TaskInfo.newBuilder()
         .setName(Tasks.id(task))
         .setTaskId(TaskID.newBuilder().setValue(Tasks.id(task)))
@@ -398,7 +397,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testExpiration() {
-    IScheduledTask task = makeTask("a", PENDING);
+    IScheduledTask task = createTask("a", PENDING);
 
     Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
@@ -407,10 +406,10 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectReservationCheck(task).times(2);
     expectMaybeAssign(OFFER_A, task, EMPTY).andReturn(Assignment.failure());
     Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
-    expectPreemptorCall(task);
+    expectPreemptorCall(task.getAssignedTask());
     driver.declineOffer(OFFER_A.getOffer().getId());
     expectTaskGroupBackoff(10, 20);
-    expectPreemptorCall(task);
+    expectPreemptorCall(task.getAssignedTask());
 
     replayAndCreateScheduler();
 
@@ -465,14 +464,14 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectOffer();
     expectOffer();
 
-    IScheduledTask taskA = makeTask("A", PENDING);
+    IScheduledTask taskA = createTask("A", PENDING);
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expectNoReservation(SLAVE_A);
     expectMaybeAssign(OFFER_A, taskA, EMPTY).andReturn(Assignment.success(mesosTaskA));
     driver.launchTask(OFFER_A.getOffer().getId(), mesosTaskA);
     Capture<Runnable> captureA = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
-    IScheduledTask taskB = makeTask("B", PENDING);
+    IScheduledTask taskB = createTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     expectNoReservation(SLAVE_B);
     expectMaybeAssign(OFFER_B, taskB, EMPTY).andReturn(Assignment.success(mesosTaskB));
@@ -499,14 +498,14 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectOffer();
     expectOffer();
 
-    IScheduledTask taskA = makeTask("A", PENDING);
+    IScheduledTask taskA = createTask("A", PENDING);
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expectNoReservation(SLAVE_B);
     expectMaybeAssign(OFFER_B, taskA, EMPTY).andReturn(Assignment.success(mesosTaskA));
     driver.launchTask(OFFER_B.getOffer().getId(), mesosTaskA);
     Capture<Runnable> captureA = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
-    IScheduledTask taskB = makeTask("B", PENDING);
+    IScheduledTask taskB = createTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     HostOffer updatedOfferC = new HostOffer(
         OFFER_C.getOffer(),
@@ -554,7 +553,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     expectAnyMaintenanceCalls();
 
-    IScheduledTask jobA0 = makeTask("a0", PENDING);
+    IScheduledTask jobA0 = setStatus(makeTask("a0", JobKeys.from("a", "b", "c")), PENDING);
 
     ScheduledTask jobA1Builder = jobA0.newBuilder();
     jobA1Builder.getAssignedTask().setTaskId("a1");
@@ -566,7 +565,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     jobA2Builder.getAssignedTask().setInstanceId(2);
     IScheduledTask jobA2 = IScheduledTask.build(jobA2Builder);
 
-    IScheduledTask jobB0 = makeTask("b0", PENDING);
+    IScheduledTask jobB0 = setStatus(makeTask("b0", JobKeys.from("d", "e", "f")), PENDING);
 
     expectNoReservation(SLAVE_A);
     expectNoReservation(SLAVE_B);
@@ -607,14 +606,14 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
 
-    final IScheduledTask task = makeTask("a", PENDING);
+    final IScheduledTask task = createTask("a", PENDING);
 
     Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectNoReservation(SLAVE_A);
     expectMaybeAssign(OFFER_A, task, EMPTY).andReturn(Assignment.failure());
     expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 20);
     expectReservationCheck(task);
-    expectPreemptorCall(task);
+    expectPreemptorCall(task.getAssignedTask());
 
     replayAndCreateScheduler();
 
@@ -662,9 +661,9 @@ public class TaskSchedulerTest extends EasyMockTest {
             .setMode(mode)));
   }
 
-  private void expectPreemptorCall(IScheduledTask task) {
+  private void expectPreemptorCall(IAssignedTask task) {
     expect(preemptor.attemptPreemptionFor(
-        eq(task.getAssignedTask()),
+        eq(task),
         eq(EMPTY),
         EasyMock.<MutableStoreProvider>anyObject())).andReturn(Optional.<String>absent());
   }

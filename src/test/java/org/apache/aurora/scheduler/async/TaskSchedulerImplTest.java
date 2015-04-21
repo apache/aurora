@@ -20,24 +20,21 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
-
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.async.preemptor.BiCache;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -75,8 +72,10 @@ import static org.junit.Assert.assertTrue;
 
 public class TaskSchedulerImplTest extends EasyMockTest {
 
-  private static final IScheduledTask TASK_A = makeTask("a");
-  private static final IScheduledTask TASK_B = makeTask("b");
+  private static final IScheduledTask TASK_A =
+      TaskTestUtil.makeTask("a", JobKeys.from("a", "a", "a"));
+  private static final IScheduledTask TASK_B =
+      TaskTestUtil.makeTask("b", JobKeys.from("b", "b", "b"));
   private static final HostOffer OFFER = new HostOffer(
       Offers.makeOffer("OFFER_A", "HOST_A"),
       IHostAttributes.build(new HostAttributes().setMode(MaintenanceMode.NONE)));
@@ -274,18 +273,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     assertTrue(scheduler.schedule(Tasks.id(taskA)));
     assignAndAssert(Result.SUCCESS, GROUP_A, OFFER, assignment);
-  }
-
-  private static IScheduledTask makeTask(String taskId) {
-    return IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask()
-            .setInstanceId(0)
-            .setTaskId(taskId)
-            .setTask(new TaskConfig()
-                .setJob(new JobKey("role-" + taskId, "env-" + taskId, "job-" + taskId))
-                .setJobName("job-" + taskId)
-                .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))
-                .setEnvironment("env-" + taskId))));
   }
 
   private static class AssignmentCapture {

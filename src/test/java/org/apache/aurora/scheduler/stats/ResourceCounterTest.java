@@ -21,10 +21,7 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Constraint;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
@@ -33,6 +30,7 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -167,28 +165,21 @@ public class ResourceCounterTest {
       ScheduleStatus status,
       Optional<String> dedicated) {
 
-    TaskConfig task = new TaskConfig()
-        .setJob(new JobKey(role, "test", job))
-        .setOwner(new Identity().setRole(role))
-        .setEnvironment("test")
-        .setJobName(job)
+    ScheduledTask task = TaskTestUtil.makeTask(id, JobKeys.from(role, "test", job)).newBuilder();
+    TaskConfig config = task.getAssignedTask().getTask()
         .setNumCpus(numCpus)
         .setRamMb(ramMb)
         .setDiskMb(diskMb)
         .setProduction(production);
 
     if (dedicated.isPresent()) {
-      task.addToConstraints(new Constraint(
+      config.addToConstraints(new Constraint(
           ConfigurationManager.DEDICATED_ATTRIBUTE,
           TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of(dedicated.get())))));
     }
 
-    return IScheduledTask.build(new ScheduledTask()
-        .setStatus(status)
-        .setAssignedTask(
-            new AssignedTask()
-                .setTaskId(id)
-                .setTask(task)));
+    task.setStatus(status);
+    return IScheduledTask.build(task);
   }
 
   private void insertTasks(final IScheduledTask... tasks) {

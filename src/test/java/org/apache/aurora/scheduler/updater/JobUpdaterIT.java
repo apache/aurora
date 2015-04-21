@@ -43,10 +43,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
-import org.apache.aurora.gen.ExecutorConfig;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateEvent;
@@ -67,6 +64,7 @@ import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
@@ -146,8 +144,8 @@ public class JobUpdaterIT extends EasyMockTest {
   private static final Amount<Long, Time> FLAPPING_THRESHOLD = Amount.of(1L, Time.MILLISECONDS);
   private static final Amount<Long, Time> ONE_DAY = Amount.of(1L, Time.DAYS);
   private static final ITaskConfig OLD_CONFIG =
-      ITaskConfig.build(makeTaskConfig().setExecutorConfig(new ExecutorConfig().setName("new")));
-  private static final ITaskConfig NEW_CONFIG = ITaskConfig.build(makeTaskConfig());
+      setExecutorData(TaskTestUtil.makeConfig(JOB), "olddata");
+  private static final ITaskConfig NEW_CONFIG = setExecutorData(OLD_CONFIG, "newdata");
   private static final long PULSE_TIMEOUT_MS = 10000;
 
   private FakeScheduledExecutor clock;
@@ -158,6 +156,12 @@ public class JobUpdaterIT extends EasyMockTest {
   private LockManager lockManager;
   private StateManager stateManager;
   private JobUpdateEventSubscriber subscriber;
+
+  private static ITaskConfig setExecutorData(ITaskConfig task, String executorData) {
+    TaskConfig builder = task.newBuilder();
+    builder.getExecutorConfig().setData(executorData);
+    return ITaskConfig.build(builder);
+  }
 
   @Before
   public void setUp() {
@@ -1326,16 +1330,5 @@ public class JobUpdaterIT extends EasyMockTest {
     return IInstanceTaskConfig.build(new InstanceTaskConfig()
         .setInstances(ImmutableSet.of(new Range(start, end)))
         .setTask(config.newBuilder()));
-  }
-
-  private static TaskConfig makeTaskConfig() {
-    return new TaskConfig()
-        .setJob(new JobKey(JOB.newBuilder()))
-        .setJobName(JOB.getName())
-        .setEnvironment(JOB.getEnvironment())
-        .setOwner(new Identity(JOB.getRole(), "user"))
-        .setIsService(true)
-        .setExecutorConfig(new ExecutorConfig().setName("old"))
-        .setNumCpus(1);
   }
 }

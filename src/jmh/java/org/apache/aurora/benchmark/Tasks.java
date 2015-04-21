@@ -20,17 +20,16 @@ import com.google.common.collect.Lists;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Constraint;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 /**
@@ -134,25 +133,23 @@ final class Tasks {
         String taskId =
             jobKey.getRole() + "-" + jobKey.getEnvironment() + "-" + i + "-" + (uuidStart + i);
 
-        tasks.add(IScheduledTask.build(new ScheduledTask()
-            .setTaskEvents(Lists.newArrayList(new TaskEvent(0, ScheduleStatus.PENDING)))
+        ScheduledTask builder = TaskTestUtil.makeTask(taskId, IJobKey.build(jobKey))
+            .newBuilder()
             .setStatus(scheduleStatus)
-            .setAssignedTask(new AssignedTask()
-                .setInstanceId(i)
-                .setTaskId(taskId)
-                .setTask(new TaskConfig()
-                    .setConstraints(constraints.build())
-                    .setNumCpus(cpu)
-                    .setRamMb(ram.as(Data.MB))
-                    .setDiskMb(disk.as(Data.MB))
-                    .setProduction(isProduction)
-                    .setRequestedPorts(ImmutableSet.<String>of())
-                    .setJob(jobKey)
-                    .setJobName(jobKey.getName())
-                    .setEnvironment(jobKey.getEnvironment())
-                    .setOwner(new Identity()
-                        .setRole(jobKey.getRole())
-                        .setUser(String.format(USER_FORMAT, taskId)))))));
+            .setTaskEvents(Lists.newArrayList(
+                new TaskEvent(0, ScheduleStatus.PENDING),
+                new TaskEvent(1, scheduleStatus)));
+        builder.getAssignedTask()
+            .setInstanceId(i)
+            .setTaskId(taskId);
+        builder.getAssignedTask().getTask()
+            .setConstraints(constraints.build())
+            .setNumCpus(cpu)
+            .setRamMb(ram.as(Data.MB))
+            .setDiskMb(disk.as(Data.MB))
+            .setProduction(isProduction)
+            .setRequestedPorts(ImmutableSet.<String>of());
+        tasks.add(IScheduledTask.build(builder));
       }
 
       return tasks.build();

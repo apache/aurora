@@ -19,16 +19,11 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
-import org.apache.aurora.gen.Constraint;
-import org.apache.aurora.gen.ExecutorConfig;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateDetails;
@@ -42,13 +37,11 @@ import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
-import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskConstraint;
-import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -85,7 +78,7 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class DBJobUpdateStoreTest {
+public class DbJobUpdateStoreTest {
 
   private static final IJobKey JOB = JobKeys.from("testRole", "testEnv", "job");
   private static final IJobUpdateKey UPDATE1 =
@@ -122,7 +115,9 @@ public class DBJobUpdateStoreTest {
     StorageEntityUtil.assertFullyPopulated(
         update1,
         StorageEntityUtil.getField(JobUpdateSummary.class, "state"),
-        StorageEntityUtil.getField(IJobUpdateSummary.class, "state"));
+        StorageEntityUtil.getField(IJobUpdateSummary.class, "state"),
+        StorageEntityUtil.getField(Range.class, "first"),
+        StorageEntityUtil.getField(Range.class, "last"));
     saveUpdate(update1, Optional.of("lock1"));
     assertUpdate(update1);
 
@@ -1040,37 +1035,27 @@ public class DBJobUpdateStoreTest {
   }
 
   private IJobUpdateInstructions makeJobUpdateInstructions() {
+    TaskConfig config = TaskTestUtil.makeConfig(JOB).newBuilder();
     return IJobUpdateInstructions.build(new JobUpdateInstructions()
         .setDesiredState(new InstanceTaskConfig()
-            .setTask(makeTaskConfig())
+            .setTask(config)
             .setInstances(ImmutableSet.of(new Range(0, 7), new Range(8, 9))))
         .setInitialState(ImmutableSet.of(
             new InstanceTaskConfig()
                 .setInstances(ImmutableSet.of(new Range(0, 1), new Range(2, 3)))
-                .setTask(makeTaskConfig()),
+                .setTask(config),
             new InstanceTaskConfig()
                 .setInstances(ImmutableSet.of(new Range(4, 5), new Range(6, 7)))
-                .setTask(makeTaskConfig())))
+                .setTask(config)))
         .setSettings(new JobUpdateSettings()
             .setBlockIfNoPulsesAfterMs(500)
+            .setUpdateGroupSize(1)
+            .setMaxPerInstanceFailures(1)
+            .setMaxFailedInstances(1)
+            .setMaxWaitToInstanceRunningMs(100)
+            .setMinWaitInInstanceRunningMs(200)
+            .setRollbackOnFailure(true)
+            .setWaitForBatchCompletion(true)
             .setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(0, 0), new Range(3, 5)))));
-  }
-
-  private TaskConfig makeTaskConfig() {
-    return new TaskConfig()
-        .setJobName(JOB.getName())
-        .setEnvironment(JOB.getEnvironment())
-        .setOwner(new Identity(JOB.getRole(), "user"))
-        .setJob(new JobKey("role", "env", "job"))
-        .setIsService(true)
-        .setConstraints(ImmutableSet.of(
-            new Constraint(
-                "name",
-                TaskConstraint.value(new ValueConstraint(true, ImmutableSet.of("x86"))))))
-        .setRequestedPorts(ImmutableSet.of("http"))
-        .setTaskLinks(ImmutableMap.of("key", "url"))
-        .setContactEmail("foo@bar.com")
-        .setExecutorConfig(new ExecutorConfig("name", "data"))
-        .setMetadata(ImmutableSet.of(new Metadata("name", "value")));
   }
 }

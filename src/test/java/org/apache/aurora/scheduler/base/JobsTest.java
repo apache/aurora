@@ -25,12 +25,11 @@ import org.apache.aurora.scheduler.storage.entities.IJobStats;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.base.TaskTestUtil.addStateTransition;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
-import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTaskEvents;
 import static org.junit.Assert.assertEquals;
 
 public class JobsTest {
-
   @Test
   public void testGetJobStats() {
     ImmutableList<IScheduledTask> tasks =
@@ -39,7 +38,7 @@ public class JobsTest {
             .transform(new Function<ScheduleStatus, IScheduledTask>() {
               @Override
               public IScheduledTask apply(ScheduleStatus status) {
-                return makeTask(status, makeTaskEvents(100, status));
+                return addStateTransition(makeTask("id", TaskTestUtil.JOB), status, 100L);
               }
             }).toList();
 

@@ -13,16 +13,22 @@
  */
 package org.apache.aurora.scheduler.updater;
 
+import java.util.List;
+import java.util.Objects;
+
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Test;
@@ -262,5 +268,34 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluateCurrentState(SUCCEEDED);
+  }
+
+  static final class TaskUtil {
+    private final FakeClock clock;
+
+    TaskUtil(FakeClock clock) {
+      this.clock = Objects.requireNonNull(clock);
+    }
+
+    IScheduledTask makeTask(ITaskConfig config, ScheduleStatus status) {
+      List<TaskEvent> events = Lists.newArrayList();
+      if (status != PENDING) {
+        events.add(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(PENDING));
+      }
+      if (Tasks.isTerminated(status) || status == KILLING) {
+        events.add(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(ASSIGNED));
+        events.add(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(RUNNING));
+      }
+
+      events.add(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(status));
+
+      return IScheduledTask.build(
+          new ScheduledTask()
+              .setStatus(status)
+              .setTaskEvents(ImmutableList.copyOf(events))
+              .setAssignedTask(
+                  new AssignedTask()
+                      .setTask(config.newBuilder())));
+    }
   }
 }
