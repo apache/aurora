@@ -538,16 +538,21 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
   @Timed("scheduler_log_recover")
   void recover() throws RecoveryFailedException {
-    try {
-      streamManager.readFromBeginning(new Closure<LogEntry>() {
-        @Override
-        public void execute(LogEntry logEntry) {
-          replay(logEntry);
+    writeBehindStorage.bulkLoad(new MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
+        try {
+          streamManager.readFromBeginning(new Closure<LogEntry>() {
+            @Override
+            public void execute(LogEntry logEntry) {
+              replay(logEntry);
+            }
+          });
+        } catch (CodingException | InvalidPositionException | StreamAccessException e) {
+          throw new RecoveryFailedException(e);
         }
-      });
-    } catch (CodingException | InvalidPositionException | StreamAccessException e) {
-      throw new RecoveryFailedException(e);
-    }
+      }
+    });
   }
 
   private static final class RecoveryFailedException extends SchedulerException {
@@ -676,6 +681,13 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     } finally {
       writeLock.unlock();
     }
+  }
+
+  @Override
+  public <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work)
+      throws StorageException, E {
+
+    throw new UnsupportedOperationException("Log storage may not be populated in bulk.");
   }
 
   @Override

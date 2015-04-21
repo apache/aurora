@@ -128,8 +128,7 @@ public class MemStorage implements Storage {
 
   @Timed("mem_storage_read_operation")
   @Override
-  public <T, E extends Exception> T read(final Work<T, E> work)
-          throws StorageException, E {
+  public <T, E extends Exception> T read(final Work<T, E> work) throws StorageException, E {
     return delegatedStore.read(new Work<T, E>() {
       @Override
       public T apply(StoreProvider provider) throws E {
@@ -147,6 +146,14 @@ public class MemStorage implements Storage {
         return work.apply(storeProvider);
       }
     });
+  }
+
+  @Timed("mem_storage_bulk_load_operation")
+  @Override
+  public <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work)
+      throws StorageException, E {
+
+    delegatedStore.bulkLoad(work);
   }
 
   @Override

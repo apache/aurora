@@ -212,6 +212,17 @@ public interface Storage {
   <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E;
 
   /**
+   * Recovers the contents of the storage, using the provided operation. This may be done with
+   * relaxed transactional guarantees and/or rollback support.
+   *
+   * @param work Bulk load operation.
+   * @param <E> The type of exception this unit of work can throw.
+   * @throws StorageException if there was a problem reading from or writing to stable storage.
+   * @throws E bubbled transparently when the unit of work throws
+   */
+  <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work) throws StorageException, E;
+
+  /**
    * Requests the underlying storage prepare its data set; ie: initialize schemas, begin syncing
    * out of date data, etc.  This method should not block.
    *
