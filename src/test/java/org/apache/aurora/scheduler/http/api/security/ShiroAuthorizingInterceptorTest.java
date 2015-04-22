@@ -25,20 +25,22 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.scheduler.spi.Permissions;
+import org.apache.aurora.scheduler.spi.Permissions.Domain;
 import org.apache.aurora.scheduler.thrift.Responses;
-import org.apache.shiro.authz.permission.WildcardPermission;
 import org.apache.shiro.subject.Subject;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.http.api.security.ShiroAuthorizingInterceptor.SHIRO_AUTHORIZATION_FAILURES;
+import static org.apache.aurora.scheduler.spi.Permissions.Domain.THRIFT_AURORA_ADMIN;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 public class ShiroAuthorizingInterceptorTest extends EasyMockTest {
-  private static final String PERMISSION_PREFIX = "adminRPC";
+  private static final Domain DOMAIN = THRIFT_AURORA_ADMIN;
 
   private Subject subject;
   private StatsProvider statsProvider;
@@ -49,7 +51,7 @@ public class ShiroAuthorizingInterceptorTest extends EasyMockTest {
 
   @Before
   public void setUp() throws NoSuchMethodException {
-    interceptor = new ShiroAuthorizingInterceptor(PERMISSION_PREFIX);
+    interceptor = new ShiroAuthorizingInterceptor(DOMAIN);
     subject = createMock(Subject.class);
     statsProvider = createMock(StatsProvider.class);
     methodInvocation = createMock(MethodInvocation.class);
@@ -64,7 +66,7 @@ public class ShiroAuthorizingInterceptorTest extends EasyMockTest {
 
   private IExpectationSetters<Boolean> expectSubjectPermitted() {
     return expect(subject.isPermitted(
-        new WildcardPermission(PERMISSION_PREFIX + ":" + interceptedMethod.getName())));
+        Permissions.createUnscopedPermission(DOMAIN, interceptedMethod.getName())));
   }
 
   @Test

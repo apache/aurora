@@ -17,7 +17,6 @@ import java.lang.reflect.Method;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -26,7 +25,6 @@ import javax.inject.Provider;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -40,7 +38,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.reflect.Invokable;
 import com.google.common.reflect.Parameter;
-import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.stats.StatsProvider;
 
 import org.aopalliance.intercept.MethodInterceptor;
@@ -60,12 +57,15 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.http.api.security.FieldGetter.AbstractFieldGetter;
 import org.apache.aurora.scheduler.http.api.security.FieldGetter.IdentityFieldGetter;
+import org.apache.aurora.scheduler.spi.Permissions;
+import org.apache.aurora.scheduler.spi.Permissions.Domain;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.shiro.authz.Permission;
-import org.apache.shiro.authz.permission.WildcardPermission;
 import org.apache.shiro.subject.Subject;
 import org.apache.thrift.TBase;
+
+import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -285,27 +285,26 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
         }
       };
 
-  private static final Joiner COLON_JOINER = Joiner.on(":");
-
   private final LoadingCache<Method, Function<Object[], Optional<JobKey>>> authorizingParamGetters =
       CacheBuilder.<Method, Function<Object[], Optional<JobKey>>>newBuilder().build(LOADER);
 
-  private final String permissionPrefix;
+  private final Domain domain;
+
   private volatile boolean initialized;
 
   private Provider<Subject> subjectProvider;
   private AtomicLong authorizationFailures;
   private AtomicLong badRequests;
 
-  ShiroAuthorizingParamInterceptor(String permissionPrefix) {
-    this.permissionPrefix = MorePreconditions.checkNotBlank(permissionPrefix);
+  ShiroAuthorizingParamInterceptor(Domain domain) {
+    this.domain = requireNonNull(domain);
   }
 
   @Inject
   void initialize(Provider<Subject> newSubjectProvider, StatsProvider statsProvider) {
     checkState(!initialized);
 
-    this.subjectProvider = Objects.requireNonNull(newSubjectProvider);
+    this.subjectProvider = requireNonNull(newSubjectProvider);
     authorizationFailures = statsProvider.makeCounter(SHIRO_AUTHORIZATION_FAILURES);
     badRequests = statsProvider.makeCounter(SHIRO_BAD_REQUESTS);
 
@@ -314,19 +313,12 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
 
   @VisibleForTesting
   Permission makeWildcardPermission(String methodName) {
-    return new WildcardPermission(
-        COLON_JOINER.join(permissionPrefix, methodName));
+    return Permissions.createUnscopedPermission(domain, methodName);
   }
 
   @VisibleForTesting
   Permission makeTargetPermission(String methodName, IJobKey jobKey) {
-    return new WildcardPermission(
-        COLON_JOINER.join(
-            permissionPrefix,
-            methodName,
-            jobKey.getRole(),
-            jobKey.getEnvironment(),
-            jobKey.getName()));
+    return Permissions.createJobScopedPermission(methodName, jobKey);
   }
 
   @Override

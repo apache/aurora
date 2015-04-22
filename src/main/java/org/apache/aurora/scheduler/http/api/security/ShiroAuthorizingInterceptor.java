@@ -21,17 +21,16 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
-import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.stats.StatsProvider;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.scheduler.spi.Permissions;
+import org.apache.aurora.scheduler.spi.Permissions.Domain;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.shiro.authz.Permission;
-import org.apache.shiro.authz.permission.WildcardPermission;
 import org.apache.shiro.subject.Subject;
 
 import static java.util.Objects.requireNonNull;
@@ -54,17 +53,15 @@ class ShiroAuthorizingInterceptor implements MethodInterceptor {
   @VisibleForTesting
   static final String SHIRO_AUTHORIZATION_FAILURES = "shiro_authorization_failures";
 
-  private static final Joiner PERMISSION_JOINER = Joiner.on(":");
-
-  private final String permissionPrefix;
+  private final Domain domain;
 
   private volatile boolean initialized;
 
   private Provider<Subject> subjectProvider;
   private AtomicLong shiroAdminAuthorizationFailures;
 
-  ShiroAuthorizingInterceptor(String permissionPrefix) {
-    this.permissionPrefix = MorePreconditions.checkNotBlank(permissionPrefix);
+  ShiroAuthorizingInterceptor(Domain domain) {
+    this.domain = requireNonNull(domain);
   }
 
   @Inject
@@ -84,8 +81,7 @@ class ShiroAuthorizingInterceptor implements MethodInterceptor {
     checkArgument(Response.class.isAssignableFrom(method.getReturnType()));
 
     Subject subject = subjectProvider.get();
-    Permission checkedPermission = new WildcardPermission(
-        PERMISSION_JOINER.join(permissionPrefix, method.getName()));
+    Permission checkedPermission = Permissions.createUnscopedPermission(domain, method.getName());
     if (subject.isPermitted(checkedPermission)) {
       return invocation.proceed();
     } else {

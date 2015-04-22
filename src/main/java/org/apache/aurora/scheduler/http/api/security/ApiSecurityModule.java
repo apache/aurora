@@ -44,6 +44,9 @@ import org.apache.shiro.web.filter.authc.BasicHttpAuthenticationFilter;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.spi.Permissions.Domain.THRIFT_AURORA_ADMIN;
+import static org.apache.aurora.scheduler.spi.Permissions.Domain.THRIFT_AURORA_SCHEDULER_MANAGER;
+
 /**
  * Provides HTTP Basic Authentication for the API using Apache Shiro. When enabled, prevents
  * unauthenticated access to write APIs. Write API access must also be authorized, with permissions
@@ -51,16 +54,6 @@ import static java.util.Objects.requireNonNull;
  * this package.
  */
 public class ApiSecurityModule extends ServletModule {
-  /**
-   * Prefix for the permission protecting all AuroraSchedulerManager RPCs.
-   */
-  public static final String AURORA_SCHEDULER_MANAGER_PERMISSION = "thrift.AuroraSchedulerManager";
-
-  /**
-   * Prefix for the permission protecting all AuroraAdmin RPCs.
-   */
-  public static final String AURORA_ADMIN_PERMISSION = "thrift.AuroraAdmin";
-
   public static final String HTTP_REALM_NAME = "Apache Aurora Scheduler";
 
   @CmdLine(name = "enable_api_security",
@@ -168,15 +161,15 @@ public class ApiSecurityModule extends ServletModule {
         AURORA_SCHEDULER_MANAGER_SERVICE.or(AURORA_ADMIN_SERVICE),
         authenticatingInterceptor);
 
-    MethodInterceptor apiInterceptor =
-        new ShiroAuthorizingParamInterceptor(AURORA_SCHEDULER_MANAGER_PERMISSION);
+    MethodInterceptor apiInterceptor = new ShiroAuthorizingParamInterceptor(
+        THRIFT_AURORA_SCHEDULER_MANAGER);
     requestInjection(apiInterceptor);
     bindInterceptor(
         Matchers.subclassesOf(AuroraSchedulerManager.Iface.class),
         AURORA_SCHEDULER_MANAGER_SERVICE,
         apiInterceptor);
 
-    MethodInterceptor adminInterceptor = new ShiroAuthorizingInterceptor(AURORA_ADMIN_PERMISSION);
+    MethodInterceptor adminInterceptor = new ShiroAuthorizingInterceptor(THRIFT_AURORA_ADMIN);
     requestInjection(adminInterceptor);
     bindInterceptor(
         Matchers.subclassesOf(AnnotatedAuroraAdmin.class),

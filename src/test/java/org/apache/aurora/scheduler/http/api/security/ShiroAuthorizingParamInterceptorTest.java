@@ -29,6 +29,7 @@ import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.spi.Permissions.Domain;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
@@ -47,7 +48,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
 public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
-  private static final String PERMISSION_PREFIX = "testperm";
+  private static final Domain DOMAIN = Domain.THRIFT_AURORA_SCHEDULER_MANAGER;
 
   private ShiroAuthorizingParamInterceptor interceptor;
 
@@ -61,7 +62,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    interceptor = new ShiroAuthorizingParamInterceptor(PERMISSION_PREFIX);
+    interceptor = new ShiroAuthorizingParamInterceptor(DOMAIN);
     subject = createMock(Subject.class);
     statsProvider = createMock(StatsProvider.class);
     thrift = createMock(AnnotatedAuroraAdmin.class);

@@ -43,6 +43,18 @@ limitations under the License.
     <Bug pattern="SE_BAD_FIELD" />
   </Match>
 
+  <!-- We must maintain reflexivity with WildcardPermission's equals, so we cannot override
+       it even though we add fields in our subclass. We cannot use delegation because
+       WildcardPermission's implies method checks that its argument is an instance of
+       WildcardPermission. -->
+  <Match>
+    <Or>
+      <Class name="org.apache.aurora.scheduler.spi.Permissions$JobScopedRpcPermission" />
+      <Class name="org.apache.aurora.scheduler.spi.Permissions$UnscopedRpcPermission" />
+    </Or>
+    <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
+  </Match>
+
   <!-- Method is intentionally only callable by EventBus. -->
   <Match>
     <Class name="org.apache.aurora.scheduler.events.PubsubEventModule$1" />
