@@ -312,6 +312,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         .setStatus(status)
         .setTaskEvents(ImmutableList.of(new TaskEvent(100, status)))
         .setAssignedTask(new AssignedTask()
+            .setSlaveId("slaveId")
             .setTaskId(id)
             .setTask(new TaskConfig()
                 .setJob(new JobKey("role-" + id, "test", "job-" + id))

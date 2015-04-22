@@ -15,22 +15,40 @@ package org.apache.aurora.scheduler.async.preemptor;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
+import com.google.common.collect.Multiset;
+import com.google.common.collect.Sets;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 
-import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
+import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -56,10 +74,12 @@ import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
  */
 class PendingTaskProcessor implements Runnable {
   private final Storage storage;
-  private final PreemptionSlotFinder preemptionSlotFinder;
+  private final OfferManager offerManager;
+  private final PreemptionVictimFilter preemptionVictimFilter;
   private final PreemptorMetrics metrics;
   private final Amount<Long, Time> preemptionCandidacyDelay;
-  private final BiCache<PreemptionSlot, TaskGroupKey> slotCache;
+  private final BiCache<PreemptionProposal, TaskGroupKey> slotCache;
+  private final ClusterState clusterState;
   private final Clock clock;
 
   /**
@@ -76,17 +96,21 @@ class PendingTaskProcessor implements Runnable {
   @Inject
   PendingTaskProcessor(
       Storage storage,
-      PreemptionSlotFinder preemptionSlotFinder,
+      OfferManager offerManager,
+      PreemptionVictimFilter preemptionVictimFilter,
       PreemptorMetrics metrics,
       @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
-      BiCache<PreemptionSlot, TaskGroupKey> slotCache,
+      BiCache<PreemptionProposal, TaskGroupKey> slotCache,
+      ClusterState clusterState,
       Clock clock) {
 
     this.storage = requireNonNull(storage);
-    this.preemptionSlotFinder = requireNonNull(preemptionSlotFinder);
+    this.offerManager = requireNonNull(offerManager);
+    this.preemptionVictimFilter = requireNonNull(preemptionVictimFilter);
     this.metrics = requireNonNull(metrics);
     this.preemptionCandidacyDelay = requireNonNull(preemptionCandidacyDelay);
     this.slotCache = requireNonNull(slotCache);
+    this.clusterState = requireNonNull(clusterState);
     this.clock = requireNonNull(clock);
   }
 
@@ -95,26 +119,63 @@ class PendingTaskProcessor implements Runnable {
     metrics.recordTaskProcessorRun();
     storage.read(new Storage.Work.Quiet<Void>() {
       @Override
-      public Void apply(StoreProvider storeProvider) {
-        Multimap<IJobKey, IAssignedTask> pendingTasks = fetchIdlePendingTasks(storeProvider);
+      public Void apply(StoreProvider store) {
+        Multimap<String, PreemptionVictim> slavesToActiveTasks =
+            clusterState.getSlavesToActiveTasks();
 
-        for (IJobKey job : pendingTasks.keySet()) {
-          AttributeAggregate jobState = AttributeAggregate.getJobActiveState(storeProvider, job);
+        if (slavesToActiveTasks.isEmpty()) {
+          // No preemption victims to consider.
+          return null;
+        }
 
-          for (IAssignedTask pendingTask : pendingTasks.get(job)) {
-            ITaskConfig task = pendingTask.getTask();
-            metrics.recordPreemptionAttemptFor(task);
+        // Group the offers by slave id so they can be paired with active tasks from the same slave.
+        Map<String, HostOffer> slavesToOffers =
+            Maps.uniqueIndex(offerManager.getOffers(), OFFER_TO_SLAVE_ID);
 
-            Optional<PreemptionSlot> slot = preemptionSlotFinder.findPreemptionSlotFor(
-                pendingTask,
-                jobState,
-                storeProvider);
+        Set<String> allSlaves = Sets.newHashSet(Iterables.concat(
+            slavesToOffers.keySet(),
+            slavesToActiveTasks.keySet()));
 
-            metrics.recordSlotSearchResult(slot, task);
+        // The algorithm below attempts to find a reservation for every task group by matching
+        // it against all available slaves until a preemption slot is found. Groups are evaluated
+        // in a round-robin fashion to ensure fairness (e.g.: G1, G2, G3, G1, G2).
+        // A slave is removed from further matching once a reservation is made. Similarly, all
+        // identical task group instances are removed from further iteration if none of the
+        // available slaves could yield a preemption proposal. A consuming iterator is used for
+        // task groups to ensure iteration order is preserved after a task group is removed.
+        LoadingCache<IJobKey, AttributeAggregate> jobStates = attributeCache(store);
+        List<TaskGroupKey> pendingGroups = fetchIdlePendingGroups(store);
+        Iterator<TaskGroupKey> groups = Iterators.consumingIterator(pendingGroups.iterator());
+        while (!pendingGroups.isEmpty()) {
+          boolean matched = false;
+          TaskGroupKey group = groups.next();
+          ITaskConfig task = group.getTask();
 
-            if (slot.isPresent()) {
-              slotCache.put(slot.get(), TaskGroupKey.from(task));
+          metrics.recordPreemptionAttemptFor(task);
+          Iterator<String> slaveIterator = allSlaves.iterator();
+          while (slaveIterator.hasNext()) {
+            String slaveId = slaveIterator.next();
+            Optional<ImmutableSet<PreemptionVictim>> candidates =
+                preemptionVictimFilter.filterPreemptionVictims(
+                    task,
+                    slavesToActiveTasks.get(slaveId),
+                    jobStates.getUnchecked(task.getJob()),
+                    Optional.fromNullable(slavesToOffers.get(slaveId)),
+                    store);
+
+            metrics.recordSlotSearchResult(candidates, task);
+            if (candidates.isPresent()) {
+              // Slot found -> remove slave to avoid multiple task reservations.
+              slaveIterator.remove();
+              slotCache.put(new PreemptionProposal(candidates.get(), slaveId), group);
+              matched = true;
+              break;
             }
+          }
+          if (!matched) {
+            // No slot found for the group -> remove group and reset group iterator.
+            pendingGroups.removeAll(ImmutableSet.of(group));
+            groups = Iterators.consumingIterator(pendingGroups.iterator());
           }
         }
         return null;
@@ -122,14 +183,55 @@ class PendingTaskProcessor implements Runnable {
     });
   }
 
-  private Multimap<IJobKey, IAssignedTask> fetchIdlePendingTasks(StoreProvider store) {
-    return Multimaps.index(
-        FluentIterable
-            .from(store.getTaskStore().fetchTasks(Query.statusScoped(PENDING)))
+  private List<TaskGroupKey> fetchIdlePendingGroups(StoreProvider store) {
+    Multiset<TaskGroupKey> taskGroupCounts = HashMultiset.create(
+        FluentIterable.from(store.getTaskStore().fetchTasks(Query.statusScoped(PENDING)))
             .filter(Predicates.and(isIdleTask, Predicates.not(hasCachedSlot)))
-            .transform(SCHEDULED_TO_ASSIGNED),
-        Tasks.ASSIGNED_TO_JOB_KEY);
+            .transform(Functions.compose(ASSIGNED_TO_GROUP_KEY, SCHEDULED_TO_ASSIGNED)));
+
+    return getPreemptionSequence(taskGroupCounts);
   }
+
+  /**
+   * Creates execution sequence for pending task groups by interleaving their unique occurrences.
+   * For example: {G1, G1, G1, G2, G2} will be converted into {G1, G2, G1, G2, G1}.
+   *
+   * @param groups Multiset of task groups.
+   * @return A task group execution sequence.
+   */
+  private static List<TaskGroupKey> getPreemptionSequence(Multiset<TaskGroupKey> groups) {
+    Multiset<TaskGroupKey> mutableGroups = HashMultiset.create(groups);
+    List<TaskGroupKey> instructions = Lists.newLinkedList();
+    Set<TaskGroupKey> keys = ImmutableSet.copyOf(groups.elementSet());
+    while (!mutableGroups.isEmpty()) {
+      for (TaskGroupKey key : keys) {
+        if (mutableGroups.contains(key)) {
+          instructions.add(key);
+          mutableGroups.remove(key);
+        }
+      }
+    }
+
+    return instructions;
+  }
+
+  private LoadingCache<IJobKey, AttributeAggregate> attributeCache(final StoreProvider store) {
+    return CacheBuilder.newBuilder().build(CacheLoader.from(
+        new Function<IJobKey, AttributeAggregate>() {
+          @Override
+          public AttributeAggregate apply(IJobKey job) {
+            return AttributeAggregate.getJobActiveState(store, job);
+          }
+        }));
+  }
+
+  private static final Function<IAssignedTask, TaskGroupKey> ASSIGNED_TO_GROUP_KEY =
+      new Function<IAssignedTask, TaskGroupKey>() {
+        @Override
+        public TaskGroupKey apply(IAssignedTask task) {
+          return TaskGroupKey.from(task.getTask());
+        }
+      };
 
   private final Predicate<IScheduledTask> hasCachedSlot = new Predicate<IScheduledTask>() {
     @Override
@@ -145,4 +247,12 @@ class PendingTaskProcessor implements Runnable {
           >= preemptionCandidacyDelay.as(Time.MILLISECONDS);
     }
   };
+
+  private static final Function<HostOffer, String> OFFER_TO_SLAVE_ID =
+      new Function<HostOffer, String>() {
+        @Override
+        public String apply(HostOffer offer) {
+          return offer.getOffer().getSlaveId().getValue();
+        }
+      };
 }

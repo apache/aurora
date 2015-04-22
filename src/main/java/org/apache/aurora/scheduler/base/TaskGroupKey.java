@@ -40,6 +40,15 @@ public final class TaskGroupKey {
     return new TaskGroupKey(task);
   }
 
+  /**
+   * Gets {@link ITaskConfig} the key created from.
+   *
+   * @return A task config.
+   */
+  public ITaskConfig getTask() {
+    return canonicalTask;
+  }
+
   @Override
   public int hashCode() {
     return Objects.hash(canonicalTask);

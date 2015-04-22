@@ -35,7 +35,7 @@ public class PreemptorMetrics {
   static final String MISSING_ATTRIBUTES_NAME = "preemptor_missing_attributes";
 
   @VisibleForTesting
-  static final String PENDING_PROCESSOR_RUN_NAME = "preemptor_task_processor_runs";
+  static final String TASK_PROCESSOR_RUN_NAME = "preemptor_task_processor_runs";
 
   private volatile boolean exported = false;
   private final CachedCounters counters;
@@ -72,7 +72,7 @@ public class PreemptorMetrics {
         slotValidationStatName(true),
         slotValidationStatName(false),
         MISSING_ATTRIBUTES_NAME,
-        PENDING_PROCESSOR_RUN_NAME);
+        TASK_PROCESSOR_RUN_NAME);
     for (String stat : allStats) {
       counters.get(stat);
     }
@@ -126,6 +126,6 @@ public class PreemptorMetrics {
   }
 
   void recordTaskProcessorRun() {
-    increment(PENDING_PROCESSOR_RUN_NAME);
+    increment(TASK_PROCESSOR_RUN_NAME);
   }
 }

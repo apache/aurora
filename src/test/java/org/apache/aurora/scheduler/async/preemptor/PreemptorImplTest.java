@@ -20,12 +20,14 @@ import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
+import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor.PreemptorImpl;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -33,9 +35,11 @@ import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
+import org.apache.mesos.Protos;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
@@ -52,39 +56,47 @@ import static org.junit.Assert.assertEquals;
 public class PreemptorImplTest extends EasyMockTest {
   private static final String SLAVE_ID = "slave_id";
   private static final IScheduledTask TASK = IScheduledTask.build(makeTask());
-  private static final PreemptionSlot SLOT = createPreemptionSlot(TASK);
+  private static final PreemptionProposal PROPOSAL = createPreemptionProposal(TASK);
   private static final TaskGroupKey GROUP_KEY =
       TaskGroupKey.from(ITaskConfig.build(makeTask().getAssignedTask().getTask()));
 
-  private static final Set<PreemptionSlot> NO_SLOTS = ImmutableSet.of();
+  private static final Set<PreemptionProposal> NO_SLOTS = ImmutableSet.of();
   private static final Optional<String> EMPTY_RESULT = Optional.absent();
+  private static final HostOffer OFFER =
+      new HostOffer(Protos.Offer.getDefaultInstance(), IHostAttributes.build(new HostAttributes()));
 
   private StateManager stateManager;
   private FakeStatsProvider statsProvider;
-  private PreemptionSlotFinder preemptionSlotFinder;
+  private PreemptionVictimFilter preemptionVictimFilter;
   private PreemptorImpl preemptor;
-  private BiCache<PreemptionSlot, TaskGroupKey> slotCache;
+  private BiCache<PreemptionProposal, TaskGroupKey> slotCache;
   private Storage.MutableStoreProvider storeProvider;
 
   @Before
   public void setUp() {
     storeProvider = createMock(Storage.MutableStoreProvider.class);
     stateManager = createMock(StateManager.class);
-    preemptionSlotFinder = createMock(PreemptionSlotFinder.class);
-    slotCache = createMock(new Clazz<BiCache<PreemptionSlot, TaskGroupKey>>() { });
+    preemptionVictimFilter = createMock(PreemptionVictimFilter.class);
+    slotCache = createMock(new Clazz<BiCache<PreemptionProposal, TaskGroupKey>>() { });
     statsProvider = new FakeStatsProvider();
+    OfferManager offerManager = createMock(OfferManager.class);
+    expect(offerManager.getOffer(anyObject(Protos.SlaveID.class)))
+        .andReturn(Optional.of(OFFER))
+        .anyTimes();
+
     preemptor = new PreemptorImpl(
         stateManager,
-        preemptionSlotFinder,
+        offerManager,
+        preemptionVictimFilter,
         new PreemptorMetrics(new CachedCounters(statsProvider)),
         slotCache);
   }
 
   @Test
   public void testPreemptTasksSuccessful() throws Exception {
-    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(SLOT));
-    slotCache.remove(SLOT, GROUP_KEY);
-    expectSlotValidation(Optional.of(ImmutableSet.of(
+    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL));
+    slotCache.remove(PROPOSAL, GROUP_KEY);
+    expectSlotValidation(PROPOSAL, Optional.of(ImmutableSet.of(
         PreemptionVictim.fromTask(TASK.getAssignedTask()))));
 
     expectPreempted(TASK);
@@ -98,9 +110,9 @@ public class PreemptorImplTest extends EasyMockTest {
 
   @Test
   public void testPreemptTasksValidationFailed() throws Exception {
-    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(SLOT));
-    slotCache.remove(SLOT, GROUP_KEY);
-    expectSlotValidation(Optional.<ImmutableSet<PreemptionVictim>>absent());
+    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL));
+    slotCache.remove(PROPOSAL, GROUP_KEY);
+    expectSlotValidation(PROPOSAL, Optional.<ImmutableSet<PreemptionVictim>>absent());
 
     control.replay();
 
@@ -124,11 +136,15 @@ public class PreemptorImplTest extends EasyMockTest {
     return preemptor.attemptPreemptionFor(TASK.getAssignedTask(), EMPTY, storeProvider);
   }
 
-  private void expectSlotValidation(Optional<ImmutableSet<PreemptionVictim>> victims) {
-    expect(preemptionSlotFinder.validatePreemptionSlotFor(
-        TASK.getAssignedTask(),
+  private void expectSlotValidation(
+      PreemptionProposal slot,
+      Optional<ImmutableSet<PreemptionVictim>> victims) {
+
+    expect(preemptionVictimFilter.filterPreemptionVictims(
+        TASK.getAssignedTask().getTask(),
+        slot.getVictims(),
         EMPTY,
-        SLOT,
+        Optional.of(OFFER),
         storeProvider)).andReturn(victims);
   }
 
@@ -142,9 +158,9 @@ public class PreemptorImplTest extends EasyMockTest {
         .andReturn(true);
   }
 
-  private static PreemptionSlot createPreemptionSlot(IScheduledTask task) {
+  private static PreemptionProposal createPreemptionProposal(IScheduledTask task) {
     IAssignedTask assigned = task.getAssignedTask();
-    return new PreemptionSlot(ImmutableSet.of(PreemptionVictim.fromTask(assigned)), SLAVE_ID);
+    return new PreemptionProposal(ImmutableSet.of(PreemptionVictim.fromTask(assigned)), SLAVE_ID);
   }
 
   private static ScheduledTask makeTask() {

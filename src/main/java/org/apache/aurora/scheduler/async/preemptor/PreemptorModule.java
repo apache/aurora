@@ -31,7 +31,6 @@ import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.preemptor.BiCache.BiCacheSettings;
-import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
@@ -90,9 +89,9 @@ public class PreemptorModule extends AbstractModule {
         if (enablePreemptor) {
           LOG.info("Preemptor Enabled.");
           bind(PreemptorMetrics.class).in(Singleton.class);
-          bind(PreemptionSlotFinder.class)
-              .to(PreemptionSlotFinder.PreemptionSlotFinderImpl.class);
-          bind(PreemptionSlotFinder.PreemptionSlotFinderImpl.class).in(Singleton.class);
+          bind(PreemptionVictimFilter.class)
+              .to(PreemptionVictimFilter.PreemptionVictimFilterImpl.class);
+          bind(PreemptionVictimFilter.PreemptionVictimFilterImpl.class).in(Singleton.class);
           bind(Preemptor.class).to(Preemptor.PreemptorImpl.class);
           bind(Preemptor.PreemptorImpl.class).in(Singleton.class);
           bind(new TypeLiteral<Amount<Long, Time>>() { })
@@ -100,7 +99,8 @@ public class PreemptorModule extends AbstractModule {
               .toInstance(preemptionDelay);
           bind(BiCacheSettings.class).toInstance(
               new BiCacheSettings(PREEMPTION_SLOT_HOLD_TIME.get(), "preemption_slot_cache_size"));
-          bind(new TypeLiteral<BiCache<PreemptionSlot, TaskGroupKey>>() { }).in(Singleton.class);
+          bind(new TypeLiteral<BiCache<PreemptionProposal, TaskGroupKey>>() { })
+              .in(Singleton.class);
           bind(PendingTaskProcessor.class).in(Singleton.class);
           bind(ClusterState.class).to(ClusterStateImpl.class);
           bind(ClusterStateImpl.class).in(Singleton.class);

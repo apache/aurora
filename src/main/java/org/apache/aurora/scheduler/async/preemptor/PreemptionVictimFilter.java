@@ -13,26 +13,21 @@
  */
 package org.apache.aurora.scheduler.async.preemptor;
 
-import java.util.Objects;
 import java.util.Set;
 
 import javax.inject.Inject;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
@@ -40,16 +35,14 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.mesos.Protos.SlaveID;
 
 import static java.util.Objects.requireNonNull;
 
 /**
- * Tries to find a slave with a combination of active tasks (victims) and available offer
- * (slack) resources that can accommodate a given task (candidate), provided victims are preempted.
+ * Filters active tasks (victims) and available offer (slack) resources that can accommodate a
+ * given task (candidate), provided victims are preempted.
  * <p>
  * A task may preempt another task if the following conditions hold true:
  * <ol>
@@ -62,96 +55,35 @@ import static java.util.Objects.requireNonNull;
  *  </li>
  * </ol>
  */
-public interface PreemptionSlotFinder {
-
-  class PreemptionSlot {
-    private final Set<PreemptionVictim> victims;
-    private final String slaveId;
-
-    @VisibleForTesting
-    PreemptionSlot(ImmutableSet<PreemptionVictim> victims, String slaveId) {
-      this.victims = requireNonNull(victims);
-      this.slaveId = requireNonNull(slaveId);
-    }
-
-    Set<PreemptionVictim> getVictims() {
-      return victims;
-    }
-
-    String getSlaveId() {
-      return slaveId;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof PreemptionSlot)) {
-        return false;
-      }
-
-      PreemptionSlot other = (PreemptionSlot) o;
-      return Objects.equals(getVictims(), other.getVictims())
-          && Objects.equals(getSlaveId(), other.getSlaveId());
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(victims, slaveId);
-    }
-
-    @Override
-    public String toString() {
-      return com.google.common.base.Objects.toStringHelper(this)
-          .add("victims", getVictims())
-          .add("slaveId", getSlaveId())
-          .toString();
-    }
-  }
-
+public interface PreemptionVictimFilter {
   /**
-   * Searches for a {@link PreemptionSlot} for a given {@code pendingTask}.
+   * Returns a set of {@link PreemptionVictim} that can accommodate a given task if preempted.
    *
    * @param pendingTask Task to search preemption slot for.
+   * @param victims Active tasks on a slave.
    * @param attributeAggregate An {@link AttributeAggregate} instance for the task's job.
+   * @param offer A resource offer for a slave.
    * @param storeProvider A store provider to access task data.
-   * @return An instance of {@link PreemptionSlot} if preemption is possible.
+   * @return A set of {@code PreemptionVictim} instances to preempt for a given task.
    */
-  Optional<PreemptionSlot> findPreemptionSlotFor(
-      IAssignedTask pendingTask,
+  Optional<ImmutableSet<PreemptionVictim>> filterPreemptionVictims(
+      ITaskConfig pendingTask,
+      Iterable<PreemptionVictim> victims,
       AttributeAggregate attributeAggregate,
+      Optional<HostOffer> offer,
       StoreProvider storeProvider);
 
-  /**
-   * Validates that a previously-found {@code preemptionSlot} can still accommodate a given task.
-   *
-   * @param pendingTask Task to validate preemption slot for.
-   * @param attributeAggregate An {@link AttributeAggregate} instance for the task's job.
-   * @param preemptionSlot A previously found preemption slot to validate.
-   * @param storeProvider A store provider to access task data.
-   * @return A finalized set of {@code PreemptionVictim} instances to preempt for a given task.
-   */
-  Optional<ImmutableSet<PreemptionVictim>> validatePreemptionSlotFor(
-      IAssignedTask pendingTask,
-      AttributeAggregate attributeAggregate,
-      PreemptionSlot preemptionSlot,
-      StoreProvider storeProvider);
-
-  class PreemptionSlotFinderImpl implements PreemptionSlotFinder {
-    private final OfferManager offerManager;
-    private final ClusterState clusterState;
+  class PreemptionVictimFilterImpl implements PreemptionVictimFilter {
     private final SchedulingFilter schedulingFilter;
     private final ExecutorSettings executorSettings;
     private final PreemptorMetrics metrics;
 
     @Inject
-    PreemptionSlotFinderImpl(
-        OfferManager offerManager,
-        ClusterState clusterState,
+    PreemptionVictimFilterImpl(
         SchedulingFilter schedulingFilter,
         ExecutorSettings executorSettings,
         PreemptorMetrics metrics) {
 
-      this.offerManager = requireNonNull(offerManager);
-      this.clusterState = requireNonNull(clusterState);
       this.schedulingFilter = requireNonNull(schedulingFilter);
       this.executorSettings = requireNonNull(executorSettings);
       this.metrics = requireNonNull(metrics);
@@ -194,94 +126,25 @@ public interface PreemptionSlotFinder {
     private final Ordering<PreemptionVictim> resourceOrder =
         ResourceSlot.ORDER.onResultOf(victimToResources).reverse();
 
-    private static final Function<HostOffer, String> OFFER_TO_SLAVE_ID =
-        new Function<HostOffer, String>() {
-          @Override
-          public String apply(HostOffer offer) {
-            return offer.getOffer().getSlaveId().getValue();
-          }
-        };
-
-    // TODO(maxim): This should take pre-computed mappings (e.g. slaveToOffers) to avoid
-    // unnecessary repeated work.
     @Override
-    public Optional<PreemptionSlot> findPreemptionSlotFor(
-        final IAssignedTask pendingTask,
-        AttributeAggregate attributeAggregate,
-        StoreProvider storeProvider) {
-
-      Multimap<String, PreemptionVictim> slavesToActiveTasks =
-          clusterState.getSlavesToActiveTasks();
-
-      if (slavesToActiveTasks.isEmpty()) {
-        return Optional.absent();
-      }
-
-      // Group the offers by slave id so they can be paired with active tasks from the same slave.
-      Multimap<String, HostOffer> slavesToOffers =
-          Multimaps.index(offerManager.getOffers(), OFFER_TO_SLAVE_ID);
-
-      Set<String> allSlaves = ImmutableSet.<String>builder()
-          .addAll(slavesToOffers.keySet())
-          .addAll(slavesToActiveTasks.keySet())
-          .build();
-
-      for (String slaveId : allSlaves) {
-        final Optional<ImmutableSet<PreemptionVictim>> preemptionVictims = getTasksToPreempt(
-            slavesToActiveTasks.get(slaveId),
-            slavesToOffers.get(slaveId),
-            pendingTask,
-            attributeAggregate,
-            storeProvider);
-
-        if (preemptionVictims.isPresent()) {
-          return Optional.of(new PreemptionSlot(preemptionVictims.get(), slaveId));
-        }
-      }
-
-      return Optional.absent();
-    }
-
-    @Override
-    public Optional<ImmutableSet<PreemptionVictim>> validatePreemptionSlotFor(
-        IAssignedTask pendingTask,
-        AttributeAggregate attributeAggregate,
-        PreemptionSlot preemptionSlot,
-        StoreProvider storeProvider) {
-
-      Optional<HostOffer> offer =
-          offerManager.getOffer(SlaveID.newBuilder().setValue(preemptionSlot.getSlaveId()).build());
-
-      return getTasksToPreempt(
-          preemptionSlot.getVictims(),
-          offer.asSet(),
-          pendingTask,
-          attributeAggregate,
-          storeProvider);
-    }
-
-    /**
-     * Optional.absent indicates that this slave does not have enough resources to satisfy the task.
-     * A set with elements indicates those tasks and the offers are enough.
-     */
-    private Optional<ImmutableSet<PreemptionVictim>> getTasksToPreempt(
+    public Optional<ImmutableSet<PreemptionVictim>> filterPreemptionVictims(
+        ITaskConfig pendingTask,
         Iterable<PreemptionVictim> possibleVictims,
-        Iterable<HostOffer> offers,
-        IAssignedTask pendingTask,
         AttributeAggregate jobState,
+        Optional<HostOffer> offer,
         StoreProvider storeProvider) {
 
       // This enforces the precondition that all of the resources are from the same host. We need to
       // get the host for the schedulingFilter.
       Set<String> hosts = ImmutableSet.<String>builder()
           .addAll(Iterables.transform(possibleVictims, VICTIM_TO_HOST))
-          .addAll(Iterables.transform(offers, OFFER_TO_HOST)).build();
+          .addAll(Iterables.transform(offer.asSet(), OFFER_TO_HOST)).build();
 
       ResourceSlot slackResources =
-          ResourceSlot.sum(Iterables.transform(offers, OFFER_TO_RESOURCE_SLOT));
+          ResourceSlot.sum(Iterables.transform(offer.asSet(), OFFER_TO_RESOURCE_SLOT));
 
       FluentIterable<PreemptionVictim> preemptableTasks = FluentIterable.from(possibleVictims)
-          .filter(preemptionFilter(pendingTask.getTask()));
+          .filter(preemptionFilter(pendingTask));
 
       if (preemptableTasks.isEmpty()) {
         return Optional.absent();
@@ -309,7 +172,7 @@ public interface PreemptionSlotFinder {
 
         Set<Veto> vetoes = schedulingFilter.filter(
             new UnusedResource(totalResource, attributes.get()),
-            new ResourceRequest(pendingTask.getTask(), jobState));
+            new ResourceRequest(pendingTask, jobState));
 
         if (vetoes.isEmpty()) {
           return Optional.of(ImmutableSet.copyOf(toPreemptTasks));

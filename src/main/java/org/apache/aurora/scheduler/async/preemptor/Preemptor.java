@@ -21,12 +21,13 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.async.preemptor.PreemptionSlotFinder.PreemptionSlot;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.mesos.Protos.SlaveID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -52,19 +53,22 @@ public interface Preemptor {
 
   class PreemptorImpl implements Preemptor {
     private final StateManager stateManager;
-    private final PreemptionSlotFinder preemptionSlotFinder;
+    private final OfferManager offerManager;
+    private final PreemptionVictimFilter preemptionVictimFilter;
     private final PreemptorMetrics metrics;
-    private final BiCache<PreemptionSlot, TaskGroupKey> slotCache;
+    private final BiCache<PreemptionProposal, TaskGroupKey> slotCache;
 
     @Inject
     PreemptorImpl(
         StateManager stateManager,
-        PreemptionSlotFinder preemptionSlotFinder,
+        OfferManager offerManager,
+        PreemptionVictimFilter preemptionVictimFilter,
         PreemptorMetrics metrics,
-        BiCache<PreemptionSlot, TaskGroupKey> slotCache) {
+        BiCache<PreemptionProposal, TaskGroupKey> slotCache) {
 
       this.stateManager = requireNonNull(stateManager);
-      this.preemptionSlotFinder = requireNonNull(preemptionSlotFinder);
+      this.offerManager = requireNonNull(offerManager);
+      this.preemptionVictimFilter = requireNonNull(preemptionVictimFilter);
       this.metrics = requireNonNull(metrics);
       this.slotCache = requireNonNull(slotCache);
     }
@@ -76,17 +80,23 @@ public interface Preemptor {
         MutableStoreProvider store) {
 
       TaskGroupKey groupKey = TaskGroupKey.from(pendingTask.getTask());
-      Set<PreemptionSlot> preemptionSlots = slotCache.getByValue(groupKey);
+      Set<PreemptionProposal> preemptionProposals = slotCache.getByValue(groupKey);
 
       // A preemption slot is available -> attempt to preempt tasks.
-      if (!preemptionSlots.isEmpty()) {
+      if (!preemptionProposals.isEmpty()) {
         // Get the next available preemption slot.
-        PreemptionSlot slot = preemptionSlots.iterator().next();
+        PreemptionProposal slot = preemptionProposals.iterator().next();
         slotCache.remove(slot, groupKey);
 
-        // Validate a PreemptionSlot is still valid for the given task.
+        // Validate PreemptionProposal is still valid for the given task.
+        SlaveID slaveId = SlaveID.newBuilder().setValue(slot.getSlaveId()).build();
         Optional<ImmutableSet<PreemptionVictim>> validatedVictims =
-            preemptionSlotFinder.validatePreemptionSlotFor(pendingTask, jobState, slot, store);
+            preemptionVictimFilter.filterPreemptionVictims(
+                pendingTask.getTask(),
+                slot.getVictims(),
+                jobState,
+                offerManager.getOffer(slaveId),
+                store);
 
         metrics.recordSlotValidationResult(validatedVictims);
         if (!validatedVictims.isPresent()) {
