@@ -126,7 +126,7 @@ public class AsyncModule extends AbstractModule {
 
   @CmdLine(name = "max_schedule_attempts_per_sec",
       help = "Maximum number of scheduling attempts to make per second.")
-  private static final Arg<Double> MAX_SCHEDULE_ATTEMPTS_PER_SEC = Arg.create(20D);
+  private static final Arg<Double> MAX_SCHEDULE_ATTEMPTS_PER_SEC = Arg.create(40D);
 
   @CmdLine(name = "flapping_task_threshold",
       help = "A task that repeatedly runs for less than this time is considered to be flapping.")
