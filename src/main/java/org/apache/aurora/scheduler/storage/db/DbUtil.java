@@ -19,13 +19,21 @@ import com.twitter.common.inject.Bindings;
 
 import org.apache.aurora.scheduler.storage.Storage;
 
-final class DbUtil {
+/**
+ * Utility class for creating ad-hoc storage instances.
+ */
+public final class DbUtil {
 
   private DbUtil() {
     // Utility class.
   }
 
-  static Storage createStorage() {
+  /**
+   * Creates a new, empty storage system.
+   *
+   * @return A new storage instance.
+   */
+  public static Storage createStorage() {
     Injector injector = Guice.createInjector(DbModule.testModule(Bindings.KeyFactory.PLAIN));
     Storage storage = injector.getInstance(Storage.class);
     storage.prepare();

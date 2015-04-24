@@ -48,9 +48,9 @@ import org.apache.aurora.scheduler.state.TaskAssigner.Assignment.Result;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.TaskInfo;
 import org.easymock.Capture;
@@ -243,7 +243,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     // Ensures that tasks in THROTTLED state are not considered part of the active job state passed
     // to the assigner function.
 
-    Storage memStorage = MemStorage.newEmptyStorage();
+    Storage memStorage = DbUtil.createStorage();
 
     Injector injector = getInjector(memStorage);
     scheduler = injector.getInstance(TaskScheduler.class);

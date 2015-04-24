@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.storage.db;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
@@ -25,6 +26,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -56,6 +58,8 @@ public class DbStorageTest extends EasyMockTest {
     storage = new DbStorage(
         sessionFactory,
         enumMapper,
+        createMock(CronJobStore.Mutable.class),
+        createMock(TaskStore.Mutable.class),
         createMock(SchedulerStore.Mutable.class),
         createMock(AttributeStore.Mutable.class),
         createMock(LockStore.Mutable.class),

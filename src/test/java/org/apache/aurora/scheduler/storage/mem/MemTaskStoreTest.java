@@ -25,10 +25,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.twitter.common.inject.Bindings;
-import com.twitter.common.inject.Bindings.KeyFactory;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
@@ -48,7 +44,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
-import org.apache.aurora.scheduler.storage.db.DbModule;
+import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -88,11 +84,7 @@ public class MemTaskStoreTest {
 
   @Before
   public void setUp() {
-    Injector injector = Guice.createInjector(
-        new MemStorageModule(KeyFactory.PLAIN),
-        DbModule.testModule(Bindings.annotatedKeyFactory(MemStorage.Delegated.class)));
-    storage = injector.getInstance(Storage.class);
-    storage.prepare();
+    storage = DbUtil.createStorage();
 
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override

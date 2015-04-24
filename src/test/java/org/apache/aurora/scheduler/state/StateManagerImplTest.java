@@ -47,10 +47,10 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.apache.mesos.Protos.SlaveID;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -103,7 +103,7 @@ public class StateManagerImplTest extends EasyMockTest {
     eventSink = createMock(EventSink.class);
     rescheduleCalculator = createMock(RescheduleCalculator.class);
     // TODO(William Farner): Use a mocked storage.
-    storage = MemStorage.newEmptyStorage();
+    storage = DbUtil.createStorage();
     stateManager = new StateManagerImpl(
         clock,
         driver,

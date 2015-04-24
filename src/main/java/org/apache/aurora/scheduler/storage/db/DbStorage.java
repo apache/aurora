@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
+import com.twitter.common.inject.TimedInterceptor.Timed;
 
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateStatus;
@@ -49,11 +50,6 @@ import static org.apache.ibatis.mapping.SqlCommandType.UPDATE;
  * A storage implementation backed by a relational database.
  * <p>
  * Delegates read and write concurrency semantics to the underlying database.
- * This class is currently only partially implemented, with the underlying
- * {@link MutableStoreProvider} only providing some, but not all, store implementations. It is
- * designed to be a long term replacement for
- * {@link org.apache.aurora.scheduler.storage.mem.MemStorage}.
- * </p>
  */
 class DbStorage extends AbstractIdleService implements Storage {
 
@@ -65,6 +61,8 @@ class DbStorage extends AbstractIdleService implements Storage {
   DbStorage(
       SqlSessionFactory sessionFactory,
       EnumValueMapper enumValueMapper,
+      final CronJobStore.Mutable cronJobStore,
+      final TaskStore.Mutable taskStore,
       final SchedulerStore.Mutable schedulerStore,
       final AttributeStore.Mutable attributeStore,
       final LockStore.Mutable lockStore,
@@ -86,17 +84,17 @@ class DbStorage extends AbstractIdleService implements Storage {
 
       @Override
       public CronJobStore.Mutable getCronJobStore() {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return cronJobStore;
       }
 
       @Override
       public TaskStore getTaskStore() {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return taskStore;
       }
 
       @Override
       public TaskStore.Mutable getUnsafeTaskStore() {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return taskStore;
       }
 
       @Override
@@ -121,6 +119,7 @@ class DbStorage extends AbstractIdleService implements Storage {
     };
   }
 
+  @Timed("db_storage_read_operation")
   @Override
   @Transactional
   public <T, E extends Exception> T read(Work<T, E> work) throws StorageException, E {
@@ -131,6 +130,7 @@ class DbStorage extends AbstractIdleService implements Storage {
     }
   }
 
+  @Timed("db_storage_write_operation")
   @Override
   @Transactional
   public <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E {
@@ -148,6 +148,7 @@ class DbStorage extends AbstractIdleService implements Storage {
 
   // TODO(wfarner): Including @Transactional here seems to render the UNDO_LOG changes useless,
   // resulting in no performance gain.  Figure out why.
+  @Timed("db_storage_bulk_load_operation")
   @Override
   public <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work)
       throws StorageException, E {

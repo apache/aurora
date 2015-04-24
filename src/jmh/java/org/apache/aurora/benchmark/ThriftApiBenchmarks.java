@@ -35,8 +35,6 @@ import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.mem.MemStorage;
-import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.thrift.ThriftModule;
 import org.apache.thrift.TException;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -93,8 +91,7 @@ public class ThriftApiBenchmarks {
               bind(LockManager.class).toInstance(createThrowingFake(LockManager.class));
             }
           },
-          new MemStorageModule(Bindings.KeyFactory.PLAIN),
-          new DbModule(Bindings.annotatedKeyFactory(MemStorage.Delegated.class)),
+          DbModule.testModule(Bindings.KeyFactory.PLAIN),
           new ThriftModule.ReadOnly());
       api = injector.getInstance(ReadOnlyScheduler.Iface.class);
 

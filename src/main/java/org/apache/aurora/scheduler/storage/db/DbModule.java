@@ -25,12 +25,15 @@ import com.google.inject.PrivateModule;
 import com.twitter.common.inject.Bindings;
 
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.db.typehandlers.TypeHandlers;
+import org.apache.aurora.scheduler.storage.mem.InMemStoresModule;
 import org.apache.ibatis.session.AutoMappingBehavior;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
@@ -130,6 +133,10 @@ public class DbModule extends PrivateModule {
         addTypeHandlersClasses(TypeHandlers.getAll());
       }
     });
+    install(new InMemStoresModule(keyFactory));
+    expose(keyFactory.create(CronJobStore.Mutable.class));
+    expose(keyFactory.create(TaskStore.Mutable.class));
+
     bindStore(AttributeStore.Mutable.class, DbAttributeStore.class);
     bindStore(LockStore.Mutable.class, DbLockStore.class);
     bindStore(QuotaStore.Mutable.class, DbQuotaStore.class);

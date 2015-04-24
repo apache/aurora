@@ -14,10 +14,6 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import java.io.IOException;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,7 +24,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
-import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -212,15 +207,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       new SlidingStats("log_storage_write_lock_wait", "ns");
   private final AtomicLong droppedUpdateEvents = Stats.exportLong("dropped_update_events");
 
-  /**
-   * Identifies a local storage layer that is written to only after first ensuring the write
-   * operation is persisted in the log.
-   */
-  @Retention(RetentionPolicy.RUNTIME)
-  @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @Qualifier
-  public @interface WriteBehind { }
-
   private final Map<LogEntry._Fields, Closure<LogEntry>> logEntryReplayActions;
   private final Map<Op._Fields, Closure<Op>> transactionReplayActions;
 
@@ -230,14 +216,14 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       ShutdownRegistry shutdownRegistry,
       Settings settings,
       SnapshotStore<Snapshot> snapshotStore,
-      @WriteBehind Storage storage,
-      @WriteBehind SchedulerStore.Mutable schedulerStore,
-      @WriteBehind CronJobStore.Mutable jobStore,
-      @WriteBehind TaskStore.Mutable taskStore,
-      @WriteBehind LockStore.Mutable lockStore,
-      @WriteBehind QuotaStore.Mutable quotaStore,
-      @WriteBehind AttributeStore.Mutable attributeStore,
-      @WriteBehind JobUpdateStore.Mutable jobUpdateStore,
+      @Volatile Storage storage,
+      @Volatile SchedulerStore.Mutable schedulerStore,
+      @Volatile CronJobStore.Mutable jobStore,
+      @Volatile TaskStore.Mutable taskStore,
+      @Volatile LockStore.Mutable lockStore,
+      @Volatile QuotaStore.Mutable quotaStore,
+      @Volatile AttributeStore.Mutable attributeStore,
+      @Volatile JobUpdateStore.Mutable jobUpdateStore,
       EventSink eventSink,
       ReentrantLock writeLock) {
 

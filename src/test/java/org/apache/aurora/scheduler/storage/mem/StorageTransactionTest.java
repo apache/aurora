@@ -43,6 +43,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
@@ -53,8 +54,9 @@ import static org.junit.Assert.fail;
 
 /**
  * TODO(William Farner): Wire a mechanism to allow verification of synchronized writers.
+ * TODO(wfarner): Merge this with DbStorageTest.
  */
-public class MemStorageTest extends TearDownTestCase {
+public class StorageTransactionTest extends TearDownTestCase {
 
   private ExecutorService executor;
   private Storage storage;
@@ -69,7 +71,7 @@ public class MemStorageTest extends TearDownTestCase {
         new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
       }
     });
-    storage = MemStorage.newEmptyStorage();
+    storage = DbUtil.createStorage();
   }
 
   @Test

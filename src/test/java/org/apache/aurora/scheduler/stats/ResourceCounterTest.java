@@ -33,11 +33,11 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -72,7 +72,7 @@ public class ResourceCounterTest {
 
   @Before
   public void setUp() throws Exception {
-    storage = MemStorage.newEmptyStorage();
+    storage = DbUtil.createStorage();
     resourceCounter = new ResourceCounter(storage);
   }
 

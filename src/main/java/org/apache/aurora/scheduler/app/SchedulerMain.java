@@ -55,14 +55,11 @@ import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.mesos.LibMesosLoadingModule;
+import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.db.DbModule;
-import org.apache.aurora.scheduler.storage.db.MigrationModule;
-import org.apache.aurora.scheduler.storage.log.LogStorage;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
-import org.apache.aurora.scheduler.storage.mem.MemStorage.Delegated;
-import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 
 import static com.twitter.common.logging.RootLogConfig.Configuration;
 
@@ -157,13 +154,8 @@ public class SchedulerMain extends AbstractApplication {
         .add(new AppModule(clusterName, serverSetPath, zkClientConfig, statsURLPrefix))
         .addAll(getExtraModules())
         .add(getPersistentStorageModule())
-        .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
         .add(new CronModule())
-        .add(new DbModule(Bindings.annotatedKeyFactory(Delegated.class)))
-        .add(new MigrationModule(
-            Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class),
-            Bindings.annotatedKeyFactory(Delegated.class))
-        )
+        .add(new DbModule(Bindings.annotatedKeyFactory(Storage.Volatile.class)))
         .build();
   }
 

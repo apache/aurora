@@ -28,9 +28,9 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
-import org.apache.aurora.scheduler.storage.mem.MemStorage;
 
 /**
  * A short-lived in-memory storage system that can be converted to a {@link Snapshot}.
@@ -66,7 +66,7 @@ interface TemporaryStorage {
   class TemporaryStorageFactory implements Function<Snapshot, TemporaryStorage> {
     @Override
     public TemporaryStorage apply(Snapshot snapshot) {
-      final Storage storage = MemStorage.newEmptyStorage();
+      final Storage storage = DbUtil.createStorage();
       FakeClock clock = new FakeClock();
       clock.setNowMillis(snapshot.getTimestamp());
       final SnapshotStore<Snapshot> snapshotStore = new SnapshotStoreImpl(clock, storage);

@@ -50,8 +50,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.mem.MemStorage;
-import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.thrift.TException;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -91,8 +89,7 @@ public class UpdateStoreBenchmarks {
               bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
             }
           },
-          new MemStorageModule(Bindings.KeyFactory.PLAIN),
-          new DbModule(Bindings.annotatedKeyFactory(MemStorage.Delegated.class)));
+          DbModule.testModule(Bindings.KeyFactory.PLAIN));
       storage = injector.getInstance(Storage.class);
       storage.prepare();
     }

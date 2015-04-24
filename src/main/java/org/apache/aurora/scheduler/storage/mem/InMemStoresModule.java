@@ -15,13 +15,11 @@ package org.apache.aurora.scheduler.storage.mem;
 
 import javax.inject.Singleton;
 
+import com.google.inject.AbstractModule;
 import com.google.inject.Key;
-import com.google.inject.PrivateModule;
 import com.twitter.common.inject.Bindings.KeyFactory;
 
 import org.apache.aurora.scheduler.storage.CronJobStore;
-import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.Volatile;
 import org.apache.aurora.scheduler.storage.TaskStore;
 
 import static java.util.Objects.requireNonNull;
@@ -29,25 +27,13 @@ import static java.util.Objects.requireNonNull;
 /**
  * Binding module for an in-memory storage system.
  * <p>
- * Exposes bindings for storage components:
- * <ul>
- *   <li>{@link org.apache.aurora.scheduler.storage.Storage}</li>
- *   <li>Keyed with keys provided by the provided{@code keyFactory}:</li>
- *     <ul>
- *       <li>{@link org.apache.aurora.scheduler.storage.SchedulerStore}</li>
- *       <li>{@link org.apache.aurora.scheduler.storage.CronJobStore}</li>
- *       <li>{@link org.apache.aurora.scheduler.storage.TaskStore}</li>
- *       <li>{@link org.apache.aurora.scheduler.storage.LockStore}</li>
- *       <li>{@link org.apache.aurora.scheduler.storage.QuotaStore}</li>
- *       <li>{@link org.apache.aurora.scheduler.storage.AttributeStore}</li>
- *     </ul>
- * </ul>
+ * NOTE: These stores are being phased out in favor of database-backed stores.
  */
-public final class MemStorageModule extends PrivateModule {
+public final class InMemStoresModule extends AbstractModule {
 
   private final KeyFactory keyFactory;
 
-  public MemStorageModule(KeyFactory keyFactory) {
+  public InMemStoresModule(KeyFactory keyFactory) {
     this.keyFactory = requireNonNull(keyFactory);
   }
 
@@ -56,19 +42,10 @@ public final class MemStorageModule extends PrivateModule {
     bind(impl).in(Singleton.class);
     Key<T> key = keyFactory.create(binding);
     bind(key).to(impl);
-    expose(key);
   }
 
   @Override
   protected void configure() {
-    Key<Storage> storageKey = keyFactory.create(Storage.class);
-    bind(storageKey).to(MemStorage.class);
-    expose(storageKey);
-    Key<Storage> exposedMemStorageKey = Key.get(Storage.class, Volatile.class);
-    bind(exposedMemStorageKey).to(MemStorage.class);
-    expose(exposedMemStorageKey);
-    bind(MemStorage.class).in(Singleton.class);
-
     bindStore(CronJobStore.Mutable.class, MemJobStore.class);
     bindStore(TaskStore.Mutable.class, MemTaskStore.class);
   }
