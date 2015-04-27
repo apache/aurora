@@ -71,6 +71,8 @@ class DbStorage extends AbstractIdleService implements Storage {
 
     this.sessionFactory = requireNonNull(sessionFactory);
     this.enumValueMapper = requireNonNull(enumValueMapper);
+    requireNonNull(cronJobStore);
+    requireNonNull(taskStore);
     requireNonNull(schedulerStore);
     requireNonNull(attributeStore);
     requireNonNull(lockStore);

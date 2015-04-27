@@ -25,7 +25,7 @@ import org.apache.aurora.scheduler.storage.TaskStore;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Binding module for an in-memory storage system.
+ * Binding module for in-memory stores.
  * <p>
  * NOTE: These stores are being phased out in favor of database-backed stores.
  */

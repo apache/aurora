@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.mem;
+package org.apache.aurora.scheduler.storage;
 
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +25,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.inject.Guice;
+import com.google.inject.Module;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
@@ -41,10 +43,7 @@ import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.storage.AttributeStore;
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -60,8 +59,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-public class MemTaskStoreTest {
-
+public abstract class AbstractTaskStoreTest {
   private static final IHostAttributes HOST_A = IHostAttributes.build(
       new HostAttributes(
           "hostA",
@@ -82,9 +80,12 @@ public class MemTaskStoreTest {
 
   private Storage storage;
 
+  protected abstract Module getStorageModule();
+
   @Before
-  public void setUp() {
-    storage = DbUtil.createStorage();
+  public void baseSetUp() {
+    storage = Guice.createInjector(getStorageModule()).getInstance(Storage.class);
+    storage.prepare();
 
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
