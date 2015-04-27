@@ -44,6 +44,7 @@ import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
@@ -246,8 +247,9 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override
       void expectations() {
         eventSink.post(PUBSUB_EVENT);
-        expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
-        expect(userLauncher.statusUpdate(STATUS)).andReturn(false);
+        expect(systemLauncher.statusUpdate(status)).andReturn(false);
+        expect(userLauncher.statusUpdate(status)).andReturn(false);
+        expect(driver.acknowledgeStatusUpdate(status)).andReturn(Protos.Status.DRIVER_RUNNING);
       }
     }.run();
   }
@@ -260,12 +262,13 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     @Override
     void expectations() {
       eventSink.post(new TaskStatusReceived(
-          STATUS.getState(),
+          status.getState(),
           Optional.fromNullable(status.getSource()),
           Optional.fromNullable(status.getReason()),
           Optional.of(1000000L)
       ));
       expect(systemLauncher.statusUpdate(status)).andReturn(true);
+      expect(driver.acknowledgeStatusUpdate(status)).andReturn(Protos.Status.DRIVER_RUNNING);
     }
   }
 
@@ -290,8 +293,9 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override
       void expectations() {
         eventSink.post(PUBSUB_EVENT);
-        expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
-        expect(userLauncher.statusUpdate(STATUS)).andReturn(true);
+        expect(systemLauncher.statusUpdate(status)).andReturn(false);
+        expect(userLauncher.statusUpdate(status)).andReturn(true);
+        expect(driver.acknowledgeStatusUpdate(status)).andReturn(Protos.Status.DRIVER_RUNNING);
       }
     }.run();
   }
@@ -302,8 +306,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override
       void expectations() {
         eventSink.post(PUBSUB_EVENT);
-        expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
-        expect(userLauncher.statusUpdate(STATUS)).andThrow(new StorageException("Injected."));
+        expect(systemLauncher.statusUpdate(status)).andReturn(false);
+        expect(userLauncher.statusUpdate(status)).andThrow(new StorageException("Injected."));
       }
     }.run();
   }

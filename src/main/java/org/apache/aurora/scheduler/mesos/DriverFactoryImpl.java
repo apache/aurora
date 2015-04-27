@@ -34,11 +34,19 @@ class DriverFactoryImpl implements DriverFactory {
       Optional<Protos.Credential> credentials,
       FrameworkInfo frameworkInfo,
       String master) {
-
     if (credentials.isPresent()) {
-      return new MesosSchedulerDriver(scheduler, frameworkInfo, master, credentials.get());
+      return new MesosSchedulerDriver(
+          scheduler,
+          frameworkInfo,
+          master,
+          false, // Disable implicit acknowledgements.
+          credentials.get());
     } else {
-      return new MesosSchedulerDriver(scheduler, frameworkInfo, master);
+      return new MesosSchedulerDriver(
+          scheduler,
+          frameworkInfo,
+          master,
+          false); // Disable implicit acknowledgements.
     }
   }
 }
