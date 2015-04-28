@@ -13,6 +13,7 @@ machines.  This guide helps you get the scheduler set up and troubleshoot some c
   - [Storage Performance Considerations](#storage-performance-considerations)
   - [Network considerations](#network-considerations)
   - [Considerations for running jobs in docker](#considerations-for-running-jobs-in-docker)
+  - [Security Considerations](#security-considerations)
 - [Running Aurora](#running-aurora)
   - [Maintaining an Aurora Installation](#maintaining-an-aurora-installation)
   - [Monitoring](#monitoring)
@@ -182,6 +183,10 @@ For example, monit can be configured with
     if failed port 8081 send "GET /health HTTP/1.0\r\n" expect "OK\n" with timeout 2 seconds for 10 cycles then restart
 
 assuming you set `-http_port=8081`.
+
+## Security Considerations
+
+See [security.md](security.md).
 
 ### Maintaining an Aurora Installation
 
