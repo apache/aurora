@@ -459,6 +459,11 @@ jacocoTestReport.finalizedBy analyzeReport
 
 def jmhHumanOutputPath = "$buildDir/reports/jmh/human.txt"
 jmh {
+  // Run specific benchmarks by passing -Pbenchmarks='<regexp' on the command line.  For example
+  // ./gradlew jmh -Pbenchmarks='ThriftApi.*'
+  if (project.hasProperty('benchmarks')) {
+    include = project.getProperty('benchmarks')
+  }
   jmhVersion = '1.7.1'
   jvmArgsPrepend = '-Xmx2g'
   humanOutputFile = project.file("$jmhHumanOutputPath")

@@ -33,7 +33,6 @@ import com.google.common.eventbus.EventBus;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.inject.Bindings.KeyFactory;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -171,7 +170,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     Injector injector = Guice.createInjector(
         new UpdaterModule(executor),
-        DbModule.testModule(KeyFactory.PLAIN),
+        DbModule.testModule(),
         new AbstractModule() {
           @Override
           protected void configure() {

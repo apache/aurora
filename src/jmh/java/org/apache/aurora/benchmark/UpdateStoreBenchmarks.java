@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.inject.Bindings;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.ExecutorConfig;
@@ -89,7 +88,7 @@ public class UpdateStoreBenchmarks {
               bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
             }
           },
-          DbModule.testModule(Bindings.KeyFactory.PLAIN));
+          DbModule.testModule());
       storage = injector.getInstance(Storage.class);
       storage.prepare();
     }

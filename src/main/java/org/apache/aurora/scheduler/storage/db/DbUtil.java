@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage.db;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.inject.Bindings;
 
 import org.apache.aurora.scheduler.storage.Storage;
 
@@ -34,7 +33,7 @@ public final class DbUtil {
    * @return A new storage instance.
    */
   public static Storage createStorage() {
-    Injector injector = Guice.createInjector(DbModule.testModule(Bindings.KeyFactory.PLAIN));
+    Injector injector = Guice.createInjector(DbModule.testModule());
     Storage storage = injector.getInstance(Storage.class);
     storage.prepare();
     return storage;

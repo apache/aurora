@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage.mem;
 
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
-import com.twitter.common.inject.Bindings.KeyFactory;
 
 import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
 import org.apache.aurora.scheduler.storage.db.DbModule;
@@ -23,6 +22,6 @@ import org.apache.aurora.scheduler.storage.db.DbModule;
 public class InMemTaskStoreTest extends AbstractTaskStoreTest {
   @Override
   protected Module getStorageModule() {
-    return Modules.combine(DbModule.testModule(KeyFactory.PLAIN));
+    return Modules.combine(DbModule.testModule());
   }
 }
