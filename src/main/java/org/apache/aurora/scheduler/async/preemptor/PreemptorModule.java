@@ -114,6 +114,7 @@ public class PreemptorModule extends AbstractModule {
                   slotSearchInterval.getUnit().getTimeUnit()));
 
           expose(PreemptorService.class);
+          expose(PendingTaskProcessor.class);
         } else {
           bind(Preemptor.class).toInstance(NULL_PREEMPTOR);
           LOG.warning("Preemptor Disabled.");

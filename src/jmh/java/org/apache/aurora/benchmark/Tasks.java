@@ -45,8 +45,6 @@ final class Tasks {
    * Builds tasks for the specified configuration.
    */
   static final class Builder {
-    private static final String USER_FORMAT = "user-%s";
-
     private JobKey jobKey = new JobKey("jmh", "dev", "benchmark");
     private int uuidStart = 0;
     private boolean isProduction = false;

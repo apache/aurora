@@ -27,18 +27,18 @@ final class BenchmarkSettings {
   private final Set<IHostAttributes> hostAttributes;
   private final double clusterUtilization;
   private final boolean allVictimsEligibleForPreemption;
-  private final IScheduledTask task;
+  private final Set<IScheduledTask> tasks;
 
   private BenchmarkSettings(
       double clusterUtilization,
       boolean allVictimsEligibleForPreemption,
       Set<IHostAttributes> hostAttributes,
-      IScheduledTask task) {
+      Set<IScheduledTask> tasks) {
 
     this.clusterUtilization = clusterUtilization;
     this.allVictimsEligibleForPreemption = allVictimsEligibleForPreemption;
     this.hostAttributes = requireNonNull(hostAttributes);
-    this.task = requireNonNull(task);
+    this.tasks = requireNonNull(tasks);
   }
 
   /**
@@ -74,15 +74,15 @@ final class BenchmarkSettings {
    *
    * @return Task to run a benchmark for.
    */
-  IScheduledTask getTask() {
-    return task;
+  Set<IScheduledTask> getTasks() {
+    return tasks;
   }
 
   static class Builder {
     private double clusterUtilization = 0.9;
     private boolean allVictimsEligibleForPreemption;
     private Set<IHostAttributes> hostAttributes;
-    private IScheduledTask task;
+    private Set<IScheduledTask> tasks;
 
     Builder setClusterUtilization(double newClusterUtilization) {
       clusterUtilization = newClusterUtilization;
@@ -99,8 +99,8 @@ final class BenchmarkSettings {
       return this;
     }
 
-    Builder setTask(IScheduledTask newTask) {
-      task = newTask;
+    Builder setTasks(Set<IScheduledTask> newTasks) {
+      tasks = newTasks;
       return this;
     }
 
@@ -109,7 +109,7 @@ final class BenchmarkSettings {
           clusterUtilization,
           allVictimsEligibleForPreemption,
           hostAttributes,
-          task);
+          tasks);
     }
   }
 }

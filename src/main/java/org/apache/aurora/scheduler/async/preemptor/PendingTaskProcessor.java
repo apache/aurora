@@ -72,7 +72,8 @@ import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
 /**
  * Attempts to find preemption slots for all PENDING tasks eligible for preemption.
  */
-class PendingTaskProcessor implements Runnable {
+@VisibleForTesting
+public class PendingTaskProcessor implements Runnable {
   private final Storage storage;
   private final OfferManager offerManager;
   private final PreemptionVictimFilter preemptionVictimFilter;
