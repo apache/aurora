@@ -66,34 +66,6 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> FRAMEWORK_FAILOVER_TIMEOUT =
       Arg.create(Amount.of(21L, Time.DAYS));
 
-  /**
-   * Require Mesos slaves to have checkpointing enabled. Slaves with checkpointing enabled will
-   * attempt to write checkpoints when required by a task's framework. These checkpoints allow
-   * executors to be reattached rather than killed when a slave is restarted.
-   *
-   * This flag is dangerous! When enabled tasks will not launch on slaves without checkpointing
-   * enabled.
-   *
-   * Behavior is as follows:
-   * (Scheduler -require_slave_checkpoint=true,  Slave --checkpoint=true):
-   *   Tasks will launch.        Checkpoints will be written.
-   * (Scheduler -require_slave_checkpoint=true,   Slave --checkpoint=false):
-   *   Tasks WILL NOT launch.
-   * (Scheduler -require_slave_checkpoint=false,  Slave --checkpoint=true):
-   *   Tasks will launch.        Checkpoints will not be written.
-   * (Scheduler -require_slave_checkpoint=false,  Slave --checkpoint=false):
-   *   Tasks will launch.        Checkpoints will not be written.
-   *
-   * TODO(ksweeney): Remove warning table after https://issues.apache.org/jira/browse/MESOS-444
-   * is resolved.
-   */
-  @CmdLine(name = "require_slave_checkpoint",
-      help = "DANGEROUS! Require Mesos slaves to have checkpointing enabled. When enabled a "
-          + "slave restart should not kill executors, but the scheduler will not be able to "
-          + "launch tasks on slaves without --checkpoint=true in their command lines. See "
-          + "DriverFactory.java for more information.")
-  private static final Arg<Boolean> REQUIRE_SLAVE_CHECKPOINT = Arg.create(false);
-
   @CmdLine(name = "executor_user",
       help = "User to start the executor. Defaults to \"root\". "
           + "Set this to an unprivileged user if the mesos master was started with "
@@ -111,7 +83,8 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
     FrameworkInfo frameworkInfo = FrameworkInfo.newBuilder()
         .setUser(EXECUTOR_USER.get())
         .setName(TWITTER_FRAMEWORK_NAME)
-        .setCheckpoint(REQUIRE_SLAVE_CHECKPOINT.get())
+        // Require slave checkpointing.  Assumes slaves have '--checkpoint=true' arg set.
+        .setCheckpoint(true)
         .setFailoverTimeout(FRAMEWORK_FAILOVER_TIMEOUT.get().as(Time.SECONDS))
         .build();
     DriverSettings settings =
