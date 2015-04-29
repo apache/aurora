@@ -45,7 +45,7 @@ At a minimum you need to set 4 command-line flags on the scheduler:
 
 ```
 -http_authentication_mechanism=BASIC
--shiro_realm_modules=org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule
+-shiro_realm_modules=INI_AUTHNZ
 -shiro_ini_path=path/to/security.ini
 ```
 
@@ -86,7 +86,7 @@ At a minimum you need to set 6 command-line flags on the scheduler:
 
 ```
 -http_authentication_mechanism=NEGOTIATE
--shiro_realm_modules=org.apache.aurora.scheduler.http.api.security.Kerberos5ShiroRealmModule,org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule
+-shiro_realm_modules=KERBEROS5_AUTHN,INI_AUTHNZ
 -kerberos_server_principal=HTTP/aurora.example.com@EXAMPLE.COM
 -kerberos_server_keytab=path/to/aurora.example.com.keytab
 -shiro_ini_path=path/to/security.ini
@@ -114,7 +114,7 @@ Next, a Realm module must be configured to **authenticate** the current request 
 credentials that were requested. Aurora ships with a realm module that can do this
 
 ```
--shiro_realm_modules=org.apache.aurora.scheduler.http.api.security.Kerberos5ShiroRealmModule[,...]
+-shiro_realm_modules=KERBEROS5_AUTHN[,...]
 ```
 
 The Kerberos5Realm requires a keytab file and a server principal name. The principal name will usually
@@ -130,7 +130,7 @@ enable a realm module that provides an Authorizer implementation. For example, t
 IniShiroRealmModule:
 
 ```
--shiro_realm_modules=org.apache.aurora.scheduler.http.api.security.Kerberos5ShiroRealmModule,org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule
+-shiro_realm_modules=KERBEROS5_AUTHN,INI_AUTHNZ
 ```
 
 You can then configure authorization using a security.ini file as described below
@@ -250,6 +250,13 @@ public class MyRealmModule extends AbstractModule {
 }
 ```
 
+To use your module in the scheduler, include it as a realm module based on its fully-qualified
+class name:
+
+```
+-shiro_realm_modules=KERBEROS5_AUTHN,INI_AUTHNZ,com.example.MyRealmModule
+```
+
 # Known Issues
 
 While the APIs and SPIs we ship with are stable as of 0.8.0, we are aware of several incremental
@@ -259,7 +266,6 @@ Relevant tickets:
 * [AURORA-343](https://issues.apache.org/jira/browse/AURORA-343): HTTPS support
 * [AURORA-1248](https://issues.apache.org/jira/browse/AURORA-1248): Client retries 4xx errors
 * [AURORA-1279](https://issues.apache.org/jira/browse/AURORA-1279): Remove kerberos-specific build targets
-* [AURORA-1290](https://issues.apache.org/jira/browse/AURORA-1290): Allow specifying a shorthand for "well-known" Module FQCNs
 * [AURORA-1293](https://issues.apache.org/jira/browse/AURORA-1291): Consider defining a JSON format in place of INI
 * [AURORA-1179](https://issues.apache.org/jira/browse/AURORA-1179): Supported hashed passwords in security.ini
 * [AURORA-1295](https://issues.apache.org/jira/browse/AURORA-1295): Support security for the ReadOnlyScheduler service

@@ -13,6 +13,9 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
+import java.util.Map;
+
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.Module;
 import com.twitter.common.args.ArgParser;
 import com.twitter.common.args.parsers.NonParameterizedTypeParser;
@@ -20,23 +23,28 @@ import com.twitter.common.args.parsers.NonParameterizedTypeParser;
 import org.apache.aurora.scheduler.app.Modules;
 
 /**
- * ArgParser for Guice modules. Constructs an instance of a Module with a given FQCN if it has a
- * public no-args constructor.
+ * ArgParser for Guice modules. Constructs an instance of a Module with a given alias or FQCN if it
+ * has a public no-args constructor.
  */
 @ArgParser
 public class ModuleParser extends NonParameterizedTypeParser<Module> {
+  private static final Map<String, String> NAME_ALIASES = ImmutableMap.of(
+      "KERBEROS5_AUTHN", Kerberos5ShiroRealmModule.class.getCanonicalName(),
+      "INI_AUTHNZ", IniShiroRealmModule.class.getCanonicalName());
+
   @Override
   public Module doParse(String raw) throws IllegalArgumentException {
+    String fullyQualifiedName = NAME_ALIASES.containsKey(raw) ? NAME_ALIASES.get(raw) : raw;
     Class<?> rawClass;
     try {
-      rawClass = Class.forName(raw);
+      rawClass = Class.forName(fullyQualifiedName);
     } catch (ClassNotFoundException e) {
       throw new IllegalArgumentException(e);
     }
 
     if (!Module.class.isAssignableFrom(rawClass)) {
       throw new IllegalArgumentException(
-          "Class " + raw + " must implement " + Module.class.getName());
+          "Class " + fullyQualifiedName + " must implement " + Module.class.getName());
     }
     @SuppressWarnings("unchecked")
     Class<? extends Module> moduleClass = (Class<? extends Module>) rawClass;
