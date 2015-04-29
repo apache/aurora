@@ -60,7 +60,7 @@ class DistributedCommandRunner(object):
     return {'slave_root': cluster.slave_root, 'slave_run_directory': cluster.slave_run_directory}
 
   @classmethod
-  def substitute_thermos(cls, command, task, cluster, **kw):
+  def substitute(cls, command, task, cluster, **kw):
     prefix_command = 'cd %s;' % cls.thermos_sandbox(cluster, **kw)
     thermos_namespace = ThermosContext(
         task_id=task.assignedTask.taskId,
@@ -70,29 +70,6 @@ class DistributedCommandRunner(object):
         thermos=thermos_namespace,
         mesos=mesos_namespace)
     return command.get()
-
-  @classmethod
-  def aurora_sandbox(cls, cluster, executor_sandbox=False):
-    if executor_sandbox:
-      return cls.make_executor_path(cluster, 'twitter')
-    else:
-      return '/var/run/nexus/%task_id%/sandbox'
-
-  @classmethod
-  def substitute_aurora(cls, command, task, cluster, **kw):
-    command = ('cd %s;' % cls.aurora_sandbox(cluster, **kw)) + command
-    command = command.replace('%shard_id%', str(task.assignedTask.instanceId))
-    command = command.replace('%task_id%', task.assignedTask.taskId)
-    for name, port in task.assignedTask.assignedPorts.items():
-      command = command.replace('%port:' + name + '%', str(port))
-    return command
-
-  @classmethod
-  def substitute(cls, command, task, cluster, **kw):
-    if task.assignedTask.task.executorConfig:
-      return cls.substitute_thermos(command, task, cluster, **kw)
-    else:
-      return cls.substitute_aurora(command, task, cluster, **kw)
 
   @classmethod
   def query_from(cls, role, env, job):
