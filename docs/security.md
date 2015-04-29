@@ -20,18 +20,10 @@ existing infrastructure.
 
 # Enabling Security
 
-By default, the Aurora scheduler will not authenticate users, and therefore is unsecured.
-To enable security, the following scheduler command line argument must be set:
-
-```
--enable_api_security=true
-```
-
-This instructs the scheduler to use *a* security mechanism, but it does not
-define *which*.  There are two major components of security: [authentication
-and authorization](http://en.wikipedia.org/wiki/Authentication#Authorization).  A cluster
-administrator may choose the approach used for each, and may also implement custom mechanisms
-for either.  Later sections describe the options available.
+There are two major components of security:
+[authentication and authorization](http://en.wikipedia.org/wiki/Authentication#Authorization).  A
+cluster administrator may choose the approach used for each, and may also implement custom
+mechanisms for either.  Later sections describe the options available.
 
 # Authentication
 
@@ -52,7 +44,6 @@ considerations](http://tools.ietf.org/html/rfc2617#section-4).
 At a minimum you need to set 4 command-line flags on the scheduler:
 
 ```
--enable_api_security=true
 -http_authentication_mechanism=BASIC
 -shiro_realm_modules=org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule
 -shiro_ini_path=path/to/security.ini
@@ -94,7 +85,6 @@ No changes are required to `clusters.json`.
 At a minimum you need to set 6 command-line flags on the scheduler:
 
 ```
--enable_api_security=true
 -http_authentication_mechanism=NEGOTIATE
 -shiro_realm_modules=org.apache.aurora.scheduler.http.api.security.Kerberos5ShiroRealmModule,org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule
 -kerberos_server_principal=HTTP/aurora.example.com@EXAMPLE.COM
@@ -117,7 +107,6 @@ What's going on here? First, Aurora must be configured to request Kerberos crede
 unauthenticated request. This is achieved by setting
 
 ```
--enable_api_security=true
 -http_authentication_mechanism=NEGOTIATE
 ```
 
@@ -187,7 +176,6 @@ are rapidly changing, or if your access control information already exists in an
 You can enable INI-based configuration with following scheduler command line arguments:
 
 ```
--enable_api_security=true
 -http_authentication_mechanism=BASIC
 -shiro_ini_path=path/to/security.ini
 ```
@@ -252,10 +240,10 @@ public class MyRealmModule extends AbstractModule {
   @Override
   public void configure() {
     Realm myRealm = new MyRealm();
-    
+
     Multibinder.newSetBinder(binder(), Realm.class).addBinding().toInstance(myRealm);
   }
-  
+
   static class MyRealm implements Realm {
     // Realm implementation.
   }
@@ -272,7 +260,6 @@ Relevant tickets:
 * [AURORA-1248](https://issues.apache.org/jira/browse/AURORA-1248): Client retries 4xx errors
 * [AURORA-1279](https://issues.apache.org/jira/browse/AURORA-1279): Remove kerberos-specific build targets
 * [AURORA-1290](https://issues.apache.org/jira/browse/AURORA-1290): Allow specifying a shorthand for "well-known" Module FQCNs
-* [AURORA-1291](https://issues.apache.org/jira/browse/AURORA-1291): Collapse enable_api_security into http_authentication_mechanism
 * [AURORA-1293](https://issues.apache.org/jira/browse/AURORA-1291): Consider defining a JSON format in place of INI
 * [AURORA-1179](https://issues.apache.org/jira/browse/AURORA-1179): Supported hashed passwords in security.ini
 * [AURORA-1295](https://issues.apache.org/jira/browse/AURORA-1295): Support security for the ReadOnlyScheduler service

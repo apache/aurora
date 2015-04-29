@@ -56,10 +56,6 @@ import static org.apache.aurora.scheduler.spi.Permissions.Domain.THRIFT_AURORA_S
 public class ApiSecurityModule extends ServletModule {
   public static final String HTTP_REALM_NAME = "Apache Aurora Scheduler";
 
-  @CmdLine(name = "enable_api_security",
-      help = "Enable security for the Thrift API (beta).")
-  private static final Arg<Boolean> ENABLE_API_SECURITY = Arg.create(false);
-
   @CmdLine(name = "shiro_realm_modules",
       help = "Guice modules for configuring Shiro Realms.")
   private static final Arg<Set<Module>> SHIRO_REALM_MODULE = Arg.<Set<Module>>create(
@@ -73,7 +69,12 @@ public class ApiSecurityModule extends ServletModule {
   static final Matcher<Method> AURORA_ADMIN_SERVICE =
       GuiceUtils.interfaceMatcher(AuroraAdmin.Iface.class, true);
 
-  public static enum HttpAuthenticationMechanism {
+  public enum HttpAuthenticationMechanism {
+    /**
+     * No security.
+     */
+    NONE,
+
     /**
      * HTTP Basic Authentication, produces {@link org.apache.shiro.authc.UsernamePasswordToken}s.
      */
@@ -87,28 +88,31 @@ public class ApiSecurityModule extends ServletModule {
 
   @CmdLine(name = "http_authentication_mechanism", help = "HTTP Authentication mechanism to use.")
   private static final Arg<HttpAuthenticationMechanism> HTTP_AUTHENTICATION_MECHANISM =
-      Arg.create(HttpAuthenticationMechanism.BASIC);
+      Arg.create(HttpAuthenticationMechanism.NONE);
 
-  private final boolean enableApiSecurity;
+  private final HttpAuthenticationMechanism mechanism;
   private final Set<Module> shiroConfigurationModules;
 
   public ApiSecurityModule() {
-    this(ENABLE_API_SECURITY.get(), SHIRO_REALM_MODULE.get());
+    this(HTTP_AUTHENTICATION_MECHANISM.get(), SHIRO_REALM_MODULE.get());
   }
 
   @VisibleForTesting
   ApiSecurityModule(Module shiroConfigurationModule) {
-    this(true, ImmutableSet.of(shiroConfigurationModule));
+    this(HttpAuthenticationMechanism.BASIC, ImmutableSet.of(shiroConfigurationModule));
   }
 
-  private ApiSecurityModule(boolean enableApiSecurity, Set<Module> shiroConfigurationModules) {
-    this.enableApiSecurity = enableApiSecurity;
+  private ApiSecurityModule(
+      HttpAuthenticationMechanism mechanism,
+      Set<Module> shiroConfigurationModules) {
+
+    this.mechanism = requireNonNull(mechanism);
     this.shiroConfigurationModules = requireNonNull(shiroConfigurationModules);
   }
 
   @Override
   protected void configureServlets() {
-    if (enableApiSecurity) {
+    if (mechanism != HttpAuthenticationMechanism.NONE) {
       doConfigureServlets();
     }
   }
@@ -125,7 +129,7 @@ public class ApiSecurityModule extends ServletModule {
           install(module);
         }
 
-        switch (HTTP_AUTHENTICATION_MECHANISM.get()) {
+        switch (mechanism) {
           case BASIC:
             addFilterChain("/**",
                 ShiroWebModule.NO_SESSION_CREATION,
@@ -139,7 +143,7 @@ public class ApiSecurityModule extends ServletModule {
             break;
 
           default:
-            addError("Unrecognized HTTP authentication mechanism.");
+            addError("Unrecognized HTTP authentication mechanism: " + mechanism);
             break;
         }
       }

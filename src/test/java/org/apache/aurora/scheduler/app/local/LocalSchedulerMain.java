@@ -97,7 +97,7 @@ public class LocalSchedulerMain extends SchedulerMain {
         .add("-mesos_master_address=fake")
         .add("-thermos_executor_path=fake")
         .add("-http_port=8081")
-        .add("-enable_api_security=true")
+        .add("-http_authentication_mechanism=BASIC")
         .add("-shiro_ini_path="
             + ResourceUtils.CLASSPATH_PREFIX
             + "org/apache/aurora/scheduler/http/api/security/shiro-example.ini")
