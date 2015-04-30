@@ -12,10 +12,20 @@
  * limitations under the License.
  */
 (function () {
-  /* global auroraUI:false, Identity:false, TaskQuery:false, ReadOnlySchedulerClient:false,
-            ACTIVE_STATES:false, CronCollisionPolicy: false, JobKey: false,
-            ScheduleStatus: false, JobUpdateQuery:false, JobUpdateAction:false,
-            JobUpdateStatus: false */
+  /* global
+    auroraUI:false,
+    ACTIVE_STATES:false,
+    ACTIVE_JOB_UPDATE_STATES: false,
+    CronCollisionPolicy: false,
+    Identity:false,
+    JobKey: false,
+    JobUpdateQuery:false,
+    JobUpdateAction:false,
+    JobUpdateStatus: false,
+    ReadOnlySchedulerClient:false,
+    ScheduleStatus: false,
+    TaskQuery:false
+  */
   'use strict';
 
   function makeJobTaskQuery(role, environment, jobName) {
@@ -246,13 +256,6 @@
         JobUpdateStatus.FAILED
       ];
 
-      var IN_PROGRESS_STATUSES = [
-        JobUpdateStatus.ROLLING_FORWARD,
-        JobUpdateStatus.ROLLING_BACK,
-        JobUpdateStatus.ROLL_FORWARD_PAUSED,
-        JobUpdateStatus.ROLL_BACK_PAUSED
-      ];
-
       var UPDATE_TERMINAL = toSet(UPDATE_TERMINAL_STATUSES);
 
       var INSTANCE_SUCCESSFUL = toSet([
@@ -302,7 +305,7 @@
           return updateUtil.getStatusQuery(UPDATE_TERMINAL_STATUSES);
         },
         getInProgressQuery: function () {
-          return updateUtil.getStatusQuery(IN_PROGRESS_STATUSES);
+          return updateUtil.getStatusQuery(ACTIVE_JOB_UPDATE_STATES);
         },
         instanceCountFromConfigs: function (instanceTaskConfigs) {
           var flattenedRanges = [];
