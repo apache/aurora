@@ -15,7 +15,9 @@ package org.apache.aurora.scheduler.base;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -32,35 +34,23 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
 
 public class AsyncUtilTest extends EasyMockTest {
+  private static final String NAME_FORMAT = "Test-%d";
   private Logger logger;
-  private ScheduledThreadPoolExecutor executor;
   private CountDownLatch latch;
 
   @Before
   public void setUp() {
     logger = createMock(Logger.class);
     latch = new CountDownLatch(1);
-    executor = AsyncUtil.singleThreadLoggingScheduledExecutor("Test-%d", logger);
   }
 
   @Test
   public void testScheduleLogging() throws Exception {
-    logger.log(
-        eq(Level.SEVERE),
-        contains("Expected exception."),
-        EasyMock.<ExecutionException>anyObject());
-
-    expectLastCall().andAnswer(new IAnswer<Object>() {
-      @Override
-      public Object answer() throws Throwable {
-        latch.countDown();
-        return null;
-      }
-    }).once();
+    expectLogging();
 
     control.replay();
 
-    executor.schedule(new Runnable() {
+    scheduledExecutor().schedule(new Runnable() {
       @Override
       public void run() {
         throw new IllegalArgumentException("Expected exception.");
@@ -72,6 +62,39 @@ public class AsyncUtilTest extends EasyMockTest {
 
   @Test
   public void testSubmitLogging() throws Exception {
+    expectLogging();
+
+    control.replay();
+
+    scheduledExecutor().submit(new Runnable() {
+      @Override
+      public void run() {
+        throw new IllegalArgumentException("Expected exception.");
+      }
+    });
+
+    latch.await();
+  }
+
+  @Test
+  public void testExecuteLogging() throws Exception {
+    expectLogging();
+
+    control.replay();
+
+    ThreadPoolExecutor executor =
+        AsyncUtil.loggingExecutor(1, 1, new LinkedBlockingQueue<Runnable>(), NAME_FORMAT, logger);
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        throw new IllegalArgumentException("Expected exception.");
+      }
+    });
+
+    latch.await();
+  }
+
+  private void expectLogging() {
     logger.log(
         eq(Level.SEVERE),
         contains("Expected exception."),
@@ -84,16 +107,9 @@ public class AsyncUtilTest extends EasyMockTest {
         return null;
       }
     }).once();
+  }
 
-    control.replay();
-
-    executor.submit(new Runnable() {
-      @Override
-      public void run() {
-        throw new IllegalArgumentException("Expected exception.");
-      }
-    });
-
-    latch.await();
+  private ScheduledThreadPoolExecutor scheduledExecutor() {
+    return AsyncUtil.singleThreadLoggingScheduledExecutor(NAME_FORMAT, logger);
   }
 }

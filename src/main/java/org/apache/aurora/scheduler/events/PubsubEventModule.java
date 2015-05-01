@@ -18,8 +18,6 @@ import java.lang.annotation.Target;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
@@ -34,7 +32,6 @@ import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.TypeLiteral;
@@ -48,6 +45,7 @@ import com.twitter.common.base.Command;
 import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -100,16 +98,12 @@ public final class PubsubEventModule extends AbstractModule {
           .annotatedWith(PubsubExecutorQueue.class)
           .toInstance(executorQueue);
 
-      executor = new ThreadPoolExecutor(
+      executor = AsyncUtil.loggingExecutor(
           MAX_ASYNC_EVENT_BUS_THREADS.get(),
           MAX_ASYNC_EVENT_BUS_THREADS.get(),
-          0L,
-          TimeUnit.MILLISECONDS,
           executorQueue,
-          new ThreadFactoryBuilder()
-              .setDaemon(true)
-              .setNameFormat("AsyncTaskEvents-%d")
-              .build());
+          "AsyncTaskEvents-%d",
+          log);
 
       LifecycleModule.bindStartupAction(binder(), RegisterGauges.class);
     } else {
