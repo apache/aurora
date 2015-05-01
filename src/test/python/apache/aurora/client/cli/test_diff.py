@@ -73,7 +73,7 @@ class TestDiffCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('subprocess.call', return_value=0),
-        patch('json.loads', return_value=Mock())) as (_, _, subprocess_patch, _):
+        patch('json.loads', return_value=Mock())) as (_, subprocess_patch, _):
 
       mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
       self.setup_populate_job_config(mock_scheduler_proxy)
@@ -108,7 +108,6 @@ class TestDiffCommand(AuroraClientCommandTest):
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (
             mock_scheduler_proxy_class,
-            mock_clusters,
             options,
             subprocess_patch,
             json_patch):
@@ -134,7 +133,6 @@ class TestDiffCommand(AuroraClientCommandTest):
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (
             mock_scheduler_proxy_class,
-            mock_clusters,
             options,
             subprocess_patch,
             json_patch):

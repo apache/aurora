@@ -127,7 +127,7 @@ class AuroraClientCommandTest(unittest.TestCase):
     # Since CLUSTERS is a global value that evaluates code on import this is the best way to
     # ensure it does not pollute any tests.
     with CLUSTERS.patch(self.TEST_CLUSTERS._clusters.values()):
-      super(AuroraClientCommandTest, self).run()
+      super(AuroraClientCommandTest, self).run(result)
 
   @classmethod
   def create_blank_response(cls, code, msg):

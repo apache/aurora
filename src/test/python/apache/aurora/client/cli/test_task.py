@@ -77,8 +77,6 @@ class TestRunCommand(AuroraClientCommandTest):
             return_value=sandbox_args),
         patch('subprocess.Popen', return_value=self.create_mock_process())) as (
             mock_scheduler_proxy_class,
-            mock_clusters,
-            mock_clusters_cli,
             mock_runner_args_patch,
             mock_subprocess):
       cmd = AuroraCommandLine()
@@ -130,7 +128,6 @@ class TestSshCommand(AuroraClientCommandTest):
             return_value=sandbox_args),
         patch('subprocess.call', return_value=0)) as (
             mock_scheduler_proxy_class,
-            mock_clusters,
             mock_runner_args_patch,
             mock_subprocess):
       cmd = AuroraCommandLine()
@@ -156,7 +153,6 @@ class TestSshCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('subprocess.call', return_value=0)) as (
             mock_scheduler_proxy_class,
-            mock_clusters,
             mock_subprocess):
       cmd = AuroraCommandLine()
       result = cmd.execute(['task', 'ssh', 'west/bozo/test/hello/1', '--command=ls'])
