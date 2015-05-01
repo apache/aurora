@@ -19,10 +19,12 @@ import json
 import textwrap
 from collections import namedtuple
 
+from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.base import combine_messages, get_update_page
 from apache.aurora.client.cli import (
     EXIT_API_ERROR,
     EXIT_COMMAND_FAILURE,
+    EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER,
     EXIT_OK,
     Noun,
@@ -155,7 +157,11 @@ class StartUpdate(Verb):
           "Cron jobs may only be updated with \"aurora cron schedule\" command")
 
     api = context.get_api(config.cluster())
-    resp = api.start_job_update(config, context.options.message, instances)
+    try:
+      resp = api.start_job_update(config, context.options.message, instances)
+    except AuroraClientAPI.UpdateConfigError as e:
+      raise context.CommandError(EXIT_INVALID_CONFIGURATION, e.message)
+
     context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
         err_msg="Failed to start update due to error:")
 

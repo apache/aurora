@@ -90,6 +90,7 @@ class TestStartUpdate(AuroraClientCommandTest):
 
   @classmethod
   def create_mock_config(cls, is_cron=False):
+    # TODO(wfarner): Consider using a real AuroraConfig object for this.
     mock_config = create_autospec(spec=AuroraConfig, spec_set=True, instance=True)
     raw_config = Job(cron_schedule='something' if is_cron else Empty)
     mock_config.raw = Mock(return_value=raw_config)
@@ -166,6 +167,21 @@ class TestStartUpdate(AuroraClientCommandTest):
     ]
     assert self._fake_context.get_out() == ["Noop update."]
     assert self._fake_context.get_err() == []
+
+  def test_update_pulse_interval_too_small(self):
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+
+    error = Context.CommandError(100, 'something failed')
+    self._mock_api.start_job_update.side_effect = error
+
+    with pytest.raises(Context.CommandError) as e:
+      self._command.execute(self._fake_context)
+
+    assert e.value == error
+    assert self._mock_api.start_job_update.mock_calls == [
+      call(ANY, None, None)
+    ]
 
 
 class TestListUpdates(AuroraClientCommandTest):
