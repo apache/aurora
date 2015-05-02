@@ -229,15 +229,15 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         Local    vs   Scheduler  => Action
        ===================================
         ACTIVE         ACTIVE    => no-op
-        ACTIVE        STARTING   => no-op
+        ACTIVE        ASSIGNED   => no-op
         ACTIVE        TERMINAL   => maybe kill task*
         ACTIVE        !EXISTS    => maybe kill task*
        TERMINAL        ACTIVE    => send actual status**
-       TERMINAL       STARTING   => send actual status**
+       TERMINAL       ASSIGNED   => send actual status**
        TERMINAL       TERMINAL   => no-op
        TERMINAL       !EXISTS    => gc locally
        !EXISTS         ACTIVE    => send LOST**
-       !EXISTS        STARTING   => no-op
+       !EXISTS        ASSIGNED   => no-op
        !EXISTS        TERMINAL   => gc remotely
 
        * - Only kill if this does not appear to be a race condition.
@@ -254,21 +254,20 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         updates - dictionary of updates sent to the scheduler (task_id: ScheduleStatus)
     """
     def partition(rt):
-      active, starting, finished = set(), set(), set()
+      active, assigned, finished = set(), set(), set()
       for task, schedule_status in rt.items():
         if schedule_status in TERMINAL_STATES:
           finished.add(task)
-        elif (schedule_status == ScheduleStatus.STARTING or
-              schedule_status == ScheduleStatus.ASSIGNED):
-          starting.add(task)
+        elif schedule_status == ScheduleStatus.ASSIGNED:
+          assigned.add(task)
         else:
           active.add(task)
-      return active, starting, finished
+      return active, assigned, finished
 
     local_active, local_finished = self.partition_tasks()
-    sched_active, sched_starting, sched_finished = partition(retained_tasks)
+    sched_active, sched_assigned, sched_finished = partition(retained_tasks)
     local_tasks = local_active | local_finished
-    sched_tasks = sched_active | sched_starting | sched_finished
+    sched_tasks = sched_active | sched_assigned | sched_finished
 
     self.log('Told to retain the following task ids:')
     for task_id, schedule_status in retained_tasks.items():
@@ -287,7 +286,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     updates = {}
 
     for task in local_active:
-      if task.task_id not in (sched_active | sched_starting):
+      if task.task_id not in (sched_active | sched_assigned):
         self.log('Inspecting task %s for termination.' % task.task_id)
         if not self.maybe_terminate_unknown_task(task):
           local_gc.update(self.should_gc_task(task))
@@ -296,8 +295,8 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       if task.task_id not in sched_tasks:
         self.log('Queueing task %s for local deletion.' % task.task_id)
         local_gc.add(task)
-      if task.task_id in (sched_active | sched_starting):
-        self.log('Task %s finished but scheduler thinks active/starting.' % task.task_id)
+      if task.task_id in (sched_active | sched_assigned):
+        self.log('Task %s finished but scheduler thinks active/assigned.' % task.task_id)
         states = self.get_states(task)
         if states:
           _, last_state = states[-1]
@@ -324,9 +323,9 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         self.send_update(
             driver, task_id, mesos_pb2.TASK_LOST, 'GC executor found no trace of task.')
 
-    for task_id in sched_starting:
+    for task_id in sched_assigned:
       if task_id not in local_task_ids:
-        self.log('Know nothing about task %s, but scheduler says STARTING - passing' % task_id)
+        self.log('Know nothing about task %s, but scheduler says ASSIGNED - passing' % task_id)
 
     return local_gc, remote_gc_ids, updates
 

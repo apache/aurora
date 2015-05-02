@@ -66,7 +66,7 @@ FINISHED_TASKS = {
 # TODO(wickman) These should be constant sets in the Thermos thrift
 THERMOS_LIVES = (TaskState.ACTIVE, TaskState.CLEANING, TaskState.FINALIZING)
 THERMOS_TERMINALS = (TaskState.SUCCESS, TaskState.FAILED, TaskState.KILLED, TaskState.LOST)
-STARTING_STATES = (ScheduleStatus.STARTING, ScheduleStatus.ASSIGNED)
+ASSIGNED_STATES = (ScheduleStatus.ASSIGNED, )
 TASK_ID = 'gc_executor_task_id'
 EVENT_WAIT_TIMEOUT_SECS = 10
 
@@ -232,15 +232,15 @@ def test_state_reconciliation_no_ops():
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
 
-  # active vs. starting
-  for st0, st1 in product(THERMOS_LIVES, STARTING_STATES):
+  # active vs. assigned
+  for st0, st1 in product(THERMOS_LIVES, ASSIGNED_STATES):
     tgc, driver = make_pair({make_task('foo'): st0}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 0)
 
-  # nexist vs. starting
-  for st1 in STARTING_STATES:
+  # nexist vs. assigned
+  for st1 in ASSIGNED_STATES:
     tgc, driver = make_pair({}, {})
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
