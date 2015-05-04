@@ -257,7 +257,7 @@ The CHANGELOG for the release is available at:
 ${aurora_git_web_url}&f=CHANGELOG&hb=${current_version_tag}
 
 The branch used to create the release candidate is:
-${aurora_git_web_url}&hb=${current_version_tag}
+${aurora_git_web_url};a=shortlog;h=refs/heads/${current_version_tag}
 
 The release candidate is available at:
 ${aurora_svn_dist_url}/${current_version_tag}/${dist_name}.tar.gz
