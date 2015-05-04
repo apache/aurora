@@ -27,6 +27,7 @@ set -o errexit
 set -o nounset
 
 rc_tag_version=0
+override_version=''
 aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/dev/aurora'
 aurora_version_file='./src/main/resources/apache/aurora/client/cli/.auroraversion'
@@ -37,13 +38,14 @@ Apache Aurora release candidate tool.
 
 Usage: $0 [-h] [-l p|m|M] [-r #] [-p | publish]
 
-  -h   Print this help message and exit
-  -l   Increment level, must be one of:
-       p, patch (default)
-  		 m, minor
-  		 M, major
-  -r   Release candidate number (default: 0)
-  -p   Publish the release candidate (default: dry-run, does not publish anything)
+  -h  Print this help message and exit
+  -l  Increment level, must be one of:
+        p, patch (default)
+        m, minor
+        M, major
+  -v  Override the existing version in .auroraversion
+  -r  Release candidate number (default: 0)
+  -p  Publish the release candidate (default: dry-run, does not publish anything)
 EOF
 exit 0
 }
@@ -51,7 +53,7 @@ exit 0
 publish=0
 increment_level="patch"
 rc_tag_version=0
-while getopts ":hl:r:p" opt; do
+while getopts ":hl:v:r:p" opt; do
   case $opt in
     l)
       case ${OPTARG} in
@@ -69,6 +71,9 @@ while getopts ":hl:r:p" opt; do
       ;;
     h)
       print_help_and_exit
+      ;;
+    v)
+      override_version=${OPTARG}
       ;;
     *  )
       echo "Unknown option: -$OPTARG"
@@ -109,6 +114,10 @@ if ! [[ $current_version =~ .*-SNAPSHOT ]]; then
   echo "ERROR: .auroraversion is required to contain 'SNAPSHOT', it is ${current_version}"
   exit 1
 else
+  if [[ $override_version != "" ]]; then
+    current_version=$override_version
+  fi
+
   major=`echo $current_version | cut -d. -f1`
   minor=`echo $current_version | cut -d. -f2`
   patch=`echo $current_version | cut -d. -f3 | cut -d- -f1`
