@@ -77,9 +77,8 @@ def test_request_transport_timeout():
 
 
 def test_raise_for_status_causes_exception():
-  response = create_autospec(spec=requests.Response, instance=True)
-  response.headers = {'header1': 'data', 'header2': 'data2'}
-  response.raise_for_status.side_effect = requests.exceptions.HTTPError()
+  response = requests.Response()
+  response.status_code = 503
 
   session = create_autospec(spec=requests.Session, instance=True)
   session.headers = {}
@@ -97,7 +96,23 @@ def test_raise_for_status_causes_exception():
 
   transport.close()
 
-  response.raise_for_status.assert_called_once_with()
+
+def test_raises_auth_error():
+  response = requests.Response()
+  response.status_code = 401
+
+  session = create_autospec(spec=requests.Session, instance=True)
+  session.headers = {}
+  session.post.return_value = response
+
+  transport = TRequestsTransport('http://localhost:12345', session_factory=lambda: session)
+  protocol = TJSONProtocol.TJSONProtocol(transport)
+  client = ReadOnlyScheduler.Client(protocol)
+
+  with pytest.raises(TRequestsTransport.AuthError):
+    client.getRoleSummary()
+
+  transport.close()
 
 
 def test_request_any_other_exception():
@@ -138,9 +153,8 @@ def test_transport_applies_default_user_agent_if_no_factory_provided():
 
 
 def test_auth_type_valid():
-  response = create_autospec(spec=requests.Response, instance=True)
-  response.headers = {'header1': 'data', 'header2': 'data2'}
-  response.raise_for_status.side_effect = requests.exceptions.HTTPError()
+  response = requests.Response()
+  response.status_code = 500
 
   session = create_autospec(spec=requests.Session, instance=True)
   session.headers = {}

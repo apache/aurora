@@ -14,14 +14,16 @@
 
 from __future__ import print_function
 
+import functools
 import logging
 from fnmatch import fnmatch
 
-from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.api import AuroraClientAPI, SchedulerProxy
 from apache.aurora.client.base import AURORA_V2_USER_AGENT_NAME, combine_messages
 from apache.aurora.client.cli import (
     Context,
     EXIT_API_ERROR,
+    EXIT_AUTH_ERROR,
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER
@@ -31,8 +33,40 @@ from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 
+from gen.apache.aurora.api import AuroraAdmin
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import ResponseCode
+
+
+class AuthErrorHandlingScheduler(object):
+  """A decorator that can be applied on a AuroraClientAPI instance to add handling of
+  auth-related errors, terminating the client."""
+
+  def __init__(self, delegate):
+    self._delegate = delegate
+
+  def __getattr__(self, method_name):
+    try:
+      method = getattr(AuroraAdmin.Client, method_name)
+    except AttributeError:
+      # Don't interfere with the non-public API.
+      return getattr(self._delegate, method_name)
+    if not callable(method):
+      return method
+
+    @functools.wraps(method)
+    def method_wrapper(*args, **kwargs):
+      try:
+        return getattr(self._delegate, method_name)(*args, **kwargs)
+      except SchedulerProxy.AuthError as e:
+        raise Context.CommandError(EXIT_AUTH_ERROR, str(e))
+
+    return method_wrapper
+
+
+def add_auth_error_handler(api):
+  api._scheduler_proxy = AuthErrorHandlingScheduler(api._scheduler_proxy)
+  return api
 
 
 class AuroraCommandContext(Context):
@@ -50,21 +84,21 @@ class AuroraCommandContext(Context):
     self.apis = {}
     self.unhooked_apis = {}
 
-  def get_api(self, cluster, enable_hooks=True):
+  def get_api(self, cluster, enable_hooks=True, clusters=CLUSTERS):
     """Gets an API object for a specified cluster
     Keeps the API handle cached, so that only one handle for each cluster will be created in a
     session.
     """
-    if cluster not in CLUSTERS:
+    if cluster not in clusters:
       raise self.CommandError(EXIT_INVALID_CONFIGURATION, "Unknown cluster: %s" % cluster)
 
     apis = self.apis if enable_hooks else self.unhooked_apis
     base_class = HookedAuroraClientAPI if enable_hooks else AuroraClientAPI
 
     if cluster not in apis:
-      api = base_class(CLUSTERS[cluster], AURORA_V2_USER_AGENT_NAME, verbose=True)
+      api = base_class(clusters[cluster], AURORA_V2_USER_AGENT_NAME, verbose=True)
       apis[cluster] = api
-    return apis[cluster]
+    return add_auth_error_handler(apis[cluster])
 
   def get_job_config(self, jobkey, config_file):
     """Loads a job configuration from a config file."""

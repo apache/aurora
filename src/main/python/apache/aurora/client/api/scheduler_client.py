@@ -214,7 +214,7 @@ class SchedulerProxy(object):
   class Error(Exception): pass
   class TimeoutError(Error): pass
   class TransientError(Error): pass
-  class AuthenticationError(Error): pass
+  class AuthError(Error): pass
   class APIVersionError(Error): pass
   class ThriftInternalError(Error): pass
 
@@ -258,7 +258,7 @@ class SchedulerProxy(object):
     try:
       return self._session_key_factory(self.cluster.auth_mechanism)
     except SessionKeyError as e:
-      raise self.AuthenticationError('Unable to create session key %s' % e)
+      raise self.AuthError('Unable to create session key %s' % e)
 
   def _construct_scheduler(self):
     """
@@ -281,7 +281,7 @@ class SchedulerProxy(object):
         # turn any auth module exception into an auth error.
         log.debug('Warning: got an unknown exception during authentication:')
         log.debug(traceback.format_exc())
-        raise self.AuthenticationError('Error connecting to scheduler: %s' % e)
+        raise self.AuthError('Error connecting to scheduler: %s' % e)
     if not self._client:
       raise self.TimeoutError('Timed out trying to connect to scheduler at %s' % self.cluster.name)
 
@@ -313,6 +313,8 @@ class SchedulerProxy(object):
               raise self.APIVersionError("Client Version: %s, Server Version: %s" %
                   (THRIFT_API_VERSION, resp.serverInfo.thriftAPIVersion))
             return resp
+          except TRequestsTransport.AuthError as e:
+            raise self.AuthError(e)
           except (TTransport.TTransportException, self.TimeoutError, self.TransientError) as e:
             if not self._terminating.is_set():
               log.warning('Connection error with scheduler: %s, reconnecting...' % e)

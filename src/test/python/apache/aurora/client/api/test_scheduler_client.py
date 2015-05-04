@@ -67,15 +67,14 @@ def test_coverage():
           'No test defined for RPC %s' % rpc_name)
 
 
+SESSION = SessionKey(mechanism='test', data='test')
+
+
 class TestSchedulerProxy(scheduler_client.SchedulerProxy):
   """In testing we shouldn't use the real SSHAgentAuthenticator."""
 
   def session_key(self):
-    return self.create_session('SOME_USER')
-
-  @classmethod
-  def create_session(cls, user):
-    return SessionKey(mechanism='test', data='test')
+    return SESSION
 
 
 class TestSchedulerProxyInjection(unittest.TestCase):
@@ -100,14 +99,14 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     return TestSchedulerProxy(Cluster(name='local'))
 
   def test_startCronJob(self):
-    self.mock_thrift_client.startCronJob(IsA(JobKey), IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.startCronJob(IsA(JobKey), SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().startCronJob(JOB_KEY)
 
   def test_createJob(self):
     self.mock_thrift_client.createJob(
         IsA(JobConfiguration),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().createJob(JobConfiguration())
 
@@ -115,21 +114,21 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mock_thrift_client.replaceCronTemplate(
         IsA(JobConfiguration),
         IsA(Lock),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().replaceCronTemplate(JobConfiguration(), Lock())
 
   def test_scheduleCronJob(self):
     self.mock_thrift_client.scheduleCronJob(
         IsA(JobConfiguration),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().scheduleCronJob(JobConfiguration())
 
   def test_descheduleCronJob(self):
     self.mock_thrift_client.descheduleCronJob(
         IsA(JobKey),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().descheduleCronJob(JOB_KEY)
 
@@ -142,7 +141,7 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mock_thrift_client.restartShards(
         IsA(JobKey),
         IgnoreArg(),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().restartShards(JOB_KEY, set([0]))
 
@@ -157,7 +156,7 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.make_scheduler_proxy().getJobs(ROLE)
 
   def test_killTasks(self):
-    self.mock_thrift_client.killTasks(IsA(TaskQuery), IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.killTasks(IsA(TaskQuery), SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().killTasks(TaskQuery())
 
@@ -178,12 +177,12 @@ class TestSchedulerProxyInjection(unittest.TestCase):
       IsA(JobKey),
       IgnoreArg(),
       IsA(Lock),
-      IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+      SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().addInstances(JobKey(), {}, Lock())
 
   def test_acquireLock(self):
-    self.mock_thrift_client.acquireLock(IsA(Lock), IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.acquireLock(IsA(Lock), SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().acquireLock(Lock())
 
@@ -191,7 +190,7 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mock_thrift_client.releaseLock(
         IsA(Lock),
         IsA(LockValidation),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().releaseLock(Lock(), LockValidation())
 
@@ -208,55 +207,62 @@ class TestSchedulerProxyInjection(unittest.TestCase):
   def test_startJobUpdate(self):
     self.mock_thrift_client.startJobUpdate(
         IsA(JobUpdateRequest),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().startJobUpdate(JobUpdateRequest())
 
   def test_pauseJobUpdate(self):
-    self.mock_thrift_client.pauseJobUpdate('update_id', IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.pauseJobUpdate('update_id', SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().pauseJobUpdate('update_id')
 
   def test_resumeJobUpdate(self):
     self.mock_thrift_client.resumeJobUpdate(
         'update_id',
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().resumeJobUpdate('update_id')
 
   def test_abortJobUpdate(self):
-    self.mock_thrift_client.abortJobUpdate('update_id', IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.abortJobUpdate('update_id', SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().abortJobUpdate('update_id')
 
   def test_pulseJobUpdate(self):
-    self.mock_thrift_client.pulseJobUpdate('update_id', IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.pulseJobUpdate('update_id', SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().pulseJobUpdate('update_id')
+
+  def test_raise_auth_error(self):
+    self.mock_thrift_client.killTasks(TaskQuery(), None, None, SESSION).AndRaise(
+        TRequestsTransport.AuthError())
+    self.mox.ReplayAll()
+    with pytest.raises(scheduler_client.SchedulerProxy.AuthError):
+      self.make_scheduler_proxy().killTasks(TaskQuery(), None, None)
 
 
 class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
   def test_startMaintenance(self):
     self.mock_thrift_client.startMaintenance(
       IsA(Hosts),
-      IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+      SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().startMaintenance(Hosts())
 
   def test_drainHosts(self):
-    self.mock_thrift_client.drainHosts(IsA(Hosts), IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.drainHosts(IsA(Hosts), SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().drainHosts(Hosts())
 
   def test_maintenanceStatus(self):
     self.mock_thrift_client.maintenanceStatus(
       IsA(Hosts),
-      IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+      SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().maintenanceStatus(Hosts())
 
   def test_endMaintenance(self):
-    self.mock_thrift_client.endMaintenance(IsA(Hosts), IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.endMaintenance(IsA(Hosts), SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().endMaintenance(Hosts())
 
@@ -264,7 +270,7 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mock_thrift_client.setQuota(
         IgnoreArg(),
         IsA(ResourceAggregate),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().setQuota(ROLE, ResourceAggregate())
 
@@ -272,60 +278,60 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mock_thrift_client.forceTaskState(
         'taskid',
         IgnoreArg(),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().forceTaskState('taskid', ScheduleStatus.LOST)
 
   def test_performBackup(self):
-    self.mock_thrift_client.performBackup(IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.performBackup(SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().performBackup()
 
   def test_listBackups(self):
-    self.mock_thrift_client.listBackups(IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.listBackups(SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().listBackups()
 
   def test_stageRecovery(self):
     self.mock_thrift_client.stageRecovery(
         IsA(TaskQuery),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().stageRecovery(TaskQuery())
 
   def test_queryRecovery(self):
     self.mock_thrift_client.queryRecovery(
       IsA(TaskQuery),
-      IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+      SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().queryRecovery(TaskQuery())
 
   def test_deleteRecoveryTasks(self):
     self.mock_thrift_client.deleteRecoveryTasks(
         IsA(TaskQuery),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().deleteRecoveryTasks(TaskQuery())
 
   def test_commitRecovery(self):
-    self.mock_thrift_client.commitRecovery(IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.commitRecovery(SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().commitRecovery()
 
   def test_unloadRecovery(self):
-    self.mock_thrift_client.unloadRecovery(IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.unloadRecovery(SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().unloadRecovery()
 
   def test_snapshot(self):
-    self.mock_thrift_client.snapshot(IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.snapshot(SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().snapshot()
 
   def test_rewriteConfigs(self):
     self.mock_thrift_client.rewriteConfigs(
         IsA(RewriteConfigsRequest),
-        IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+        SESSION).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().rewriteConfigs(RewriteConfigsRequest())
 

@@ -37,6 +37,10 @@ def default_requests_session_factory():
 class TRequestsTransport(TTransportBase):
   """A Thrift HTTP client based upon the requests module."""
 
+  class AuthError(Exception):
+    """Indicates that a request failed due to an authentication or authorization problem. """
+    pass
+
   def __init__(
       self,
       uri,
@@ -57,7 +61,7 @@ class TRequestsTransport(TTransportBase):
     :keyword auth: The requests authentication context
     :type auth: requests.auth.AuthBase
     :keyword session_factory: A callable that returns a requests session
-    :type session_factory: requests.Session
+    :type session_factory: () -> requests.Session
     :keyword user_agent: The value to use for the User-Agent header
     :type user_agent: str
     """
@@ -119,7 +123,6 @@ class TRequestsTransport(TTransportBase):
     self._session.headers['Content-Length'] = str(len(data))
     self._session.headers['Host'] = self.__urlparse.hostname
 
-    response = None
     try:
       response = self._session.post(
           self.__uri,
@@ -127,17 +130,18 @@ class TRequestsTransport(TTransportBase):
           timeout=self.__timeout,
           auth=self.__auth)
       response.raise_for_status()
+      self.__rbuf = BytesIO(response.content)
     except request_exceptions.Timeout:
       raise TTransportException(
           type=TTransportException.TIMED_OUT,
           message='Timed out talking to %s' % self.__uri)
     except request_exceptions.RequestException as e:
-      if response:
-        log.debug('Error connecting, logging response headers:.')
-        for field_name, field_value in response.headers.items():
+      if e.response is not None:
+        log.debug('Request failed, response headers:')
+        for field_name, field_value in e.response.headers.items():
           log.debug('  %s: %s' % (field_name, field_value))
+        if e.response.status_code in (401, 403):
+          raise self.AuthError(e)
       raise TTransportException(
           type=TTransportException.UNKNOWN,
           message='Unknown error talking to %s: %s' % (self.__uri, e))
-
-    self.__rbuf = BytesIO(response.content)
