@@ -27,7 +27,7 @@ We encourage you to ask questions on the [Aurora developer list](http://aurora.a
  * [Generating test resources](test-resource-generation.md)
 
 ## Developers
- * [Contributing to the project](contributing.md)
+ * [Contributing to the project](../CONTRIBUTING.md)
  * [Developing the Aurora Scheduler](developing-aurora-scheduler.md)
  * [Developing the Aurora Client](developing-aurora-client.md)
  * [Committers Guide](committers.md)
