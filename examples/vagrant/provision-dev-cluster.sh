@@ -59,9 +59,6 @@ function prepare_extras() {
   popd
 
   sudo chown -R vagrant:vagrant aurora
-
-  # Install the upstart configurations.
-  cp /vagrant/examples/vagrant/upstart/*.conf /etc/init
 }
 
 function install_mesos {
@@ -115,13 +112,15 @@ rsync -urzvhl /vagrant/ /home/vagrant/aurora \
     --filter=':- /vagrant/.gitignore' \
     --exclude=.git \
     --delete
+# Install/update the upstart configurations.
+sudo cp /vagrant/examples/vagrant/upstart/*.conf /etc/init
 EOF
   chmod +x /usr/local/bin/update-sources
   update-sources
 }
 
-prepare_sources
 install_mesos
+prepare_sources
 prepare_extras
 install_cluster_config
 install_ssh_config
