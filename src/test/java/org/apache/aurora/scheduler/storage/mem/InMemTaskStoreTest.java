@@ -13,15 +13,25 @@
  */
 package org.apache.aurora.scheduler.storage.mem;
 
+import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
+import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
 import org.apache.aurora.scheduler.storage.db.DbModule;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 
 public class InMemTaskStoreTest extends AbstractTaskStoreTest {
   @Override
   protected Module getStorageModule() {
-    return Modules.combine(DbModule.testModule());
+    return Modules.combine(
+        DbModule.testModule(),
+        new AbstractModule() {
+          @Override
+          protected void configure() {
+            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
+          }
+        });
   }
 }

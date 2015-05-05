@@ -18,6 +18,7 @@ import java.util.Set;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
@@ -27,7 +28,9 @@ import com.twitter.common.base.MorePreconditions;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateKey;
+import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
+import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -53,18 +56,21 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   private final JobUpdateDetailsMapper detailsMapper;
   private final JobUpdateEventMapper jobEventMapper;
   private final JobInstanceUpdateEventMapper instanceEventMapper;
+  private final CachedCounters stats;
 
   @Inject
   DBJobUpdateStore(
       JobKeyMapper jobKeyMapper,
       JobUpdateDetailsMapper detailsMapper,
       JobUpdateEventMapper jobEventMapper,
-      JobInstanceUpdateEventMapper instanceEventMapper) {
+      JobInstanceUpdateEventMapper instanceEventMapper,
+      CachedCounters stats) {
 
     this.jobKeyMapper = requireNonNull(jobKeyMapper);
     this.detailsMapper = requireNonNull(detailsMapper);
     this.jobEventMapper = requireNonNull(jobEventMapper);
     this.instanceEventMapper = requireNonNull(instanceEventMapper);
+    this.stats = requireNonNull(stats);
   }
 
   @Timed("job_update_store_save_update")
@@ -122,9 +128,15 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
     }
   }
 
+  @VisibleForTesting
+  static String statName(JobUpdateStatus status) {
+    return "update_transition_" + status;
+  }
+
   @Timed("job_update_store_save_event")
   @Override
   public void saveJobUpdateEvent(IJobUpdateKey key, IJobUpdateEvent event) {
+    stats.get(statName(event.getStatus())).incrementAndGet();
     jobEventMapper.insert(key, event.newBuilder());
   }
 

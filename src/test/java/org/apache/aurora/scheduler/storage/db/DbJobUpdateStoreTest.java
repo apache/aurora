@@ -15,12 +15,16 @@
 package org.apache.aurora.scheduler.storage.db;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.inject.Injector;
 
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
@@ -58,6 +62,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -90,10 +95,13 @@ public class DbJobUpdateStoreTest {
       makeJobUpdateEvent(ROLLING_FORWARD, CREATED_MS);
 
   private Storage storage;
+  private FakeStatsProvider stats;
 
   @Before
   public void setUp() throws Exception {
-    storage = DbUtil.createStorage();
+    Injector injector = DbUtil.createStorageInjector();
+    storage = injector.getInstance(Storage.class);
+    stats = injector.getInstance(FakeStatsProvider.class);
   }
 
   @After
@@ -264,6 +272,15 @@ public class DbJobUpdateStoreTest {
         getUpdateDetails(updateId).get().getUpdate());
     assertEquals(event1, getUpdateDetails(updateId).get().getUpdateEvents().get(1));
     assertEquals(event2, getUpdateDetails(updateId).get().getUpdateEvents().get(2));
+    assertStats(ImmutableMap.of(ROLL_FORWARD_PAUSED, 1, ROLLING_FORWARD, 2));
+  }
+
+  private <T extends Number> void assertStats(Map<JobUpdateStatus, T> expected) {
+    Map<String, Long> statValues = Maps.newHashMap();
+    for (Map.Entry<JobUpdateStatus, T> entry : expected.entrySet()) {
+      statValues.put(DBJobUpdateStore.statName(entry.getKey()), entry.getValue().longValue());
+    }
+    assertEquals(statValues , stats.getAllValues());
   }
 
   @Test

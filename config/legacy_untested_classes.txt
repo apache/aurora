@@ -59,4 +59,5 @@ org/apache/aurora/scheduler/stats/AsyncStatsModule$OfferAdapter$1
 org/apache/aurora/scheduler/storage/log/LogStorage$RecoveryFailedException
 org/apache/aurora/scheduler/storage/mem/Util
 org/apache/aurora/scheduler/storage/mem/Util$1
+org/apache/aurora/scheduler/testing/FakeStatsProvider$3
 org/apache/aurora/scheduler/updater/UpdateConfigurationException
