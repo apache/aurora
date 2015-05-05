@@ -42,6 +42,7 @@ public class SchedulerDriverModule extends AbstractModule {
 
         bind(Scheduler.class).to(MesosSchedulerImpl.class);
         bind(MesosSchedulerImpl.class).in(Singleton.class);
+        expose(Scheduler.class);
 
         // TODO(zmanji): Create singleThreadedExecutor (non-scheduled) variant.
         bind(Executor.class).annotatedWith(MesosSchedulerImpl.SchedulerExecutor.class)

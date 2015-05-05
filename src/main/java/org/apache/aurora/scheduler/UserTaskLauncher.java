@@ -36,7 +36,8 @@ import static java.util.Objects.requireNonNull;
 /**
  * A task launcher that matches resource offers against user tasks.
  */
-class UserTaskLauncher implements TaskLauncher {
+@VisibleForTesting
+public class UserTaskLauncher implements TaskLauncher {
 
   private static final Logger LOG = Logger.getLogger(UserTaskLauncher.class.getName());
 
