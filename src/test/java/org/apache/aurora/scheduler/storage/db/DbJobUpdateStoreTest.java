@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
 import com.google.inject.Injector;
 
 import org.apache.aurora.gen.InstanceTaskConfig;
@@ -276,11 +275,11 @@ public class DbJobUpdateStoreTest {
   }
 
   private <T extends Number> void assertStats(Map<JobUpdateStatus, T> expected) {
-    Map<String, Long> statValues = Maps.newHashMap();
     for (Map.Entry<JobUpdateStatus, T> entry : expected.entrySet()) {
-      statValues.put(DBJobUpdateStore.statName(entry.getKey()), entry.getValue().longValue());
+      assertEquals(
+          entry.getValue().longValue(),
+          stats.getLongValue(DBJobUpdateStore.statName(entry.getKey())));
     }
-    assertEquals(statValues , stats.getAllValues());
   }
 
   @Test

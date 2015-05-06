@@ -72,13 +72,13 @@ public abstract class AbstractTaskStoreTest {
           ImmutableSet.of(new Attribute("zone", ImmutableSet.of("1a"))))
           .setSlaveId("slaveIdB")
           .setMode(MaintenanceMode.NONE));
-  private static final IScheduledTask TASK_A = createTask("a");
+  protected static final IScheduledTask TASK_A = createTask("a");
   private static final IScheduledTask TASK_B =
       setContainer(createTask("b"), Container.mesos(new MesosContainer()));
   private static final IScheduledTask TASK_C = createTask("c");
   private static final IScheduledTask TASK_D = createTask("d");
 
-  private Storage storage;
+  protected Storage storage;
 
   protected abstract Module getStorageModule();
 
