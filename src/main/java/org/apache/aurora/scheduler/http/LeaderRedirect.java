@@ -167,6 +167,7 @@ public class LeaderRedirect {
         default:
           LOG.severe("Multiple schedulers detected, will not redirect: " + hostSet);
           leader.set(null);
+          break;
       }
     }
   }

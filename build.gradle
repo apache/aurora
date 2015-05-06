@@ -353,6 +353,10 @@ tasks.withType(FindBugs) {
 }
 
 pmd {
+  // Avoiding gradle's upgrade of PMD since there have been regressions in some rules post-5.1.1.
+  // For example, UnusedPrivateMethod raises some obvious false positives.
+  toolVersion = '5.1.1'
+
   sourceSets = [sourceSets.main]
   // PMD rule set names match XML files stored in the PMD jar.  For example, with 5.11 you can
   // see all the rules included with:

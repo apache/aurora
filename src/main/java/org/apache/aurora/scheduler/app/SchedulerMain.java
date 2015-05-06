@@ -259,7 +259,7 @@ public class SchedulerMain extends AbstractApplication {
     appLifecycle.awaitShutdown();
   }
 
-  public static void main(String[] args) {
+  public static void main(String... args) {
     AppLauncher.launch(SchedulerMain.class, args);
   }
 }

@@ -17,6 +17,8 @@ import java.io.File;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 
+import javax.annotation.Nullable;
+
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -47,6 +49,7 @@ import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class StorageBackupTest extends EasyMockTest {
 
@@ -92,9 +95,11 @@ public class StorageBackupTest extends EasyMockTest {
     assertBackupCount(1);
     assertEquals(1, storageBackup.getSuccesses().get());
 
-    Snapshot restored = ThriftBinaryCodec.decode(
-        Snapshot.class,
-        Files.toByteArray(config.getDir().listFiles()[0]));
+    @Nullable
+    File[] files = config.getDir().listFiles();
+    assertNotNull(files);
+
+    Snapshot restored = ThriftBinaryCodec.decode(Snapshot.class, Files.toByteArray(files[0]));
     assertEquals(snapshot, restored);
   }
 

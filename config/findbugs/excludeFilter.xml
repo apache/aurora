@@ -67,10 +67,6 @@ limitations under the License.
     <Bug pattern="IS2_INCONSISTENT_SYNC" />
   </Match>
   <Match>
-    <Class name="org.apache.aurora.scheduler.storage.mem.MemAttributeStore" />
-    <Bug pattern="RV_RETURN_VALUE_OF_PUTIFABSENT_IGNORED" />
-  </Match>
-  <Match>
     <Class name="org.apache.aurora.scheduler.http.Utilization" />
     <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
   </Match>
@@ -80,7 +76,6 @@ limitations under the License.
   </Match>
   <Match>
     <Or>
-      <Class name="org.apache.aurora.scheduler.log.testing.FileLogTest" />
       <Class name="org.apache.aurora.scheduler.storage.backup.StorageBackup$StorageBackupImpl" />
       <Class name="org.apache.aurora.scheduler.storage.backup.StorageBackupTest" />
     </Or>
@@ -102,5 +97,14 @@ limitations under the License.
       <Class name="org.apache.aurora.scheduler.thrift.ThriftIT$1" />
     </Or>
     <Bug pattern="DM_DEFAULT_ENCODING" />
+  </Match>
+
+  <Match>
+    <!-- False positives on a check introduced in findbugs 3.0.1 -->
+    <Or>
+      <Class name="org.apache.aurora.scheduler.storage.db.DbStorage" />
+      <Class name="org.apache.aurora.scheduler.http.api.security.AuthorizeHeaderTokenTest" />
+    </Or>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
 </FindBugsFilter>
