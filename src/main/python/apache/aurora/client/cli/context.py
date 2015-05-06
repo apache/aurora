@@ -96,7 +96,7 @@ class AuroraCommandContext(Context):
     base_class = HookedAuroraClientAPI if enable_hooks else AuroraClientAPI
 
     if cluster not in apis:
-      api = base_class(clusters[cluster], AURORA_V2_USER_AGENT_NAME, verbose=True)
+      api = base_class(clusters[cluster], AURORA_V2_USER_AGENT_NAME, verbose=False)
       apis[cluster] = api
     return add_auth_error_handler(apis[cluster])
 
