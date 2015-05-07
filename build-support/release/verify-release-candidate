@@ -13,45 +13,77 @@
 # limitations under the License.
 #
 #
-# This script will download a release candidate and verify the gpg signature and
-# checksums.
+# Downloads a release candidate and verifies that it passes binary
+# verification (signature and checksums) and test suites.
 #
-set -e
+set -ex
+set -o nounset
+
+HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
 aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/aurora'
 
-# Get the current version string
-if [[ ! -f .auroraversion ]]; then
-  read -r -p "Apache Aurora version to verify: " current_version
-else
-  current_version=$(cat .auroraversion | tr '[a-z]' '[A-Z]')
-fi
+case $# in
+  1) verify_version="$1"
+     ;;
 
-dist_name="aurora-${current_version}"
+  *) echo "Usage: $0 RC_VERSION"
+     exit 1
+     ;;
+esac
+
+dist_name="apache-aurora-${verify_version}"
 rc_dir=${dist_name}-verify
 mkdir -p $rc_dir
 cd $rc_dir
 
-# Download KEYS file
-curl -O ${aurora_svn_dev_dist_url}/KEYS
+download_dist_file() {
+  curl -f -O ${aurora_svn_dev_dist_url}/$1
+}
+
+download_rc_file() {
+  download_dist_file ${verify_version}/$1
+}
 
 # Check and import the KEYS files
 read -r -p "Import Apache Aurora GPG KEYS? [y/n]" response
 response=${response,,}
 if [[ $response =~ ^(yes|y| ) ]]; then
+  download_dist_file KEYS
   gpg --import KEYS
 fi
 
-# Check out the rc
-svn co ${aurora_svn_dev_dist_url}/${current_version} ${rc_dir}
+download_rc_file ${dist_name}.tar.gz
+download_rc_file ${dist_name}.tar.gz.asc
+download_rc_file ${dist_name}.tar.gz.md5
+download_rc_file ${dist_name}.tar.gz.sha
 
-# Verify GPG
-gpg --verify ${dist_name}.tar.gz.asc ${dist_name}.tar.gz
+verify_archive() {
+  gpg --verify ${dist_name}.tar.gz.asc ${dist_name}.tar.gz
+  gpg --print-md MD5 ${dist_name}.tar.gz | diff - ${dist_name}.tar.gz.md5
+  shasum ${dist_name}.tar.gz | diff - ${dist_name}.tar.gz.sha
+}
 
-# Verify MD5
-gpg --print-md MD5 ${dist_name}.tar.gz | diff - ${dist_name}.tar.gz.md5
+install_gradle_wrapper() {
+  GRADLE_VERSION=$(grep GRADLE_VERSION $HERE/../../buildSrc/gradle.properties | cut -d' ' -f3)
+  curl -f -O https://downloads.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
+  unzip gradle-${GRADLE_VERSION}-bin.zip
+  gradle_path=$PWD/gradle-$GRADLE_VERSION/bin/gradle
+  pushd $1
+    $gradle_path wrapper
+  popd
+}
 
-# Verify SHA
-shasum ${dist_name}.tar.gz | diff - ${dist_name}.tar.gz.sha
+run_tests() {
+  ./build-support/jenkins/build.sh
+  ./src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh
+}
 
+verify_archive
+tar xvzf ${dist_name}.tar.gz
+install_gradle_wrapper ${dist_name}
+cd ${dist_name}
+run_tests
+
+echo 'Release candidate looks good!'
 exit 0
