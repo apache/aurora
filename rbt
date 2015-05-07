@@ -25,7 +25,8 @@ if ! [ -f "$HERE/build-support/rbt.venv/BOOTSTRAPPED" ] || \
   "$HERE/build-support/virtualenv" "$HERE/build-support/rbt.venv"
   source "$HERE/build-support/rbt.venv/bin/activate"
   # Workaround for https://groups.google.com/forum/#!topic/reviewboard/rqdoykc-rpo
-  pip install "RBTools==$RBTOOLS_VERSION" --allow-external RBTools --allow-unverified RBTools
+  python -m pip install "RBTools==$RBTOOLS_VERSION" \
+      --allow-external RBTools --allow-unverified RBTools
   echo $RBTOOLS_VERSION > "$HERE/build-support/rbt.venv/BOOTSTRAPPED"
 fi
 source "$HERE/build-support/rbt.venv/bin/activate"

@@ -24,7 +24,7 @@ if ! [ -f "$HERE/isort.venv/BOOTSTRAPPED" ] || \
   rm -fr "$HERE/isort.venv"
   "$HERE/../virtualenv" "$HERE/isort.venv"
   source "$HERE/isort.venv/bin/activate"
-  pip install "isort==$ISORT_VERSION"
+  python -m pip install "isort==$ISORT_VERSION"
   echo $ISORT_VERSION > "$HERE/isort.venv/BOOTSTRAPPED"
 fi
 

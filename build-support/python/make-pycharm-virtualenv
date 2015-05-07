@@ -25,20 +25,20 @@ pushd "$BUILDROOT"
   ./pants setup-py api/src/main/thrift/org/apache/aurora/gen:py-thrift-packaged
   ./pants setup-py api/src/main/thrift/org/apache/thermos:py-thrift
   source build-support/pants.venv/bin/activate
-    pytest_requirement=$(pip freeze | grep pytest==)
-    pytest_cov_requirement=$(pip freeze | grep pytest-cov==)
+    pytest_requirement=$(python -m pip freeze | grep pytest==)
+    pytest_cov_requirement=$(python -m pip freeze | grep pytest-cov==)
   deactivate
   rm -rf "$VENV_DIR"
   ./build-support/virtualenv "$VENV_DIR"
   source $VENV_DIR/bin/activate
     # NOTE: PyCharm navigation (ctrl-click) doesn't work without --egg - it gets confused by
     # the namespace packages in twitter.common.
-    pip install --egg -r requirements.txt
-    pip install --egg -f dist \
+    python -m pip install --egg -r requirements.txt
+    python -m pip install --egg -f dist \
       apache.gen.aurora==$(< .auroraversion) \
       apache.gen.thermos==$(<.auroraversion)
     # Use same py.test version embedded into pants
-    pip install $pytest_requirement $pytest_cov_requirement
+    python -m pip install $pytest_requirement $pytest_cov_requirement
   deactivate
 popd
 

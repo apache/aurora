@@ -35,7 +35,7 @@ if ! [ -f "$HERE/pex.venv/BOOTSTRAPPED" ] || \
   rm -fr "$HERE/pex.venv"
   "$HERE/virtualenv" "$HERE/pex.venv"
   source "$HERE/pex.venv/bin/activate"
-  pip install "twitter.common.python==$TWITTER_COMMON_PYTHON_VERSION"
+  python -m pip install "twitter.common.python==$TWITTER_COMMON_PYTHON_VERSION"
   echo $TWITTER_COMMON_PYTHON_VERSION > "$HERE"/pex.venv/BOOTSTRAPPED
 fi
 source "$HERE/pex.venv/bin/activate"

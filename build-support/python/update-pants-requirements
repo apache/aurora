@@ -23,7 +23,7 @@ PANTS_VENV_PATH="$BUILD_SUPPORT/pants-requirements.venv"
 rm -rf "$PANTS_VENV_PATH"
 "$BUILD_SUPPORT/virtualenv" "$PANTS_VENV_PATH"
 source "$PANTS_VENV_PATH/bin/activate"
-pip install pantsbuild.pants==$PANTS_VERSION
+python -m pip install pantsbuild.pants==$PANTS_VERSION
 cat <<EOF > "$BUILD_SUPPORT/pants_requirements.txt"
 #
 # This file is generated automatically. Do not modify it manually! Instead it

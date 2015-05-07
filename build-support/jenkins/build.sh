@@ -25,7 +25,7 @@ date
 export PIP_DEFAULT_TIMEOUT=60
 mkdir -p third_party
 # We omit mesos.native here since we don't actually build or use it in our unit tests.
-pip install -d third_party -r <(grep -v mesos.native 3rdparty/python/requirements.txt)
+python -m pip install -d third_party -r <(grep -v mesos.native 3rdparty/python/requirements.txt)
 
 # Run Python style checks
 ./build-support/python/isort-check

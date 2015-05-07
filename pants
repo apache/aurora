@@ -28,7 +28,7 @@ if ! [ -f "$HERE/build-support/pants.venv/BOOTSTRAPPED" ] || \
   # TODO(ksweeney): remove this hack when https://github.com/pantsbuild/pex/issues/21 is fixed.
   rm -fr "$HERE/build-support/pants.venv/local"
   source "$HERE/build-support/pants.venv/bin/activate"
-  pip install -r "$PANTS_REQUIREMENTS"
+  python -m pip install -r "$PANTS_REQUIREMENTS"
   echo $PANTS_VERSION > "$HERE/build-support/pants.venv/BOOTSTRAPPED"
 fi
 source "$HERE/build-support/pants.venv/bin/activate"
