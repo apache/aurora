@@ -23,20 +23,6 @@ HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
 aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/aurora'
 
-case $# in
-  1) verify_version="$1"
-     ;;
-
-  *) echo "Usage: $0 RC_VERSION"
-     exit 1
-     ;;
-esac
-
-dist_name="apache-aurora-${verify_version}"
-rc_dir=${dist_name}-verify
-mkdir -p $rc_dir
-cd $rc_dir
-
 download_dist_file() {
   curl -f -O ${aurora_svn_dev_dist_url}/$1
 }
@@ -45,20 +31,22 @@ download_rc_file() {
   download_dist_file ${verify_version}/$1
 }
 
-# Check and import the KEYS files
-read -r -p "Import Apache Aurora GPG KEYS? [y/n]" response
-response=${response,,}
-if [[ $response =~ ^(yes|y| ) ]]; then
-  download_dist_file KEYS
-  gpg --import KEYS
-fi
+maybe_import_gpg_keys() {
+  # Check and import the KEYS files
+  read -r -p "Import Apache Aurora GPG KEYS? [y/n]" response
+  response=${response,,}
+  if [[ $response =~ ^(yes|y| ) ]]; then
+    download_dist_file KEYS
+    gpg --import KEYS
+  fi
+}
 
-download_rc_file ${dist_name}.tar.gz
-download_rc_file ${dist_name}.tar.gz.asc
-download_rc_file ${dist_name}.tar.gz.md5
-download_rc_file ${dist_name}.tar.gz.sha
-
-verify_archive() {
+fetch_archive() {
+  local dist_name=$1
+  download_rc_file ${dist_name}.tar.gz
+  download_rc_file ${dist_name}.tar.gz.asc
+  download_rc_file ${dist_name}.tar.gz.md5
+  download_rc_file ${dist_name}.tar.gz.sha
   gpg --verify ${dist_name}.tar.gz.asc ${dist_name}.tar.gz
   gpg --print-md MD5 ${dist_name}.tar.gz | diff - ${dist_name}.tar.gz.md5
   shasum ${dist_name}.tar.gz | diff - ${dist_name}.tar.gz.sha
@@ -79,7 +67,37 @@ run_tests() {
   ./src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh
 }
 
-verify_archive
+# TODO(wfarner): Share this with make-mesos-native-egg.
+setup_tempdir() {
+  TMPDIR=""
+  cleanup() {
+    if [[ -f Vagrantfile ]]; then
+      vagrant destroy -f
+    fi
+    cd /
+    rm -fr "$TMPDIR"
+  }
+  trap cleanup EXIT
+  TMPDIR=$(mktemp -d -t "$1.XXXXX")
+}
+
+case $# in
+  1) verify_version="$1"
+     ;;
+
+  *) echo "Usage: $0 RC_VERSION"
+     exit 1
+     ;;
+esac
+
+setup_tempdir "aurora-$verify_version"
+echo "Working in sandbox $TMPDIR"
+cd $TMPDIR
+
+maybe_import_gpg_keys
+
+dist_name="apache-aurora-${verify_version}"
+fetch_archive $dist_name
 tar xvzf ${dist_name}.tar.gz
 install_gradle_wrapper ${dist_name}
 cd ${dist_name}
