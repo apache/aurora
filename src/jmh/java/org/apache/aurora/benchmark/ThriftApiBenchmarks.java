@@ -24,8 +24,10 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.twitter.common.inject.Bindings;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -146,6 +148,7 @@ public class ThriftApiBenchmarks {
             bind(CronPredictor.class).toInstance(createThrowingFake(CronPredictor.class));
             bind(QuotaManager.class).toInstance(createThrowingFake(QuotaManager.class));
             bind(LockManager.class).toInstance(createThrowingFake(LockManager.class));
+            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
           }
         },
         new DbModule(Bindings.KeyFactory.PLAIN),
