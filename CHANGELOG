@@ -1,3 +1,161 @@
+Aurora 0.8.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1106] - Release candidate script does not generate correct branch link
+    * [AURORA-1201] - auth_module is not installed in child injector
+    * [AURORA-1297] - link to apache git repo on the download page outdated
+    * [AURORA-1155] - GC executor broken / Insufficient automated testing
+    * [AURORA-1266] - Backwards incompatibility - executor does not ignore unknown (new) fields in task definition
+    * [AURORA-842] - LeaderRedirectTest#testLeader fails in local builds
+    * [AURORA-330] - aurora update should fail gracefully if job is not a service
+    * [AURORA-1134] - Quota checks are inaccurate for cron schedule updates
+    * [AURORA-1133] - Thermos Observer does not export stats via /vars
+    * [AURORA-1094] - aurora cron start --open-browser fails with stacktrace
+    * [AURORA-1263] - Fetching update details for a large job update takes seconds in the UI
+    * [AURORA-1153] - Preemptor frequently reloads loop-invariant host attributes
+    * [AURORA-1285] - Scheduler updater does not resume updates waiting for a pulse after restart
+    * [AURORA-958] - Scheduler does not retry transitions for all transient states
+    * [AURORA-1174] - make-python-sdists failing on master
+    * [AURORA-1008] - Pystachio section variables don't seem to work as described in the documentation
+    * [AURORA-1248] - Client retries 4xx errors
+    * [AURORA-1173] - JobUpdateController.systemResume() is not called on scheduler startup anymore
+    * [AURORA-1138] - aurorabuild.sh should exit on error in any command
+    * [AURORA-1137] - Publish centos mesos.native eggs for 0.20.1
+    * [AURORA-1060] - Branch coverage check is flaky
+    * [AURORA-1023] - Releasing the update lock trips off scheduler updater
+    * [AURORA-1217] - Gradle run broken
+    * [AURORA-1301] - Tests inheriting from AuroraClientCommandTest always pass
+    * [AURORA-926] - Scheduler crashes due to JVM running out of memory on start
+    * [AURORA-1020] - The --rollback-on-failure option is meaningless for "aurora job restart"
+    * [AURORA-1115] - Observer is no longer finding task sandboxes
+    * [AURORA-1165] - aurora update status subcommand shows invalid date values
+    * [AURORA-1256] - git repository references throughout aurora.apache.org are wrong
+    * [AURORA-916] - test_inotify_diskcollector is flaky
+    * [AURORA-1166] - aurora update status subcommand does not filter by update status
+    * [AURORA-1255] - Download links on aurora.apache.org point to old location
+    * [AURORA-917] - "aurora job create" gives misleading error when used to create a cron job
+    * [AURORA-1113] - Invalid create commands in the tutorial
+    * [AURORA-1176] - CommandLine uses print() directly instead of doing so through context
+    * [AURORA-991] - Documented steps for replicated log don't work for multi-master
+    * [AURORA-1053] - StorageBackupImpl doesn't use streaming
+    * [AURORA-1135] - "download" link broken in logs stdout/stderr page
+    * [AURORA-1191] - end-to-end tests no longer rebuilds components
+    * [AURORA-1108] - The scheduler synchronously writes a backup while writing a snapshot to the replicated log
+    * [AURORA-1124] - Aurora beta-update status command is broken
+    * [AURORA-823] - thermos pex GLIBC error when using py27/glibc 2.12/rhel6.4
+    * [AURORA-1309] - Build can fail if repo directory absolute path is too long
+
+## Epic
+    * [AURORA-690] - Add support for external update coordination
+    * [AURORA-999] - Various scheduler performance improvements
+    * [AURORA-905] - 0.8.0 deprecations
+    * [AURORA-1034] - Graduate Apache Aurora from Incubator
+
+## Story
+    * [AURORA-1099] - 0.7.0 missing license headers
+    * [AURORA-1187] - Create JobKey-scoped Permissions and apply to AuroraSchedulerManager
+    * [AURORA-1302] - Allow rc script to set an explicit version
+    * [AURORA-689] - Start vetting Mesos 0.21.0
+    * [AURORA-911] - Scheduling vetos are only displayed for the first task in a TaskGroup
+    * [AURORA-1093] - Scheduler updates should be uniquely identified by jobKey + updateId
+    * [AURORA-909] - Differentiate between dynamic and static vetoes
+    * [AURORA-857] - aurora cron schedule should ouput url
+    * [AURORA-974] - upgrade pants invocations once pants 0.0.25 is released
+    * [AURORA-1206] - Make update status command more versatile
+    * [AURORA-1236] - git repo on aurora.apache.org references old incubator repo which is 404
+    * [AURORA-434] - document steps to recover replica db from backup
+    * [AURORA-796] - Configurable Health-Endpoint
+    * [AURORA-524] - Preemptor should export more detailed statistics
+    * [AURORA-184] - Implicit scheduling constraints should be removed
+    * [AURORA-1001] - Support Mesos TASK_ERROR state
+    * [AURORA-1104] - Upgrade to pants 0.0.28
+    * [AURORA-1231] - Blocked updates missing from cluster-wide in progress view
+    * [AURORA-1025] - Update gc executor to read checkpoint stream from sandbox
+    * [AURORA-1024] - Implement API for dual reading Thermos checkpoints
+    * [AURORA-1028] - Export TASK_LOST source stats from Scheduler
+    * [AURORA-1027] - Update thermos cli to read checkpoint stream from sandbox
+    * [AURORA-1026] - Update observer to read checkpoint stream from sandbox
+    * [AURORA-1210] - Aurora Graduation checklist
+    * [AURORA-1299] - UpdateConfigError results in stack trace
+    * [AURORA-472] - V2 end-to-end tests stall for 5 seconds due to "large change"
+    * [AURORA-716] - Reconsider default for -require_slave_checkpoint
+    * [AURORA-1148] - Display All Scheduling Veto Reasons for PENDING tasks
+    * [AURORA-1291] - Replace enable_api_security arg with a value for http_authentication_mechanism
+    * [AURORA-1290] - Allow specifying a shorthand for "well-known" Module FQCNs
+    * [AURORA-1275] - Don't delay kill sequence when HTTP teardown signal could not be dispatched
+    * [AURORA-1189] - Add a warning in the scheduler when the JVM version is < 1.8
+    * [AURORA-1190] - Add a deprecation warning when the client-side updater is used
+    * [AURORA-979] - Update to virtualenv 12.0
+    * [AURORA-913] - Replace MaintenanceMode field with HostAttributes in HostOffer
+    * [AURORA-1204] - Update upstart configurations when syncing sources
+    * [AURORA-1306] - Upgrade to gradle 2.4
+    * [AURORA-1305] - MemTaskStore: items are not removed from secondary index
+    * [AURORA-358] - Allow executor command-line flags to be specified on the scheduler command-line
+    * [AURORA-1308] - 0.8.0 changelog contains wontfix and duplicate ticket references
+    * [AURORA-1310] - Remove blanket 'Error executing command: ' prefix from client output
+
+## Sub-task
+    * [AURORA-471] - Measure performance of the getTasks API call
+    * [AURORA-1313] - Fix broken style test cases causing PEP302
+
+## Task
+    * [AURORA-811] - Add ShiroAopModule, shiro AOP @RequiresPermissions annotations
+    * [AURORA-809] - Use Apache Shiro for HTTP authentication
+    * [AURORA-1268] - Executor is not backwards compatible with regards to schema additions
+    * [AURORA-892] - Improve specs for command line option mocks in Python tests
+    * [AURORA-1156] - Preemptor perf improvements
+    * [AURORA-1055] - Remove LiveClusterState
+    * [AURORA-549] - Export a stat to track status update handling delay
+    * [AURORA-1088] - Expose blockIfNoPulseAfterMs setting in updateSettings.html
+    * [AURORA-896] - Remove client stack trace redirection
+    * [AURORA-1128] - Pin python protobuf dependency to 2.6.1
+    * [AURORA-1129] - Upgrade myBatis version to latest
+    * [AURORA-1077] - Allow message to be stored with update write events
+    * [AURORA-1062] - apache.aurora.executor.common.HealthChecker should export stats
+    * [AURORA-195] - remove legacy remnants of "aurora" executor
+    * [AURORA-532] - Publish twitter.common.python 0.5.7 and publish external docs
+    * [AURORA-1119] - Enable UPDATE_COORDINATOR role to access pauseJobUpdate RPC
+    * [AURORA-1009] - Implement pulseJobUpdates RPC
+    * [AURORA-1010] - Modify updater state machine to support heartbeat-driven pause/resume
+    * [AURORA-1012] - Update documentation to explain the scheduler heartbeat mechanism
+    * [AURORA-1097] - Scheduler updater should suppress instance events on resume
+    * [AURORA-969] - Create scheduler performance benchmark framework
+    * [AURORA-1240] - Ignore JobUpdateSettings.maxWaitToInstanceRunningMs in the scheduler
+    * [AURORA-817] - Add documentation for HTTP basic and kerberos authentication
+    * [AURORA-1168] - beta-update list should use a hierarchy for query specifications
+    * [AURORA-1181] - optimize host_drain to speed up maintenance
+    * [AURORA-973] - Add a document describing thrift deprecation procedure
+    * [AURORA-975] - Remove populatedDEPRECATED from PopulateJobResult
+    * [AURORA-1160] - Rename beta-update to update
+    * [AURORA-1159] - NearestFix does not account for certain veto types
+    * [AURORA-1158] - Consider finding preemption slots asynchronously 
+    * [AURORA-1214] - Reevaluate "max_schedule_attempts_per_sec" with asynchronous preemptor
+    * [AURORA-1071] - Modify UpdateConfig schema to support heartbeats
+    * [AURORA-1037] - Community Vote for graduation readiness
+    * [AURORA-1246] - Mesos warns about executor resources being to small
+    * [AURORA-1170] - Add more logging in MaintenanceController
+    * [AURORA-1120] - Add the ability to optionally create an unhooked version of the Aurora client api
+    * [AURORA-1219] - Improve preemptor efficiency
+    * [AURORA-1080] - Upgrade mesos dependency to 0.21.1
+    * [AURORA-1029] - Remove client YAML support (drop pyaml dependency)
+    * [AURORA-1081] - Upgrade to latest checkstyle version
+    * [AURORA-1276] - Upgrade to mesos 0.22
+    * [AURORA-1040] - Submit Resolution to Board
+    * [AURORA-825] - Cron tasks don't check quota when launched
+    * [AURORA-723] - Create design document for security code refactor
+    * [AURORA-812] - Wire in SPNEGO HTTP module
+    * [AURORA-813] - Add ability to configure client to use Kerberos
+    * [AURORA-810] - Add an end-to-end test case for http basic auth
+    * [AURORA-808] - Refactor the scheduler to allow authenticated subject-per-request
+    * [AURORA-1090] - Optimize or remove shard uniqueness check from StorageBackfill
+    * [AURORA-885] - Improve lock held message in client output
+    * [AURORA-324] - Migrate from Twitter ShutdownRegistry to Guava ServiceManager
+    * [AURORA-1157] - Add end-to-end test coverage for async updates
+    * [AURORA-1283] - Implement a benchmark for status update processing throughput.
+    * [AURORA-1259] - Add metrics for scheduler update states
+    * [AURORA-378] - Add config grouping visualisation to job page
+
+
 Aurora 0.7.0
 --------------------------------------------------------------------------------
 ## Bug
