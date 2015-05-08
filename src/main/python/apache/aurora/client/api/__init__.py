@@ -206,7 +206,13 @@ class AuroraClientAPI(object):
     """
     return self._scheduler_proxy.abortJobUpdate(update_key, message)
 
-  def query_job_updates(self, role=None, job_key=None, user=None, update_statuses=None):
+  def query_job_updates(
+      self,
+      role=None,
+      job_key=None,
+      user=None,
+      update_statuses=None,
+      update_key=None):
     """Returns all job updates matching the query.
 
     Arguments:
@@ -214,15 +220,18 @@ class AuroraClientAPI(object):
     job_key -- job key.
     user -- user who initiated an update.
     update_statuses -- set of JobUpdateStatus to match.
+    update_key -- JobUpdateKey to match.
 
     Returns response object with all matching job update summaries.
     """
+    # TODO(wfarner): Consider accepting JobUpdateQuery in this function instead of kwargs.
     return self._scheduler_proxy.getJobUpdateSummaries(
         JobUpdateQuery(
             role=role,
             jobKey=job_key.to_thrift() if job_key else None,
             user=user,
-            updateStatuses=update_statuses))
+            updateStatuses=update_statuses,
+            key=update_key))
 
   def get_job_update_details(self, key):
     """Gets JobUpdateDetails for the specified job update ID.

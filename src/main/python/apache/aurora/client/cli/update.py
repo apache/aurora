@@ -17,6 +17,7 @@ from __future__ import print_function
 import datetime
 import json
 import textwrap
+import time
 from collections import namedtuple
 
 from apache.aurora.client.api import AuroraClientAPI
@@ -117,6 +118,15 @@ class StartUpdate(Verb):
 
   UPDATE_MSG_TEMPLATE = "Job update has started. View your update progress at %s"
 
+  WAIT_OPTION = CommandOption(
+      '--wait',
+      default=False,
+      action='store_true',
+      help='Wait until the update completes')
+
+  def __init__(self, clock=time):
+    self._clock = clock
+
   @property
   def name(self):
     return 'start'
@@ -130,7 +140,8 @@ class StartUpdate(Verb):
         MESSAGE_OPTION,
         STRICT_OPTION,
         INSTANCES_SPEC_ARGUMENT,
-        CONFIG_ARGUMENT
+        CONFIG_ARGUMENT,
+        self.WAIT_OPTION
     ]
 
   @property
@@ -166,13 +177,73 @@ class StartUpdate(Verb):
         err_msg="Failed to start update due to error:")
 
     if resp.result:
+      update_key = resp.result.startJobUpdateResult.key
       url = get_update_page(
         api,
-        AuroraJobKey.from_thrift(config.cluster(), resp.result.startJobUpdateResult.key.job),
+        AuroraJobKey.from_thrift(config.cluster(), update_key.job),
         resp.result.startJobUpdateResult.key.id)
       context.print_out(self.UPDATE_MSG_TEMPLATE % url)
+
+      if context.options.wait:
+        wait_for_update(context, self._clock, api, update_key)
     else:
       context.print_out(combine_messages(resp))
+
+    return EXIT_OK
+
+
+def wait_for_update(context, clock, api, update_key):
+  cur_state = None
+
+  while True:
+    resp = api.query_job_updates(update_key=update_key)
+    context.log_response_and_raise(resp)
+    summaries = resp.result.getJobUpdateSummariesResult.updateSummaries
+    if len(summaries) == 1:
+      new_state = summaries[0].state.status
+      if new_state != cur_state:
+        cur_state = new_state
+        context.print_out('Current state %s' % JobUpdateStatus._VALUES_TO_NAMES[cur_state])
+        if cur_state not in ACTIVE_JOB_UPDATE_STATES:
+          break
+      clock.sleep(5)
+    elif len(summaries) == 0:
+      raise context.CommandError(EXIT_INVALID_PARAMETER, 'Job update not found.')
+    else:
+      raise context.CommandError(
+          EXIT_API_ERROR,
+          'Scheduler returned multiple updates: %s' % summaries)
+
+
+UPDATE_ID_ARGUMENT = CommandOption(
+    'id',
+    type=str,
+    nargs='?',
+    metavar='ID',
+    help='Update identifier provided by the scheduler when an update was started.')
+
+
+class UpdateWait(Verb):
+  def __init__(self, clock=time):
+    self._clock = clock
+
+  @property
+  def name(self):
+    return 'wait'
+
+  def get_options(self):
+    return [JOBSPEC_ARGUMENT, UPDATE_ID_ARGUMENT]
+
+  @property
+  def help(self):
+    return 'Block until an update has entered a terminal state.'
+
+  def execute(self, context):
+    wait_for_update(
+        context,
+        self._clock,
+        context.get_api(context.options.jobspec.cluster),
+        JobUpdateKey(job=context.options.jobspec.to_thrift(), id=context.options.id))
     return EXIT_OK
 
 
@@ -186,7 +257,7 @@ class PauseUpdate(Verb):
 
   @property
   def help(self):
-    return """Pause an update."""
+    return 'Pause an update.'
 
   def execute(self, context):
     job_key = context.options.jobspec
@@ -205,7 +276,7 @@ class ResumeUpdate(Verb):
 
   @property
   def help(self):
-    return """Resume an update."""
+    return 'Resume an update.'
 
   def execute(self, context):
     job_key = context.options.jobspec
@@ -224,7 +295,7 @@ class AbortUpdate(Verb):
 
   @property
   def help(self):
-    return """Abort an in-progress update."""
+    return 'Abort an in-progress update.'
 
   def execute(self, context):
     job_key = context.options.jobspec
@@ -365,19 +436,12 @@ updates matching any of the specified statuses will be included."""),
 
 class UpdateInfo(Verb):
 
-  UPDATE_ID_ARGUMENT = CommandOption(
-      'id',
-      type=str,
-      nargs='?',
-      metavar='ID',
-      help='Update identifier provided by the scheduler when an update was started.')
-
   @property
   def name(self):
     return 'info'
 
   def get_options(self):
-    return [JSON_WRITE_OPTION, JOBSPEC_ARGUMENT, self.UPDATE_ID_ARGUMENT]
+    return [JSON_WRITE_OPTION, JOBSPEC_ARGUMENT, UPDATE_ID_ARGUMENT]
 
   @property
   def help(self):
@@ -484,3 +548,4 @@ class Update(Noun):
     self.register_verb(AbortUpdate())
     self.register_verb(ListUpdates())
     self.register_verb(UpdateInfo())
+    self.register_verb(UpdateWait())

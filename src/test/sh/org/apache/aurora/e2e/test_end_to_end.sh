@@ -146,25 +146,6 @@ assert_update_state() {
   fi
 }
 
-await_update_finished() {
-  local _jobkey=$1
-
-  local _matched=0
-  for i in $(seq 1 120); do
-    if [[ $(aurora update list $_jobkey --status active | wc -l) -eq 0 ]]; then
-      _matched=1
-      break
-    else
-      sleep 1
-    fi
-  done
-
-  if [[ $_matched -ne 1 ]]; then
-    echo "Timed out while waiting for update $_jobkey"
-    exit 1
-  fi
-}
-
 test_update() {
   local _jobkey=$1 _config=$2 _cluster=$3
 
@@ -178,8 +159,7 @@ test_update() {
   assert_update_state $_jobkey 'ROLL_FORWARD_PAUSED'
   aurora update resume $_jobkey
   assert_update_state $_jobkey 'ROLLING_FORWARD'
-
-  await_update_finished $_jobkey
+  aurora update wait $_jobkey $_update_id
 
   # Check that the update ended in ROLLED_FORWARD state.  Assumes the status is the last column.
   local status=$(aurora update info $_jobkey $_update_id | grep 'Current status' | awk '{print $NF}')
