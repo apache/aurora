@@ -17,14 +17,12 @@ import unittest
 
 import pytest
 from mock import call, Mock, patch
-from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.cli import Context
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.jobs import KillCommand
+from apache.aurora.client.cli.jobs import KillAllJobCommand, KillCommand
 from apache.aurora.client.cli.options import parse_instances, TaskInstanceKey
-from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 
@@ -55,11 +53,8 @@ class TestKillCommand(AuroraClientCommandTest):
   def test_kill_lock_error_nobatch(self):
     """Verify that the no batch code path correctly includes the lock error message."""
     command = KillCommand()
-
-    jobkey = AuroraJobKey("cluster", "role", "env", "job")
-
     mock_options = mock_verb_options(command)
-    mock_options.instance_spec = TaskInstanceKey(jobkey, [])
+    mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [])
     mock_options.no_batching = True
 
     fake_context = FakeAuroraCommandContext()
@@ -72,17 +67,18 @@ class TestKillCommand(AuroraClientCommandTest):
     with pytest.raises(Context.CommandError):
       command.execute(fake_context)
 
-    mock_api.kill_job.assert_called_once_with(jobkey, mock_options.instance_spec.instance)
+    mock_api.kill_job.assert_called_once_with(
+        self.TEST_JOBKEY,
+        mock_options.instance_spec.instance,
+        config=None)
+
     self.assert_lock_message(fake_context)
 
   def test_kill_lock_error_batches(self):
     """Verify that the batch kill path short circuits and includes the lock error message."""
     command = KillCommand()
-
-    jobkey = AuroraJobKey("cluster", "role", "env", "job")
-
     mock_options = mock_verb_options(command)
-    mock_options.instance_spec = TaskInstanceKey(jobkey, [1])
+    mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [1])
     mock_options.no_batching = False
 
     fake_context = FakeAuroraCommandContext()
@@ -99,17 +95,18 @@ class TestKillCommand(AuroraClientCommandTest):
     with pytest.raises(Context.CommandError):
       command.execute(fake_context)
 
-    mock_api.kill_job.assert_called_once_with(jobkey, mock_options.instance_spec.instance)
+    mock_api.kill_job.assert_called_once_with(
+        self.TEST_JOBKEY,
+        mock_options.instance_spec.instance,
+        config=None)
+
     self.assert_lock_message(fake_context)
 
   def test_kill_inactive_instance_spec(self):
     """Verify the instance spec is validated in a batched kill."""
     command = KillCommand()
-
-    jobkey = AuroraJobKey("cluster", "role", "env", "job")
-
     mock_options = mock_verb_options(command)
-    mock_options.instance_spec = TaskInstanceKey(jobkey, [1])
+    mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [1])
     mock_options.no_batching = False
     mock_options.strict = True
 
@@ -125,11 +122,8 @@ class TestKillCommand(AuroraClientCommandTest):
   def test_kill_batched_queries_active_instances(self):
     """Verify that the batch kill operates on active instances only."""
     command = KillCommand()
-
-    jobkey = AuroraJobKey("cluster", "role", "env", "job")
-
     mock_options = mock_verb_options(command)
-    mock_options.instance_spec = TaskInstanceKey(jobkey, [1])
+    mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [1])
     mock_options.no_batching = False
 
     fake_context = FakeAuroraCommandContext()
@@ -138,16 +132,14 @@ class TestKillCommand(AuroraClientCommandTest):
     fake_context.add_expected_query_result(AuroraClientCommandTest.create_empty_task_result())
 
     command.execute(fake_context)
-    assert fake_context.get_err()[0] == "No tasks to kill found for job cluster/role/env/job"
+    message = "No tasks to kill found for job %s" % self.TEST_JOBKEY.to_path()
+    assert fake_context.get_err()[0] == message
 
   def test_kill_opens_url(self):
     """Verify the kill commands opens the job page if requested"""
     command = KillCommand()
-
-    jobkey = AuroraJobKey("cluster", "role", "env", "job")
-
     mock_options = mock_verb_options(command)
-    mock_options.instance_spec = TaskInstanceKey(jobkey, [1])
+    mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [1])
     mock_options.open_browser = True
 
     fake_context = FakeAuroraCommandContext()
@@ -158,8 +150,83 @@ class TestKillCommand(AuroraClientCommandTest):
     command.execute(fake_context)
 
     assert self.mock_webbrowser.mock_calls == [
-        call("http://something_or_other/scheduler/role/env/job")
+        call("http://something_or_other/scheduler/bozo/test/hello")
     ]
+
+  def test_kill_nobatch_passes_config(self):
+    """Verify that the no batch code path correctly passes job config to the api."""
+    command = KillCommand()
+    config = self.get_valid_config()
+
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [])
+    mock_options.no_batching = True
+    mock_options.config = config
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+    fake_context.add_config(config)
+
+    mock_api = fake_context.get_api('test')
+    fake_context.add_expected_query_result(AuroraClientCommandTest.create_empty_task_result())
+    mock_api.kill_job.return_value = self.create_simple_success_response()
+
+    command.execute(fake_context)
+
+    assert mock_api.kill_job.mock_calls == [
+        call(self.TEST_JOBKEY, mock_options.instance_spec.instance, config=config)
+    ]
+
+  def test_kill_batched_passes_config(self):
+    """Verify that the batched code path correctly passes job config to the api."""
+    command = KillCommand()
+    config = self.get_valid_config()
+
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [1])
+    mock_options.no_batching = False
+    mock_options.config = config
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+    fake_context.add_config(config)
+
+    fake_context.add_expected_query_result(
+      AuroraClientCommandTest.create_query_call_result(
+        AuroraClientCommandTest.create_scheduled_task(1, ScheduleStatus.RUNNING)))
+
+    mock_api = fake_context.get_api('test')
+    mock_api.kill_job.return_value = self.create_simple_success_response()
+
+    command.execute(fake_context)
+
+    assert mock_api.kill_job.mock_calls == [
+        call(self.TEST_JOBKEY, mock_options.instance_spec.instance, config=config)
+    ]
+
+
+class TestKillAllCommand(AuroraClientCommandTest):
+  def test_killall_nobatch_passes_config(self):
+    """Verify that the no batch code path correctly passes job config to the api."""
+    command = KillAllJobCommand()
+    config = self.get_valid_config()
+
+    mock_options = mock_verb_options(command)
+    mock_options.jobspec = self.TEST_JOBKEY
+    mock_options.no_batching = True
+    mock_options.config = config
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+    fake_context.add_config(config)
+
+    mock_api = fake_context.get_api('test')
+    fake_context.add_expected_query_result(AuroraClientCommandTest.create_empty_task_result())
+    mock_api.kill_job.return_value = self.create_simple_success_response()
+
+    command.execute(fake_context)
+
+    assert mock_api.kill_job.mock_calls == [call(self.TEST_JOBKEY, None, config=config)]
 
 
 class TestClientKillCommand(AuroraClientCommandTest):
@@ -181,9 +248,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
   @classmethod
   def assert_kill_calls(cls, api, instance_range=None, instances=None):
     if instances:
-      kill_calls = [call(AuroraJobKey.from_path(cls.TEST_JOBSPEC), instances)]
+      kill_calls = [call(cls.TEST_JOBKEY, instances, config=None)]
     else:
-      kill_calls = [call(AuroraJobKey.from_path(cls.TEST_JOBSPEC), [i]) for i in instance_range]
+      kill_calls = [call(cls.TEST_JOBKEY, [i], config=None) for i in instance_range]
     assert api.kill_job.mock_calls == kill_calls
 
   @classmethod
@@ -196,7 +263,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_kill_call_no_instances(cls, api):
-    assert api.kill_job.mock_calls == call((AuroraJobKey.from_path(cls.TEST_JOBSPEC), None))
+    assert api.kill_job.mock_calls == [call(cls.TEST_JOBKEY, None, config=None)]
 
   @classmethod
   def assert_query(cls, fake_api):
@@ -213,12 +280,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'killall', '--no-batching', '--config=%s' % fp.name, self.TEST_JOBSPEC])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'killall', '--no-batching', self.TEST_JOBSPEC])
 
       self.assert_kill_call_no_instances(api)
       assert mock_monitor.wait_until.mock_calls == [
@@ -237,11 +300,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
       mock_context.add_expected_query_result(
           self.create_query_call_result(), job_key=self.TEST_JOBKEY)
 
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'killall', '--config=%s' % fp.name, self.TEST_JOBSPEC])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'killall', self.TEST_JOBSPEC])
 
       self.assert_kill_calls(api, instance_range=range(20))
       self.assert_wait_calls(mock_monitor, m.terminal, instance_range=range(20))
@@ -256,13 +316,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)) as (_, m):
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--no-batching',
-            self.get_instance_spec('0,2,4-6')])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'kill', '--no-batching', self.get_instance_spec('0,2,4-6')])
 
       instances = [0, 2, 4, 5, 6]
       self.assert_kill_calls(api, instances=instances)
@@ -275,13 +330,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--no-batching', '--strict',
-             self.get_instance_spec('0,2,4-6,11-20')])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'kill', '--no-batching', '--strict',
+           self.get_instance_spec('0,2,4-6,11-20')])
 
       assert api.kill_job.call_count == 0
 
@@ -294,14 +345,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)) as (_, m):
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--no-batching',
-             self.get_instance_spec('0,2,4-6,11-13')])
-
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'kill', '--no-batching', self.get_instance_spec('0,2,4-6,11-13')])
       instances = [0, 2, 4, 5, 6, 11, 12, 13]
       self.assert_kill_calls(api, instances=instances)
       self.assert_wait_calls(mock_monitor, m.terminal, instances=instances)
@@ -318,12 +363,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
           self.create_query_call_result(), job_key=self.TEST_JOBKEY)
 
       api.kill_job.return_value = self.create_simple_success_response()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--config=%s' % fp.name, self.get_instance_spec('0-6')])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'kill', self.get_instance_spec('0-6')])
 
       self.assert_kill_calls(api, instance_range=range(7))
       self.assert_wait_calls(mock_monitor, m.terminal, instance_range=range(7))
@@ -341,13 +382,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
           self.create_query_call_result(), job_key=self.TEST_JOBKEY)
 
       api.kill_job.return_value = self.create_simple_success_response()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--max-total-failures=1', '--config=%s' % fp.name,
-            self.get_instance_spec('0-4')])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'kill', '--max-total-failures=1', self.get_instance_spec('0-4')])
 
       # We should have aborted after the second batch.
       self.assert_kill_calls(api, instance_range=range(2))
@@ -364,12 +400,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
       status_response.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[]))
       mock_context.add_expected_query_result(status_response)
       api.kill_job.return_value = self.create_simple_success_response()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--config=%s' % fp.name, self.get_instance_spec('0,2,4-13')])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'kill', self.get_instance_spec('0,2,4-13')])
 
       assert api.kill_job.call_count == 0
 
@@ -382,11 +414,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
 
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'killall', '--no-batching', '--config=%s' % fp.name, self.TEST_JOBSPEC])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'killall', '--no-batching', self.TEST_JOBSPEC])
 
       assert mock_context.get_out() == ['Job killall succeeded']
       assert mock_context.get_err() == []
@@ -400,13 +429,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
       api = mock_context.get_api('west')
       mock_context.add_expected_query_result(self.create_query_call_result())
       api.kill_job.return_value = self.create_simple_success_response()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--batch-size=5',
-                     self.get_instance_spec('0,2,4-6')])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'kill', '--batch-size=5', self.get_instance_spec('0,2,4-6')])
 
     assert mock_context.get_out() == ['Successfully killed instances [0, 2, 4, 5, 6]',
         'Job kill succeeded']
@@ -422,13 +446,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
       api = mock_context.get_api('west')
       mock_context.add_expected_query_result(self.create_query_call_result())
       api.kill_job.return_value = self.create_simple_success_response()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--max-total-failures=1', '--config=%s' % fp.name,
-                     '--batch-size=5', self.get_instance_spec('0,2,4-13')])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'kill', '--max-total-failures=1', '--batch-size=5',
+          self.get_instance_spec('0,2,4-13')])
 
       assert mock_context.get_out() == []
       assert mock_context.get_err() == [

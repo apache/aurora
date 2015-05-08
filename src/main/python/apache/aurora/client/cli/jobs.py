@@ -295,9 +295,9 @@ class InspectCommand(Verb):
 class AbstractKillCommand(Verb):
   def get_options(self):
     return [BROWSER_OPTION,
-        CommandOption("--config", type=str, default=None, dest="config",
-            metavar="pathname",
-            help="Config file for the job, possibly containing hooks"),
+        BIND_OPTION,
+        JSON_READ_OPTION,
+        CONFIG_OPTION,
         BATCH_OPTION,
         MAX_TOTAL_FAILURES_OPTION,
         NO_BATCHING_OPTION]
@@ -309,7 +309,7 @@ class AbstractKillCommand(Verb):
       return EXIT_TIMEOUT
     return EXIT_OK
 
-  def kill_in_batches(self, context, job, instances_arg):
+  def kill_in_batches(self, context, job, instances_arg, config):
     api = context.get_api(job.cluster)
     # query the job, to get the list of active instances.
     tasks = context.get_active_instances(job)
@@ -326,7 +326,7 @@ class AbstractKillCommand(Verb):
       batch = []
       for i in range(min(context.options.batch_size, len(instances_to_kill))):
         batch.append(instances_to_kill.pop())
-      resp = api.kill_job(job, batch)
+      resp = api.kill_job(job, batch, config=config)
       # Short circuit max errors in this case as it's most likely a fatal repeatable error.
       context.log_response_and_raise(
         resp,
@@ -365,14 +365,15 @@ class KillCommand(AbstractKillCommand):
     if context.options.strict:
       context.verify_instances_option_validity(job, instances_arg)
     api = context.get_api(job.cluster)
+    config = context.get_job_config_optional(job, context.options.config)
     if context.options.no_batching:
-      resp = api.kill_job(job, instances_arg)
+      resp = api.kill_job(job, instances_arg, config=config)
       context.log_response_and_raise(resp)
       wait_result = self.wait_kill_tasks(context, api.scheduler_proxy, job, instances_arg)
       if wait_result is not EXIT_OK:
         return wait_result
     else:
-      self.kill_in_batches(context, job, instances_arg)
+      self.kill_in_batches(context, job, instances_arg, config)
     if context.options.open_browser:
       webbrowser.open_new_tab(get_job_page(api, job))
     context.print_out("Job kill succeeded")
@@ -394,14 +395,15 @@ class KillAllJobCommand(AbstractKillCommand):
   def execute(self, context):
     job = context.options.jobspec
     api = context.get_api(job.cluster)
+    config = context.get_job_config_optional(job, context.options.config)
     if context.options.no_batching:
-      resp = api.kill_job(job, None)
+      resp = api.kill_job(job, None, config=config)
       context.log_response_and_raise(resp)
       wait_result = self.wait_kill_tasks(context, api.scheduler_proxy, job)
       if wait_result is not EXIT_OK:
         return wait_result
     else:
-      self.kill_in_batches(context, job, None)
+      self.kill_in_batches(context, job, None, config)
     if context.options.open_browser:
       webbrowser.open_new_tab(get_job_page(api, job))
     context.print_out("Job killall succeeded")
@@ -500,8 +502,7 @@ class RestartCommand(Verb):
     if instances is not None and context.options.strict:
       context.verify_instances_option_validity(job, instances)
     api = context.get_api(job.cluster)
-    config = (context.get_job_config(job, context.options.config)
-        if context.options.config else None)
+    config = context.get_job_config_optional(job, context.options.config)
     updater_config = UpdaterConfig(
         context.options.batch_size,
         context.options.restart_threshold,
@@ -687,16 +688,14 @@ class CancelUpdateCommand(Verb):
 
   def get_options(self):
     return [JSON_READ_OPTION,
-        CommandOption("--config", type=str, default=None, dest="config_file",
-            metavar="pathname",
-            help="Config file for the job, possibly containing hooks"),
+        BIND_OPTION,
+        CONFIG_OPTION,
         JOBSPEC_ARGUMENT]
 
   def execute(self, context):
     context.print_err(CLIENT_UPDATER_DEPRECATION)
     api = context.get_api(context.options.jobspec.cluster)
-    config = (context.get_job_config(context.options.jobspec, context.options.config_file)
-        if context.options.config_file else None)
+    config = context.get_job_config_optional(context.options.jobspec, context.options.config)
     resp = api.cancel_update(context.options.jobspec, config=config)
     context.log_response_and_raise(resp)
     return EXIT_OK

@@ -66,6 +66,7 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     self.task_result = []
     self.out = []
     self.err = []
+    self.config = None
 
   def get_api(self, cluster):
     return self.fake_api
@@ -88,6 +89,12 @@ class FakeAuroraCommandContext(AuroraCommandContext):
   def print_err(self, msg, indent=0):
     indent_str = " " * indent
     self.err.append("%s%s" % (indent_str, msg))
+
+  def get_job_config(self, jobkey, config_file):
+    if not self.config:
+      return super(FakeAuroraCommandContext, self).get_job_config(jobkey, config_file)
+    else:
+      return self.config
 
   def get_out(self):
     return self.out
@@ -113,6 +120,9 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     self.task_result.append(expected_result)
     # each call adds an expected query result, in order.
     self.fake_api.scheduler_proxy.getTasksWithoutConfigs.side_effect = self.task_result
+
+  def add_config(self, config):
+    self.config = config
 
 
 class AuroraClientCommandTest(unittest.TestCase):

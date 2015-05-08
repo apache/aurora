@@ -12,28 +12,16 @@
 # limitations under the License.
 #
 
-from mock import patch
-from twitter.common.contextutil import temporary_file
+from mock import call, patch
 
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
-from gen.apache.aurora.api.ttypes import JobKey, TaskQuery
+from gen.apache.aurora.api.ttypes import JobKey, Lock, LockKey, LockValidation, TaskQuery
 
 
 class TestClientCancelUpdateCommand(AuroraClientCommandTest):
-
-  @classmethod
-  def assert_cancel_update_called(cls, mock_api):
-    # Running cancel update should result in calling the API cancel_update
-    # method once, with an AuroraJobKey parameter.
-    assert mock_api.cancel_update.call_count == 1
-    mock_api.cancel_update.assert_called_with(
-        AuroraJobKey(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB),
-        config=None)
-
   def test_simple_successful_cancel_update(self):
     """Run a test of the "kill" command against a mocked-out API:
     Verifies that the kill command sends the right API RPCs, and performs the correct
@@ -43,8 +31,8 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
     mock_api.cancel_update.return_value = self.create_simple_success_response()
     with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
-      cmd.execute(['job', 'cancel-update', 'west/bozo/test/hello'])
-      self.assert_cancel_update_called(mock_api)
+      cmd.execute(['job', 'cancel-update', self.TEST_JOBSPEC])
+      assert mock_api.cancel_update.mock_calls == [call(self.TEST_JOBKEY, config=None)]
 
   @classmethod
   def get_expected_task_query(cls, shards=None):
@@ -65,14 +53,10 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_scheduler_proxy.releaseLock.return_value = self.get_release_lock_response()
     with patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy):
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        cmd.execute(['job', 'cancel-update', 'west/mchucarroll/test/hello'])
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'cancel-update', self.TEST_JOBSPEC])
 
       # All that cancel_update really does is release the update lock.
       # So that's all we really need to check.
-      assert mock_scheduler_proxy.releaseLock.call_count == 1
-      assert mock_scheduler_proxy.releaseLock.call_args[0][0].key.job == JobKey(environment='test',
-          role='mchucarroll', name='hello')
+      assert mock_scheduler_proxy.releaseLock.mock_calls == [
+          call(Lock(key=LockKey(job=self.TEST_JOBKEY.to_thrift())), LockValidation.UNCHECKED)]

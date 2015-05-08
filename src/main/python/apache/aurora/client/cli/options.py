@@ -168,14 +168,16 @@ BIND_OPTION = CommandOption('--bind', dest='bindings',
 
 BROWSER_OPTION = CommandOption('--open-browser', default=False, dest='open_browser',
     action='store_true',
-    help='open browser to view job page after job is created')
+    help='Open browser to view job page after job is created')
 
 
 CONFIG_ARGUMENT = CommandOption('config_file', type=str, metavar="pathname",
-    help='pathname of the aurora configuration file contain the job specification')
+    help='Pathname of the aurora configuration file contain the job specification')
+
 
 CONFIG_OPTION = CommandOption('--config', type=str, default=None, metavar="pathname",
-    help='pathname of the aurora configuration file contain the job specification')
+    help='Pathname of the aurora configuration file containing job specification'
+        'and possibly API hook definitions')
 
 EXECUTOR_SANDBOX_OPTION = CommandOption('--executor-sandbox', action='store_true',
      default=False, help='Run the command in the executor sandbox instead of the task sandbox')

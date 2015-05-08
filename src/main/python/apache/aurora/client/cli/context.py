@@ -100,6 +100,10 @@ class AuroraCommandContext(Context):
       apis[cluster] = api
     return add_auth_error_handler(apis[cluster])
 
+  def get_job_config_optional(self, jobkey, config_file):
+    """Loads a job configuration if provided."""
+    return self.get_job_config(jobkey, config_file) if config_file is not None else None
+
   def get_job_config(self, jobkey, config_file):
     """Loads a job configuration from a config file."""
     jobname = jobkey.name
