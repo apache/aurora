@@ -368,7 +368,7 @@ class TestAbortUpdate(AuroraClientCommandTest):
     with pytest.raises(Context.CommandError) as error:
       self._command.execute(self._fake_context)
       assert error.message == (
-        'Error executing command: scheduler returned multiple active updates for this job.')
+        'scheduler returned multiple active updates for this job.')
 
     assert self._mock_api.query_job_updates.mock_calls == [
       call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]

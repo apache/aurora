@@ -404,7 +404,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         assert result == EXIT_INVALID_CONFIGURATION
       assert mock_context.get_out() == []
       assert mock_context.get_err() == [
-            "Error executing command: Error loading configuration: "
+            "Error loading configuration: "
             "TypeCheck(FAILED): MesosJob[update_config] failed: "
             "UpdateConfig[batch_size] failed: u'{{TEST_BATCH}}' not an integer"]
 

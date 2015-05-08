@@ -65,7 +65,7 @@ class UpdateController(object):
       else:
         raise self.context.CommandError(
             EXIT_API_ERROR,
-            "scheduler returned multiple active updates for this job.")
+            "The scheduler returned multiple active updates for this job.")
     else:
       return None
 

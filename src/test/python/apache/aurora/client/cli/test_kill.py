@@ -434,4 +434,4 @@ class TestClientKillCommand(AuroraClientCommandTest):
       assert mock_context.get_err() == [
          'Instances [0, 2, 4, 5, 6] were not killed in time',
          'Instances [7, 8, 9, 10, 11] were not killed in time',
-         'Error executing command: Exceeded maximum number of errors while killing instances']
+         'Exceeded maximum number of errors while killing instances']
