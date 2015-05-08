@@ -22,8 +22,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
@@ -86,6 +88,7 @@ public class UpdateStoreBenchmarks {
             @Override
             protected void configure() {
               bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
+              bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             }
           },
           DbModule.testModule());
