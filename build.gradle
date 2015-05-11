@@ -257,7 +257,7 @@ dependencies {
   compile "com.google.inject:guice:${guiceRev}"
   compile "com.google.inject.extensions:guice-assistedinject:${guiceRev}"
   compile 'com.google.protobuf:protobuf-java:2.5.0'
-  compile 'com.h2database:h2:1.4.177'
+  compile 'com.h2database:h2:1.4.187'
   compile "com.sun.jersey:jersey-core:${jerseyRev}"
   compile "com.sun.jersey:jersey-json:${jerseyRev}"
   compile "com.sun.jersey:jersey-server:${jerseyRev}"
@@ -469,7 +469,7 @@ jmh {
     include = project.getProperty('benchmarks')
   }
   jmhVersion = '1.7.1'
-  jvmArgsPrepend = '-Xmx2g'
+  jvmArgsPrepend = '-Xmx3g'
   humanOutputFile = project.file("$jmhHumanOutputPath")
   resultsFile = project.file("$buildDir/reports/jmh/results.txt")
 }

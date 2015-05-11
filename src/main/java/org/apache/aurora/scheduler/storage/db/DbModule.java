@@ -81,7 +81,8 @@ public class DbModule extends PrivateModule {
 
   private DbModule(KeyFactory keyFactory, String jdbcSchema) {
     this.keyFactory = requireNonNull(keyFactory);
-    this.jdbcSchema = requireNonNull(jdbcSchema);
+    // We always disable the MvStore, as it is in beta as of this writing.
+    this.jdbcSchema = jdbcSchema + ";MV_STORE=false";
   }
 
   public DbModule(KeyFactory keyFactory) {
