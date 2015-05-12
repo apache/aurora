@@ -273,7 +273,7 @@ west/bozo/test/hello                            update_id                       
         {
             "status": "ROLLED_FORWARD",
             "started": "1970-01-17T08:03:24",
-            "lastModified": "1970-06-13T08:34:16",
+            "last_modified": "1970-06-13T08:34:16",
             "user": "me",
             "job": "west/bozo/test/hello",
             "id": "update_id"
@@ -281,7 +281,7 @@ west/bozo/test/hello                            update_id                       
         {
             "status": "ROLLED_FORWARD",
             "started": "1970-01-17T08:03:24",
-            "lastModified": "1970-06-13T08:34:16",
+            "last_modified": "1970-06-13T08:34:16",
             "user": "me",
             "job": "west/bozo/test/hello",
             "id": "update_id"
@@ -289,7 +289,7 @@ west/bozo/test/hello                            update_id                       
         {
             "status": "ROLLED_FORWARD",
             "started": "1970-01-17T08:03:24",
-            "lastModified": "1970-06-13T08:34:16",
+            "last_modified": "1970-06-13T08:34:16",
             "user": "me",
             "job": "west/bozo/test/hello",
             "id": "update_id"
@@ -530,7 +530,7 @@ Instance events:
     ]
     assert json.loads(self._fake_context.get_out_str()) == {
         "status": "ROLLING_FORWARD",
-        "last_updated": 2000,
+        "last_modified": "1970-01-01T00:00:02",
         "started": 1000,
         "update_events": [
             {

@@ -414,7 +414,7 @@ updates matching any of the specified statuses will be included."""),
             "id": summary.key.id,
             "user": summary.user,
             "started": format_timestamp(summary.state.createdTimestampMs),
-            "lastModified": format_timestamp(summary.state.lastModifiedTimestampMs),
+            "last_modified": format_timestamp(summary.state.lastModifiedTimestampMs),
             "status": JobUpdateStatus._VALUES_TO_NAMES[summary.state.status]
         }
         result.append(job_entry)
@@ -470,7 +470,7 @@ class UpdateInfo(Verb):
         "updateId": ("%s" % details.update.summary.key.id),
         "job": str(context.options.jobspec),
         "started": details.update.summary.state.createdTimestampMs,
-        "last_updated": details.update.summary.state.lastModifiedTimestampMs,
+        "last_modified": format_timestamp(details.update.summary.state.lastModifiedTimestampMs),
         "status": JobUpdateStatus._VALUES_TO_NAMES[details.update.summary.state.status],
         "update_events": [],
         "instance_update_events": []
