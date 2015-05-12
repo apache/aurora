@@ -42,8 +42,8 @@ allprojects {
   }
 
   compileJava {
-    sourceCompatibility = 1.7
-    targetCompatibility = 1.7
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
   }
 
   group 'org.apache.aurora'
@@ -163,6 +163,8 @@ project(':api') {
 
   idea {
     module {
+      jdkName = '1.8'
+
       [thrift.genJavaDir, thriftEntities.genJavaDir].each {
         sourceDirs += it
         generatedSourceDirs += it

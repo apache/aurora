@@ -138,9 +138,12 @@ public class StorageBackupTest extends EasyMockTest {
     assertBackupCount(MAX_BACKUPS);
     assertEquals(MAX_BACKUPS + 1, storageBackup.getSuccesses().get());
     List<String> backupNames = nameBuilder.build();
+
+    File[] files = config.getDir().listFiles();
+    assertNotNull(files);
     assertEquals(
         ImmutableSet.copyOf(backupNames.subList(1, backupNames.size())),
-        FluentIterable.from(ImmutableList.copyOf(config.getDir().listFiles()))
+        FluentIterable.from(ImmutableList.copyOf(files))
             .transform(StorageBackupImpl.FILE_NAME)
             .toSet());
   }
