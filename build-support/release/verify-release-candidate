@@ -31,14 +31,9 @@ download_rc_file() {
   download_dist_file ${verify_version}/$1
 }
 
-maybe_import_gpg_keys() {
-  # Check and import the KEYS files
-  read -r -p "Import Apache Aurora GPG KEYS? [y/n]" response
-  response=${response,,}
-  if [[ $response =~ ^(yes|y| ) ]]; then
-    download_dist_file KEYS
-    gpg --import KEYS
-  fi
+import_gpg_keys() {
+  download_dist_file KEYS
+  gpg --import KEYS
 }
 
 fetch_archive() {
@@ -69,12 +64,10 @@ run_tests() {
 
 # TODO(wfarner): Share this with make-mesos-native-egg.
 setup_tempdir() {
-  TMPDIR=""
   cleanup() {
     if [[ -f Vagrantfile ]]; then
       vagrant destroy -f
     fi
-    cd /
     rm -fr "$TMPDIR"
   }
   trap cleanup EXIT
@@ -94,7 +87,7 @@ setup_tempdir "aurora-$verify_version"
 echo "Working in sandbox $TMPDIR"
 cd $TMPDIR
 
-maybe_import_gpg_keys
+import_gpg_keys
 
 dist_name="apache-aurora-${verify_version}"
 fetch_archive $dist_name
