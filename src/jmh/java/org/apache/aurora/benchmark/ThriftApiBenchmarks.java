@@ -151,7 +151,7 @@ public class ThriftApiBenchmarks {
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
           }
         },
-        new DbModule(Bindings.KeyFactory.PLAIN),
+        DbModule.productionModule(Bindings.KeyFactory.PLAIN),
         new ThriftModule.ReadOnly());
   }
 

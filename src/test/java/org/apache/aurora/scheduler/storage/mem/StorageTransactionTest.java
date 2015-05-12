@@ -23,7 +23,6 @@ import java.util.concurrent.Future;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.testing.TearDown;
 import com.google.common.testing.junit4.TearDownTestCase;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -31,12 +30,9 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
-import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ResourceAggregate;
-import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -113,13 +109,7 @@ public class StorageTransactionTest extends TearDownTestCase {
   }
 
   private IScheduledTask makeTask(String taskId) {
-    return IScheduledTask.build(new ScheduledTask().setAssignedTask(
-        new AssignedTask()
-            .setTaskId(taskId)
-            .setTask(new TaskConfig()
-                .setOwner(new Identity().setRole("owner-" + taskId))
-                .setJobName("job-" + taskId)
-                .setEnvironment("env-" + taskId))));
+    return TaskTestUtil.makeTask(taskId, TaskTestUtil.JOB);
   }
 
   private static class CustomException extends RuntimeException {
@@ -186,7 +176,7 @@ public class StorageTransactionTest extends TearDownTestCase {
         throw new CustomException();
       }
     });
-    expectTasks("a", "b");
+    expectTasks();
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
@@ -203,7 +193,14 @@ public class StorageTransactionTest extends TearDownTestCase {
         throw new CustomException();
       }
     });
-    expectTasks();
+    expectTasks("a", "b");
+
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().deleteAllTasks();
+      }
+    });
 
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override
@@ -212,15 +209,12 @@ public class StorageTransactionTest extends TearDownTestCase {
         throw new CustomException();
       }
     });
-    expectTasks("a");
-    storage.read(new Work.Quiet<Void>() {
+    expectTasks();
+
+    storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      public Void apply(StoreProvider storeProvider) {
-        assertEquals(
-            makeTask("a"),
-            Iterables.getOnlyElement(storeProvider.getTaskStore().fetchTasks(
-                Query.taskScoped("a"))));
-        return null;
+      protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a")));
       }
     });
 
@@ -238,7 +232,7 @@ public class StorageTransactionTest extends TearDownTestCase {
         });
       }
     });
-    expectTasks("a", "c", "d");
+    expectTasks("a");
 
     // Nested transaction where outer transaction fails.
     expectWriteFail(new MutateWork.NoResult.Quiet() {
@@ -254,6 +248,6 @@ public class StorageTransactionTest extends TearDownTestCase {
         throw new CustomException();
       }
     });
-    expectTasks("a", "c", "d");
+    expectTasks("a");
   }
 }

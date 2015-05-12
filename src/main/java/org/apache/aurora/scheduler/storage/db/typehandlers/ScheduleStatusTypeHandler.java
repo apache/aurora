@@ -13,26 +13,14 @@
  */
 package org.apache.aurora.scheduler.storage.db.typehandlers;
 
-import java.util.List;
-
-import com.google.common.collect.ImmutableList;
-
-import org.apache.ibatis.type.TypeHandler;
+import org.apache.aurora.gen.ScheduleStatus;
 
 /**
- * Utility class to access the available type handler classes.
+ * Type handler for {@link ScheduleStatus}.
  */
-public final class TypeHandlers {
-  private TypeHandlers() {
-    // Utility class.
-  }
-
-  public static List<Class<? extends TypeHandler<?>>> getAll() {
-    return ImmutableList.<Class<? extends TypeHandler<?>>>of(
-        JobUpdateActionTypeHandler.class,
-        JobUpdateStatusTypeHandler.class,
-        MaintenanceModeTypeHandler.class,
-        ScheduleStatusTypeHandler.class,
-        TaskConfigTypeHandler.class);
+class ScheduleStatusTypeHandler extends AbstractTEnumTypeHandler<ScheduleStatus> {
+  @Override
+  protected ScheduleStatus fromValue(int value) {
+    return ScheduleStatus.findByValue(value);
   }
 }

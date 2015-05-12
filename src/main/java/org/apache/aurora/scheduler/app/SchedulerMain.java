@@ -155,7 +155,7 @@ public class SchedulerMain extends AbstractApplication {
         .addAll(getExtraModules())
         .add(getPersistentStorageModule())
         .add(new CronModule())
-        .add(new DbModule(Bindings.annotatedKeyFactory(Storage.Volatile.class)))
+        .add(DbModule.productionModule(Bindings.annotatedKeyFactory(Storage.Volatile.class)))
         .build();
   }
 

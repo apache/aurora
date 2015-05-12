@@ -11,53 +11,56 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.mem;
+package org.apache.aurora.scheduler.storage.db;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
-import com.twitter.common.inject.Bindings.KeyFactory;
 import com.twitter.common.stats.StatsProvider;
+import com.twitter.common.util.Clock;
+import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
-import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.db.DbModule;
+import org.apache.aurora.scheduler.storage.db.views.TaskConfigRow;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class InMemTaskStoreTest extends AbstractTaskStoreTest {
+public class DbTaskStoreTest extends AbstractTaskStoreTest {
 
-  private FakeStatsProvider statsProvider;
+  private TaskConfigManager configManager;
+
+  @Before
+  public void setUp() {
+    configManager = injector.getInstance(TaskConfigManager.class);
+  }
 
   @Override
   protected Module getStorageModule() {
-    statsProvider = new FakeStatsProvider();
     return Modules.combine(
-        DbModule.testModule(new InMemStoresModule.TaskStoreModule(KeyFactory.PLAIN)),
+        DbModule.testModule(),
         new AbstractModule() {
           @Override
           protected void configure() {
-            bind(StatsProvider.class).toInstance(statsProvider);
+            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
+            bind(Clock.class).toInstance(new FakeClock());
           }
         });
   }
 
   @Test
-  public void testSecondaryIndexConsistency() {
-    // Test for regression of AURORA-1305.
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
-        TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
-        taskStore.saveTasks(ImmutableSet.of(TASK_A));
-        taskStore.deleteTasks(Tasks.ids(TASK_A));
-        assertEquals(0L, statsProvider.getLongValue(MemTaskStore.getIndexSizeStatName("job")));
-      }
-    });
+  public void testRelationsRemoved() {
+    // When there are no remaining references to a task config, it should be removed.
+    saveTasks(TASK_A);
+    deleteTasks(Tasks.id(TASK_A));
+    assertEquals(
+        ImmutableList.<TaskConfigRow>of(),
+        configManager.getConfigs(TASK_A.getAssignedTask().getTask().getJob()));
+
+    // TODO(wfarner): Check that the job key was removed.
   }
 }

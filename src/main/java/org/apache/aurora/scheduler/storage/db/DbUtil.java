@@ -17,6 +17,8 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.twitter.common.stats.StatsProvider;
+import com.twitter.common.util.Clock;
+import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
@@ -45,6 +47,7 @@ public final class DbUtil {
             FakeStatsProvider stats = new FakeStatsProvider();
             bind(StatsProvider.class).toInstance(stats);
             bind(FakeStatsProvider.class).toInstance(stats);
+            bind(Clock.class).toInstance(new FakeClock());
           }
         });
     Storage storage = injector.getInstance(Storage.class);

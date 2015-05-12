@@ -299,13 +299,11 @@
         AND j.name = #{jobKey.name}
         AND j.environment = #{jobKey.environment}
       </if>
-      <if test="updateStatuses != null">
-        <if test="updateStatuses.size() > 0">
-          AND (max_status.status IN
-          <foreach item="element" collection="updateStatuses" open="(" separator="," close="))">
-            #{element, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler}
-          </foreach>
-        </if>
+      <if test="updateStatuses != null and !updateStatuses.isEmpty()">
+        AND (max_status.status IN
+        <foreach item="element" collection="updateStatuses" open="(" separator="," close="))">
+          #{element, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler}
+        </foreach>
       </if>
     </if>
     ORDER BY max_ts.timestamp_ms DESC

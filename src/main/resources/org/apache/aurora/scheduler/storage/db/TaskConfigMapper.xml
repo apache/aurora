@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ -->
+
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.apache.aurora.scheduler.storage.db.TaskConfigMapper">
+  <cache size="1000" readOnly="true" />
+  <insert id="insert" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
+    INSERT INTO task_configs (
+      job_key_id,
+      creator_user,
+      service,
+      num_cpus,
+      ram_mb,
+      disk_mb,
+      priority,
+      max_task_failures,
+      production,
+      contact_email,
+      executor_name,
+      executor_data,
+    ) VALUES (
+      (
+        SELECT ID
+        FROM job_keys
+        WHERE role = #{config.job.role}
+          AND environment = #{config.job.environment}
+          AND name = #{config.job.name}
+      ),
+      #{config.owner.user},
+      #{config.isService},
+      #{config.numCpus},
+      #{config.ramMb},
+      #{config.diskMb},
+      #{config.priority},
+      #{config.maxTaskFailures},
+      #{config.production},
+      #{config.contactEmail},
+      #{config.executorConfig.name},
+      #{config.executorConfig.data},
+    )
+  </insert>
+
+  <resultMap id="limitConstraintMap" type="org.apache.aurora.gen.LimitConstraint">
+    <id column="id"/>
+  </resultMap>
+
+  <resultMap id="valueConstraintMap" type="org.apache.aurora.gen.ValueConstraint">
+    <id column="id"/>
+
+    <collection property="values" ofType="String" columnPrefix="v_">
+      <result column="value" />
+    </collection>
+  </resultMap>
+
+  <!--
+    A subclass of TaskConstraint is used to work around trouble using TaskConstraint.  See docs in
+    TaskConstraintShim for details.
+  -->
+  <resultMap id="taskConstraintMap" type="org.apache.aurora.scheduler.storage.db.shims.TaskConstraintShim">
+    <id column="id"/>
+    <association property="value" resultMap="valueConstraintMap" columnPrefix="v_"/>
+    <association property="limit" resultMap="limitConstraintMap" columnPrefix="l_"/>
+  </resultMap>
+
+  <resultMap id="constraintMap" type="org.apache.aurora.gen.Constraint">
+    <id column="id"/>
+    <association property="constraint" resultMap="taskConstraintMap"/>
+  </resultMap>
+
+  <select id="selectConstraints" resultMap="constraintMap">
+    SELECT
+      tc.id AS id,
+      tc.name AS name,
+      tlc.id AS l_id,
+      tlc.value AS l_limit,
+      tvc.id AS v_id,
+      tvc.negated AS v_negated,
+      tvcv.value AS v_v_value
+    FROM task_constraints AS tc
+    LEFT OUTER JOIN limit_constraints AS tlc ON tlc.constraint_id = tc.id
+    LEFT OUTER JOIN value_constraints AS tvc ON tvc.constraint_id = tc.id
+    LEFT OUTER JOIN value_constraint_values AS tvcv ON tvcv.value_constraint_id = tvc.id
+    WHERE tc.task_config_id = #{id}
+  </select>
+
+  <resultMap id="dockerContainerMap" type="org.apache.aurora.gen.DockerContainer">
+    <result column="image" property="image"/>
+  </resultMap>
+
+  <resultMap id="containerMap" type="org.apache.aurora.scheduler.storage.db.shims.ContainerShim">
+    <association property="docker" resultMap="dockerContainerMap"/>
+  </resultMap>
+
+  <resultMap id="metadataMap" type="org.apache.aurora.gen.Metadata">
+    <id column="id" />
+  </resultMap>
+
+  <resultMap id="taskConfigMap" type="org.apache.aurora.gen.TaskConfig">
+    <id column="id" />
+    <result column="j_role" property="owner.role"/>
+    <result column="j_environment" property="environment"/>
+    <result column="j_name" property="jobName"/>
+    <result column="creator_user" property="owner.user"/>
+    <result column="executor_name" property="executorConfig.name"/>
+    <result column="executor_data" property="executorConfig.data"/>
+    <association
+        property="job"
+        resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
+        columnPrefix="j_"/>
+    <association property="container" resultMap="containerMap" columnPrefix="c_"/>
+    <collection
+        property="constraints"
+        select="selectConstraints"
+        column="id"
+        foreignColumn="task_config_id"/>
+    <collection property="requestedPorts" ofType="String" columnPrefix="p_">
+      <result column="port_name" />
+    </collection>
+    <collection property="metadata" resultMap="metadataMap" columnPrefix="m_"/>
+  </resultMap>
+
+  <sql id="unscopedConfigSelect">
+    SELECT
+      c.id AS id,
+      c.creator_user AS creator_user,
+      c.service AS is_service,
+      c.num_cpus AS num_cpus,
+      c.ram_mb AS ram_mb,
+      c.disk_mb AS disk_mb,
+      c.priority AS priority,
+      c.max_task_failures AS max_task_failures,
+      c.production AS production,
+      c.contact_email AS contact_email,
+      c.executor_name AS executor_name,
+      c.executor_data AS executor_data,
+      j.role AS j_role,
+      j.environment AS j_environment,
+      j.name AS j_name,
+      p.port_name AS p_port_name,
+      d.id AS c_id,
+      d.image AS c_image,
+      m.id AS m_id,
+      m.key AS m_key,
+      m.value AS m_value
+    FROM task_configs AS c
+    INNER JOIN job_keys AS j ON j.id = c.job_key_id
+    LEFT OUTER JOIN task_config_requested_ports AS p ON p.task_config_id = c.id
+    LEFT OUTER JOIN task_config_docker_containers AS d ON d.task_config_id = c.id
+    LEFT OUTER JOIN task_config_metadata AS m ON m.task_config_id = c.id
+  </sql>
+
+  <select id="selectConfig" resultMap="taskConfigMap">
+    <include refid="unscopedConfigSelect"/>
+    WHERE c.id = #{id}
+  </select>
+
+  <resultMap
+      id="taskConfigRowMap"
+      type="org.apache.aurora.scheduler.storage.db.views.TaskConfigRow">
+
+    <id column="id" property="id" />
+    <association property="config" resultMap="taskConfigMap"/>
+  </resultMap>
+
+  <select id="selectConfigsByJob" resultMap="taskConfigRowMap">
+    <include refid="unscopedConfigSelect"/>
+    WHERE j.role = #{role}
+      AND j.environment = #{environment}
+      AND j.name = #{name}
+  </select>
+
+  <select id="selectConfigsByTaskId" resultType="long">
+    SELECT
+      c.id AS id
+    FROM task_configs AS c
+    INNER JOIN tasks AS t ON t.task_config_row_id = c.id
+    WHERE t.task_id IN (
+      <foreach item="taskId" collection="taskIds" separator=",">
+        #{taskId}
+      </foreach>
+    )
+  </select>
+
+  <select id="selectTasksByConfigId" resultType="long">
+    SELECT
+      t.id AS id
+    FROM tasks AS t
+    INNER JOIN task_configs AS c ON c.id = t.task_config_row_id
+    WHERE c.id IN (
+      <foreach item="configId" collection="configIds" separator=",">
+        #{configId}
+      </foreach>
+    )
+  </select>
+
+  <insert id="insertConstraint" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
+    INSERT INTO task_constraints (
+      task_config_id,
+      name
+    ) VALUES (
+      #{configId},
+      #{constraint.name}
+    )
+  </insert>
+
+  <insert id="insertLimitConstraint">
+    INSERT INTO limit_constraints (
+      constraint_id,
+      value
+    ) VALUES (
+      #{constraintId},
+      #{constraint.limit}
+    )
+  </insert>
+
+  <insert id="insertValueConstraint" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
+    INSERT INTO value_constraints (
+      constraint_id,
+      negated
+    ) VALUES (
+      #{constraintId},
+      #{constraint.negated}
+    )
+  </insert>
+
+  <insert id="insertValueConstraintValues">
+    INSERT INTO value_constraint_values (
+      value_constraint_id,
+      value
+    ) VALUES (
+      <foreach item="value" collection="values" separator="),(">
+        #{valueConstraintId},
+        #{value}
+      </foreach>
+    )
+  </insert>
+
+  <insert id="insertRequestedPorts">
+    INSERT INTO task_config_requested_ports (
+      task_config_id,
+      port_name
+    ) VALUES (
+      <foreach item="port" collection="ports" separator="),(">
+        #{configId},
+        #{port}
+      </foreach>
+    )
+  </insert>
+
+  <insert id="insertTaskLinks" >
+    INSERT INTO task_config_task_links (
+      task_config_id,
+      label,
+      url
+    ) VALUES (
+      <foreach item="link" collection="links" separator="),(">
+        #{configId},
+        #{link.label},
+        #{link.url}
+      </foreach>
+    )
+  </insert>
+
+  <resultMap id="taskLinkMap" type="org.apache.aurora.scheduler.storage.db.views.TaskLink">
+    <id column="id"/>
+  </resultMap>
+
+  <select id="selectTaskLinks" resultMap="taskLinkMap">
+    SELECT
+      id,
+      label,
+      url
+    FROM task_config_task_links
+    WHERE task_config_id = #{configId}
+  </select>
+
+  <insert id="insertContainer">
+    INSERT INTO task_config_docker_containers (
+      task_config_id,
+      image
+    ) VALUES (
+      #{configId},
+      #{container.image}
+    )
+  </insert>
+
+  <insert id="insertMetadata">
+    INSERT INTO task_config_metadata (
+      task_config_id,
+      key,
+      value
+    ) VALUES (
+    <foreach item="entry" collection="metadata" separator="),(">
+      #{configId},
+      #{entry.key},
+      #{entry.value}
+    </foreach>
+    )
+  </insert>
+
+  <delete id="delete">
+    DELETE FROM task_configs
+    WHERE id IN (
+      <foreach item="configId" collection="configIds" separator=",">
+        #{configId}
+      </foreach>
+    )
+  </delete>
+</mapper>

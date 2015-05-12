@@ -50,7 +50,7 @@ import static com.twitter.common.inject.TimedInterceptor.Timed;
 /**
  * A relational database-backed job update store.
  */
-public class DBJobUpdateStore implements JobUpdateStore.Mutable {
+public class DbJobUpdateStore implements JobUpdateStore.Mutable {
 
   private final JobKeyMapper jobKeyMapper;
   private final JobUpdateDetailsMapper detailsMapper;
@@ -59,7 +59,7 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   private final CachedCounters stats;
 
   @Inject
-  DBJobUpdateStore(
+  DbJobUpdateStore(
       JobKeyMapper jobKeyMapper,
       JobUpdateDetailsMapper detailsMapper,
       JobUpdateEventMapper jobEventMapper,
@@ -176,7 +176,7 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
         perJobRetainCount,
         historyPruneThresholdMs);
 
-    for (Long jobKeyId : jobKeyIdsToPrune) {
+    for (long jobKeyId : jobKeyIdsToPrune) {
       Set<PruneVictim> pruneVictims = detailsMapper.selectPruneVictims(
           jobKeyId,
           perJobRetainCount,

@@ -278,7 +278,7 @@ public class DbJobUpdateStoreTest {
     for (Map.Entry<JobUpdateStatus, T> entry : expected.entrySet()) {
       assertEquals(
           entry.getValue().longValue(),
-          stats.getLongValue(DBJobUpdateStore.statName(entry.getKey())));
+          stats.getLongValue(DbJobUpdateStore.statName(entry.getKey())));
     }
   }
 

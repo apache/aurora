@@ -17,6 +17,7 @@ import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
+import com.google.inject.PrivateModule;
 import com.twitter.common.inject.Bindings.KeyFactory;
 
 import org.apache.aurora.scheduler.storage.CronJobStore;
@@ -47,6 +48,30 @@ public final class InMemStoresModule extends AbstractModule {
   @Override
   protected void configure() {
     bindStore(CronJobStore.Mutable.class, MemJobStore.class);
-    bindStore(TaskStore.Mutable.class, MemTaskStore.class);
+  }
+
+  /**
+   * Binding module that installs the map-based task store implementation.
+   */
+  public static class TaskStoreModule extends PrivateModule {
+    private final KeyFactory keyFactory;
+
+    public TaskStoreModule(KeyFactory keyFactory) {
+      this.keyFactory = requireNonNull(keyFactory);
+    }
+
+    private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {
+      bind(binding).to(impl);
+      bind(impl).in(Singleton.class);
+      Key<T> key = keyFactory.create(binding);
+      bind(key).to(impl);
+      expose(key);
+    }
+
+    @Override
+    protected void configure() {
+      bindStore(TaskStore.Mutable.class, MemTaskStore.class);
+      expose(TaskStore.Mutable.class);
+    }
   }
 }

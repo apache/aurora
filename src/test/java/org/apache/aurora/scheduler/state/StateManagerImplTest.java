@@ -197,6 +197,7 @@ public class StateManagerImplTest extends EasyMockTest {
             .setScheduler(StateManagerImpl.LOCAL_HOST_SUPPLIER.get())
             .setStatus(PENDING)))
         .setAssignedTask(new AssignedTask()
+            .setAssignedPorts(ImmutableMap.<String, Integer>of())
             .setInstanceId(3)
             .setTaskId(taskId)
             .setTask(NON_SERVICE_CONFIG.newBuilder()));

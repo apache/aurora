@@ -26,6 +26,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Guice;
+import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -60,31 +61,33 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public abstract class AbstractTaskStoreTest {
-  private static final IHostAttributes HOST_A = IHostAttributes.build(
+  protected static final IHostAttributes HOST_A = IHostAttributes.build(
       new HostAttributes(
           "hostA",
           ImmutableSet.of(new Attribute("zone", ImmutableSet.of("1a"))))
           .setSlaveId("slaveIdA")
           .setMode(MaintenanceMode.NONE));
-  private static final IHostAttributes HOST_B = IHostAttributes.build(
+  protected static final IHostAttributes HOST_B = IHostAttributes.build(
       new HostAttributes(
           "hostB",
           ImmutableSet.of(new Attribute("zone", ImmutableSet.of("1a"))))
           .setSlaveId("slaveIdB")
           .setMode(MaintenanceMode.NONE));
   protected static final IScheduledTask TASK_A = createTask("a");
-  private static final IScheduledTask TASK_B =
+  protected static final IScheduledTask TASK_B =
       setContainer(createTask("b"), Container.mesos(new MesosContainer()));
-  private static final IScheduledTask TASK_C = createTask("c");
-  private static final IScheduledTask TASK_D = createTask("d");
+  protected static final IScheduledTask TASK_C = createTask("c");
+  protected static final IScheduledTask TASK_D = createTask("d");
 
+  protected Injector injector;
   protected Storage storage;
 
   protected abstract Module getStorageModule();
 
   @Before
   public void baseSetUp() {
-    storage = Guice.createInjector(getStorageModule()).getInstance(Storage.class);
+    injector = Guice.createInjector(getStorageModule());
+    storage = injector.getInstance(Storage.class);
     storage.prepare();
 
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
@@ -106,7 +109,7 @@ public abstract class AbstractTaskStoreTest {
     });
   }
 
-  private void saveTasks(final IScheduledTask... tasks) {
+  protected void saveTasks(final IScheduledTask... tasks) {
     saveTasks(ImmutableSet.copyOf(tasks));
   }
 
@@ -140,7 +143,7 @@ public abstract class AbstractTaskStoreTest {
     });
   }
 
-  private void deleteTasks(final String... taskIds) {
+  protected void deleteTasks(final String... taskIds) {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) {
