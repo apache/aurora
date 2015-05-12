@@ -260,7 +260,6 @@ public class StateManagerImpl implements StateManager {
   private static final List<Action> ACTIONS_IN_ORDER = ImmutableList.of(
       Action.INCREMENT_FAILURES,
       Action.SAVE_STATE,
-      Action.STATE_CHANGE,
       Action.RESCHEDULE,
       Action.KILL,
       Action.DELETE);
@@ -339,15 +338,6 @@ public class StateManagerImpl implements StateManager {
               PubsubEvent.TaskStateChange.transition(
                   Iterables.getOnlyElement(taskStore.fetchTasks(query)),
                   stateMachine.getPreviousState()));
-          break;
-
-        case STATE_CHANGE:
-          updateTaskAndExternalState(
-              taskStore,
-              Optional.<ScheduleStatus>absent(),
-              taskId,
-              sideEffect.getNextState().get(),
-              Optional.<String>absent());
           break;
 
         case RESCHEDULE:

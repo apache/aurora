@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.state;
 import java.util.Objects;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 
 import org.apache.aurora.gen.ScheduleStatus;
 
@@ -30,20 +29,11 @@ class SideEffect {
 
   SideEffect(Action action, Optional<ScheduleStatus> nextState) {
     this.action = action;
-    if (action == Action.STATE_CHANGE) {
-      Preconditions.checkArgument(
-          nextState.isPresent(),
-          "A next state must be provided for a state change action.");
-    }
     this.nextState = nextState;
   }
 
   public Action getAction() {
     return action;
-  }
-
-  public Optional<ScheduleStatus> getNextState() {
-    return nextState;
   }
 
   @Override
@@ -95,11 +85,6 @@ class SideEffect {
     /**
      * Increment the failure count for this task.
      */
-    INCREMENT_FAILURES,
-
-    /**
-     * Perform an additional state change on the task.
-     */
-    STATE_CHANGE
+    INCREMENT_FAILURES
   }
 }

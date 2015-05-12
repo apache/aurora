@@ -353,9 +353,6 @@ public class TaskStateMachineTest {
   private static final TransitionResult DELETE_TASK = new TransitionResult(
       true,
       ImmutableSet.of(new SideEffect(Action.DELETE, Optional.<ScheduleStatus>absent())));
-  private static final TransitionResult MARK_LOST = new TransitionResult(
-      false,
-      ImmutableSet.of(new SideEffect(Action.STATE_CHANGE, Optional.of(LOST.getStatus().get()))));
 
   private static final class TestCase {
     private final boolean taskPresent;
