@@ -92,6 +92,7 @@ import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
@@ -655,7 +656,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         TASK_ID,
         Optional.<ScheduleStatus>absent(),
         ScheduleStatus.KILLING,
-        killedByMessage(USER))).andReturn(true);
+        killedByMessage(USER))).andReturn(StateChangeResult.SUCCESS);
   }
 
   @Test
@@ -885,7 +886,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         TASK_ID,
         Optional.<ScheduleStatus>absent(),
         ScheduleStatus.FAILED,
-        Optional.of(transitionMessage(USER).get()))).andReturn(true);
+        Optional.of(transitionMessage(USER).get()))).andReturn(StateChangeResult.SUCCESS);
 
     expectAuth(ROOT, true);
     expectAuth(ROOT, false);
@@ -983,7 +984,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         TASK_ID,
         Optional.<ScheduleStatus>absent(),
         ScheduleStatus.RESTARTING,
-        restartedByMessage(USER))).andReturn(true);
+        restartedByMessage(USER))).andReturn(StateChangeResult.SUCCESS);
 
     control.replay();
 

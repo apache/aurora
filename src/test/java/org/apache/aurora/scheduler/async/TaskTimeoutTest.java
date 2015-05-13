@@ -31,6 +31,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -143,7 +144,7 @@ public class TaskTimeoutTest extends EasyMockTest {
         Optional.of(KILLING),
         LOST,
         TaskTimeout.TIMEOUT_MESSAGE))
-        .andReturn(true);
+        .andReturn(StateChangeResult.SUCCESS);
 
     replayAndCreate();
 
@@ -161,7 +162,7 @@ public class TaskTimeoutTest extends EasyMockTest {
         Optional.of(ASSIGNED),
         LOST,
         TaskTimeout.TIMEOUT_MESSAGE))
-        .andReturn(true);
+        .andReturn(StateChangeResult.SUCCESS);
 
     replayAndCreate();
 
@@ -180,7 +181,7 @@ public class TaskTimeoutTest extends EasyMockTest {
         Optional.of(KILLING),
         LOST,
         TaskTimeout.TIMEOUT_MESSAGE))
-        .andReturn(false);
+        .andReturn(StateChangeResult.ILLEGAL);
 
     replayAndCreate();
 

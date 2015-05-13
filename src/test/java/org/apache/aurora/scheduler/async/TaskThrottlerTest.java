@@ -29,6 +29,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -130,7 +131,7 @@ public class TaskThrottlerTest extends EasyMockTest {
         Optional.of(THROTTLED),
         PENDING,
         Optional.<String>absent()))
-        .andReturn(true);
+        .andReturn(StateChangeResult.SUCCESS);
   }
 
   private IScheduledTask makeTask(String id, ScheduleStatus status) {

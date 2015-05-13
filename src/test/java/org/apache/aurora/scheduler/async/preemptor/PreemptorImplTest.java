@@ -31,6 +31,7 @@ import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.preemptor.Preemptor.PreemptorImpl;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -155,7 +156,7 @@ public class PreemptorImplTest extends EasyMockTest {
         eq(Optional.<ScheduleStatus>absent()),
         eq(ScheduleStatus.PREEMPTING),
         EasyMock.<Optional<String>>anyObject()))
-        .andReturn(true);
+        .andReturn(StateChangeResult.SUCCESS);
   }
 
   private static PreemptionProposal createPreemptionProposal(IScheduledTask task) {

@@ -69,12 +69,14 @@ import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
+import static org.apache.aurora.scheduler.state.StateChangeResult.ILLEGAL;
+import static org.apache.aurora.scheduler.state.StateChangeResult.INVALID_CAS_STATE;
+import static org.apache.aurora.scheduler.state.StateChangeResult.NOOP;
+import static org.apache.aurora.scheduler.state.StateChangeResult.SUCCESS;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class StateManagerImplTest extends EasyMockTest {
 
@@ -216,8 +218,8 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     insertTask(NON_SERVICE_CONFIG, 0);
-    assertEquals(true, changeState(taskId, KILLING));
-    assertEquals(false, changeState(taskId, KILLING));
+    assertEquals(SUCCESS, changeState(taskId, KILLING));
+    assertEquals(ILLEGAL, changeState(taskId, KILLING));
   }
 
   @Test
@@ -231,10 +233,10 @@ public class StateManagerImplTest extends EasyMockTest {
 
     insertTask(NON_SERVICE_CONFIG, 0);
     assignTask(taskId, HOST_A);
-    assertEquals(true, changeState(taskId, RUNNING));
-    assertEquals(true, changeState(taskId, KILLING));
-    assertEquals(true, changeState(taskId, KILLED));
-    assertEquals(false, changeState(taskId, KILLED));
+    assertEquals(SUCCESS, changeState(taskId, RUNNING));
+    assertEquals(SUCCESS, changeState(taskId, KILLING));
+    assertEquals(SUCCESS, changeState(taskId, KILLED));
+    assertEquals(NOOP, changeState(taskId, KILLED));
   }
 
   @Test
@@ -370,12 +372,12 @@ public class StateManagerImplTest extends EasyMockTest {
 
     insertTask(config, 0);
     assignTask(taskId, HOST_A);
-    assertFalse(changeState(
+    assertEquals(INVALID_CAS_STATE, changeState(
         taskId,
         Optional.of(PENDING),
         RUNNING,
         Optional.<String>absent()));
-    assertTrue(changeState(
+    assertEquals(SUCCESS, changeState(
         taskId,
         Optional.of(ASSIGNED),
         FAILED,
@@ -386,7 +388,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testCasTaskNotFound() {
     control.replay();
 
-    assertFalse(changeState(
+    assertEquals(INVALID_CAS_STATE, changeState(
         "a",
         Optional.of(PENDING),
         ASSIGNED,
@@ -551,15 +553,15 @@ public class StateManagerImplTest extends EasyMockTest {
     });
   }
 
-  private boolean changeState(
+  private StateChangeResult changeState(
       final String taskId,
       final Optional<ScheduleStatus> casState,
       final ScheduleStatus newState,
       final Optional<String> auditMessage) {
 
-    return storage.write(new Storage.MutateWork.Quiet<Boolean>() {
+    return storage.write(new Storage.MutateWork.Quiet<StateChangeResult>() {
       @Override
-      public Boolean apply(Storage.MutableStoreProvider storeProvider) {
+      public StateChangeResult apply(Storage.MutableStoreProvider storeProvider) {
         return stateManager.changeState(
             storeProvider,
             taskId,
@@ -570,7 +572,7 @@ public class StateManagerImplTest extends EasyMockTest {
     });
   }
 
-  private boolean changeState(final String taskId, final ScheduleStatus status) {
+  private StateChangeResult changeState(final String taskId, final ScheduleStatus status) {
     return changeState(
         taskId,
         Optional.<ScheduleStatus>absent(),

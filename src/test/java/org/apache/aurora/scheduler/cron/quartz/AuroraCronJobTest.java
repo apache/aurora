@@ -25,6 +25,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
@@ -123,7 +124,7 @@ public class AuroraCronJobTest extends EasyMockTest {
         eq(Optional.<ScheduleStatus>absent()),
         eq(ScheduleStatus.KILLING),
         eq(AuroraCronJob.KILL_AUDIT_MESSAGE)))
-        .andReturn(true);
+        .andReturn(StateChangeResult.SUCCESS);
     backoffHelper.doUntilSuccess(EasyMock.capture(capture));
     stateManager.insertPendingTasks(
         EasyMock.<MutableStoreProvider>anyObject(),

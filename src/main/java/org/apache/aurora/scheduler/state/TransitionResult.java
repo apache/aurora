@@ -15,7 +15,11 @@ package org.apache.aurora.scheduler.state;
 
 import java.util.Objects;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+
+import static org.apache.aurora.scheduler.state.StateChangeResult.ILLEGAL_WITH_SIDE_EFFECTS;
+import static org.apache.aurora.scheduler.state.StateChangeResult.SUCCESS;
 
 /**
  * The actions that should be performed in response to a state transition attempt.
@@ -23,22 +27,27 @@ import com.google.common.collect.ImmutableSet;
  * {@see TaskStateMachine}
  */
 public class TransitionResult {
-  private final boolean success;
+  private final StateChangeResult result;
   private final ImmutableSet<SideEffect> sideEffects;
 
   /**
    * Creates a transition result with the given side effects.
    *
-   * @param success Whether the transition attempt relevant to this result was successful.
+   * @param result Transition attempt result.
    * @param sideEffects Actions that must be performed in response to the state transition.
    */
-  public TransitionResult(boolean success, ImmutableSet<SideEffect> sideEffects) {
-    this.success = success;
+  public TransitionResult(StateChangeResult result, ImmutableSet<SideEffect> sideEffects) {
+    this.result = result;
     this.sideEffects = Objects.requireNonNull(sideEffects);
+    if (!this.sideEffects.isEmpty()) {
+      Preconditions.checkArgument(
+          result == SUCCESS || result == ILLEGAL_WITH_SIDE_EFFECTS,
+          "Invalid transition result for a non-empty set of side effects");
+    }
   }
 
-  public boolean isSuccess() {
-    return success;
+  public StateChangeResult getResult() {
+    return result;
   }
 
   public ImmutableSet<SideEffect> getSideEffects() {
@@ -52,19 +61,19 @@ public class TransitionResult {
     }
 
     TransitionResult other = (TransitionResult) o;
-    return Objects.equals(success, other.success)
+    return Objects.equals(result, other.result)
         && Objects.equals(sideEffects, other.sideEffects);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(success, sideEffects);
+    return Objects.hash(result, sideEffects);
   }
 
   @Override
   public String toString() {
     return com.google.common.base.Objects.toStringHelper(this)
-        .add("success", success)
+        .add("result", result)
         .add("sideEffects", sideEffects)
         .toString();
   }

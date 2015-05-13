@@ -54,6 +54,7 @@ import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.MaintenanceController;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
@@ -358,7 +359,7 @@ public class TaskSchedulerTest extends EasyMockTest {
         eq(Optional.of(PENDING)),
         eq(LOST),
         eq(TaskSchedulerImpl.LAUNCH_FAILED_MSG)))
-        .andReturn(true);
+        .andReturn(StateChangeResult.SUCCESS);
 
     replayAndCreateScheduler();
 

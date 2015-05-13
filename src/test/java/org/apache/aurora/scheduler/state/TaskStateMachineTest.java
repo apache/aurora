@@ -37,6 +37,10 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.state.StateChangeResult.ILLEGAL;
+import static org.apache.aurora.scheduler.state.StateChangeResult.ILLEGAL_WITH_SIDE_EFFECTS;
+import static org.apache.aurora.scheduler.state.StateChangeResult.NOOP;
+import static org.apache.aurora.scheduler.state.StateChangeResult.SUCCESS;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.ASSIGNED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.DELETED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.DRAINING;
@@ -53,9 +57,7 @@ import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.RUNNI
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.STARTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.THROTTLED;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 // TODO(wfarner): At this rate, it's probably best to exhaustively cover this class with a matrix
@@ -117,7 +119,11 @@ public class TaskStateMachineTest {
       legalTransition(TaskState.valueOf(endState.name()), finalActions);
 
       for (ScheduleStatus badTransition : Tasks.TERMINAL_STATES) {
-        illegalTransition(TaskState.valueOf(badTransition.name()));
+        if (endState == badTransition) {
+          assertEquals(NOOP, stateMachine.updateState(Optional.of(badTransition)).getResult());
+        } else {
+          illegalTransition(TaskState.valueOf(badTransition.name()));
+        }
       }
     }
   }
@@ -284,7 +290,7 @@ public class TaskStateMachineTest {
   private void legalTransition(TaskState state, Set<SideEffect.Action> expectedActions) {
     ScheduleStatus previousState = stateMachine.getPreviousState();
     TransitionResult result = stateMachine.updateState(state.getStatus());
-    assertTrue("Transition to " + state + " was not successful", result.isSuccess());
+    assertEquals("Transition to " + state + " was not successful", SUCCESS, result.getResult());
     assertNotEquals(previousState, stateMachine.getPreviousState());
     assertEquals(
         FluentIterable.from(expectedActions).transform(TO_SIDE_EFFECT).toSet(),
@@ -305,9 +311,10 @@ public class TaskStateMachineTest {
   }
 
   private void illegalTransition(TaskState state, Set<SideEffect> sideEffects) {
-    TransitionResult result = stateMachine.updateState(state.getStatus());
-    assertFalse(result.isSuccess());
-    assertEquals(sideEffects, result.getSideEffects());
+    TransitionResult expected = new TransitionResult(
+        sideEffects.isEmpty() ? ILLEGAL : ILLEGAL_WITH_SIDE_EFFECTS,
+        ImmutableSet.copyOf(sideEffects));
+    assertEquals(expected, stateMachine.updateState(state.getStatus()));
   }
 
   private static ScheduledTask makeTask(boolean service) {
@@ -324,34 +331,34 @@ public class TaskStateMachineTest {
   }
 
   private static final TransitionResult SAVE = new TransitionResult(
-      true,
+      SUCCESS,
       ImmutableSet.of(new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent())));
   private static final TransitionResult SAVE_AND_KILL = new TransitionResult(
-      true,
+      SUCCESS,
       ImmutableSet.of(
           new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
           new SideEffect(Action.KILL, Optional.<ScheduleStatus>absent())));
   private static final TransitionResult SAVE_AND_RESCHEDULE = new TransitionResult(
-      true,
+      SUCCESS,
       ImmutableSet.of(
           new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
           new SideEffect(Action.RESCHEDULE, Optional.<ScheduleStatus>absent())));
   private static final TransitionResult SAVE_KILL_AND_RESCHEDULE = new TransitionResult(
-      true,
+      SUCCESS,
       ImmutableSet.of(
           new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
           new SideEffect(Action.KILL, Optional.<ScheduleStatus>absent()),
           new SideEffect(Action.RESCHEDULE, Optional.<ScheduleStatus>absent())));
   private static final TransitionResult ILLEGAL_KILL = new TransitionResult(
-      false,
+      ILLEGAL_WITH_SIDE_EFFECTS,
       ImmutableSet.of(new SideEffect(Action.KILL, Optional.<ScheduleStatus>absent())));
   private static final TransitionResult RECORD_FAILURE = new TransitionResult(
-      true,
+      SUCCESS,
       ImmutableSet.of(
           new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
           new SideEffect(Action.INCREMENT_FAILURES, Optional.<ScheduleStatus>absent())));
   private static final TransitionResult DELETE_TASK = new TransitionResult(
-      true,
+      SUCCESS,
       ImmutableSet.of(new SideEffect(Action.DELETE, Optional.<ScheduleStatus>absent())));
 
   private static final class TestCase {
@@ -531,7 +538,11 @@ public class TaskStateMachineTest {
 
           TransitionResult expectation = EXPECTATIONS.get(testCase);
           if (expectation == null) {
-            expectation = new TransitionResult(false, ImmutableSet.<SideEffect>of());
+            if (taskPresent && from == to || !taskPresent && to == DELETED) {
+              expectation = new TransitionResult(NOOP, ImmutableSet.<SideEffect>of());
+            } else {
+              expectation = new TransitionResult(ILLEGAL, ImmutableSet.<SideEffect>of());
+            }
           }
 
           TaskStateMachine machine;

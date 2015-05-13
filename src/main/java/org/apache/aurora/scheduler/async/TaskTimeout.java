@@ -32,6 +32,7 @@ import com.twitter.common.stats.StatsProvider;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 
@@ -116,9 +117,9 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
         // canceled, but in the event of a state transition race, including transientState
         // prevents an unintended task timeout.
         // Note: This requires LOST transitions trigger Driver.killTask.
-        boolean movedToLost = storage.write(new MutateWork.Quiet<Boolean>() {
+        StateChangeResult result = storage.write(new MutateWork.Quiet<StateChangeResult>() {
           @Override
-          public Boolean apply(Storage.MutableStoreProvider storeProvider) {
+          public StateChangeResult apply(Storage.MutableStoreProvider storeProvider) {
             return stateManager.changeState(
                 storeProvider,
                 taskId,
@@ -128,7 +129,7 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
           }
         });
 
-        if (movedToLost) {
+        if (result == StateChangeResult.SUCCESS) {
           LOG.info("Timeout reached for task " + taskId + ":" + taskId);
           timedOutTasks.incrementAndGet();
         }

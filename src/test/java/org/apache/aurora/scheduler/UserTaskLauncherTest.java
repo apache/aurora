@@ -21,6 +21,7 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.mesos.Offers;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -78,7 +79,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
         Optional.<ScheduleStatus>absent(),
         RUNNING,
         Optional.of("fake message")))
-        .andReturn(true);
+        .andReturn(StateChangeResult.SUCCESS);
 
     control.replay();
 
@@ -127,7 +128,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
         Optional.<ScheduleStatus>absent(),
         FAILED,
         Optional.of(UserTaskLauncher.MEMORY_LIMIT_DISPLAY)))
-        .andReturn(false);
+        .andReturn(StateChangeResult.ILLEGAL);
 
     control.replay();
 

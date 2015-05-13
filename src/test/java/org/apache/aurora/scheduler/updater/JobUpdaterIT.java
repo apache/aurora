@@ -69,6 +69,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManagerImpl;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.StateManagerImpl;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
@@ -125,7 +126,6 @@ import static org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import static org.apache.aurora.scheduler.updater.UpdateFactory.UpdateFactoryImpl.expandInstanceIds;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class JobUpdaterIT extends EasyMockTest {
@@ -242,7 +242,7 @@ public class JobUpdaterIT extends EasyMockTest {
       storage.write(new NoResult.Quiet() {
         @Override
         protected void execute(Storage.MutableStoreProvider storeProvider) {
-          assertTrue(stateManager.changeState(
+          assertEquals(StateChangeResult.SUCCESS, stateManager.changeState(
               storeProvider,
               getTaskId(job, instanceId),
               Optional.<ScheduleStatus>absent(),

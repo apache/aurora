@@ -193,7 +193,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
         Optional.<ScheduleStatus>absent(),
         ScheduleStatus.DRAINING,
         MaintenanceControllerImpl.DRAINING_MESSAGE))
-        .andReturn(true);
+        .andReturn(StateChangeResult.SUCCESS);
   }
 
   private void expectFetchTasksByHost(String hostName, ImmutableSet<ScheduledTask> tasks) {

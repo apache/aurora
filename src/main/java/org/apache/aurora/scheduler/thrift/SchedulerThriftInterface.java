@@ -98,6 +98,7 @@ import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
 import org.apache.aurora.scheduler.storage.CronJobStore;
@@ -570,7 +571,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
         boolean tasksKilled = false;
         for (String taskId : Tasks.ids(tasks)) {
-          tasksKilled |= stateManager.changeState(
+          tasksKilled |= StateChangeResult.SUCCESS == stateManager.changeState(
               storeProvider,
               taskId,
               Optional.<ScheduleStatus>absent(),

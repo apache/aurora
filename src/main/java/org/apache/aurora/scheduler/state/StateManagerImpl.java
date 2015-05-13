@@ -68,6 +68,8 @@ import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
+import static org.apache.aurora.scheduler.state.StateChangeResult.INVALID_CAS_STATE;
+import static org.apache.aurora.scheduler.state.StateChangeResult.SUCCESS;
 
 /**
  * Manager of all persistence-related operations for the scheduler.  Acts as a controller for
@@ -149,7 +151,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   @Override
-  public boolean changeState(
+  public StateChangeResult changeState(
       MutableStoreProvider storeProvider,
       String taskId,
       Optional<ScheduleStatus> casState,
@@ -192,7 +194,7 @@ public class StateManagerImpl implements StateManager {
           }
         });
 
-    boolean success = updateTaskAndExternalState(
+    StateChangeResult changeResult = updateTaskAndExternalState(
         storeProvider.getUnsafeTaskStore(),
         Optional.<ScheduleStatus>absent(),
         taskId,
@@ -200,7 +202,7 @@ public class StateManagerImpl implements StateManager {
         Optional.<String>absent());
 
     Preconditions.checkState(
-        success,
+        changeResult == SUCCESS,
         "Attempt to assign task " + taskId + " to " + slaveHost + " failed");
 
     return Iterables.getOnlyElement(
@@ -223,7 +225,7 @@ public class StateManagerImpl implements StateManager {
         }
       });
 
-  private boolean updateTaskAndExternalState(
+  private StateChangeResult updateTaskAndExternalState(
       TaskStore.Mutable taskStore,
       Optional<ScheduleStatus> casState,
       String taskId,
@@ -238,7 +240,7 @@ public class StateManagerImpl implements StateManager {
     if (casState.isPresent()
         && (!task.isPresent() || casState.get() != task.get().getStatus())) {
 
-      return false;
+      return INVALID_CAS_STATE;
     }
 
     return updateTaskAndExternalState(
@@ -277,7 +279,7 @@ public class StateManagerImpl implements StateManager {
   private static final Ordering<SideEffect> ACTION_ORDER =
       Ordering.explicit(ACTIONS_IN_ORDER).onResultOf(GET_ACTION);
 
-  private boolean updateTaskAndExternalState(
+  private StateChangeResult updateTaskAndExternalState(
       TaskStore.Mutable taskStore,
       String taskId,
       // Note: This argument is deliberately non-final, and should not be made final.
@@ -399,7 +401,7 @@ public class StateManagerImpl implements StateManager {
       eventSink.post(event);
     }
 
-    return result.isSuccess();
+    return result.getResult();
   }
 
   @Override

@@ -44,12 +44,10 @@ public interface StateManager {
    *                 decision to defer the action was mde.
    * @param newState State to move the task to.
    * @param auditMessage Message to include with the transition.
-   * @return {@code true} if the transition was performed and the task was moved to
-   *         {@code newState}, {@code false} if the transition was not allowed, or the task was not
-   *         in {@code casState}.
+   * @return {@link StateChangeResult}.
    *
    */
-  boolean changeState(
+  StateChangeResult changeState(
       MutableStoreProvider storeProvider,
       String taskId,
       Optional<ScheduleStatus> casState,

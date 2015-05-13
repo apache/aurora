@@ -48,6 +48,10 @@ import static org.apache.aurora.scheduler.state.SideEffect.Action.INCREMENT_FAIL
 import static org.apache.aurora.scheduler.state.SideEffect.Action.KILL;
 import static org.apache.aurora.scheduler.state.SideEffect.Action.RESCHEDULE;
 import static org.apache.aurora.scheduler.state.SideEffect.Action.SAVE_STATE;
+import static org.apache.aurora.scheduler.state.StateChangeResult.ILLEGAL;
+import static org.apache.aurora.scheduler.state.StateChangeResult.ILLEGAL_WITH_SIDE_EFFECTS;
+import static org.apache.aurora.scheduler.state.StateChangeResult.NOOP;
+import static org.apache.aurora.scheduler.state.StateChangeResult.SUCCESS;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.ASSIGNED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.DELETED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.DRAINING;
@@ -523,13 +527,18 @@ class TaskStateMachine {
      */
     TaskState taskState = status.transform(STATUS_TO_TASK_STATE).or(TaskState.DELETED);
     if (stateMachine.getState() == taskState) {
-      return new TransitionResult(false, ImmutableSet.<SideEffect>of());
+      return new TransitionResult(NOOP, ImmutableSet.<SideEffect>of());
     }
 
     boolean success = stateMachine.transition(taskState);
     ImmutableSet<SideEffect> transitionEffects = ImmutableSet.copyOf(sideEffects);
     sideEffects.clear();
-    return new TransitionResult(success, transitionEffects);
+    if (success) {
+      return new TransitionResult(SUCCESS, transitionEffects);
+    }
+    return new TransitionResult(
+          transitionEffects.isEmpty() ? ILLEGAL : ILLEGAL_WITH_SIDE_EFFECTS,
+          transitionEffects);
   }
 
   /**
