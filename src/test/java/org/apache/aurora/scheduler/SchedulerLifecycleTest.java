@@ -78,7 +78,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
 
   private Capture<ExceptionalCommand<?>> replayAndCreateLifecycle() {
     Capture<ExceptionalCommand<?>> shutdownCommand = createCapture();
-    shutdownRegistry.addAction(capture(shutdownCommand));
+    shutdownRegistry.addAction(EasyMock.<ExceptionalCommand<?>>capture(shutdownCommand));
 
     control.replay();
 
