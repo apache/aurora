@@ -61,6 +61,7 @@ scheduler itself, you may want to explore developing your own
 - [Gutefrage.net](https://www.gutefrage.net)
 - [Magine TV](https://magine.com)
 - [Oscar Health](https://www.hioscar.com)
+- [Sabre Labs](http://www.sabre.com)
 - [TellApart](https://www.tellapart.com)
 - [Twitter](https://twitter.com)
 
