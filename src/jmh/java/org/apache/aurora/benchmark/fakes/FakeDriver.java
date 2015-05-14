@@ -40,6 +40,16 @@ public class FakeDriver extends AbstractIdleService implements Driver {
   }
 
   @Override
+  public void acknowledgeStatusUpdate(Protos.TaskStatus status) {
+    // no-op
+  }
+
+  @Override
+  public void abort() {
+    // no-op
+  }
+
+  @Override
   protected void startUp() throws Exception {
     // no-op
   }

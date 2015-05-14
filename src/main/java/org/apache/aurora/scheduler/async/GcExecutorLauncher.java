@@ -230,6 +230,7 @@ public class GcExecutorLauncher implements TaskLauncher {
       if (status.getState() == Protos.TaskState.TASK_LOST) {
         lostTasks.incrementAndGet();
       }
+      driver.acknowledgeStatusUpdate(status);
       return true;
     } else {
       return false;

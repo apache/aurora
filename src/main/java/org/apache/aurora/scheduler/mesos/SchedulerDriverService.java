@@ -114,6 +114,11 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
   }
 
   @Override
+  public void abort() {
+    Futures.getUnchecked(driverFuture).abort();
+  }
+
+  @Override
   public void launchTask(Protos.OfferID offerId, Protos.TaskInfo task) {
     checkState(isRunning(), "Driver is not running.");
     Futures.getUnchecked(driverFuture)
@@ -137,5 +142,11 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
           taskId, status));
       killFailures.incrementAndGet();
     }
+  }
+
+  @Override
+  public void acknowledgeStatusUpdate(Protos.TaskStatus status) {
+    checkState(isRunning(), "Driver is not running.");
+    Futures.getUnchecked(driverFuture).acknowledgeStatusUpdate(status);
   }
 }

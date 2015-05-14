@@ -23,6 +23,7 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -63,7 +64,8 @@ import static org.apache.mesos.Protos.Offer;
 /**
  * Location for communication with mesos.
  */
-class MesosSchedulerImpl implements Scheduler {
+@VisibleForTesting
+public class MesosSchedulerImpl implements Scheduler {
   private final List<TaskLauncher> taskLaunchers;
 
   private final Storage storage;
@@ -77,9 +79,10 @@ class MesosSchedulerImpl implements Scheduler {
   /**
    * Binding annotation for the executor the incoming Mesos message handler uses.
    */
+  @VisibleForTesting
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  @interface SchedulerExecutor { }
+  public @interface SchedulerExecutor { }
 
   /**
    * Creates a new scheduler.
@@ -228,7 +231,7 @@ class MesosSchedulerImpl implements Scheduler {
     try {
       for (TaskLauncher launcher : taskLaunchers) {
         if (launcher.statusUpdate(status)) {
-          driver.acknowledgeStatusUpdate(status);
+          // The launcher is responsible for acknowledging the update.
           return;
         }
       }

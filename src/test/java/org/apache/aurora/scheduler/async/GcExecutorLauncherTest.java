@@ -191,15 +191,25 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
   @Test
   public void testStatusUpdate() {
+    TaskStatus gcStatus1 = makeStatus(SYSTEM_TASK_PREFIX);
+    TaskStatus gcStatus2 = makeStatus(SYSTEM_TASK_PREFIX + "1");
+    TaskStatus lost = makeStatus(SYSTEM_TASK_PREFIX).toBuilder()
+        .setState(TaskState.TASK_LOST).build();
+
+    driver.acknowledgeStatusUpdate(gcStatus1);
+    driver.acknowledgeStatusUpdate(gcStatus2);
+    driver.acknowledgeStatusUpdate(lost);
+
     replayAndConstruct();
 
-    assertTrue(gcExecutorLauncher.statusUpdate(makeStatus(SYSTEM_TASK_PREFIX)));
-    assertTrue(gcExecutorLauncher.statusUpdate(makeStatus(SYSTEM_TASK_PREFIX + "1")));
+    assertTrue(gcExecutorLauncher.statusUpdate(gcStatus1));
+    assertTrue(gcExecutorLauncher.statusUpdate(gcStatus2));
+
     assertFalse(gcExecutorLauncher.statusUpdate(makeStatus("1" + SYSTEM_TASK_PREFIX)));
     assertFalse(gcExecutorLauncher.statusUpdate(makeStatus("asdf")));
+
     assertEquals(0, lostTasks.get());
-    assertTrue(gcExecutorLauncher.statusUpdate(
-        makeStatus(SYSTEM_TASK_PREFIX).toBuilder().setState(TaskState.TASK_LOST).build()));
+    assertTrue(gcExecutorLauncher.statusUpdate(lost));
     assertEquals(1, lostTasks.get());
   }
 

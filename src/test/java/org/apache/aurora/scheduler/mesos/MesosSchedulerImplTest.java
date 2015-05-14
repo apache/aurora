@@ -268,7 +268,6 @@ public class MesosSchedulerImplTest extends EasyMockTest {
           Optional.of(1000000L)
       ));
       expect(systemLauncher.statusUpdate(status)).andReturn(true);
-      expect(driver.acknowledgeStatusUpdate(status)).andReturn(Protos.Status.DRIVER_RUNNING);
     }
   }
 
@@ -295,7 +294,6 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         eventSink.post(PUBSUB_EVENT);
         expect(systemLauncher.statusUpdate(status)).andReturn(false);
         expect(userLauncher.statusUpdate(status)).andReturn(true);
-        expect(driver.acknowledgeStatusUpdate(status)).andReturn(Protos.Status.DRIVER_RUNNING);
       }
     }.run();
   }

@@ -14,6 +14,8 @@
 package org.apache.aurora.scheduler;
 
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Logger;
 
@@ -23,8 +25,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
+import com.google.inject.TypeLiteral;
+
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
@@ -33,6 +38,7 @@ import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.mesos.Protos;
 
 /**
  * Binding module for top-level scheduling logic.
@@ -51,10 +57,14 @@ public class SchedulerModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> MAX_LEADING_DURATION =
       Arg.create(Amount.of(1L, Time.DAYS));
 
+  @Positive
+  @CmdLine(name = "max_status_update_batch_size",
+      help = "The maximum number of status updates that can be processed in a batch.")
+  private static final Arg<Integer> MAX_STATUS_UPDATE_BATCH_SIZE = Arg.create(1000);
+
   @Override
   protected void configure() {
     bind(TaskIdGenerator.class).to(TaskIdGeneratorImpl.class);
-    bind(UserTaskLauncher.class).in(Singleton.class);
 
     install(new PrivateModule() {
       @Override
@@ -75,6 +85,16 @@ public class SchedulerModule extends AbstractModule {
     bind(TaskVars.class).in(Singleton.class);
     PubsubEventModule.bindSubscriber(binder(), TaskVars.class);
     SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(TaskVars.class);
+
+    bind(new TypeLiteral<BlockingQueue<Protos.TaskStatus>>() { })
+        .annotatedWith(UserTaskLauncher.StatusUpdateQueue.class)
+        .toInstance(new LinkedBlockingQueue<Protos.TaskStatus>());
+    bind(new TypeLiteral<Integer>() { })
+        .annotatedWith(UserTaskLauncher.MaxBatchSize.class)
+        .toInstance(MAX_STATUS_UPDATE_BATCH_SIZE.get());
+
+    bind(UserTaskLauncher.class).in(Singleton.class);
+    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(UserTaskLauncher.class);
   }
 
   @Provides

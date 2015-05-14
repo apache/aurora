@@ -15,8 +15,12 @@ package org.apache.aurora.benchmark;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
@@ -29,6 +33,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Provides;
+import com.google.inject.TypeLiteral;
 
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.base.Command;
@@ -38,6 +43,7 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.benchmark.fakes.FakeDriver;
 import org.apache.aurora.benchmark.fakes.FakeOfferManager;
 import org.apache.aurora.benchmark.fakes.FakeRescheduleCalculator;
 import org.apache.aurora.benchmark.fakes.FakeSchedulerDriver;
@@ -49,14 +55,16 @@ import org.apache.aurora.scheduler.UserTaskLauncher;
 import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.preemptor.ClusterStateImpl;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
+import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
-import org.apache.aurora.scheduler.mesos.SchedulerDriverModule;
+import org.apache.aurora.scheduler.mesos.MesosSchedulerImpl;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
@@ -75,6 +83,7 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
@@ -154,8 +163,8 @@ public class StatusUpdateBenchmark {
   @Param({"5", "25", "100"})
   private long latencyMilliseconds;
 
-  private SchedulerDriver driver;
   private Scheduler scheduler;
+  private UserTaskLauncher userTaskLauncher;
   private SlowStorageWrapper storage;
   private EventBus eventBus;
   private Set<IScheduledTask> tasks;
@@ -171,10 +180,17 @@ public class StatusUpdateBenchmark {
 
     Injector injector = Guice.createInjector(
         new StateModule(),
-        new SchedulerDriverModule(),
         new AbstractModule() {
           @Override
           protected void configure() {
+            bind(Driver.class).toInstance(new FakeDriver());
+            bind(Scheduler.class).to(MesosSchedulerImpl.class);
+            bind(MesosSchedulerImpl.class).in(Singleton.class);
+            bind(Executor.class)
+                .annotatedWith(MesosSchedulerImpl.SchedulerExecutor.class)
+                .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor(
+                    "SchedulerImpl-%d",
+                    Logger.getLogger(StatusUpdateBenchmark.class.getName())));
             bind(DriverFactory.class).toInstance(new DriverFactory() {
               @Override
               public SchedulerDriver create(
@@ -226,13 +242,19 @@ public class StatusUpdateBenchmark {
                 eventBus.post(event);
               }
             });
+            bind(new TypeLiteral<BlockingQueue<Protos.TaskStatus>>() { })
+                .annotatedWith(UserTaskLauncher.StatusUpdateQueue.class)
+                .toInstance(new LinkedBlockingQueue<Protos.TaskStatus>());
+            bind(new TypeLiteral<Integer>() { })
+                .annotatedWith(UserTaskLauncher.MaxBatchSize.class)
+                .toInstance(1000);
+            bind(UserTaskLauncher.class).in(Singleton.class);
           }
 
           @Provides
           @Singleton
-          List<TaskLauncher> provideTaskLaunchers(
-              UserTaskLauncher userTaskLauncher) {
-            return ImmutableList.<TaskLauncher>of(userTaskLauncher);
+          List<TaskLauncher> provideTaskLaunchers(UserTaskLauncher launcher) {
+            return ImmutableList.<TaskLauncher>of(launcher);
           }
         }
     );
@@ -240,6 +262,14 @@ public class StatusUpdateBenchmark {
     eventBus.register(injector.getInstance(ClusterStateImpl.class));
     scheduler = injector.getInstance(Scheduler.class);
     eventBus.register(this);
+
+    userTaskLauncher = injector.getInstance(UserTaskLauncher.class);
+    userTaskLauncher.startAsync();
+  }
+
+  @TearDown(Level.Trial)
+  public void tearDown() {
+    userTaskLauncher.stopAsync();
   }
 
   /**
