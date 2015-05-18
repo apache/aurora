@@ -109,21 +109,34 @@ public final class DbModule extends PrivateModule {
 
   /**
    * Creates a module that will prepare a private in-memory database, using a specific task store
-   * implementation bound within the provided module.
+   * implementation bound within the provided module and a key factory.
+   *
+   * @param taskStoreModule Module providing task store bindings.
+   * @param keyFactory Key factory to use.
+   * @return A new database module for testing.
+   */
+  @VisibleForTesting
+  public static Module testModule(Module taskStoreModule, KeyFactory keyFactory) {
+    return new DbModule(
+        keyFactory,
+        taskStoreModule,
+        // A non-zero close delay is used here to avoid eager database cleanup in tests that
+        // make use of multiple threads.  Since all test databases are separately scoped by the
+        // included UUID, multiple DB instances will overlap in time but they should be distinct
+        // in content.
+        "testdb-" + UUID.randomUUID().toString() + ";DB_CLOSE_DELAY=5;");
+  }
+
+  /**
+   * Creates a module that will prepare a private in-memory database using specific task store
+   * module.
    *
    * @param taskStoreModule Module providing task store bindings.
    * @return A new database module for testing.
    */
   @VisibleForTesting
   public static Module testModule(Module taskStoreModule) {
-    return new DbModule(
-        KeyFactory.PLAIN,
-        taskStoreModule,
-        // A non-zero close delay is used here to avoid eager database cleanup in tests that
-        // make use of multiple threads.  Since all test databases are separately scoped by the
-        // included UUID, multiple DB instances will overlap in time but they should be distinct
-        // in content.
-        "testdb-" + UUID.randomUUID().toString() + ";DB_CLOSE_DELAY=5");
+    return testModule(taskStoreModule, KeyFactory.PLAIN);
   }
 
   /**

@@ -13,12 +13,13 @@
  */
 package org.apache.aurora.benchmark;
 
-import java.util.Arrays;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -26,27 +27,12 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
-import org.apache.aurora.gen.ExecutorConfig;
-import org.apache.aurora.gen.InstanceTaskConfig;
-import org.apache.aurora.gen.JobInstanceUpdateEvent;
-import org.apache.aurora.gen.JobKey;
-import org.apache.aurora.gen.JobUpdate;
-import org.apache.aurora.gen.JobUpdateAction;
-import org.apache.aurora.gen.JobUpdateEvent;
-import org.apache.aurora.gen.JobUpdateInstructions;
-import org.apache.aurora.gen.JobUpdateKey;
-import org.apache.aurora.gen.JobUpdateSettings;
-import org.apache.aurora.gen.JobUpdateStatus;
-import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
-import org.apache.aurora.gen.Range;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
@@ -63,6 +49,7 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
 public class UpdateStoreBenchmarks {
@@ -76,7 +63,7 @@ public class UpdateStoreBenchmarks {
   public static class JobDetailsBenchmark {
     private static final String USER = "user";
     private Storage storage;
-    private IJobUpdateKey key;
+    private Set<IJobUpdateKey> keys;
 
     @Param({"1000", "5000", "10000"})
     private int instances;
@@ -98,66 +85,45 @@ public class UpdateStoreBenchmarks {
 
     @Setup(Level.Iteration)
     public void setUpIteration() {
-      final JobKey job = new JobKey("role", "env", UUID.randomUUID().toString());
-      key = IJobUpdateKey.build(new JobUpdateKey()
-          .setJob(job)
-          .setId(UUID.randomUUID().toString()));
-
-      TaskConfig task = new TaskConfig()
-          .setJob(job)
-          .setExecutorConfig(new ExecutorConfig("cfg", string(10000)));
-
-      final JobUpdate update = new JobUpdate()
-          .setSummary(new JobUpdateSummary()
-              .setKey(key.newBuilder())
-              .setUpdateId(key.getId())
-              .setJobKey(job)
-              .setUser(USER))
-          .setInstructions(new JobUpdateInstructions()
-              .setSettings(new JobUpdateSettings()
-                  .setUpdateGroupSize(100)
-                  .setMaxFailedInstances(1)
-                  .setMaxPerInstanceFailures(1)
-                  .setMaxWaitToInstanceRunningMs(1)
-                  .setMinWaitInInstanceRunningMs(1)
-                  .setRollbackOnFailure(true)
-                  .setWaitForBatchCompletion(false))
-              .setInitialState(ImmutableSet.of(new InstanceTaskConfig()
-                  .setTask(task)
-                  .setInstances(ImmutableSet.of(new Range(0, 10)))))
-              .setDesiredState(new InstanceTaskConfig()
-                  .setTask(task)
-                  .setInstances(ImmutableSet.of(new Range(0, instances)))));
-
       storage.write(new Storage.MutateWork.NoResult.Quiet() {
         @Override
         protected void execute(Storage.MutableStoreProvider storeProvider) {
-          String lockToken = UUID.randomUUID().toString();
-          storeProvider.getLockStore().saveLock(
-              ILock.build(new Lock(LockKey.job(job), lockToken, USER, 0L)));
-
           JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
-          updateStore.saveJobUpdate(IJobUpdate.build(update), Optional.of(lockToken));
-          updateStore.saveJobUpdateEvent(
-              key,
-              IJobUpdateEvent.build(new JobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, 0L)
-                  .setUser(USER)
-                  .setMessage("message")));
+          Set<IJobUpdateDetails> updates =
+              new JobUpdates.Builder().setNumInstanceEvents(instances).build(1);
 
-          for (int i = 0; i < instances; i++) {
-            updateStore.saveJobInstanceUpdateEvent(
-                key,
-                IJobInstanceUpdateEvent.build(
-                    new JobInstanceUpdateEvent(i, 0L, JobUpdateAction.INSTANCE_UPDATING)));
+          ImmutableSet.Builder<IJobUpdateKey> keyBuilder = ImmutableSet.builder();
+          for (IJobUpdateDetails details : updates) {
+            IJobUpdateKey key = details.getUpdate().getSummary().getKey();
+            keyBuilder.add(key);
+            String lockToken = UUID.randomUUID().toString();
+            storeProvider.getLockStore().saveLock(
+                ILock.build(new Lock(LockKey.job(key.getJob().newBuilder()), lockToken, USER, 0L)));
+
+            updateStore.saveJobUpdate(details.getUpdate(), Optional.of(lockToken));
+
+            for (IJobUpdateEvent updateEvent : details.getUpdateEvents()) {
+              updateStore.saveJobUpdateEvent(key, updateEvent);
+            }
+
+            for (IJobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
+              updateStore.saveJobInstanceUpdateEvent(key, instanceEvent);
+            }
           }
+          keys = keyBuilder.build();
         }
       });
     }
 
-    private static String string(int numChars) {
-      char[] chars = new char[numChars];
-      Arrays.fill(chars, 'a');
-      return new String(chars);
+    @TearDown(Level.Iteration)
+    public void tearDownIteration() {
+      storage.write(new Storage.MutateWork.NoResult.Quiet() {
+        @Override
+        protected void execute(Storage.MutableStoreProvider storeProvider) {
+          storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+          storeProvider.getLockStore().deleteLocks();
+        }
+      });
     }
 
     @Benchmark
@@ -165,7 +131,8 @@ public class UpdateStoreBenchmarks {
       return storage.read(new Storage.Work.Quiet<IJobUpdateDetails>() {
         @Override
         public IJobUpdateDetails apply(Storage.StoreProvider store) {
-          return store.getJobUpdateStore().fetchJobUpdateDetails(key).get();
+          return store.getJobUpdateStore().fetchJobUpdateDetails(
+              Iterables.getOnlyElement(keys)).get();
         }
       });
     }
