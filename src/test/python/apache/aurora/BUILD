@@ -22,3 +22,12 @@ python_test_suite(
     'src/test/python/apache/aurora/executor:all',
   ]
 )
+
+python_library(
+  name = 'api_util',
+  sources = [ 'api_util.py' ],
+  dependencies = [
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/main/python/apache/aurora/client/api:scheduler_client',
+  ]
+)

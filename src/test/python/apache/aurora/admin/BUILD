@@ -67,8 +67,9 @@ python_library(
   sources = [ 'util.py' ],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client/hooks:hooks',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/main/python/apache/aurora/client/hooks:hooks',
     'src/main/python/apache/aurora/client:config',
+    'src/test/python/apache/aurora:api_util',
   ],
 )
