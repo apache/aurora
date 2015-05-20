@@ -36,7 +36,9 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.mesos.Driver;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskStatus;
@@ -61,12 +63,15 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
   @VisibleForTesting
   static final String MEMORY_LIMIT_DISPLAY = "Task used more memory than requested.";
 
+  private static final String STATUS_STAT_FORMAT = "status_update_%s_%s";
+
   private final Storage storage;
   private final OfferManager offerManager;
   private final StateManager stateManager;
   private final Driver driver;
   private final BlockingQueue<TaskStatus> pendingUpdates;
   private final int maxBatchSize;
+  private final CachedCounters counters;
 
   private final AtomicReference<Thread> threadReference = new AtomicReference<>();
 
@@ -93,7 +98,8 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
       StateManager stateManager,
       final Driver driver,
       @StatusUpdateQueue BlockingQueue<TaskStatus> pendingUpdates,
-      @MaxBatchSize Integer maxBatchSize) {
+      @MaxBatchSize Integer maxBatchSize,
+      CachedCounters counters) {
 
     this.storage = requireNonNull(storage);
     this.offerManager = requireNonNull(offerManager);
@@ -101,6 +107,7 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
     this.driver = requireNonNull(driver);
     this.pendingUpdates = requireNonNull(pendingUpdates);
     this.maxBatchSize = requireNonNull(maxBatchSize);
+    this.counters = requireNonNull(counters);
 
     Stats.exportSize("status_updates_queue_size", this.pendingUpdates);
 
@@ -181,12 +188,16 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
                 message = Optional.of(MEMORY_LIMIT_DISPLAY);
               }
 
-              stateManager.changeState(
+              StateChangeResult result = stateManager.changeState(
                   storeProvider,
                   status.getTaskId().getValue(),
                   Optional.<ScheduleStatus>absent(),
                   translatedState,
                   message);
+
+              if (status.hasReason()) {
+                counters.get(statName(status, result)).incrementAndGet();
+              }
             }
           }
         });
@@ -198,5 +209,10 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
         LOG.log(Level.SEVERE, "Failed to process status update batch " + updates, e);
       }
     }
+  }
+
+  @VisibleForTesting
+  static String statName(TaskStatus status, StateChangeResult result) {
+    return String.format(STATUS_STAT_FORMAT, status.getReason(), result);
   }
 }

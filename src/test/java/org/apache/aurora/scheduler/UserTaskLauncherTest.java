@@ -29,9 +29,11 @@ import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.mesos.Offers;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskState;
@@ -43,8 +45,10 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.UserTaskLauncher.statName;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class UserTaskLauncherTest extends EasyMockTest {
@@ -61,6 +65,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private Driver driver;
   private BlockingQueue<TaskStatus> queue;
+  private FakeStatsProvider stats;
 
   private UserTaskLauncher launcher;
 
@@ -71,6 +76,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     driver = createMock(Driver.class);
     queue = new LinkedBlockingQueue<>();
+    stats = new FakeStatsProvider();
 
     launcher = new UserTaskLauncher(
         storageUtil.storage,
@@ -78,7 +84,8 @@ public class UserTaskLauncherTest extends EasyMockTest {
         stateManager,
         driver,
         queue,
-        1000);
+        1000,
+        new CachedCounters(stats));
 
     launcher.startAsync();
   }
@@ -101,6 +108,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
   public void testForwardsStatusUpdates() throws Exception {
     TaskStatus status = TaskStatus.newBuilder()
         .setState(TaskState.TASK_RUNNING)
+        .setReason(TaskStatus.Reason.REASON_RECONCILIATION)
         .setTaskId(TaskID.newBuilder().setValue(TASK_ID_A))
         .setMessage("fake message")
         .build();
@@ -126,8 +134,8 @@ public class UserTaskLauncherTest extends EasyMockTest {
     control.replay();
 
     assertTrue(launcher.statusUpdate(status));
-
     assertTrue(latch.await(5L, TimeUnit.SECONDS));
+    assertEquals(1L, stats.getValue(statName(status, StateChangeResult.SUCCESS)));
   }
 
   @Test
@@ -242,7 +250,8 @@ public class UserTaskLauncherTest extends EasyMockTest {
         stateManager,
         driver,
         queue,
-        1000);
+        1000,
+        new CachedCounters(stats));
 
     expect(queue.add(EasyMock.<TaskStatus>anyObject()))
         .andReturn(true);
