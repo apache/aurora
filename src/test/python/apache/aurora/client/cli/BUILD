@@ -23,6 +23,7 @@ python_test_suite(
     ':inspect',
     ':job',
     ':config',
+    ':options',
     ':plugins',
     ':quota',
     ':sla',
@@ -221,6 +222,14 @@ python_tests(
   sources = [ 'test_context.py' ],
   dependencies = [
     '3rdparty/python:mock',
+    'src/main/python/apache/aurora/client/cli',
+  ]
+)
+
+python_tests(
+  name = 'options',
+  sources = [ 'test_options.py' ],
+  dependencies = [
     'src/main/python/apache/aurora/client/cli',
   ]
 )

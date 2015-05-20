@@ -71,7 +71,11 @@ def parse_instances(instances):
   result = set()
   for part in instances.split(','):
     x = part.split('-')
-    result.update(range(int(x[0]), int(x[-1]) + 1))
+    start = int(x[0])
+    end = int(x[-1]) + 1
+    if start >= end:
+      raise ArgumentTypeError('Invalid instance range: %s' % x)
+    result.update(range(start, end))
   return sorted(result)
 
 
