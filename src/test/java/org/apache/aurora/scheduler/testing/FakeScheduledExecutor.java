@@ -91,13 +91,23 @@ public final class FakeScheduledExecutor extends FakeClock {
       ScheduledExecutorService mock,
       int maxInvocations) {
 
+    return scheduleAtFixedRateExecutor(mock, 1, maxInvocations);
+  }
+
+  public static FakeScheduledExecutor scheduleAtFixedRateExecutor(
+      ScheduledExecutorService mock,
+      int maxSchedules,
+      int maxInvocations) {
+
     FakeScheduledExecutor executor = new FakeScheduledExecutor();
     mock.scheduleAtFixedRate(
         EasyMock.<Runnable>anyObject(),
         EasyMock.anyLong(),
         EasyMock.anyLong(),
         EasyMock.<TimeUnit>anyObject());
-    expectLastCall().andAnswer(answerScheduleAtFixedRate(executor, maxInvocations)).once();
+    expectLastCall()
+        .andAnswer(answerScheduleAtFixedRate(executor, maxInvocations))
+        .times(maxSchedules);
 
     return executor;
   }
@@ -114,7 +124,7 @@ public final class FakeScheduledExecutor extends FakeClock {
         long initialDelay = (Long) args[1];
         long period = (Long) args[2];
         TimeUnit unit = (TimeUnit) args[3];
-        for (int i = 1; i <= workCount; i++) {
+        for (int i = 0; i <= workCount; i++) {
           addDelayedWork(executor, toMillis(initialDelay, unit) + i * toMillis(period, unit), work);
         }
         return null;

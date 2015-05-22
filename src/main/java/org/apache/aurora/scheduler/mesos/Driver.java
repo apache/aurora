@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.Collection;
+
 import com.google.common.util.concurrent.Service;
 
 import org.apache.mesos.Protos.OfferID;
@@ -67,4 +69,11 @@ public interface Driver extends Service {
    * Aborts the driver.
    */
   void abort();
+
+  /**
+   * Requests task reconciliation.
+   *
+   * @param statuses Task statuses to reconcile.
+   */
+  void reconcileTasks(Collection<TaskStatus> statuses);
 }

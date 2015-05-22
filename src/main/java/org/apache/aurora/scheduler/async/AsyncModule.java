@@ -51,6 +51,7 @@ import org.apache.aurora.scheduler.async.OfferManager.OfferReturnDelay;
 import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.async.TaskHistoryPruner.HistoryPrunnerSettings;
+import org.apache.aurora.scheduler.async.TaskReconciler.TaskReconcilerSettings;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.async.preemptor.BiCache;
 import org.apache.aurora.scheduler.async.preemptor.BiCache.BiCacheSettings;
@@ -181,6 +182,32 @@ public class AsyncModule extends AbstractModule {
   @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
   private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
 
+  // TODO(maxim): Disabled by default until AURORA-715 is complete.
+  @CmdLine(name = "reconciliation_initial_delay",
+      help = "Initial amount of time to delay task reconciliation after scheduler start up.")
+  private static final Arg<Amount<Long, Time>> RECONCILIATION_INITIAL_DELAY =
+      Arg.create(Amount.of(Long.MAX_VALUE, Time.MINUTES));
+
+  @Positive
+  @CmdLine(name = "reconciliation_explicit_interval",
+      help = "Interval on which scheduler will ask Mesos for status updates of all non-terminal "
+      + "tasks known to scheduler.")
+  private static final Arg<Amount<Long, Time>> RECONCILIATION_EXPLICIT_INTERVAL =
+      Arg.create(Amount.of(60L, Time.MINUTES));
+
+  @Positive
+  @CmdLine(name = "reconciliation_implicit_interval",
+      help = "Interval on which scheduler will ask Mesos for status updates of all non-terminal "
+          + "tasks known to Mesos.")
+  private static final Arg<Amount<Long, Time>> RECONCILIATION_IMPLICIT_INTERVAL =
+      Arg.create(Amount.of(60L, Time.MINUTES));
+
+  @CmdLine(name = "reconciliation_schedule_spread",
+      help = "Difference between explicit and implicit reconciliation intervals intended to "
+          + "create a non-overlapping task reconciliation schedule.")
+  private static final Arg<Amount<Long, Time>> RECONCILIATION_SCHEDULE_SPREAD =
+      Arg.create(Amount.of(30L, Time.MINUTES));
+
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   private @interface AsyncExecutor { }
@@ -308,6 +335,21 @@ public class AsyncModule extends AbstractModule {
         expose(GcExecutorLauncher.class);
       }
     });
+
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(TaskReconcilerSettings.class).toInstance(new TaskReconcilerSettings(
+            RECONCILIATION_INITIAL_DELAY.get(),
+            RECONCILIATION_EXPLICIT_INTERVAL.get(),
+            RECONCILIATION_IMPLICIT_INTERVAL.get(),
+            RECONCILIATION_SCHEDULE_SPREAD.get()));
+        bind(ScheduledExecutorService.class).toInstance(executor);
+        bind(TaskReconciler.class).in(Singleton.class);
+        expose(TaskReconciler.class);
+      }
+    });
+    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(TaskReconciler.class);
 
     install(new PrivateModule() {
       @Override

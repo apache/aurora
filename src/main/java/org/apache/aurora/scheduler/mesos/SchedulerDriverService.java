@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
@@ -120,20 +121,20 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
 
   @Override
   public void launchTask(Protos.OfferID offerId, Protos.TaskInfo task) {
-    checkState(isRunning(), "Driver is not running.");
+    ensureRunning();
     Futures.getUnchecked(driverFuture)
         .launchTasks(ImmutableList.of(offerId), ImmutableList.of(task));
   }
 
   @Override
   public void declineOffer(Protos.OfferID offerId) {
-    checkState(isRunning(), "Driver is not running.");
+    ensureRunning();
     Futures.getUnchecked(driverFuture).declineOffer(offerId);
   }
 
   @Override
   public void killTask(String taskId) {
-    checkState(isRunning(), "Driver is not running.");
+    ensureRunning();
     Protos.Status status = Futures.getUnchecked(driverFuture).killTask(
         Protos.TaskID.newBuilder().setValue(taskId).build());
 
@@ -146,7 +147,17 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
 
   @Override
   public void acknowledgeStatusUpdate(Protos.TaskStatus status) {
-    checkState(isRunning(), "Driver is not running.");
+    ensureRunning();
     Futures.getUnchecked(driverFuture).acknowledgeStatusUpdate(status);
+  }
+
+  @Override
+  public void reconcileTasks(Collection<Protos.TaskStatus> statuses) {
+    ensureRunning();
+    Futures.getUnchecked(driverFuture).reconcileTasks(statuses);
+  }
+
+  private void ensureRunning() {
+    checkState(isRunning(), "Driver is not running.");
   }
 }

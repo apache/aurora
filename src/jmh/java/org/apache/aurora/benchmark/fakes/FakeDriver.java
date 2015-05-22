@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.benchmark.fakes;
 
+import java.util.Collection;
+
 import com.google.common.util.concurrent.AbstractIdleService;
 
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -56,6 +58,11 @@ public class FakeDriver extends AbstractIdleService implements Driver {
 
   @Override
   protected void shutDown() throws Exception {
+    // no-op
+  }
+
+  @Override
+  public void reconcileTasks(Collection<Protos.TaskStatus> statuses) {
     // no-op
   }
 }
