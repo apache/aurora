@@ -30,7 +30,7 @@ To start a virtual cluster, you need to install Vagrant, and then run `vagrant u
 the aurora workspace. This will create a vagrant host named "devcluster", with a mesos master, a set
 of mesos slaves, and an aurora scheduler.
 
-If you have changed you would like to test in your local cluster, you'll rebuild the client:
+If you have a change you would like to test in your local cluster, you'll rebuild the client:
 
     vagrant ssh -c 'aurorabuild client'
 
