@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -100,7 +101,7 @@ public class SnapshotBenchmarks {
             bind(SnapshotStoreImpl.class).in(Singleton.class);
           }
         },
-        DbModule.testModule(new DbModule.TaskStoreModule(keyFactory), keyFactory));
+        DbModule.testModule(keyFactory, Optional.of(new DbModule.TaskStoreModule(keyFactory))));
 
     Storage storage = injector.getInstance(Key.get(Storage.class, Storage.Volatile.class));
     storage.prepare();

@@ -66,7 +66,7 @@ interface TemporaryStorage {
   class TemporaryStorageFactory implements Function<Snapshot, TemporaryStorage> {
     @Override
     public TemporaryStorage apply(Snapshot snapshot) {
-      final Storage storage = DbUtil.createStorage();
+      final Storage storage = DbUtil.createFlaggedStorage();
       FakeClock clock = new FakeClock();
       clock.setNowMillis(snapshot.getTimestamp());
       final SnapshotStore<Snapshot> snapshotStore = new SnapshotStoreImpl(clock, storage);

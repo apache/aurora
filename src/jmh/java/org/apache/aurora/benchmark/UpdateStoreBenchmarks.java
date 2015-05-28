@@ -20,18 +20,12 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.Clock;
 
-import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.db.DbModule;
+import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
@@ -70,17 +64,7 @@ public class UpdateStoreBenchmarks {
 
     @Setup(Level.Trial)
     public void setUp() {
-      Injector injector = Guice.createInjector(
-          new AbstractModule() {
-            @Override
-            protected void configure() {
-              bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
-              bind(StatsProvider.class).toInstance(new FakeStatsProvider());
-            }
-          },
-          DbModule.testModule());
-      storage = injector.getInstance(Storage.class);
-      storage.prepare();
+      storage = DbUtil.createStorage();
     }
 
     @Setup(Level.Iteration)

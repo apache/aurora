@@ -98,7 +98,7 @@ public class DbJobUpdateStoreTest {
 
   @Before
   public void setUp() throws Exception {
-    Injector injector = DbUtil.createStorageInjector();
+    Injector injector = DbUtil.createStorageInjector(DbModule.testModule());
     storage = injector.getInstance(Storage.class);
     stats = injector.getInstance(FakeStatsProvider.class);
   }

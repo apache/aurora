@@ -19,6 +19,7 @@ import java.util.UUID;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Key;
@@ -99,27 +100,22 @@ public final class DbModule extends PrivateModule {
    * @return A new database module for production.
    */
   public static Module productionModule(KeyFactory keyFactory) {
-    return new DbModule(
-        keyFactory,
-        USE_DB_TASK_STORE.get()
-            ? new TaskStoreModule(keyFactory)
-            : new InMemStoresModule.TaskStoreModule(keyFactory),
-        "aurora;DB_CLOSE_DELAY=-1");
+    return new DbModule(keyFactory, getTaskStoreModule(keyFactory), "aurora;DB_CLOSE_DELAY=-1");
   }
 
   /**
    * Creates a module that will prepare a private in-memory database, using a specific task store
-   * implementation bound within the provided module and a key factory.
+   * implementation bound within the key factory and provided module.
    *
-   * @param taskStoreModule Module providing task store bindings.
    * @param keyFactory Key factory to use.
+   * @param taskStoreModule Module providing task store bindings.
    * @return A new database module for testing.
    */
   @VisibleForTesting
-  public static Module testModule(Module taskStoreModule, KeyFactory keyFactory) {
+  public static Module testModule(KeyFactory keyFactory, Optional<Module> taskStoreModule) {
     return new DbModule(
         keyFactory,
-        taskStoreModule,
+        taskStoreModule.isPresent() ? taskStoreModule.get() : getTaskStoreModule(keyFactory),
         // A non-zero close delay is used here to avoid eager database cleanup in tests that
         // make use of multiple threads.  Since all test databases are separately scoped by the
         // included UUID, multiple DB instances will overlap in time but they should be distinct
@@ -128,25 +124,19 @@ public final class DbModule extends PrivateModule {
   }
 
   /**
-   * Creates a module that will prepare a private in-memory database using specific task store
-   * module.
-   *
-   * @param taskStoreModule Module providing task store bindings.
-   * @return A new database module for testing.
-   */
-  @VisibleForTesting
-  public static Module testModule(Module taskStoreModule) {
-    return testModule(taskStoreModule, KeyFactory.PLAIN);
-  }
-
-  /**
-   * Creates a module that will prepare a private in-memory database.
+   * Same as {@link #testModule(KeyFactory, Optional)} but with default task store and key factory.
    *
    * @return A new database module for testing.
    */
   @VisibleForTesting
   public static Module testModule() {
-    return testModule(new DbModule.TaskStoreModule(KeyFactory.PLAIN));
+    return testModule(KeyFactory.PLAIN, Optional.of(new TaskStoreModule(KeyFactory.PLAIN)));
+  }
+
+  private static Module getTaskStoreModule(KeyFactory keyFactory) {
+    return USE_DB_TASK_STORE.get()
+        ? new TaskStoreModule(keyFactory)
+        : new InMemStoresModule.TaskStoreModule(keyFactory);
   }
 
   private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {

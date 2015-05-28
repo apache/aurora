@@ -13,11 +13,11 @@
  */
 package org.apache.aurora.scheduler.storage.mem;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
-import com.twitter.common.inject.Bindings.KeyFactory;
 import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.scheduler.base.Tasks;
@@ -27,6 +27,8 @@ import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
+
+import static com.twitter.common.inject.Bindings.KeyFactory.PLAIN;
 
 import static org.junit.Assert.assertEquals;
 
@@ -38,7 +40,7 @@ public class InMemTaskStoreTest extends AbstractTaskStoreTest {
   protected Module getStorageModule() {
     statsProvider = new FakeStatsProvider();
     return Modules.combine(
-        DbModule.testModule(new InMemStoresModule.TaskStoreModule(KeyFactory.PLAIN)),
+        DbModule.testModule(PLAIN, Optional.of(new InMemStoresModule.TaskStoreModule(PLAIN))),
         new AbstractModule() {
           @Override
           protected void configure() {
