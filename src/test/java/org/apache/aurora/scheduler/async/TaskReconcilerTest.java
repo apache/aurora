@@ -31,19 +31,34 @@ import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.junit.Before;
 import org.junit.Test;
 
+import static com.twitter.common.quantity.Time.MINUTES;
+
 import static org.apache.aurora.scheduler.async.TaskReconciler.EXPLICIT_STAT_NAME;
 import static org.apache.aurora.scheduler.async.TaskReconciler.IMPLICIT_STAT_NAME;
 import static org.apache.aurora.scheduler.async.TaskReconciler.TASK_TO_PROTO;
+import static org.apache.aurora.scheduler.async.TaskReconciler.TaskReconcilerSettings;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 
 public class TaskReconcilerTest extends EasyMockTest {
+  private static final Amount<Long, Time> INITIAL_DELAY = Amount.of(10L, MINUTES);
+  private static final Amount<Long, Time> EXPLICIT_SCHEDULE = Amount.of(60L, MINUTES);
+  private static final Amount<Long, Time> IMPLICT_SCHEDULE = Amount.of(180L, MINUTES);
+  private static final Amount<Long, Time> SPREAD = Amount.of(30L, MINUTES);
+  private static final TaskReconcilerSettings SETTINGS = new TaskReconcilerSettings(
+      INITIAL_DELAY,
+      EXPLICIT_SCHEDULE,
+      IMPLICT_SCHEDULE,
+      SPREAD);
+
   private StorageTestUtil storageUtil;
   private StatsProvider statsProvider;
   private Driver driver;
   private ScheduledExecutorService executorService;
   private FakeScheduledExecutor clock;
+  private AtomicLong explicitRuns;
+  private AtomicLong implicitRuns;
 
   @Before
   public void setUp() {
@@ -51,15 +66,15 @@ public class TaskReconcilerTest extends EasyMockTest {
     statsProvider = createMock(StatsProvider.class);
     driver = createMock(Driver.class);
     executorService = createMock(ScheduledExecutorService.class);
-    clock = FakeScheduledExecutor.scheduleAtFixedRateExecutor(executorService, 2, 5);
+    explicitRuns = new AtomicLong();
+    implicitRuns = new AtomicLong();
   }
 
   @Test
   public void testExecution() {
-    AtomicLong explicitRuns = new AtomicLong();
-    AtomicLong implicitRuns = new AtomicLong();
     expect(statsProvider.makeCounter(EXPLICIT_STAT_NAME)).andReturn(explicitRuns);
     expect(statsProvider.makeCounter(IMPLICIT_STAT_NAME)).andReturn(implicitRuns);
+    clock = FakeScheduledExecutor.scheduleAtFixedRateExecutor(executorService, 2, 5);
 
     IScheduledTask task = TaskTestUtil.makeTask("id1", TaskTestUtil.JOB);
     storageUtil.expectOperations();
@@ -73,17 +88,8 @@ public class TaskReconcilerTest extends EasyMockTest {
 
     control.replay();
 
-    Amount<Long, Time> initialDelay = Amount.of(10L, Time.MINUTES);
-    Amount<Long, Time> explicitSchedule = Amount.of(60L, Time.MINUTES);
-    Amount<Long, Time> implicitSchedule = Amount.of(180L, Time.MINUTES);
-    Amount<Long, Time> spread = Amount.of(30L, Time.MINUTES);
-
     TaskReconciler reconciler = new TaskReconciler(
-        new TaskReconciler.TaskReconcilerSettings(
-            initialDelay,
-            explicitSchedule,
-            implicitSchedule,
-            spread),
+        SETTINGS,
         storageUtil.storage,
         driver,
         executorService,
@@ -91,20 +97,42 @@ public class TaskReconcilerTest extends EasyMockTest {
 
     reconciler.startAsync().awaitRunning();
 
-    clock.advance(initialDelay);
+    clock.advance(INITIAL_DELAY);
     assertEquals(1L, explicitRuns.get());
     assertEquals(0L, implicitRuns.get());
 
-    clock.advance(spread);
+    clock.advance(SPREAD);
     assertEquals(1L, explicitRuns.get());
     assertEquals(1L, implicitRuns.get());
 
-    clock.advance(explicitSchedule);
+    clock.advance(EXPLICIT_SCHEDULE);
     assertEquals(2L, explicitRuns.get());
     assertEquals(1L, implicitRuns.get());
 
-    clock.advance(implicitSchedule);
+    clock.advance(IMPLICT_SCHEDULE);
     assertEquals(5L, explicitRuns.get());
     assertEquals(2L, implicitRuns.get());
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testInvalidImplicitDelay() throws Exception {
+    control.replay();
+
+    new TaskReconcilerSettings(
+        INITIAL_DELAY,
+        EXPLICIT_SCHEDULE,
+        IMPLICT_SCHEDULE,
+        Amount.of(Long.MAX_VALUE, MINUTES));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testInvalidExplicitDelay() throws Exception {
+    control.replay();
+
+    new TaskReconcilerSettings(
+        Amount.of(Long.MAX_VALUE, MINUTES),
+        EXPLICIT_SCHEDULE,
+        IMPLICT_SCHEDULE,
+        SPREAD);
   }
 }

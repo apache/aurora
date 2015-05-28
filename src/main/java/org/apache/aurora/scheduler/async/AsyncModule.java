@@ -186,7 +186,7 @@ public class AsyncModule extends AbstractModule {
   @CmdLine(name = "reconciliation_initial_delay",
       help = "Initial amount of time to delay task reconciliation after scheduler start up.")
   private static final Arg<Amount<Long, Time>> RECONCILIATION_INITIAL_DELAY =
-      Arg.create(Amount.of(Long.MAX_VALUE, Time.MINUTES));
+      Arg.create(Amount.of((long) Integer.MAX_VALUE, Time.MINUTES));
 
   @Positive
   @CmdLine(name = "reconciliation_explicit_interval",

@@ -35,6 +35,7 @@ import org.apache.mesos.Protos;
 
 import static java.util.Objects.requireNonNull;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.twitter.common.quantity.Time.MINUTES;
 
 /**
@@ -58,10 +59,10 @@ public class TaskReconciler extends AbstractIdleService {
   private final AtomicLong implicitRuns;
 
   static class TaskReconcilerSettings {
-    private final Amount<Long, Time> initialDelay;
     private final Amount<Long, Time> explicitInterval;
     private final Amount<Long, Time> implicitInterval;
-    private final Amount<Long, Time> scheduleSpread;
+    private final long explicitDelayMinutes;
+    private final long implicitDelayMinutes;
 
     @VisibleForTesting
     TaskReconcilerSettings(
@@ -70,10 +71,16 @@ public class TaskReconciler extends AbstractIdleService {
         Amount<Long, Time> implicitInterval,
         Amount<Long, Time> scheduleSpread) {
 
-      this.initialDelay = requireNonNull(initialDelay);
       this.explicitInterval = requireNonNull(explicitInterval);
       this.implicitInterval = requireNonNull(implicitInterval);
-      this.scheduleSpread = requireNonNull(scheduleSpread);
+      explicitDelayMinutes = requireNonNull(initialDelay).as(MINUTES);
+      implicitDelayMinutes = initialDelay.as(MINUTES) + scheduleSpread.as(MINUTES);
+      checkArgument(
+          explicitDelayMinutes >= 0,
+          "Invalid explicit reconciliation delay: " + explicitDelayMinutes);
+      checkArgument(
+          implicitDelayMinutes >= 0L,
+          "Invalid implicit reconciliation delay: " + implicitDelayMinutes);
     }
   }
 
@@ -109,7 +116,7 @@ public class TaskReconciler extends AbstractIdleService {
             explicitRuns.incrementAndGet();
           }
         },
-        settings.initialDelay.as(MINUTES),
+        settings.explicitDelayMinutes,
         settings.explicitInterval.as(MINUTES),
         MINUTES.getTimeUnit());
 
@@ -122,7 +129,7 @@ public class TaskReconciler extends AbstractIdleService {
             implicitRuns.incrementAndGet();
           }
         },
-        settings.initialDelay.as(MINUTES) + settings.scheduleSpread.as(MINUTES),
+        settings.implicitDelayMinutes,
         settings.implicitInterval.as(MINUTES),
         MINUTES.getTimeUnit());
   }
