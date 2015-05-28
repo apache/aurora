@@ -24,6 +24,7 @@ python_tests(
   name = 'gc_executor_entry_point',
   sources = ['test_gc_executor_entry_point.py'],
   dependencies = [
+    '3rdparty/python:mock',
     'src/main/python/apache/aurora/executor/bin:gc_executor_source',
   ],
 )

@@ -12,7 +12,29 @@
 # limitations under the License.
 #
 
+import unittest
+
+from mock import create_autospec, Mock, patch
+
+from apache.aurora.executor.bin.gc_executor_main import initialize, proxy_main
+from apache.aurora.executor.gc_executor import ThermosGCExecutor
+from apache.thermos.monitoring.detector import ChainedPathDetector
+
 
 def test_gc_executor_valid_import_dependencies():
-  from apache.aurora.executor.bin.gc_executor_main import proxy_main
   assert proxy_main is not None
+
+
+class GcExecutorMainTest(unittest.TestCase):
+  def test_chained_path_detector_initialized(self):
+    mock_gc_executor = create_autospec(spec=ThermosGCExecutor)
+    with patch('apache.aurora.executor.bin.gc_executor_main.ThermosGCExecutor',
+        return_value=mock_gc_executor) as mock:
+      with patch('apache.aurora.executor.bin.gc_executor_main.MesosExecutorDriver',
+          return_value=Mock()):
+
+        initialize()
+        assert len(mock.mock_calls) == 1
+        call = mock.mock_calls[0]
+        _, args, _ = call
+        assert len(args) == 1 and isinstance(args[0], ChainedPathDetector)

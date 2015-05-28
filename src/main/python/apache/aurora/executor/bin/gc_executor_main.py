@@ -29,9 +29,10 @@ from twitter.common.log.options import LogOptions
 from twitter.common.metrics.sampler import DiskMetricWriter
 
 from apache.aurora.executor.common.executor_detector import ExecutorDetector
+from apache.aurora.executor.common.path_detector import MesosPathDetector
 from apache.aurora.executor.gc_executor import ThermosGCExecutor
 from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
-from apache.thermos.monitoring.detector import FixedPathDetector
+from apache.thermos.monitoring.detector import ChainedPathDetector, FixedPathDetector
 
 app.configure(debug=True)
 
@@ -42,23 +43,33 @@ LogOptions.set_disk_log_level('DEBUG')
 LogOptions.set_log_dir(ExecutorDetector.LOG_PATH)
 
 
+def initialize():
+  path_detector = ChainedPathDetector(
+      FixedPathDetector(DEFAULT_CHECKPOINT_ROOT),
+      MesosPathDetector(),
+  )
+
+  # Create executor stub
+  thermos_gc_executor = ThermosGCExecutor(path_detector)
+
+  # Create metrics collector
+  metric_writer = DiskMetricWriter(thermos_gc_executor.metrics, ExecutorDetector.VARS_PATH)
+
+  # Create driver stub
+  driver = MesosExecutorDriver(thermos_gc_executor)
+
+  return thermos_gc_executor, metric_writer, driver
+
+
 def proxy_main():
   def main():
     if MesosExecutorDriver is None:
       app.error('Could not load MesosExecutorDriver!')
 
-    # Create executor stub
-    thermos_gc_executor = ThermosGCExecutor(FixedPathDetector(DEFAULT_CHECKPOINT_ROOT))
+    thermos_gc_executor, metric_writer, driver = initialize()
+
     thermos_gc_executor.start()
-
-    # Start metrics collection
-    metric_writer = DiskMetricWriter(thermos_gc_executor.metrics, ExecutorDetector.VARS_PATH)
     metric_writer.start()
-
-    # Create driver stub
-    driver = MesosExecutorDriver(thermos_gc_executor)
-
-    # Start GC executor
     driver.run()
 
     log.info('MesosExecutorDriver.run() has finished.')

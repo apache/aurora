@@ -58,6 +58,7 @@ python_library(
     'src/main/python/apache/thermos/common:constants',
     'src/main/python/apache/thermos/monitoring:detector',
     'src/main/python/apache/aurora/executor/common:executor_detector',
+    'src/main/python/apache/aurora/executor/common:path_detector',
     'src/main/python/apache/aurora/executor:executor_vars',
     'src/main/python/apache/aurora/executor:gc_executor',
   ]
