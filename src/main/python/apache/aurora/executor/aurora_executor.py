@@ -31,6 +31,10 @@ from .executor_base import ExecutorBase
 from .status_manager import StatusManager
 
 
+def propagate_deadline(*args, **kw):
+  return deadline(*args, daemon=True, propagate=True, **kw)
+
+
 class AuroraExecutor(ExecutorBase, Observable):
   PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
   SANDBOX_INITIALIZATION_TIMEOUT = Amount(10, Time.MINUTES)
@@ -118,8 +122,7 @@ class AuroraExecutor(ExecutorBase, Observable):
     self._sandbox = self._sandbox_provider.from_assigned_task(assigned_task)
     self.sandbox_initialized.set()
     try:
-      deadline(self._sandbox.create, timeout=self.SANDBOX_INITIALIZATION_TIMEOUT,
-               daemon=True, propagate=True)
+      propagate_deadline(self._sandbox.create, timeout=self.SANDBOX_INITIALIZATION_TIMEOUT)
     except Timeout:
       self._die(driver, mesos_pb2.TASK_FAILED, 'Timed out waiting for sandbox to initialize!')
       return
@@ -134,7 +137,7 @@ class AuroraExecutor(ExecutorBase, Observable):
       self._die(driver, mesos_pb2.TASK_KILLED, 'Task killed during initialization.')
 
     try:
-      deadline(self._runner.start, timeout=self.START_TIMEOUT, propagate=True)
+      propagate_deadline(self._runner.start, timeout=self.START_TIMEOUT)
     except TaskError as e:
       self._die(driver, mesos_pb2.TASK_FAILED, 'Task initialization failed: %s' % e)
       return False
@@ -186,14 +189,20 @@ class AuroraExecutor(ExecutorBase, Observable):
     runner_status = self._runner.status
 
     try:
-      deadline(self._chained_checker.stop, timeout=self.STOP_TIMEOUT)
+      propagate_deadline(self._chained_checker.stop, timeout=self.STOP_TIMEOUT)
     except Timeout:
       log.error('Failed to stop all checkers within deadline.')
+    except Exception:
+      log.error('Failed to stop health checkers:')
+      log.error(traceback.format_exc())
 
     try:
-      deadline(self._runner.stop, timeout=self.STOP_TIMEOUT)
+      propagate_deadline(self._runner.stop, timeout=self.STOP_TIMEOUT)
     except Timeout:
       log.error('Failed to stop runner within deadline.')
+    except Exception:
+      log.error('Failed to stop runner:')
+      log.error(traceback.format_exc())
 
     # If the runner was alive when _shutdown was called, defer to the status_result,
     # otherwise the runner's terminal state is the preferred state.
