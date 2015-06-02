@@ -26,6 +26,7 @@ python_library(
     'src/main/python/apache/aurora/executor/common:executor_detector',
     'src/main/python/apache/aurora/executor/common:executor_timeout',
     'src/main/python/apache/aurora/executor/common:health_checker',
+    'src/main/python/apache/aurora/executor/common:path_detector',
     'src/main/python/apache/aurora/executor/common:resource_manager',
     'src/main/python/apache/aurora/executor/common:sandbox',
     'src/main/python/apache/aurora/executor:executor_vars',

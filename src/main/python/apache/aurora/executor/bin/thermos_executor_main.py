@@ -28,13 +28,13 @@ from apache.aurora.executor.aurora_executor import AuroraExecutor
 from apache.aurora.executor.common.announcer import DefaultAnnouncerCheckerProvider
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
 from apache.aurora.executor.common.health_checker import HealthCheckerProvider
+from apache.aurora.executor.common.path_detector import MesosPathDetector
 from apache.aurora.executor.common.resource_manager import ResourceManagerProvider
 from apache.aurora.executor.common.sandbox import DefaultSandboxProvider
 from apache.aurora.executor.thermos_task_runner import (
     DefaultThermosTaskRunnerProvider,
     UserOverrideThermosTaskRunnerProvider
 )
-from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
 
 try:
   from mesos.native import MesosExecutorDriver
@@ -84,14 +84,6 @@ app.add_option(
 
 
 app.add_option(
-    '--checkpoint-root',
-    dest='checkpoint_root',
-    metavar='PATH',
-    default=DEFAULT_CHECKPOINT_ROOT,
-    help='The checkpoint root where Thermos task checkpoints are stored.')
-
-
-app.add_option(
     '--nosetuid',
     dest='nosetuid',
     action='store_true',
@@ -122,47 +114,58 @@ class UserOverrideDirectorySandboxProvider(DefaultSandboxProvider):
     return self._user_override
 
 
+def initialize(options):
+  cwd_path = os.path.abspath(CWD)
+  checkpoint_root = os.path.join(cwd_path, MesosPathDetector.DEFAULT_SANDBOX_PATH)
+
+  # status providers:
+  status_providers = [
+      HealthCheckerProvider(),
+      ResourceManagerProvider(checkpoint_root=checkpoint_root)
+  ]
+
+  if options.announcer_enable:
+    if options.announcer_ensemble is None:
+      app.error('Must specify --announcer-ensemble if the announcer is enabled.')
+    status_providers.append(DefaultAnnouncerCheckerProvider(
+      options.announcer_ensemble, options.announcer_serverset_path))
+
+  # Create executor stub
+  if options.execute_as_user or options.nosetuid:
+    # If nosetuid is set, execute_as_user is also None
+    thermos_runner_provider = UserOverrideThermosTaskRunnerProvider(
+      dump_runner_pex(),
+      checkpoint_root,
+      artifact_dir=cwd_path
+    )
+    thermos_runner_provider.set_role(None)
+
+    thermos_executor = AuroraExecutor(
+      runner_provider=thermos_runner_provider,
+      status_providers=status_providers,
+      sandbox_provider=UserOverrideDirectorySandboxProvider(options.execute_as_user)
+    )
+  else:
+    thermos_runner_provider = DefaultThermosTaskRunnerProvider(
+      dump_runner_pex(),
+      checkpoint_root,
+      artifact_dir=cwd_path
+    )
+
+    thermos_executor = AuroraExecutor(
+      runner_provider=thermos_runner_provider,
+      status_providers=status_providers
+    )
+
+  return thermos_executor
+
+
 def proxy_main():
   def main(args, options):
     if MesosExecutorDriver is None:
       app.error('Could not load MesosExecutorDriver!')
 
-    # status providers:
-    status_providers = [
-        HealthCheckerProvider(),
-        ResourceManagerProvider(checkpoint_root=options.checkpoint_root)
-    ]
-
-    if options.announcer_enable:
-      if options.announcer_ensemble is None:
-        app.error('Must specify --announcer-ensemble if the announcer is enabled.')
-      status_providers.append(DefaultAnnouncerCheckerProvider(
-        options.announcer_ensemble, options.announcer_serverset_path))
-
-    # Create executor stub
-    if options.execute_as_user or options.nosetuid:
-      # If nosetuid is set, execute_as_user is also None
-      thermos_runner_provider = UserOverrideThermosTaskRunnerProvider(
-        dump_runner_pex(),
-        artifact_dir=os.path.abspath(CWD)
-      )
-      thermos_runner_provider.set_role(None)
-
-      thermos_executor = AuroraExecutor(
-        runner_provider=thermos_runner_provider,
-        status_providers=status_providers,
-        sandbox_provider=UserOverrideDirectorySandboxProvider(options.execute_as_user)
-      )
-    else:
-      thermos_runner_provider = DefaultThermosTaskRunnerProvider(
-        dump_runner_pex(),
-        artifact_dir=os.path.abspath(CWD)
-      )
-
-      thermos_executor = AuroraExecutor(
-        runner_provider=thermos_runner_provider,
-        status_providers=status_providers
-      )
+    thermos_executor = initialize(options)
 
     # Create driver stub
     driver = MesosExecutorDriver(thermos_executor)

@@ -33,6 +33,7 @@ python_tests(
   name = 'thermos_executor_entry_point',
   sources = ['test_thermos_executor_entry_point.py'],
   dependencies = [
+    '3rdparty/python:mock',
     'src/main/python/apache/aurora/executor/bin:thermos_executor_source',
   ],
 )

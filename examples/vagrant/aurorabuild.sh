@@ -75,7 +75,7 @@ EOF
 }
 
 function build_observer {
-  ./pants binary src/main/python/apache/thermos/observer/bin:thermos_observer
+  ./pants binary src/main/python/apache/aurora/tools:thermos_observer
   upstart_update aurora-thermos-observer
 }
 
