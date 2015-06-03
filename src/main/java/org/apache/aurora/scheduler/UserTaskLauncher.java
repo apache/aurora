@@ -58,9 +58,6 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
   private static final Logger LOG = Logger.getLogger(UserTaskLauncher.class.getName());
 
   @VisibleForTesting
-  static final String MEMORY_LIMIT_EXCEEDED = "MEMORY STATISTICS";
-
-  @VisibleForTesting
   static final String MEMORY_LIMIT_DISPLAY = "Task used more memory than requested.";
 
   private static final String STATUS_STAT_FORMAT = "status_update_%s_%s";
@@ -180,11 +177,8 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
                 message = Optional.of(status.getMessage());
               }
 
-              // TODO(William Farner): Remove this hack once Mesos API change is done.
-              //                       Tracked by: https://issues.apache.org/jira/browse/MESOS-343
-              if (translatedState == ScheduleStatus.FAILED
-                  && message.isPresent()
-                  && message.get().contains(MEMORY_LIMIT_EXCEEDED)) {
+              if (translatedState == ScheduleStatus.FAILED && status.hasReason()
+                  && status.getReason() == TaskStatus.Reason.REASON_MEMORY_LIMIT) {
                 message = Optional.of(MEMORY_LIMIT_DISPLAY);
               }
 

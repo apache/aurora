@@ -178,44 +178,23 @@ public class UserTaskLauncherTest extends EasyMockTest {
   }
 
   @Test
-  public void testMemoryLimitTranslationHack() throws Exception {
+  public void testMemoryLimitTranslation() throws Exception {
     storageUtil.expectWrite();
 
     TaskStatus status = TaskStatus.newBuilder()
         .setState(TaskState.TASK_FAILED)
         .setTaskId(TaskID.newBuilder().setValue(TASK_ID_A))
-        .setMessage("Memory limit exceeded: Requested 256MB, Used 256MB.\n\n"
-            + "MEMORY STATISTICS: \n"
-            + "cache 20422656\n"
-            + "rss 248012800\n"
-            + "mapped_file 8192\n"
-            + "pgpgin 28892\n"
-            + "pgpgout 6791\n"
-            + "inactive_anon 90112\n"
-            + "active_anon 245768192\n"
-            + "inactive_file 19685376\n"
-            + "active_file 700416\n"
-            + "unevictable 0\n"
-            + "hierarchical_memory_limit 268435456\n"
-            + "total_cache 20422656\n"
-            + "total_rss 248012800\n"
-            + "total_mapped_file 8192\n"
-            + "total_pgpgin 28892\n"
-            + "total_pgpgout 6791\n"
-            + "total_inactive_anon 90112\n"
-            + "total_active_anon 245768192\n"
-            + "total_inactive_file 19685376\n"
-            + "total_active_file 700416\n"
-            + "total_unevictable 0 ")
+        .setReason(TaskStatus.Reason.REASON_MEMORY_LIMIT)
+        .setMessage("Some Message")
         .build();
 
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID_A,
-        Optional.<ScheduleStatus>absent(),
+        Optional.absent(),
         FAILED,
         Optional.of(UserTaskLauncher.MEMORY_LIMIT_DISPLAY)))
-        .andReturn(StateChangeResult.ILLEGAL);
+        .andReturn(StateChangeResult.SUCCESS);
 
     final CountDownLatch latch = new CountDownLatch(1);
 
