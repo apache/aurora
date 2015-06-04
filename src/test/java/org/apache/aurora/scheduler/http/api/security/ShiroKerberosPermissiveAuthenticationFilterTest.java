@@ -27,35 +27,29 @@ import com.google.inject.util.Providers;
 import com.sun.jersey.api.client.ClientResponse;
 
 import org.apache.aurora.scheduler.http.JettyServerModuleTest;
-import org.apache.shiro.authc.AuthenticationException;
-import org.apache.shiro.authc.AuthenticationToken;
+import org.apache.shiro.authz.UnauthenticatedException;
 import org.apache.shiro.subject.Subject;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.easymock.EasyMock.isA;
 import static org.junit.Assert.assertEquals;
 
-public class ShiroKerberosAuthenticationFilterTest extends JettyServerModuleTest {
+public class ShiroKerberosPermissiveAuthenticationFilterTest extends JettyServerModuleTest {
   private static final String PATH = "/test";
 
   private Subject subject;
   private HttpServlet mockServlet;
 
-  private ShiroKerberosAuthenticationFilter filter;
+  private ShiroKerberosPermissiveAuthenticationFilter filter;
 
   @Before
   public void setUp() {
     subject = createMock(Subject.class);
     mockServlet = createMock(HttpServlet.class);
 
-    filter = new ShiroKerberosAuthenticationFilter(Providers.of(subject));
-  }
-
-  private HttpServlet getMockServlet() {
-    return mockServlet;
+    filter = new ShiroKerberosPermissiveAuthenticationFilter(Providers.of(subject));
   }
 
   @Override
@@ -69,7 +63,7 @@ public class ShiroKerberosAuthenticationFilterTest extends JettyServerModuleTest
           protected void service(HttpServletRequest req, HttpServletResponse resp)
               throws ServletException, IOException {
 
-            getMockServlet().service(req, resp);
+            mockServlet.service(req, resp);
             resp.setStatus(HttpServletResponse.SC_OK);
           }
         });
@@ -78,56 +72,27 @@ public class ShiroKerberosAuthenticationFilterTest extends JettyServerModuleTest
   }
 
   @Test
-  public void testDoesNotPermitUnauthenticated() throws ServletException, IOException {
-    replayAndStart();
-
-    ClientResponse clientResponse = getRequestBuilder(PATH).get(ClientResponse.class);
-    assertEquals(HttpServletResponse.SC_UNAUTHORIZED, clientResponse.getStatus());
-    assertEquals(
-        ShiroKerberosAuthenticationFilter.NEGOTIATE,
-        clientResponse.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE));
-  }
-
-  @Test
-  public void testRejectsMalformedMechanism() {
-    replayAndStart();
-
-    ClientResponse clientResponse = getRequestBuilder(PATH)
-        .header(HttpHeaders.AUTHORIZATION, "Basic asdf")
-        .get(ClientResponse.class);
-    assertEquals(
-        HttpServletResponse.SC_BAD_REQUEST,
-        clientResponse.getStatus());
-  }
-
-  @Test
-  public void testLoginFailure401() {
-    subject.login(isA(AuthenticationToken.class));
-    expectLastCall().andThrow(new AuthenticationException());
-
-    replayAndStart();
-
-    ClientResponse clientResponse = getRequestBuilder(PATH)
-        .header(HttpHeaders.AUTHORIZATION, ShiroKerberosAuthenticationFilter.NEGOTIATE + " asdf")
-        .get(ClientResponse.class);
-
-    assertEquals(HttpServletResponse.SC_UNAUTHORIZED, clientResponse.getStatus());
-    assertEquals(
-        ShiroKerberosAuthenticationFilter.NEGOTIATE,
-        clientResponse.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE));
-  }
-
-  @Test
-  public void testLoginSuccess200() throws ServletException, IOException {
-    subject.login(isA(AuthenticationToken.class));
+  public void testPermitsUnauthenticated() throws ServletException, IOException {
     mockServlet.service(anyObject(HttpServletRequest.class), anyObject(HttpServletResponse.class));
 
     replayAndStart();
 
-    ClientResponse clientResponse = getRequestBuilder(PATH)
-        .header(HttpHeaders.AUTHORIZATION, ShiroKerberosAuthenticationFilter.NEGOTIATE + " asdf")
-        .get(ClientResponse.class);
-
+    ClientResponse clientResponse = getRequestBuilder(PATH).get(ClientResponse.class);
     assertEquals(HttpServletResponse.SC_OK, clientResponse.getStatus());
+  }
+
+  @Test
+  public void testInterceptsUnauthenticatedException() throws ServletException, IOException {
+    mockServlet.service(anyObject(HttpServletRequest.class), anyObject(HttpServletResponse.class));
+    expectLastCall().andThrow(new UnauthenticatedException());
+
+    replayAndStart();
+
+    ClientResponse clientResponse = getRequestBuilder(PATH).get(ClientResponse.class);
+
+    assertEquals(HttpServletResponse.SC_UNAUTHORIZED, clientResponse.getStatus());
+    assertEquals(
+        ShiroKerberosAuthenticationFilter.NEGOTIATE,
+        clientResponse.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE));
   }
 }

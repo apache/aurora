@@ -28,7 +28,6 @@ import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.http.AbstractFilter;
 import org.apache.shiro.authc.AuthenticationException;
-import org.apache.shiro.authz.UnauthenticatedException;
 import org.apache.shiro.subject.Subject;
 
 import static java.util.Objects.requireNonNull;
@@ -75,13 +74,16 @@ public class ShiroKerberosAuthenticationFilter extends AbstractFilter {
         sendChallenge(response);
       }
     } else {
-      // Incoming request is unauthenticated, but some RPCs might be okay with that.
-      try {
-        chain.doFilter(request, response);
-      } catch (UnauthenticatedException e) {
-        sendChallenge(response);
-      }
+      handleUnauthenticated(request, response, chain);
     }
+  }
+
+  protected void handleUnauthenticated(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      FilterChain chain) throws IOException, ServletException {
+
+    sendChallenge(response);
   }
 
   private void sendChallenge(HttpServletResponse response) throws IOException {

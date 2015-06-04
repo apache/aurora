@@ -16,6 +16,8 @@ package org.apache.aurora.scheduler.http.api.security;
 import java.lang.reflect.Method;
 import java.util.Set;
 
+import javax.servlet.Filter;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Key;
@@ -34,27 +36,37 @@ import org.apache.aurora.GuiceUtils;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraSchedulerManager;
 import org.apache.aurora.scheduler.app.Modules;
-import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.guice.aop.ShiroAopModule;
 import org.apache.shiro.guice.web.ShiroWebModule;
 import org.apache.shiro.subject.Subject;
-import org.apache.shiro.web.filter.authc.BasicHttpAuthenticationFilter;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PATH;
+import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PERM;
+import static org.apache.aurora.scheduler.http.api.ApiModule.API_PATH;
 import static org.apache.aurora.scheduler.spi.Permissions.Domain.THRIFT_AURORA_ADMIN;
 import static org.apache.aurora.scheduler.spi.Permissions.Domain.THRIFT_AURORA_SCHEDULER_MANAGER;
+import static org.apache.shiro.guice.web.ShiroWebModule.guiceFilterModule;
+import static org.apache.shiro.web.filter.authc.AuthenticatingFilter.PERMISSIVE;
 
 /**
- * Provides HTTP Basic Authentication for the API using Apache Shiro. When enabled, prevents
- * unauthenticated access to write APIs. Write API access must also be authorized, with permissions
- * configured in a shiro.ini file. For an example of this file, see the test resources included with
- * this package.
+ * Provides HTTP Basic Authentication using Apache Shiro. When enabled, prevents unauthenticated
+ * access to write APIs and configured servlets. Write API access must also be authorized, with
+ * permissions configured in a shiro.ini file. For an example of this file, see the test resources
+ * included with this package.
  */
-public class ApiSecurityModule extends ServletModule {
+public class HttpSecurityModule extends ServletModule {
   public static final String HTTP_REALM_NAME = "Apache Aurora Scheduler";
+
+  private static final String H2_PATTERN = H2_PATH + "/**";
+  private static final String ALL_PATTERN = "/**";
+  private static final Key<? extends Filter> K_STRICT =
+      Key.get(ShiroKerberosAuthenticationFilter.class);
+  private static final Key<? extends Filter> K_PERMISSIVE =
+      Key.get(ShiroKerberosPermissiveAuthenticationFilter.class);
 
   @CmdLine(name = "shiro_realm_modules",
       help = "Guice modules for configuring Shiro Realms.")
@@ -93,16 +105,16 @@ public class ApiSecurityModule extends ServletModule {
   private final HttpAuthenticationMechanism mechanism;
   private final Set<Module> shiroConfigurationModules;
 
-  public ApiSecurityModule() {
+  public HttpSecurityModule() {
     this(HTTP_AUTHENTICATION_MECHANISM.get(), SHIRO_REALM_MODULE.get());
   }
 
   @VisibleForTesting
-  ApiSecurityModule(Module shiroConfigurationModule) {
+  HttpSecurityModule(Module shiroConfigurationModule) {
     this(HttpAuthenticationMechanism.BASIC, ImmutableSet.of(shiroConfigurationModule));
   }
 
-  private ApiSecurityModule(
+  private HttpSecurityModule(
       HttpAuthenticationMechanism mechanism,
       Set<Module> shiroConfigurationModules) {
 
@@ -118,7 +130,9 @@ public class ApiSecurityModule extends ServletModule {
   }
 
   private void doConfigureServlets() {
-    install(ShiroWebModule.guiceFilterModule(ApiModule.API_PATH));
+    install(guiceFilterModule(API_PATH));
+    install(guiceFilterModule(H2_PATH));
+    install(guiceFilterModule(H2_PATH + "/*"));
     install(new ShiroWebModule(getServletContext()) {
       @Override
       @SuppressWarnings("unchecked")
@@ -129,17 +143,17 @@ public class ApiSecurityModule extends ServletModule {
           install(module);
         }
 
+        // Filter registration order is important here and is defined by the matching pattern:
+        // more specific pattern first.
         switch (mechanism) {
           case BASIC:
-            addFilterChain("/**",
-                ShiroWebModule.NO_SESSION_CREATION,
-                config(ShiroWebModule.AUTHC_BASIC, BasicHttpAuthenticationFilter.PERMISSIVE));
+            addFilterChain(H2_PATTERN, NO_SESSION_CREATION, AUTHC_BASIC, config(PERMS, H2_PERM));
+            addFilterChain(ALL_PATTERN, NO_SESSION_CREATION, config(AUTHC_BASIC, PERMISSIVE));
             break;
 
           case NEGOTIATE:
-            addFilterChain("/**",
-                ShiroWebModule.NO_SESSION_CREATION,
-                Key.get(ShiroKerberosAuthenticationFilter.class));
+            addFilterChain(H2_PATTERN, NO_SESSION_CREATION, K_STRICT, config(PERMS, H2_PERM));
+            addFilterChain(ALL_PATTERN, NO_SESSION_CREATION, K_PERMISSIVE);
             break;
 
           default:

@@ -64,7 +64,7 @@ import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.http.api.ApiModule;
-import org.apache.aurora.scheduler.http.api.security.ApiSecurityModule;
+import org.apache.aurora.scheduler.http.api.security.HttpSecurityModule;
 import org.apache.aurora.scheduler.thrift.ThriftModule;
 import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import org.eclipse.jetty.rewrite.handler.RewriteHandler;
@@ -188,7 +188,8 @@ public class JettyServerModule extends AbstractModule {
           parentInjector,
           Modules.combine(
               new ApiModule(),
-              new ApiSecurityModule(),
+              new H2ConsoleModule(),
+              new HttpSecurityModule(),
               new ThriftModule(),
               new ThriftAuthModule()));
     }

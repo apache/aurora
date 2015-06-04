@@ -24,6 +24,7 @@ import com.google.common.testing.TearDown;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
+import com.sun.jersey.api.client.ClientResponse;
 import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.gen.AuroraAdmin;
@@ -33,16 +34,19 @@ import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.http.H2ConsoleModule;
 import org.apache.aurora.scheduler.http.JettyServerModuleTest;
 import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.aurora.scheduler.thrift.aop.MockDecoratedThrift;
+import org.apache.http.HttpResponse;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.shiro.config.Ini;
@@ -55,13 +59,15 @@ import org.apache.thrift.transport.TTransportException;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PATH;
+import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PERM;
 import static org.apache.aurora.scheduler.http.api.ApiModule.API_PATH;
 import static org.easymock.EasyMock.anyString;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class ApiSecurityIT extends JettyServerModuleTest {
+public class HttpSecurityIT extends JettyServerModuleTest {
   private static final Response OK = new Response().setResponseCode(ResponseCode.OK);
 
   private static final UsernamePasswordCredentials ROOT =
@@ -74,6 +80,8 @@ public class ApiSecurityIT extends JettyServerModuleTest {
       new UsernamePasswordCredentials("backupsvc", "s3cret!!1");
   private static final UsernamePasswordCredentials DEPLOY_SERVICE =
       new UsernamePasswordCredentials("deploysvc", "0_0-x_0");
+  private static final UsernamePasswordCredentials H2_USER =
+      new UsernamePasswordCredentials("dbuser", "pwd");
 
   private static final UsernamePasswordCredentials INCORRECT =
       new UsernamePasswordCredentials("root", "wrong");
@@ -97,6 +105,7 @@ public class ApiSecurityIT extends JettyServerModuleTest {
   private static final String ENG_ROLE = "eng";
   private static final String BACKUP_ROLE = "backup";
   private static final String DEPLOY_ROLE = "deploy";
+  private static final String H2_ROLE = "h2access";
 
   @Before
   public void setUp() {
@@ -112,6 +121,7 @@ public class ApiSecurityIT extends JettyServerModuleTest {
     users.put(
         DEPLOY_SERVICE.getUserName(),
         COMMA_JOINER.join(DEPLOY_SERVICE.getPassword(), DEPLOY_ROLE));
+    users.put(H2_USER.getUserName(), COMMA_JOINER.join(H2_USER.getPassword(), H2_ROLE));
 
     Ini.Section roles = ini.addSection(IniRealm.ROLES_SECTION_NAME);
     roles.put(ADMIN_ROLE, "*");
@@ -125,6 +135,7 @@ public class ApiSecurityIT extends JettyServerModuleTest {
             + ADS_STAGING_JOB.getEnvironment()
             + ":"
             + ADS_STAGING_JOB.getName());
+    roles.put(H2_ROLE, H2_PERM);
 
     auroraAdmin = createMock(AnnotatedAuroraAdmin.class);
     statsProvider = createMock(StatsProvider.class);
@@ -135,7 +146,8 @@ public class ApiSecurityIT extends JettyServerModuleTest {
   protected Module getChildServletModule() {
     return Modules.combine(
         new ApiModule(),
-        new ApiSecurityModule(new IniShiroRealmModule(ini)),
+        new H2ConsoleModule(),
+        new HttpSecurityModule(new IniShiroRealmModule(ini)),
         new AbstractModule() {
           @Override
           protected void configure() {
@@ -149,10 +161,12 @@ public class ApiSecurityIT extends JettyServerModuleTest {
     return getClient(null);
   }
 
+  private String formatUrl(String endpoint) {
+    return "http://" + httpServer.getHostText() + ":" + httpServer.getPort() + endpoint;
+  }
+
   private AuroraAdmin.Client getClient(HttpClient httpClient) throws TTransportException {
-    final TTransport httpClientTransport = new THttpClient(
-        "http://" + httpServer.getHostText() + ":" + httpServer.getPort() + API_PATH,
-        httpClient);
+    final TTransport httpClientTransport = new THttpClient(formatUrl(API_PATH), httpClient);
     addTearDown(new TearDown() {
       @Override
       public void tearDown() throws Exception {
@@ -270,5 +284,41 @@ public class ApiSecurityIT extends JettyServerModuleTest {
     }
 
     assertEquals(OK, getAuthenticatedClient(BACKUP_SERVICE).listBackups(null));
+  }
+
+  private HttpResponse callH2Console(Credentials credentials) throws Exception {
+    DefaultHttpClient defaultHttpClient = new DefaultHttpClient();
+
+    CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+    credentialsProvider.setCredentials(AuthScope.ANY, credentials);
+    defaultHttpClient.setCredentialsProvider(credentialsProvider);
+    return defaultHttpClient.execute(new HttpPost(formatUrl(H2_PATH + "/")));
+  }
+
+  @Test
+  public void testH2ConsoleUser() throws Exception {
+    replayAndStart();
+
+    assertEquals(
+        ClientResponse.Status.OK.getStatusCode(),
+        callH2Console(H2_USER).getStatusLine().getStatusCode());
+  }
+
+  @Test
+  public void testH2ConsoleAdmin() throws Exception {
+    replayAndStart();
+
+    assertEquals(
+        ClientResponse.Status.OK.getStatusCode(),
+        callH2Console(ROOT).getStatusLine().getStatusCode());
+  }
+
+  @Test
+  public void testH2ConsoleUnauthorized() throws Exception {
+    replayAndStart();
+
+    assertEquals(
+        ClientResponse.Status.UNAUTHORIZED.getStatusCode(),
+        callH2Console(UNPRIVILEGED).getStatusLine().getStatusCode());
   }
 }

@@ -82,7 +82,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
             MockDecoratedThrift.bindForwardedMock(binder(), thrift);
             bindInterceptor(
                 Matchers.subclassesOf(AnnotatedAuroraAdmin.class),
-                ApiSecurityModule.AURORA_SCHEDULER_MANAGER_SERVICE,
+                HttpSecurityModule.AURORA_SCHEDULER_MANAGER_SERVICE,
                 interceptor);
             bind(StatsProvider.class).toInstance(statsProvider);
             requestInjection(interceptor);
@@ -95,7 +95,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
     control.replay();
 
     for (Method method : AnnotatedAuroraAdmin.class.getMethods()) {
-      if (ApiSecurityModule.AURORA_SCHEDULER_MANAGER_SERVICE.matches(method)) {
+      if (HttpSecurityModule.AURORA_SCHEDULER_MANAGER_SERVICE.matches(method)) {
         interceptor.getAuthorizingParamGetters().getUnchecked(method);
       }
     }

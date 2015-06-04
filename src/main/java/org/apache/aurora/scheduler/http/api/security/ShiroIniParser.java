@@ -30,7 +30,7 @@ import org.apache.shiro.realm.text.IniRealm;
  * The provided ini file must have only the sections required for configuration
  * ({@link IniRealm.ROLES_SECTION_NAME} and {@link IniRealm.USERS_SECTION_NAME}) and no extras -
  * Aurora uses Guice in to configure those sections in
- * {@link org.apache.aurora.scheduler.http.api.security.ApiSecurityModule}}.
+ * {@link HttpSecurityModule}}.
  */
 @ArgParser
 public class ShiroIniParser extends NonParameterizedTypeParser<Ini> {
