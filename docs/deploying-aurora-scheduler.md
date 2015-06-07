@@ -278,7 +278,7 @@ is the same as the one on the scheduler:
 ### Tasks are stuck in `PENDING` forever
 
 #### Symptoms
-The scheduler is registered, and (receiving offers](docs/monitoring.md#scheduler_resource_offers),
+The scheduler is registered, and [receiving offers](monitoring.md#scheduler_resource_offers),
 but tasks are perpetually shown as `PENDING - Constraint not satisfied: host`.
 
 #### Solution
