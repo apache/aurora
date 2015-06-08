@@ -13,10 +13,13 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
+import com.google.common.collect.ImmutableSet;
+
 import org.apache.aurora.scheduler.http.api.security.ShiroIniParser.ExtraSectionsException;
 import org.apache.aurora.scheduler.http.api.security.ShiroIniParser.MissingSectionsException;
 import org.apache.aurora.scheduler.http.api.security.ShiroIniParser.ShiroConfigurationException;
 import org.apache.shiro.io.ResourceUtils;
+import org.apache.shiro.realm.text.IniRealm;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -27,8 +30,9 @@ public class ShiroIniParserTest {
 
   private static final String EXAMPLE_RESOURCE = "shiro-example.ini";
   private static final String EXTRA_SECTIONS_SHIRO_INI = "shiro-malformed-extra-sections.ini";
-  private static final String MISSING_SECTIONS_SHIRO_INI = "shiro-malformed-missing-sections.ini";
+  private static final String MISSING_SECTIONS_SHIRO_INI = "shiro-missing-sections.ini";
   private static final String NONEXISTENT_RESOURCE = "shiro-nonexistent.ini";
+  private static final String NO_SECTIONS_SHURO_INI = "shiro-malformed-no-sections.ini";
 
   @Before
   public void setUp() {
@@ -38,9 +42,18 @@ public class ShiroIniParserTest {
   @Test
   public void testDoParseSuccess() {
     assertEquals(
-        ShiroIniParser.REQUIRED_SECTION_NAMES,
+        ShiroIniParser.ALLOWED_SECTION_NAMES,
         parser.doParse(
             ShiroIniParserTest.class.getResource(EXAMPLE_RESOURCE).toString()).getSectionNames());
+  }
+
+  @Test
+  public void testDoParseOptionalSections() {
+    assertEquals(
+        ImmutableSet.of(IniRealm.ROLES_SECTION_NAME),
+        parser
+            .doParse(ShiroIniParserTest.class.getResource(MISSING_SECTIONS_SHIRO_INI).toString())
+            .getSectionNames());
   }
 
   @Test(expected = ShiroConfigurationException.class)
@@ -55,6 +68,6 @@ public class ShiroIniParserTest {
 
   @Test(expected = MissingSectionsException.class)
   public void testDoParseMissingSections() {
-    parser.doParse(getClass().getResource(MISSING_SECTIONS_SHIRO_INI).toString());
+    parser.doParse(getClass().getResource(NO_SECTIONS_SHURO_INI).toString());
   }
 }
