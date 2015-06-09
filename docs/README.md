@@ -31,3 +31,6 @@ We encourage you to ask questions on the [Aurora developer list](http://aurora.a
  * [Developing the Aurora Scheduler](developing-aurora-scheduler.md)
  * [Developing the Aurora Client](developing-aurora-client.md)
  * [Committers Guide](committers.md)
+ 
+## Additional Resources
+ * [Presentation videos and slides](presentations.md)
