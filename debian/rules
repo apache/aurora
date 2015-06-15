@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Uncomment for debugging.
+#DH_VERBOSE = 1
+
+%:
+	dh $@ --exclude=aurora-scheduler.bat
+
+gradle = $(shell which gradle)
+pants = $(CURDIR)/pants
+PANTS_CONFIG_OVERRIDE = $(CURDIR)/debian/pants.ini
+export PANTS_CONFIG_OVERRIDE
+
+override_dh_auto_build: __gradle_build __pants_build
+
+__gradle_build:
+	$(gradle) installApp
+
+__pants_build:
+	mkdir -p third_party
+	$(pants) binary src/main/python/apache/aurora/admin:kaurora_admin
+	$(pants) binary src/main/python/apache/aurora/client/cli:kaurora
+	$(pants) binary src/main/python/apache/aurora/executor/bin:gc_executor
+	$(pants) binary src/main/python/apache/aurora/executor/bin:thermos_executor
+	$(pants) binary src/main/python/apache/thermos/cli/bin:thermos
+	$(pants) binary src/main/python/apache/thermos/bin:thermos_runner
+	$(pants) binary src/main/python/apache/thermos/observer/bin:thermos_observer
+	build-support/embed_runner_in_executor.py
+
+override_dh_installinit:
+	dh_installinit --name=thermos
+	dh_installinit

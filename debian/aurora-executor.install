@@ -1,0 +1,6 @@
+dist/gc_executor.pex /usr/share/aurora/bin
+dist/thermos_executor.pex /usr/share/aurora/bin
+dist/thermos_observer.pex /usr/share/aurora/bin
+dist/thermos.pex /usr/share/aurora/bin
+
+debian/clusters.json /etc/aurora

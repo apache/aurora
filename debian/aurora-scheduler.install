@@ -1,0 +1,2 @@
+dist/install/aurora-scheduler/bin /usr/share/aurora
+dist/install/aurora-scheduler/lib /usr/share/aurora

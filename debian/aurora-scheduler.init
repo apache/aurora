@@ -1,0 +1,96 @@
+#!/bin/sh
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Start/stop the aurora-scheduler daemon.
+#
+### BEGIN INIT INFO
+# Provides:          aurora-scheduler
+# Required-Start:    $remote_fs $syslog $time
+# Required-Stop:     $remote_fs $syslog $time
+# Should-Start:      $network $named slapd autofs ypbind nscd nslcd
+# Should-Stop:       $network $named slapd autofs ypbind nscd nslcd
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: Apache Aurora scheduler daemon
+# Description:       Aurora is service scheduler that runs on top of Apache
+#                    Mesos, enabling you to run long-running services that take
+#                    advantage of Apache Mesos' scalability, fault-tolerance,
+#                    and resource isolation.
+### END INIT INFO
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+DESC="Aurora scheduler"
+NAME=aurora-scheduler
+DAEMON=/usr/sbin/aurora-scheduler
+PIDFILE=/var/run/aurora-scheduler.pid
+SCRIPTNAME=/etc/init.d/"$NAME"
+
+test -f $DAEMON || exit 0
+
+. /lib/lsb/init-functions
+
+if which initctl >/dev/null && initctl version | grep -q upstart; then
+  if test -e /lib/init/upstart-job -a -e /etc/init/${NAME}.conf; then
+    . /lib/init/upstart-job
+    exit $?
+  fi
+fi
+
+[ -r /etc/default/aurora-scheduler ] && . /etc/default/aurora-scheduler
+
+ARGS="-cluster_name=$CLUSTER_NAME
+  -http_port=$HTTP_PORT
+  -native_log_quorum_size=$QUORUM_SIZE
+  -zk_endpoints=$ZK_ENDPOINTS
+  -mesos_master_address=$MESOS_MASTER
+  -serverset_path=$ZK_SERVERSET_PATH
+  -native_log_zk_group_path=$ZK_LOGDB_PATH
+  -native_log_file_path=$LOGDB_FILE_PATH
+  -backup_dir=$BACKUP_DIR
+  -thermos_executor_path=$THERMOS_EXECUTOR_PATH
+  -thermos_executor_resources=$THERMOS_EXECUTOR_RESOURCES
+  -thermos_executor_flags=$THERMOS_EXECUTOR_FLAGS
+  -allowed_container_types=$ALLOWED_CONTAINER_TYPES
+  -gc_executor_path=$GC_EXECUTOR_PATH
+  -vlog=$LOG_LEVEL
+  $EXTRA_SCHEDULER_ARGS"
+
+export JAVA_OPTS GLOG_v LIBPROCESS_PORT LIBPROCESS_IP
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting $DESC" "$NAME"
+    start_daemon -p $PIDFILE $DAEMON $ARGS
+    log_end_msg $?
+    ;;
+  stop)
+    log_daemon_msg "Stopping $DESC" "$NAME"
+    killproc -p $PIDFILE $DAEMON
+    RETVAL=$?
+    [ $RETVAL -eq 0 ] && [ -e "$PIDFILE" ] && rm -f $PIDFILE
+    log_end_msg $RETVAL
+    ;;
+  restart|force-reload) log_daemon_msg "Restarting $DESC" "$NAME"
+    $0 stop
+    $0 start
+    ;;
+  status)
+    status_of_proc -p $PIDFILE $DAEMON $NAME && exit 0 || exit $?
+    ;;
+  *)
+    log_action_msg "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}"
+    exit 2
+    ;;
+esac
+exit 0

@@ -1,0 +1,78 @@
+Source: apache-aurora
+Priority: optional
+Maintainer: The Apache Aurora authors <dev@aurora.apache.org>
+Build-Depends: debhelper (>= 9),
+ java8-sdk | openjdk-8-jdk,
+ gradle (>= 2.4) | gradle-2.4,
+ python-all-dev,
+ libkrb5-dev,
+ curl,
+ git,
+ wget,
+ thrift-compiler (>= 0.9.1)
+# thrift-compiler version needs to match the ext.thriftRev value from build.gradle
+Section: net
+Standards-Version: 3.9.5
+Homepage: https://aurora.apache.org
+
+Package: aurora-scheduler
+Architecture: any
+Section: net
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ adduser,
+ openjdk-8-jre-headless | java-runtime-headless (>= 8),
+ mesos (>= 0.21.1)
+Recommends: aurora-tools
+Suggests: aurora-doc
+Description: Apache Aurora scheduler
+ Aurora is a service scheduler that runs on top of Apache Mesos, enabling you
+ to run long-running services that take advantage of Apache Mesos' scalability,
+ fault-tolerance, and resource isolation.
+ .
+ This package contains the Aurora Scheduler daemon.
+
+Package: aurora-tools
+Architecture: any
+Section: net
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ python2.7
+Suggests: aurora-doc
+Recommends: libkrb5-3 | libkrb5-26-heimdal
+Description: Apache Aurora commandline tools
+ Aurora is a service scheduler that runs on top of Apache Mesos, enabling you
+ to run long-running services that take advantage of Apache Mesos' scalability,
+ fault-tolerance, and resource isolation.
+ .
+ This package includes the aurora and aurora-admin commandline utilities for
+ interacting with an Aurora scheduler.
+
+Package: aurora-executor
+Architecture: any
+Section: net
+Replaces: aurora-mesos-slave
+Breaks: aurora-mesos-slave
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ python2.7
+Recommends:
+ aurora-tools,
+ lxc-docker (>= 1.0) | docker.io (>= 1.0)
+Suggests: aurora-doc
+Description: Apache Aurora executor deployment
+ Aurora is a service scheduler that runs on top of Apache Mesos, enabling you
+ to run long-running services that take advantage of Apache Mesos' scalability,
+ fault-tolerance, and resource isolation.
+ .
+ This package contains the components necessary to run Aurora jobs on a Mesos
+ slave node: the garbage collection executor, Thermos executor, and Thermos
+ observer.
+
+Package: aurora-doc
+Architecture: all
+Section: doc
+Depends: ${misc:Depends}
+Description: Documentation for Apache Aurora
+ Aurora is a service scheduler that runs on top of Apache Mesos, enabling you
+ to run long-running services that take advantage of Apache Mesos' scalability,
+ fault-tolerance, and resource isolation.
+ .
+ This package contains documentation.

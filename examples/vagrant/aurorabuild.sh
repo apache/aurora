@@ -63,13 +63,7 @@ function build_executor {
   ./pants binary src/main/python/apache/thermos/bin:thermos_runner
 
   # Package runner within executor.
-  python <<EOF
-import contextlib
-import zipfile
-with contextlib.closing(zipfile.ZipFile('dist/thermos_executor.pex', 'a')) as zf:
-  zf.writestr('apache/aurora/executor/resources/__init__.py', '')
-  zf.write('dist/thermos_runner.pex', 'apache/aurora/executor/resources/thermos_runner.pex')
-EOF
+  build-support/embed_runner_in_executor.py
 
   chmod +x /home/vagrant/aurora/dist/thermos_executor.pex
 }

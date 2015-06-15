@@ -1,0 +1,8 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: aurora
+Source: http://incubator.apache.org/aurora/
+
+Files: *
+Copyright: 2014 The Apache Software Foundation
+License: Apache-2.0
+ /usr/share/common-licenses/Apache-2.0
