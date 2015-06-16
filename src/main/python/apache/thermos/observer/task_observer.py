@@ -21,7 +21,6 @@ polls a designated Thermos checkpoint root and collates information about all ta
 """
 import os
 import threading
-import time
 from operator import attrgetter
 
 from twitter.common import log
@@ -54,7 +53,10 @@ class TaskObserver(ExceptionalThread, Lockable):
 
   POLLING_INTERVAL = Amount(5, Time.SECONDS)
 
-  def __init__(self, path_detector, resource_monitor_class=TaskResourceMonitor):
+  def __init__(self,
+               path_detector,
+               resource_monitor_class=TaskResourceMonitor,
+               interval=POLLING_INTERVAL):
     self._detector = ObserverTaskDetector(
         path_detector,
         self.__on_active,
@@ -63,6 +65,7 @@ class TaskObserver(ExceptionalThread, Lockable):
     if not issubclass(resource_monitor_class, ResourceMonitorBase):
       raise ValueError("resource monitor class must implement ResourceMonitorBase!")
     self._resource_monitor_class = resource_monitor_class
+    self._interval = interval
     self._active_tasks = {}    # task_id => ActiveObservedTask
     self._finished_tasks = {}  # task_id => FinishedObservedTask
     self._stop_event = threading.Event()
@@ -127,7 +130,7 @@ class TaskObserver(ExceptionalThread, Lockable):
       finished state.
     """
     while not self._stop_event.is_set():
-      time.sleep(self.POLLING_INTERVAL.as_(Time.SECONDS))
+      self._stop_event.wait(self._interval.as_(Time.SECONDS))
       with self.lock:
         self._detector.refresh()
 

@@ -19,6 +19,7 @@ import time
 from twitter.common import app
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.log.options import LogOptions
+from twitter.common.quantity import Amount, Time
 
 from apache.aurora.executor.common.path_detector import MesosPathDetector
 from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
@@ -50,18 +51,31 @@ app.add_option(
     help='The port on which the observer should listen.')
 
 
+app.add_option(
+    '--polling_interval_secs',
+      dest='polling_interval_secs',
+      type='int',
+      default=TaskObserver.POLLING_INTERVAL.as_(Time.SECONDS),
+      help='The number of seconds between observer refresh attempts.')
+
+
 # Allow an interruptible sleep so that ^C works.
 def sleep_forever():
   while True:
     time.sleep(1)
 
 
-def main(_, options):
+def initialize(options):
   path_detector = ChainedPathDetector(
       FixedPathDetector(options.root),
       MesosPathDetector(options.mesos_root),
   )
-  observer = TaskObserver(path_detector)
+  polling_interval = Amount(options.polling_interval_secs, Time.SECONDS)
+  return TaskObserver(path_detector, interval=polling_interval)
+
+
+def main(_, options):
+  observer = initialize(options)
   observer.start()
   root_server = configure_server(observer)
 
