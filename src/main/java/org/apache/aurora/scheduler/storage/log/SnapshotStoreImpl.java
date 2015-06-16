@@ -50,11 +50,9 @@ import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.updater.Updates;
 
 import static java.util.Objects.requireNonNull;
 
@@ -219,10 +217,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
           if (snapshot.isSetJobUpdateDetails()) {
             for (StoredJobUpdateDetails storedDetails : snapshot.getJobUpdateDetails()) {
               JobUpdateDetails details = storedDetails.getDetails();
-              details.getUpdate().setSummary(
-                  Updates.backfillJobUpdateKey(
-                      IJobUpdateSummary.build(details.getUpdate().getSummary())).newBuilder());
-
               updateStore.saveJobUpdate(
                   IJobUpdate.build(details.getUpdate()),
                   Optional.fromNullable(storedDetails.getLockToken()));

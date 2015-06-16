@@ -83,18 +83,6 @@ public interface JobUpdateStore {
   Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails();
 
   /**
-   * Fetches an update key based on the update ID.
-   *
-   * <p>
-   * This is a compatibility shim for when updates were only identified by a string, and should
-   * be removed in 0.9.0.
-   *
-   * @param updateId Update identifier.
-   * @return The update key matching {@code updateId}.
-   */
-  Optional<IJobUpdateKey> fetchUpdateKey(String updateId);
-
-  /**
    * Gets the lock token associated with a job update.
    *
    * @param key Update identifier.

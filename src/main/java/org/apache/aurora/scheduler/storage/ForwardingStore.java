@@ -139,11 +139,6 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Optional<IJobUpdateKey> fetchUpdateKey(String updateId) {
-    return jobUpdateStore.fetchUpdateKey(updateId);
-  }
-
-  @Override
   public List<IJobUpdateSummary> fetchJobUpdateSummaries(IJobUpdateQuery query) {
     return jobUpdateStore.fetchJobUpdateSummaries(query);
   }

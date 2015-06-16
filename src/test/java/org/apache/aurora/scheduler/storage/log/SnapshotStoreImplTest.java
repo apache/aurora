@@ -111,20 +111,13 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     IJobUpdateKey updateId2 = makeKey("updateId2");
     IJobUpdateDetails updateDetails1 = IJobUpdateDetails.build(new JobUpdateDetails()
         .setUpdate(new JobUpdate().setSummary(
-            new JobUpdateSummary()
-                .setKey(updateId1.newBuilder())
-                .setUpdateId(updateId1.getId())
-                .setJobKey(updateId1.getJob().newBuilder())))
+            new JobUpdateSummary().setKey(updateId1.newBuilder())))
         .setUpdateEvents(ImmutableList.of(new JobUpdateEvent().setStatus(JobUpdateStatus.ERROR)))
         .setInstanceEvents(ImmutableList.of(new JobInstanceUpdateEvent().setTimestampMs(123L))));
 
     IJobUpdateDetails updateDetails2 = IJobUpdateDetails.build(new JobUpdateDetails()
         .setUpdate(new JobUpdate().setSummary(
-            new JobUpdateSummary()
-                // Deliberately not setting the key field here to validate backwards compatibility
-                // with data written before that field existed.
-                .setUpdateId(updateId2.getId())
-                .setJobKey(updateId2.getJob().newBuilder()))));
+            new JobUpdateSummary().setKey(updateId2.newBuilder()))));
 
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);

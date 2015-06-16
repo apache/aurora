@@ -1197,8 +1197,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         IJobUpdate update = IJobUpdate.build(new JobUpdate()
             .setSummary(new JobUpdateSummary()
                 .setKey(new JobUpdateKey(job.newBuilder(), updateId))
-                .setJobKey(job.newBuilder())
-                .setUpdateId(updateId)
                 .setUser(context.getIdentity()))
             .setInstructions(instructions));
         try {

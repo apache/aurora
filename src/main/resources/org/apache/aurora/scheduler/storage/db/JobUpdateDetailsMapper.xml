@@ -58,11 +58,11 @@
       (
         SELECT ID
         FROM job_keys
-        WHERE role = #{summary.jobKey.role}
-          AND environment = #{summary.jobKey.environment}
-          AND name = #{summary.jobKey.name}
+        WHERE role = #{summary.key.job.role}
+          AND environment = #{summary.key.job.environment}
+          AND name = #{summary.key.job.name}
       ),
-      #{summary.updateId},
+      #{summary.key.id},
       #{summary.user},
       #{instructions.settings.updateGroupSize},
       #{instructions.settings.maxPerInstanceFailures},
@@ -144,17 +144,7 @@
   </resultMap>
 
   <resultMap id="jobUpdateSummaryMap" type="org.apache.aurora.gen.JobUpdateSummary">
-    <id column="update_id" property="updateId"/>
-    <result column="update_id" property="key.id" javaType="String"/>
-    <!-- myBatis breaks here if an association is used to map the job key into both the old
-         and new job key fields.  The observed behavior is that only the first declared association
-         will result in a field being set, and the other will be null.  Expanding the association
-         allows for the desired result of populating both JobKey fields.
-    -->
-    <result column="jk_role" property="jobKey.role" javaType="String"/>
-    <result column="jk_environment" property="jobKey.environment" javaType="String"/>
-    <result column="jk_name" property="jobKey.name" javaType="String"/>
-
+    <id column="update_id" property="key.id" javaType="String" />
     <association property="key.job"
                  resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
                  columnPrefix="jk_"/>
@@ -326,17 +316,6 @@
     <include refid="job_key_inner_join" />
     <include refid="timestamps_inner_joins" />
     <include refid="query_filter" />
-  </select>
-
-  <select id="selectUpdateKey" resultMap="jobUpdateKeyMap">
-    SELECT
-      u.update_id AS id,
-      j.role AS jk_role,
-      j.environment AS jk_environment,
-      j.name AS jk_name
-    FROM job_updates AS u
-    <include refid="job_key_inner_join" />
-    WHERE u.update_id = #{id}
   </select>
 
   <!--Column naming convention below follows the thrift object hierarchy and columnPrefix

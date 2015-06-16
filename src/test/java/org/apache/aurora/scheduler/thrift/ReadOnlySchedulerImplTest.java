@@ -39,6 +39,7 @@ import org.apache.aurora.gen.JobStats;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateDetails;
+import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.PendingReason;
@@ -577,8 +578,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     ImmutableList.Builder<JobUpdateSummary> builder = ImmutableList.builder();
     for (int i = 0; i < count; i++) {
       builder.add(new JobUpdateSummary()
-          .setUpdateId("id" + i)
-          .setJobKey(JOB_KEY.newBuilder())
+          .setKey(new JobUpdateKey(JOB_KEY.newBuilder(), "id" + 1))
           .setUser(USER));
     }
     return builder.build();

@@ -27,7 +27,6 @@ import com.twitter.common.base.MorePreconditions;
 
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
-import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.stats.CachedCounters;
@@ -83,12 +82,10 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
           "Missing both initial and desired states. At least one is required.");
     }
 
-    IJobUpdateSummary summary = update.getSummary();
-    jobKeyMapper.merge(summary.getJobKey().newBuilder());
+    IJobUpdateKey key = update.getSummary().getKey();
+    jobKeyMapper.merge(key.getJob().newBuilder());
     detailsMapper.insert(update.newBuilder());
 
-    IJobUpdateKey key = IJobUpdateKey.build(
-        new JobUpdateKey(summary.getJobKey().newBuilder(), summary.getUpdateId()));
     if (lockToken.isPresent()) {
       detailsMapper.insertLockToken(key, lockToken.get());
     }
@@ -249,13 +246,6 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
   @Override
   public Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails() {
     return ImmutableSet.copyOf(detailsMapper.selectAllDetails());
-  }
-
-  @Timed("job_update_store_fetch_update_key")
-  @Override
-  public Optional<IJobUpdateKey> fetchUpdateKey(String updateId) {
-    return Optional.fromNullable(detailsMapper.selectUpdateKey(updateId))
-        .transform(IJobUpdateKey.FROM_BUILDER);
   }
 
   @Timed("job_update_store_get_lock_token")

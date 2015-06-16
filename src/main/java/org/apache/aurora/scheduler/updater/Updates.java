@@ -19,12 +19,9 @@ import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 
-import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateStatus;
-import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 
 /**
@@ -40,23 +37,6 @@ public final class Updates {
    */
   public static final Set<JobUpdateStatus> ACTIVE_JOB_UPDATE_STATES =
       Sets.immutableEnumSet(apiConstants.ACTIVE_JOB_UPDATE_STATES);
-
-  /**
-   * Populates the {@link IJobUpdateSummary#getKey()} if it is not set by cloning other fields.
-   *
-   * @param summary Update summary to backfill.
-   * @return The original summary, guaranteed to have the {@code key} field populated.
-   */
-  public static IJobUpdateSummary backfillJobUpdateKey(IJobUpdateSummary summary) {
-    if (summary.isSetKey()) {
-      return summary;
-    } else {
-      JobUpdateSummary mutableSummary = summary.newBuilder();
-      mutableSummary.setKey(
-          new JobUpdateKey(mutableSummary.getJobKey(), mutableSummary.getUpdateId()));
-      return IJobUpdateSummary.build(mutableSummary);
-    }
-  }
 
   /**
    * Creates a range set representing all instance IDs represented by a set of instance

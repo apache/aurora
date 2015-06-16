@@ -131,9 +131,8 @@ public class DbJobUpdateStoreTest {
     saveUpdate(update2, Optional.<String>absent());
     assertUpdate(update2);
 
-    // Colliding update IDs should be forbidden.
-    IJobUpdate update3 =
-        makeJobUpdate(makeKey(JobKeys.from("role", "env", "name3"), updateId2.getId()));
+    // Colliding update keys should be forbidden.
+    IJobUpdate update3 = makeJobUpdate(updateId2);
     try {
       saveUpdate(update3, Optional.<String>absent());
       fail("Update ID collision should not be allowed");
@@ -336,7 +335,7 @@ public class DbJobUpdateStoreTest {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
         IJobUpdate update = makeJobUpdate(updateId);
-        storeProvider.getLockStore().saveLock(makeLock(update.getSummary().getJobKey(), "lock1"));
+        storeProvider.getLockStore().saveLock(makeLock(update, "lock1"));
         storeProvider.getJobUpdateStore().saveJobUpdate(update, Optional.of("lock1"));
       }
     });
@@ -610,15 +609,13 @@ public class DbJobUpdateStoreTest {
             Optional.of("lock2"),
             storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
 
-        storeProvider.getLockStore().removeLock(
-            makeLock(update1.getSummary().getJobKey(), "lock1").getKey());
+        storeProvider.getLockStore().removeLock(makeLock(update1, "lock1").getKey());
         assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
         assertEquals(
             Optional.of("lock2"),
             storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
 
-        storeProvider.getLockStore().removeLock(
-            makeLock(update2.getSummary().getJobKey(), "lock2").getKey());
+        storeProvider.getLockStore().removeLock(makeLock(update2, "lock2").getKey());
         assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
         assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
       }
@@ -666,17 +663,17 @@ public class DbJobUpdateStoreTest {
     assertEquals(
         ImmutableList.of(s5),
         getSummaries(
-            new JobUpdateQuery().setKey(new JobUpdateKey(job5.newBuilder(), s5.getUpdateId()))));
+            new JobUpdateQuery().setKey(new JobUpdateKey(job5.newBuilder(), s5.getKey().getId()))));
 
     // Test querying by incorrect update keys.
     assertEquals(
         ImmutableList.<IJobUpdateSummary>of(),
         getSummaries(
-            new JobUpdateQuery().setKey(new JobUpdateKey(job5.newBuilder(), s4.getUpdateId()))));
+            new JobUpdateQuery().setKey(new JobUpdateKey(job5.newBuilder(), s4.getKey().getId()))));
     assertEquals(
         ImmutableList.<IJobUpdateSummary>of(),
         getSummaries(
-            new JobUpdateQuery().setKey(new JobUpdateKey(job4.newBuilder(), s5.getUpdateId()))));
+            new JobUpdateQuery().setKey(new JobUpdateKey(job4.newBuilder(), s5.getKey().getId()))));
 
     // Test query by user.
     assertEquals(ImmutableList.of(s2, s1), getSummaries(new JobUpdateQuery().setUser("user")));
@@ -862,9 +859,9 @@ public class DbJobUpdateStoreTest {
     });
   }
 
-  private static ILock makeLock(IJobKey jobKey, String lockToken) {
+  private static ILock makeLock(IJobUpdate update, String lockToken) {
     return ILock.build(new Lock()
-        .setKey(LockKey.job(jobKey.newBuilder()))
+        .setKey(LockKey.job(update.getSummary().getKey().getJob().newBuilder()))
         .setToken(lockToken)
         .setTimestampMs(100)
         .setUser("fake user"));
@@ -875,8 +872,7 @@ public class DbJobUpdateStoreTest {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
         if (lockToken.isPresent()) {
-          storeProvider.getLockStore().saveLock(
-              makeLock(update.getSummary().getJobKey(), lockToken.get()));
+          storeProvider.getLockStore().saveLock(makeLock(update, lockToken.get()));
         }
         storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
         storeProvider.getJobUpdateStore().saveJobUpdateEvent(
@@ -893,8 +889,7 @@ public class DbJobUpdateStoreTest {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
         if (lockToken.isPresent()) {
-          storeProvider.getLockStore().saveLock(
-              makeLock(update.getSummary().getJobKey(), lockToken.get()));
+          storeProvider.getLockStore().saveLock(makeLock(update, lockToken.get()));
         }
         storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
       }
@@ -943,8 +938,7 @@ public class DbJobUpdateStoreTest {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getLockStore().removeLock(
-            makeLock(update.getSummary().getJobKey(), lockToken).getKey());
+        storeProvider.getLockStore().removeLock(makeLock(update, lockToken).getKey());
       }
     });
   }
@@ -1012,8 +1006,6 @@ public class DbJobUpdateStoreTest {
   private IJobUpdateSummary makeSummary(IJobUpdateKey key, String user) {
     return IJobUpdateSummary.build(new JobUpdateSummary()
         .setKey(key.newBuilder())
-        .setUpdateId(key.getId())
-        .setJobKey(key.getJob().newBuilder())
         .setUser(user));
   }
 
@@ -1026,8 +1018,6 @@ public class DbJobUpdateStoreTest {
 
     IJobUpdateSummary summary = IJobUpdateSummary.build(new JobUpdateSummary()
         .setKey(key.newBuilder())
-        .setUpdateId(key.getId())
-        .setJobKey(key.getJob().newBuilder())
         .setUser(user));
 
     IJobUpdate update = makeJobUpdate(summary);

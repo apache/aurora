@@ -279,8 +279,7 @@ class WriteAheadStorage extends ForwardingStore implements
     requireNonNull(key);
     requireNonNull(event);
 
-    write(Op.saveJobUpdateEvent(
-        new SaveJobUpdateEvent(event.newBuilder(), key.getId(), key.newBuilder())));
+    write(Op.saveJobUpdateEvent(new SaveJobUpdateEvent(event.newBuilder(), key.newBuilder())));
     jobUpdateStore.saveJobUpdateEvent(key, event);
   }
 
@@ -290,7 +289,7 @@ class WriteAheadStorage extends ForwardingStore implements
     requireNonNull(event);
 
     write(Op.saveJobInstanceUpdateEvent(
-        new SaveJobInstanceUpdateEvent(event.newBuilder(), key.getId(), key.newBuilder())));
+        new SaveJobInstanceUpdateEvent(event.newBuilder(), key.newBuilder())));
     jobUpdateStore.saveJobInstanceUpdateEvent(key, event);
   }
 

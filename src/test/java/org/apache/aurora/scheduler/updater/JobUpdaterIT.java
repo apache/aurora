@@ -1090,7 +1090,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ILock lock;
     try {
       lock = lockManager.acquireLock(
-          ILockKey.build(LockKey.job(update.getSummary().getJobKey().newBuilder())), USER);
+          ILockKey.build(LockKey.job(update.getSummary().getKey().getJob().newBuilder())), USER);
     } catch (LockManager.LockException e) {
       throw Throwables.propagate(e);
     }
@@ -1339,7 +1339,7 @@ public class JobUpdaterIT extends EasyMockTest {
     releaseAllLocks();
 
     JobUpdate builder = makeJobUpdate(makeInstanceConfig(0, 0, OLD_CONFIG)).newBuilder();
-    builder.getSummary().setUpdateId("another update");
+    builder.getSummary().getKey().setId("another update");
     IJobUpdate update2 = IJobUpdate.build(builder);
 
     try {
@@ -1360,9 +1360,7 @@ public class JobUpdaterIT extends EasyMockTest {
   private static IJobUpdateSummary makeUpdateSummary() {
     return IJobUpdateSummary.build(new JobUpdateSummary()
         .setUser("user")
-        .setKey(UPDATE_ID.newBuilder())
-        .setJobKey(UPDATE_ID.getJob().newBuilder())
-        .setUpdateId(UPDATE_ID.getId()));
+        .setKey(UPDATE_ID.newBuilder()));
   }
 
   private static IJobUpdate makeJobUpdate(IInstanceTaskConfig... configs) {

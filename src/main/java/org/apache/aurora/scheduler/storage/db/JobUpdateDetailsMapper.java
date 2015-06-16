@@ -21,7 +21,6 @@ import javax.annotation.Nullable;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
-import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Range;
@@ -143,18 +142,6 @@ interface JobUpdateDetailsMapper {
    * @return Job update summaries matching the query.
    */
   List<JobUpdateSummary> selectSummaries(JobUpdateQuery query);
-
-  /**
-   * Selects an update key by the update ID field contained within it.
-   *
-   * <p>
-   * TODO(wfarner): Remove this in the final phase of AURORA-1093.
-   *
-   * @param updateId Update to search by.
-   * @return The update key that {@code updateId} represents.
-   */
-  @Nullable
-  JobUpdateKey selectUpdateKey(String updateId);
 
   /**
    * Gets details for the provided {@code key}.

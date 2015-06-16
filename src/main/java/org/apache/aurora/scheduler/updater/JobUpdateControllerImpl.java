@@ -153,7 +153,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
         IJobUpdateSummary summary = update.getSummary();
         IJobUpdateInstructions instructions = update.getInstructions();
-        IJobKey job = summary.getJobKey();
+        IJobKey job = summary.getKey().getJob();
 
         // Validate the update configuration by making sure we can create an updater for it.
         updateFactory.newUpdate(update.getInstructions(), true);

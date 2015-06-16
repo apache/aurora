@@ -70,8 +70,6 @@ final class JobUpdates {
         JobUpdate update = new JobUpdate()
             .setSummary(new JobUpdateSummary()
                 .setKey(key)
-                .setUpdateId(key.getId())
-                .setJobKey(job)
                 .setUser(USER))
             .setInstructions(new JobUpdateInstructions()
                 .setSettings(new JobUpdateSettings()
