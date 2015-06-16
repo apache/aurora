@@ -103,9 +103,3 @@ class HttpSignaler(object):
         return (True, None)
     except self.QueryError as e:
       return (False, str(e))
-
-  def quitquitquit(self):
-    return self('/quitquitquit', use_post_method=True)
-
-  def abortabortabort(self):
-    return self('/abortabortabort', use_post_method=True)

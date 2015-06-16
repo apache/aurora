@@ -162,6 +162,8 @@ can be omitted. In Mesos, `resources` is also required.
    ```max_failures```      | Integer                          | Maximum process failures before being considered failed (Default: 1)
    ```max_concurrency```   | Integer                          | Maximum number of concurrent processes (Default: 0, unlimited concurrency.)
    ```finalization_wait``` | Integer                          | Amount of time allocated for finalizing processes, in seconds. (Default: 30)
+   ```graceful_shutdown_endpoint``` | String                  | Endpoint to hit to indicate that a task should gracefully shutdown. (Default: /quitquitquit)
+   ```shutdown_endpoint``` | String                           | Endpoint to hit to give a task its final warning before being killed. (Default: /abortabortabort)
 
 #### name
 `name` is a string denoting the name of this task. It defaults to the name of the first Process in
@@ -276,6 +278,18 @@ never invoked.)
 Client applications with higher priority may force a shorter
 finalization wait (e.g. through parameters to `thermos kill`), so this
 is mostly a best-effort signal.
+
+#### graceful_shutdown_endpoint
+
+If the Job has a port named `health`, a HTTP POST request will be sent over
+localhost to this endpoint to request that the task gracefully shut itself
+down.
+
+#### shutdown_endpoint
+
+If the Job has a port named `health`, a HTTP POST request will be sent over
+localhost to this endpoint to request as a final warning before being shut
+down.
 
 ### Constraint Object
 

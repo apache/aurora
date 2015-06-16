@@ -79,10 +79,12 @@ class TestThermosTaskRunnerIntegration(object):
       print('Saving executor logs in %s' % cls.LOG_DIR)
 
   @contextlib.contextmanager
-  def yield_runner(self, runner_class, portmap={}, clock=time, **bindings):
+  def yield_runner(self, runner_class, portmap=None, clock=time, **bindings):
     with contextlib.nested(temporary_dir(), temporary_dir()) as (td1, td2):
       sandbox = DirectorySandbox(td1)
       checkpoint_root = td2
+      if not portmap:
+        portmap = {}
 
       task_runner = runner_class(
           runner_pex=os.path.join('dist', 'thermos_runner.pex'),
@@ -195,7 +197,7 @@ class TestThermosTaskRunnerIntegration(object):
       assert task_runner.status.status == mesos_pb2.TASK_LOST
 
   @pytest.mark.skipif('True', reason='Flaky test (AURORA-1054)')
-  def test_integration_quitquitquit(self):
+  def test_integration_ignores_sigterm(self):
     ignorant_script = ';'.join([
         'import time, signal',
         'signal.signal(signal.SIGTERM, signal.SIG_IGN)',
@@ -218,8 +220,7 @@ class TestThermosTaskRunnerIntegration(object):
   @patch('apache.aurora.executor.thermos_task_runner.HttpSignaler')
   def test_integration_http_teardown(self, SignalerClass):
     signaler = SignalerClass.return_value
-    signaler.quitquitquit.return_value = (False, 'failed to dispatch')
-    signaler.abortabortabort.return_value = (True, None)
+    signaler.side_effect = lambda path, use_post_method: (path != '/quitquitquit', None)
 
     clock = Mock(wraps=time)
 
@@ -240,7 +241,9 @@ class TestThermosTaskRunnerIntegration(object):
 
       escalation_wait = call(ShortEscalationRunner.ESCALATION_WAIT.as_(Time.SECONDS))
       assert clock.sleep.mock_calls.count(escalation_wait) == 1
-      assert signaler.mock_calls == [call.quitquitquit(), call.abortabortabort()]
+      assert signaler.mock_calls == [
+        call('/quitquitquit', use_post_method=True),
+        call('/abortabortabort', use_post_method=True)]
 
   def test_thermos_normal_exit_status(self):
     with self.exit_with_status(0, TaskState.SUCCESS) as task_runner:

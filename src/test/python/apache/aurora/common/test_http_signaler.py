@@ -61,8 +61,8 @@ class TestHttpSignaler(unittest.TestCase):
     self._mox.ReplayAll()
 
     signaler = HttpSignaler(self.PORT)
-    assert signaler.quitquitquit() == (True, None)
-    assert signaler.abortabortabort() == (True, None)
+    assert signaler('/quitquitquit', use_post_method=True) == (True, None)
+    assert signaler('/abortabortabort', use_post_method=True) == (True, None)
 
   def test_health_checks(self):
     self._mox.StubOutWithMock(urllib_request, 'urlopen')

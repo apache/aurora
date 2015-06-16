@@ -118,8 +118,10 @@ class ThermosTaskRunner(TaskRunner):
 
     http_signaler = HttpSignaler(self._ports['health'])
 
-    for exit_request in [http_signaler.quitquitquit, http_signaler.abortabortabort]:
-      handled, _ = exit_request()
+    for exit_endpoint in [
+        self._task.graceful_shutdown_endpoint().get(),
+        self._task.shutdown_endpoint().get()]:
+      handled, _ = http_signaler(exit_endpoint, use_post_method=True)
       if handled:
         self._clock.sleep(self.ESCALATION_WAIT.as_(Time.SECONDS))
         if self.status is not None:
