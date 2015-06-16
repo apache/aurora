@@ -17,8 +17,11 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 import com.google.inject.AbstractModule;
+import com.google.inject.Inject;
 
 import org.apache.aurora.gen.SessionKey;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * An authentication module that uses an {@link UnsecureSessionValidator}. This behavior
@@ -26,7 +29,6 @@ import org.apache.aurora.gen.SessionKey;
  * to {@link SessionValidator}.
  */
 public class UnsecureAuthModule extends AbstractModule {
-  private static final String UNSECURE = "UNSECURE";
   private static final Logger LOG = Logger.getLogger(UnsecureAuthModule.class.getName());
 
   @Override
@@ -37,16 +39,18 @@ public class UnsecureAuthModule extends AbstractModule {
   }
 
   static class UnsecureSessionValidator implements SessionValidator {
+    private final SessionContext sessionContext;
+
+    @Inject
+    UnsecureSessionValidator(UnsecureSessionContext sessionContext) {
+      this.sessionContext = requireNonNull(sessionContext);
+    }
+
     @Override
     public SessionContext checkAuthenticated(SessionKey key, Set<String> targetRoles)
         throws AuthFailedException {
 
-      return new SessionContext() {
-        @Override
-        public String getIdentity() {
-          return UNSECURE;
-        }
-      };
+      return sessionContext;
     }
 
     @Override
@@ -56,33 +60,35 @@ public class UnsecureAuthModule extends AbstractModule {
   }
 
   static class UnsecureCapabilityValidator implements CapabilityValidator {
+    private final SessionValidator sessionValidator;
+    private final SessionContext sessionContext;
+
+    @Inject
+    UnsecureCapabilityValidator(
+        SessionValidator sessionValidator,
+        UnsecureSessionContext sessionContext) {
+
+      this.sessionValidator = requireNonNull(sessionValidator);
+      this.sessionContext = requireNonNull(sessionContext);
+    }
+
     @Override
     public SessionContext checkAuthorized(SessionKey key, Capability capability, AuditCheck check)
         throws AuthFailedException {
 
-      return new SessionContext() {
-        @Override
-        public String getIdentity() {
-          return UNSECURE;
-        }
-      };
+      return sessionContext;
     }
 
     @Override
     public SessionContext checkAuthenticated(SessionKey key, Set<String> targetRoles)
         throws AuthFailedException {
 
-      return new SessionContext() {
-        @Override
-        public String getIdentity() {
-          return UNSECURE;
-        }
-      };
+      return sessionValidator.checkAuthenticated(key, targetRoles);
     }
 
     @Override
     public String toString(SessionKey sessionKey) {
-      return sessionKey.toString();
+      return sessionValidator.toString(sessionKey);
     }
   }
 }

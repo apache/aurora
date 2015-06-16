@@ -1,8 +1,6 @@
 org/apache/aurora/Protobufs$1
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$1
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$2
-org/apache/aurora/auth/UnsecureAuthModule$UnsecureSessionValidator
-org/apache/aurora/auth/UnsecureAuthModule$UnsecureSessionValidator$1
 org/apache/aurora/scheduler/app/SchedulerMain$2
 org/apache/aurora/scheduler/app/SchedulerMain$3
 org/apache/aurora/scheduler/async/GcExecutorLauncher$1
