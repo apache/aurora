@@ -30,5 +30,5 @@ class MesosPathDetector(PathDetector):
   def get_paths(self):
     def iterate():
       for scan_result in self._detector:
-        yield os.path.join(ExecutorDetector.path(scan_result), self._sandbox_path)
-    return [path for path in iterate() if os.path.exists(path)]
+        yield os.path.join(os.path.realpath(ExecutorDetector.path(scan_result)), self._sandbox_path)
+    return list(set(path for path in iterate() if os.path.exists(path)))

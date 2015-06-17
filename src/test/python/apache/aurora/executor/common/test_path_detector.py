@@ -34,27 +34,35 @@ def test_path_detector():
   FAKE_ROOT = '/var/blah/blah'
   FAKE_CHECKPOINT_DIR = 'ckpt'
 
-  path1, path2 = (
+  path1_symlink, path1, path2 = (
       ExecutorDetector.path(Match(ROOTS[0], 'slave001', 'framework1', 'executor1', 'latest')),
+      ExecutorDetector.path(Match(ROOTS[0], 'slave001', 'framework1', 'executor1', 'asdf-ghjk')),
       ExecutorDetector.path(Match(ROOTS[1], 'slave002', 'framework2', 'executor2', 'latest')),
   )
 
-  with mock.patch('glob.glob', return_value=(path1, path2)) as glob:
-    with mock.patch('os.path.exists', side_effect=(True, False)) as exists:
-      mpd = MesosPathDetector(root=FAKE_ROOT, sandbox_path=FAKE_CHECKPOINT_DIR)
-      paths = list(mpd.get_paths())
-      assert len(paths) == 1
-      assert paths == [os.path.join(path1, FAKE_CHECKPOINT_DIR)]
+  with mock.patch('glob.glob', return_value=(path1_symlink, path1, path2)) as glob:
+    with mock.patch('os.path.realpath', side_effect=(path1, path1, path2)) as realpath:
+      with mock.patch('os.path.exists', side_effect=(True, True, False)) as exists:
+        mpd = MesosPathDetector(root=FAKE_ROOT, sandbox_path=FAKE_CHECKPOINT_DIR)
+        paths = list(mpd.get_paths())
+        assert len(paths) == 1
+        assert paths == [os.path.join(path1, FAKE_CHECKPOINT_DIR)]
 
-      expected_glob_pattern = os.path.join(*ExecutorDetector.PATTERN) % {
-        'root': FAKE_ROOT,
-        'slave_id': '*',
-        'framework_id': '*',
-        'executor_id': '*',
-        'run': '*'
-      }
-      glob.assert_called_once_with(expected_glob_pattern)
-      assert exists.mock_calls == [
-          mock.call(os.path.join(path1, FAKE_CHECKPOINT_DIR)),
-          mock.call(os.path.join(path2, FAKE_CHECKPOINT_DIR)),
-      ]
+        expected_glob_pattern = os.path.join(*ExecutorDetector.PATTERN) % {
+          'root': FAKE_ROOT,
+          'slave_id': '*',
+          'framework_id': '*',
+          'executor_id': '*',
+          'run': '*'
+        }
+        assert glob.mock_calls == [mock.call(expected_glob_pattern)]
+        assert realpath.mock_calls == [
+            mock.call(os.path.join(path1_symlink)),
+            mock.call(os.path.join(path1)),
+            mock.call(os.path.join(path2)),
+        ]
+        assert exists.mock_calls == [
+            mock.call(os.path.join(path1, FAKE_CHECKPOINT_DIR)),
+            mock.call(os.path.join(path1, FAKE_CHECKPOINT_DIR)),
+            mock.call(os.path.join(path2, FAKE_CHECKPOINT_DIR)),
+        ]

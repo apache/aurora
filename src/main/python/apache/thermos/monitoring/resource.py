@@ -147,7 +147,7 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
     log.debug("Initialising ResourceHistory of length %s" % history_length)
     self._history = ResourceHistory(history_length)
     self._kill_signal = threading.Event()
-    ExceptionalThread.__init__(self)
+    ExceptionalThread.__init__(self, name='%s[%s]' % (self.__class__.__name__, task_id))
     self.daemon = True
 
   def sample(self):

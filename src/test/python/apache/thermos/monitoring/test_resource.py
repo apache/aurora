@@ -71,6 +71,7 @@ class TestTaskResouceMonitor(TestCase):
     mock_sample.return_value = fake_process_sample
 
     task_resource_monitor = TaskResourceMonitor('fake-task-id', task_monitor)
+    assert task_resource_monitor.name == 'TaskResourceMonitor[fake-task-id]'
 
     assert fake_process_sample == task_resource_monitor.sample_by_process(fake_process_name)
     assert mock_get_active_processes.mock_calls == [mock.call(task_monitor)]
