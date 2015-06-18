@@ -109,6 +109,11 @@ public class ForwardingStore implements
   }
 
   @Override
+  public Set<IJobKey> getJobKeys() {
+    return taskStore.getJobKeys();
+  }
+
+  @Override
   public Set<ILock> fetchLocks() {
     return lockStore.fetchLocks();
   }

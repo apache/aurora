@@ -227,22 +227,29 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
 
   @Override
   public Response getRoleSummary() {
-    Multimap<String, IJobKey> jobsByRole = mapByRole(
-        Storage.Util.fetchTasks(storage, Query.unscoped()),
-        Tasks.SCHEDULED_TO_JOB_KEY);
+    Multimap<String, IJobKey> jobsByRole = storage.read(new Quiet<Multimap<String, IJobKey>>() {
+      @Override
+      public Multimap<String, IJobKey> apply(StoreProvider storeProvider) {
+        return Multimaps.index(storeProvider.getTaskStore().getJobKeys(), JobKeys.TO_ROLE);
+      }
+    });
 
-    Multimap<String, IJobKey> cronJobsByRole = mapByRole(
-        Storage.Util.fetchCronJobs(storage),
-        JobKeys.FROM_CONFIG);
+    Multimap<String, IJobKey> cronJobsByRole = Multimaps.index(
+        Iterables.transform(Storage.Util.fetchCronJobs(storage), JobKeys.FROM_CONFIG),
+        JobKeys.TO_ROLE);
 
-    Set<RoleSummary> summaries = Sets.newHashSet();
-    for (String role : Sets.union(jobsByRole.keySet(), cronJobsByRole.keySet())) {
-      RoleSummary summary = new RoleSummary();
-      summary.setRole(role);
-      summary.setJobCount(jobsByRole.get(role).size());
-      summary.setCronJobCount(cronJobsByRole.get(role).size());
-      summaries.add(summary);
-    }
+    Set<RoleSummary> summaries = FluentIterable.from(
+        Sets.union(jobsByRole.keySet(), cronJobsByRole.keySet()))
+        .transform(new Function<String, RoleSummary>() {
+          @Override
+          public RoleSummary apply(String role) {
+            return new RoleSummary(
+                role,
+                jobsByRole.get(role).size(),
+                cronJobsByRole.get(role).size());
+          }
+        })
+        .toSet();
 
     return ok(Result.roleSummaryResult(new RoleSummaryResult(summaries)));
   }
@@ -403,13 +410,5 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
 
   private Multimap<IJobKey, IScheduledTask> getTasks(Query.Builder query) {
     return Tasks.byJobKey(Storage.Util.fetchTasks(storage, query));
-  }
-
-  private static <T> Multimap<String, IJobKey> mapByRole(
-      Iterable<T> tasks,
-      Function<T, IJobKey> keyExtractor) {
-
-    return HashMultimap.create(
-        Multimaps.index(Iterables.transform(tasks, keyExtractor), JobKeys.TO_ROLE));
   }
 }

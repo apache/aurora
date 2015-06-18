@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.storage.db;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.storage.db.views.AssignedPort;
 import org.apache.aurora.scheduler.storage.db.views.ScheduledTaskWrapper;
@@ -41,6 +42,13 @@ interface TaskMapper {
    * @return Tasks matching the query.
    */
   List<ScheduledTaskWrapper> select(TaskQuery query);
+
+  /**
+   * Gets job keys of all stored tasks.
+   *
+   * @return Job keys.
+   */
+  Set<JobKey> selectJobKeys();
 
   /**
    * Inserts the task events association within an

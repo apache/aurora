@@ -21,6 +21,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -58,6 +59,7 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
@@ -634,8 +636,10 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     IScheduledTask task4 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfigThree)));
 
-    storageUtil.expectTaskFetch(Query.unscoped(), task1, task2, task3, task4);
-
+    expect(storageUtil.taskStore.getJobKeys()).andReturn(
+        FluentIterable.from(ImmutableSet.of(task1, task2, task3, task4))
+            .transform(Tasks.SCHEDULED_TO_JOB_KEY)
+            .toSet());
     expect(storageUtil.jobStore.fetchJobs()).andReturn(IJobConfiguration.setFromBuilders(crons));
 
     RoleSummaryResult expectedResult = new RoleSummaryResult();

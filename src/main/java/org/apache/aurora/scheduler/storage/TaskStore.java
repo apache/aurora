@@ -19,6 +19,7 @@ import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -35,6 +36,13 @@ public interface TaskStore {
    * @return A read-only view of matching tasks.
    */
   Iterable<IScheduledTask> fetchTasks(Query.Builder query);
+
+  /**
+   * Fetches all job keys represented in the task store.
+   *
+   * @return Job keys of stored tasks.
+   */
+  Set<IJobKey> getJobKeys();
 
   interface Mutable extends TaskStore {
 

@@ -144,6 +144,14 @@ class MemTaskStore implements TaskStore.Mutable {
     return result;
   }
 
+  @Timed("mem_storage_get_job_keys")
+  @Override
+  public Set<IJobKey> getJobKeys() {
+    return FluentIterable.from(fetchTasks(Query.unscoped()))
+        .transform(Tasks.SCHEDULED_TO_JOB_KEY)
+        .toSet();
+  }
+
   private final Function<IScheduledTask, Task> toTask =
       new Function<IScheduledTask, Task>() {
         @Override

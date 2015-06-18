@@ -110,6 +110,12 @@ class DbTaskStore implements TaskStore.Mutable {
     return result;
   }
 
+  @Timed("db_storage_get_job_keys")
+  @Override
+  public ImmutableSet<IJobKey> getJobKeys() {
+    return IJobKey.setFromBuilders(taskMapper.selectJobKeys());
+  }
+
   private static final Function<TaskConfigRow, Long> CONFIG_ID =
       new Function<TaskConfigRow, Long>() {
         @Override

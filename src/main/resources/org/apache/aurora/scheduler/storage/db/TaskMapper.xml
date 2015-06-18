@@ -163,6 +163,16 @@
     </where>
   </select>
 
+  <select id="selectJobKeys" resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap">
+    SELECT DISTINCT
+      j.role AS role,
+      j.environment AS environment,
+      j.name AS name
+    FROM tasks AS t
+    INNER JOIN task_configs as c ON c.id = t.task_config_row_id
+    INNER JOIN job_keys AS j ON j.id = c.job_key_id
+  </select>
+
   <insert id="insertTaskEvents">
     INSERT INTO task_events(
       task_row_id,

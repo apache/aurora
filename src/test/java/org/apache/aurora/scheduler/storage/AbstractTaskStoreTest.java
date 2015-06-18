@@ -46,6 +46,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
@@ -506,6 +507,40 @@ public abstract class AbstractTaskStoreTest {
     saveTasks(updated);
     assertQueryResults(Query.taskScoped(Tasks.id(a)), updated);
     assertQueryResults(Query.slaveScoped(HOST_A.getHost()), updated);
+  }
+
+  private Set<IJobKey> getJobKeys() {
+    return storage.read(new Storage.Work.Quiet<Set<IJobKey>>() {
+      @Override
+      public Set<IJobKey> apply(Storage.StoreProvider storeProvider) {
+        return storeProvider.getTaskStore().getJobKeys();
+      }
+    });
+  }
+
+  private Set<IJobKey> toJobKeys(IScheduledTask... tasks) {
+    return FluentIterable.from(ImmutableSet.copyOf(tasks))
+        .transform(Tasks.SCHEDULED_TO_JOB_KEY)
+        .toSet();
+  }
+
+  @Test
+  public void testGetsJobKeys() {
+    assertEquals(ImmutableSet.<IJobKey>of(), getJobKeys());
+    saveTasks(TASK_A);
+    assertEquals(toJobKeys(TASK_A), getJobKeys());
+    saveTasks(TASK_B, TASK_C);
+    assertEquals(toJobKeys(TASK_A, TASK_B, TASK_C), getJobKeys());
+    deleteTasks(Tasks.id(TASK_B));
+    assertEquals(toJobKeys(TASK_A, TASK_C), getJobKeys());
+    IJobKey multiInstanceJob = JobKeys.from("role", "env", "instances");
+    saveTasks(
+        makeTask("instance1", multiInstanceJob),
+        makeTask("instance2", multiInstanceJob),
+        makeTask("instance3", multiInstanceJob));
+    assertEquals(
+        ImmutableSet.builder().addAll(toJobKeys(TASK_A, TASK_C)).add(multiInstanceJob).build(),
+        getJobKeys());
   }
 
   @Ignore
