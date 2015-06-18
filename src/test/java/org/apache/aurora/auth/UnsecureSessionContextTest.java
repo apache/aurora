@@ -15,29 +15,49 @@ package org.apache.aurora.auth;
 
 import javax.inject.Provider;
 
+import com.google.common.base.Supplier;
 import com.google.inject.util.Providers;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.shiro.subject.SimplePrincipalCollection;
 import org.apache.shiro.subject.Subject;
+import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class UnsecureSessionContextTest extends EasyMockTest {
+  private StatsProvider statsProvider;
   private Subject subject;
   private Provider<Subject> subjectProvider;
 
   private UnsecureSessionContext sessionContext;
 
+  private Supplier<Integer> gauge;
+
   @Before
   public void setUp() {
+    statsProvider = createMock(StatsProvider.class);
     subject = createMock(Subject.class);
     subjectProvider = Providers.of(subject);
 
-    sessionContext = new UnsecureSessionContext();
+  }
+
+  private void constructAndReplay() {
+    Capture<Supplier<Integer>> gaugeCapture = createCapture();
+    expect(statsProvider.makeGauge(eq(UnsecureSessionContext.SHIRO_AUDIT_LOGGING_ENABLED), capture(gaugeCapture)))
+        .andReturn(null);
+
+    control.replay();
+
+    sessionContext = new UnsecureSessionContext(statsProvider);
+    gauge = gaugeCapture.getValue();
+    assertEquals(0, (int) gauge.get());
   }
 
   private void assertIdentityEquals(String identity) {
@@ -46,7 +66,7 @@ public class UnsecureSessionContextTest extends EasyMockTest {
 
   @Test
   public void testNoSubjectProvider() {
-    control.replay();
+    constructAndReplay();
 
     assertIdentityEquals(UnsecureSessionContext.UNSECURE);
   }
@@ -55,10 +75,11 @@ public class UnsecureSessionContextTest extends EasyMockTest {
   public void testSubjectProviderReturnsNull() {
     expect(subject.getPrincipals()).andReturn(new SimplePrincipalCollection());
 
-    control.replay();
+    constructAndReplay();
 
     sessionContext.setSubjectProvider(subjectProvider);
     assertIdentityEquals(UnsecureSessionContext.UNSECURE);
+    assertEquals(1, (int) gauge.get());
   }
 
   @Test
@@ -67,9 +88,10 @@ public class UnsecureSessionContextTest extends EasyMockTest {
 
     expect(subject.getPrincipals()).andReturn(new SimplePrincipalCollection(userName, "realm"));
 
-    control.replay();
+    constructAndReplay();
 
     sessionContext.setSubjectProvider(subjectProvider);
     assertIdentityEquals(userName);
+    assertEquals(1, (int) gauge.get());
   }
 }

@@ -21,6 +21,7 @@ import javax.inject.Provider;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 
+import com.twitter.common.stats.StatsProvider;
 import org.apache.shiro.subject.Subject;
 
 /**
@@ -29,7 +30,15 @@ import org.apache.shiro.subject.Subject;
  */
 class UnsecureSessionContext implements SessionValidator.SessionContext {
   @VisibleForTesting
+  static final String SHIRO_AUDIT_LOGGING_ENABLED = "shiro_audit_logging_enabled";
+
+  @VisibleForTesting
   static final String UNSECURE = "UNSECURE";
+
+  @Inject
+  UnsecureSessionContext(StatsProvider statsProvider) {
+    statsProvider.makeGauge(SHIRO_AUDIT_LOGGING_ENABLED, () -> subjectProvider == null ? 0 : 1);
+  }
 
   @Nullable
   private Provider<Subject> subjectProvider;

@@ -131,6 +131,10 @@ function test_clients {
   kdestroy
 }
 
+function test_audit_logging_enabled {
+  curl -s localhost:8081/vars | grep -q 'shiro_audit_logging_enabled 1'
+}
+
 function tear_down {
   sudo cp /vagrant/examples/vagrant/clusters.json /etc/aurora/clusters.json
   sudo stop aurora-scheduler-kerberos || true
@@ -146,6 +150,7 @@ function main {
   else
     trap tear_down EXIT
     setup
+    test_audit_logging_enabled
     test_snapshot
     test_clients
     test_h2console
