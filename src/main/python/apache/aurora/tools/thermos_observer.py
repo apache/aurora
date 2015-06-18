@@ -55,7 +55,7 @@ app.add_option(
     '--polling_interval_secs',
       dest='polling_interval_secs',
       type='int',
-      default=TaskObserver.POLLING_INTERVAL.as_(Time.SECONDS),
+      default=int(TaskObserver.POLLING_INTERVAL.as_(Time.SECONDS)),
       help='The number of seconds between observer refresh attempts.')
 
 
