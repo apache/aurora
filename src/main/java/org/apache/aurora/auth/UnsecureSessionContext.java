@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 
 import com.twitter.common.stats.StatsProvider;
+
 import org.apache.shiro.subject.Subject;
 
 /**

@@ -37,10 +37,11 @@ public class UnsecureAuthModule extends AbstractModule {
     LOG.info("Using default (UNSECURE!!!) authentication module.");
     bind(SessionValidator.class).to(UnsecureSessionValidator.class);
     bind(CapabilityValidator.class).to(UnsecureCapabilityValidator.class);
-    // NOTE: This binding is very important, as UnsecureSessionContext has an optional injection, so its provider must
-    // be created in the same injector as the one that *might* have its optional dependency. Omitting this binding will
-    // cause a Just-In-Time binding to be created in the parent injector, where it will not have access to the optional
-    // dependency in the child injector (so its optional dependency will never be used). This was the cause of
+    // NOTE: This binding is very important, as UnsecureSessionContext has an optional injection,
+    // so its provider must be created in the same injector as the one that *might* have its
+    // optional dependency. Omitting this binding will cause a Just-In-Time binding to be created
+    // in the parent injector, where it will not have access to the optional dependency in the
+    // child injector (so its optional dependency will never be used). This was the cause of
     // https://issues.apache.org/jira/browse/AURORA-1352. This can be mitigated slightly by
     // https://issues.apache.org/jira/browse/AURORA-1357
     bind(SessionContext.class).to(UnsecureSessionContext.class);

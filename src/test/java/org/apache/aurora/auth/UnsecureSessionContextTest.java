@@ -50,8 +50,9 @@ public class UnsecureSessionContextTest extends EasyMockTest {
 
   private void constructAndReplay() {
     Capture<Supplier<Integer>> gaugeCapture = createCapture();
-    expect(statsProvider.makeGauge(eq(UnsecureSessionContext.SHIRO_AUDIT_LOGGING_ENABLED), capture(gaugeCapture)))
-        .andReturn(null);
+    expect(statsProvider.makeGauge(
+        eq(UnsecureSessionContext.SHIRO_AUDIT_LOGGING_ENABLED),
+        capture(gaugeCapture))).andReturn(null);
 
     control.replay();
 
