@@ -24,6 +24,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -78,7 +79,8 @@ public class TaskReconcilerTest extends EasyMockTest {
 
     IScheduledTask task = TaskTestUtil.makeTask("id1", TaskTestUtil.JOB);
     storageUtil.expectOperations();
-    storageUtil.expectTaskFetch(Query.unscoped().active(), task).times(5);
+    storageUtil.expectTaskFetch(Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES), task)
+        .times(5);
 
     driver.reconcileTasks(ImmutableSet.of(TASK_TO_PROTO.apply(task)));
     expectLastCall().times(5);

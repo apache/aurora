@@ -28,6 +28,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -108,7 +109,9 @@ public class TaskReconciler extends AbstractIdleService {
           @Override
           public void run() {
             ImmutableSet<Protos.TaskStatus> active = FluentIterable
-                .from(Storage.Util.fetchTasks(storage, Query.unscoped().active()))
+                .from(Storage.Util.fetchTasks(
+                    storage,
+                    Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES)))
                 .transform(TASK_TO_PROTO)
                 .toSet();
 
