@@ -15,7 +15,7 @@ import org.apache.aurora.build.CoverageReportCheck
 
 plugins {
   id 'com.eriwen.gradle.js' version '1.12.1'
-  id 'com.github.ben-manes.versions' version '0.8'
+  id 'com.github.ben-manes.versions' version '0.10.1'
   id 'com.github.hierynomus.license' version '0.11.0'
   id 'me.champeau.gradle.jmh' version '0.2.0'
 }
@@ -79,11 +79,11 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
     }
   }
 
-  ext.junitRev = '4.11'
+  ext.junitRev = '4.12'
   ext.log4jRev = '1.2.17'
-  ext.gsonRev = '2.2.4'
+  ext.gsonRev = '2.3.1'
   ext.guavaRev = '16.0'
-  ext.slf4jRev = '1.6.6'
+  ext.slf4jRev = '1.7.12'
   ext.thriftRev = '0.9.1'
 
   configurations {
@@ -280,7 +280,7 @@ dependencies {
   compile "org.eclipse.jetty:jetty-server:${jettyDep}"
   compile "org.eclipse.jetty:jetty-servlet:${jettyDep}"
   compile "org.eclipse.jetty:jetty-servlets:${jettyDep}"
-  compile 'org.mybatis:mybatis:3.2.8'
+  compile 'org.mybatis:mybatis:3.3.0'
   compile 'org.mybatis:mybatis-guice:3.6'
   compile 'org.quartz-scheduler:quartz:2.2.1'
   compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
