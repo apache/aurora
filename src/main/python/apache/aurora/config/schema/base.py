@@ -98,7 +98,7 @@ class MesosJob(Struct):
   production                 = Default(Boolean, False)
   priority                   = Default(Integer, 0)
   health_check_config        = Default(HealthCheckConfig, HealthCheckConfig())
-  task_links                 = Map(String, String)
+  task_links                 = Map(String, String)  # Unsupported.  See AURORA-739
 
   enable_hooks = Default(Boolean, False)  # enable client API hooks; from env python-list 'hooks'
 

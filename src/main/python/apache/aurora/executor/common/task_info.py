@@ -14,7 +14,6 @@
 
 import json
 
-from pystachio import Ref
 from thrift.Thrift import TException
 from thrift.TSerialization import deserialize as thrift_deserialize
 from twitter.common import log
@@ -22,8 +21,17 @@ from twitter.common import log
 from apache.aurora.config.port_resolver import PortResolver
 from apache.aurora.config.schema.base import MesosJob, MesosTaskInstance
 from apache.aurora.config.thrift import task_instance_from_job
+from apache.thermos.config.loader import ThermosTaskValidator
 
 from gen.apache.aurora.api.ttypes import AssignedTask
+
+
+class TaskInfoError(ValueError):
+  pass
+
+
+class UnexpectedUnboundRefsError(TaskInfoError):
+  pass
 
 
 def assigned_task_from_mesos_task(task):
@@ -31,7 +39,7 @@ def assigned_task_from_mesos_task(task):
   try:
     assigned_task = thrift_deserialize(AssignedTask(), task.data)
   except (EOFError, TException) as e:
-    raise ValueError('Could not deserialize task! %s' % e)
+    raise TaskInfoError('Could not deserialize task! %s' % e)
   return assigned_task
 
 
@@ -53,46 +61,30 @@ def mesos_task_instance_from_assigned_task(assigned_task):
   thermos_task = assigned_task.task.executorConfig.data
 
   if not thermos_task:
-    raise ValueError('Task did not have a thermos config!')
+    raise TaskInfoError('Task did not have a thermos config!')
 
   try:
     json_blob = json.loads(thermos_task)
   except (TypeError, ValueError) as e:
-    raise ValueError('Could not deserialize thermos config: %s' % e)
+    raise TaskInfoError('Could not deserialize thermos config: %s' % e)
 
-  # As part of the transition for MESOS-2133, we can send either a MesosTaskInstance
-  # or we can be sending a MesosJob.  So handle both possible cases.  Once everyone
-  # is using MesosJob, then we can begin to leverage additional information that
-  # becomes available such as cluster.
+  # TODO(wickman) Determine if there are any serialized MesosTaskInstances in the wild;
+  # kill this code if not.
   if 'instance' in json_blob:
     return MesosTaskInstance.json_loads(thermos_task)
 
   # This is a MesosJob
-  mti, refs = task_instance_from_job(MesosJob.json_loads(thermos_task), assigned_task.instanceId)
-  unbound_refs = []
-  for ref in refs:
-    # If the ref is {{thermos.task_id}} or a subscope of
-    # {{thermos.ports}}, it currently gets bound by the Thermos Runner,
-    # so we must leave them unbound.
-    #
-    # {{thermos.user}} is a legacy binding which we can safely ignore.
-    #
-    # TODO(wickman) These should be rewritten by the mesos client to use
-    # %%style%% replacements in order to allow us to better type-check configs
-    # client-side.
-    if ref == Ref.from_address('thermos.task_id'):
-      continue
-    if Ref.subscope(Ref.from_address('thermos.ports'), ref):
-      continue
-    if ref == Ref.from_address('thermos.user'):
-      continue
-    else:
-      unbound_refs.append(ref)
+  task_instance = task_instance_from_job(
+      MesosJob.json_loads(thermos_task), assigned_task.instanceId)
 
-  if len(unbound_refs) != 0:
-    raise ValueError('Unexpected unbound refs: %s' % ' '.join(map(str, unbound_refs)))
+  try:
+    ThermosTaskValidator.assert_valid_task(task_instance.task())
+    ThermosTaskValidator.assert_all_refs_bound(task_instance)
+  except ThermosTaskValidator.InvalidTaskError as e:
+    raise UnexpectedUnboundRefsError('Got invalid task: %s' % e)
 
-  return mti
+  task_instance, _ = task_instance.interpolate()
+  return task_instance
 
 
 def resolve_ports(mesos_task, portmap):

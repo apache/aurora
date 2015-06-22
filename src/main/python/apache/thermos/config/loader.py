@@ -14,6 +14,7 @@
 
 import json
 import os
+import random
 import re
 import textwrap
 
@@ -22,7 +23,7 @@ from pystachio.config import Config
 from twitter.common.dirutil import safe_open
 
 from apache.thermos.common.planner import TaskPlanner
-from apache.thermos.config.schema import Task
+from apache.thermos.config.schema import Task, ThermosContext
 
 
 class PortExtractor(object):
@@ -115,6 +116,7 @@ class ThermosTaskValidator(object):
     cls.assert_valid_names(task)
     cls.assert_typecheck(task)
     cls.assert_valid_plan(task)
+    cls.assert_all_refs_bound(task)
 
   @classmethod
   def assert_valid_plan(cls, task):
@@ -154,6 +156,25 @@ class ThermosTaskValidator(object):
       if not task_on_disk or task_on_disk.task != task:
         raise cls.InvalidTaskError('Task differs from on disk copy: %r vs %r' % (
             task_on_disk.task if task_on_disk else None, task))
+
+  @classmethod
+  def assert_all_refs_bound(cls, task):
+    port_names = PortExtractor.extract(task)
+
+    # Create fake bindings and make sure that there are no unbound refs afterwards.  If
+    # there are unbound refs that could indicate improper scoping e.g.
+    # {{array[{{mesos.instance}}]}} which is disallowed.
+    thermos_bindings = ThermosContext(
+        task_id='dummy_task_id',
+        user='dummy_user',
+        ports=dict((name, random.randrange(30000, 40000)) for name in port_names),
+    )
+    task_instance, unbindable_refs = (task % dict(thermos=thermos_bindings)).interpolate()
+
+    if len(unbindable_refs) != 0:
+      raise cls.InvalidTaskError(
+          'Unexpected unbound refs: %s. Make sure you are not nesting template variables.'
+          % ' '.join(map(str, unbindable_refs)))
 
 
 class ThermosConfigLoader(object):

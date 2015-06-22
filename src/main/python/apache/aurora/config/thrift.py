@@ -82,7 +82,6 @@ def task_instance_from_job(job, instance):
   health_check_config = HealthCheckConfig()
   if job.has_health_check_config():
     health_check_config = job.health_check_config()
-
   ti = MesosTaskInstance(task=job.task(),
                          role=job.role(),
                          health_check_config=health_check_config,
@@ -91,7 +90,7 @@ def task_instance_from_job(job, instance):
     ti = ti(announce=job.announce())
   if job.has_environment():
     ti = ti(environment=job.environment())
-  return ti.bind(mesos=instance_context).interpolate()
+  return ti.bind(mesos=instance_context)
 
 
 def fully_interpolated(pystachio_object, coerce_fn=lambda i: i):
@@ -215,7 +214,7 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   task.job = key
   task.owner = owner
   task.requestedPorts = ports
-  task.taskLinks = not_empty_or(job.task_links(), {})
+  task.taskLinks = {}  # See AURORA-739
   task.constraints = constraints_to_thrift(not_empty_or(job.constraints(), {}))
   task.container = create_container_config(job.container())
 

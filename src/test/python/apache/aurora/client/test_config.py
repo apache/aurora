@@ -13,11 +13,13 @@
 #
 
 import os
+from io import BytesIO
 
 import pytest
-from twitter.common.contextutil import temporary_dir, temporary_file
+from twitter.common.contextutil import temporary_dir
 
 from apache.aurora.client import config
+from apache.aurora.client.config import get_config as get_aurora_config
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
 from apache.aurora.config.schema.base import (
@@ -36,10 +38,10 @@ HELLO_WORLD = Job(
   role = 'john_doe',
   cluster = 'test-cluster',
   environment = 'test',
-  %s
+  %(announce)s
   task = Task(
     name = 'main',
-    processes = [Process(name = 'hello_world', cmdline = 'echo {{thermos.ports[http]}}')],
+    processes = [Process(name = 'hello_world', cmdline = '%(cmdline)s')],
     resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
   )
 )
@@ -53,44 +55,66 @@ include(%s)
 """
 
 
-MESOS_CONFIG_WITH_ANNOUNCE_1 = MESOS_CONFIG_BASE % 'announce = Announcer(primary_port="http"),'
-MESOS_CONFIG_WITH_ANNOUNCE_2 = MESOS_CONFIG_BASE % (
- '''announce = Announcer(
+MESOS_CONFIG_WITH_ANNOUNCE_1 = MESOS_CONFIG_BASE % {
+    'cmdline': 'echo {{thermos.ports[http]}}',
+    'announce': 'announce = Announcer(primary_port="http"),'}
+MESOS_CONFIG_WITH_ANNOUNCE_2 = MESOS_CONFIG_BASE % {
+    'cmdline': 'echo {{thermos.ports[http]}}',
+    'announce': '''announce = Announcer(
        primary_port = "http",
        portmap = {"aurora": "http"}),
- ''')
-MESOS_CONFIG_WITH_INVALID_STATS = MESOS_CONFIG_BASE % (
-    'announce = Announcer(primary_port="http", stats_port="blah"),')
-MESOS_CONFIG_WITHOUT_ANNOUNCE = MESOS_CONFIG_BASE % ''
+'''}
+MESOS_CONFIG_WITH_INVALID_STATS = MESOS_CONFIG_BASE % {
+    'cmdline': 'echo {{thermos.ports[http]}}',
+    'announce': 'announce = Announcer(primary_port="http", stats_port="blah"),'}
+MESOS_CONFIG_WITHOUT_ANNOUNCE = MESOS_CONFIG_BASE % {
+    'cmdline': 'echo {{thermos.ports[http]}}',
+    'announce': ''
+}
 
 
 def test_get_config_announces():
-  for good_config in (MESOS_CONFIG_WITH_ANNOUNCE_1, MESOS_CONFIG_WITH_ANNOUNCE_2,
-                      MESOS_CONFIG_WITHOUT_ANNOUNCE):
-    with temporary_file() as fp:
-      fp.write(good_config)
-      fp.flush()
+  for good_config in (
+      MESOS_CONFIG_WITH_ANNOUNCE_1,
+      MESOS_CONFIG_WITH_ANNOUNCE_2,
+      MESOS_CONFIG_WITHOUT_ANNOUNCE):
 
-      fp.seek(0)
-      config.get_config('hello_world', fp)
+    bio = BytesIO(good_config)
+    get_aurora_config('hello_world', bio).job()
+
+
+def test_get_config_with_broken_subscopes():
+  bad_config = MESOS_CONFIG_BASE % {
+      'cmdline': 'echo {{hello[{{thermos.ports[http]}}]}}',
+      'announce': '',
+  }
+  bio = BytesIO(bad_config)
+  with pytest.raises(AuroraConfig.InvalidConfig) as cm:
+    get_aurora_config('hello_world', bio).job()
+  assert 'Unexpected unbound refs' in str(cm.value.message)
 
 
 def test_get_config_select():
-  with temporary_file() as fp:
-    fp.write(MESOS_CONFIG_BASE % '')
-    fp.flush()
+  bio = BytesIO(MESOS_CONFIG_WITHOUT_ANNOUNCE)
 
-    fp.seek(0)
-    config.get_config(
-        'hello_world', fp, select_env='test',
-        select_role='john_doe', select_cluster='test-cluster')
+  get_aurora_config(
+      'hello_world',
+      bio,
+      select_env='test',
+      select_role='john_doe',
+      select_cluster='test-cluster').job()
 
-    fp.seek(0)
-    with pytest.raises(ValueError) as cm:
-      config.get_config(
-          'hello_world', fp, select_env='staging42',
-          select_role='moua', select_cluster='test-cluster')
-    assert 'test-cluster/john_doe/test/hello_world' in str(cm.value.message)
+  bio.seek(0)
+
+  with pytest.raises(ValueError) as cm:
+    get_aurora_config(
+        'hello_world',
+        bio,
+        select_env='staging42',
+        select_role='moua',
+        select_cluster='test-cluster').job()
+
+  assert 'test-cluster/john_doe/test/hello_world' in str(cm.value.message)
 
 
 def test_include():
@@ -107,11 +131,11 @@ def test_include():
             ("", """'%s'""" % hello_mesos_fname))
         hello_include_fname_fp.flush()
 
-        config.get_config('hello_world', hello_include_fname_path)
+        get_aurora_config('hello_world', hello_include_fname_path)
 
         hello_include_fname_fp.seek(0)
         with pytest.raises(AuroraConfigLoader.InvalidConfigError):
-          config.get_config('hello_world', hello_include_fname_fp)
+          get_aurora_config('hello_world', hello_include_fname_fp)
 
 
 def test_environment_names():
