@@ -60,6 +60,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.mesos.Protos.Offer;
+import static org.apache.mesos.Protos.TaskStatus.Reason.REASON_RECONCILIATION;
 
 /**
  * Location for communication with mesos.
@@ -193,7 +194,13 @@ public class MesosSchedulerImpl implements Scheduler {
     }
   }
 
-  private static void logStatusUpdate(Logger log, TaskStatus status) {
+  private static void logStatusUpdate(Logger logger, TaskStatus status) {
+    // Periodic task reconciliation runs generate a large amount of no-op messages.
+    // Suppress logging for reconciliation status updates by default.
+    Level level = status.hasReason() && status.getReason() == REASON_RECONCILIATION
+        ? Level.FINE
+        : Level.INFO;
+
     StringBuilder message = new StringBuilder("Received status update for task ")
         .append(status.getTaskId().getValue())
         .append(" in state ")
@@ -207,7 +214,7 @@ public class MesosSchedulerImpl implements Scheduler {
     if (status.hasMessage()) {
       message.append(": ").append(status.getMessage());
     }
-    log.info(message.toString());
+    logger.log(level, message.toString());
   }
 
   private static final Function<Double, Long> SECONDS_TO_MICROS = new Function<Double, Long>() {

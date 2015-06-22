@@ -62,6 +62,8 @@ import org.junit.Test;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.mesos.Protos.Offer;
+import static org.easymock.EasyMock.anyString;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertTrue;
 
@@ -106,20 +108,32 @@ public class MesosSchedulerImplTest extends EasyMockTest {
               .setMode(NONE)
               .setAttributes(ImmutableSet.<Attribute>of())));
 
-  private static final TaskStatus STATUS = TaskStatus.newBuilder()
+  private static final TaskStatus.Builder STATUS_BUILDER = TaskStatus.newBuilder()
       .setState(TaskState.TASK_RUNNING)
       .setSource(Source.SOURCE_SLAVE)
       // Only testing data plumbing, this field with TASK_RUNNING would not normally happen,
       .setReason(Reason.REASON_COMMAND_EXECUTOR_FAILED)
       .setMessage("message")
       .setTimestamp(1D)
-      .setTaskId(TaskID.newBuilder().setValue("task-id").build())
+      .setTaskId(TaskID.newBuilder().setValue("task-id").build());
+
+  private static final TaskStatus STATUS = STATUS_BUILDER.build();
+
+  private static final TaskStatus STATUS_RECONCILIATION = STATUS_BUILDER
+      .setReason(Reason.REASON_RECONCILIATION)
       .build();
 
   private static final TaskStatusReceived PUBSUB_EVENT = new TaskStatusReceived(
       STATUS.getState(),
       Optional.of(STATUS.getSource()),
       Optional.of(STATUS.getReason()),
+      Optional.of(1000000L)
+  );
+
+  private static final TaskStatusReceived PUBSUB_RECONCILIATION_EVENT = new TaskStatusReceived(
+      STATUS_RECONCILIATION.getState(),
+      Optional.of(STATUS_RECONCILIATION.getSource()),
+      Optional.of(STATUS_RECONCILIATION.getReason()),
       Optional.of(1000000L)
   );
 
@@ -137,6 +151,10 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void setUp() {
     log = Logger.getAnonymousLogger();
     log.setLevel(Level.INFO);
+    initializeScheduler(log);
+  }
+
+  private void initializeScheduler(Logger logger) {
     storageUtil = new StorageTestUtil(this);
     shutdownCommand = createMock(Command.class);
     final Lifecycle lifecycle =
@@ -151,7 +169,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         ImmutableList.of(systemLauncher, userLauncher),
         eventSink,
         MoreExecutors.sameThreadExecutor(),
-        log,
+        logger,
         new CachedCounters(new FakeStatsProvider()));
     driver = createMock(SchedulerDriver.class);
   }
@@ -396,6 +414,23 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     scheduler.executorLost(driver, EXECUTOR_ID, SLAVE_ID, 1);
   }
 
+  @Test
+  public void testStatusReconciliationAcceptsFineLogging() {
+    Logger mockLogger = createMock(Logger.class);
+    mockLogger.info(anyString());
+    mockLogger.log(eq(Level.FINE), anyString());
+    initializeScheduler(mockLogger);
+
+    new StatusReconciliationFixture() {
+      @Override
+      void expectations() {
+        eventSink.post(PUBSUB_RECONCILIATION_EVENT);
+        expect(systemLauncher.statusUpdate(status)).andReturn(false);
+        expect(userLauncher.statusUpdate(status)).andReturn(true);
+      }
+    }.run();
+  }
+
   private void expectOfferAttributesSaved(HostOffer offer) {
     expect(storageUtil.attributeStore.getHostAttributes(offer.getOffer().getHostname()))
         .andReturn(Optional.<IHostAttributes>absent());
@@ -470,6 +505,12 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     @Override
     void test() {
       scheduler.statusUpdate(driver, status);
+    }
+  }
+
+  private abstract class StatusReconciliationFixture extends StatusFixture {
+    StatusReconciliationFixture() {
+      super(STATUS_RECONCILIATION);
     }
   }
 }
