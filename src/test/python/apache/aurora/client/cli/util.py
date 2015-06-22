@@ -296,7 +296,10 @@ jobs = [HELLO_WORLD]
         ),
         task = Task(
           name = 'test',
-          processes = [Process(name = 'hello_world', cmdline = 'echo {{thermos.ports[http]}}')],
+          processes = [Process(
+            name = 'hello_world',
+            cmdline = 'echo {{thermos.ports[http]}} {{flags_binding}}'
+          )],
           resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
         )
       )

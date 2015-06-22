@@ -147,8 +147,8 @@ def binding_parser(binding):
   the user from a list of "name=value" formatted strings to a list of the dictionaries
   expected by pystachio.
   """
-  binding_parts = binding.split("=")
-  if len(binding_parts) != 2:
+  binding_parts = binding.split("=", 1)
+  if len(binding_parts) < 2:
     raise ValueError('Binding parameter must be formatted name=value')
   try:
     ref = Ref.from_address(binding_parts[0])

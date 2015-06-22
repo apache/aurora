@@ -374,6 +374,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'create', '--wait-until=RUNNING', '--bind', 'cluster_binding=west',
             '--bind', 'instances_binding=20', '--bind', 'TEST_BATCH=1',
+            '--bind', 'flags_binding=-some_flag=value',
             'west/bozo/test/hello',
             fp.name])
 
