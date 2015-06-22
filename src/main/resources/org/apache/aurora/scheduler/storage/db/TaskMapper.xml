@@ -89,10 +89,7 @@
     <association property="task" resultMap="scheduledTaskMap"/>
   </resultMap>
 
-  <!-- TODO(wfarner): Consider adding selectById and/or selectByIds methods.  The dynamic SQL here
-       seems to come with a ~3x performance hit.
-   -->
-  <select id="select" resultMap="taskWrapperMap">
+  <sql id="unscopedSelect">
     SELECT
       t.id AS row_id,
       t.task_config_row_id AS task_config_row_id,
@@ -110,6 +107,16 @@
     INNER JOIN task_configs as c ON c.id = t.task_config_row_id
     INNER JOIN job_keys AS j ON j.id = c.job_key_id
     LEFT OUTER JOIN host_attributes AS h ON h.id = t.slave_row_id
+  </sql>
+
+  <select id="selectById" resultMap="taskWrapperMap">
+    <include refid="unscopedSelect"/>
+    WHERE
+      t.task_id = #{taskId}
+  </select>
+
+  <select id="select" resultMap="taskWrapperMap">
+    <include refid="unscopedSelect"/>
     <where>
       <if test="role != null">
         j.role = #{role}

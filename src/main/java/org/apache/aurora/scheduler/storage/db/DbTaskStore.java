@@ -23,6 +23,8 @@ import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -291,9 +293,24 @@ class DbTaskStore implements TaskStore.Mutable {
     return Functions.compose(REPLACE_UNION_TYPES, linkPopulator);
   }
 
-  private FluentIterable<ScheduledTaskWrapper> fetchRows(Query.Builder query) {
+  private FluentIterable<IScheduledTask> matches(Query.Builder query) {
+    Iterable<ScheduledTaskWrapper> results;
+    Predicate<IScheduledTask> filter;
+    if (query.get().getTaskIdsSize() == 1) {
+      // Optimize queries that are scoped to a single task, as the dynamic SQL used for arbitrary
+      // queries comes with a performance penalty.
+      results = Optional.fromNullable(
+          taskMapper.selectById(Iterables.getOnlyElement(query.get().getTaskIds())))
+          .asSet();
+      filter = Util.queryFilter(query);
+    } else {
+      results = taskMapper.select(query.get());
+      // Additional filtering is not necessary in this case, since the query does it for us.
+      filter = Predicates.alwaysTrue();
+    }
+
     final Function<TaskConfigRow, TaskConfig> configSaturator = getConfigSaturator();
-    return FluentIterable.from(taskMapper.select(query.get()))
+    return FluentIterable.from(results)
         .transform(populateAssignedPorts)
         .transform(new Function<ScheduledTaskWrapper, ScheduledTaskWrapper>() {
           @Override
@@ -304,7 +321,10 @@ class DbTaskStore implements TaskStore.Mutable {
                     task.getTask().getAssignedTask().getTask()));
             return task;
           }
-        });
+        })
+        .transform(UNWRAP)
+        .transform(IScheduledTask.FROM_BUILDER)
+        .filter(filter);
   }
 
   private final Function<ScheduledTaskWrapper, ScheduledTaskWrapper> populateAssignedPorts =
@@ -319,12 +339,6 @@ class DbTaskStore implements TaskStore.Mutable {
           return task;
         }
       };
-
-  private FluentIterable<IScheduledTask> matches(Query.Builder query) {
-    return fetchRows(query)
-        .transform(UNWRAP)
-        .transform(IScheduledTask.FROM_BUILDER);
-  }
 
   private static final Function<ScheduledTaskWrapper, ScheduledTask> UNWRAP =
       new Function<ScheduledTaskWrapper, ScheduledTask>() {

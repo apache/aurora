@@ -16,6 +16,8 @@ package org.apache.aurora.scheduler.storage.db;
 import java.util.List;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.storage.db.views.AssignedPort;
@@ -42,6 +44,15 @@ interface TaskMapper {
    * @return Tasks matching the query.
    */
   List<ScheduledTaskWrapper> select(TaskQuery query);
+
+  /**
+   * Gets a task by ID.
+   *
+   * @param taskId ID of the task to fetch.
+   * @return Task with the specified ID.
+   */
+  @Nullable
+  ScheduledTaskWrapper selectById(@Param("taskId") String taskId);
 
   /**
    * Gets job keys of all stored tasks.
