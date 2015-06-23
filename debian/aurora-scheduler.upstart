@@ -34,7 +34,6 @@ script
       -thermos_executor_resources="$THERMOS_EXECUTOR_RESOURCES" \
       -thermos_executor_flags="$THERMOS_EXECUTOR_FLAGS" \
       -allowed_container_types="$ALLOWED_CONTAINER_TYPES" \
-      -gc_executor_path="$GC_EXECUTOR_PATH" \
       -vlog="$LOG_LEVEL" \
       $EXTRA_SCHEDULER_ARGS
 end script

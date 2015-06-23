@@ -13,10 +13,8 @@
  */
 package org.apache.aurora.scheduler.base;
 
-import java.util.Map;
-
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.TextFormat;
 
 import org.apache.mesos.Protos.CommandInfo;
@@ -26,16 +24,22 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 public class CommandUtilTest {
+
+  private static final Optional<String> NO_EXTRA_ARGS = Optional.absent();
+  private static final ImmutableList<String> NO_RESOURCES = ImmutableList.of();
+  private static final String PATH = "./";
+
   @Test
   public void testUriBasename() {
-    test("c", "c", ImmutableMap.<String, String>of());
-    test("c", "/a/b/c", ImmutableMap.of("FOO", "1"));
-    test("foo.zip", "hdfs://twitter.com/path/foo.zip", ImmutableMap.of("PATH", "/bin:/usr/bin"));
+    test("c", "c");
+    test("c", "/a/b/c");
+    test("foo.zip", "hdfs://twitter.com/path/foo.zip");
   }
 
   @Test
   public void testExecutorOnlyCommand() {
-    CommandInfo cmd = CommandUtil.create("test/executor", ImmutableList.<String>of());
+    CommandInfo cmd =
+        CommandUtil.create("test/executor", NO_RESOURCES, PATH, NO_EXTRA_ARGS).build();
     assertEquals("./executor", cmd.getValue());
     assertEquals("test/executor", cmd.getUris(0).getValue());
   }
@@ -44,7 +48,9 @@ public class CommandUtilTest {
   public void testWrapperAndExecutorCommand() {
     CommandInfo cmd = CommandUtil.create(
         "test/wrapper",
-        ImmutableList.of("test/executor"));
+        ImmutableList.of("test/executor"),
+        PATH,
+        NO_EXTRA_ARGS).build();
     assertEquals("./wrapper", cmd.getValue());
     assertEquals("test/executor", cmd.getUris(0).getValue());
     assertEquals("test/wrapper", cmd.getUris(1).getValue());
@@ -52,17 +58,17 @@ public class CommandUtilTest {
 
   @Test(expected = NullPointerException.class)
   public void testBadParameters() {
-    CommandUtil.create(null, ImmutableList.<String>of());
+    CommandUtil.create(null, NO_RESOURCES, PATH, NO_EXTRA_ARGS);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testBadUri() {
-    CommandUtil.create("a/b/c/", ImmutableList.<String>of());
+    CommandUtil.create("a/b/c/", NO_RESOURCES, PATH, NO_EXTRA_ARGS);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testEmptyUri() {
-    CommandUtil.create("", ImmutableList.<String>of());
+    CommandUtil.create("", NO_RESOURCES, PATH, NO_EXTRA_ARGS);
   }
 
   @Test
@@ -72,19 +78,21 @@ public class CommandUtilTest {
     // with the same id but different executorInfo. See MESOS-2309 for more details. This is
     // required because Aurora's GC executor has a constant id.
 
-    String uri = "/usr/local/bin/gc_executor";
-    String expectedValue = "uris { value: \"/usr/local/bin/gc_executor\" "
-        + "executable: true } value: \"./gc_executor\"";
-    CommandInfo actual = CommandUtil.create(uri, ImmutableList.<String>of());
+    String uri = "/usr/local/bin/test_executor";
+    String expectedValue = "uris { value: \"/usr/local/bin/test_executor\" "
+        + "executable: true } value: \"./test_executor\"";
+    CommandInfo actual = CommandUtil.create(uri, NO_RESOURCES, PATH, NO_EXTRA_ARGS).build();
 
     assertEquals(expectedValue, TextFormat.shortDebugString(actual));
   }
 
-  private void test(String basename, String uri, Map<String, String> env) {
+  private void test(String basename, String uri) {
     CommandInfo expectedCommand = CommandInfo.newBuilder()
         .addUris(URI.newBuilder().setValue(uri).setExecutable(true))
         .setValue("./" + basename)
         .build();
-    assertEquals(expectedCommand, CommandUtil.create(uri, ImmutableList.<String>of()));
+    assertEquals(
+        expectedCommand,
+        CommandUtil.create(uri, NO_RESOURCES, PATH, NO_EXTRA_ARGS).build());
   }
 }

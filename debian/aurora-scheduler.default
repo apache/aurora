@@ -70,9 +70,6 @@ THERMOS_EXECUTOR_FLAGS=""
 # Container types that are allowed to be used by jobs.
 ALLOWED_CONTAINER_TYPES="MESOS,DOCKER"
 
-# Path (on the slave nodes) or URL to garbage collection executor
-GC_EXECUTOR_PATH="/usr/share/aurora/bin/gc_executor.pex"
-
 # Scheduler log verbosity
 LOG_LEVEL="INFO"
 

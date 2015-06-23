@@ -35,7 +35,6 @@ import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
-import org.apache.aurora.scheduler.async.GcExecutorLauncher;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.mesos.Protos;
@@ -99,11 +98,7 @@ public class SchedulerModule extends AbstractModule {
 
   @Provides
   @Singleton
-  List<TaskLauncher> provideTaskLaunchers(
-      GcExecutorLauncher gcLauncher,
-      UserTaskLauncher userTaskLauncher) {
-
-    return ImmutableList.of(gcLauncher, userTaskLauncher);
+  List<TaskLauncher> provideTaskLaunchers(UserTaskLauncher userTaskLauncher) {
+    return ImmutableList.of(userTaskLauncher);
   }
-
 }

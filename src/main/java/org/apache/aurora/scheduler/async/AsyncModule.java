@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.async;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Logger;
@@ -25,7 +24,6 @@ import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.RateLimiter;
@@ -44,8 +42,6 @@ import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
-import org.apache.aurora.scheduler.async.GcExecutorLauncher.GcExecutorSettings;
-import org.apache.aurora.scheduler.async.GcExecutorLauncher.RandomGcExecutorSettings;
 import org.apache.aurora.scheduler.async.OfferManager.OfferManagerImpl;
 import org.apache.aurora.scheduler.async.OfferManager.OfferReturnDelay;
 import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
@@ -174,19 +170,10 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> RESERVATION_DURATION =
       Arg.create(Amount.of(3L, Time.MINUTES));
 
-  @CmdLine(name = "executor_gc_interval",
-      help = "Max interval on which to run the GC executor on a host to clean up dead tasks.")
-  private static final Arg<Amount<Long, Time>> EXECUTOR_GC_INTERVAL =
-      Arg.create(Amount.of(1L, Time.HOURS));
-
-  @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
-  private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
-
-  // TODO(maxim): Disabled by default until AURORA-715 is complete.
   @CmdLine(name = "reconciliation_initial_delay",
       help = "Initial amount of time to delay task reconciliation after scheduler start up.")
   private static final Arg<Amount<Long, Time>> RECONCILIATION_INITIAL_DELAY =
-      Arg.create(Amount.of((long) Integer.MAX_VALUE, Time.MINUTES));
+      Arg.create(Amount.of(0L, Time.MINUTES));
 
   @Positive
   @CmdLine(name = "reconciliation_explicit_interval",
@@ -322,19 +309,6 @@ public class AsyncModule extends AbstractModule {
       }
     });
     PubsubEventModule.bindSubscriber(binder(), TaskThrottler.class);
-
-    install(new PrivateModule() {
-      @Override
-      protected void configure() {
-        bind(GcExecutorSettings.class).toInstance(new RandomGcExecutorSettings(
-            EXECUTOR_GC_INTERVAL.get(),
-            Optional.fromNullable(GC_EXECUTOR_PATH.get())));
-        bind(Executor.class).toInstance(executor);
-
-        bind(GcExecutorLauncher.class).in(Singleton.class);
-        expose(GcExecutorLauncher.class);
-      }
-    });
 
     install(new PrivateModule() {
       @Override
