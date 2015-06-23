@@ -170,10 +170,12 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> RESERVATION_DURATION =
       Arg.create(Amount.of(3L, Time.MINUTES));
 
+  // Reconciliation may create a big surge of status updates in a large cluster. Setting the default
+  // initial delay to 1 minute to ease up storage contention during scheduler start up.
   @CmdLine(name = "reconciliation_initial_delay",
       help = "Initial amount of time to delay task reconciliation after scheduler start up.")
   private static final Arg<Amount<Long, Time>> RECONCILIATION_INITIAL_DELAY =
-      Arg.create(Amount.of(0L, Time.MINUTES));
+      Arg.create(Amount.of(1L, Time.MINUTES));
 
   @Positive
   @CmdLine(name = "reconciliation_explicit_interval",

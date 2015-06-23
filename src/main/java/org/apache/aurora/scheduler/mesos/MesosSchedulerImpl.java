@@ -32,7 +32,8 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.TaskLauncher;
+import org.apache.aurora.scheduler.TaskStatusHandler;
+import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
@@ -67,8 +68,8 @@ import static org.apache.mesos.Protos.TaskStatus.Reason.REASON_RECONCILIATION;
  */
 @VisibleForTesting
 public class MesosSchedulerImpl implements Scheduler {
-  private final List<TaskLauncher> taskLaunchers;
-
+  private final TaskStatusHandler taskStatusHandler;
+  private final OfferManager offerManager;
   private final Storage storage;
   private final Lifecycle lifecycle;
   private final EventSink eventSink;
@@ -90,11 +91,8 @@ public class MesosSchedulerImpl implements Scheduler {
    *
    * @param storage Store to save host attributes into.
    * @param lifecycle Application lifecycle manager.
-   * @param taskLaunchers Task launchers, which will be used in order.  Calls to
-   *                      {@link TaskLauncher#willUse(HostOffer)} and
-   *                      {@link TaskLauncher#statusUpdate(TaskStatus)} are propagated to provided
-   *                      launchers, ceasing after the first match (based on a return value of
-   *                      {@code true}.
+   * @param taskStatusHandler Task status update manager.
+   * @param offerManager Offer manager.
    * @param eventSink Pubsub sink to send driver status changes to.
    * @param executor Executor for async work
    */
@@ -102,7 +100,8 @@ public class MesosSchedulerImpl implements Scheduler {
   public MesosSchedulerImpl(
       Storage storage,
       final Lifecycle lifecycle,
-      List<TaskLauncher> taskLaunchers,
+      TaskStatusHandler taskStatusHandler,
+      OfferManager offerManager,
       EventSink eventSink,
       @SchedulerExecutor Executor executor,
       Logger log,
@@ -110,7 +109,8 @@ public class MesosSchedulerImpl implements Scheduler {
 
     this.storage = requireNonNull(storage);
     this.lifecycle = requireNonNull(lifecycle);
-    this.taskLaunchers = requireNonNull(taskLaunchers);
+    this.taskStatusHandler = requireNonNull(taskStatusHandler);
+    this.offerManager = requireNonNull(offerManager);
     this.eventSink = requireNonNull(eventSink);
     this.executor = requireNonNull(executor);
     this.log = requireNonNull(log);
@@ -174,11 +174,7 @@ public class MesosSchedulerImpl implements Scheduler {
                 log.log(Level.FINE, String.format("Received offer: %s", offer));
               }
               counters.get("scheduler_resource_offers").incrementAndGet();
-              for (TaskLauncher launcher : taskLaunchers) {
-                if (launcher.willUse(new HostOffer(offer, attributes))) {
-                  break;
-                }
-              }
+              offerManager.addOffer(new HostOffer(offer, attributes));
             }
           }
         });
@@ -189,9 +185,7 @@ public class MesosSchedulerImpl implements Scheduler {
   @Override
   public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerId) {
     log.info("Offer rescinded: " + offerId);
-    for (TaskLauncher launcher : taskLaunchers) {
-      launcher.cancelOffer(offerId);
-    }
+    offerManager.cancelOffer(offerId);
   }
 
   private static void logStatusUpdate(Logger logger, TaskStatus status) {
@@ -236,24 +230,13 @@ public class MesosSchedulerImpl implements Scheduler {
         Optional.fromNullable(status.getTimestamp()).transform(SECONDS_TO_MICROS)));
 
     try {
-      for (TaskLauncher launcher : taskLaunchers) {
-        if (launcher.statusUpdate(status)) {
-          // The launcher is responsible for acknowledging the update.
-          return;
-        }
-      }
+      // The status handler is responsible for acknowledging the update.
+      taskStatusHandler.statusUpdate(status);
     } catch (SchedulerException e) {
       log.log(Level.SEVERE, "Status update failed due to scheduler exception: " + e, e);
       // We re-throw the exception here to trigger an abort of the driver.
       throw e;
     }
-
-    log.warning("Unhandled status update " + status);
-    counters.get("scheduler_status_updates").incrementAndGet();
-
-    // Even though we have not handled this update, we acknowledge it to prevent an unbounded
-    // growth of status update retries from Mesos.
-    driver.acknowledgeStatusUpdate(status);
   }
 
   @Override

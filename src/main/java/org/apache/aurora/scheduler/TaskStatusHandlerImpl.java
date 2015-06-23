@@ -33,14 +33,12 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskStatus;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -50,12 +48,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 /**
- * A task launcher that matches resource offers against user tasks.
+ * A {@link TaskStatusHandler} implementation.
  */
 @VisibleForTesting
-public class UserTaskLauncher extends AbstractExecutionThreadService implements TaskLauncher {
+public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
+    implements TaskStatusHandler {
 
-  private static final Logger LOG = Logger.getLogger(UserTaskLauncher.class.getName());
+  private static final Logger LOG = Logger.getLogger(TaskStatusHandlerImpl.class.getName());
 
   @VisibleForTesting
   static final String MEMORY_LIMIT_DISPLAY = "Task used more memory than requested.";
@@ -63,7 +62,6 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
   private static final String STATUS_STAT_FORMAT = "status_update_%s_%s";
 
   private final Storage storage;
-  private final OfferManager offerManager;
   private final StateManager stateManager;
   private final Driver driver;
   private final BlockingQueue<TaskStatus> pendingUpdates;
@@ -89,9 +87,8 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
   public @interface MaxBatchSize { }
 
   @Inject
-  UserTaskLauncher(
+  TaskStatusHandlerImpl(
       Storage storage,
-      OfferManager offerManager,
       StateManager stateManager,
       final Driver driver,
       @StatusUpdateQueue BlockingQueue<TaskStatus> pendingUpdates,
@@ -99,7 +96,6 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
       CachedCounters counters) {
 
     this.storage = requireNonNull(storage);
-    this.offerManager = requireNonNull(offerManager);
     this.stateManager = requireNonNull(stateManager);
     this.driver = requireNonNull(driver);
     this.pendingUpdates = requireNonNull(pendingUpdates);
@@ -112,7 +108,7 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
         new Listener() {
           @Override
           public void failed(State from, Throwable failure) {
-            LOG.log(Level.SEVERE, "UserTaskLauncher failed: ", failure);
+            LOG.log(Level.SEVERE, "TaskStatusHandler failed: ", failure);
             driver.abort();
           }
         },
@@ -120,22 +116,8 @@ public class UserTaskLauncher extends AbstractExecutionThreadService implements 
   }
 
   @Override
-  public boolean willUse(HostOffer offer) {
-    requireNonNull(offer);
-
-    offerManager.addOffer(offer);
-    return true;
-  }
-
-  @Override
-  public boolean statusUpdate(TaskStatus status) {
+  public void statusUpdate(TaskStatus status) {
     pendingUpdates.add(status);
-    return true;
-  }
-
-  @Override
-  public void cancelOffer(OfferID offer) {
-    offerManager.cancelOffer(offer);
   }
 
   @Override

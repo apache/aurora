@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.benchmark;
 
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -25,14 +24,13 @@ import java.util.logging.Logger;
 import javax.inject.Singleton;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
 import com.twitter.common.application.ShutdownStage;
@@ -50,8 +48,8 @@ import org.apache.aurora.benchmark.fakes.FakeSchedulerDriver;
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.TaskIdGenerator;
-import org.apache.aurora.scheduler.TaskLauncher;
-import org.apache.aurora.scheduler.UserTaskLauncher;
+import org.apache.aurora.scheduler.TaskStatusHandler;
+import org.apache.aurora.scheduler.TaskStatusHandlerImpl;
 import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.preemptor.ClusterStateImpl;
@@ -164,7 +162,7 @@ public class StatusUpdateBenchmark {
   private long latencyMilliseconds;
 
   private Scheduler scheduler;
-  private UserTaskLauncher userTaskLauncher;
+  private AbstractExecutionThreadService statusHandler;
   private SlowStorageWrapper storage;
   private EventBus eventBus;
   private Set<IScheduledTask> tasks;
@@ -243,18 +241,13 @@ public class StatusUpdateBenchmark {
               }
             });
             bind(new TypeLiteral<BlockingQueue<Protos.TaskStatus>>() { })
-                .annotatedWith(UserTaskLauncher.StatusUpdateQueue.class)
+                .annotatedWith(TaskStatusHandlerImpl.StatusUpdateQueue.class)
                 .toInstance(new LinkedBlockingQueue<Protos.TaskStatus>());
             bind(new TypeLiteral<Integer>() { })
-                .annotatedWith(UserTaskLauncher.MaxBatchSize.class)
+                .annotatedWith(TaskStatusHandlerImpl.MaxBatchSize.class)
                 .toInstance(1000);
-            bind(UserTaskLauncher.class).in(Singleton.class);
-          }
-
-          @Provides
-          @Singleton
-          List<TaskLauncher> provideTaskLaunchers(UserTaskLauncher launcher) {
-            return ImmutableList.<TaskLauncher>of(launcher);
+            bind(TaskStatusHandler.class).to(TaskStatusHandlerImpl.class);
+            bind(TaskStatusHandlerImpl.class).in(Singleton.class);
           }
         }
     );
@@ -263,13 +256,13 @@ public class StatusUpdateBenchmark {
     scheduler = injector.getInstance(Scheduler.class);
     eventBus.register(this);
 
-    userTaskLauncher = injector.getInstance(UserTaskLauncher.class);
-    userTaskLauncher.startAsync();
+    statusHandler = injector.getInstance(TaskStatusHandlerImpl.class);
+    statusHandler.startAsync();
   }
 
   @TearDown(Level.Trial)
   public void tearDown() {
-    userTaskLauncher.stopAsync();
+    statusHandler.stopAsync();
   }
 
   /**

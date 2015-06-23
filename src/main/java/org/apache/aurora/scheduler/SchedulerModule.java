@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler;
 
-import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -21,10 +20,8 @@ import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
-import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
-import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
 import com.twitter.common.args.Arg;
@@ -38,6 +35,8 @@ import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.mesos.Protos;
+
+import static org.apache.aurora.scheduler.SchedulerServicesModule.addSchedulerActiveServiceBinding;
 
 /**
  * Binding module for top-level scheduling logic.
@@ -83,22 +82,17 @@ public class SchedulerModule extends AbstractModule {
     PubsubEventModule.bindSubscriber(binder(), SchedulerLifecycle.class);
     bind(TaskVars.class).in(Singleton.class);
     PubsubEventModule.bindSubscriber(binder(), TaskVars.class);
-    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(TaskVars.class);
+    addSchedulerActiveServiceBinding(binder()).to(TaskVars.class);
 
     bind(new TypeLiteral<BlockingQueue<Protos.TaskStatus>>() { })
-        .annotatedWith(UserTaskLauncher.StatusUpdateQueue.class)
-        .toInstance(new LinkedBlockingQueue<Protos.TaskStatus>());
+        .annotatedWith(TaskStatusHandlerImpl.StatusUpdateQueue.class)
+        .toInstance(new LinkedBlockingQueue<>());
     bind(new TypeLiteral<Integer>() { })
-        .annotatedWith(UserTaskLauncher.MaxBatchSize.class)
+        .annotatedWith(TaskStatusHandlerImpl.MaxBatchSize.class)
         .toInstance(MAX_STATUS_UPDATE_BATCH_SIZE.get());
 
-    bind(UserTaskLauncher.class).in(Singleton.class);
-    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(UserTaskLauncher.class);
-  }
-
-  @Provides
-  @Singleton
-  List<TaskLauncher> provideTaskLaunchers(UserTaskLauncher userTaskLauncher) {
-    return ImmutableList.of(userTaskLauncher);
+    bind(TaskStatusHandler.class).to(TaskStatusHandlerImpl.class);
+    bind(TaskStatusHandlerImpl.class).in(Singleton.class);
+    addSchedulerActiveServiceBinding(binder()).to(TaskStatusHandlerImpl.class);
   }
 }
