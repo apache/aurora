@@ -92,7 +92,7 @@
             </tr>
             <tr ng-repeat="e in update.updateEvents">
               <td>{{e.status | toNiceStatus}}</td>
-              <td>{{e.timestampMs | toElapsedTime }} ago</td>
+              <td><span tooltip="{{e.timestampMs | toUtcTime}}">{{e.timestampMs | toElapsedTime }} ago</span></td>
               <td>{{e.user}}</td>
               <td>{{e.message}}</td>
             </tr>
@@ -110,7 +110,7 @@
           <tr ng-repeat="e in instanceEvents">
             <td>{{e.instanceId}}</td>
             <td>{{e.action | toNiceAction}}</td>
-            <td>{{e.timestampMs | toElapsedTime}} ago</td>
+            <td><span tooltip="{{e.timestampMs | toUtcTime}}">{{e.timestampMs | toElapsedTime}} ago</span></td>
           </tr>
           </table>
 
