@@ -14,7 +14,6 @@
 
 
 def test_imports():
-  from apache.thermos.cli.commands import gc as gc_command
   from apache.thermos.cli.commands import help as help_command
   from apache.thermos.cli.commands import inspect as inspect_command
   from apache.thermos.cli.commands import kill as kill_command
@@ -25,7 +24,6 @@ def test_imports():
   from apache.thermos.cli.commands import tail as tail_command
 
   for command in (
-      gc_command,
       help_command,
       inspect_command,
       kill_command,

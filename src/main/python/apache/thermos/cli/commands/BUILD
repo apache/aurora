@@ -15,7 +15,6 @@
 python_library(
   name = 'commands',
   dependencies = [
-    ':gc',
     ':help',
     ':inspect',
     ':kill',
@@ -24,17 +23,6 @@ python_library(
     ':simplerun',
     ':status',
     ':tail',
-  ]
-)
-
-python_library(
-  name = 'gc',
-  sources = ['gc.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.quantity',
-    'src/main/python/apache/thermos/cli:common',
-    'src/main/python/apache/thermos/monitoring:garbage',
   ]
 )
 

@@ -4,9 +4,8 @@
 The Aurora source repository and distributions contain several
 [binary files](../src/test/resources/org/apache/thermos/root/checkpoints) to
 qualify the backwards-compatibility of thermos with checkpoint data. Since
-thermos persists state to disk, to be read by other components (the GC executor
-and the thermos observer), it is important that we have tests that prevent
-regressions affecting the ability to parse previously-written data.
+thermos persists state to disk, to be read by the thermos observer), it is important that we have
+tests that prevent regressions affecting the ability to parse previously-written data.
 
 ## Generating test files
 The files included represent persisted checkpoints that exercise different

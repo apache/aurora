@@ -58,7 +58,6 @@ function build_scheduler {
 }
 
 function build_executor {
-  ./pants binary src/main/python/apache/aurora/executor/bin:gc_executor
   ./pants binary src/main/python/apache/aurora/executor/bin:thermos_executor
   ./pants binary src/main/python/apache/thermos/bin:thermos_runner
 

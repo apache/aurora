@@ -20,7 +20,6 @@ from .common import clear_path_detectors, register_path_detector
 def register_commands(app):
   from apache.thermos.cli.common import generate_usage
   from apache.thermos.cli.commands import (
-      gc as gc_command,
       help as help_command,
       inspect as inspect_command,
       kill as kill_command,
@@ -32,7 +31,6 @@ def register_commands(app):
   )
 
   app.register_commands_from(
-      gc_command,
       help_command,
       inspect_command,
       kill_command,

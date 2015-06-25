@@ -95,36 +95,6 @@ python_library(
   ]
 )
 
-
-python_library(
-  name = 'gc_executor',
-  sources = ['gc_executor.py'],
-  dependencies = [
-    ':executor_base',
-    '3rdparty/python:mesos.interface',
-    # To prevent an alpha version of protobuf from being pulled down by pants we
-    # specify protobuf here. See AURORA-1128 for more details.
-    '3rdparty/python:protobuf',
-    '3rdparty/python:psutil',
-    '3rdparty/python:twitter.common.collections',
-    '3rdparty/python:twitter.common.exceptions',
-    '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.metrics',
-    '3rdparty/python:twitter.common.quantity',
-    'src/main/python/apache/thermos/common:ckpt',
-    'src/main/python/apache/thermos/common:path',
-    'src/main/python/apache/thermos/core:helper',
-    'src/main/python/apache/thermos/core:inspector',
-    'src/main/python/apache/thermos/monitoring:detector',
-    'src/main/python/apache/thermos/monitoring:garbage',
-    'src/main/python/apache/aurora/config:schema',
-    'src/main/python/apache/aurora/executor/common:executor_detector',
-    'src/main/python/apache/aurora/executor/common:sandbox',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
-  ]
-)
-
 python_library(
   name = 'executor-packaged',
   dependencies = [
@@ -140,7 +110,6 @@ python_library(
     name = 'apache.aurora.executor',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
   ).with_binaries(
-    gc_executor = 'src/main/python/apache/aurora/executor/bin:gc_executor',
     thermos_executor = 'src/main/python/apache/aurora/executor/bin:thermos_executor',
   )
 )

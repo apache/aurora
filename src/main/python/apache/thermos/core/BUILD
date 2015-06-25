@@ -30,18 +30,6 @@ python_library(
 )
 
 python_library(
-  name = 'inspector',
-  sources = ['inspector.py'],
-  dependencies = [
-    ':muxer',
-    '3rdparty/python:twitter.common.recordio',
-    'src/main/python/apache/thermos/common:ckpt',
-    'src/main/python/apache/thermos/common:path',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
-  ]
-)
-
-python_library(
   name = 'muxer',
   sources = ['muxer.py'],
   dependencies = [
@@ -87,7 +75,6 @@ python_library(
 python_library(
   name = 'core',
   dependencies = [
-    ':inspector',
     ':runner',
 
     # covering libs

@@ -25,19 +25,6 @@ python_library(
 )
 
 python_library(
-  name = 'garbage',
-  sources = ['garbage.py'],
-  dependencies = [
-    ':detector',
-    '3rdparty/python:twitter.common.dirutil',
-    '3rdparty/python:twitter.common.lang',
-    '3rdparty/python:twitter.common.quantity',
-    'src/main/python/apache/thermos/common:ckpt',
-    'src/main/python/apache/thermos/common:path',
-  ]
-)
-
-python_library(
   name = 'monitor',
   sources = ['monitor.py'],
   dependencies = [
@@ -95,7 +82,6 @@ python_library(
   dependencies = [
     ':detector',
     ':disk',
-    ':garbage',
     ':monitor',
     ':process',
     ':resource',

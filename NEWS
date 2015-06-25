@@ -2,3 +2,4 @@
 -----
 
 - Now requires JRE 8 or greater.
+- GC executor is fully replaced by the task state reconciliation (AURORA-1047).

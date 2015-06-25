@@ -30,24 +30,6 @@ from apache.thermos.common.path import TaskPath
 from gen.apache.thermos.ttypes import ProcessState, ProcessStatus, RunnerCkpt, TaskState, TaskStatus
 
 
-class TaskKiller(object):
-  """
-    Task killing interface.
-  """
-
-  def __init__(self, task_id, checkpoint_root):
-    self._task_id = task_id
-    self._checkpoint_root = checkpoint_root
-
-  def kill(self, force=True):
-    TaskRunnerHelper.kill(self._task_id, self._checkpoint_root, force=force,
-                          terminal_status=TaskState.KILLED)
-
-  def lose(self, force=True):
-    TaskRunnerHelper.kill(self._task_id, self._checkpoint_root, force=force,
-                          terminal_status=TaskState.LOST)
-
-
 class TaskRunnerHelper(object):
   """
     TaskRunner helper methods that can be operated directly upon checkpoint
