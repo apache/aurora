@@ -22,7 +22,7 @@ import static org.junit.Assert.assertEquals;
 
 public class GuavaUtilsTest {
   @Test
-  public static void testToImmutableSet() {
+  public void testToImmutableSet() {
     assertEquals(
         ImmutableSet.of("b", "c", "a"),
         ImmutableList.of("a", "b", "c").stream().collect(GuavaUtils.toImmutableSet()));
