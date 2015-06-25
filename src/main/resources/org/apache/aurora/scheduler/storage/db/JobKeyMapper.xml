@@ -28,22 +28,24 @@
       #{name}
     )
   </insert>
+
   <sql id="job_key_clause">
     role = #{role}
     AND environment = #{environment}
     AND name = #{name}
   </sql>
-  <delete id="delete">
-    DELETE FROM job_keys
-    WHERE <include refid="job_key_clause"/>
-  </delete>
-  <select id="exists" resultType="org.apache.aurora.gen.JobKey">
-    SELECT * FROM job_keys
-    WHERE <include refid="job_key_clause"/>
-  </select>
+
   <select id="selectAll" resultType="org.apache.aurora.gen.JobKey">
     SELECT * FROM job_keys
   </select>
+
+  <select id="selectAllRowIds" resultType="long">
+    SELECT id FROM job_keys
+  </select>
+
+  <delete id="deleteRow">
+    DELETE FROM job_keys WHERE id = #{rowId}
+  </delete>
 
   <resultMap id="jobKeyMap" type="org.apache.aurora.gen.JobKey">
     <id column="id" />

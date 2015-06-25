@@ -34,14 +34,17 @@ import static java.util.Objects.requireNonNull;
 
 class TaskConfigManager {
   private final TaskConfigMapper configMapper;
+  private final JobKeyMapper jobKeyMapper;
 
   @Inject
-  TaskConfigManager(TaskConfigMapper configMapper) {
+  TaskConfigManager(TaskConfigMapper configMapper, JobKeyMapper jobKeyMapper) {
     this.configMapper = requireNonNull(configMapper);
+    this.jobKeyMapper = requireNonNull(jobKeyMapper);
   }
 
   long insert(ITaskConfig config) {
     InsertResult configInsert = new InsertResult();
+    jobKeyMapper.merge(config.getJob());
     configMapper.insert(config, configInsert);
     for (IConstraint constraint : config.getConstraints()) {
       InsertResult constraintResult = new InsertResult();
@@ -108,24 +111,9 @@ class TaskConfigManager {
     return configMapper.selectConfigsByJob(job);
   }
 
-  List<Long> getTaskConfigIds(Set<String> scheduledTaskIds) {
+  Set<Long> getTaskConfigIds(Set<String> scheduledTaskIds) {
     requireNonNull(scheduledTaskIds);
     return configMapper.selectConfigsByTaskId(scheduledTaskIds);
-  }
-
-  /**
-   * Performs reference counting on configurations.  If there are no longer any references to
-   * these configuration rows, they will be deleted.
-   * TODO(wfarner): Should we rely on foreign key constraints and opportunistically delete?
-   *
-   * @param configRowIds Configurations to delete if no references are found.
-   */
-  void maybeExpungeConfigs(Set<Long> configRowIds) {
-    if (configMapper.selectTasksByConfigId(configRowIds).isEmpty()) {
-      configMapper.delete(configRowIds);
-
-      // TODO(wfarner): Need to try removal from other tables as well, e.g. job keys.
-    }
   }
 
   private static final Function<Map.Entry<String, String>, TaskLink> TO_LINK =

@@ -30,7 +30,7 @@ import org.apache.ibatis.annotations.Param;
 /**
  * MyBatis mapper for task config objects.
  */
-interface TaskConfigMapper {
+interface TaskConfigMapper extends GarbageCollectedTableMapper {
 
   /**
    * Inserts fields from a task config into the {@code task_configs} table.
@@ -56,15 +56,7 @@ interface TaskConfigMapper {
    * @param taskIds Task IDs to look up.
    * @return Task config row IDs.
    */
-  List<Long> selectConfigsByTaskId(@Param("taskIds") Set<String> taskIds);
-
-  /**
-   * Looks up task config IDs by id.
-   *
-   * @param configIds Task config IDs.
-   * @return Task config row IDs.
-   */
-  List<Long> selectTasksByConfigId(@Param("configIds") Set<Long> configIds);
+  Set<Long> selectConfigsByTaskId(@Param("taskIds") Set<String> taskIds);
 
   /**
    * Inserts the constraint association within an {@link ITaskConfig}.

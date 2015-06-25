@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.AbstractScheduledService;
+import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
@@ -32,6 +34,7 @@ import com.twitter.common.inject.Bindings.KeyFactory;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -66,6 +69,11 @@ public final class DbModule extends PrivateModule {
       help = "Log all queries that take at least this long to execute.")
   private static final Arg<Amount<Long, Time>> SLOW_QUERY_LOG_THRESHOLD =
       Arg.create(Amount.of(25L, Time.MILLISECONDS));
+
+  @CmdLine(name = "db_row_gc_interval",
+      help = "Interval on which to scan the database for unused row references.")
+  private static final Arg<Amount<Long, Time>> DB_ROW_GC_INTERVAL =
+      Arg.create(Amount.of(2L, Time.HOURS));
 
   private static final Set<Class<?>> MAPPER_CLASSES = ImmutableSet.<Class<?>>builder()
       .add(AttributeMapper.class)
@@ -200,6 +208,9 @@ public final class DbModule extends PrivateModule {
 
     expose(DbStorage.class);
     expose(SqlSessionFactory.class);
+    expose(TaskMapper.class);
+    expose(TaskConfigMapper.class);
+    expose(JobKeyMapper.class);
   }
 
   /**
@@ -226,6 +237,29 @@ public final class DbModule extends PrivateModule {
     protected void configure() {
       bindStore(TaskStore.Mutable.class, DbTaskStore.class);
       expose(TaskStore.Mutable.class);
+    }
+  }
+
+  /**
+   * Module that sets up a periodic database garbage-collection routine.
+   */
+  public static class GarbageCollectorModule extends AbstractModule {
+    @Override
+    protected void configure() {
+      install(new PrivateModule() {
+        @Override
+        protected void configure() {
+          bind(RowGarbageCollector.class).in(Singleton.class);
+          bind(AbstractScheduledService.Scheduler.class).toInstance(
+              AbstractScheduledService.Scheduler.newFixedRateSchedule(
+                  0L,
+                  DB_ROW_GC_INTERVAL.get().getValue(),
+                  DB_ROW_GC_INTERVAL.get().getUnit().getTimeUnit()));
+          expose(RowGarbageCollector.class);
+        }
+      });
+      SchedulerServicesModule.addSchedulerActiveServiceBinding(binder())
+          .to(RowGarbageCollector.class);
     }
   }
 }

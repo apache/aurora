@@ -83,7 +83,7 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
     }
 
     IJobUpdateKey key = update.getSummary().getKey();
-    jobKeyMapper.merge(key.getJob().newBuilder());
+    jobKeyMapper.merge(key.getJob());
     detailsMapper.insert(update.newBuilder());
 
     if (lockToken.isPresent()) {

@@ -15,7 +15,7 @@ package org.apache.aurora.scheduler.storage.db;
 
 import com.google.inject.Inject;
 
-import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.scheduler.storage.entities.ILockKey;
 
 import static java.util.Objects.requireNonNull;
 
@@ -39,7 +39,7 @@ class LockKeyMapper {
     this.jobKeyMapper = requireNonNull(jobKeyMapper);
   }
 
-  public void insert(LockKey key) {
+  public void insert(ILockKey key) {
     if (key.isSetJob()) {
       jobKeyMapper.merge(requireNonNull(key.getJob()));
     } else {

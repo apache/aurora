@@ -195,18 +195,6 @@
     )
   </select>
 
-  <select id="selectTasksByConfigId" resultType="long">
-    SELECT
-      t.id AS id
-    FROM tasks AS t
-    INNER JOIN task_configs AS c ON c.id = t.task_config_row_id
-    WHERE c.id IN (
-      <foreach item="configId" collection="configIds" separator=",">
-        #{configId}
-      </foreach>
-    )
-  </select>
-
   <insert id="insertConstraint" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
     INSERT INTO task_constraints (
       task_config_id,
@@ -312,12 +300,11 @@
     )
   </insert>
 
-  <delete id="delete">
-    DELETE FROM task_configs
-    WHERE id IN (
-      <foreach item="configId" collection="configIds" separator=",">
-        #{configId}
-      </foreach>
-    )
+  <select id="selectAllRowIds" resultType="long">
+    SELECT id FROM task_configs
+  </select>
+
+  <delete id="deleteRow">
+    DELETE FROM task_configs WHERE id = #{rowId}
   </delete>
 </mapper>

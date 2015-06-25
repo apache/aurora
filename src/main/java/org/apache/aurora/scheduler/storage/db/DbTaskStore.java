@@ -73,7 +73,6 @@ class DbTaskStore implements TaskStore.Mutable {
 
   private final TaskMapper taskMapper;
   private final TaskConfigManager configManager;
-  private final JobKeyMapper jobKeyMapper;
   private final Clock clock;
   private final long slowQueryThresholdNanos;
 
@@ -81,14 +80,12 @@ class DbTaskStore implements TaskStore.Mutable {
   DbTaskStore(
       TaskMapper taskMapper,
       TaskConfigManager configManager,
-      JobKeyMapper jobKeyMapper,
       Clock clock,
       Amount<Long, Time> slowQueryThreshold) {
 
     LOG.warning("DbTaskStore is experimental, and should not be used in production clusters!");
     this.taskMapper = requireNonNull(taskMapper);
     this.configManager = requireNonNull(configManager);
-    this.jobKeyMapper = requireNonNull(jobKeyMapper);
     this.clock = requireNonNull(clock);
     this.slowQueryThresholdNanos =  slowQueryThreshold.as(Time.NANOSECONDS);
   }
@@ -178,7 +175,6 @@ class DbTaskStore implements TaskStore.Mutable {
             .toSet()));
 
     for (IScheduledTask task : tasks) {
-      jobKeyMapper.merge(task.getAssignedTask().getTask().getJob().newBuilder());
       long configId = configCache.getUnchecked(task.getAssignedTask().getTask());
 
       ScheduledTaskWrapper wrappedTask = new ScheduledTaskWrapper(-1, configId, task.newBuilder());
@@ -213,7 +209,6 @@ class DbTaskStore implements TaskStore.Mutable {
   @Timed("db_storage_delete_all_tasks")
   @Override
   public void deleteAllTasks() {
-    // TODO(wfarner): Need to re-evaluate all task configs after deleting tasks.
     taskMapper.truncate();
   }
 
@@ -221,14 +216,7 @@ class DbTaskStore implements TaskStore.Mutable {
   @Override
   public void deleteTasks(Set<String> taskIds) {
     if (!taskIds.isEmpty()) {
-      // First fetch task configs referenced by these task IDs.
-      List<Long> configIds = configManager.getTaskConfigIds(taskIds);
-
       taskMapper.deleteTasks(taskIds);
-
-      if (!configIds.isEmpty()) {
-        configManager.maybeExpungeConfigs(ImmutableSet.copyOf(configIds));
-      }
     }
   }
 

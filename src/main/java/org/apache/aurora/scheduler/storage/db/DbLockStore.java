@@ -46,7 +46,7 @@ class DbLockStore implements LockStore.Mutable {
   @Timed("lock_store_save_lock")
   @Override
   public void saveLock(ILock lock) {
-    lockKeyMapper.insert(lock.getKey().newBuilder());
+    lockKeyMapper.insert(lock.getKey());
     mapper.insert(lock.newBuilder());
   }
 

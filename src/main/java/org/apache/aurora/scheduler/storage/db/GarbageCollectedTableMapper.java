@@ -15,22 +15,19 @@ package org.apache.aurora.scheduler.storage.db;
 
 import java.util.List;
 
-import org.apache.aurora.gen.JobKey;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.ibatis.annotations.Param;
 
 /**
- * MyBatis mapper class for JobKeyMapper.xml
- *
- * See http://mybatis.github.io/mybatis-3/sqlmap-xml.html for more details.
+ * Base interface for a table mapper whose rows should be garbage-collected when unreferenced.
  */
-interface JobKeyMapper extends GarbageCollectedTableMapper {
+interface GarbageCollectedTableMapper {
   /**
-   * Saves the job key, updating the existing value if it exists.
+   * Selects the IDs of all rows in the table.
    */
-  void merge(IJobKey key);
+  List<Long> selectAllRowIds();
 
   /**
-   * Selects all job keys from the database.
+   * Attempts to delete a row from the table.
    */
-  List<JobKey> selectAll();
+  void deleteRow(@Param("rowId") long rowId);
 }

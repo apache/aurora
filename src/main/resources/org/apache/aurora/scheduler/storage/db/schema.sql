@@ -72,8 +72,7 @@ CREATE TABLE host_attributes(
 
 CREATE TABLE host_attribute_values(
   id IDENTITY,
-  host_attribute_id BIGINT NOT NULL REFERENCES host_attributes(id)
-  ON DELETE CASCADE,
+  host_attribute_id BIGINT NOT NULL REFERENCES host_attributes(id) ON DELETE CASCADE,
   name VARCHAR NOT NULL,
   value VARCHAR NOT NULL,
 

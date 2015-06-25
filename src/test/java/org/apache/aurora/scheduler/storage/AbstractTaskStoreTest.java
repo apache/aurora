@@ -153,7 +153,7 @@ public abstract class AbstractTaskStoreTest {
     });
   }
 
-  private void deleteAllTasks() {
+  protected void deleteAllTasks() {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) {
