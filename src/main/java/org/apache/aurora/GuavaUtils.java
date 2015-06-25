@@ -15,11 +15,15 @@ package org.apache.aurora;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collector;
 
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Service;
 import com.google.common.util.concurrent.Service.State;
 import com.google.common.util.concurrent.ServiceManager;
+
+import static java.util.stream.Collector.Characteristics.UNORDERED;
 
 /**
  * Utilities for working with Guava.
@@ -27,6 +31,18 @@ import com.google.common.util.concurrent.ServiceManager;
 public final class GuavaUtils {
   private GuavaUtils() {
     // Utility class.
+  }
+
+  /**
+   * Collector to create a Guava ImmutableSet.
+   */
+  public static <T> Collector<T, ?, ImmutableSet<T>> toImmutableSet() {
+    return Collector.of(
+        ImmutableSet::builder,
+        ImmutableSet.Builder::add,
+        (ImmutableSet.Builder<T> l, ImmutableSet.Builder<T> r) -> l.addAll(r.build()),
+        ImmutableSet.Builder::build,
+        UNORDERED);
   }
 
   /**

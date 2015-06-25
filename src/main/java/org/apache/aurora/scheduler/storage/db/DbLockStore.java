@@ -13,13 +13,13 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
-import com.google.common.base.Function;
-import com.google.common.base.Optional;
-import com.google.common.collect.FluentIterable;
 import com.google.inject.Inject;
 
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.db.views.LockRow;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -65,22 +65,17 @@ class DbLockStore implements LockStore.Mutable {
   @Timed("lock_store_fetch_locks")
   @Override
   public Set<ILock> fetchLocks() {
-    return FluentIterable.from(mapper.selectAll()).transform(TO_ROW).toSet();
+    return mapper.selectAll().stream().map(TO_ROW).collect(GuavaUtils.toImmutableSet());
   }
 
   @Timed("lock_store_fetch_lock")
   @Override
   public Optional<ILock> fetchLock(ILockKey lockKey) {
-    return Optional.fromNullable(mapper.select(lockKey.newBuilder())).transform(TO_ROW);
+    return Optional.ofNullable(mapper.select(lockKey.newBuilder())).map(TO_ROW);
   }
 
   /**
    * LockRow converter to satisfy the ILock interface.
    */
-  private static final Function<LockRow, ILock> TO_ROW = new Function<LockRow, ILock>() {
-    @Override
-    public ILock apply(LockRow input) {
-      return ILock.build(input.getLock());
-    }
-  };
+  private static final Function<LockRow, ILock> TO_ROW = input -> ILock.build(input.getLock());
 }

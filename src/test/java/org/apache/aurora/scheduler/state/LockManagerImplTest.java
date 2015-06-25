@@ -13,10 +13,10 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -120,7 +120,7 @@ public class LockManagerImplTest extends EasyMockTest {
   public void testValidateLockNotStoredNotHeld() throws Exception {
     control.replay();
 
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>empty());
   }
 
   @Test
@@ -139,7 +139,7 @@ public class LockManagerImplTest extends EasyMockTest {
 
     expectLockException(JOB_KEY);
     lockManager.acquireLock(LOCK_KEY, USER);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>empty());
   }
 
   @Test
@@ -168,7 +168,7 @@ public class LockManagerImplTest extends EasyMockTest {
 
     expect(storageUtil.storeProvider.getLockStore()).andReturn(storageUtil.lockStore).atLeastOnce();
     expect(storageUtil.lockStore.fetchLock(LOCK_KEY))
-        .andReturn(Optional.<ILock>absent())
+        .andReturn(Optional.<ILock>empty())
         .atLeastOnce();
 
     final CountDownLatch reads = new CountDownLatch(2);
@@ -198,7 +198,7 @@ public class LockManagerImplTest extends EasyMockTest {
           @Override
           public void run() {
             try {
-              lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+              lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>empty());
             } catch (LockException e) {
               throw Throwables.propagate(e);
             }
@@ -206,7 +206,7 @@ public class LockManagerImplTest extends EasyMockTest {
         })
         .start();
 
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>empty());
   }
 
   private void expectLockException(IJobKey key) {

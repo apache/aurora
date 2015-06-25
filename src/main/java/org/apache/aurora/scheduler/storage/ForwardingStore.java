@@ -119,7 +119,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Optional<ILock> fetchLock(ILockKey lockKey) {
+  public java.util.Optional<ILock> fetchLock(ILockKey lockKey) {
     return lockStore.fetchLock(lockKey);
   }
 

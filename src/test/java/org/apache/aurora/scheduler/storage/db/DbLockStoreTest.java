@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.storage.db;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.JobKey;
@@ -167,17 +167,17 @@ public class DbLockStoreTest {
     ILock lock1 = makeLock(JobKeys.from(role1, env, job).newBuilder(), "token1");
     ILock lock2 = makeLock(JobKeys.from(role2, env, job).newBuilder(), "token2");
 
-    assertEquals(Optional.<ILock>absent(), getLock(lock1.getKey()));
-    assertEquals(Optional.<ILock>absent(), getLock(lock2.getKey()));
+    assertEquals(Optional.<ILock>empty(), getLock(lock1.getKey()));
+    assertEquals(Optional.<ILock>empty(), getLock(lock2.getKey()));
 
     saveLocks(StorageEntityUtil.assertFullyPopulated(lock1));
     assertEquals(Optional.of(lock1), getLock(lock1.getKey()));
-    assertEquals(Optional.<ILock>absent(), getLock(lock2.getKey()));
+    assertEquals(Optional.<ILock>empty(), getLock(lock2.getKey()));
     saveLocks(lock2);
     assertEquals(Optional.of(lock1), getLock(lock1.getKey()));
     assertEquals(Optional.of(lock2), getLock(lock2.getKey()));
     removeLocks(lock1);
-    assertEquals(Optional.<ILock>absent(), getLock(lock1.getKey()));
+    assertEquals(Optional.<ILock>empty(), getLock(lock1.getKey()));
     assertEquals(Optional.of(lock2), getLock(lock2.getKey()));
   }
 

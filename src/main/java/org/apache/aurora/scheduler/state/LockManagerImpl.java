@@ -14,11 +14,11 @@
 package org.apache.aurora.scheduler.state;
 
 import java.util.Date;
+import java.util.Optional;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.Lock;
