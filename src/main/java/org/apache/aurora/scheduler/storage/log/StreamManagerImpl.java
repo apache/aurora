@@ -284,9 +284,6 @@ class StreamManagerImpl implements StreamManager {
      * Tries to coalesce a new op into the prior to compact the binary representation and increase
      * batching.
      *
-     * <p>Its recommended that as new {@code Op}s are added, they be treated here although they
-     * need not be</p>
-     *
      * @param prior The previous op.
      * @param next The next op to be added.
      * @return {@code true} if the next op was coalesced into the prior, {@code false} otherwise.
@@ -305,13 +302,6 @@ class StreamManagerImpl implements StreamManager {
         case SAVE_FRAMEWORK_ID:
           prior.setSaveFrameworkId(next.getSaveFrameworkId());
           return true;
-
-        case SAVE_CRON_JOB:
-        case REMOVE_JOB:
-        case SAVE_QUOTA:
-        case REMOVE_QUOTA:
-          return false;
-
         case SAVE_TASKS:
           coalesce(prior.getSaveTasks(), next.getSaveTasks());
           return true;
@@ -321,7 +311,6 @@ class StreamManagerImpl implements StreamManager {
         case SAVE_HOST_ATTRIBUTES:
           return coalesce(prior.getSaveHostAttributes(), next.getSaveHostAttributes());
         default:
-          LOG.warning("Unoptimized op: " + priorType);
           return false;
       }
     }
