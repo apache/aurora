@@ -560,9 +560,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setProduction(true)
         .setRequestedPorts(ImmutableSet.<String>of())
         .setTaskLinks(ImmutableMap.<String, String>of())
-        .setConstraints(ImmutableSet.of(
-            ConfigurationManager.hostLimitConstraint(1),
-            ConfigurationManager.rackLimitConstraint(1)))
+        .setConstraints(ImmutableSet.of())
         .setMaxTaskFailures(1)
         .setEnvironment("devel");
 

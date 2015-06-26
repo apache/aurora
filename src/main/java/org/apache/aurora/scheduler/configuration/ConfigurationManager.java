@@ -32,12 +32,10 @@ import com.google.common.collect.Sets;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
-import com.twitter.common.base.MorePreconditions;
 
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.JobConfiguration;
-import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConfig._Fields;
@@ -66,14 +64,7 @@ public final class ConfigurationManager {
   private static final Arg<List<Container._Fields>> ALLOWED_CONTAINER_TYPES =
       Arg.<List<Container._Fields>>create(ImmutableList.of(Container._Fields.MESOS));
 
-  @CmdLine(name = "enable_legacy_constraints",
-      help = "Set a default host:limit:1 for all and rack:limit:1 constraint for production jobs")
-  private static final Arg<Boolean> ENABLE_LEGACY_CONSTRAINTS = Arg.create(true);
-
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
-
-  @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
-  @VisibleForTesting public static final String RACK_CONSTRAINT = "rack";
 
   private static final Pattern GOOD_IDENTIFIER = Pattern.compile(GOOD_IDENTIFIER_PATTERN_JVM);
 
@@ -371,70 +362,18 @@ public final class ConfigurationManager {
    * @return A filter that matches the constraint.
    */
   public static Predicate<IConstraint> getConstraintByName(final String name) {
-    return new Predicate<IConstraint>() {
-      @Override
-      public boolean apply(IConstraint constraint) {
-        return constraint.getName().equals(name);
-      }
-    };
-  }
-
-  @VisibleForTesting
-  public static Constraint hostLimitConstraint(int limit) {
-    return new Constraint(HOST_CONSTRAINT, TaskConstraint.limit(new LimitConstraint(limit)));
-  }
-
-  @VisibleForTesting
-  public static Constraint rackLimitConstraint(int limit) {
-    return new Constraint(RACK_CONSTRAINT, TaskConstraint.limit(new LimitConstraint(limit)));
-  }
-
-  @VisibleForTesting
-  static Predicate<Constraint> hasName(final String name) {
-    MorePreconditions.checkNotBlank(name);
-    return new Predicate<Constraint>() {
-      @Override
-      public boolean apply(Constraint constraint) {
-        return name.equals(constraint.getName());
-      }
-    };
-  }
-
-  /**
-   * Wrapper for applyDefaultsIfUnset that passes along the DISABLE_LEGACY_CONSTRAINTS.
-   * @param task Task to apply defaults to.
-   * @return A reference to the (modified) {@code task}.
-   */
-  @VisibleForTesting
-  public static TaskConfig applyDefaultsIfUnset(TaskConfig task) {
-    return applyDefaultsIfUnset(task, ENABLE_LEGACY_CONSTRAINTS.get());
+    return constraint -> constraint.getName().equals(name);
   }
 
   /**
    * Applies defaults to unset values in a task.
    * @param task Task to apply defaults to.
-   * @param useLegacyConstraints flag to decide if we should add legacy constraints or not.
    * @return A reference to the (modified) {@code task}.
    */
-  @VisibleForTesting
-  static TaskConfig applyDefaultsIfUnset(TaskConfig task, boolean useLegacyConstraints) {
+  public static TaskConfig applyDefaultsIfUnset(TaskConfig task) {
     for (Closure<TaskConfig> populator : DEFAULT_FIELD_POPULATORS) {
       populator.execute(task);
     }
-
-    // Adding a default Host&Rack constraint is legacy behaviour that can be disabled if needed.
-    if (useLegacyConstraints) {
-      if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
-        task.addToConstraints(hostLimitConstraint(1));
-      }
-      if (!isDedicated(IConstraint.setFromBuilders(task.getConstraints()))
-          && task.isProduction()
-          && task.isIsService()
-          && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
-        task.addToConstraints(rackLimitConstraint(1));
-      }
-    }
-
     return task;
   }
 

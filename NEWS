@@ -3,3 +3,6 @@
 
 - Now requires JRE 8 or greater.
 - GC executor is fully replaced by the task state reconciliation (AURORA-1047).
+- The scheduler command line argument 'enable_legacy_constraints' has been
+  removed, and the scheduler no longer automatically injects 'host' and 'rack'
+  constraints for production services. (AURORA-1074)

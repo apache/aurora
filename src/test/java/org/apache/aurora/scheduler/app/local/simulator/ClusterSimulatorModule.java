@@ -31,8 +31,6 @@ import org.apache.mesos.Protos.Offer;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static org.apache.aurora.scheduler.configuration.ConfigurationManager.HOST_CONSTRAINT;
-import static org.apache.aurora.scheduler.configuration.ConfigurationManager.RACK_CONSTRAINT;
 import static org.apache.mesos.Protos.Value.Type.RANGES;
 import static org.apache.mesos.Protos.Value.Type.SCALAR;
 
@@ -97,10 +95,10 @@ public class ClusterSimulatorModule extends AbstractModule {
         .addResources(Protos.Resource.newBuilder().setType(RANGES).setName(Resources.PORTS)
             .setRanges(portRanges))
         .addAttributes(Protos.Attribute.newBuilder().setType(Protos.Value.Type.TEXT)
-            .setName(HOST_CONSTRAINT)
+            .setName("host")
             .setText(Protos.Value.Text.newBuilder().setValue(host)))
         .addAttributes(Protos.Attribute.newBuilder().setType(Protos.Value.Type.TEXT)
-            .setName(RACK_CONSTRAINT)
+            .setName("rack")
             .setText(Protos.Value.Text.newBuilder().setValue(rack)))
         .setSlaveId(Protos.SlaveID.newBuilder().setValue(slaveId))
         .setHostname(host)

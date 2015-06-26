@@ -15,8 +15,6 @@ package org.apache.aurora.scheduler.configuration;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
@@ -36,9 +34,6 @@ import org.junit.Test;
 import static org.apache.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
 import static org.apache.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static org.apache.aurora.scheduler.configuration.ConfigurationManager.HOST_CONSTRAINT;
-import static org.apache.aurora.scheduler.configuration.ConfigurationManager.RACK_CONSTRAINT;
-import static org.apache.aurora.scheduler.configuration.ConfigurationManager.hasName;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.isGoodIdentifier;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -121,29 +116,5 @@ public class ConfigurationManagerTest {
     taskConfig.getContainer().getDocker().setImage(null);
 
     ConfigurationManager.validateAndPopulate(ITaskConfig.build(taskConfig));
-  }
-
-  @Test
-  public void testDisableLegacyConstraints() {
-    // By default, legacy constraints are applied to production jobs.
-    TaskConfig task = new TaskConfig()
-        .setIsService(true)
-        .setEnvironment("prod")
-        .setConstraints(Sets.<Constraint>newHashSet())
-        .setProduction(true);
-
-    TaskConfig copy = task.deepCopy();
-
-    task = ConfigurationManager.applyDefaultsIfUnset(task, false);
-
-    // In this case we shouldn't have those fields added.
-    assertFalse(Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT)));
-    assertFalse(Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT)));
-
-    copy = ConfigurationManager.applyDefaultsIfUnset(copy, true);
-
-    // In this case we should have those fields added.
-    assertTrue(Iterables.any(copy.getConstraints(), hasName(HOST_CONSTRAINT)));
-    assertTrue(Iterables.any(copy.getConstraints(), hasName(RACK_CONSTRAINT)));
   }
 }

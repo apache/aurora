@@ -26,8 +26,6 @@ import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Type;
 
-import static org.apache.aurora.scheduler.configuration.ConfigurationManager.HOST_CONSTRAINT;
-
 public final class Offers {
   private Offers() {
     // Utility class.
@@ -54,7 +52,7 @@ public final class Offers {
         .addResources(Resource.newBuilder().setType(Type.RANGES).setName(Resources.PORTS)
             .setRanges(portRanges))
         .addAttributes(Protos.Attribute.newBuilder().setType(Type.TEXT)
-            .setName(HOST_CONSTRAINT)
+            .setName("host")
             .setText(Protos.Value.Text.newBuilder().setValue("slavehost")))
         .setSlaveId(SlaveID.newBuilder().setValue("SlaveId").build())
         .setHostname("slavehost")
