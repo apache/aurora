@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.servlet.ServletModule;
 import com.twitter.common.args.Arg;
@@ -30,11 +31,22 @@ public class H2ConsoleModule extends ServletModule {
   public static final String H2_PERM = "h2_management_console";
 
   @CmdLine(name = "enable_h2_console", help = "Enable H2 DB management console.")
-  private static final Arg<Boolean> ENABLE_H2_CONSOLE = Arg.create(true);
+  private static final Arg<Boolean> ENABLE_H2_CONSOLE = Arg.create(false);
+
+  private final boolean enabled;
+
+  public H2ConsoleModule() {
+    this(ENABLE_H2_CONSOLE.get());
+  }
+
+  @VisibleForTesting
+  public H2ConsoleModule(boolean enabled) {
+    this.enabled = enabled;
+  }
 
   @Override
   protected void configureServlets() {
-    if (ENABLE_H2_CONSOLE.get()) {
+    if (enabled) {
       filter(H2_PATH, H2_PATH + "/*").through(LeaderRedirectFilter.class);
       serve(H2_PATH, H2_PATH + "/*").with(new WebServlet(), ImmutableMap.of(
           "webAllowOthers", "true",

@@ -146,7 +146,7 @@ public class HttpSecurityIT extends JettyServerModuleTest {
   protected Module getChildServletModule() {
     return Modules.combine(
         new ApiModule(),
-        new H2ConsoleModule(),
+        new H2ConsoleModule(true),
         new HttpSecurityModule(new IniShiroRealmModule(ini)),
         new AbstractModule() {
           @Override
