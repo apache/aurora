@@ -30,6 +30,7 @@ Aurora + Thermos Configuration Reference
     - [HealthCheckConfig Objects](#healthcheckconfig-objects)
     - [Announcer Objects](#announcer-objects)
     - [Container Objects](#container)
+    - [LifecycleConfig Objects](#lifecycleconfig-objects)
 - [Specifying Scheduling Constraints](#specifying-scheduling-constraints)
 - [Template Namespaces](#template-namespaces)
     - [mesos Namespace](#mesos-namespace)
@@ -162,8 +163,6 @@ can be omitted. In Mesos, `resources` is also required.
    ```max_failures```      | Integer                          | Maximum process failures before being considered failed (Default: 1)
    ```max_concurrency```   | Integer                          | Maximum number of concurrent processes (Default: 0, unlimited concurrency.)
    ```finalization_wait``` | Integer                          | Amount of time allocated for finalizing processes, in seconds. (Default: 30)
-   ```graceful_shutdown_endpoint``` | String                  | Endpoint to hit to indicate that a task should gracefully shutdown. (Default: /quitquitquit)
-   ```shutdown_endpoint``` | String                           | Endpoint to hit to give a task its final warning before being killed. (Default: /abortabortabort)
 
 #### name
 `name` is a string denoting the name of this task. It defaults to the name of the first Process in
@@ -279,17 +278,6 @@ Client applications with higher priority may force a shorter
 finalization wait (e.g. through parameters to `thermos kill`), so this
 is mostly a best-effort signal.
 
-#### graceful_shutdown_endpoint
-
-If the Job has a port named `health`, a HTTP POST request will be sent over
-localhost to this endpoint to request that the task gracefully shut itself
-down.
-
-#### shutdown_endpoint
-
-If the Job has a port named `health`, a HTTP POST request will be sent over
-localhost to this endpoint to request as a final warning before being shut
-down.
 
 ### Constraint Object
 
@@ -339,6 +327,7 @@ Job Schema
   ```production``` | Boolean |  Whether or not this is a production task backed by quota (Default: False). Production jobs may preempt any non-production job, and may only be preempted by production jobs in the same role and of higher priority. To run jobs at this level, the job role must have the appropriate quota. To grant quota to a particular role in production, operators use the ``aurora_admin set_quota`` command.
   ```health_check_config``` | ```heath_check_config``` object | Parameters for controlling a task's health checks via HTTP. Only used if a  health port was assigned with a command line wildcard.
   ```container``` | ```Container``` object | An optional container to run all processes inside of.
+  ```lifecycle``` | ```LifecycleConfig``` object | An optional task lifecycle configuration that dictates commands to be executed on startup/teardown.  HTTP lifecycle is enabled by default if the "health" port is requested.  See [LifecycleConfig Objects](#lifecycleconfig-objects) for more information.
 
 ### Services
 
@@ -431,6 +420,37 @@ Describes the container the job's processes will run inside.
   param          | type           | description
   -----          | :----:         | -----------
   ```image```    | String         | The name of the docker image to execute.  If the image does not exist locally it will be pulled with ```docker pull```.
+
+### LifecycleConfig Objects
+
+*Note: The only lifecycle configuration supported is the HTTP lifecycle via the HTTPLifecycleConfig.*
+
+  param          | type                | description
+  -----          | :----:              | -----------
+  ```http```     | HTTPLifecycleConfig | Configure the lifecycle manager to send lifecycle commands to the task via HTTP.
+
+### HTTPLifecycleConfig Objects
+
+  param          | type            | description
+  -----          | :----:          | -----------
+  ```port```     | String          | The named port to send POST commands (Default: health)
+  ```graceful_shutdown_endpoint``` | String | Endpoint to hit to indicate that a task should gracefully shutdown. (Default: /quitquitquit)
+  ```shutdown_endpoint``` | String | Endpoint to hit to give a task its final warning before being killed. (Default: /abortabortabort)
+
+#### graceful_shutdown_endpoint
+
+If the Job is listening on the port as specified by the HTTPLifecycleConfig
+(default: `health`), a HTTP POST request will be sent over localhost to this
+endpoint to request that the task gracefully shut itself down.  This is a
+courtesy call before the `shutdown_endpoint` is invoked a fixed amount of
+time later.
+
+#### shutdown_endpoint
+
+If the Job is listening on the port as specified by the HTTPLifecycleConfig
+(default: `health`), a HTTP POST request will be sent over localhost to this
+endpoint to request as a final warning before being shut down.  If the task
+does not shut down on its own after this, it will be forcefully killed
 
 
 Specifying Scheduling Constraints

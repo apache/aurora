@@ -15,6 +15,7 @@
 import getpass
 
 from apache.aurora.config.schema.base import (
+    DefaultLifecycleConfig,
     MB,
     MesosJob,
     MesosTaskInstance,
@@ -23,7 +24,11 @@ from apache.aurora.config.schema.base import (
     Task
 )
 
-BASE_MTI = MesosTaskInstance(instance=0, role=getpass.getuser())
+BASE_MTI = MesosTaskInstance(
+    instance=0,
+    lifecycle=DefaultLifecycleConfig,
+    role=getpass.getuser(),
+)
 BASE_TASK = Task(resources=Resources(cpu=1.0, ram=16 * MB, disk=32 * MB))
 
 HELLO_WORLD_TASK_ID = 'hello_world-001'

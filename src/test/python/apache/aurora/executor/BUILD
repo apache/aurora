@@ -25,6 +25,7 @@ python_test_suite(
   dependencies = [
     ':executor_base',
     ':executor_vars',
+    ':http_lifecycle',
     ':status_manager',
     ':thermos_task_runner',
     'src/test/python/apache/aurora/executor/common:all',
@@ -102,4 +103,14 @@ python_tests(name = 'executor_vars',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/executor:executor_vars',
   ]
+)
+
+python_tests(name = 'http_lifecycle',
+  sources = ['test_http_lifecycle.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/config:schema',
+    'src/main/python/apache/aurora/executor:http_lifecycle',
+    'src/main/python/apache/aurora/executor:thermos_task_runner',
+  ],
 )

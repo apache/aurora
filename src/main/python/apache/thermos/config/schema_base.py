@@ -74,10 +74,6 @@ class Task(Struct):
                                             # > 0 is max concurrent processes.
   finalization_wait = Default(Integer, 30)  # the amount of time in seconds we allocate to run the
                                             # finalization schedule.
-  # Endpoint to hit to indicate that a task should gracefully shutdown.
-  graceful_shutdown_endpoint = Default(String, "/quitquitquit")
-  # Endpoint to hit to give a task it's final warning before being killed.
-  shutdown_endpoint = Default(String, "/abortabortabort")
 
   # TODO(jon): remove/replace with proper solution to MESOS-3546
   user = String

@@ -90,6 +90,8 @@ def task_instance_from_job(job, instance):
     ti = ti(announce=job.announce())
   if job.has_environment():
     ti = ti(environment=job.environment())
+  if job.has_lifecycle():
+    ti = ti(lifecycle=job.lifecycle())
   return ti.bind(mesos=instance_context)
 
 

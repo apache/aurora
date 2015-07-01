@@ -32,6 +32,7 @@ from twitter.common.quantity import Amount, Time
 
 from apache.aurora.config.schema.base import MB, MesosTaskInstance, Process, Resources, Task
 from apache.aurora.executor.common.sandbox import DirectorySandbox
+from apache.aurora.executor.http_lifecycle import HttpLifecycleManager
 from apache.aurora.executor.thermos_task_runner import ThermosTaskRunner
 from apache.thermos.common.statuses import (
     INTERNAL_ERROR,
@@ -217,29 +218,30 @@ class TestThermosTaskRunnerIntegration(object):
       assert task_runner.status is not None
       assert task_runner.status.status == mesos_pb2.TASK_KILLED
 
-  @patch('apache.aurora.executor.thermos_task_runner.HttpSignaler')
+  @patch('apache.aurora.executor.http_lifecycle.HttpSignaler')
   def test_integration_http_teardown(self, SignalerClass):
     signaler = SignalerClass.return_value
     signaler.side_effect = lambda path, use_post_method: (path != '/quitquitquit', None)
 
     clock = Mock(wraps=time)
 
-    class ShortEscalationRunner(ThermosTaskRunner):
-      ESCALATION_WAIT = Amount(1, Time.MICROSECONDS)
-
     with self.yield_sleepy(
-        ShortEscalationRunner,
+        ThermosTaskRunner,
         portmap={'health': 3141},
         clock=clock,
         sleep=1000,
         exit_code=0) as task_runner:
 
-      task_runner.start()
+      class ImmediateHttpLifecycleManager(HttpLifecycleManager):
+        ESCALATION_WAIT = Amount(1, Time.MICROSECONDS)
+
+      http_task_runner = ImmediateHttpLifecycleManager(
+          task_runner, 3141, ['/quitquitquit', '/abortabortabort'], clock=clock)
+      http_task_runner.start()
       task_runner.forked.wait()
+      http_task_runner.stop()
 
-      task_runner.stop()
-
-      escalation_wait = call(ShortEscalationRunner.ESCALATION_WAIT.as_(Time.SECONDS))
+      escalation_wait = call(ImmediateHttpLifecycleManager.ESCALATION_WAIT.as_(Time.SECONDS))
       assert clock.sleep.mock_calls.count(escalation_wait) == 1
       assert signaler.mock_calls == [
         call('/quitquitquit', use_post_method=True),
