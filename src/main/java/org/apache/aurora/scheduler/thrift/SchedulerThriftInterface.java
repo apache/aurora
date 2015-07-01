@@ -659,7 +659,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
           quotaManager.saveQuota(
               ownerRole,
               IResourceAggregate.build(resourceAggregate),
-              store.getQuotaStore());
+              store);
         }
       });
       return ok();

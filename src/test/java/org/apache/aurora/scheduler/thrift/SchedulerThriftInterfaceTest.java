@@ -844,7 +844,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     quotaManager.saveQuota(
         ROLE,
         IResourceAggregate.build(resourceAggregate),
-        storageUtil.quotaStore);
+        storageUtil.mutableStoreProvider);
 
     control.replay();
 
@@ -860,7 +860,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     quotaManager.saveQuota(
         ROLE,
         IResourceAggregate.build(resourceAggregate),
-        storageUtil.quotaStore);
+        storageUtil.mutableStoreProvider);
 
     expectLastCall().andThrow(new QuotaManager.QuotaException("fail"));
 

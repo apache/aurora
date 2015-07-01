@@ -669,10 +669,19 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testSaveQuotaPasses() throws Exception {
+    expectNoJobUpdates();
+    expectNoCronJobs();
+    IScheduledTask prodTask = createProdTask("foo", 1, 1, 1);
+    expectTasks(prodTask);
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(1, 1, 1)));
+
     storageUtil.quotaStore.saveQuota(ROLE, QUOTA);
 
     control.replay();
-    quotaManager.saveQuota(ROLE, QUOTA, storageUtil.mutableStoreProvider.getQuotaStore());
+    quotaManager.saveQuota(
+        ROLE,
+        QUOTA,
+        storageUtil.mutableStoreProvider);
   }
 
   @Test(expected = QuotaException.class)
@@ -681,7 +690,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     quotaManager.saveQuota(
         ROLE,
         IResourceAggregate.build(new ResourceAggregate()),
-        storageUtil.mutableStoreProvider.getQuotaStore());
+        storageUtil.mutableStoreProvider);
   }
 
   @Test(expected = QuotaException.class)
@@ -690,7 +699,23 @@ public class QuotaManagerImplTest extends EasyMockTest {
     quotaManager.saveQuota(
         ROLE,
         IResourceAggregate.build(new ResourceAggregate(-2.0, 4, 5)),
-        storageUtil.mutableStoreProvider.getQuotaStore());
+        storageUtil.mutableStoreProvider);
+  }
+
+  @Test(expected = QuotaException.class)
+  public void testSaveQuotaFailsWhenBelowCurrentReservation() throws Exception {
+    expectNoJobUpdates();
+    expectNoCronJobs();
+    IScheduledTask prodTask = createProdTask("foo", 10, 100, 100);
+    expectTasks(prodTask);
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(20, 200, 200)));
+
+    control.replay();
+
+    quotaManager.saveQuota(
+        ROLE,
+        IResourceAggregate.build(new ResourceAggregate(1, 1, 1)),
+        storageUtil.mutableStoreProvider);
   }
 
   @Test
