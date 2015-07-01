@@ -23,6 +23,7 @@ import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 
+import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.MaintenanceMode;
@@ -207,6 +208,10 @@ class DbStorage extends AbstractIdleService implements Storage {
 
     try (SqlSession session = sessionFactory.openSession()) {
       session.update(createStatementName);
+    }
+
+    for (CronCollisionPolicy policy : CronCollisionPolicy.values()) {
+      enumValueMapper.addEnumValue("cron_policies", policy.getValue(), policy.name());
     }
 
     for (MaintenanceMode mode : MaintenanceMode.values()) {

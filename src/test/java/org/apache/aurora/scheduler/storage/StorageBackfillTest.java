@@ -16,19 +16,14 @@ package org.apache.aurora.scheduler.storage;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.Container;
-import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
-import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
-import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
 import org.junit.Test;
@@ -49,40 +44,6 @@ public class StorageBackfillTest {
   @Before
   public void setUp() {
     storage = DbUtil.createStorage();
-  }
-
-  @Test
-  public void testJobConfigurationBackfill() throws Exception {
-    TaskConfig task = TASK.getAssignedTask().getTask().newBuilder();
-    final JobConfiguration config = new JobConfiguration()
-        .setOwner(task.getOwner())
-        .setKey(task.getJob())
-        .setInstanceCount(1)
-        .setTaskConfig(task);
-
-    SanitizedConfiguration expected =
-        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(config));
-
-    // Unset task config job key.
-    config.getTaskConfig().unsetJob();
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getCronJobStore().saveAcceptedJob(IJobConfiguration.build(config));
-      }
-    });
-
-    backfill();
-
-    IJobConfiguration actual = Iterables.getOnlyElement(
-        storage.read(new Storage.Work.Quiet<Iterable<IJobConfiguration>>() {
-          @Override
-          public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
-            return storeProvider.getCronJobStore().fetchJobs();
-          }
-        }));
-
-    assertEquals(expected.getJobConfig(), actual);
   }
 
   @Test

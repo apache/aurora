@@ -40,7 +40,7 @@ public class InMemTaskStoreTest extends AbstractTaskStoreTest {
   protected Module getStorageModule() {
     statsProvider = new FakeStatsProvider();
     return Modules.combine(
-        DbModule.testModule(PLAIN, Optional.of(new InMemStoresModule.TaskStoreModule(PLAIN))),
+        DbModule.testModule(PLAIN, Optional.of(new InMemStoresModule(PLAIN))),
         new AbstractModule() {
           @Override
           protected void configure() {

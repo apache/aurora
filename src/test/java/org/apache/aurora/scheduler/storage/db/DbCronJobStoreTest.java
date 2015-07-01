@@ -11,29 +11,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.mem;
+package org.apache.aurora.scheduler.storage.db;
 
-import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
 import com.twitter.common.stats.StatsProvider;
+import com.twitter.common.util.Clock;
+import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.scheduler.storage.AbstractCronJobStoreTest;
-import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 
-import static com.twitter.common.inject.Bindings.KeyFactory.PLAIN;
-
-public class MemCronJobStoreTest extends AbstractCronJobStoreTest {
+public class DbCronJobStoreTest extends AbstractCronJobStoreTest {
   @Override
   protected Module getStorageModule() {
     return Modules.combine(
-        DbModule.testModule(PLAIN, Optional.of(new InMemStoresModule(PLAIN))),
+        DbModule.testModule(),
         new AbstractModule() {
           @Override
           protected void configure() {
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
+            bind(Clock.class).toInstance(new FakeClock());
           }
         });
   }

@@ -29,12 +29,6 @@
     )
   </insert>
 
-  <sql id="job_key_clause">
-    role = #{role}
-    AND environment = #{environment}
-    AND name = #{name}
-  </sql>
-
   <select id="selectAll" resultType="org.apache.aurora.gen.JobKey">
     SELECT * FROM job_keys
   </select>

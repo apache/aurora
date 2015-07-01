@@ -13,31 +13,30 @@
  */
 package org.apache.aurora.scheduler.storage.db.views;
 
-import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.scheduler.storage.db.InsertResult;
+import org.apache.aurora.gen.JobConfiguration;
 
 /**
- * Representation of a row in the tasks table.
+ * Representation of a row in the cron_jobs table.
  */
-public class ScheduledTaskWrapper extends InsertResult {
+public class CronJobWrapper {
   private final long taskConfigRowId;
-  private final ScheduledTask task;
+  private final JobConfiguration job;
 
-  private ScheduledTaskWrapper() {
+  private CronJobWrapper() {
     // Needed by mybatis.
     this(-1, null);
   }
 
-  public ScheduledTaskWrapper(long taskConfigRowId, ScheduledTask task) {
+  public CronJobWrapper(long taskConfigRowId, JobConfiguration job) {
     this.taskConfigRowId = taskConfigRowId;
-    this.task = task;
+    this.job = job;
   }
 
   public long getTaskConfigRowId() {
     return taskConfigRowId;
   }
 
-  public ScheduledTask getTask() {
-    return task;
+  public JobConfiguration getJob() {
+    return job;
   }
 }

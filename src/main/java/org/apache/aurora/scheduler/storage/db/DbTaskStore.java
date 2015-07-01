@@ -40,11 +40,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 
-import org.apache.aurora.gen.Constraint;
-import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -142,7 +139,8 @@ class DbTaskStore implements TaskStore.Mutable {
     Map<ITaskConfig, TaskConfigRow> rowsToIds =
         FluentIterable.from(jobs)
             .transformAndConcat(getRows)
-            .uniqueIndex(Functions.compose(ITaskConfig.FROM_BUILDER, getConfigSaturator()));
+            .uniqueIndex(
+                Functions.compose(ITaskConfig.FROM_BUILDER, configManager.getConfigSaturator()));
 
     return Maps.transformValues(rowsToIds, CONFIG_ID);
   }
@@ -177,17 +175,14 @@ class DbTaskStore implements TaskStore.Mutable {
     for (IScheduledTask task : tasks) {
       long configId = configCache.getUnchecked(task.getAssignedTask().getTask());
 
-      ScheduledTaskWrapper wrappedTask = new ScheduledTaskWrapper(-1, configId, task.newBuilder());
+      ScheduledTaskWrapper wrappedTask = new ScheduledTaskWrapper(configId, task.newBuilder());
       taskMapper.insertScheduledTask(wrappedTask);
-      Preconditions.checkState(
-          wrappedTask.getTaskRowId() != -1,
-          "Row ID should have been populated during insert.");
       if (!task.getTaskEvents().isEmpty()) {
-        taskMapper.insertTaskEvents(wrappedTask.getTaskRowId(), task.getTaskEvents());
+        taskMapper.insertTaskEvents(wrappedTask.getId(), task.getTaskEvents());
       }
       if (!task.getAssignedTask().getAssignedPorts().isEmpty()) {
         taskMapper.insertPorts(
-            wrappedTask.getTaskRowId(),
+            wrappedTask.getId(),
             toAssignedPorts(task.getAssignedTask().getAssignedPorts()));
       }
     }
@@ -261,26 +256,6 @@ class DbTaskStore implements TaskStore.Mutable {
     return false;
   }
 
-  private Function<TaskConfigRow, TaskConfig> getConfigSaturator() {
-    // It appears that there is no way in mybatis to populate a field of type Map.  To work around
-    // this, we need to manually perform the query and associate the elements.
-    final LoadingCache<Long, Map<String, String>> taskLinkCache = CacheBuilder.newBuilder()
-        .build(new CacheLoader<Long, Map<String, String>>() {
-          @Override
-          public Map<String, String> load(Long configId) {
-            return configManager.getTaskLinks(configId);
-          }
-        });
-    Function<TaskConfigRow, TaskConfig> linkPopulator = new Function<TaskConfigRow, TaskConfig>() {
-      @Override
-      public TaskConfig apply(TaskConfigRow row) {
-        return row.getConfig().setTaskLinks(taskLinkCache.getUnchecked(row.getId()));
-      }
-    };
-
-    return Functions.compose(REPLACE_UNION_TYPES, linkPopulator);
-  }
-
   private FluentIterable<IScheduledTask> matches(Query.Builder query) {
     Iterable<ScheduledTaskWrapper> results;
     Predicate<IScheduledTask> filter;
@@ -297,7 +272,7 @@ class DbTaskStore implements TaskStore.Mutable {
       filter = Predicates.alwaysTrue();
     }
 
-    final Function<TaskConfigRow, TaskConfig> configSaturator = getConfigSaturator();
+    final Function<TaskConfigRow, TaskConfig> configSaturator = configManager.getConfigSaturator();
     return FluentIterable.from(results)
         .transform(populateAssignedPorts)
         .transform(new Function<ScheduledTaskWrapper, ScheduledTaskWrapper>() {
@@ -320,7 +295,7 @@ class DbTaskStore implements TaskStore.Mutable {
         @Override
         public ScheduledTaskWrapper apply(ScheduledTaskWrapper task) {
           ImmutableMap.Builder<String, Integer> ports = ImmutableMap.builder();
-          for (AssignedPort port : taskMapper.selectPorts(task.getTaskRowId())) {
+          for (AssignedPort port : taskMapper.selectPorts(task.getId())) {
             ports.put(port.getName(), port.getPort());
           }
           task.getTask().getAssignedTask().setAssignedPorts(ports.build());
@@ -333,37 +308,6 @@ class DbTaskStore implements TaskStore.Mutable {
         @Override
         public ScheduledTask apply(ScheduledTaskWrapper task) {
           return task.getTask();
-        }
-      };
-
-  /**
-   * Replaces the shimmed {@link org.apache.thrift.TUnion} instances with the base thrift types.
-   * This is necessary because TUnion, as of thrift 0.9.1, restricts subclassing.  The copy
-   * constructor checks for equality on {@link Object#getClass()} rather than the subclass-friendly
-   * {@link Class#isInstance(Object).
-   */
-  private static final Function<TaskConfig, TaskConfig> REPLACE_UNION_TYPES =
-      new Function<TaskConfig, TaskConfig>() {
-        @Override
-        public TaskConfig apply(TaskConfig config) {
-          ImmutableSet.Builder<Constraint> constraints = ImmutableSet.builder();
-          for (Constraint constraint : config.getConstraints()) {
-            Constraint replacement = new Constraint()
-                .setName(constraint.getName());
-            replacement.setConstraint(
-                new TaskConstraint(
-                    constraint.getConstraint().getSetField(),
-                    constraint.getConstraint().getFieldValue()));
-            constraints.add(replacement);
-          }
-          config.setConstraints(constraints.build());
-
-          config.setContainer(
-              new Container(
-                  config.getContainer().getSetField(),
-                  config.getContainer().getFieldValue()));
-
-          return config;
         }
       };
 }

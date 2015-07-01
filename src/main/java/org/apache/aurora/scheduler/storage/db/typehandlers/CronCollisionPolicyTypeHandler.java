@@ -11,26 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db;
+package org.apache.aurora.scheduler.storage.db.typehandlers;
+
+import org.apache.aurora.gen.CronCollisionPolicy;
 
 /**
- * MyBatis returns auto-generated IDs through mutable fields in parameters.
- * This class can be used as an additional {@link org.apache.ibatis.annotations.Param Param} to
- * retrieve the ID when the inserted object is not self-identifying.
+ * Type handler for {@link CronCollisionPolicy}.
  */
-public class InsertResult {
-  private long id = Long.MIN_VALUE;
-  private boolean isSet;
-
-  public long getId() {
-    if (!isSet) {
-      throw new IllegalStateException("Missing ID value.");
-    }
-    return id;
-  }
-
-  void setId(long value) {
-    id = value;
-    isSet = true;
+public class CronCollisionPolicyTypeHandler extends AbstractTEnumTypeHandler<CronCollisionPolicy> {
+  @Override
+  protected CronCollisionPolicy fromValue(int value) {
+    return CronCollisionPolicy.findByValue(value);
   }
 }

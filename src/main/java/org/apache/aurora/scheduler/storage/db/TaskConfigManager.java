@@ -20,9 +20,18 @@ import java.util.Set;
 import javax.inject.Inject;
 
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.Container;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.storage.db.views.TaskConfigRow;
 import org.apache.aurora.scheduler.storage.db.views.TaskLink;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
@@ -40,6 +49,62 @@ class TaskConfigManager {
   TaskConfigManager(TaskConfigMapper configMapper, JobKeyMapper jobKeyMapper) {
     this.configMapper = requireNonNull(configMapper);
     this.jobKeyMapper = requireNonNull(jobKeyMapper);
+  }
+
+  /**
+   * Replaces the shimmed {@link org.apache.thrift.TUnion} instances with the base thrift types.
+   * This is necessary because TUnion, as of thrift 0.9.1, restricts subclassing.  The copy
+   * constructor checks for equality on {@link Object#getClass()} rather than the subclass-friendly
+   * {@link Class#isInstance(Object).
+   */
+  private static final Function<TaskConfig, TaskConfig> REPLACE_UNION_TYPES =
+      new Function<TaskConfig, TaskConfig>() {
+        @Override
+        public TaskConfig apply(TaskConfig config) {
+          ImmutableSet.Builder<Constraint> constraints = ImmutableSet.builder();
+          for (Constraint constraint : config.getConstraints()) {
+            Constraint replacement = new Constraint()
+                .setName(constraint.getName());
+            replacement.setConstraint(
+                new TaskConstraint(
+                    constraint.getConstraint().getSetField(),
+                    constraint.getConstraint().getFieldValue()));
+            constraints.add(replacement);
+          }
+          config.setConstraints(constraints.build());
+
+          config.setContainer(
+              new Container(
+                  config.getContainer().getSetField(),
+                  config.getContainer().getFieldValue()));
+
+          return config;
+        }
+      };
+
+  /**
+   * Creates an instance of a caching function that will fill all relations in a task config.
+   *
+   * @return A function to populate relations in task configs.
+   */
+  Function<TaskConfigRow, TaskConfig> getConfigSaturator() {
+    // It appears that there is no way in mybatis to populate a field of type Map.  To work around
+    // this, we need to manually perform the query and associate the elements.
+    final LoadingCache<Long, Map<String, String>> taskLinkCache = CacheBuilder.newBuilder()
+        .build(new CacheLoader<Long, Map<String, String>>() {
+          @Override
+          public Map<String, String> load(Long configId) {
+            return getTaskLinks(configId);
+          }
+        });
+    Function<TaskConfigRow, TaskConfig> linkPopulator = new Function<TaskConfigRow, TaskConfig>() {
+      @Override
+      public TaskConfig apply(TaskConfigRow row) {
+        return row.getConfig().setTaskLinks(taskLinkCache.getUnchecked(row.getId()));
+      }
+    };
+
+    return Functions.compose(REPLACE_UNION_TYPES, linkPopulator);
   }
 
   long insert(ITaskConfig config) {

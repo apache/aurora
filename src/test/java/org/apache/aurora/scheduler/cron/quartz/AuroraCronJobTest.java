@@ -29,7 +29,6 @@ import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
-import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.easymock.Capture;
@@ -66,20 +65,6 @@ public class AuroraCronJobTest extends EasyMockTest {
   @Test
   public void testExecuteNonexistentIsNoop() throws JobExecutionException {
     control.replay();
-
-    auroraCronJob.doExecute(QuartzTestUtil.AURORA_JOB_KEY);
-  }
-
-  @Test
-  public void testInvalidConfigIsNoop() throws JobExecutionException {
-    control.replay();
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getCronJobStore().saveAcceptedJob(
-            IJobConfiguration.build(QuartzTestUtil.JOB.newBuilder().setCronSchedule(null)));
-      }
-    });
 
     auroraCronJob.doExecute(QuartzTestUtil.AURORA_JOB_KEY);
   }

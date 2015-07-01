@@ -25,9 +25,9 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 /**
- * An in-memory job store.
+ * An in-memory cron job store.
  */
-class MemJobStore implements CronJobStore.Mutable {
+class MemCronJobStore implements CronJobStore.Mutable {
   private final Map<IJobKey, IJobConfiguration> jobs = Maps.newConcurrentMap();
 
   @Override

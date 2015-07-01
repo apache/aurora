@@ -28,11 +28,13 @@ public final class TypeHandlers {
   }
 
   public static List<Class<? extends TypeHandler<?>>> getAll() {
-    return ImmutableList.<Class<? extends TypeHandler<?>>>of(
-        JobUpdateActionTypeHandler.class,
-        JobUpdateStatusTypeHandler.class,
-        MaintenanceModeTypeHandler.class,
-        ScheduleStatusTypeHandler.class,
-        TaskConfigTypeHandler.class);
+    return ImmutableList.<Class<? extends TypeHandler<?>>>builder()
+        .add(CronCollisionPolicyTypeHandler.class)
+        .add(JobUpdateActionTypeHandler.class)
+        .add(JobUpdateStatusTypeHandler.class)
+        .add(MaintenanceModeTypeHandler.class)
+        .add(ScheduleStatusTypeHandler.class)
+        .add(TaskConfigTypeHandler.class)
+        .build();
   }
 }

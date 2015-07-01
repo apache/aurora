@@ -293,3 +293,22 @@ CREATE TABLE task_ports(
 
   UNIQUE(task_row_id, name)
 );
+
+CREATE TABLE cron_policies(
+  id INT PRIMARY KEY,
+  name VARCHAR NOT NULL,
+
+  UNIQUE(name)
+);
+
+CREATE TABLE cron_jobs(
+  id IDENTITY,
+  job_key_id INT NOT NULL REFERENCES job_keys(id),
+  creator_user VARCHAR NOT NULL,
+  cron_schedule VARCHAR NOT NULL,
+  cron_collision_policy INT REFERENCES cron_policies(id),
+  task_config_row_id INT NOT NULL REFERENCES task_configs(id),
+  instance_count INT NOT NULL,
+
+  UNIQUE(job_key_id)
+);

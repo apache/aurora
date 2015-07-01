@@ -14,11 +14,13 @@
 package org.apache.aurora.scheduler.cron.quartz;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
@@ -47,6 +49,7 @@ final class QuartzTestUtil {
               .setDiskMb(3)
               .setRamMb(4)
               .setNumCpus(5)
+              .setMetadata(ImmutableSet.<Metadata>of())
               .setExecutorConfig(new ExecutorConfig()
                   .setName("cmd.exe")
                   .setData("echo hello world")))

@@ -77,6 +77,7 @@ public final class DbModule extends PrivateModule {
 
   private static final Set<Class<?>> MAPPER_CLASSES = ImmutableSet.<Class<?>>builder()
       .add(AttributeMapper.class)
+      .add(CronJobMapper.class)
       .add(EnumValueMapper.class)
       .add(FrameworkIdMapper.class)
       .add(JobInstanceUpdateEventMapper.class)
@@ -90,12 +91,12 @@ public final class DbModule extends PrivateModule {
       .build();
 
   private final KeyFactory keyFactory;
-  private final Module taskStoreModule;
+  private final Module taskStoresModule;
   private final String jdbcSchema;
 
-  private DbModule(KeyFactory keyFactory, Module taskStoreModule, String jdbcSchema) {
+  private DbModule(KeyFactory keyFactory, Module taskStoresModule, String jdbcSchema) {
     this.keyFactory = requireNonNull(keyFactory);
-    this.taskStoreModule = requireNonNull(taskStoreModule);
+    this.taskStoresModule = requireNonNull(taskStoresModule);
     // We always disable the MvStore, as it is in beta as of this writing.
     this.jdbcSchema = jdbcSchema + ";MV_STORE=false";
   }
@@ -144,7 +145,7 @@ public final class DbModule extends PrivateModule {
   private static Module getTaskStoreModule(KeyFactory keyFactory) {
     return USE_DB_TASK_STORE.get()
         ? new TaskStoreModule(keyFactory)
-        : new InMemStoresModule.TaskStoreModule(keyFactory);
+        : new InMemStoresModule(keyFactory);
   }
 
   private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {
@@ -190,8 +191,7 @@ public final class DbModule extends PrivateModule {
         expose(JobKeyMapper.class);
       }
     });
-    install(new InMemStoresModule(keyFactory));
-    install(taskStoreModule);
+    install(taskStoresModule);
     expose(keyFactory.create(CronJobStore.Mutable.class));
     expose(keyFactory.create(TaskStore.Mutable.class));
 
@@ -237,6 +237,8 @@ public final class DbModule extends PrivateModule {
     protected void configure() {
       bindStore(TaskStore.Mutable.class, DbTaskStore.class);
       expose(TaskStore.Mutable.class);
+      bindStore(CronJobStore.Mutable.class, DbCronJobStore.class);
+      expose(DbCronJobStore.Mutable.class);
     }
   }
 

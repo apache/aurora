@@ -94,7 +94,7 @@ public class RowGarbageCollectorTest {
     InsertResult a2Insert = new InsertResult();
     taskConfigMapper.insert(TASK_A2.getAssignedTask().getTask(), a2Insert);
     taskMapper.insertScheduledTask(
-        new ScheduledTaskWrapper(-1, a2Insert.getId(), TASK_A2.newBuilder()));
+        new ScheduledTaskWrapper(a2Insert.getId(), TASK_A2.newBuilder()));
     jobKeyMapper.merge(JOB_B);
     taskConfigMapper.insert(CONFIG_B, new InsertResult());
     rowGc.runOneIteration();

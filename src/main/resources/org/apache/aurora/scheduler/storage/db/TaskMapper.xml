@@ -18,7 +18,7 @@
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.TaskMapper">
   <cache size="10000" readOnly="true" />
-  <insert id="insertScheduledTask" useGeneratedKeys="true" keyColumn="id" keyProperty="taskRowId">
+  <insert id="insertScheduledTask" useGeneratedKeys="true" keyColumn="id" keyProperty="id">
     INSERT INTO tasks (
       task_id,
       slave_row_id,
@@ -84,7 +84,7 @@
   </resultMap>
 
   <resultMap id="taskWrapperMap" type="org.apache.aurora.scheduler.storage.db.views.ScheduledTaskWrapper">
-    <id column="row_id" property="taskRowId"/>
+    <id column="row_id" property="id"/>
     <result column="c_id" property="taskConfigRowId"/>
     <association property="task" resultMap="scheduledTaskMap"/>
   </resultMap>

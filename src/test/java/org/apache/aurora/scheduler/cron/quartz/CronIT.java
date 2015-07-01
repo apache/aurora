@@ -23,11 +23,13 @@ import com.google.inject.util.Modules;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 
-import org.apache.aurora.gen.ExecutorConfig;
+import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
@@ -63,17 +65,7 @@ public class CronIT extends EasyMockTest {
           .setKey(JOB_KEY.newBuilder())
           .setInstanceCount(2)
           .setOwner(IDENTITY)
-          .setTaskConfig(new TaskConfig()
-              .setJobName(JOB_KEY.getName())
-              .setEnvironment(JOB_KEY.getEnvironment())
-              .setOwner(IDENTITY)
-              .setExecutorConfig(new ExecutorConfig()
-                  .setName("cmd.exe")
-                  .setData("echo hello world"))
-              .setNumCpus(7)
-              .setRamMb(8)
-              .setDiskMb(9))
-  );
+          .setTaskConfig(makeTaskConfig()));
 
   private Injector injector;
   private StateManager stateManager;
@@ -102,6 +94,15 @@ public class CronIT extends EasyMockTest {
             bind(Storage.class).toInstance(storage);
           }
         });
+  }
+
+  private static TaskConfig makeTaskConfig() {
+    TaskConfig config = TaskTestUtil.makeConfig(JOB_KEY).newBuilder();
+    config.setIsService(false);
+    // Bypassing a command-line argument in ConfigurationManager that by default disallows the
+    // docker container type.
+    config.setContainer(Container.mesos(new MesosContainer()));
+    return config;
   }
 
   private Service boot() {
