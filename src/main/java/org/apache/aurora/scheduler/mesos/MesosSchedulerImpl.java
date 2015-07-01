@@ -226,7 +226,7 @@ public class MesosSchedulerImpl implements Scheduler {
     eventSink.post(new TaskStatusReceived(
         status.getState(),
         Optional.fromNullable(status.getSource()),
-        Optional.fromNullable(status.getReason()),
+        status.hasReason() ? Optional.of(status.getReason()) : Optional.absent(),
         Optional.fromNullable(status.getTimestamp()).transform(SECONDS_TO_MICROS)));
 
     try {

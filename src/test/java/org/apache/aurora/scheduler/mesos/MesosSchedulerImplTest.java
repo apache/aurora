@@ -109,27 +109,24 @@ public class MesosSchedulerImplTest extends EasyMockTest {
               .setMode(NONE)
               .setAttributes(ImmutableSet.<Attribute>of())));
 
-  private static final TaskStatus.Builder STATUS_BUILDER = TaskStatus.newBuilder()
+  private static final TaskStatus STATUS_NO_REASON = TaskStatus.newBuilder()
       .setState(TaskState.TASK_RUNNING)
       .setSource(Source.SOURCE_SLAVE)
-      // Only testing data plumbing, this field with TASK_RUNNING would not normally happen,
-      .setReason(Reason.REASON_COMMAND_EXECUTOR_FAILED)
       .setMessage("message")
       .setTimestamp(1D)
-      .setTaskId(TaskID.newBuilder().setValue("task-id").build());
-
-  private static final TaskStatus STATUS = STATUS_BUILDER.build();
-
-  private static final TaskStatus STATUS_RECONCILIATION = STATUS_BUILDER
-      .setReason(Reason.REASON_RECONCILIATION)
+      .setTaskId(TaskID.newBuilder().setValue("task-id").build())
       .build();
 
-  private static final TaskStatusReceived PUBSUB_EVENT = new TaskStatusReceived(
-      STATUS.getState(),
-      Optional.of(STATUS.getSource()),
-      Optional.of(STATUS.getReason()),
-      Optional.of(1000000L)
-  );
+  private static final TaskStatus STATUS = STATUS_NO_REASON
+      .toBuilder()
+      // Only testing data plumbing, this field with TASK_RUNNING would not normally happen,
+      .setReason(Reason.REASON_COMMAND_EXECUTOR_FAILED)
+      .build();
+
+  private static final TaskStatus STATUS_RECONCILIATION = STATUS_NO_REASON
+      .toBuilder()
+      .setReason(Reason.REASON_RECONCILIATION)
+      .build();
 
   private static final TaskStatusReceived PUBSUB_RECONCILIATION_EVENT = new TaskStatusReceived(
       STATUS_RECONCILIATION.getState(),
@@ -261,7 +258,12 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new StatusFixture() {
       @Override
       void expectations() {
-        eventSink.post(PUBSUB_EVENT);
+        eventSink.post(new TaskStatusReceived(
+            STATUS.getState(),
+            Optional.of(STATUS.getSource()),
+            Optional.of(STATUS.getReason()),
+            Optional.of(1000000L)
+        ));
         statusHandler.statusUpdate(status);
         expectLastCall().andThrow(new StorageException("Injected."));
       }
@@ -377,7 +379,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       eventSink.post(new TaskStatusReceived(
           status.getState(),
           Optional.fromNullable(status.getSource()),
-          Optional.fromNullable(status.getReason()),
+          status.hasReason() ? Optional.of(status.getReason()) : Optional.absent(),
           Optional.of(1000000L)
       ));
       statusHandler.statusUpdate(status);
