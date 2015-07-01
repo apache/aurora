@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.async.preemptor;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeClock;

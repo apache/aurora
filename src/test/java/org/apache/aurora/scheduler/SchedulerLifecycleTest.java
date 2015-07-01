@@ -29,7 +29,6 @@ import org.apache.aurora.scheduler.SchedulerLifecycle.DelayedActions;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.mesos.Driver;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
@@ -102,14 +101,14 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   }
 
   private void expectLoadStorage() {
-    storageUtil.storage.start(EasyMock.<Quiet>anyObject());
+    storageUtil.storage.start(EasyMock.anyObject());
     storageUtil.expectOperations();
   }
 
   private void expectInitializeDriver() {
     expect(driver.startAsync()).andReturn(driver);
     driver.awaitRunning();
-    delayedActions.blockingDriverJoin(EasyMock.<Runnable>anyObject());
+    delayedActions.blockingDriverJoin(EasyMock.anyObject());
   }
 
   private void expectFullStartup() throws Exception {
@@ -137,7 +136,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     expectLoadStorage();
     Capture<Runnable> triggerFailover = createCapture();
     delayedActions.onAutoFailover(capture(triggerFailover));
-    delayedActions.onRegistrationTimeout(EasyMock.<Runnable>anyObject());
+    delayedActions.onRegistrationTimeout(EasyMock.anyObject());
     expectInitializeDriver();
 
     expectFullStartup();
@@ -160,7 +159,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   public void testRegistrationTimeout() throws Exception {
     storageUtil.storage.prepare();
     expectLoadStorage();
-    delayedActions.onAutoFailover(EasyMock.<Runnable>anyObject());
+    delayedActions.onAutoFailover(EasyMock.anyObject());
     Capture<Runnable> registrationTimeout = createCapture();
     delayedActions.onRegistrationTimeout(capture(registrationTimeout));
     expect(driver.startAsync()).andReturn(driver);
@@ -179,8 +178,8 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   public void testDefeatedBeforeRegistered() throws Exception {
     storageUtil.storage.prepare();
     expectLoadStorage();
-    delayedActions.onAutoFailover(EasyMock.<Runnable>anyObject());
-    delayedActions.onRegistrationTimeout(EasyMock.<Runnable>anyObject());
+    delayedActions.onAutoFailover(EasyMock.anyObject());
+    delayedActions.onRegistrationTimeout(EasyMock.anyObject());
     expect(driver.startAsync()).andReturn(driver);
     driver.awaitRunning();
 
@@ -198,7 +197,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   public void testStorageStartFails() throws Exception {
     storageUtil.storage.prepare();
     storageUtil.expectOperations();
-    storageUtil.storage.start(EasyMock.<Quiet>anyObject());
+    storageUtil.storage.start(EasyMock.anyObject());
     expectLastCall().andThrow(new StorageException("Recovery failed."));
     expectShutdown();
 
@@ -220,7 +219,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     expectLoadStorage();
     Capture<Runnable> triggerFailover = createCapture();
     delayedActions.onAutoFailover(capture(triggerFailover));
-    delayedActions.onRegistrationTimeout(EasyMock.<Runnable>anyObject());
+    delayedActions.onRegistrationTimeout(EasyMock.anyObject());
     expectInitializeDriver();
 
     expectFullStartup();

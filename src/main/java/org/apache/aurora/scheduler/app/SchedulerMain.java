@@ -87,7 +87,7 @@ public class SchedulerMain extends AbstractApplication {
           + "Note: if thermos_executor_path is not the thermos_executor.pex file itself, "
           + "this must include it.")
   private static final Arg<List<String>> THERMOS_EXECUTOR_RESOURCES =
-      Arg.<List<String>>create(ImmutableList.<String>of());
+      Arg.create(ImmutableList.of());
 
   @CmdLine(name = "thermos_executor_flags",
       help = "Extra arguments to be passed to the thermos executor")
@@ -115,7 +115,7 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "extra_modules",
       help = "A list of modules that provide additional functionality.")
   private static final Arg<List<Class<? extends Module>>> EXTRA_MODULES =
-      Arg.create((List<Class<? extends Module>>) ImmutableList.<Class<? extends Module>>of());
+      Arg.create(ImmutableList.of());
 
   // TODO(Suman Karumuri): Rename viz_job_url_prefix to stats_job_url_prefix for consistency.
   @CmdLine(name = "viz_job_url_prefix", help = "URL prefix for job container stats.")
@@ -124,8 +124,7 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "global_container_mounts",
       help = "A comma seperated list of mount points (in host:container form) to mount "
           + "into all (non-mesos) containers.")
-  private static final Arg<List<Volume>> GLOBAL_CONTAINER_MOUNTS =
-      Arg.<List<Volume>>create(ImmutableList.<Volume>of());
+  private static final Arg<List<Volume>> GLOBAL_CONTAINER_MOUNTS = Arg.create(ImmutableList.of());
 
   @Inject private SingletonService schedulerService;
   @Inject private HttpService httpService;

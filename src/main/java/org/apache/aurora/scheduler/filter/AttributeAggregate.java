@@ -126,8 +126,7 @@ public final class AttributeAggregate {
 
   @VisibleForTesting
   public static final AttributeAggregate EMPTY =
-      new AttributeAggregate(Suppliers.<Multiset<Pair<String, String>>>ofInstance(
-          ImmutableMultiset.<Pair<String, String>>of()));
+      new AttributeAggregate(Suppliers.ofInstance(ImmutableMultiset.of()));
 
   /**
    * Gets the total number of tasks with a given attribute name and value combination.

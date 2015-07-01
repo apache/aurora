@@ -279,7 +279,7 @@ public class TaskStateMachineTest {
       new Function<Action, SideEffect>() {
         @Override
         public SideEffect apply(Action action) {
-          return new SideEffect(action, Optional.<ScheduleStatus>absent());
+          return new SideEffect(action, Optional.absent());
         }
       };
 
@@ -332,34 +332,34 @@ public class TaskStateMachineTest {
 
   private static final TransitionResult SAVE = new TransitionResult(
       SUCCESS,
-      ImmutableSet.of(new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent())));
+      ImmutableSet.of(new SideEffect(Action.SAVE_STATE, Optional.absent())));
   private static final TransitionResult SAVE_AND_KILL = new TransitionResult(
       SUCCESS,
       ImmutableSet.of(
-          new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
-          new SideEffect(Action.KILL, Optional.<ScheduleStatus>absent())));
+          new SideEffect(Action.SAVE_STATE, Optional.absent()),
+          new SideEffect(Action.KILL, Optional.absent())));
   private static final TransitionResult SAVE_AND_RESCHEDULE = new TransitionResult(
       SUCCESS,
       ImmutableSet.of(
-          new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
-          new SideEffect(Action.RESCHEDULE, Optional.<ScheduleStatus>absent())));
+          new SideEffect(Action.SAVE_STATE, Optional.absent()),
+          new SideEffect(Action.RESCHEDULE, Optional.absent())));
   private static final TransitionResult SAVE_KILL_AND_RESCHEDULE = new TransitionResult(
       SUCCESS,
       ImmutableSet.of(
-          new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
-          new SideEffect(Action.KILL, Optional.<ScheduleStatus>absent()),
-          new SideEffect(Action.RESCHEDULE, Optional.<ScheduleStatus>absent())));
+          new SideEffect(Action.SAVE_STATE, Optional.absent()),
+          new SideEffect(Action.KILL, Optional.absent()),
+          new SideEffect(Action.RESCHEDULE, Optional.absent())));
   private static final TransitionResult ILLEGAL_KILL = new TransitionResult(
       ILLEGAL_WITH_SIDE_EFFECTS,
-      ImmutableSet.of(new SideEffect(Action.KILL, Optional.<ScheduleStatus>absent())));
+      ImmutableSet.of(new SideEffect(Action.KILL, Optional.absent())));
   private static final TransitionResult RECORD_FAILURE = new TransitionResult(
       SUCCESS,
       ImmutableSet.of(
-          new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
-          new SideEffect(Action.INCREMENT_FAILURES, Optional.<ScheduleStatus>absent())));
+          new SideEffect(Action.SAVE_STATE, Optional.absent()),
+          new SideEffect(Action.INCREMENT_FAILURES, Optional.absent())));
   private static final TransitionResult DELETE_TASK = new TransitionResult(
       SUCCESS,
-      ImmutableSet.of(new SideEffect(Action.DELETE, Optional.<ScheduleStatus>absent())));
+      ImmutableSet.of(new SideEffect(Action.DELETE, Optional.absent())));
 
   private static final class TestCase {
     private final boolean taskPresent;
@@ -539,9 +539,9 @@ public class TaskStateMachineTest {
           TransitionResult expectation = EXPECTATIONS.get(testCase);
           if (expectation == null) {
             if (taskPresent && from == to || !taskPresent && to == DELETED) {
-              expectation = new TransitionResult(NOOP, ImmutableSet.<SideEffect>of());
+              expectation = new TransitionResult(NOOP, ImmutableSet.of());
             } else {
-              expectation = new TransitionResult(ILLEGAL, ImmutableSet.<SideEffect>of());
+              expectation = new TransitionResult(ILLEGAL, ImmutableSet.of());
             }
           }
 

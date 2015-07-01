@@ -159,8 +159,8 @@ public class AopModule extends AbstractModule {
       for (Map.Entry<String, Boolean> toggleMethod : toggleMethods.entrySet()) {
         Predicate<String> enableMethod = Predicates.or(
             toggleMethod.getValue()
-                ? Predicates.<String>alwaysTrue()
-                : Predicates.<String>alwaysFalse(),
+                ? Predicates.alwaysTrue()
+                : Predicates.alwaysFalse(),
             Predicates.not(Predicates.equalTo(toggleMethod.getKey())));
         builder = Predicates.and(builder, enableMethod);
       }

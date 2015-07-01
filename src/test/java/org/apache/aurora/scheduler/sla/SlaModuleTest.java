@@ -26,7 +26,6 @@ import com.google.inject.Key;
 import com.google.inject.Module;
 import com.twitter.common.application.modules.AppLauncherModule;
 import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.base.Supplier;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stat;
@@ -99,8 +98,8 @@ public class SlaModuleTest extends EasyMockTest {
     final CountDownLatch latch = new CountDownLatch(1);
     StatsProvider untracked = createMock(StatsProvider.class);
     expect(statsProvider.untracked()).andReturn(untracked).anyTimes();
-    expect(untracked.makeGauge(EasyMock.anyString(), EasyMock.<Supplier<Number>>anyObject()))
-        .andReturn(EasyMock.<Stat<Number>>anyObject())
+    expect(untracked.makeGauge(EasyMock.anyString(), EasyMock.anyObject()))
+        .andReturn(EasyMock.anyObject())
         .andAnswer(new IAnswer<Stat<Number>>() {
           @Override
           public Stat<Number> answer() throws Throwable {

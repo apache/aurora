@@ -341,7 +341,7 @@ public class TaskVarsTest extends EasyMockTest {
   public void testRackMissing() {
     expectStatusCountersInitialized();
     expect(storageUtil.attributeStore.getHostAttributes("a"))
-        .andReturn(Optional.<IHostAttributes>absent());
+        .andReturn(Optional.absent());
 
     IScheduledTask a = makeTask(JOB_A, RUNNING, "a");
     expectStatExport(jobStatName(a, LOST), untrackedProvider);

@@ -40,7 +40,7 @@ public final class Responses {
    * @return An empty response message.
    */
   public static Response empty() {
-    return new Response().setDetails(Lists.<ResponseDetail>newArrayList());
+    return new Response().setDetails(Lists.newArrayList());
   }
 
   /**

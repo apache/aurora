@@ -130,7 +130,7 @@ public class TaskThrottlerTest extends EasyMockTest {
         Tasks.id(task),
         Optional.of(THROTTLED),
         PENDING,
-        Optional.<String>absent()))
+        Optional.absent()))
         .andReturn(StateChangeResult.SUCCESS);
   }
 

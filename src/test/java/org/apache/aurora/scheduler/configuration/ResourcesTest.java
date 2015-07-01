@@ -84,7 +84,7 @@ public class ResourcesTest {
   @Test
   public void testGetNoPorts() {
     Resource portsResource = createPortRange(Pair.of(1, 5));
-    assertEquals(ImmutableSet.<Integer>of(), Resources.getPorts(createOffer(portsResource), 0));
+    assertEquals(ImmutableSet.of(), Resources.getPorts(createOffer(portsResource), 0));
   }
 
   private static final Resources NEGATIVE_ONE =
@@ -150,7 +150,7 @@ public class ResourcesTest {
 
   @Test
   public void testRangeResourceEmpty() {
-    expectRanges(ImmutableSet.<Pair<Long, Long>>of(), ImmutableSet.<Integer>of());
+    expectRanges(ImmutableSet.of(), ImmutableSet.of());
   }
 
   @Test
@@ -242,7 +242,7 @@ public class ResourcesTest {
             Resources.makeMesosResource(Resources.CPUS, TASK.getNumCpus()),
             Resources.makeMesosResource(Resources.RAM_MB, TASK.getRamMb()),
             Resources.makeMesosResource(Resources.DISK_MB, TASK.getDiskMb())),
-        ImmutableSet.copyOf(resources.toResourceList(ImmutableSet.<Integer>of())));
+        ImmutableSet.copyOf(resources.toResourceList(ImmutableSet.of())));
   }
 
   private void expectRanges(Set<Pair<Long, Long>> expected, Set<Integer> values) {

@@ -126,7 +126,7 @@ public class Resources {
    * @return Mesos resources.
    */
   public List<Resource> toResourceList() {
-    return toResourceList(ImmutableSet.<Integer>of());
+    return toResourceList(ImmutableSet.of());
   }
 
   @Override

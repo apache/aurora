@@ -20,7 +20,6 @@ import javax.inject.Inject;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
@@ -109,7 +108,7 @@ public interface Preemptor {
           stateManager.changeState(
               store,
               toPreempt.getTaskId(),
-              Optional.<ScheduleStatus>absent(),
+              Optional.absent(),
               PREEMPTING,
               Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
         }

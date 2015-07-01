@@ -85,7 +85,7 @@ public class LeaderRedirect {
 
   private Optional<HostAndPort> getLocalHttp() {
     HostAndPort localHttp = httpService.getAddress();
-    return (localHttp == null) ? Optional.<HostAndPort>absent()
+    return (localHttp == null) ? Optional.absent()
         : Optional.of(HostAndPort.fromParts(localHttp.getHostText(), localHttp.getPort()));
   }
 

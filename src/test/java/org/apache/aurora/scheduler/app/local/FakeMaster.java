@@ -68,12 +68,9 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
 
   private static final Logger LOG = Logger.getLogger(FakeMaster.class.getName());
 
-  private final Map<TaskID, Task> activeTasks =
-      Collections.synchronizedMap(Maps.<TaskID, Task>newHashMap());
-  private final Map<OfferID, Offer> idleOffers =
-      Collections.synchronizedMap(Maps.<OfferID, Offer>newHashMap());
-  private final Map<OfferID, Offer> sentOffers =
-      Collections.synchronizedMap(Maps.<OfferID, Offer>newHashMap());
+  private final Map<TaskID, Task> activeTasks = Collections.synchronizedMap(Maps.newHashMap());
+  private final Map<OfferID, Offer> idleOffers = Collections.synchronizedMap(Maps.newHashMap());
+  private final Map<OfferID, Offer> sentOffers = Collections.synchronizedMap(Maps.newHashMap());
 
   private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
   private final CountDownLatch stopped = new CountDownLatch(1);

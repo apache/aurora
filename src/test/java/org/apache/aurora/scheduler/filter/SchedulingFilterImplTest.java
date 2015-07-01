@@ -114,7 +114,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     ITaskConfig noPortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .newBuilder()
-        .setRequestedPorts(ImmutableSet.<String>of()));
+        .setRequestedPorts(ImmutableSet.of()));
     ITaskConfig onePortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .newBuilder()
         .setRequestedPorts(ImmutableSet.of("one")));
@@ -299,7 +299,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     control.replay();
 
     AttributeAggregate stateA = AttributeAggregate.create(
-        Suppliers.<Iterable<IAttribute>>ofInstance(ImmutableList.of(
+        Suppliers.ofInstance(ImmutableList.of(
             host(HOST_A),
             rack(RACK_A),
             host(HOST_B),
@@ -309,7 +309,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
             host(HOST_C),
             rack(RACK_B))));
     AttributeAggregate stateB = AttributeAggregate.create(
-        Suppliers.<Iterable<IAttribute>>ofInstance(ImmutableList.of(
+        Suppliers.ofInstance(ImmutableList.of(
             host(HOST_A),
             rack(RACK_A),
             host(HOST_A),
@@ -407,7 +407,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     ITaskConfig task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
     assertEquals(
-        ImmutableSet.<Veto>of(),
+        ImmutableSet.of(),
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostA),
             new ResourceRequest(task, EMPTY)));
@@ -452,7 +452,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testVetoGroups() {
     control.replay();
 
-    assertEquals(VetoGroup.EMPTY, Veto.identifyGroup(ImmutableSet.<Veto>of()));
+    assertEquals(VetoGroup.EMPTY, Veto.identifyGroup(ImmutableSet.of()));
 
     assertEquals(
         VetoGroup.STATIC,

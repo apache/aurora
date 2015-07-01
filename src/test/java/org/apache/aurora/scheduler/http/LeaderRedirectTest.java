@@ -83,7 +83,7 @@ public class LeaderRedirectTest extends EasyMockTest {
     replayAndMonitor();
     publishSchedulers(localPort(HTTP_PORT));
 
-    assertEquals(Optional.<HostAndPort>absent(), leaderRedirector.getRedirect());
+    assertEquals(Optional.absent(), leaderRedirector.getRedirect());
   }
 
   @Test
@@ -110,7 +110,7 @@ public class LeaderRedirectTest extends EasyMockTest {
   public void testNoLeaders() throws Exception {
     replayAndMonitor();
 
-    assertEquals(Optional.<HostAndPort>absent(), leaderRedirector.getRedirect());
+    assertEquals(Optional.absent(), leaderRedirector.getRedirect());
   }
 
   @Test
@@ -119,7 +119,7 @@ public class LeaderRedirectTest extends EasyMockTest {
 
     publishSchedulers(HostAndPort.fromParts("foobar", 500), HostAndPort.fromParts("baz", 800));
 
-    assertEquals(Optional.<HostAndPort>absent(), leaderRedirector.getRedirect());
+    assertEquals(Optional.absent(), leaderRedirector.getRedirect());
   }
 
   @Test
@@ -131,7 +131,7 @@ public class LeaderRedirectTest extends EasyMockTest {
 
     publishSchedulers(ImmutableSet.of(badLocal));
 
-    assertEquals(Optional.<HostAndPort>absent(), leaderRedirector.getRedirect());
+    assertEquals(Optional.absent(), leaderRedirector.getRedirect());
   }
 
   private HttpServletRequest mockRequest(String attributeValue, String queryString) {

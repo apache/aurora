@@ -146,7 +146,7 @@ final class Tasks {
             .setRamMb(ram.as(Data.MB))
             .setDiskMb(disk.as(Data.MB))
             .setProduction(isProduction)
-            .setRequestedPorts(ImmutableSet.<String>of());
+            .setRequestedPorts(ImmutableSet.of());
         tasks.add(IScheduledTask.build(builder));
       }
 

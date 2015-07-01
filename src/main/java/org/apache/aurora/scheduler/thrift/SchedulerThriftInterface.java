@@ -488,7 +488,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     // Authenticate the session against any affected roles, always including the role for a
     // role-scoped query.
     ImmutableSet.Builder<String> targetRoles = ImmutableSet.builder();
-    Set<IJobKey> keys = JobKeys.from(taskQuery).or(ImmutableSet.<IJobKey>of());
+    Set<IJobKey> keys = JobKeys.from(taskQuery).or(ImmutableSet.of());
     targetRoles.addAll(FluentIterable.from(keys).transform(JobKeys.TO_ROLE));
 
     if (taskQuery.get().isSetRole()) {
@@ -569,7 +569,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
           tasksKilled |= StateChangeResult.SUCCESS == stateManager.changeState(
               storeProvider,
               taskId,
-              Optional.<ScheduleStatus>absent(),
+              Optional.absent(),
               ScheduleStatus.KILLING,
               killedByMessage(context.getIdentity()));
         }
@@ -625,7 +625,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
               stateManager.changeState(
                   storeProvider,
                   taskId,
-                  Optional.<ScheduleStatus>absent(),
+                  Optional.absent(),
                   ScheduleStatus.RESTARTING,
                   restartedByMessage(context.getIdentity()));
             }
@@ -722,7 +722,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         stateManager.changeState(
             storeProvider,
             taskId,
-            Optional.<ScheduleStatus>absent(),
+            Optional.absent(),
             status,
             transitionMessage(context.getIdentity()));
       }

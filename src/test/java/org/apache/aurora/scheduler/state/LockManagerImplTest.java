@@ -120,7 +120,7 @@ public class LockManagerImplTest extends EasyMockTest {
   public void testValidateLockNotStoredNotHeld() throws Exception {
     control.replay();
 
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>empty());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
   }
 
   @Test
@@ -139,7 +139,7 @@ public class LockManagerImplTest extends EasyMockTest {
 
     expectLockException(JOB_KEY);
     lockManager.acquireLock(LOCK_KEY, USER);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>empty());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
   }
 
   @Test
@@ -168,12 +168,12 @@ public class LockManagerImplTest extends EasyMockTest {
 
     expect(storageUtil.storeProvider.getLockStore()).andReturn(storageUtil.lockStore).atLeastOnce();
     expect(storageUtil.lockStore.fetchLock(LOCK_KEY))
-        .andReturn(Optional.<ILock>empty())
+        .andReturn(Optional.empty())
         .atLeastOnce();
 
     final CountDownLatch reads = new CountDownLatch(2);
     EasyMock.makeThreadSafe(storageUtil.storage, false);
-    expect(storageUtil.storage.read(EasyMock.<Work<Object, ?>>anyObject()))
+    expect(storageUtil.storage.read(EasyMock.anyObject()))
         .andAnswer(new IAnswer<Object>() {
           @Override
           public Object answer() throws Throwable {
@@ -198,7 +198,7 @@ public class LockManagerImplTest extends EasyMockTest {
           @Override
           public void run() {
             try {
-              lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>empty());
+              lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
             } catch (LockException e) {
               throw Throwables.propagate(e);
             }
@@ -206,7 +206,7 @@ public class LockManagerImplTest extends EasyMockTest {
         })
         .start();
 
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>empty());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
   }
 
   private void expectLockException(IJobKey key) {

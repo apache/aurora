@@ -119,7 +119,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   // Currently-active updaters. An active updater is one that is rolling forward or back. Paused
   // and completed updates are represented only in storage, not here.
   private final Map<IJobKey, UpdateFactory.Update> updates =
-      Collections.synchronizedMap(Maps.<IJobKey, UpdateFactory.Update>newHashMap());
+      Collections.synchronizedMap(Maps.newHashMap());
 
   @Inject
   JobUpdateControllerImpl(
@@ -340,7 +340,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   public void instanceDeleted(IInstanceKey instance) {
     // This is primarily used to detect when an instance was stuck in PENDING and killed, which
     // results in deletion.
-    instanceChanged(instance, Optional.<IScheduledTask>absent());
+    instanceChanged(instance, Optional.absent());
   }
 
   private void instanceChanged(final IInstanceKey instance, final Optional<IScheduledTask> state) {
@@ -509,7 +509,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
           storeProvider,
           update,
           jobUpdate.getSummary(),
-          ImmutableMap.<Integer, Optional<IScheduledTask>>of());
+          ImmutableMap.of());
     }
   }
 

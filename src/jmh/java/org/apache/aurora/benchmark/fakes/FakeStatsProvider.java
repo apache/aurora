@@ -16,7 +16,6 @@ package org.apache.aurora.benchmark.fakes;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Supplier;
-
 import com.twitter.common.stats.Stat;
 import com.twitter.common.stats.StatsProvider;
 

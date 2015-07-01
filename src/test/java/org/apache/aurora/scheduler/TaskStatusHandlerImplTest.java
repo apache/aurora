@@ -19,10 +19,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
-
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -96,7 +94,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID_A,
-        Optional.<ScheduleStatus>absent(),
+        Optional.absent(),
         RUNNING,
         Optional.of("fake message")))
         .andReturn(StateChangeResult.SUCCESS);
@@ -125,7 +123,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID_A,
-        Optional.<ScheduleStatus>absent(),
+        Optional.absent(),
         RUNNING,
         Optional.of("fake message")))
         .andAnswer(() -> {
@@ -189,7 +187,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
     storageUtil = new StorageTestUtil(this);
     driver = createMock(Driver.class);
-    queue = createMock(BlockingQueue.class);
+    queue = createMock(new Clazz<BlockingQueue<TaskStatus>>() { });
 
     statusHandler = new TaskStatusHandlerImpl(
         storageUtil.storage,
@@ -199,7 +197,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
         1000,
         new CachedCounters(stats));
 
-    expect(queue.add(EasyMock.<TaskStatus>anyObject()))
+    expect(queue.add(EasyMock.anyObject()))
         .andReturn(true);
 
     expect(queue.take())

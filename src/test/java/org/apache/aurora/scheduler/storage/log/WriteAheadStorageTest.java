@@ -115,7 +115,7 @@ public class WriteAheadStorageTest extends EasyMockTest {
 
   @Test
   public void testNoopPruneHistory() {
-    expect(jobUpdateStore.pruneHistory(1, 1)).andReturn(ImmutableSet.<IJobUpdateKey>of());
+    expect(jobUpdateStore.pruneHistory(1, 1)).andReturn(ImmutableSet.of());
 
     control.replay();
 

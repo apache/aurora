@@ -167,17 +167,17 @@ public class DbLockStoreTest {
     ILock lock1 = makeLock(JobKeys.from(role1, env, job).newBuilder(), "token1");
     ILock lock2 = makeLock(JobKeys.from(role2, env, job).newBuilder(), "token2");
 
-    assertEquals(Optional.<ILock>empty(), getLock(lock1.getKey()));
-    assertEquals(Optional.<ILock>empty(), getLock(lock2.getKey()));
+    assertEquals(Optional.empty(), getLock(lock1.getKey()));
+    assertEquals(Optional.empty(), getLock(lock2.getKey()));
 
     saveLocks(StorageEntityUtil.assertFullyPopulated(lock1));
     assertEquals(Optional.of(lock1), getLock(lock1.getKey()));
-    assertEquals(Optional.<ILock>empty(), getLock(lock2.getKey()));
+    assertEquals(Optional.empty(), getLock(lock2.getKey()));
     saveLocks(lock2);
     assertEquals(Optional.of(lock1), getLock(lock1.getKey()));
     assertEquals(Optional.of(lock2), getLock(lock2.getKey()));
     removeLocks(lock1);
-    assertEquals(Optional.<ILock>empty(), getLock(lock1.getKey()));
+    assertEquals(Optional.empty(), getLock(lock1.getKey()));
     assertEquals(Optional.of(lock2), getLock(lock2.getKey()));
   }
 

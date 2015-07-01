@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.metadata;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeTicker;
@@ -113,11 +112,11 @@ public class NearestFitTest {
   }
 
   private Set<Veto> vetoes(Veto... vetoes) {
-    return ImmutableSet.<Veto>builder().add(vetoes).build();
+    return ImmutableSet.copyOf(vetoes);
   }
 
   private void vetoed(Veto... vetoes) {
-    nearest.vetoed(new Vetoed(GROUP_KEY, ImmutableSet.<Veto>builder().add(vetoes).build()));
+    nearest.vetoed(new Vetoed(GROUP_KEY, ImmutableSet.copyOf(vetoes)));
   }
 
   private void assertNearest(Veto... vetoes) {

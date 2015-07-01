@@ -81,7 +81,7 @@ public interface AttributeStore {
     public static Iterable<IAttribute> attributesOrNone(StoreProvider store, String host) {
       Optional<IHostAttributes> attributes = store.getAttributeStore().getHostAttributes(host);
       return attributes.isPresent()
-          ? attributes.get().getAttributes() : ImmutableList.<IAttribute>of();
+          ? attributes.get().getAttributes() : ImmutableList.of();
     }
 
     /**

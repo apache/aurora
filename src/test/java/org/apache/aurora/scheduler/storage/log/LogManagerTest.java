@@ -55,7 +55,6 @@ import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
@@ -115,7 +114,7 @@ public class LogManagerTest extends EasyMockTest {
 
   @Test
   public void testStreamManagerReadFromUnknownNone() throws CodingException {
-    expect(stream.readAll()).andReturn(Iterators.<Log.Entry>emptyIterator());
+    expect(stream.readAll()).andReturn(Iterators.emptyIterator());
 
     Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() { });
 

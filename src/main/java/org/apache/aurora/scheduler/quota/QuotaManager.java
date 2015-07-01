@@ -167,7 +167,7 @@ public interface QuotaManager {
 
     @Override
     public QuotaInfo getQuotaInfo(String role, StoreProvider storeProvider) {
-      return getQuotaInfo(role, Optional.<IJobUpdate>absent(), storeProvider);
+      return getQuotaInfo(role, Optional.absent(), storeProvider);
     }
 
     @Override
@@ -215,7 +215,7 @@ public interface QuotaManager {
       }
 
       QuotaInfo quotaInfo =
-          getQuotaInfo(cronConfig.getKey().getRole(), Optional.<IJobUpdate>absent(), storeProvider);
+          getQuotaInfo(cronConfig.getKey().getRole(), Optional.absent(), storeProvider);
 
       Optional<IJobConfiguration> oldCron =
           storeProvider.getCronJobStore().fetchJob(cronConfig.getKey());
@@ -375,7 +375,7 @@ public interface QuotaManager {
             RangeSet<Integer> initialInstances = getInstanceIds(instructions.getInitialState());
             RangeSet<Integer> desiredInstances = getInstanceIds(instructions.isSetDesiredState()
                 ? ImmutableSet.of(instructions.getDesiredState())
-                : ImmutableSet.<IInstanceTaskConfig>of());
+                : ImmutableSet.of());
 
             int instanceId = task.getInstanceId();
             return !initialInstances.contains(instanceId) && !desiredInstances.contains(instanceId);

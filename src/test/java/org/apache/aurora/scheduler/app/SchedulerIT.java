@@ -91,7 +91,6 @@ import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
-import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Status;
@@ -126,7 +125,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
   private static final DriverSettings SETTINGS = new DriverSettings(
       "fakemaster",
-      Optional.<Protos.Credential>absent(),
+      Optional.absent(),
       FrameworkInfo.newBuilder()
           .setUser("framework user")
           .setName("test framework")
@@ -135,7 +134,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private ExecutorService executor = Executors.newCachedThreadPool(
       new ThreadFactoryBuilder().setNameFormat("SchedulerIT-%d").setDaemon(true).build());
   private AtomicReference<Optional<RuntimeException>> mainException =
-      Atomics.newReference(Optional.<RuntimeException>absent());
+      Atomics.newReference(Optional.absent());
 
   private IMocksControl control;
   private Injector injector;
@@ -347,7 +346,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
     expect(logStream.readAll()).andReturn(recoveredEntries.iterator()).anyTimes();
     // An empty saveTasks is an artifact of the fact that mutateTasks always writes a log operation
     // even if nothing is changed.
-    streamMatcher.expectTransaction(Op.saveTasks(new SaveTasks(ImmutableSet.<ScheduledTask>of())))
+    streamMatcher.expectTransaction(Op.saveTasks(new SaveTasks(ImmutableSet.of())))
         .andReturn(nextPosition());
     streamMatcher.expectTransaction(Op.saveFrameworkId(new SaveFrameworkId(FRAMEWORK_ID)))
         .andReturn(nextPosition());

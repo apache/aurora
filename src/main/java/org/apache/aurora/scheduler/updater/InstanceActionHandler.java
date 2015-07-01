@@ -107,7 +107,7 @@ interface InstanceActionHandler {
       stateManager.changeState(
           storeProvider,
           taskId,
-          Optional.<ScheduleStatus>absent(),
+          Optional.absent(),
           ScheduleStatus.KILLING,
           Optional.of("Killed for job update."));
       return Amount.of(

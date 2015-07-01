@@ -24,7 +24,6 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import org.easymock.EasyMock;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSManager;
-import org.ietf.jgss.GSSName;
 import org.ietf.jgss.Oid;
 import org.junit.Before;
 import org.junit.Test;
@@ -58,7 +57,7 @@ public class Kerberos5ShiroRealmModuleTest extends EasyMockTest {
     expect(serverKeytab.getAbsolutePath()).andReturn("path.keytab");
     expect(
         gssManager.createCredential(
-            EasyMock.<GSSName>isNull(),
+            EasyMock.isNull(),
             eq(GSSCredential.INDEFINITE_LIFETIME),
             anyObject(Oid[].class),
             eq(GSSCredential.ACCEPT_ONLY)))

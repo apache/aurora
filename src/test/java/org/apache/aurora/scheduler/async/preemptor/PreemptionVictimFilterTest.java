@@ -21,7 +21,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -358,8 +357,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a1);
 
-    expect(storageUtil.attributeStore.getHostAttributes(HOST))
-        .andReturn(Optional.<IHostAttributes>absent());
+    expect(storageUtil.attributeStore.getHostAttributes(HOST)).andReturn(Optional.absent());
 
     control.replay();
 
@@ -429,15 +427,15 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   }
 
   private IExpectationSetters<Set<SchedulingFilter.Veto>> expectFiltering() {
-    return expectFiltering(Optional.<Veto>absent());
+    return expectFiltering(Optional.absent());
   }
 
   private IExpectationSetters<Set<SchedulingFilter.Veto>> expectFiltering(
       final Optional<Veto> veto) {
 
     return expect(schedulingFilter.filter(
-        EasyMock.<SchedulingFilter.UnusedResource>anyObject(),
-        EasyMock.<SchedulingFilter.ResourceRequest>anyObject()))
+        EasyMock.anyObject(),
+        EasyMock.anyObject()))
         .andAnswer(
             new IAnswer<Set<SchedulingFilter.Veto>>() {
               @Override

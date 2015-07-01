@@ -344,7 +344,7 @@ class MemTaskStore implements TaskStore.Mutable {
    */
   private static class SecondaryIndex<K> {
     private final Multimap<K, String> index =
-        Multimaps.synchronizedSetMultimap(HashMultimap.<K, String>create());
+        Multimaps.synchronizedSetMultimap(HashMultimap.create());
     private final Function<IScheduledTask, K> indexer;
     private final Function<Query.Builder, Optional<Set<K>>> queryExtractor;
     private final AtomicLong hitCount;

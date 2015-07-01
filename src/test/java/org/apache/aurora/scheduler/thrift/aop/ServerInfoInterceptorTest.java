@@ -21,7 +21,6 @@ import com.google.inject.matcher.Matchers;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.GetJobsResult;
-import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.ServerInfo;
@@ -73,8 +72,7 @@ public class ServerInfoInterceptorTest extends EasyMockTest {
         new ServerInfo().setClusterName("FAKECLUSTER").setThriftAPIVersion(100000);
 
     Response response = okResponse(
-        Result.getJobsResult(
-            new GetJobsResult().setConfigs(ImmutableSet.<JobConfiguration>of())))
+        Result.getJobsResult(new GetJobsResult().setConfigs(ImmutableSet.of())))
         .setServerInfo(previousServerInfo);
 
     expect(realThrift.getJobs(ROLE)).andReturn(response);

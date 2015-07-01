@@ -61,7 +61,7 @@ class LoggingInterceptor implements MethodInterceptor {
   }
 
   private final Map<Class<?>, Function<Object, String>> printFunctions =
-      ImmutableMap.<Class<?>, Function<Object, String>>of(
+      ImmutableMap.of(
           JobConfiguration.class,
           new Function<Object, String>() {
             @Override

@@ -20,13 +20,13 @@ import static org.apache.aurora.scheduler.updater.InstanceActionHandler.KillTask
 import static org.apache.aurora.scheduler.updater.InstanceActionHandler.WatchRunningTask;
 
 enum InstanceAction {
-  KILL_TASK(Optional.<InstanceActionHandler>of(new KillTask())),
+  KILL_TASK(Optional.of(new KillTask())),
   // TODO(wfarner): Build this action into the scheduler state machine instead.  Rather than
   // killing a task and re-recreating it, choose the updated or rolled-back task when we are
   // deciding to reschedule the task.
-  ADD_TASK(Optional.<InstanceActionHandler>of(new AddTask())),
-  WATCH_TASK(Optional.<InstanceActionHandler>of(new WatchRunningTask())),
-  AWAIT_STATE_CHANGE(Optional.<InstanceActionHandler>absent());
+  ADD_TASK(Optional.of(new AddTask())),
+  WATCH_TASK(Optional.of(new WatchRunningTask())),
+  AWAIT_STATE_CHANGE(Optional.absent());
 
   private final Optional<InstanceActionHandler> handler;
 

@@ -241,13 +241,13 @@ public class PendingTaskProcessorTest extends EasyMockTest {
   private void expectSlotSearch(ITaskConfig config, IScheduledTask... victims) {
     expect(preemptionVictimFilter.filterPreemptionVictims(
         eq(config),
-        EasyMock.<Iterable<PreemptionVictim>>anyObject(),
+        EasyMock.anyObject(),
         anyObject(AttributeAggregate.class),
-        EasyMock.<Optional<HostOffer>>anyObject(),
+        EasyMock.anyObject(),
         eq(storageUtil.storeProvider)));
     expectLastCall().andReturn(
         victims.length == 0
-            ? Optional.<ImmutableSet<PreemptionVictim>>absent()
+            ? Optional.absent()
             : Optional.of(ImmutableSet.copyOf(getVictims(victims).values())))
         .anyTimes();
   }

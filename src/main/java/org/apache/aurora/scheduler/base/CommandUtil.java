@@ -71,7 +71,7 @@ public final class CommandUtil {
         executorUri,
         executorResources,
         "./",
-        Optional.<String>absent()).build();
+        Optional.absent()).build();
   }
 
   /**

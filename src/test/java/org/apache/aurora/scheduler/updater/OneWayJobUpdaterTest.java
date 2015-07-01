@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
 import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
 import org.junit.Before;
 import org.junit.Test;
@@ -76,7 +75,7 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
   private void evaluate(OneWayStatus expectedStatus, Map<Integer, SideEffect> expectedSideEffects) {
     assertEquals(
         new EvaluationResult<>(expectedStatus, expectedSideEffects),
-        jobUpdater.evaluate(ImmutableMap.<Integer, String>of(), stateProvider));
+        jobUpdater.evaluate(ImmutableMap.of(), stateProvider));
   }
 
   private void evaluate(
@@ -112,14 +111,14 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
     return new SideEffect(
         Optional.of(action),
         ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build(),
-        Optional.<Failure>absent());
+        Optional.absent());
   }
 
   private static SideEffect sideEffect(InstanceUpdateStatus... statuses) {
     return new SideEffect(
-        Optional.<InstanceAction>absent(),
+        Optional.absent(),
         ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build(),
-        Optional.<Failure>absent());
+        Optional.absent());
   }
 
   @Test
@@ -215,7 +214,7 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
 
     // The updater should now reject further attempts to evaluate.
     try {
-      jobUpdater.evaluate(ImmutableMap.<Integer, String>of(), stateProvider);
+      jobUpdater.evaluate(ImmutableMap.of(), stateProvider);
       fail();
     } catch (IllegalStateException e) {
       // Expected.
@@ -229,7 +228,7 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
     expect(strategy.getNextGroup(ImmutableSet.of(1, 2, 3), EMPTY))
         .andReturn(ImmutableSet.of(1));
     expect(strategy.getNextGroup(ImmutableSet.of(2, 3), ImmutableSet.of(1)))
-        .andReturn(ImmutableSet.<Integer>of());
+        .andReturn(ImmutableSet.of());
     String s0 = "0";
     String s1 = "1";
     expectFetchAndEvaluate(
@@ -259,7 +258,7 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
         0,
         s0,
         OneWayStatus.WORKING,
-        ImmutableMap.<Integer, SideEffect>of());
+        ImmutableMap.of());
   }
 
   @Test

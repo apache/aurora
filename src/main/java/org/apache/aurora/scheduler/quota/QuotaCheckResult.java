@@ -60,7 +60,7 @@ public class QuotaCheckResult {
 
   @VisibleForTesting
   public QuotaCheckResult(Result result) {
-    this(result, Optional.<String>absent());
+    this(result, Optional.absent());
   }
 
   private QuotaCheckResult(Result result, Optional<String> details) {

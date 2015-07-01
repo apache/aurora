@@ -50,10 +50,10 @@ public class ThriftAuthModule extends AbstractModule {
 
   @CmdLine(name = "auth_module",
       help = "A Guice module to provide auth bindings. NOTE: The default is unsecure.")
-  private static final Arg<Module> AUTH_MODULE = Arg.<Module>create(new UnsecureAuthModule());
+  private static final Arg<Module> AUTH_MODULE = Arg.create(new UnsecureAuthModule());
 
   private static final Iterable<Class<?>> AUTH_MODULE_CLASSES =
-      ImmutableList.<Class<?>>of(SessionValidator.class, CapabilityValidator.class);
+      ImmutableList.of(SessionValidator.class, CapabilityValidator.class);
 
   private Map<Capability, String> capabilities;
   private final Module authModule;

@@ -234,7 +234,7 @@ public class InstanceUpdaterTest {
   public void testInvalidInput() {
     TestFixture f = new TestFixture(NEW, 1);
     ScheduledTask noEvents = new TaskUtil(new FakeClock())
-        .makeTask(OLD, RUNNING).newBuilder().setTaskEvents(ImmutableList.<TaskEvent>of());
+        .makeTask(OLD, RUNNING).newBuilder().setTaskEvents(ImmutableList.of());
     f.updater.evaluate(Optional.of(IScheduledTask.build(noEvents)));
   }
 

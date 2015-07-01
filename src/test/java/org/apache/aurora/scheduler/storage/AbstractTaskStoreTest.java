@@ -200,12 +200,12 @@ public abstract class AbstractTaskStoreTest {
     // Explicitly call out the current differing behaviors for types of empty query conditions.
     // Specifically - null task IDs and empty task IDs are different than other 'IN' conditions..
     assertQueryResults(new TaskQuery().setTaskIds(null), TASK_A, TASK_B, TASK_C, TASK_D);
-    assertQueryResults(new TaskQuery().setTaskIds(ImmutableSet.<String>of()));
+    assertQueryResults(new TaskQuery().setTaskIds(ImmutableSet.of()));
     assertQueryResults(
-        new TaskQuery().setInstanceIds(ImmutableSet.<Integer>of()),
+        new TaskQuery().setInstanceIds(ImmutableSet.of()),
         TASK_A, TASK_B, TASK_C, TASK_D);
     assertQueryResults(
-        new TaskQuery().setStatuses(ImmutableSet.<ScheduleStatus>of()),
+        new TaskQuery().setStatuses(ImmutableSet.of()),
         TASK_A, TASK_B, TASK_C, TASK_D);
   }
 
@@ -526,7 +526,7 @@ public abstract class AbstractTaskStoreTest {
 
   @Test
   public void testGetsJobKeys() {
-    assertEquals(ImmutableSet.<IJobKey>of(), getJobKeys());
+    assertEquals(ImmutableSet.of(), getJobKeys());
     saveTasks(TASK_A);
     assertEquals(toJobKeys(TASK_A), getJobKeys());
     saveTasks(TASK_B, TASK_C);

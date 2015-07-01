@@ -83,7 +83,7 @@ class Kerberos5Realm implements Realm {
             new KerberosPrincipal(context.getSrcName().toString());
         return new SimpleAuthenticationInfo(
             new SimplePrincipalCollection(
-                ImmutableList.<Object>of(
+                ImmutableList.of(
                     // We assume there's a single Kerberos realm in use here. Most Authorizer
                     // implementations care about the "simple" username instead of the full
                     // principal.

@@ -35,7 +35,7 @@ public class SchedulerDriverServiceTest extends EasyMockTest {
 
   private static final DriverSettings SETTINGS = new DriverSettings(
       "fakemaster",
-      Optional.<Protos.Credential>absent(),
+      Optional.absent(),
       FrameworkInfo.newBuilder()
           .setUser("framework user")
           .setName("test framework")

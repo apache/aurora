@@ -22,7 +22,6 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.GetJobsResult;
-import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
@@ -63,7 +62,7 @@ public class ThriftStatsExporterInterceptorTest extends EasyMockTest {
   public void testIncrementStat() throws Exception {
     Response response = new Response().setResponseCode(OK)
         .setResult(Result.getJobsResult(new GetJobsResult()
-        .setConfigs(ImmutableSet.<JobConfiguration>of())));
+        .setConfigs(ImmutableSet.of())));
 
     expect(realThrift.getJobs(ROLE)).andReturn(response);
     control.replay();

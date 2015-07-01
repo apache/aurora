@@ -390,7 +390,7 @@ public class LogStorageTest extends EasyMockTest {
       expect(entry.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(logEntry));
     }
 
-    storageUtil.storage.bulkLoad(EasyMock.<MutateWork.NoResult<?>>anyObject());
+    storageUtil.storage.bulkLoad(EasyMock.anyObject());
     expectLastCall().andAnswer(new IAnswer<MutateWork.NoResult<?>>() {
       @Override
       public NoResult<?> answer() throws Throwable {
@@ -444,7 +444,7 @@ public class LogStorageTest extends EasyMockTest {
         }
       });
 
-      storageUtil.storage.bulkLoad(EasyMock.<MutateWork.NoResult<?>>anyObject());
+      storageUtil.storage.bulkLoad(EasyMock.anyObject());
       expectLastCall().andAnswer(new IAnswer<MutateWork.NoResult<?>>() {
         @Override
         public NoResult<?> answer() throws Throwable {
@@ -453,7 +453,7 @@ public class LogStorageTest extends EasyMockTest {
           return null;
         }
       });
-      expect(stream.readAll()).andReturn(Iterators.<Entry>emptyIterator());
+      expect(stream.readAll()).andReturn(Iterators.emptyIterator());
       final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
       expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
           new IAnswer<Void>() {
@@ -865,7 +865,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         expect(storageUtil.attributeStore.getHostAttributes(host))
-            .andReturn(Optional.<IHostAttributes>absent());
+            .andReturn(Optional.absent());
 
         expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
 
@@ -884,7 +884,7 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
         AttributeStore.Mutable store = storeProvider.getAttributeStore();
-        assertEquals(Optional.<IHostAttributes>absent(), store.getHostAttributes(host));
+        assertEquals(Optional.absent(), store.getHostAttributes(host));
 
         assertTrue(store.saveHostAttributes(hostAttributes.get()));
 
@@ -904,7 +904,7 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testSaveUpdateWithNullLockToken() throws Exception {
-    saveAndAssertJobUpdate(Optional.<String>absent());
+    saveAndAssertJobUpdate(Optional.absent());
   }
 
   private void saveAndAssertJobUpdate(final Optional<String> lockToken)

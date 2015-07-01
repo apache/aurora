@@ -160,7 +160,7 @@ public class StorageTransactionTest extends TearDownTestCase {
       @Override
       public Void apply(StoreProvider storeProvider) {
         // If the previous write was under a transaction then there would be no quota records.
-        assertEquals(ImmutableMap.<String, IResourceAggregate>of(),
+        assertEquals(ImmutableMap.of(),
             storeProvider.getQuotaStore().fetchQuotas());
         return null;
       }

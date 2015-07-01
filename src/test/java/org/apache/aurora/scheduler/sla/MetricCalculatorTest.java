@@ -19,10 +19,8 @@ import java.util.Set;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
-import com.twitter.common.base.Supplier;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.Stat;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
@@ -62,8 +60,8 @@ public class MetricCalculatorTest extends EasyMockTest {
     expect(statsProvider.untracked()).andReturn(untracked).anyTimes();
 
     Capture<String> names = new Capture<>(CaptureType.ALL);
-    expect(untracked.makeGauge(EasyMock.capture(names), EasyMock.<Supplier<Number>>anyObject()))
-        .andReturn(EasyMock.<Stat<Number>>anyObject())
+    expect(untracked.makeGauge(EasyMock.capture(names), EasyMock.anyObject()))
+        .andReturn(EasyMock.anyObject())
         .anyTimes();
 
     IScheduledTask task1 = makeTask(ImmutableMap.of(clock.nowMillis() - 1000, PENDING), 0);

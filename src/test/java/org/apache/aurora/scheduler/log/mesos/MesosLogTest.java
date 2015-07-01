@@ -275,9 +275,9 @@ public class MesosLogTest extends EasyMockTest {
     Position end = expectWrite(DUMMY_CONTENT, 3);
     expectDiscoverEntryRange(beginning, end);
     // SKipped entries.
-    expectRead(beginning).andReturn(ImmutableList.<Log.Entry>of());
-    expectRead(middle).andReturn(ImmutableList.<Log.Entry>of());
-    expectRead(end).andReturn(ImmutableList.<Log.Entry>of());
+    expectRead(beginning).andReturn(ImmutableList.of());
+    expectRead(middle).andReturn(ImmutableList.of());
+    expectRead(end).andReturn(ImmutableList.of());
 
     control.replay();
 

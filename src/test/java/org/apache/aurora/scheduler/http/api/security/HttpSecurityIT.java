@@ -89,10 +89,10 @@ public class HttpSecurityIT extends JettyServerModuleTest {
       new UsernamePasswordCredentials("nobody", "12345");
 
   private static final Set<Credentials> INVALID_CREDENTIALS =
-      ImmutableSet.<Credentials>of(INCORRECT, NONEXISTENT);
+      ImmutableSet.of(INCORRECT, NONEXISTENT);
 
   private static final Set<Credentials> VALID_CREDENTIALS =
-      ImmutableSet.<Credentials>of(ROOT, WFARNER, UNPRIVILEGED, BACKUP_SERVICE);
+      ImmutableSet.of(ROOT, WFARNER, UNPRIVILEGED, BACKUP_SERVICE);
 
   private static final IJobKey ADS_STAGING_JOB = JobKeys.from("ads", "staging", "job");
 

@@ -21,10 +21,8 @@ import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.ibatis.exceptions.PersistenceException;
@@ -69,7 +67,7 @@ public class DbStorageTest extends EasyMockTest {
 
   @Test(expected = StorageException.class)
   public void testReadFails() {
-    expect(readWork.apply(EasyMock.<StoreProvider>anyObject()))
+    expect(readWork.apply(EasyMock.anyObject()))
         .andThrow(new PersistenceException());
 
     control.replay();
@@ -79,7 +77,7 @@ public class DbStorageTest extends EasyMockTest {
 
   @Test
   public void testRead() {
-    expect(readWork.apply(EasyMock.<StoreProvider>anyObject())).andReturn("hi");
+    expect(readWork.apply(EasyMock.anyObject())).andReturn("hi");
 
     control.replay();
 
@@ -101,7 +99,7 @@ public class DbStorageTest extends EasyMockTest {
   public void testBulkLoad() {
     expect(sessionFactory.openSession(false)).andReturn(session);
     expect(session.update(DbStorage.DISABLE_UNDO_LOG)).andReturn(0);
-    writeWork.apply(EasyMock.<MutableStoreProvider>anyObject());
+    writeWork.apply(EasyMock.anyObject());
     session.close();
     expect(session.update(DbStorage.ENABLE_UNDO_LOG)).andReturn(0);
 

@@ -70,7 +70,7 @@ public class HttpSecurityModule extends ServletModule {
 
   @CmdLine(name = "shiro_realm_modules",
       help = "Guice modules for configuring Shiro Realms.")
-  private static final Arg<Set<Module>> SHIRO_REALM_MODULE = Arg.<Set<Module>>create(
+  private static final Arg<Set<Module>> SHIRO_REALM_MODULE = Arg.create(
       ImmutableSet.of(Modules.lazilyInstantiated(IniShiroRealmModule.class)));
 
   @VisibleForTesting

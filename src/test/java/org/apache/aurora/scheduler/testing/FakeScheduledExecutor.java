@@ -48,10 +48,10 @@ public final class FakeScheduledExecutor extends FakeClock {
     mock.schedule(
         EasyMock.<Runnable>anyObject(),
         EasyMock.anyLong(),
-        EasyMock.<TimeUnit>anyObject());
+        EasyMock.anyObject());
     expectLastCall().andAnswer(answerSchedule(executor)).anyTimes();
 
-    mock.execute(EasyMock.<Runnable>anyObject());
+    mock.execute(EasyMock.anyObject());
     expectLastCall().andAnswer(answerExecute()).anyTimes();
 
     return executor;
@@ -101,10 +101,10 @@ public final class FakeScheduledExecutor extends FakeClock {
 
     FakeScheduledExecutor executor = new FakeScheduledExecutor();
     mock.scheduleAtFixedRate(
-        EasyMock.<Runnable>anyObject(),
+        EasyMock.anyObject(),
         EasyMock.anyLong(),
         EasyMock.anyLong(),
-        EasyMock.<TimeUnit>anyObject());
+        EasyMock.anyObject());
     expectLastCall()
         .andAnswer(answerScheduleAtFixedRate(executor, maxInvocations))
         .times(maxSchedules);

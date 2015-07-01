@@ -46,7 +46,7 @@ public class LocalSchedulerMain extends SchedulerMain {
 
   private static final DriverSettings DRIVER_SETTINGS = new DriverSettings(
       "fakemaster",
-      Optional.<Protos.Credential>absent(),
+      Optional.absent(),
       Protos.FrameworkInfo.newBuilder()
           .setUser("framework user")
           .setName("test framework")

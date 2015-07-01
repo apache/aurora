@@ -123,8 +123,8 @@ final class Fixtures {
         .setRamMb(1024)
         .setDiskMb(1024)
         .setProduction(production)
-        .setRequestedPorts(ImmutableSet.<String>of())
-        .setTaskLinks(ImmutableMap.<String, String>of())
+        .setRequestedPorts(ImmutableSet.of())
+        .setTaskLinks(ImmutableMap.of())
         .setMaxTaskFailures(1)
         .setContainer(Container.mesos(new MesosContainer()));
   }

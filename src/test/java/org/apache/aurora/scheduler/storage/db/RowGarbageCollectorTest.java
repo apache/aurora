@@ -26,7 +26,6 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.db.views.ScheduledTaskWrapper;
-import org.apache.aurora.scheduler.storage.db.views.TaskConfigRow;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -79,15 +78,15 @@ public class RowGarbageCollectorTest {
   @Test
   public void testGarbageCollection() {
     rowGc.runOneIteration();
-    assertEquals(ImmutableList.<JobKey>of(), jobKeyMapper.selectAll());
-    assertEquals(ImmutableList.<TaskConfigRow>of(), taskConfigMapper.selectConfigsByJob(JOB_A));
-    assertEquals(ImmutableList.<TaskConfigRow>of(), taskConfigMapper.selectConfigsByJob(JOB_B));
+    assertEquals(ImmutableList.of(), jobKeyMapper.selectAll());
+    assertEquals(ImmutableList.of(), taskConfigMapper.selectConfigsByJob(JOB_A));
+    assertEquals(ImmutableList.of(), taskConfigMapper.selectConfigsByJob(JOB_B));
 
     jobKeyMapper.merge(JOB_A);
     rowGc.runOneIteration();
-    assertEquals(ImmutableList.<JobKey>of(), jobKeyMapper.selectAll());
-    assertEquals(ImmutableList.<TaskConfigRow>of(), taskConfigMapper.selectConfigsByJob(JOB_A));
-    assertEquals(ImmutableList.<TaskConfigRow>of(), taskConfigMapper.selectConfigsByJob(JOB_B));
+    assertEquals(ImmutableList.of(), jobKeyMapper.selectAll());
+    assertEquals(ImmutableList.of(), taskConfigMapper.selectConfigsByJob(JOB_A));
+    assertEquals(ImmutableList.of(), taskConfigMapper.selectConfigsByJob(JOB_B));
 
     jobKeyMapper.merge(JOB_A);
     taskConfigMapper.insert(CONFIG_A, new InsertResult());
@@ -106,6 +105,6 @@ public class RowGarbageCollectorTest {
         TASK_A2.getAssignedTask().getTask().getRamMb(),
         Iterables.getOnlyElement(taskConfigMapper.selectConfigsByJob(JOB_A))
             .getConfig().getRamMb());
-    assertEquals(ImmutableList.<TaskConfigRow>of(), taskConfigMapper.selectConfigsByJob(JOB_B));
+    assertEquals(ImmutableList.of(), taskConfigMapper.selectConfigsByJob(JOB_B));
   }
 }

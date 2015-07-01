@@ -28,7 +28,6 @@ import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
@@ -94,7 +93,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
               .setHost(SLAVE_HOST)
               .setSlaveId(SLAVE_ID.getValue())
               .setMode(NONE)
-              .setAttributes(ImmutableSet.<Attribute>of())));
+              .setAttributes(ImmutableSet.of())));
   private static final OfferID OFFER_ID_2 = OfferID.newBuilder().setValue("offer-id-2").build();
   private static final HostOffer OFFER_2 = new HostOffer(
       Offer.newBuilder(OFFER.getOffer())
@@ -107,7 +106,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
               .setHost(SLAVE_HOST_2)
               .setSlaveId(SLAVE_ID_2.getValue())
               .setMode(NONE)
-              .setAttributes(ImmutableSet.<Attribute>of())));
+              .setAttributes(ImmutableSet.of())));
 
   private static final TaskStatus STATUS_NO_REASON = TaskStatus.newBuilder()
       .setState(TaskState.TASK_RUNNING)
@@ -178,7 +177,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     control.replay();
 
     // Should fail since the scheduler is not yet registered.
-    scheduler.resourceOffers(driver, ImmutableList.<Offer>of());
+    scheduler.resourceOffers(driver, ImmutableList.of());
   }
 
   @Test
@@ -186,7 +185,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new RegisteredFixture() {
       @Override
       void test() {
-        scheduler.resourceOffers(driver, ImmutableList.<Offer>of());
+        scheduler.resourceOffers(driver, ImmutableList.of());
       }
     }.run();
   }
@@ -388,7 +387,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   private void expectOfferAttributesSaved(HostOffer offer) {
     expect(storageUtil.attributeStore.getHostAttributes(offer.getOffer().getHostname()))
-        .andReturn(Optional.<IHostAttributes>absent());
+        .andReturn(Optional.absent());
     IHostAttributes defaultMode = IHostAttributes.build(
         Conversions.getAttributes(offer.getOffer()).newBuilder().setMode(MaintenanceMode.NONE));
     expect(storageUtil.attributeStore.saveHostAttributes(defaultMode)).andReturn(true);

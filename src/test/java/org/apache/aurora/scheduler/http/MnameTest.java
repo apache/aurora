@@ -149,9 +149,9 @@ public class MnameTest extends JettyServerModuleTest {
   public void testRedirectPort() {
     replayAndStart();
 
-    assertEquals(Optional.<Integer>absent(), getRedirectPort(null));
-    assertEquals(Optional.<Integer>absent(), getRedirectPort(ImmutableMap.<String, Integer>of()));
-    assertEquals(Optional.<Integer>absent(), getRedirectPort(ImmutableMap.of("thrift", 5)));
+    assertEquals(Optional.absent(), getRedirectPort(null));
+    assertEquals(Optional.absent(), getRedirectPort(ImmutableMap.of()));
+    assertEquals(Optional.absent(), getRedirectPort(ImmutableMap.of("thrift", 5)));
     assertEquals(Optional.of(5), getRedirectPort(ImmutableMap.of("health", 5, "http", 6)));
     assertEquals(Optional.of(6), getRedirectPort(ImmutableMap.of("http", 6)));
     assertEquals(Optional.of(7), getRedirectPort(ImmutableMap.of("HTTP", 7)));

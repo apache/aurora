@@ -33,7 +33,6 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 
-import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.MesosContainer;
@@ -62,7 +61,7 @@ public final class ConfigurationManager {
   @CmdLine(name = "allowed_container_types",
       help = "Container types that are allowed to be used by jobs.")
   private static final Arg<List<Container._Fields>> ALLOWED_CONTAINER_TYPES =
-      Arg.<List<Container._Fields>>create(ImmutableList.of(Container._Fields.MESOS));
+      Arg.create(ImmutableList.of(Container._Fields.MESOS));
 
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
 
@@ -128,20 +127,20 @@ public final class ConfigurationManager {
   }
 
   private static final Iterable<Closure<TaskConfig>> DEFAULT_FIELD_POPULATORS =
-      ImmutableList.<Closure<TaskConfig>>of(
+      ImmutableList.of(
           new DefaultField(_Fields.IS_SERVICE, false),
           new DefaultField(_Fields.PRIORITY, 0),
           new DefaultField(_Fields.PRODUCTION, false),
           new DefaultField(_Fields.MAX_TASK_FAILURES, 1),
-          new DefaultField(_Fields.TASK_LINKS, Maps.<String, String>newHashMap()),
-          new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()),
-          new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()),
+          new DefaultField(_Fields.TASK_LINKS, Maps.newHashMap()),
+          new DefaultField(_Fields.REQUESTED_PORTS, Sets.newHashSet()),
+          new DefaultField(_Fields.CONSTRAINTS, Sets.newHashSet()),
           // TODO(wfarner): Explore replacing these with thrift defaults.
           new DefaultField(_Fields.CONTAINER,
               Container.mesos(new MesosContainer())));
 
   private static final Iterable<RequiredFieldValidator<?>> REQUIRED_FIELDS_VALIDATORS =
-      ImmutableList.<RequiredFieldValidator<?>>of(
+      ImmutableList.of(
           new RequiredFieldValidator<>(_Fields.NUM_CPUS, new GreaterThan(0.0, "num_cpus")),
           new RequiredFieldValidator<>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")),
           new RequiredFieldValidator<>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")));
@@ -269,7 +268,7 @@ public final class ConfigurationManager {
     TaskConfig builder = config.newBuilder();
 
     if (!builder.isSetRequestedPorts()) {
-      builder.setRequestedPorts(ImmutableSet.<String>of());
+      builder.setRequestedPorts(ImmutableSet.of());
     }
 
     maybeFillLinks(builder);

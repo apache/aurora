@@ -50,8 +50,8 @@ public class DbQuotaStoreTest {
 
   @Test
   public void testCrud() {
-    assertEquals(Optional.<IResourceAggregate>absent(), select(ROLE_A));
-    assertQuotas(ImmutableMap.<String, IResourceAggregate>of());
+    assertEquals(Optional.absent(), select(ROLE_A));
+    assertQuotas(ImmutableMap.of());
 
     save(ROLE_A, StorageEntityUtil.assertFullyPopulated(QUOTA_A));
     save(ROLE_B, QUOTA_B);
@@ -62,22 +62,22 @@ public class DbQuotaStoreTest {
 
     delete(ROLE_B);
     assertEquals(Optional.of(QUOTA_A), select(ROLE_A));
-    assertEquals(Optional.<IResourceAggregate>absent(), select(ROLE_B));
+    assertEquals(Optional.absent(), select(ROLE_B));
     assertQuotas(ImmutableMap.of(ROLE_A, QUOTA_A));
 
     deleteAll();
-    assertEquals(Optional.<IResourceAggregate>absent(), select(ROLE_A));
-    assertEquals(Optional.<IResourceAggregate>absent(), select(ROLE_B));
-    assertQuotas(ImmutableMap.<String, IResourceAggregate>of());
+    assertEquals(Optional.absent(), select(ROLE_A));
+    assertEquals(Optional.absent(), select(ROLE_B));
+    assertQuotas(ImmutableMap.of());
   }
 
   @Test
   public void testDeleteNonExistent() {
-    assertEquals(Optional.<IResourceAggregate>absent(), select(ROLE_A));
-    assertQuotas(ImmutableMap.<String, IResourceAggregate>of());
+    assertEquals(Optional.absent(), select(ROLE_A));
+    assertQuotas(ImmutableMap.of());
     delete(ROLE_A);
-    assertEquals(Optional.<IResourceAggregate>absent(), select(ROLE_A));
-    assertQuotas(ImmutableMap.<String, IResourceAggregate>of());
+    assertEquals(Optional.absent(), select(ROLE_A));
+    assertQuotas(ImmutableMap.of());
   }
 
   @Test

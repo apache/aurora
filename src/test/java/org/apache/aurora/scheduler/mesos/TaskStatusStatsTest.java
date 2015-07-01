@@ -84,7 +84,7 @@ public class TaskStatusStatsTest extends EasyMockTest {
     eventBus.post(new TaskStatusReceived(
         TaskState.TASK_RUNNING,
         Optional.of(Source.SOURCE_MASTER),
-        Optional.<Reason>absent(),
+        Optional.absent(),
         Optional.of(agoMicros(ONE_SECOND))));
 
     clock.advance(ONE_SECOND);
@@ -102,19 +102,19 @@ public class TaskStatusStatsTest extends EasyMockTest {
     // No counting for these since they do not have both a source and timestamp.
     eventBus.post(new TaskStatusReceived(
         TaskState.TASK_LOST,
-        Optional.<Source>absent(),
-        Optional.<Reason>absent(),
-        Optional.<Long>absent()));
+        Optional.absent(),
+        Optional.absent(),
+        Optional.absent()));
     eventBus.post(new TaskStatusReceived(
         TaskState.TASK_LOST,
-        Optional.<Source>absent(),
-        Optional.<Reason>absent(),
+        Optional.absent(),
+        Optional.absent(),
         Optional.of(agoMicros(ONE_SECOND))));
     eventBus.post(new TaskStatusReceived(
         TaskState.TASK_LOST,
         Optional.of(Source.SOURCE_MASTER),
         Optional.of(Reason.REASON_SLAVE_DISCONNECTED),
-        Optional.<Long>absent()));
+        Optional.absent()));
 
     // No time tracking for this since the timestamp is the current time.
     eventBus.post(new TaskStatusReceived(

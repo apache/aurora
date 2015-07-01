@@ -114,7 +114,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expect(storageUtil.attributeStore.getHostAttributes()).andReturn(ImmutableSet.of(attributes));
     expectFetchTasksByHost(HOST_A, ImmutableSet.of(task2));
     // TaskA is KILLED and therefore no longer active
-    expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of());
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of());
     expectMaintenanceModeChange(HOST_A, DRAINED);
     expectMaintenanceModeChange(HOST_A, NONE);
 
@@ -133,18 +133,18 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   @Test
   public void testUnknownHost() {
     expect(storageUtil.attributeStore.getHostAttributes("b"))
-        .andReturn(Optional.<IHostAttributes>absent());
+        .andReturn(Optional.absent());
 
     control.replay();
 
-    assertEquals(ImmutableSet.<HostStatus>of(),
+    assertEquals(ImmutableSet.of(),
         maintenance.startMaintenance(ImmutableSet.of("b")));
   }
 
   @Test
   public void testDrainEmptyHost() {
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
-    expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of());
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of());
     expectMaintenanceModeChange(HOST_A, DRAINED);
 
     control.replay();
@@ -177,8 +177,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   public void testGetMode() {
     expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.of(
         IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING))));
-    expect(storageUtil.attributeStore.getHostAttributes("unknown"))
-        .andReturn(Optional.<IHostAttributes>absent());
+    expect(storageUtil.attributeStore.getHostAttributes("unknown")).andReturn(Optional.absent());
 
     control.replay();
 
@@ -190,7 +189,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         Tasks.id(task),
-        Optional.<ScheduleStatus>absent(),
+        Optional.absent(),
         ScheduleStatus.DRAINING,
         MaintenanceControllerImpl.DRAINING_MESSAGE))
         .andReturn(StateChangeResult.SUCCESS);

@@ -131,7 +131,7 @@ public interface MaintenanceController {
             stateManager.changeState(
                 store,
                 taskId,
-                Optional.<ScheduleStatus>absent(),
+                Optional.absent(),
                 ScheduleStatus.DRAINING,
                 DRAINING_MESSAGE);
           }

@@ -36,6 +36,6 @@ public class BatchStrategy<T extends Comparable<T>> extends ActiveLimitedStrateg
 
   @Override
   Set<T> doGetNextGroup(Set<T> idle, Set<T> active) {
-    return active.isEmpty() ? idle : ImmutableSet.<T>of();
+    return active.isEmpty() ? idle : ImmutableSet.of();
   }
 }

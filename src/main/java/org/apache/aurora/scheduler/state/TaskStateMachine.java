@@ -144,7 +144,7 @@ class TaskStateMachine {
    * @param name Name of the state machine, for logging.
    */
   public TaskStateMachine(String name) {
-    this(name, Optional.<IScheduledTask>absent());
+    this(name, Optional.absent());
   }
 
   /**
@@ -486,7 +486,7 @@ class TaskStateMachine {
   }
 
   private void addFollowup(Action action) {
-    addFollowup(new SideEffect(action, Optional.<ScheduleStatus>absent()));
+    addFollowup(new SideEffect(action, Optional.absent()));
   }
 
   private void addFollowup(SideEffect sideEffect) {
@@ -527,7 +527,7 @@ class TaskStateMachine {
      */
     TaskState taskState = status.transform(STATUS_TO_TASK_STATE).or(TaskState.DELETED);
     if (stateMachine.getState() == taskState) {
-      return new TransitionResult(NOOP, ImmutableSet.<SideEffect>of());
+      return new TransitionResult(NOOP, ImmutableSet.of());
     }
 
     boolean success = stateMachine.transition(taskState);

@@ -54,7 +54,7 @@ public class AttributeAggregateTest extends EasyMockTest {
 
   @Test(expected = IllegalStateException.class)
   public void testAttributesMissing() {
-    expect(attributeStore.getHostAttributes("a")).andReturn(Optional.<IHostAttributes>absent());
+    expect(attributeStore.getHostAttributes("a")).andReturn(Optional.absent());
 
     control.replay();
 
@@ -135,7 +135,7 @@ public class AttributeAggregateTest extends EasyMockTest {
 
   private AttributeAggregate aggregate(IScheduledTask... activeTasks) {
     return AttributeAggregate.create(
-        Suppliers.<Iterable<IScheduledTask>>ofInstance(ImmutableSet.copyOf(activeTasks)),
+        Suppliers.ofInstance(ImmutableSet.copyOf(activeTasks)),
         attributeStore);
   }
 
@@ -143,7 +143,7 @@ public class AttributeAggregateTest extends EasyMockTest {
     return expect(attributeStore.getHostAttributes(host)).andReturn(Optional.of(
         IHostAttributes.build(new HostAttributes()
             .setHost(host)
-            .setAttributes(ImmutableSet.<Attribute>builder().add(attributes).build()))));
+            .setAttributes(ImmutableSet.copyOf(attributes)))));
   }
 
   private void assertAggregate(
@@ -165,6 +165,6 @@ public class AttributeAggregateTest extends EasyMockTest {
   private Attribute attribute(String name, String... values) {
     return new Attribute()
         .setName(name)
-        .setValues(ImmutableSet.<String>builder().add(values).build());
+        .setValues(ImmutableSet.copyOf(values));
   }
 }

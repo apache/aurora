@@ -98,7 +98,7 @@ public interface PubsubEvent {
      * @return A state change event.
      */
     public static TaskStateChange initialized(IScheduledTask task) {
-      return new TaskStateChange(task, Optional.<ScheduleStatus>absent());
+      return new TaskStateChange(task, Optional.absent());
     }
 
     /**

@@ -28,7 +28,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 public class ClusterStateImpl implements ClusterState, PubsubEvent.EventSubscriber {
 
   private final Multimap<String, PreemptionVictim> victims =
-      Multimaps.synchronizedMultimap(HashMultimap.<String, PreemptionVictim>create());
+      Multimaps.synchronizedMultimap(HashMultimap.create());
 
   @Override
   public Multimap<String, PreemptionVictim> getSlavesToActiveTasks() {

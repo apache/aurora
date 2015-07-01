@@ -90,7 +90,7 @@ interface UpdateFactory {
       Set<Integer> instances;
       Set<Integer> desiredInstances = instructions.isSetDesiredState()
           ? expandInstanceIds(ImmutableSet.of(instructions.getDesiredState()))
-          : ImmutableSet.<Integer>of();
+          : ImmutableSet.of();
 
       if (settings.getUpdateOnlyTheseInstances().isEmpty()) {
         // In a full job update, the working set is the union of instance IDs before and after.
@@ -107,7 +107,7 @@ interface UpdateFactory {
         if (rollingForward) {
           desiredStateConfig = desiredInstances.contains(instanceId)
               ? Optional.of(instructions.getDesiredState().getTask())
-              : Optional.<ITaskConfig>absent();
+              : Optional.absent();
         } else {
           desiredStateConfig = getConfig(instanceId, instructions.getInitialState());
         }
@@ -122,8 +122,8 @@ interface UpdateFactory {
       }
 
       Ordering<Integer> updateOrder = rollingForward
-          ? Ordering.<Integer>natural()
-          : Ordering.<Integer>natural().reverse();
+          ? Ordering.natural()
+          : Ordering.natural().reverse();
 
       UpdateStrategy<Integer> strategy = settings.isWaitForBatchCompletion()
           ? new BatchStrategy<>(updateOrder, settings.getUpdateGroupSize())

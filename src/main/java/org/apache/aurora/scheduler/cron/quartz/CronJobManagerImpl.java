@@ -206,7 +206,7 @@ class CronJobManagerImpl implements CronJobManager {
     // for debugging.
     ImmutableMap.Builder<IJobKey, CrontabEntry> scheduledJobs = ImmutableMap.builder();
     try {
-      for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.<JobKey>anyGroup())) {
+      for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.anyGroup())) {
         // The quartz API allows jobs to have multiple triggers. We don't use that feature but
         // we're defensive here since this function is used for debugging.
         Optional<CronTrigger> trigger = FluentIterable.from(scheduler.getTriggersOfJob(jobKey))

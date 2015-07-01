@@ -136,7 +136,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
 
   @SuppressWarnings("unchecked")
   private static final Set<FieldGetter<?, JobKey>> FIELD_GETTERS =
-      ImmutableSet.<FieldGetter<?, JobKey>>of(
+      ImmutableSet.of(
           FieldGetters.compose(UPDATE_REQUEST_GETTER, TASK_CONFIG_GETTER),
           TASK_CONFIG_GETTER,
           JOB_CONFIGURATION_GETTER,
@@ -286,7 +286,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
       };
 
   private final LoadingCache<Method, Function<Object[], Optional<JobKey>>> authorizingParamGetters =
-      CacheBuilder.<Method, Function<Object[], Optional<JobKey>>>newBuilder().build(LOADER);
+      CacheBuilder.newBuilder().build(LOADER);
 
   private final Domain domain;
 

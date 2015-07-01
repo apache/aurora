@@ -102,7 +102,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     expect(filter.filter(
         new UnusedResource(ResourceSlot.from(MESOS_OFFER), OFFER.getAttributes()),
         new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
-        .andReturn(ImmutableSet.<Veto>of());
+        .andReturn(ImmutableSet.of());
     expect(stateManager.assignTask(
         storeProvider,
         Tasks.id(TASK),

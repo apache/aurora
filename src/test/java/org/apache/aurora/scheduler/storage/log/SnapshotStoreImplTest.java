@@ -95,7 +95,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     // A legacy attribute that has a maintenance mode set, but nothing else.  These should be
     // dropped.
     IHostAttributes legacyAttribute = IHostAttributes.build(
-        new HostAttributes("host", ImmutableSet.<Attribute>of()));
+        new HostAttributes("host", ImmutableSet.of()));
     StoredCronJob job = new StoredCronJob(
         new JobConfiguration().setKey(new JobKey("owner", "env", "name")));
     String frameworkId = "framework_id";
@@ -155,7 +155,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     JobUpdate update2Expected = updateDetails2.getUpdate().newBuilder();
     update2Expected.getSummary().setKey(updateId2.newBuilder());
     storageUtil.jobUpdateStore.saveJobUpdate(
-        IJobUpdate.build(update2Expected), Optional.<String>absent());
+        IJobUpdate.build(update2Expected), Optional.absent());
 
     control.replay();
 

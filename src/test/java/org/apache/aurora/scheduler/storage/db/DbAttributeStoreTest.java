@@ -46,12 +46,12 @@ public class DbAttributeStoreTest {
   private static final IHostAttributes HOST_A_ATTRS =
       IHostAttributes.build(new HostAttributes(HOST_A, ImmutableSet.of(ATTR1, ATTR2))
           .setSlaveId(SLAVE_A)
-          .setAttributes(ImmutableSet.<Attribute>of())
+          .setAttributes(ImmutableSet.of())
           .setMode(MaintenanceMode.NONE));
   private static final IHostAttributes HOST_B_ATTRS =
       IHostAttributes.build(new HostAttributes(HOST_B, ImmutableSet.of(ATTR2, ATTR3))
           .setSlaveId(SLAVE_B)
-          .setAttributes(ImmutableSet.<Attribute>of())
+          .setAttributes(ImmutableSet.of())
           .setMode(MaintenanceMode.DRAINING));
 
   private Storage storage;
@@ -63,8 +63,8 @@ public class DbAttributeStoreTest {
 
   @Test
   public void testCrud() {
-    assertEquals(Optional.<IHostAttributes>absent(), read(HOST_A));
-    assertEquals(ImmutableSet.<IHostAttributes>of(), readAll());
+    assertEquals(Optional.absent(), read(HOST_A));
+    assertEquals(ImmutableSet.of(), readAll());
 
     insert(HOST_A_ATTRS);
     assertEquals(Optional.of(HOST_A_ATTRS), read(HOST_A));
@@ -87,21 +87,21 @@ public class DbAttributeStoreTest {
     assertEquals(ImmutableSet.of(updatedMode, HOST_B_ATTRS), readAll());
 
     truncate();
-    assertEquals(Optional.<IHostAttributes>absent(), read(HOST_A));
-    assertEquals(ImmutableSet.<IHostAttributes>of(), readAll());
+    assertEquals(Optional.absent(), read(HOST_A));
+    assertEquals(ImmutableSet.of(), readAll());
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testEmptyAttributeValues() {
     IHostAttributes attributes = IHostAttributes.build(HOST_A_ATTRS.newBuilder()
-        .setAttributes(ImmutableSet.of(new Attribute("attr1", ImmutableSet.<String>of()))));
+        .setAttributes(ImmutableSet.of(new Attribute("attr1", ImmutableSet.of()))));
     insert(attributes);
   }
 
   @Test
   public void testNoAttributes() {
     IHostAttributes attributes = IHostAttributes.build(
-        HOST_A_ATTRS.newBuilder().setAttributes(ImmutableSet.<Attribute>of()));
+        HOST_A_ATTRS.newBuilder().setAttributes(ImmutableSet.of()));
     insert(attributes);
     assertEquals(Optional.of(attributes), read(HOST_A));
   }

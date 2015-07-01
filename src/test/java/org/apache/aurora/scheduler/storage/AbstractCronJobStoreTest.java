@@ -62,7 +62,7 @@ public abstract class AbstractCronJobStoreTest {
   @Test
   public void testJobStore() {
     assertNull(fetchJob(JobKeys.from("nobody", "nowhere", "noname")).orNull());
-    assertEquals(ImmutableSet.<IJobConfiguration>of(), fetchJobs());
+    assertEquals(ImmutableSet.of(), fetchJobs());
 
     saveAcceptedJob(JOB_A);
     assertEquals(JOB_A, fetchJob(KEY_A).orNull());
@@ -76,7 +76,7 @@ public abstract class AbstractCronJobStoreTest {
     assertEquals(ImmutableSet.of(JOB_A), fetchJobs());
 
     deleteJobs();
-    assertEquals(ImmutableSet.<IJobConfiguration>of(), fetchJobs());
+    assertEquals(ImmutableSet.of(), fetchJobs());
   }
 
   @Test

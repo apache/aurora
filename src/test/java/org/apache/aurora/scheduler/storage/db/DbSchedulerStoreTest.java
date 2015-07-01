@@ -38,7 +38,7 @@ public class DbSchedulerStoreTest {
 
   @Test
   public void testSchedulerStore() {
-    assertEquals(Optional.<String>absent(), select());
+    assertEquals(Optional.absent(), select());
     save("a");
     assertEquals(Optional.of("a"), select());
     save("b");

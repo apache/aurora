@@ -32,7 +32,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
-
 import com.twitter.common.application.ShutdownStage;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -221,7 +220,7 @@ public class StatusUpdateBenchmark {
             bind(DriverSettings.class).toInstance(
                 new DriverSettings(
                     "fakemaster",
-                    Optional.<Protos.Credential>absent(),
+                    Optional.absent(),
                     Protos.FrameworkInfo.newBuilder()
                         .setUser("framework user")
                         .setName("test framework")

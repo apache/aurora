@@ -123,7 +123,7 @@ STRUCT_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
 IMMUTABLE_COLLECTION_DECLARATION = (
     '''private final Immutable%(collection)s<%(params)s> %(field)s;''')
 IMMUTABLE_COLLECTION_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
-        ? Immutable%(collection)s.<%(params)s>of()
+        ? Immutable%(collection)s.of()
         : Immutable%(collection)s.copyOf(wrapped.%(fn_name)s());'''
 
 

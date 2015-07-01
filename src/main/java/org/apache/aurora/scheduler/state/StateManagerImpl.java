@@ -146,7 +146,7 @@ public class StateManagerImpl implements StateManager {
           Tasks.id(scheduledTask),
           Optional.of(scheduledTask),
           Optional.of(PENDING),
-          Optional.<String>absent());
+          Optional.absent());
     }
   }
 
@@ -196,10 +196,10 @@ public class StateManagerImpl implements StateManager {
 
     StateChangeResult changeResult = updateTaskAndExternalState(
         storeProvider.getUnsafeTaskStore(),
-        Optional.<ScheduleStatus>absent(),
+        Optional.absent(),
         taskId,
         ASSIGNED,
-        Optional.<String>absent());
+        Optional.absent());
 
     Preconditions.checkState(
         changeResult == SUCCESS,
@@ -415,8 +415,8 @@ public class StateManagerImpl implements StateManager {
           storeProvider.getUnsafeTaskStore(),
           entry.getKey(),
           Optional.of(entry.getValue()),
-          Optional.<ScheduleStatus>absent(),
-          Optional.<String>absent());
+          Optional.absent(),
+          Optional.absent());
     }
   }
 

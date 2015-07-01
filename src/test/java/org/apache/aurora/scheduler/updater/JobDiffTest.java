@@ -45,7 +45,7 @@ public class JobDiffTest extends EasyMockTest {
 
   private static final IJobKey JOB = JobKeys.from("role", "env", "job");
   private static final JobDiff NO_DIFF =
-      new JobDiff(ImmutableMap.<Integer, ITaskConfig>of(), ImmutableSet.<Integer>of());
+      new JobDiff(ImmutableMap.of(), ImmutableSet.of());
   private static final Set<IRange> NO_SCOPE = ImmutableSet.of();
   private static final Set<IRange> CANARY_SCOPE = ImmutableSet.of(IRange.build(new Range(0, 0)));
 
@@ -77,7 +77,7 @@ public class JobDiffTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        new JobDiff(ImmutableMap.<Integer, ITaskConfig>of(), ImmutableSet.of(2, 3, 4)),
+        new JobDiff(ImmutableMap.of(), ImmutableSet.of(2, 3, 4)),
         JobDiff.compute(store, JOB, JobDiff.asMap(task, 5), NO_SCOPE));
     assertEquals(
         NO_DIFF,
@@ -93,7 +93,7 @@ public class JobDiffTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        new JobDiff(ImmutableMap.of(1, task, 2, task), ImmutableSet.<Integer>of()),
+        new JobDiff(ImmutableMap.of(1, task, 2, task), ImmutableSet.of()),
         JobDiff.compute(store, JOB, JobDiff.asMap(task, 1), NO_SCOPE));
     assertEquals(
         NO_DIFF,

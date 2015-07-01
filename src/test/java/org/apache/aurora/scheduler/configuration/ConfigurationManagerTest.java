@@ -48,10 +48,10 @@ public class ConfigurationManagerTest {
       .setTaskConfig(
           new TaskConfig()
               .setIsService(false)
-              .setTaskLinks(ImmutableMap.<String, String>of())
+              .setTaskLinks(ImmutableMap.of())
               .setExecutorConfig(new ExecutorConfig("aurora", "config"))
               .setEnvironment("devel")
-              .setRequestedPorts(ImmutableSet.<String>of())
+              .setRequestedPorts(ImmutableSet.of())
               .setJobName(null)
               .setPriority(0)
               .setOwner(null)

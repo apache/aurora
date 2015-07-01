@@ -134,7 +134,7 @@ public interface MesosTaskFactory {
       List<Resource> resources = resourceSlot
           .toResourceList(task.isSetAssignedPorts()
               ? ImmutableSet.copyOf(task.getAssignedPorts().values())
-              : ImmutableSet.<Integer>of());
+              : ImmutableSet.of());
 
       if (LOG.isLoggable(Level.FINE)) {
         LOG.fine("Setting task resources to "

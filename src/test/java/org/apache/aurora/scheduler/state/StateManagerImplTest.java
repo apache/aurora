@@ -199,7 +199,7 @@ public class StateManagerImplTest extends EasyMockTest {
             .setScheduler(StateManagerImpl.LOCAL_HOST_SUPPLIER.get())
             .setStatus(PENDING)))
         .setAssignedTask(new AssignedTask()
-            .setAssignedPorts(ImmutableMap.<String, Integer>of())
+            .setAssignedPorts(ImmutableMap.of())
             .setInstanceId(3)
             .setTaskId(taskId)
             .setTask(NON_SERVICE_CONFIG.newBuilder()));
@@ -227,7 +227,7 @@ public class StateManagerImplTest extends EasyMockTest {
     String taskId = "a";
     expect(taskIdGenerator.generate(NON_SERVICE_CONFIG, 0)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING, KILLED);
-    driver.killTask(EasyMock.<String>anyObject());
+    driver.killTask(EasyMock.anyObject());
 
     control.replay();
 
@@ -245,7 +245,7 @@ public class StateManagerImplTest extends EasyMockTest {
     expect(taskIdGenerator.generate(NON_SERVICE_CONFIG, 0)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING, LOST);
 
-    driver.killTask(EasyMock.<String>anyObject());
+    driver.killTask(EasyMock.anyObject());
 
     control.replay();
 
@@ -305,8 +305,7 @@ public class StateManagerImplTest extends EasyMockTest {
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, FAILED);
     String newTaskId = "b";
     expect(taskIdGenerator.generate(task, 0)).andReturn(newTaskId);
-    expect(rescheduleCalculator.getFlappingPenaltyMs(EasyMock.<IScheduledTask>anyObject()))
-        .andReturn(100L);
+    expect(rescheduleCalculator.getFlappingPenaltyMs(EasyMock.anyObject())).andReturn(100L);
     expectStateTransitions(newTaskId, INIT, THROTTLED);
 
     control.replay();
@@ -329,8 +328,7 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   private void noFlappingPenalty() {
-    expect(rescheduleCalculator.getFlappingPenaltyMs(EasyMock.<IScheduledTask>anyObject()))
-        .andReturn(0L);
+    expect(rescheduleCalculator.getFlappingPenaltyMs(EasyMock.anyObject())).andReturn(0L);
   }
 
   @Test
@@ -376,12 +374,12 @@ public class StateManagerImplTest extends EasyMockTest {
         taskId,
         Optional.of(PENDING),
         RUNNING,
-        Optional.<String>absent()));
+        Optional.absent()));
     assertEquals(SUCCESS, changeState(
         taskId,
         Optional.of(ASSIGNED),
         FAILED,
-        Optional.<String>absent()));
+        Optional.absent()));
   }
 
   @Test
@@ -392,7 +390,7 @@ public class StateManagerImplTest extends EasyMockTest {
         "a",
         Optional.of(PENDING),
         ASSIGNED,
-        Optional.<String>absent()));
+        Optional.absent()));
   }
 
   @Test
@@ -480,7 +478,7 @@ public class StateManagerImplTest extends EasyMockTest {
         stateManager.insertPendingTasks(
             storeProvider,
             NON_SERVICE_CONFIG,
-            ImmutableSet.<Integer>of());
+            ImmutableSet.of());
       }
     });
   }
@@ -575,13 +573,13 @@ public class StateManagerImplTest extends EasyMockTest {
   private StateChangeResult changeState(final String taskId, final ScheduleStatus status) {
     return changeState(
         taskId,
-        Optional.<ScheduleStatus>absent(),
+        Optional.absent(),
         status,
-        Optional.<String>absent());
+        Optional.absent());
   }
 
   private void assignTask(String taskId, IHostAttributes host) {
-    assignTask(taskId, host, ImmutableMap.<String, Integer>of());
+    assignTask(taskId, host, ImmutableMap.of());
   }
 
   private void assignTask(

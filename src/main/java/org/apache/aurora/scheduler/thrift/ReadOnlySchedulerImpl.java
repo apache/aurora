@@ -217,7 +217,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
         Tasks.ASSIGNED_TO_INFO);
     Multimap<ITaskConfig, Integer> instancesByDetails = Multimaps.invertFrom(
         Multimaps.forMap(tasksByInstance),
-        HashMultimap.<ITaskConfig, Integer>create());
+        HashMultimap.create());
     Iterable<ConfigGroup> groups = Iterables.transform(
         instancesByDetails.asMap().entrySet(), TO_GROUP);
 
@@ -400,7 +400,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
     // been created above.
     Predicate<IJobConfiguration> configFilter = ownerRole.isPresent()
         ? Predicates.compose(Predicates.equalTo(ownerRole.get()), JobKeys.CONFIG_TO_ROLE)
-        : Predicates.<IJobConfiguration>alwaysTrue();
+        : Predicates.alwaysTrue();
     jobs.putAll(Maps.uniqueIndex(
         FluentIterable.from(Storage.Util.fetchCronJobs(storage)).filter(configFilter),
         JobKeys.FROM_CONFIG));

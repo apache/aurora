@@ -263,7 +263,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   @Test
   public void testCheckQuotaNoQuotaSet() {
     expect(storageUtil.quotaStore.fetchQuota(ROLE))
-        .andReturn(Optional.<IResourceAggregate>absent());
+        .andReturn(Optional.absent());
 
     expectNoTasks();
     expectNoJobUpdates();
@@ -502,7 +502,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(UPDATE_KEY);
     IJobUpdate update = buildJobUpdate(summaries.get(0), config, 1, config, 1);
     JobUpdate builder = update.newBuilder();
-    builder.getInstructions().setInitialState(ImmutableSet.<InstanceTaskConfig>of());
+    builder.getInstructions().setInitialState(ImmutableSet.of());
 
     expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getJob().getRole())))
         .andReturn(summaries).times(2);
@@ -863,7 +863,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   private IExpectationSetters<?> expectNoJobUpdates() {
     return expect(jobUpdateStore.fetchJobUpdateSummaries(
-        QuotaManagerImpl.updateQuery(ROLE))).andReturn(ImmutableList.<IJobUpdateSummary>of());
+        QuotaManagerImpl.updateQuery(ROLE))).andReturn(ImmutableList.of());
   }
 
   private IExpectationSetters<?> expectNoTasks() {
@@ -871,7 +871,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   }
 
   private IExpectationSetters<?> expectNoCronJobs() {
-    return expect(storageUtil.jobStore.fetchJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
+    return expect(storageUtil.jobStore.fetchJobs()).andReturn(ImmutableSet.of());
   }
 
   private IExpectationSetters<?> expectCronJobs(IJobConfiguration... jobs) {
@@ -889,7 +889,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   private IExpectationSetters<?> expectNoCronJob() {
     return expect(storageUtil.jobStore.fetchJob(anyObject(IJobKey.class)))
-        .andReturn(Optional.<IJobConfiguration>absent());
+        .andReturn(Optional.absent());
   }
 
   private IExpectationSetters<Optional<IResourceAggregate>> expectQuota(IResourceAggregate quota) {

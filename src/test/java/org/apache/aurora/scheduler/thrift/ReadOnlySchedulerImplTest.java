@@ -195,7 +195,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         .andReturn(IJobConfiguration.setFromBuilders(unownedCronJobOnly));
 
     storageUtil.expectTaskFetch(query);
-    expect(storageUtil.jobStore.fetchJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
+    expect(storageUtil.jobStore.fetchJobs()).andReturn(ImmutableSet.of());
 
     // Handle the case where a cron job has a running task (same JobKey present in both stores).
     storageUtil.expectTaskFetch(query, ownedCronJobScheduledTask);
@@ -216,7 +216,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
             .getJob()
             .getTaskConfig());
 
-    assertEquals(jobSummaryResponse(ImmutableSet.<JobSummary>of()), thrift.getJobSummary(ROLE));
+    assertEquals(jobSummaryResponse(ImmutableSet.of()), thrift.getJobSummary(ROLE));
 
     assertEquals(jobSummaryResponse(ownedCronJobSummaryWithRunningTask),
         thrift.getJobSummary(ROLE));
@@ -418,7 +418,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     expect(storageUtil.jobStore.fetchJobs())
         .andReturn(IJobConfiguration.setFromBuilders(unownedCronJobOnly));
 
-    expect(storageUtil.jobStore.fetchJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
+    expect(storageUtil.jobStore.fetchJobs()).andReturn(ImmutableSet.of());
     storageUtil.expectTaskFetch(query);
 
     // Handle the case where a cron job has a running task (same JobKey present in both stores).
@@ -658,11 +658,11 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   public void testEmptyConfigSummary() throws Exception {
     IJobKey key = JobKeys.from("test", "test", "test");
 
-    storageUtil.expectTaskFetch(Query.jobScoped(key).active(), ImmutableSet.<IScheduledTask>of());
+    storageUtil.expectTaskFetch(Query.jobScoped(key).active(), ImmutableSet.of());
 
     ConfigSummary summary = new ConfigSummary()
         .setKey(key.newBuilder())
-        .setGroups(Sets.<ConfigGroup>newHashSet());
+        .setGroups(Sets.newHashSet());
 
     ConfigSummaryResult expected = new ConfigSummaryResult().setSummary(summary);
 
@@ -675,7 +675,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   @Test
   public void testGetJobUpdateDetailsInvalidId() throws Exception {
     expect(storageUtil.jobUpdateStore.fetchJobUpdateDetails(UPDATE_KEY))
-        .andReturn(Optional.<IJobUpdateDetails>absent());
+        .andReturn(Optional.absent());
 
     control.replay();
 

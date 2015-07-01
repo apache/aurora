@@ -145,9 +145,9 @@ public class MesosTaskFactoryImplTest {
         .setNumCpus(0.001)
         .setRamMb(1)
         .setDiskMb(0)
-        .setRequestedPorts(ImmutableSet.<String>of());
+        .setRequestedPorts(ImmutableSet.of());
     IAssignedTask assignedTask =
-        IAssignedTask.build(builder.setAssignedPorts(ImmutableMap.<String, Integer>of()));
+        IAssignedTask.build(builder.setAssignedPorts(ImmutableMap.of()));
 
     assertEquals(
         MIN_THERMOS_RESOURCES,

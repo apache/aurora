@@ -72,10 +72,10 @@ final class ConstraintMatcher {
     switch (taskConstraint.getSetField()) {
       case VALUE:
         boolean matches = AttributeFilter.matches(
-            attribute.transform(GET_VALUES).or(ImmutableSet.<String>of()),
+            attribute.transform(GET_VALUES).or(ImmutableSet.of()),
             taskConstraint.getValue());
         return matches
-            ? Optional.<Veto>absent()
+            ? Optional.absent()
             : Optional.of(Veto.constraintMismatch(constraint.getName()));
 
       case LIMIT:
@@ -88,7 +88,7 @@ final class ConstraintMatcher {
             taskConstraint.getLimit().getLimit(),
             cachedjobState);
         return satisfied
-            ? Optional.<Veto>absent()
+            ? Optional.absent()
             : Optional.of(Veto.unsatisfiedLimit(constraint.getName()));
 
       default:

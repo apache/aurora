@@ -137,7 +137,7 @@ public class Mname {
       @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, instanceId, uriInfo, Optional.<String>absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.absent());
   }
 
   @PUT
@@ -149,7 +149,7 @@ public class Mname {
       @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, instanceId, uriInfo, Optional.<String>absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.absent());
   }
 
   @POST
@@ -161,7 +161,7 @@ public class Mname {
       @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, instanceId, uriInfo, Optional.<String>absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.absent());
   }
 
   @DELETE
@@ -173,7 +173,7 @@ public class Mname {
       @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, instanceId, uriInfo, Optional.<String>absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.absent());
   }
 
   private Response get(
@@ -219,7 +219,7 @@ public class Mname {
   @VisibleForTesting
   static Optional<Integer> getRedirectPort(IAssignedTask task) {
     Map<String, Integer> ports = task.isSetAssignedPorts()
-        ? task.getAssignedPorts() : ImmutableMap.<String, Integer>of();
+        ? task.getAssignedPorts() : ImmutableMap.of();
     for (String httpPortName : HTTP_PORT_NAMES) {
       Integer port = ports.get(httpPortName);
       if (port != null) {

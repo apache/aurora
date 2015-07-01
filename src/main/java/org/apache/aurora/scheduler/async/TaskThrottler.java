@@ -84,7 +84,7 @@ class TaskThrottler implements EventSubscriber {
                       stateChange.getTaskId(),
                       Optional.of(THROTTLED),
                       PENDING,
-                      Optional.<String>absent());
+                      Optional.absent());
                 }
               });
             }

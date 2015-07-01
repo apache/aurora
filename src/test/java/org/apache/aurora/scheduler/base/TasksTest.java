@@ -33,7 +33,7 @@ public class TasksTest {
     // OrderedTaskStatuses should contain all ScheduleStatus values except INIT.
     assertEquals(
         ImmutableSet.copyOf(ScheduleStatus.values()),
-        ImmutableSet.<ScheduleStatus>builder()
+        ImmutableSet.builder()
             .addAll(Tasks.ORDERED_TASK_STATUSES)
             .add(ScheduleStatus.INIT)
             .build());
@@ -49,7 +49,7 @@ public class TasksTest {
     IScheduledTask r3 = makeTask(RUNNING, 600);
 
     try {
-      getLatestActiveTask(ImmutableList.<IScheduledTask>of());
+      getLatestActiveTask(ImmutableList.of());
       fail("Should have thrown IllegalArgumentException.");
     } catch (IllegalArgumentException e) {
       // Expected when called with an empty task list.

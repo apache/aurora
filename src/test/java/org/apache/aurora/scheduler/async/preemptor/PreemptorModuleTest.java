@@ -82,7 +82,7 @@ public class PreemptorModuleTest extends EasyMockTest {
 
     injector.getBindings();
     assertEquals(
-        Optional.<String>absent(),
+        Optional.absent(),
         injector.getInstance(Preemptor.class).attemptPreemptionFor(
             IAssignedTask.build(new AssignedTask()),
             AttributeAggregate.EMPTY,

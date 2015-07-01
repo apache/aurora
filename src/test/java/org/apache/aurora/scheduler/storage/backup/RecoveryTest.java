@@ -25,13 +25,8 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
-import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
-import org.apache.aurora.gen.storage.StoredCronJob;
-import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -108,7 +103,7 @@ public class RecoveryTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(ImmutableSet.<String>of(), recovery.listBackups());
+    assertEquals(ImmutableSet.of(), recovery.listBackups());
 
     clock.advance(INTERVAL);
     storageBackup.createSnapshot();
@@ -163,12 +158,12 @@ public class RecoveryTest extends EasyMockTest {
 
   private static Snapshot makeSnapshot(IScheduledTask... tasks) {
     return new Snapshot()
-        .setHostAttributes(ImmutableSet.<HostAttributes>of())
-        .setCronJobs(ImmutableSet.<StoredCronJob>of())
+        .setHostAttributes(ImmutableSet.of())
+        .setCronJobs(ImmutableSet.of())
         .setSchedulerMetadata(new SchedulerMetadata().setVersion(CURRENT_API_VERSION))
-        .setQuotaConfigurations(ImmutableSet.<QuotaConfiguration>of())
+        .setQuotaConfigurations(ImmutableSet.of())
         .setTasks(IScheduledTask.toBuildersSet(ImmutableSet.copyOf(tasks)))
-        .setLocks(ImmutableSet.<Lock>of())
-        .setJobUpdateDetails(ImmutableSet.<StoredJobUpdateDetails>of());
+        .setLocks(ImmutableSet.of())
+        .setJobUpdateDetails(ImmutableSet.of());
   }
 }

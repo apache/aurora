@@ -75,7 +75,7 @@ public class AopModuleTest extends EasyMockTest {
 
   @Test
   public void testNoFlaggedMethods() throws Exception {
-    assertCreateAllowed(ImmutableMap.<String, Boolean>of());
+    assertCreateAllowed(ImmutableMap.of());
   }
 
   @Test
@@ -115,7 +115,7 @@ public class AopModuleTest extends EasyMockTest {
   public void assertToStringNotIntercepted() {
     control.replay();
 
-    Iface thrift = getIface(ImmutableMap.<String, Boolean>of());
+    Iface thrift = getIface(ImmutableMap.of());
     assertNotNull(thrift.toString());
   }
 }

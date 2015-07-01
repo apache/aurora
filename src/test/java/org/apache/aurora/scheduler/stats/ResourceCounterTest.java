@@ -37,7 +37,6 @@ import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -84,9 +83,9 @@ public class ResourceCounterTest {
 
     Map<IJobKey, Metric> aggregates = resourceCounter.computeAggregates(
         Query.unscoped(),
-        Predicates.<ITaskConfig>alwaysTrue(),
+        Predicates.alwaysTrue(),
         INFO_TO_JOB_KEY);
-    assertEquals(ImmutableMap.<IJobKey, Metric>of(), aggregates);
+    assertEquals(ImmutableMap.of(), aggregates);
 
     for (Metric metric : resourceCounter.computeConsumptionTotals()) {
       assertEquals(ZERO, metric);
@@ -186,8 +185,7 @@ public class ResourceCounterTest {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(Storage.MutableStoreProvider storeProvider) {
-          storeProvider.getUnsafeTaskStore()
-              .saveTasks(ImmutableSet.<IScheduledTask>builder().add(tasks).build());
+          storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.copyOf(tasks));
       }
     });
   }

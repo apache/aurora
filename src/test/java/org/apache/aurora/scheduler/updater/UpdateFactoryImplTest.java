@@ -48,7 +48,7 @@ public class UpdateFactoryImplTest {
               .setMaxWaitToInstanceRunningMs(100)
               .setMinWaitInInstanceRunningMs(100)
               .setUpdateGroupSize(2)
-              .setUpdateOnlyTheseInstances(ImmutableSet.<Range>of())));
+              .setUpdateOnlyTheseInstances(ImmutableSet.of())));
 
   private UpdateFactory factory;
 

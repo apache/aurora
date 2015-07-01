@@ -54,6 +54,6 @@ public class Cron {
       scheduled.put(JobKeys.canonicalString(entry.getKey()), entry.getValue().toString());
     }
 
-    return Response.ok(ImmutableMap.<String, Object>of("scheduled", scheduled.build())).build();
+    return Response.ok(ImmutableMap.of("scheduled", scheduled.build())).build();
   }
 }

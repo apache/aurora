@@ -30,7 +30,6 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
 
-import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -68,7 +67,6 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
@@ -286,19 +284,19 @@ public class TaskSchedulerTest extends EasyMockTest {
       AttributeAggregate jobAggregate) {
 
     return expect(assigner.maybeAssign(
-        EasyMock.<MutableStoreProvider>anyObject(),
+        EasyMock.anyObject(),
         eq(offer),
         eq(new ResourceRequest(task.getAssignedTask().getTask(), jobAggregate)),
         eq(Tasks.id(task))));
   }
 
   private IExpectationSetters<?> expectNoReservation(String slaveId) {
-    return expect(reservations.get(slaveId)).andReturn(Optional.<TaskGroupKey>absent());
+    return expect(reservations.get(slaveId)).andReturn(Optional.absent());
   }
 
   private IExpectationSetters<?> expectReservationCheck(IScheduledTask task) {
     return expect(reservations.getByValue(TaskGroupKey.from(task.getAssignedTask().getTask())))
-        .andReturn(ImmutableSet.<String>of());
+        .andReturn(ImmutableSet.of());
   }
 
   @Test
@@ -354,7 +352,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     driver.launchTask(OFFER_A.getOffer().getId(), mesosTask);
     expectLastCall().andThrow(new IllegalStateException("Driver not ready."));
     expect(stateManager.changeState(
-        EasyMock.<MutableStoreProvider>anyObject(),
+        EasyMock.anyObject(),
         eq("a"),
         eq(Optional.of(PENDING)),
         eq(LOST),
@@ -539,11 +537,11 @@ public class TaskSchedulerTest extends EasyMockTest {
     TaskInfo mesosTask = makeTaskInfo(task);
     Capture<String> taskId = createCapture();
     expect(assigner.maybeAssign(
-        EasyMock.<MutableStoreProvider>anyObject(),
-        EasyMock.<HostOffer>anyObject(),
-        EasyMock.<ResourceRequest>anyObject(),
+        EasyMock.anyObject(),
+        EasyMock.anyObject(),
+        EasyMock.anyObject(),
         capture(taskId))).andReturn(Assignment.success(mesosTask));
-    driver.launchTask(EasyMock.<OfferID>anyObject(), eq(mesosTask));
+    driver.launchTask(EasyMock.anyObject(), eq(mesosTask));
     return taskId;
   }
 
@@ -658,7 +656,7 @@ public class TaskSchedulerTest extends EasyMockTest {
         IHostAttributes.build(new HostAttributes()
             .setHost(hostName)
             .setSlaveId(offer.getSlaveId().getValue())
-            .setAttributes(ImmutableSet.<Attribute>of())
+            .setAttributes(ImmutableSet.of())
             .setMode(mode)));
   }
 
@@ -666,6 +664,6 @@ public class TaskSchedulerTest extends EasyMockTest {
     expect(preemptor.attemptPreemptionFor(
         eq(task),
         eq(EMPTY),
-        EasyMock.<MutableStoreProvider>anyObject())).andReturn(Optional.<String>absent());
+        EasyMock.anyObject())).andReturn(Optional.absent());
   }
 }

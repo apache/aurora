@@ -29,7 +29,6 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffHelper;
 
 import org.apache.aurora.gen.CronCollisionPolicy;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -185,7 +184,7 @@ class AuroraCronJob implements Job {
           stateManager.changeState(
               storeProvider,
               taskId,
-              Optional.<ScheduleStatus>absent(),
+              Optional.absent(),
               KILLING,
               KILL_AUDIT_MESSAGE);
         }

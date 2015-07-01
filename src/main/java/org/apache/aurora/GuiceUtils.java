@@ -165,7 +165,7 @@ public final class GuiceUtils {
         "Non-void methods must be explicitly whitelisted with @AllowUnchecked: " + disallowed);
 
     Matcher<Method> matcher =
-        Matchers.<Method>not(WHITELIST_MATCHER).and(interfaceMatcher(wrapInterface, false));
+        Matchers.not(WHITELIST_MATCHER).and(interfaceMatcher(wrapInterface, false));
     binder.bindInterceptor(Matchers.subclassesOf(wrapInterface), matcher,
         new MethodInterceptor() {
           @Override

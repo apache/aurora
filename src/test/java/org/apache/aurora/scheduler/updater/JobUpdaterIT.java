@@ -208,7 +208,7 @@ public class JobUpdaterIT extends EasyMockTest {
   @After
   public void validateExitState() {
     clock.assertEmpty();
-    assertEquals(ImmutableList.<ILock>of(), ImmutableList.copyOf(lockManager.getLocks()));
+    assertEquals(ImmutableList.of(), ImmutableList.copyOf(lockManager.getLocks()));
   }
 
   @Test(expected = UpdateStateException.class)
@@ -245,9 +245,9 @@ public class JobUpdaterIT extends EasyMockTest {
           assertEquals(StateChangeResult.SUCCESS, stateManager.changeState(
               storeProvider,
               getTaskId(job, instanceId),
-              Optional.<ScheduleStatus>absent(),
+              Optional.absent(),
               s,
-              Optional.<String>absent()));
+              Optional.absent()));
         }
       });
     }
@@ -298,7 +298,7 @@ public class JobUpdaterIT extends EasyMockTest {
   }
 
   private IExpectationSetters<String> expectTaskKilled() {
-    driver.killTask(EasyMock.<String>anyObject());
+    driver.killTask(EasyMock.anyObject());
     return expectLastCall();
   }
 
@@ -1158,7 +1158,7 @@ public class JobUpdaterIT extends EasyMockTest {
     });
 
     subscriber.startAsync().awaitRunning();
-    assertState(ERROR, ImmutableMultimap.<Integer, JobUpdateAction>of());
+    assertState(ERROR, ImmutableMultimap.of());
   }
 
   @Test
@@ -1375,7 +1375,7 @@ public class JobUpdaterIT extends EasyMockTest {
                 .setRollbackOnFailure(true)
                 .setMaxWaitToInstanceRunningMs(RUNNING_TIMEOUT.as(Time.MILLISECONDS).intValue())
                 .setMinWaitInInstanceRunningMs(WATCH_TIMEOUT.as(Time.MILLISECONDS).intValue())
-                .setUpdateOnlyTheseInstances(ImmutableSet.<Range>of())));
+                .setUpdateOnlyTheseInstances(ImmutableSet.of())));
 
     for (IInstanceTaskConfig config : configs) {
       builder.getInstructions().addToInitialState(config.newBuilder());

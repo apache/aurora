@@ -186,7 +186,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     AssignmentCapture firstAssignment = expectLaunchAttempt(false);
     expectGetReservation(SLAVE_ID, TASK_A);
     expectReservationCheck(TASK_B);
-    expectPreemptorCall(TASK_B, Optional.<String>absent());
+    expectPreemptorCall(TASK_B, Optional.absent());
 
     // Status changed -> reservation removed.
     reservations.remove(SLAVE_ID, TaskGroupKey.from(TASK_A.getAssignedTask().getTask()));
@@ -264,7 +264,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectGetNoReservation(SLAVE_ID);
     AssignmentCapture assignment = expectLaunchAttempt(true);
     expect(assigner.maybeAssign(
-        EasyMock.<MutableStoreProvider>anyObject(),
+        EasyMock.anyObject(),
         eq(OFFER),
         eq(new ResourceRequest(taskA.getAssignedTask().getTask(), EMPTY)),
         eq(Tasks.id(taskA)))).andReturn(Assignment.success(TaskInfo.getDefaultInstance()));
@@ -316,7 +316,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     storageUtil.expectTaskFetch(
         Query.jobScoped(Tasks.SCHEDULED_TO_JOB_KEY.apply(task))
             .byStatus(Tasks.SLAVE_ASSIGNED_STATES),
-        ImmutableSet.<IScheduledTask>of());
+        ImmutableSet.of());
   }
 
   private void expectAddReservation(String slaveId, IScheduledTask task) {
@@ -329,11 +329,11 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   private IExpectationSetters<?> expectGetNoReservation(String slaveId) {
-    return expect(reservations.get(slaveId)).andReturn(Optional.<TaskGroupKey>absent());
+    return expect(reservations.get(slaveId)).andReturn(Optional.absent());
   }
 
   private IExpectationSetters<?> expectReservationCheck(IScheduledTask task) {
     return expect(reservations.getByValue(TaskGroupKey.from(task.getAssignedTask().getTask())))
-        .andReturn(ImmutableSet.<String>of());
+        .andReturn(ImmutableSet.of());
   }
 }

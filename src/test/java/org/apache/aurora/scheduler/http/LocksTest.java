@@ -73,7 +73,7 @@ public class LocksTest extends EasyMockTest {
 
   @Test
   public void testDumpEmptyContents() throws Exception {
-    expect(lockManager.getLocks()).andReturn(ImmutableSet.<ILock>of());
+    expect(lockManager.getLocks()).andReturn(ImmutableSet.of());
 
     control.replay();
 

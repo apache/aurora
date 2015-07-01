@@ -29,7 +29,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.MoreExecutors;
-
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.gen.ScheduleStatus;
@@ -167,7 +166,7 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
               StateChangeResult result = stateManager.changeState(
                   storeProvider,
                   status.getTaskId().getValue(),
-                  Optional.<ScheduleStatus>absent(),
+                  Optional.absent(),
                   translatedState,
                   message);
 
