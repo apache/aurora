@@ -22,12 +22,16 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -128,6 +132,34 @@ public class DbAttributeStoreTest {
     IHostAttributes updated = IHostAttributes.build(HOST_A_ATTRS.newBuilder().setSlaveId(SLAVE_B));
     insert(updated);
     assertEquals(Optional.of(updated), read(HOST_A));
+  }
+
+  @Test
+  public void testUpdateAttributesWithRelations() {
+    // Test for regression of AURORA-1379, where host attribute mutation performed a delete,
+    // violating foreign key constraints.
+    insert(HOST_A_ATTRS);
+
+    ScheduledTask builder = TaskTestUtil.makeTask("a", JobKeys.from("role", "env", "job"))
+        .newBuilder();
+    builder.getAssignedTask()
+        .setSlaveHost(HOST_A_ATTRS.getHost())
+        .setSlaveId(HOST_A_ATTRS.getSlaveId());
+    final IScheduledTask taskA = IScheduledTask.build(builder);
+
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(taskA));
+      }
+    });
+
+    HostAttributes attributeBuilder = HOST_A_ATTRS.newBuilder()
+        .setMode(MaintenanceMode.DRAINED);
+    attributeBuilder.addToAttributes(new Attribute("newAttr", ImmutableSet.of("a", "b")));
+    IHostAttributes hostAUpdated = IHostAttributes.build(attributeBuilder);
+    insert(hostAUpdated);
+    assertEquals(Optional.of(hostAUpdated), read(HOST_A));
   }
 
   private void insert(final IHostAttributes attributes) {

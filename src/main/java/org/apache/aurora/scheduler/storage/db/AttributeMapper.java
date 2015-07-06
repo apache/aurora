@@ -18,7 +18,9 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * MyBatis mapper interface for Attribute.xml.
@@ -34,9 +36,21 @@ interface AttributeMapper {
   /**
    * Deletes all attributes and attribute values associated with a slave.
    *
-   * @param slaveId Slave ID to delete associated values from.
+   * @param host Host to delete associated values from.
    */
-  void deleteAttributesAndValues(String slaveId);
+  void deleteAttributeValues(@Param("host") String host);
+
+  /**
+   * Updates the mode and slave ID associated with a host.
+   *
+   * @param host Host to update.
+   * @param mode New host maintenance mode.
+   * @param slaveId New host slave ID.
+   */
+  void updateHostModeAndSlaveId(
+      @Param("host") String host,
+      @Param("mode") MaintenanceMode mode,
+      @Param("slaveId") String slaveId);
 
   /**
    * Inserts values in {@link IHostAttributes#getAttributes()}, associating them with
@@ -53,7 +67,7 @@ interface AttributeMapper {
    * @return Attributes associated with {@code host}, or {@code null} if no association exists.
    */
   @Nullable
-  HostAttributes select(String host);
+  HostAttributes select(@Param("host") String host);
 
   /**
    * Retrieves all stored host attributes.

@@ -53,13 +53,29 @@ class DbAttributeStore implements AttributeStore.Mutable {
     checkArgument(hostAttributes.isSetAttributes());
     checkArgument(hostAttributes.isSetMode());
 
+    if (Iterables.any(hostAttributes.getAttributes(), EMPTY_VALUES)) {
+      throw new IllegalArgumentException(
+          "Host attributes contains empty values: " + hostAttributes);
+    }
+
     Optional<IHostAttributes> existing = getHostAttributes(hostAttributes.getHost());
     if (existing.equals(Optional.of(hostAttributes))) {
       return false;
+    } else if (existing.isPresent()) {
+      mapper.updateHostModeAndSlaveId(
+          hostAttributes.getHost(),
+          hostAttributes.getMode(),
+          hostAttributes.getSlaveId());
     } else {
-      merge(hostAttributes);
-      return true;
+      mapper.insert(hostAttributes);
     }
+
+    mapper.deleteAttributeValues(hostAttributes.getHost());
+    if (!hostAttributes.getAttributes().isEmpty()) {
+      mapper.insertAttributeValues(hostAttributes);
+    }
+
+    return true;
   }
 
   private static final Predicate<IAttribute> EMPTY_VALUES = new Predicate<IAttribute>() {
@@ -68,19 +84,6 @@ class DbAttributeStore implements AttributeStore.Mutable {
       return attribute.getValues().isEmpty();
     }
   };
-
-  private void merge(IHostAttributes hostAttributes) {
-    if (Iterables.any(hostAttributes.getAttributes(), EMPTY_VALUES)) {
-      throw new IllegalArgumentException(
-          "Host attributes contains empty values: " + hostAttributes);
-    }
-
-    mapper.deleteAttributesAndValues(hostAttributes.getHost());
-    mapper.insert(hostAttributes);
-    if (!hostAttributes.getAttributes().isEmpty()) {
-      mapper.insertAttributeValues(hostAttributes);
-    }
-  }
 
   @Timed("attribute_store_fetch_one")
   @Override

@@ -31,11 +31,18 @@
     </foreach>
   </insert>
 
-  <delete id="deleteAttributesAndValues">
+  <delete id="deleteAttributeValues">
     <!-- This assumes the schema enables cascading deletes in the values table. -->
-    DELETE FROM host_attributes
-    WHERE host = #{id}
+    DELETE FROM host_attribute_values
+    WHERE host_attribute_id IN (SELECT id FROM host_attributes WHERE host = #{host})
   </delete>
+
+  <update id="updateHostModeAndSlaveId">
+    UPDATE host_attributes SET
+      mode = #{mode, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.MaintenanceModeTypeHandler},
+      slave_id = #{slaveId}
+    WHERE host = #{host}
+  </update>
 
   <resultMap id="hostAttributeResultMap" type="org.apache.aurora.gen.HostAttributes">
     <id column="a_id" />
@@ -69,7 +76,7 @@
 
   <select id="select" resultMap="hostAttributeResultMap">
     <include refid="unscoped_select"/>
-    WHERE host = #{id}
+    WHERE host = #{host}
   </select>
 
   <select id="selectAll" resultMap="hostAttributeResultMap">

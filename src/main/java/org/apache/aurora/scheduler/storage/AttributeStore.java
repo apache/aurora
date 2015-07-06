@@ -32,6 +32,13 @@ import org.apache.mesos.Protos;
 public interface AttributeStore {
   /**
    * Fetches all host attributes given by the host.
+   * <p>
+   * TODO(wfarner): We need to transition this API to key off slave ID instead of host name, as
+   * the host is not guaranteed to be unique (it's possible, and sometimes desirable to have
+   * multiple slaves on a machine).  The current API ripples down into storage, since the store
+   * is not in the position to dictate behavior when host names collide.  Most callers seem to have
+   * sufficient context to use slave ID instead, with the exception of those related to host
+   * maintenance.
    *
    * @param host host name.
    * @return attributes associated with {@code host}, if the host is known.
