@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.sla;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
@@ -65,36 +66,41 @@ import static org.apache.aurora.scheduler.sla.SlaGroup.GroupType.RESOURCE_RAM;
 class MetricCalculator implements Runnable {
 
   @VisibleForTesting
-  static final Multimap<AlgorithmType, GroupType> PROD_METRICS =
-      ImmutableMultimap.<AlgorithmType, GroupType>builder()
-          .put(JOB_UPTIME_50, JOB)
-          .put(JOB_UPTIME_75, JOB)
-          .put(JOB_UPTIME_90, JOB)
-          .put(JOB_UPTIME_95, JOB)
-          .put(JOB_UPTIME_99, JOB)
-          .putAll(AGGREGATE_PLATFORM_UPTIME, JOB, CLUSTER)
-          .putAll(MEDIAN_TIME_TO_ASSIGNED, JOB, CLUSTER, RESOURCE_CPU, RESOURCE_RAM, RESOURCE_DISK)
-          .putAll(MEDIAN_TIME_TO_RUNNING, JOB, CLUSTER, RESOURCE_CPU, RESOURCE_RAM, RESOURCE_DISK)
-          .build();
+  static final String NAME_QUALIFIER_PROD = "";
 
   @VisibleForTesting
-  static final Multimap<AlgorithmType, GroupType> NON_PROD_METRICS =
-      ImmutableMultimap.<AlgorithmType, GroupType>builder()
-          .putAll(
-              AlgorithmType.MEDIAN_TIME_TO_ASSIGNED_NON_PROD,
-              JOB,
-              CLUSTER,
-              RESOURCE_CPU,
-              RESOURCE_RAM,
-              RESOURCE_DISK)
-          .putAll(
-              AlgorithmType.MEDIAN_TIME_TO_RUNNING_NON_PROD,
-              JOB,
-              CLUSTER,
-              RESOURCE_CPU,
-              RESOURCE_RAM,
-              RESOURCE_DISK)
-          .build();
+  static final String NAME_QUALIFIER_NON_PROD = "_nonprod";
+
+  /**
+   * Pre-configured categories of metrics.
+   */
+  enum MetricCategory {
+
+    JOB_UPTIMES(ImmutableMultimap.<AlgorithmType, GroupType>builder()
+        .put(JOB_UPTIME_50, JOB)
+        .put(JOB_UPTIME_75, JOB)
+        .put(JOB_UPTIME_90, JOB)
+        .put(JOB_UPTIME_95, JOB)
+        .put(JOB_UPTIME_99, JOB)
+        .build()),
+    PLATFORM_UPTIME(ImmutableMultimap.<AlgorithmType, GroupType>builder()
+        .putAll(AGGREGATE_PLATFORM_UPTIME, JOB, CLUSTER)
+        .build()),
+    MEDIANS(ImmutableMultimap.<AlgorithmType, GroupType>builder()
+        .putAll(MEDIAN_TIME_TO_ASSIGNED, JOB, CLUSTER, RESOURCE_CPU, RESOURCE_RAM, RESOURCE_DISK)
+        .putAll(MEDIAN_TIME_TO_RUNNING, JOB, CLUSTER, RESOURCE_CPU, RESOURCE_RAM, RESOURCE_DISK)
+        .build());
+
+    private final Multimap<AlgorithmType, GroupType> metrics;
+
+    MetricCategory(Multimap<AlgorithmType, GroupType> metrics) {
+      this.metrics = metrics;
+    }
+
+    Multimap<AlgorithmType, GroupType> getMetrics() {
+      return metrics;
+    }
+  }
 
   private static final Predicate<ITaskConfig> IS_SERVICE =
       new Predicate<ITaskConfig>() {
@@ -111,14 +117,23 @@ class MetricCalculator implements Runnable {
 
   static class MetricCalculatorSettings {
     private final long refreshRateMs;
+    private final Set<MetricCategory> prodMetrics;
+    private final Set<MetricCategory> nonProdMetrics;
 
-    MetricCalculatorSettings(long refreshRateMs) {
+    MetricCalculatorSettings(
+        long refreshRateMs,
+        Set<MetricCategory> prodMetrics,
+        Set<MetricCategory> nonProdMetrics) {
+
       this.refreshRateMs = refreshRateMs;
+      this.prodMetrics = requireNonNull(prodMetrics);
+      this.nonProdMetrics = requireNonNull(nonProdMetrics);
     }
 
     long getRefreshRateMs() {
       return refreshRateMs;
     }
+
   }
 
   private static class Counter implements Supplier<Number> {
@@ -179,25 +194,28 @@ class MetricCalculator implements Runnable {
         Tasks.SCHEDULED_TO_INFO)).toList();
 
     long nowMs = clock.nowMillis();
-    Range<Long> timeRange = Range.closedOpen(nowMs - settings.getRefreshRateMs(), nowMs);
+    Range<Long> timeRange = Range.closedOpen(nowMs - settings.refreshRateMs, nowMs);
 
-    runAlgorithms(prodTasks, PROD_METRICS, timeRange);
-    runAlgorithms(nonProdTasks, NON_PROD_METRICS, timeRange);
+    runAlgorithms(prodTasks, settings.prodMetrics, timeRange, NAME_QUALIFIER_PROD);
+    runAlgorithms(nonProdTasks, settings.nonProdMetrics, timeRange, NAME_QUALIFIER_NON_PROD);
   }
 
   private void runAlgorithms(
       List<IScheduledTask> tasks,
-      Multimap<AlgorithmType, GroupType> metrics,
-      Range<Long> timeRange) {
+      Set<MetricCategory> categories,
+      Range<Long> timeRange,
+      String nameQualifier) {
 
-    for (Entry<AlgorithmType, GroupType> slaMetric : metrics.entries()) {
-      for (Entry<String, Collection<IScheduledTask>> namedGroup
-          : slaMetric.getValue().getSlaGroup().createNamedGroups(tasks).asMap().entrySet()) {
+    for (MetricCategory category : categories) {
+      for (Entry<AlgorithmType, GroupType> slaMetric : category.getMetrics().entries()) {
+        for (Entry<String, Collection<IScheduledTask>> namedGroup
+            : slaMetric.getValue().getSlaGroup().createNamedGroups(tasks).asMap().entrySet()) {
 
-        AlgorithmType algoType = slaMetric.getKey();
-        String metricName = namedGroup.getKey() + algoType.getAlgorithmName();
-        metricCache.getUnchecked(metricName)
-            .set(metricName, algoType.getAlgorithm().calculate(namedGroup.getValue(), timeRange));
+          AlgorithmType algoType = slaMetric.getKey();
+          String metricName = namedGroup.getKey() + algoType.getAlgorithmName() + nameQualifier;
+          metricCache.getUnchecked(metricName)
+              .set(metricName, algoType.getAlgorithm().calculate(namedGroup.getValue(), timeRange));
+        }
       }
     }
   }

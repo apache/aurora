@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.twitter.common.quantity.Amount;
@@ -27,6 +28,7 @@ import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
+import org.apache.aurora.scheduler.sla.SlaGroup.GroupType;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.Capture;
@@ -35,8 +37,11 @@ import org.easymock.EasyMock;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.scheduler.sla.MetricCalculator.NON_PROD_METRICS;
-import static org.apache.aurora.scheduler.sla.MetricCalculator.PROD_METRICS;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.JOB_UPTIMES;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.MEDIANS;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.PLATFORM_UPTIME;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.NAME_QUALIFIER_NON_PROD;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.NAME_QUALIFIER_PROD;
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType;
 import static org.apache.aurora.scheduler.sla.SlaTestUtil.makeTask;
 import static org.easymock.EasyMock.expect;
@@ -44,12 +49,29 @@ import static org.junit.Assert.assertEquals;
 
 public class MetricCalculatorTest extends EasyMockTest {
 
+  static final Multimap<AlgorithmType, GroupType> PROD_METRICS =
+      ImmutableMultimap.<AlgorithmType, GroupType>builder()
+          .putAll(JOB_UPTIMES.getMetrics())
+          .putAll(MEDIANS.getMetrics())
+          .putAll(PLATFORM_UPTIME.getMetrics())
+          .build();
+
+  static final Multimap<AlgorithmType, GroupType> NON_PROD_METRICS =
+      ImmutableMultimap.<AlgorithmType, GroupType>builder()
+          .putAll(JOB_UPTIMES.getMetrics())
+          .putAll(MEDIANS.getMetrics())
+          .putAll(PLATFORM_UPTIME.getMetrics())
+          .build();
+
   @Test
   public void runTest() {
     FakeClock clock = new FakeClock();
     StatsProvider statsProvider = createMock(StatsProvider.class);
     StatsProvider untracked = createMock(StatsProvider.class);
-    MetricCalculatorSettings settings = new MetricCalculatorSettings(10000);
+    MetricCalculatorSettings settings = new MetricCalculatorSettings(
+        10000,
+        ImmutableSet.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME),
+        ImmutableSet.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME));
     StorageTestUtil storageUtil = new StorageTestUtil(this);
     MetricCalculator calculator = new MetricCalculator(
         storageUtil.storage,
@@ -92,7 +114,8 @@ public class MetricCalculatorTest extends EasyMockTest {
     for (Multimap<AlgorithmType, SlaGroup.GroupType> definition : definitions) {
       for (Map.Entry<AlgorithmType, SlaGroup.GroupType> entry : definition.entries()) {
         for (String metric : entry.getValue().getSlaGroup().createNamedGroups(tasks).keys()) {
-          names.add(metric + entry.getKey().getAlgorithmName());
+          names.add(metric + entry.getKey().getAlgorithmName() + NAME_QUALIFIER_PROD);
+          names.add(metric + entry.getKey().getAlgorithmName() + NAME_QUALIFIER_NON_PROD);
         }
       }
     }

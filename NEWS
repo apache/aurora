@@ -6,3 +6,6 @@
 - The scheduler command line argument 'enable_legacy_constraints' has been
   removed, and the scheduler no longer automatically injects 'host' and 'rack'
   constraints for production services. (AURORA-1074)
+- SLA metrics for non-production jobs have been disabled by default. They can
+  be enabled via the scheduler command line. Metric names have changed from
+  '...nonprod_ms' to "...ms_nonprod" (AURORA-1350).

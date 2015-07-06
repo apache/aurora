@@ -19,6 +19,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -44,6 +45,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.JOB_UPTIMES;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.MEDIANS;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.PLATFORM_UPTIME;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -61,7 +65,10 @@ public class SlaModuleTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     clock = new FakeClock();
     statsProvider = createMock(StatsProvider.class);
-    module = new SlaModule(Amount.of(5L, Time.MILLISECONDS));
+    module = new SlaModule(
+        Amount.of(5L, Time.MILLISECONDS),
+        ImmutableSet.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME),
+        ImmutableSet.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME));
     injector = Guice.createInjector(
         ImmutableList.<Module>builder()
             .add(module)

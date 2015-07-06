@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.sla;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -23,6 +24,7 @@ import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
@@ -35,12 +37,17 @@ import com.twitter.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
+import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.JOB_UPTIMES;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.MEDIANS;
+import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.PLATFORM_UPTIME;
 
 /**
  * Binding module for the sla processor.
@@ -54,26 +61,47 @@ public class SlaModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> SLA_REFRESH_INTERVAL =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
+  @CmdLine(name = "sla_prod_metrics",
+      help = "Metric categories collected for production tasks.")
+  private static final Arg<Set<MetricCategory>> SLA_PROD_METRICS =
+      Arg.<Set<MetricCategory>>create(ImmutableSet.of(JOB_UPTIMES, PLATFORM_UPTIME, MEDIANS));
+
+  @CmdLine(name = "sla_non_prod_metrics",
+      help = "Metric categories collected for non production tasks.")
+  private static final Arg<Set<MetricCategory>> SLA_NON_PROD_METRICS =
+      Arg.<Set<MetricCategory>>create(ImmutableSet.of());
+
   @VisibleForTesting
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   @interface SlaExecutor { }
 
   private final Amount<Long, Time> refreshInterval;
+  private final Set<MetricCategory> prodMetrics;
+  private final Set<MetricCategory> nonProdMetrics;
 
   @VisibleForTesting
-  SlaModule(Amount<Long, Time> refreshInterval) {
+  SlaModule(
+      Amount<Long, Time> refreshInterval,
+      Set<MetricCategory> prodMetrics,
+      Set<MetricCategory> nonProdMetrics) {
+
     this.refreshInterval = refreshInterval;
+    this.prodMetrics = prodMetrics;
+    this.nonProdMetrics = nonProdMetrics;
   }
 
   public SlaModule() {
-    this(SLA_REFRESH_INTERVAL.get());
+    this(SLA_REFRESH_INTERVAL.get(), SLA_PROD_METRICS.get(), SLA_NON_PROD_METRICS.get());
   }
 
   @Override
   protected void configure() {
     bind(MetricCalculatorSettings.class)
-        .toInstance(new MetricCalculatorSettings(refreshInterval.as(Time.MILLISECONDS)));
+        .toInstance(new MetricCalculatorSettings(
+            refreshInterval.as(Time.MILLISECONDS),
+            prodMetrics,
+            nonProdMetrics));
 
     bind(MetricCalculator.class).in(Singleton.class);
     bind(ScheduledExecutorService.class)

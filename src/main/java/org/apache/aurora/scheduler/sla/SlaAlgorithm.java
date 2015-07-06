@@ -72,9 +72,7 @@ interface SlaAlgorithm {
     JOB_UPTIME_50(new JobUptime(50f), String.format(JobUptime.NAME_FORMAT, 50f)),
     AGGREGATE_PLATFORM_UPTIME(new AggregatePlatformUptime(), "platform_uptime_percent"),
     MEDIAN_TIME_TO_ASSIGNED(new MedianAlgorithm(ASSIGNED), "mtta_ms"),
-    MEDIAN_TIME_TO_RUNNING(new MedianAlgorithm(RUNNING), "mttr_ms"),
-    MEDIAN_TIME_TO_ASSIGNED_NON_PROD(new MedianAlgorithm(ASSIGNED), "mtta_nonprod_ms"),
-    MEDIAN_TIME_TO_RUNNING_NON_PROD(new MedianAlgorithm(RUNNING), "mttr_nonprod_ms");
+    MEDIAN_TIME_TO_RUNNING(new MedianAlgorithm(RUNNING), "mttr_ms");
 
     private final SlaAlgorithm algorithm;
     private final String name;
