@@ -1,0 +1,79 @@
+#!/bin/bash
+# Configuration used when executing the Aurora task scheduler process.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+GLOG_v=0
+
+LIBPROCESS_PORT=8083
+LIBPROCESS_IP='127.0.0.1'
+
+# Flags that control the behavior of the JVM.
+JAVA_OPTS=(
+  # Uses server-level GC optimizations, as this is a server.
+  -server
+
+  # Location of libmesos-XXXX.so / libmesos-XXXX.dylib
+  -Djava.library.path='/usr/lib;/usr/lib64'
+)
+
+# Flags control the behavior of the Aurora scheduler.
+# For a full list of available flags, run /usr/lib/aurora/bin/aurora-scheduler -help
+AURORA_FLAGS=(
+  # The name of this cluster.
+  -cluster_name='main'
+
+  # The HTTP port upon which Aurora will listen.
+  -http_port=8081
+
+  # The ZooKeeper URL of the ZNode where the Mesos master has registered.
+  -mesos_master_address='zk://127.0.0.1:2181/mesos/master'
+
+  # The ZooKeeper quorum to which Aurora will register itself.
+  -zk_endpoints='127.0.0.1:2181'
+
+  # The ZooKeeper ZNode within the specified quorum to which Aurora will register its
+  # ServerSet, which keeps track of all live Aurora schedulers.
+  -serverset_path='/aurora/scheduler'
+
+  # The log level of the built-in logger.
+  -vlog='INFO'
+
+  # Allows the scheduling of containers of the provided type.
+  -allowed_container_types='DOCKER,MESOS'
+
+  ### Native Log Settings ###
+
+  # The native log serves as a replicated database which stores the state of the
+  # scheduler, allowing for multi-master operation.
+
+  # Size of the quorum of Aurora schedulers which possess a native log.  If running in
+  # multi-master mode, consult the following document to determine appropriate values:
+  #
+  # https://aurora.apache.org/documentation/latest/deploying-aurora-scheduler/#replicated-log-configuration
+  -native_log_quorum_size='1'
+  # The ZooKeeper ZNode to which Aurora will register the locations of its replicated log.
+  -native_log_zk_group_path='/aurora/native-log'
+  # The local directory in which an Aurora scheduler can find Aurora's replicated log.
+  -native_log_file_path='/var/lib/aurora/db'
+  # The local directory in which Aurora schedulers will place state backups.
+  -backup_dir='/var/lib/aurora/backups'
+
+  ### Thermos Settings ###
+
+  # The local path of the Thermos executor binary.
+  -thermos_executor_path='/usr/bin/thermos_executor'
+  # Flags to pass to the Thermos executor.
+  -thermos_executor_flags='--announcer-enable --announcer-ensemble 127.0.0.1:2181'
+)
