@@ -243,9 +243,7 @@ CREATE TABLE task_config_metadata(
   id IDENTITY,
   task_config_id INT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
   key VARCHAR NOT NULL,
-  value VARCHAR NOT NULL,
-
-  UNIQUE(task_config_id)
+  value VARCHAR NOT NULL
 );
 
 CREATE TABLE task_config_docker_containers(

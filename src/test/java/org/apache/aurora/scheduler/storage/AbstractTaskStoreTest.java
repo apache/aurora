@@ -38,6 +38,7 @@ import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.MesosContainer;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskQuery;
@@ -177,6 +178,18 @@ public abstract class AbstractTaskStoreTest {
     IScheduledTask taskAModified = IScheduledTask.build(aWithHost.newBuilder().setStatus(RUNNING));
     saveTasks(taskAModified);
     assertStoreContents(taskAModified, TASK_B, TASK_C, TASK_D);
+  }
+
+  @Test
+  public void testSaveWithMetadata() {
+    ScheduledTask builder = TASK_A.newBuilder();
+    builder.getAssignedTask().getTask().setMetadata(
+        ImmutableSet.of(
+            new Metadata("package", "a"),
+            new Metadata("package", "b")));
+    IScheduledTask task = IScheduledTask.build(builder);
+    saveTasks(task);
+    assertStoreContents(task);
   }
 
   @Test
