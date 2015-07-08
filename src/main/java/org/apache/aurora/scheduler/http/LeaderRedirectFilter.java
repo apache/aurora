@@ -21,6 +21,7 @@ import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.core.HttpHeaders;
 
 import com.google.common.base.Optional;
 
@@ -42,7 +43,8 @@ public class LeaderRedirectFilter extends AbstractFilter {
 
     Optional<String> leaderRedirect = redirector.getRedirectTarget(request);
     if (leaderRedirect.isPresent()) {
-      response.sendRedirect(leaderRedirect.get());
+      response.setStatus(HttpServletResponse.SC_TEMPORARY_REDIRECT);
+      response.setHeader(HttpHeaders.LOCATION, leaderRedirect.get());
     } else {
       chain.doFilter(request, response);
     }

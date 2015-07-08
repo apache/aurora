@@ -112,7 +112,7 @@ public class ServletFilterTest extends JettyServerModuleTest {
     leaderRedirectSmokeTest(Status.OK);
 
     setLeadingScheduler("otherHost", 1234);
-    leaderRedirectSmokeTest(Status.FOUND);
+    leaderRedirectSmokeTest(Status.TEMPORARY_REDIRECT);
     assertResponseStatus("/", Status.OK);
   }
 }
