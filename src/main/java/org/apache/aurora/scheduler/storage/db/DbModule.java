@@ -13,12 +13,14 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -94,11 +96,27 @@ public final class DbModule extends PrivateModule {
   private final Module taskStoresModule;
   private final String jdbcSchema;
 
-  private DbModule(KeyFactory keyFactory, Module taskStoresModule, String jdbcSchema) {
+  private DbModule(
+      KeyFactory keyFactory,
+      Module taskStoresModule,
+      String dbName,
+      Map<String, String> jdbcUriArgs) {
+
     this.keyFactory = requireNonNull(keyFactory);
     this.taskStoresModule = requireNonNull(taskStoresModule);
-    // We always disable the MvStore, as it is in beta as of this writing.
-    this.jdbcSchema = jdbcSchema + ";MV_STORE=false";
+
+    Map<String, String> args = ImmutableMap.<String, String>builder()
+        .putAll(jdbcUriArgs)
+        // We always disable the MvStore, as it is in beta as of this writing.
+        .put("MV_STORE", "false")
+        // In several scenarios, we initiate asynchronous work in the context of a transaction,
+        // which can cause the asynchronous work to read yet-to-be-committed data.  Since this
+        // is currently only used as an in-memory store, we allow reads of uncommitted data to match
+        // previous behavior of the map-based store, and allow this type of pattern to work without
+        // regression.
+        .put("LOCK_MODE", "0")
+        .build();
+    this.jdbcSchema = dbName + Joiner.on(";").withKeyValueSeparator("=").join(args);
   }
 
   /**
@@ -109,7 +127,11 @@ public final class DbModule extends PrivateModule {
    * @return A new database module for production.
    */
   public static Module productionModule(KeyFactory keyFactory) {
-    return new DbModule(keyFactory, getTaskStoreModule(keyFactory), "aurora;DB_CLOSE_DELAY=-1");
+    return new DbModule(
+        keyFactory,
+        getTaskStoreModule(keyFactory),
+        "aurora",
+        ImmutableMap.of("DB_CLOSE_DELAY", "-1"));
   }
 
   /**
@@ -125,11 +147,12 @@ public final class DbModule extends PrivateModule {
     return new DbModule(
         keyFactory,
         taskStoreModule.isPresent() ? taskStoreModule.get() : getTaskStoreModule(keyFactory),
+        "testdb-" + UUID.randomUUID().toString(),
         // A non-zero close delay is used here to avoid eager database cleanup in tests that
         // make use of multiple threads.  Since all test databases are separately scoped by the
         // included UUID, multiple DB instances will overlap in time but they should be distinct
         // in content.
-        "testdb-" + UUID.randomUUID().toString() + ";DB_CLOSE_DELAY=5;");
+        ImmutableMap.of("DB_CLOSE_DELAY", "5"));
   }
 
   /**

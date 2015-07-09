@@ -15,15 +15,18 @@ package org.apache.aurora.scheduler.storage;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.testing.junit4.TearDownTestCase;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -44,6 +47,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -62,7 +66,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-public abstract class AbstractTaskStoreTest {
+public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   protected static final IHostAttributes HOST_A = IHostAttributes.build(
       new HostAttributes(
           "hostA",
@@ -595,6 +599,38 @@ public abstract class AbstractTaskStoreTest {
     } finally {
       new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
     }
+  }
+
+  @Test
+  public void testLegacyPermissiveTransactionIsolation() throws Exception {
+    // Ensures that a thread launched within a transaction can read the uncommitted changes caused
+    // by the transaction.  This is not a pattern that we should embrace, but is necessary for
+    // DbStorage to match behavior with MemStorage.
+    // TODO(wfarner): Create something like a transaction-aware Executor so that we can still
+    // asynchronously react to a completed transaction, but in a way that allows for more strict
+    // transaction isolation.
+
+    ExecutorService executor = Executors.newFixedThreadPool(1,
+        new ThreadFactoryBuilder().setNameFormat("AsyncRead-%d").setDaemon(true).build());
+    addTearDown(() -> new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute());
+
+    saveTasks(TASK_A);
+    storage.write(new Storage.MutateWork.NoResult<Exception>() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) throws Exception {
+        IScheduledTask taskARunning = TaskTestUtil.addStateTransition(TASK_A, RUNNING, 1000L);
+        saveTasks(taskARunning);
+
+        Future<ScheduleStatus> asyncReadState = executor.submit(new Callable<ScheduleStatus>() {
+          @Override
+          public ScheduleStatus call() {
+            return Iterables.getOnlyElement(fetchTasks(Query.taskScoped(Tasks.id(TASK_A))))
+                .getStatus();
+          }
+        });
+        assertEquals(RUNNING, asyncReadState.get());
+      }
+    });
   }
 
   private void assertStoreContents(IScheduledTask... tasks) {
