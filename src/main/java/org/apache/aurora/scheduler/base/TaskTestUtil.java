@@ -79,6 +79,10 @@ public final class TaskTestUtil {
   }
 
   public static IScheduledTask makeTask(String id, IJobKey job) {
+    return makeTask(id, makeConfig(job));
+  }
+
+  public static IScheduledTask makeTask(String id, ITaskConfig config) {
     return IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.PENDING)
         .setTaskEvents(ImmutableList.of(
@@ -94,7 +98,7 @@ public final class TaskTestUtil {
             .setInstanceId(2)
             .setTaskId(id)
             .setAssignedPorts(ImmutableMap.of("http", 1000))
-            .setTask(makeConfig(job).newBuilder())));
+            .setTask(config.newBuilder())));
   }
 
   public static IScheduledTask addStateTransition(

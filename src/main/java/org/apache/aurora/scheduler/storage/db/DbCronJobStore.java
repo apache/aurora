@@ -70,7 +70,7 @@ class DbCronJobStore implements CronJobStore.Mutable {
         @Override
         public JobConfiguration apply(CronJobWrapper row) {
           JobConfiguration job = row.getJob();
-          job.setTaskConfig(taskConfigManager.getConfigSaturator().apply(
+          job.setTaskConfig(taskConfigManager.getConfigHydrator().apply(
               new TaskConfigRow(row.getTaskConfigRowId(), job.getTaskConfig())));
           return job;
         }

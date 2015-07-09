@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.storage.db;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -87,7 +88,7 @@ class TaskConfigManager {
    *
    * @return A function to populate relations in task configs.
    */
-  Function<TaskConfigRow, TaskConfig> getConfigSaturator() {
+  Function<TaskConfigRow, TaskConfig> getConfigHydrator() {
     // It appears that there is no way in mybatis to populate a field of type Map.  To work around
     // this, we need to manually perform the query and associate the elements.
     final LoadingCache<Long, Map<String, String>> taskLinkCache = CacheBuilder.newBuilder()
@@ -107,8 +108,28 @@ class TaskConfigManager {
     return Functions.compose(REPLACE_UNION_TYPES, linkPopulator);
   }
 
+  private Optional<Long> getConfigRow(ITaskConfig config) {
+    // We could optimize this slightly by first comparing the un-hydrated row and breaking early.
+
+    Iterable<TaskConfigRow> configsInJob = getConfigs(config.getJob());
+
+    Map<ITaskConfig, TaskConfigRow> rowsToIds =
+        FluentIterable.from(configsInJob)
+            .uniqueIndex(
+                Functions.compose(ITaskConfig.FROM_BUILDER, getConfigHydrator()));
+
+    return Optional.ofNullable(rowsToIds.get(config)).map(TaskConfigRow::getId);
+  }
+
   long insert(ITaskConfig config) {
     InsertResult configInsert = new InsertResult();
+
+    // Determine whether this config is already stored.
+    Optional<Long> existingRow = getConfigRow(config);
+    if (existingRow.isPresent()) {
+      return existingRow.get();
+    }
+
     jobKeyMapper.merge(config.getJob());
     configMapper.insert(config, configInsert);
     for (IConstraint constraint : config.getConstraints()) {

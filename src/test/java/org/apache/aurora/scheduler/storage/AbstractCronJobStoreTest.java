@@ -24,14 +24,18 @@ import com.google.inject.Module;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
 import org.junit.Before;
@@ -100,6 +104,34 @@ public abstract class AbstractCronJobStoreTest {
     removeJob(prod.getKey());
     assertNull(fetchJob(prod.getKey()).orNull());
     assertEquals(staging, fetchJob(staging.getKey()).orNull());
+  }
+
+  @Test
+  public void testTaskConfigDedupe() {
+    // Test for regression of AURORA-1392.
+
+    final IScheduledTask instance = TaskTestUtil.makeTask("a", JOB_A.getTaskConfig());
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(instance));
+      }
+    });
+
+    saveAcceptedJob(JOB_A);
+
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().mutateTasks(Query.taskScoped(Tasks.id(instance)),
+            new TaskStore.Mutable.TaskMutation() {
+              @Override
+              public IScheduledTask apply(IScheduledTask task) {
+                return IScheduledTask.build(task.newBuilder().setStatus(ScheduleStatus.RUNNING));
+              }
+            });
+      }
+    });
   }
 
   @Test

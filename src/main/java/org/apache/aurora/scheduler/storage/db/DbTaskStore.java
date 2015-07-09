@@ -20,7 +20,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -33,7 +32,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
@@ -112,39 +110,6 @@ class DbTaskStore implements TaskStore.Mutable {
     return IJobKey.setFromBuilders(taskMapper.selectJobKeys());
   }
 
-  private static final Function<TaskConfigRow, Long> CONFIG_ID =
-      new Function<TaskConfigRow, Long>() {
-        @Override
-        public Long apply(TaskConfigRow row) {
-          return row.getId();
-        }
-      };
-
-  /**
-   * Computes an association between config table row ID and {@link ITaskConfig} object for all
-   * configs in the provided jobs.
-   *
-   * @param jobs Jobs to fetch task configs for.
-   * @return A mutable bi-map between row ID and task config.
-   */
-  private Map<ITaskConfig, Long> getTaskConfigRows(Set<IJobKey> jobs) {
-    Function<IJobKey, Iterable<TaskConfigRow>> getRows =
-        new Function<IJobKey, Iterable<TaskConfigRow>>() {
-          @Override
-          public Iterable<TaskConfigRow> apply(IJobKey job) {
-            return configManager.getConfigs(job);
-          }
-        };
-
-    Map<ITaskConfig, TaskConfigRow> rowsToIds =
-        FluentIterable.from(jobs)
-            .transformAndConcat(getRows)
-            .uniqueIndex(
-                Functions.compose(ITaskConfig.FROM_BUILDER, configManager.getConfigSaturator()));
-
-    return Maps.transformValues(rowsToIds, CONFIG_ID);
-  }
-
   @Timed("db_storage_save_tasks")
   @Override
   public void saveTasks(Set<IScheduledTask> tasks) {
@@ -165,12 +130,6 @@ class DbTaskStore implements TaskStore.Mutable {
             return configManager.insert(config);
           }
         });
-
-    // Seed the cache with known configs in the jobs being updated.
-    configCache.putAll(getTaskConfigRows(
-        FluentIterable.from(tasks)
-            .transform(Tasks.SCHEDULED_TO_JOB_KEY)
-            .toSet()));
 
     for (IScheduledTask task : tasks) {
       long configId = configCache.getUnchecked(task.getAssignedTask().getTask());
@@ -272,7 +231,7 @@ class DbTaskStore implements TaskStore.Mutable {
       filter = Predicates.alwaysTrue();
     }
 
-    final Function<TaskConfigRow, TaskConfig> configSaturator = configManager.getConfigSaturator();
+    final Function<TaskConfigRow, TaskConfig> configSaturator = configManager.getConfigHydrator();
     return FluentIterable.from(results)
         .transform(populateAssignedPorts)
         .transform(new Function<ScheduledTaskWrapper, ScheduledTaskWrapper>() {
