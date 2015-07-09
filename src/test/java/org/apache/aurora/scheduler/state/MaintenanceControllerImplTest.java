@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -39,6 +40,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -76,6 +78,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
             StateModule.bindMaintenanceController(binder());
             bind(Storage.class).toInstance(storageUtil.storage);
             bind(StateManager.class).toInstance(stateManager);
+            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
           }
         });
     maintenance = injector.getInstance(MaintenanceController.class);

@@ -13,25 +13,31 @@
  */
 package org.apache.aurora.scheduler.events;
 
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.eventbus.EventBus;
+import com.google.common.eventbus.Subscribe;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
+import com.google.inject.Module;
 import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.easymock.EasyMock.anyString;
+import static org.easymock.EasyMock.eq;
 import static org.junit.Assert.assertEquals;
 
 public class PubsubEventModuleTest extends EasyMockTest {
@@ -63,15 +69,44 @@ public class PubsubEventModuleTest extends EasyMockTest {
 
     injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
     assertEquals(
-        ImmutableMap.of(PubsubEventModule.PUBSUB_EXECUTOR_QUEUE_GAUGE, 0),
-        statsProvider.getAllValues()
+        0L,
+        statsProvider.getLongValue(PubsubEventModule.PUBSUB_EXECUTOR_QUEUE_GAUGE)
     );
   }
 
-  public Injector getInjector(boolean isAsync) {
+  @Test
+  public void testPubsubExceptionTracking() throws Exception {
+    Injector injector = getInjector(
+        false,
+        new AbstractModule() {
+          @Override
+          protected void configure() {
+            PubsubEventModule.bindSubscriber(binder(), ThrowingSubscriber.class);
+          }
+        });
+
+    logger.log(eq(Level.SEVERE), anyString(), EasyMock.<Throwable>anyObject());
+
+    control.replay();
+
+    injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
+    assertEquals(0L, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
+    injector.getInstance(EventBus.class).post("hello");
+    assertEquals(1L, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
+  }
+
+  static class ThrowingSubscriber implements PubsubEvent.EventSubscriber {
+    @Subscribe
+    public void receiveString(String value) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  public Injector getInjector(boolean isAsync, Module... additionalModules) {
     return Guice.createInjector(
         new LifecycleModule(),
         new PubsubEventModule(isAsync, logger),
+        new SchedulerServicesModule(),
         new AbstractModule() {
           @Override
           protected void configure() {
@@ -81,6 +116,9 @@ public class PubsubEventModuleTest extends EasyMockTest {
             bind(StatsProvider.class).toInstance(statsProvider);
             PubsubEventModule.bindSchedulingFilterDelegate(binder())
                 .toInstance(createMock(SchedulingFilter.class));
+            for (Module module : additionalModules) {
+              install(module);
+            }
           }
         });
   }

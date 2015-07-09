@@ -52,6 +52,7 @@ import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.Protos.TaskInfo;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -121,7 +122,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
             bind(StateManager.class).toInstance(stateManager);
             bind(TaskAssigner.class).toInstance(assigner);
             bind(Clock.class).toInstance(createMock(Clock.class));
-            bind(StatsProvider.class).toInstance(createMock(StatsProvider.class));
+            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(Storage.class).toInstance(storageImpl);
             PubsubEventModule.bindSubscriber(binder(), TaskScheduler.class);
           }

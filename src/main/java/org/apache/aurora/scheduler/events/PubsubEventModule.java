@@ -13,35 +13,33 @@
  */
 package org.apache.aurora.scheduler.events;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
-import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Supplier;
 import com.google.common.eventbus.AsyncEventBus;
 import com.google.common.eventbus.DeadEvent;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.eventbus.SubscriberExceptionContext;
+import com.google.common.eventbus.SubscriberExceptionHandler;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
-import com.google.inject.TypeLiteral;
+import com.google.inject.Provides;
 import com.google.inject.binder.LinkedBindingBuilder;
 import com.google.inject.multibindings.Multibinder;
-import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.Positive;
-import com.twitter.common.base.Command;
 import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
@@ -50,10 +48,6 @@ import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelega
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -67,9 +61,8 @@ public final class PubsubEventModule extends AbstractModule {
   @VisibleForTesting
   static final String PUBSUB_EXECUTOR_QUEUE_GAUGE = "pubsub_executor_queue_size";
 
-  @Qualifier
-  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  private @interface PubsubExecutorQueue { }
+  @VisibleForTesting
+  static final String EXCEPTIONS_STAT = "event_bus_exceptions";
 
   @Positive
   @CmdLine(name = "max_async_event_bus_threads",
@@ -91,12 +84,19 @@ public final class PubsubEventModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    final Executor executor;
+    // Ensure at least an empty binding is present.
+    getSubscriberBinder(binder());
+    // TODO(ksweeney): Would this be better as a scheduler active service?
+    SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RegisterSubscribers.class);
+  }
+
+  @Provides
+  @Singleton
+  EventBus provideEventBus(StatsProvider statsProvider) {
+    Executor executor;
     if (async) {
       LinkedBlockingQueue<Runnable> executorQueue = new LinkedBlockingQueue<>();
-      bind(new TypeLiteral<LinkedBlockingQueue<Runnable>>() { })
-          .annotatedWith(PubsubExecutorQueue.class)
-          .toInstance(executorQueue);
+      statsProvider.makeGauge(PUBSUB_EXECUTOR_QUEUE_GAUGE, executorQueue::size);
 
       executor = AsyncUtil.loggingExecutor(
           MAX_ASYNC_EVENT_BUS_THREADS.get(),
@@ -104,60 +104,44 @@ public final class PubsubEventModule extends AbstractModule {
           executorQueue,
           "AsyncTaskEvents-%d",
           log);
-
-      LifecycleModule.bindStartupAction(binder(), RegisterGauges.class);
     } else {
       executor = MoreExecutors.sameThreadExecutor();
     }
 
-    final EventBus eventBus = new AsyncEventBus("AsyncTaskEvents", executor);
-    eventBus.register(new DeadEventHandler());
-    bind(EventBus.class).toInstance(eventBus);
+    final AtomicLong subscriberExceptions = statsProvider.makeCounter(EXCEPTIONS_STAT);
+    EventBus eventBus = new AsyncEventBus(
+        executor,
+        new SubscriberExceptionHandler() {
+          @Override
+          public void handleException(Throwable exception, SubscriberExceptionContext context) {
+            subscriberExceptions.incrementAndGet();
+            log.log(
+                Level.SEVERE,
+                "Failed to dispatch event to " + context.getSubscriberMethod() + ": " + exception,
+                exception);
+          }
+        }
+    );
 
-    EventSink eventSink = new EventSink() {
+    eventBus.register(new DeadEventHandler());
+    return eventBus;
+  }
+
+  @Provides
+  @Singleton
+  EventSink provideEventSink(EventBus eventBus) {
+    return new EventSink() {
       @Override
       public void post(PubsubEvent event) {
         eventBus.post(event);
       }
     };
-    bind(EventSink.class).toInstance(eventSink);
-
-    // Ensure at least an empty binding is present.
-    getSubscriberBinder(binder());
-    // TODO(ksweeney): Would this be better as a scheduler active service?
-    SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RegisterSubscribers.class);
   }
 
   private class DeadEventHandler {
     @Subscribe
     public void logDeadEvent(DeadEvent event) {
       log.warning(String.format(DEAD_EVENT_MESSAGE, event.getEvent()));
-    }
-  }
-
-  static class RegisterGauges implements Command {
-    private final StatsProvider statsProvider;
-    private final LinkedBlockingQueue<Runnable> pubsubQueue;
-
-    @Inject
-    RegisterGauges(
-        StatsProvider statsProvider,
-        @PubsubExecutorQueue LinkedBlockingQueue<Runnable> pubsubQueue) {
-
-      this.statsProvider = requireNonNull(statsProvider);
-      this.pubsubQueue = requireNonNull(pubsubQueue);
-    }
-
-    @Override
-    public void execute() throws RuntimeException {
-      statsProvider.makeGauge(
-          PUBSUB_EXECUTOR_QUEUE_GAUGE,
-          new Supplier<Integer>() {
-            @Override
-            public Integer get() {
-              return pubsubQueue.size();
-            }
-          });
     }
   }
 

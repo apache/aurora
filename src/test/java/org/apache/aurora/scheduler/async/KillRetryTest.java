@@ -18,7 +18,6 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import javax.inject.Singleton;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.eventbus.EventBus;
 import com.google.common.testing.TearDown;
 import com.google.inject.AbstractModule;
@@ -139,7 +138,7 @@ public class KillRetryTest extends EasyMockTest {
     clock.advance(Amount.of(100L, Time.MILLISECONDS));
     clock.advance(Amount.of(1000L, Time.MILLISECONDS));
     clock.advance(Amount.of(10000L, Time.MILLISECONDS));
-    assertEquals(ImmutableMap.of(KillRetry.RETRIES_COUNTER, 2L), statsProvider.getAllValues());
+    assertEquals(2L, statsProvider.getLongValue(KillRetry.RETRIES_COUNTER));
   }
 
   @Test
@@ -153,6 +152,6 @@ public class KillRetryTest extends EasyMockTest {
 
     moveToKilling(taskId);
     clock.advance(Amount.of(100L, Time.MILLISECONDS));
-    assertEquals(ImmutableMap.of(KillRetry.RETRIES_COUNTER, 0L), statsProvider.getAllValues());
+    assertEquals(0L, statsProvider.getLongValue(KillRetry.RETRIES_COUNTER));
   }
 }
