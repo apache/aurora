@@ -102,6 +102,18 @@ public abstract class AbstractCronJobStoreTest {
     assertEquals(staging, fetchJob(staging.getKey()).orNull());
   }
 
+  @Test
+  public void testUpdate() {
+    // Test for regression of AURORA-1390.  Updates are not normal, but are used in cases such as
+    // backfilling fields upon storage recovery.
+
+    saveAcceptedJob(JOB_A);
+    IJobConfiguration jobAUpdated =
+        IJobConfiguration.build(JOB_A.newBuilder().setCronSchedule("changed"));
+    saveAcceptedJob(jobAUpdated);
+    assertEquals(jobAUpdated, fetchJob(KEY_A).orNull());
+  }
+
   private static IJobConfiguration makeJob(String name) {
     IJobKey job = JobKeys.from("role-" + name, "env-" + name, name);
     ITaskConfig config = TaskTestUtil.makeConfig(job);

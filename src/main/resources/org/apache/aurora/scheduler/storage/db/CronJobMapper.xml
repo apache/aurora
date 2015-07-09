@@ -18,8 +18,8 @@
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.CronJobMapper">
 
-  <insert id="insert">
-    INSERT INTO cron_jobs(
+  <insert id="merge">
+    MERGE INTO cron_jobs(
       job_key_id,
       creator_user,
       cron_schedule,
@@ -28,7 +28,7 @@
       </if>
       task_config_row_id,
       instance_count
-    ) VALUES (
+    ) KEY(job_key_id) VALUES (
       (
         SELECT ID
         FROM job_keys

@@ -51,7 +51,7 @@ class DbCronJobStore implements CronJobStore.Mutable {
   public void saveAcceptedJob(IJobConfiguration jobConfig) {
     requireNonNull(jobConfig);
     jobKeyMapper.merge(jobConfig.getKey());
-    cronJobMapper.insert(jobConfig, taskConfigManager.insert(jobConfig.getTaskConfig()));
+    cronJobMapper.merge(jobConfig, taskConfigManager.insert(jobConfig.getTaskConfig()));
   }
 
   @Override

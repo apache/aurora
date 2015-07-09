@@ -27,7 +27,7 @@ import org.apache.ibatis.annotations.Param;
  */
 interface CronJobMapper {
 
-  void insert(@Param("job") IJobConfiguration job, @Param("task_config_id") long taskConfigId);
+  void merge(@Param("job") IJobConfiguration job, @Param("task_config_id") long taskConfigId);
 
   void delete(@Param("job") IJobKey job);
 
