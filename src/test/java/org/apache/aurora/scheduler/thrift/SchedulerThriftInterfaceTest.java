@@ -111,6 +111,7 @@ import org.apache.aurora.scheduler.updater.JobUpdateController;
 import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.thrift.TException;
+import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
@@ -1828,6 +1829,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         response.getResult().getStartJobUpdateResult());
   }
 
+  private void expectJobUpdateQuotaCheck(QuotaCheckResult result) {
+    expect(quotaManager.checkJobUpdate(
+        anyObject(IJobUpdate.class),
+        eq(storageUtil.mutableStoreProvider))).andReturn(result);
+  }
+
   @Test
   public void testStartUpdateEmptyDesired() throws Exception {
     expectAuth(ROLE, true);
@@ -1845,9 +1852,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         newTask,
         ImmutableMap.of(oldTask1.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 1))));
 
-    expect(quotaManager.checkJobUpdate(
-        anyObject(IJobUpdate.class),
-        eq(storageUtil.mutableStoreProvider))).andReturn(ENOUGH_QUOTA);
+    expectJobUpdateQuotaCheck(ENOUGH_QUOTA);
 
     // Set diff-adjusted IJobUpdate expectations.
     JobUpdate expected = update.newBuilder();
@@ -2046,6 +2051,45 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartScopeIncludesNoop() throws Exception {
+    // Test for regression of AURORA-1332: a scoped update should be allowed when unchanged
+    // instances are included in the scope.
+
+    expectAuth(ROLE, true);
+    expectNoCronJob();
+    expect(uuidGenerator.createNew()).andReturn(UU_ID);
+
+    ScheduledTask taskBuilder = buildTaskForJobUpdate(0).newBuilder();
+    taskBuilder.getAssignedTask().getTask().setNumCpus(100);
+    IScheduledTask newTask = IScheduledTask.build(taskBuilder);
+
+    IScheduledTask oldTask1 = buildTaskForJobUpdate(1);
+    IScheduledTask oldTask2 = buildTaskForJobUpdate(2);
+    storageUtil.expectTaskFetch(
+        Query.unscoped().byJob(JOB_KEY).active(),
+        newTask, oldTask1, oldTask2);
+    expectJobUpdateQuotaCheck(ENOUGH_QUOTA);
+    expect(taskIdGenerator.generate(EasyMock.<ITaskConfig>anyObject(), anyInt()))
+        .andReturn(TASK_ID);
+    jobUpdateController.start(EasyMock.<IJobUpdate>anyObject(), eq(AUDIT));
+
+    ITaskConfig newConfig = newTask.getAssignedTask().getTask();
+    JobUpdate builder = buildJobUpdate(
+        3,
+        newConfig,
+        ImmutableMap.of(
+            newConfig, ImmutableSet.of(new Range(0, 0)),
+            oldTask1.getAssignedTask().getTask(), ImmutableSet.of(new Range(1, 2))))
+        .newBuilder();
+    builder.getInstructions().getSettings()
+        .setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(0, 2)));
+
+    control.replay();
+    JobUpdateRequest request = buildJobUpdateRequest(IJobUpdate.build(builder));
+    assertResponse(OK, thrift.startJobUpdate(request, AUDIT_MESSAGE, SESSION));
+  }
+
+  @Test
   public void testStartUpdateFailsInstanceCountCheck() throws Exception {
     JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
     request.setInstanceCount(4001);
@@ -2053,9 +2097,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectNoCronJob();
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active());
-    expect(quotaManager.checkJobUpdate(
-        anyObject(IJobUpdate.class),
-        eq(storageUtil.mutableStoreProvider))).andReturn(ENOUGH_QUOTA);
+    expectJobUpdateQuotaCheck(ENOUGH_QUOTA);
 
     control.replay();
 
@@ -2069,9 +2111,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectNoCronJob();
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active());
-    expect(quotaManager.checkJobUpdate(
-        anyObject(IJobUpdate.class),
-        eq(storageUtil.mutableStoreProvider))).andReturn(ENOUGH_QUOTA);
+    expectJobUpdateQuotaCheck(ENOUGH_QUOTA);
 
     expect(taskIdGenerator.generate(ITaskConfig.build(request.getTaskConfig()), 6))
         .andReturn(Strings.repeat("a", MAX_TASK_ID_LENGTH + 1));
@@ -2093,13 +2133,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(taskIdGenerator.generate(ITaskConfig.build(request.getTaskConfig()), 6))
         .andReturn(TASK_ID);
 
-    ITaskConfig config = ITaskConfig.build(request.getTaskConfig());
-    IJobUpdate update = buildJobUpdate(6, config, ImmutableMap.of(
-        oldTask.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 0))));
-
-    expect(quotaManager.checkJobUpdate(
-        update,
-        storageUtil.mutableStoreProvider)).andReturn(NOT_ENOUGH_QUOTA);
+    expectJobUpdateQuotaCheck(NOT_ENOUGH_QUOTA);
 
     control.replay();
 
@@ -2121,9 +2155,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
     expect(taskIdGenerator.generate(newTask, 1)).andReturn(TASK_ID);
-    expect(quotaManager.checkJobUpdate(
-        update,
-        storageUtil.mutableStoreProvider)).andReturn(ENOUGH_QUOTA);
+    expectJobUpdateQuotaCheck(ENOUGH_QUOTA);
 
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
     jobUpdateController.start(update, AUDIT);

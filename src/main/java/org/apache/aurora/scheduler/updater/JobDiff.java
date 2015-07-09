@@ -45,6 +45,7 @@ import static java.util.Objects.requireNonNull;
 public final class JobDiff {
   private final Map<Integer, ITaskConfig> replacedInstances;
   private final Set<Integer> replacementInstances;
+  private final Set<Integer> unchangedInstances;
 
   /**
    * Creates a job diff containing the instances to be replaced (original state), and instances
@@ -54,9 +55,14 @@ public final class JobDiff {
    * @param replacedInstances Instances being replaced.
    * @param replacementInstances Instances to replace {@code replacedInstances}.
    */
-  public JobDiff(Map<Integer, ITaskConfig> replacedInstances, Set<Integer> replacementInstances) {
+  public JobDiff(
+      Map<Integer, ITaskConfig> replacedInstances,
+      Set<Integer> replacementInstances,
+      Set<Integer> unchangedInstances) {
+
     this.replacedInstances = requireNonNull(replacedInstances);
     this.replacementInstances = requireNonNull(replacementInstances);
+    this.unchangedInstances = requireNonNull(unchangedInstances);
   }
 
   public Map<Integer, ITaskConfig> getReplacedInstances() {
@@ -67,6 +73,10 @@ public final class JobDiff {
     return replacementInstances;
   }
 
+  public Set<Integer> getUnchangedInstances() {
+    return unchangedInstances;
+  }
+
   /**
    * Gets instances contained in a {@code scope} that are not a part of the job diff.
    *
@@ -74,9 +84,12 @@ public final class JobDiff {
    * @return Instance IDs in {@code scope} that are not in this job diff.
    */
   public Set<Integer> getOutOfScopeInstances(Set<Integer> scope) {
-    Set<Integer> allAlteredInstances = ImmutableSet.copyOf(
-        Sets.union(getReplacedInstances().keySet(), getReplacementInstances()));
-    return ImmutableSet.copyOf(Sets.difference(scope, allAlteredInstances));
+    Set<Integer> allValidInstances = ImmutableSet.<Integer>builder()
+        .addAll(getReplacedInstances().keySet())
+        .addAll(getReplacementInstances())
+        .addAll(getUnchangedInstances())
+        .build();
+    return ImmutableSet.copyOf(Sets.difference(scope, allValidInstances));
   }
 
   /**
@@ -90,7 +103,7 @@ public final class JobDiff {
 
   @Override
   public int hashCode() {
-    return Objects.hash(replacedInstances, replacementInstances);
+    return Objects.hash(replacedInstances, replacementInstances, unchangedInstances);
   }
 
   @Override
@@ -101,7 +114,8 @@ public final class JobDiff {
 
     JobDiff other = (JobDiff) o;
     return Objects.equals(getReplacedInstances(), other.getReplacedInstances())
-        && Objects.equals(getReplacementInstances(), other.getReplacementInstances());
+        && Objects.equals(getReplacementInstances(), other.getReplacementInstances())
+        && Objects.equals(getUnchangedInstances(), other.getUnchangedInstances());
   }
 
   @Override
@@ -109,6 +123,7 @@ public final class JobDiff {
     return com.google.common.base.Objects.toStringHelper(this)
         .add("replacedInstances", getReplacedInstances())
         .add("replacementInstances", getReplacementInstances())
+        .add("unchangedInstances", getUnchangedInstances())
         .toString();
   }
 
@@ -122,20 +137,12 @@ public final class JobDiff {
   }
 
   private static JobDiff computeUnscoped(
-      TaskStore taskStore,
+      Map<Integer, ITaskConfig> currentState,
       IJobKey job,
       Map<Integer, ITaskConfig> proposedState) {
 
-    requireNonNull(taskStore);
     requireNonNull(job);
     requireNonNull(proposedState);
-
-    Map<Integer, ITaskConfig> currentState = ImmutableMap.copyOf(
-        Maps.transformValues(
-            Maps.uniqueIndex(
-                taskStore.fetchTasks(Query.jobScoped(job).active()),
-                Tasks.SCHEDULED_TO_INSTANCE_ID),
-            Tasks.SCHEDULED_TO_INFO));
 
     MapDifference<Integer, ITaskConfig> diff = Maps.difference(currentState, proposedState);
 
@@ -149,7 +156,10 @@ public final class JobDiff {
         .addAll(diff.entriesDiffering().keySet())
         .build();
 
-    return new JobDiff(removedInstances, addedInstances);
+    return new JobDiff(
+        removedInstances,
+        addedInstances,
+        ImmutableSet.copyOf(diff.entriesInCommon().keySet()));
   }
 
   /**
@@ -167,14 +177,27 @@ public final class JobDiff {
       Map<Integer, ITaskConfig> proposedState,
       Set<IRange> scope) {
 
-    JobDiff diff = computeUnscoped(taskStore, job, proposedState);
+    Map<Integer, ITaskConfig> currentState = ImmutableMap.copyOf(
+        Maps.transformValues(
+            Maps.uniqueIndex(
+                taskStore.fetchTasks(Query.jobScoped(job).active()),
+                Tasks.SCHEDULED_TO_INSTANCE_ID),
+            Tasks.SCHEDULED_TO_INFO));
+
+    JobDiff diff = computeUnscoped(currentState, job, proposedState);
     if (scope.isEmpty()) {
       return diff;
     } else {
       Set<Integer> limit = Numbers.rangesToInstanceIds(scope);
-      return new JobDiff(
-          ImmutableMap.copyOf(Maps.filterKeys(diff.getReplacedInstances(), Predicates.in(limit))),
-          ImmutableSet.copyOf(Sets.intersection(diff.getReplacementInstances(), limit)));
+      Map<Integer, ITaskConfig> replaced =
+          ImmutableMap.copyOf(Maps.filterKeys(diff.getReplacedInstances(), Predicates.in(limit)));
+      Set<Integer> replacements =
+          ImmutableSet.copyOf(Sets.intersection(diff.getReplacementInstances(), limit));
+      Set<Integer> unchanged = ImmutableSet.copyOf(
+          Sets.difference(
+              ImmutableSet.copyOf(Sets.difference(currentState.keySet(), replaced.keySet())),
+              replacements));
+      return new JobDiff(replaced, replacements, unchanged);
     }
   }
 

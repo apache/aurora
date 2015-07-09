@@ -1155,7 +1155,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
             Numbers.rangesToInstanceIds(settings.getUpdateOnlyTheseInstances()));
         if (!invalidScope.isEmpty()) {
           return invalidRequest(
-              "updateOnlyTheseInstances contains instances irrelevant to the update: "
+              "The update request attempted to update specific instances,"
+                  + " but some are irrelevant to the update and current job state: "
                   + invalidScope);
         }
 
