@@ -3,7 +3,7 @@ Priority: optional
 Maintainer: The Apache Aurora authors <dev@aurora.apache.org>
 Build-Depends: debhelper (>= 9),
  java8-sdk | openjdk-8-jdk,
- gradle (>= 2.4) | gradle-2.4,
+ gradle (>= 2.5) | gradle-2.5,
  python-all-dev,
  libkrb5-dev,
  curl,
