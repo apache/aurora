@@ -147,12 +147,12 @@ public class JettyServerModule extends AbstractModule {
 
     final Optional<String> hostnameOverride = Optional.fromNullable(HOSTNAME_OVERRIDE.get());
     if (hostnameOverride.isPresent()) {
-        /* Force resolution of the DNS address passed in to ensure it's valid */
       try {
         InetAddress.getByName(hostnameOverride.get());
       } catch (UnknownHostException e) {
-        throw new IllegalStateException(
-            "Failed to resolve hostname supplied by -hostname", e);
+        /* Possible misconfiguration, so warn the user. */
+        LOG.warning("Unable to resolve name specified in -hostname. "
+                    + "Depending on your environment, this may be valid.");
       }
     }
     install(new PrivateModule() {
