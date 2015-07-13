@@ -116,7 +116,7 @@ public final class DbModule extends PrivateModule {
         // regression.
         .put("LOCK_MODE", "0")
         .build();
-    this.jdbcSchema = dbName + Joiner.on(";").withKeyValueSeparator("=").join(args);
+    this.jdbcSchema = dbName + ";" + Joiner.on(";").withKeyValueSeparator("=").join(args);
   }
 
   /**
