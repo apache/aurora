@@ -12,7 +12,6 @@
 # limitations under the License.
 #
 
-import json
 import pkgutil
 
 from pystachio.config import Config as PystachioConfig
@@ -70,7 +69,7 @@ class AuroraConfigLoader(PystachioConfig):
 
   @classmethod
   def loads_json(cls, string):
-    return base_schema.Job(json.loads(string))
+    return base_schema.Job.json_loads(string)
 
 
 AuroraConfigLoader.flush_schemas()
