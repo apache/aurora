@@ -13,28 +13,18 @@
  */
 package org.apache.aurora.scheduler.storage.db.views;
 
-/**
- * Representation of a row in the task_ports table.
- */
-public class AssignedPort {
-  private final String name;
-  private final int port;
+import org.apache.aurora.gen.Constraint;
 
-  private AssignedPort() {
-    // Needed by mybatis.
-    this(null, -1);
+public final class DbConstraint {
+  private String name;
+  private DbTaskConstraint constraint;
+
+  private DbConstraint() {
   }
 
-  public AssignedPort(String name, int port) {
-    this.name = name;
-    this.port = port;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public int getPort() {
-    return port;
+  Constraint toThrift() {
+    return new Constraint()
+        .setName(name)
+        .setConstraint(constraint.toThrift());
   }
 }

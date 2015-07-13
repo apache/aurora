@@ -11,32 +11,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db.shims;
+package org.apache.aurora.scheduler.storage.db.views;
 
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.MesosContainer;
 
-/**
- * An extension of {@link Container} that does not throw {@link NullPointerException} when
- * accessors are called on unset fields.
- */
-public class ContainerShim extends Container {
-  @Override
-  public DockerContainer getDocker() {
-    if (isSet(_Fields.DOCKER)) {
-      return super.getDocker();
-    } else {
-      return null;
-    }
+public final class DbContainer {
+  private DockerContainer docker;
+
+  private DbContainer() {
   }
 
-  @Override
-  public MesosContainer getMesos() {
-    if (isSet(_Fields.MESOS)) {
-      return super.getMesos();
+  Container toThrift() {
+    if (docker == null) {
+      return Container.mesos(new MesosContainer());
     } else {
-      return null;
+      return Container.docker(docker);
     }
   }
 }

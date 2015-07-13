@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collector;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Service;
@@ -38,11 +39,22 @@ public final class GuavaUtils {
    */
   public static <T> Collector<T, ?, ImmutableSet<T>> toImmutableSet() {
     return Collector.of(
-        ImmutableSet::builder,
+        ImmutableSet.Builder<T>::new,
         ImmutableSet.Builder::add,
-        (ImmutableSet.Builder<T> l, ImmutableSet.Builder<T> r) -> l.addAll(r.build()),
+        (l, r) -> l.addAll(r.build()),
         ImmutableSet.Builder::build,
         UNORDERED);
+  }
+
+  /**
+   * Collector to create a Guava ImmutableList.
+   */
+  public static <T> Collector<T, ?, ImmutableList<T>> toImmutableList() {
+    return Collector.of(
+        ImmutableList.Builder<T>::new,
+        ImmutableList.Builder::add,
+        (l, r) -> l.addAll(r.build()),
+        ImmutableList.Builder::build);
   }
 
   /**

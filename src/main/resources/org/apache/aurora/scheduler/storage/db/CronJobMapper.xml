@@ -62,41 +62,37 @@
 
   <resultMap
       id="cronJobWrapperResultMap"
-      type="org.apache.aurora.scheduler.storage.db.views.CronJobWrapper">
+      type="org.apache.aurora.scheduler.storage.db.views.DbJobConfiguration">
 
     <id column="c_id" />
-    <result property="taskConfigRowId" column="c_task_config_row_id"/>
-    <association property="job" javaType="org.apache.aurora.gen.JobConfiguration" columnPrefix="c_">
-      <id column="id"/>
-      <result property="owner.role" column="j_role"/>
-      <result property="owner.user" column="creator_user"/>
-      <result
-          property="cronCollisionPolicy"
-          column="cron_collision_policy"
-          typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.CronCollisionPolicyTypeHandler"/>
-      <association
-          property="key"
-          resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
-          columnPrefix="j_"/>
-      <association
-          property="taskConfig"
-          select="org.apache.aurora.scheduler.storage.db.TaskConfigMapper.selectConfig"
-          column="task_config_row_id"
-          foreignColumn="id"/>
-    </association>
+    <result property="owner.role" column="j_role"/>
+    <result property="owner.user" column="creator_user"/>
+    <result
+        property="cronCollisionPolicy"
+        column="cron_collision_policy"
+        typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.CronCollisionPolicyTypeHandler"/>
+    <association
+        property="key"
+        resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
+        columnPrefix="j_"/>
+    <association
+        property="taskConfig"
+        select="org.apache.aurora.scheduler.storage.db.TaskConfigMapper.selectConfig"
+        column="task_config_row_id"
+        foreignColumn="id"/>
   </resultMap>
 
   <sql id="unscopedSelect">
     SELECT
       c.id AS c_id,
-      c.creator_user AS c_creator_user,
-      c.cron_schedule AS c_cron_schedule,
-      c.cron_collision_policy AS c_cron_collision_policy,
-      c.task_config_row_id AS c_task_config_row_id,
-      c.instance_count AS c_instance_count,
-      j.role AS c_j_role,
-      j.environment AS c_j_environment,
-      j.name AS c_j_name
+      c.creator_user AS creator_user,
+      c.cron_schedule AS cron_schedule,
+      c.cron_collision_policy AS cron_collision_policy,
+      c.task_config_row_id AS task_config_row_id,
+      c.instance_count AS instance_count,
+      j.role AS j_role,
+      j.environment AS j_environment,
+      j.name AS j_name
     FROM cron_jobs AS c
     INNER JOIN job_keys AS j ON j.id = c.job_key_id
   </sql>

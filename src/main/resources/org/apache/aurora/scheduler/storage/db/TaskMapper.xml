@@ -18,7 +18,7 @@
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.TaskMapper">
   <cache size="10000" readOnly="true" />
-  <insert id="insertScheduledTask" useGeneratedKeys="true" keyColumn="id" keyProperty="id">
+  <insert id="insertScheduledTask" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
     INSERT INTO tasks (
       task_id,
       slave_row_id,
@@ -39,7 +39,7 @@
       #{task.status, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.ScheduleStatusTypeHandler},
       #{task.failureCount},
       #{task.ancestorId},
-      #{taskConfigRowId}
+      #{configId}
     )
   </insert>
 
@@ -62,8 +62,9 @@
     ORDER BY e.timestamp_ms ASC
   </select>
 
-  <resultMap id="scheduledTaskMap" type="org.apache.aurora.gen.ScheduledTask">
+  <resultMap id="scheduledTaskMap" type="org.apache.aurora.scheduler.storage.db.views.DbScheduledTask">
     <id column="row_id"/>
+    <result column="c_id" property="taskConfigRowId"/>
     <result property="status"
             column="status"
             typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.ScheduleStatusTypeHandler" />
@@ -75,18 +76,17 @@
         property="assignedTask.task"
         select="org.apache.aurora.scheduler.storage.db.TaskConfigMapper.selectConfig"
         column="task_config_row_id"
-        foreignColumn="id"/>
+        foreignColumn="row_id"/>
+    <collection
+        property="assignedTask.assignedPorts"
+        select="selectPorts"
+        column="row_id"
+        foreignColumn="task_row_id"/>
     <collection
         property="taskEvents"
         select="selectTaskEvents"
         column="row_id"
         foreignColumn="task_row_id"/>
-  </resultMap>
-
-  <resultMap id="taskWrapperMap" type="org.apache.aurora.scheduler.storage.db.views.ScheduledTaskWrapper">
-    <id column="row_id" property="id"/>
-    <result column="c_id" property="taskConfigRowId"/>
-    <association property="task" resultMap="scheduledTaskMap"/>
   </resultMap>
 
   <sql id="unscopedSelect">
@@ -109,13 +109,13 @@
     LEFT OUTER JOIN host_attributes AS h ON h.id = t.slave_row_id
   </sql>
 
-  <select id="selectById" resultMap="taskWrapperMap">
+  <select id="selectById" resultMap="scheduledTaskMap">
     <include refid="unscopedSelect"/>
     WHERE
       t.task_id = #{taskId}
   </select>
 
-  <select id="select" resultMap="taskWrapperMap">
+  <select id="select" resultMap="scheduledTaskMap">
     <include refid="unscopedSelect"/>
     <where>
       <if test="role != null">
@@ -206,14 +206,17 @@
     ) VALUES (
     <foreach item="port" collection="ports" separator="),(">
       #{taskRowId},
-      #{port.name},
-      #{port.port}
+      #{port.first},
+      #{port.second}
     </foreach>
     )
   </insert>
 
-  <resultMap id="portMap" type="org.apache.aurora.scheduler.storage.db.views.AssignedPort">
-    <id column="id"/>
+  <resultMap id="portMap" type="com.twitter.common.collections.Pair">
+    <constructor>
+      <arg column="name"/>
+      <arg column="port"/>
+    </constructor>
   </resultMap>
 
   <select id="selectPorts" resultMap="portMap">

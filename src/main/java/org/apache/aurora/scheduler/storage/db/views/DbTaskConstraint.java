@@ -11,30 +11,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db.shims;
+package org.apache.aurora.scheduler.storage.db.views;
+
+import javax.annotation.Nullable;
 
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 
-/**
- * An extension of {@link TaskConstraint} that does not throw {@link NullPointerException} when
- * accessors are called on unset fields.
- */
-public class TaskConstraintShim extends TaskConstraint {
-  @Override
-  public ValueConstraint getValue() {
-    if (isSet(_Fields.VALUE)) {
-      return super.getValue();
-    } else {
-      return null;
-    }
+public final class DbTaskConstraint {
+  private ValueConstraint value;
+  private LimitConstraint limit;
+
+  private DbTaskConstraint() {
   }
 
-  @Override
-  public LimitConstraint getLimit() {
-    if (isSet(_Fields.LIMIT)) {
-      return super.getLimit();
+  private static boolean isSet(Object o) {
+    return o != null;
+  }
+
+  @Nullable
+  TaskConstraint toThrift() {
+    // Using the isSet shim to work around a well-intentioned PMD rule that prefers positive
+    // branching (would trip if we did value != null directly here.
+    if (isSet(value)) {
+      return TaskConstraint.value(value);
+    } else if (isSet(limit)) {
+      return TaskConstraint.limit(limit);
     } else {
       return null;
     }

@@ -16,8 +16,9 @@ package org.apache.aurora.scheduler.storage.db;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.aurora.scheduler.storage.db.views.TaskConfigRow;
-import org.apache.aurora.scheduler.storage.db.views.TaskLink;
+import com.twitter.common.collections.Pair;
+
+import org.apache.aurora.scheduler.storage.db.views.DbTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -48,7 +49,7 @@ interface TaskConfigMapper extends GarbageCollectedTableMapper {
    * @param job Job to look up.
    * @return Task config row container.
    */
-  List<TaskConfigRow> selectConfigsByJob(IJobKey job);
+  List<DbTaskConfig> selectConfigsByJob(IJobKey job);
 
   /**
    * Looks up task config IDs by task IDs.
@@ -120,15 +121,7 @@ interface TaskConfigMapper extends GarbageCollectedTableMapper {
    */
   void insertTaskLinks(
       @Param("configId") long configId,
-      @Param("links") List<TaskLink> links);
-
-  /**
-   * Selects the task links associated with a {@link ITaskConfig}.
-   *
-   * @param configId Task config ID.
-   * @return Links associated with the task config.
-   */
-  List<TaskLink> selectTaskLinks(@Param("configId") long configId);
+      @Param("links") List<Pair<String, String>> links);
 
   /**
    * Inserts the container association within an {@link ITaskConfig}.

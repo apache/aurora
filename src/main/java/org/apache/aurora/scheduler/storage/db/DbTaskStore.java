@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,8 +26,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
@@ -39,14 +35,12 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.db.views.AssignedPort;
-import org.apache.aurora.scheduler.storage.db.views.ScheduledTaskWrapper;
-import org.apache.aurora.scheduler.storage.db.views.TaskConfigRow;
+import org.apache.aurora.scheduler.storage.db.views.DbScheduledTask;
+import org.apache.aurora.scheduler.storage.db.views.Pairs;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -132,32 +126,21 @@ class DbTaskStore implements TaskStore.Mutable {
         });
 
     for (IScheduledTask task : tasks) {
-      long configId = configCache.getUnchecked(task.getAssignedTask().getTask());
+      InsertResult result = new InsertResult();
+      taskMapper.insertScheduledTask(
+          task,
+          configCache.getUnchecked(task.getAssignedTask().getTask()),
+          result);
 
-      ScheduledTaskWrapper wrappedTask = new ScheduledTaskWrapper(configId, task.newBuilder());
-      taskMapper.insertScheduledTask(wrappedTask);
       if (!task.getTaskEvents().isEmpty()) {
-        taskMapper.insertTaskEvents(wrappedTask.getId(), task.getTaskEvents());
+        taskMapper.insertTaskEvents(result.getId(), task.getTaskEvents());
       }
       if (!task.getAssignedTask().getAssignedPorts().isEmpty()) {
         taskMapper.insertPorts(
-            wrappedTask.getId(),
-            toAssignedPorts(task.getAssignedTask().getAssignedPorts()));
+            result.getId(),
+            Pairs.fromMap(task.getAssignedTask().getAssignedPorts()));
       }
     }
-  }
-
-  private static List<AssignedPort> toAssignedPorts(Map<String, Integer> ports) {
-    // Mybatis does not seem to support inserting maps where the keys are not known in advance (it
-    // treats them as bags of properties, presumably like a cheap bean object).
-    // See https://github.com/mybatis/mybatis-3/pull/208, and seemingly-relevant code in
-    // https://github.com/mybatis/mybatis-3/blob/4cfc129938fd6b5cb20c4b741392e8b3fa41b529/src
-    // main/java/org/apache/ibatis/scripting/xmltags/ForEachSqlNode.java#L73-L77.
-    ImmutableList.Builder<AssignedPort> list = ImmutableList.builder();
-    for (Map.Entry<String, Integer> entry : ports.entrySet()) {
-      list.add(new AssignedPort(entry.getKey(), entry.getValue()));
-    }
-    return list.build();
   }
 
   @Timed("db_storage_delete_all_tasks")
@@ -216,7 +199,7 @@ class DbTaskStore implements TaskStore.Mutable {
   }
 
   private FluentIterable<IScheduledTask> matches(Query.Builder query) {
-    Iterable<ScheduledTaskWrapper> results;
+    Iterable<DbScheduledTask> results;
     Predicate<IScheduledTask> filter;
     if (query.get().getTaskIdsSize() == 1) {
       // Optimize queries that are scoped to a single task, as the dynamic SQL used for arbitrary
@@ -231,42 +214,8 @@ class DbTaskStore implements TaskStore.Mutable {
       filter = Predicates.alwaysTrue();
     }
 
-    final Function<TaskConfigRow, TaskConfig> configSaturator = configManager.getConfigHydrator();
     return FluentIterable.from(results)
-        .transform(populateAssignedPorts)
-        .transform(new Function<ScheduledTaskWrapper, ScheduledTaskWrapper>() {
-          @Override
-          public ScheduledTaskWrapper apply(ScheduledTaskWrapper task) {
-            configSaturator.apply(
-                new TaskConfigRow(
-                    task.getTaskConfigRowId(),
-                    task.getTask().getAssignedTask().getTask()));
-            return task;
-          }
-        })
-        .transform(UNWRAP)
-        .transform(IScheduledTask.FROM_BUILDER)
+        .transform(DbScheduledTask::toImmutable)
         .filter(filter);
   }
-
-  private final Function<ScheduledTaskWrapper, ScheduledTaskWrapper> populateAssignedPorts =
-      new Function<ScheduledTaskWrapper, ScheduledTaskWrapper>() {
-        @Override
-        public ScheduledTaskWrapper apply(ScheduledTaskWrapper task) {
-          ImmutableMap.Builder<String, Integer> ports = ImmutableMap.builder();
-          for (AssignedPort port : taskMapper.selectPorts(task.getId())) {
-            ports.put(port.getName(), port.getPort());
-          }
-          task.getTask().getAssignedTask().setAssignedPorts(ports.build());
-          return task;
-        }
-      };
-
-  private static final Function<ScheduledTaskWrapper, ScheduledTask> UNWRAP =
-      new Function<ScheduledTaskWrapper, ScheduledTask>() {
-        @Override
-        public ScheduledTask apply(ScheduledTaskWrapper task) {
-          return task.getTask();
-        }
-      };
 }

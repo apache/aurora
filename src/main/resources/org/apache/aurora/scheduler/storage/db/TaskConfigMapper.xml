@@ -66,17 +66,13 @@
     </collection>
   </resultMap>
 
-  <!--
-    A subclass of TaskConstraint is used to work around trouble using TaskConstraint.  See docs in
-    TaskConstraintShim for details.
-  -->
-  <resultMap id="taskConstraintMap" type="org.apache.aurora.scheduler.storage.db.shims.TaskConstraintShim">
+  <resultMap id="taskConstraintMap" type="org.apache.aurora.scheduler.storage.db.views.DbTaskConstraint">
     <id column="id"/>
     <association property="value" resultMap="valueConstraintMap" columnPrefix="v_"/>
     <association property="limit" resultMap="limitConstraintMap" columnPrefix="l_"/>
   </resultMap>
 
-  <resultMap id="constraintMap" type="org.apache.aurora.gen.Constraint">
+  <resultMap id="constraintMap" type="org.apache.aurora.scheduler.storage.db.views.DbConstraint">
     <id column="id"/>
     <association property="constraint" resultMap="taskConstraintMap"/>
   </resultMap>
@@ -101,7 +97,7 @@
     <result column="image" property="image"/>
   </resultMap>
 
-  <resultMap id="containerMap" type="org.apache.aurora.scheduler.storage.db.shims.ContainerShim">
+  <resultMap id="containerMap" type="org.apache.aurora.scheduler.storage.db.views.DbContainer">
     <association property="docker" resultMap="dockerContainerMap"/>
   </resultMap>
 
@@ -109,8 +105,8 @@
     <id column="id" />
   </resultMap>
 
-  <resultMap id="taskConfigMap" type="org.apache.aurora.gen.TaskConfig">
-    <id column="id" />
+  <resultMap id="taskConfigMap" type="org.apache.aurora.scheduler.storage.db.views.DbTaskConfig">
+    <id column="id" property="rowId" />
     <result column="j_role" property="owner.role"/>
     <result column="j_environment" property="environment"/>
     <result column="j_name" property="jobName"/>
@@ -131,6 +127,11 @@
       <result column="port_name" />
     </collection>
     <collection property="metadata" resultMap="metadataMap" columnPrefix="m_"/>
+    <collection
+        property="taskLinks"
+        select="selectTaskLinks"
+        column="id"
+        foreignColumn="task_config_id"/>
   </resultMap>
 
   <sql id="unscopedConfigSelect">
@@ -168,15 +169,7 @@
     WHERE c.id = #{id}
   </select>
 
-  <resultMap
-      id="taskConfigRowMap"
-      type="org.apache.aurora.scheduler.storage.db.views.TaskConfigRow">
-
-    <id column="id" property="id" />
-    <association property="config" resultMap="taskConfigMap"/>
-  </resultMap>
-
-  <select id="selectConfigsByJob" resultMap="taskConfigRowMap">
+  <select id="selectConfigsByJob" resultMap="taskConfigMap">
     <include refid="unscopedConfigSelect"/>
     WHERE j.role = #{role}
       AND j.environment = #{environment}
@@ -257,14 +250,17 @@
     ) VALUES (
       <foreach item="link" collection="links" separator="),(">
         #{configId},
-        #{link.label},
-        #{link.url}
+        #{link.first},
+        #{link.second}
       </foreach>
     )
   </insert>
 
-  <resultMap id="taskLinkMap" type="org.apache.aurora.scheduler.storage.db.views.TaskLink">
-    <id column="id"/>
+  <resultMap id="taskLinkMap" type="com.twitter.common.collections.Pair">
+    <constructor>
+      <arg column="label"/>
+      <arg column="url"/>
+    </constructor>
   </resultMap>
 
   <select id="selectTaskLinks" resultMap="taskLinkMap">
@@ -273,7 +269,7 @@
       label,
       url
     FROM task_config_task_links
-    WHERE task_config_id = #{configId}
+    WHERE task_config_id = #{id}
   </select>
 
   <insert id="insertContainer">

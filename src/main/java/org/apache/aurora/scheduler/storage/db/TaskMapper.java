@@ -18,10 +18,12 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import com.twitter.common.collections.Pair;
+
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskQuery;
-import org.apache.aurora.scheduler.storage.db.views.AssignedPort;
-import org.apache.aurora.scheduler.storage.db.views.ScheduledTaskWrapper;
+import org.apache.aurora.scheduler.storage.db.views.DbScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 import org.apache.ibatis.annotations.Param;
 
@@ -35,7 +37,10 @@ interface TaskMapper {
    *
    * @param task Task to insert.
    */
-  void insertScheduledTask(ScheduledTaskWrapper task);
+  void insertScheduledTask(
+      @Param("task") IScheduledTask task,
+      @Param("configId") long configId,
+      @Param("result") InsertResult result);
 
   /**
    * Gets tasks based on a query.
@@ -43,7 +48,7 @@ interface TaskMapper {
    * @param query Query to use as a filter for tasks.
    * @return Tasks matching the query.
    */
-  List<ScheduledTaskWrapper> select(TaskQuery query);
+  List<DbScheduledTask> select(TaskQuery query);
 
   /**
    * Gets a task by ID.
@@ -52,7 +57,7 @@ interface TaskMapper {
    * @return Task with the specified ID.
    */
   @Nullable
-  ScheduledTaskWrapper selectById(@Param("taskId") String taskId);
+  DbScheduledTask selectById(@Param("taskId") String taskId);
 
   /**
    * Gets job keys of all stored tasks.
@@ -79,16 +84,9 @@ interface TaskMapper {
    * @param taskRowId Task row ID.
    * @param ports Assigned ports to insert.
    */
-  void insertPorts(@Param("taskRowId") long taskRowId, @Param("ports") List<AssignedPort> ports);
-
-  /**
-   * Selects the assigned ports association within an
-   * {@link org.apache.aurora.scheduler.storage.entities.IScheduledTask}.
-   *
-   * @param taskRowId Task row ID.
-   * @return Ports associated with the task.
-   */
-  List<AssignedPort> selectPorts(@Param("taskRowId") long taskRowId);
+  void insertPorts(
+      @Param("taskRowId") long taskRowId,
+      @Param("ports") List<Pair<String, Integer>> ports);
 
   /**
    * Deletes all task rows.

@@ -13,30 +13,16 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Function;
-import com.google.common.base.Functions;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 
-import org.apache.aurora.gen.Constraint;
-import org.apache.aurora.gen.Container;
-import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskConstraint;
-import org.apache.aurora.scheduler.storage.db.views.TaskConfigRow;
-import org.apache.aurora.scheduler.storage.db.views.TaskLink;
+import org.apache.aurora.scheduler.storage.db.views.DbTaskConfig;
+import org.apache.aurora.scheduler.storage.db.views.Pairs;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 
@@ -52,73 +38,15 @@ class TaskConfigManager {
     this.jobKeyMapper = requireNonNull(jobKeyMapper);
   }
 
-  /**
-   * Replaces the shimmed {@link org.apache.thrift.TUnion} instances with the base thrift types.
-   * This is necessary because TUnion, as of thrift 0.9.1, restricts subclassing.  The copy
-   * constructor checks for equality on {@link Object#getClass()} rather than the subclass-friendly
-   * {@link Class#isInstance(Object).
-   */
-  private static final Function<TaskConfig, TaskConfig> REPLACE_UNION_TYPES =
-      new Function<TaskConfig, TaskConfig>() {
-        @Override
-        public TaskConfig apply(TaskConfig config) {
-          ImmutableSet.Builder<Constraint> constraints = ImmutableSet.builder();
-          for (Constraint constraint : config.getConstraints()) {
-            Constraint replacement = new Constraint()
-                .setName(constraint.getName());
-            replacement.setConstraint(
-                new TaskConstraint(
-                    constraint.getConstraint().getSetField(),
-                    constraint.getConstraint().getFieldValue()));
-            constraints.add(replacement);
-          }
-          config.setConstraints(constraints.build());
-
-          config.setContainer(
-              new Container(
-                  config.getContainer().getSetField(),
-                  config.getContainer().getFieldValue()));
-
-          return config;
-        }
-      };
-
-  /**
-   * Creates an instance of a caching function that will fill all relations in a task config.
-   *
-   * @return A function to populate relations in task configs.
-   */
-  Function<TaskConfigRow, TaskConfig> getConfigHydrator() {
-    // It appears that there is no way in mybatis to populate a field of type Map.  To work around
-    // this, we need to manually perform the query and associate the elements.
-    final LoadingCache<Long, Map<String, String>> taskLinkCache = CacheBuilder.newBuilder()
-        .build(new CacheLoader<Long, Map<String, String>>() {
-          @Override
-          public Map<String, String> load(Long configId) {
-            return getTaskLinks(configId);
-          }
-        });
-    Function<TaskConfigRow, TaskConfig> linkPopulator = new Function<TaskConfigRow, TaskConfig>() {
-      @Override
-      public TaskConfig apply(TaskConfigRow row) {
-        return row.getConfig().setTaskLinks(taskLinkCache.getUnchecked(row.getId()));
-      }
-    };
-
-    return Functions.compose(REPLACE_UNION_TYPES, linkPopulator);
-  }
-
   private Optional<Long> getConfigRow(ITaskConfig config) {
     // We could optimize this slightly by first comparing the un-hydrated row and breaking early.
 
-    Iterable<TaskConfigRow> configsInJob = getConfigs(config.getJob());
+    Map<ITaskConfig, DbTaskConfig> rowsByConfig =
+        Maps.uniqueIndex(
+            configMapper.selectConfigsByJob(config.getJob()),
+            DbTaskConfig::toImmutable);
 
-    Map<ITaskConfig, TaskConfigRow> rowsToIds =
-        FluentIterable.from(configsInJob)
-            .uniqueIndex(
-                Functions.compose(ITaskConfig.FROM_BUILDER, getConfigHydrator()));
-
-    return Optional.ofNullable(rowsToIds.get(config)).map(TaskConfigRow::getId);
+    return Optional.ofNullable(rowsByConfig.get(config)).map(DbTaskConfig::getRowId);
   }
 
   long insert(ITaskConfig config) {
@@ -167,9 +95,7 @@ class TaskConfigManager {
     if (!config.getTaskLinks().isEmpty()) {
       configMapper.insertTaskLinks(
           configInsert.getId(),
-          FluentIterable.from(config.getTaskLinks().entrySet())
-              .transform(TO_LINK)
-              .toList());
+          Pairs.fromMap(config.getTaskLinks()));
     }
 
     if (!config.getMetadata().isEmpty()) {
@@ -183,30 +109,4 @@ class TaskConfigManager {
 
     return configInsert.getId();
   }
-
-  Map<String, String> getTaskLinks(long configId) {
-    ImmutableMap.Builder<String, String> links = ImmutableMap.builder();
-    for (TaskLink link : configMapper.selectTaskLinks(configId)) {
-      links.put(link.getLabel(), link.getUrl());
-    }
-    return links.build();
-  }
-
-  List<TaskConfigRow> getConfigs(IJobKey job) {
-    requireNonNull(job);
-    return configMapper.selectConfigsByJob(job);
-  }
-
-  Set<Long> getTaskConfigIds(Set<String> scheduledTaskIds) {
-    requireNonNull(scheduledTaskIds);
-    return configMapper.selectConfigsByTaskId(scheduledTaskIds);
-  }
-
-  private static final Function<Map.Entry<String, String>, TaskLink> TO_LINK =
-      new Function<Map.Entry<String, String>, TaskLink>() {
-        @Override
-        public TaskLink apply(Map.Entry<String, String> entry) {
-          return new TaskLink(entry.getKey(), entry.getValue());
-        }
-      };
 }

@@ -51,6 +51,9 @@ limitations under the License.
     <!-- Unfortunately we have several large classes that trip this rule.
          TODO(wfarner): Break apart god classes. -->
     <exclude name="GodClass"/>
+
+    <!-- Classes that are only meant to be managed by mybatis with reflection trip this rule. -->
+    <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
   </rule>
   <rule ref="rulesets/java/empty.xml">
     <!-- Configured below -->

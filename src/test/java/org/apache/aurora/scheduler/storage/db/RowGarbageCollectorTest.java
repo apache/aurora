@@ -25,7 +25,6 @@ import com.twitter.common.util.testing.FakeClock;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.db.views.ScheduledTaskWrapper;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -92,8 +91,7 @@ public class RowGarbageCollectorTest {
     taskConfigMapper.insert(CONFIG_A, new InsertResult());
     InsertResult a2Insert = new InsertResult();
     taskConfigMapper.insert(TASK_A2.getAssignedTask().getTask(), a2Insert);
-    taskMapper.insertScheduledTask(
-        new ScheduledTaskWrapper(a2Insert.getId(), TASK_A2.newBuilder()));
+    taskMapper.insertScheduledTask(TASK_A2, a2Insert.getId(), new InsertResult());
     jobKeyMapper.merge(JOB_B);
     taskConfigMapper.insert(CONFIG_B, new InsertResult());
     rowGc.runOneIteration();
@@ -103,8 +101,8 @@ public class RowGarbageCollectorTest {
     // populated, therefore full object equivalence cannot easily be used.
     assertEquals(
         TASK_A2.getAssignedTask().getTask().getRamMb(),
-        Iterables.getOnlyElement(taskConfigMapper.selectConfigsByJob(JOB_A))
-            .getConfig().getRamMb());
+        Iterables.getOnlyElement(taskConfigMapper.selectConfigsByJob(JOB_A)).toImmutable()
+            .getRamMb());
     assertEquals(ImmutableList.of(), taskConfigMapper.selectConfigsByJob(JOB_B));
   }
 }

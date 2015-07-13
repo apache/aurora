@@ -15,14 +15,11 @@ package org.apache.aurora.scheduler.storage.db;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 
-import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.scheduler.storage.CronJobStore;
-import org.apache.aurora.scheduler.storage.db.views.CronJobWrapper;
-import org.apache.aurora.scheduler.storage.db.views.TaskConfigRow;
+import org.apache.aurora.scheduler.storage.db.views.DbJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
@@ -65,22 +62,10 @@ class DbCronJobStore implements CronJobStore.Mutable {
     cronJobMapper.truncate();
   }
 
-  private final Function<CronJobWrapper, JobConfiguration> hydrateJob =
-      new Function<CronJobWrapper, JobConfiguration>() {
-        @Override
-        public JobConfiguration apply(CronJobWrapper row) {
-          JobConfiguration job = row.getJob();
-          job.setTaskConfig(taskConfigManager.getConfigHydrator().apply(
-              new TaskConfigRow(row.getTaskConfigRowId(), job.getTaskConfig())));
-          return job;
-        }
-      };
-
   @Override
   public Iterable<IJobConfiguration> fetchJobs() {
     return FluentIterable.from(cronJobMapper.selectAll())
-        .transform(hydrateJob)
-        .transform(IJobConfiguration.FROM_BUILDER)
+        .transform(DbJobConfiguration::toImmutable)
         .toList();
   }
 
@@ -88,7 +73,6 @@ class DbCronJobStore implements CronJobStore.Mutable {
   public Optional<IJobConfiguration> fetchJob(IJobKey jobKey) {
     requireNonNull(jobKey);
     return Optional.fromNullable(cronJobMapper.select(jobKey))
-        .transform(hydrateJob)
-        .transform(IJobConfiguration.FROM_BUILDER);
+        .transform(DbJobConfiguration::toImmutable);
   }
 }

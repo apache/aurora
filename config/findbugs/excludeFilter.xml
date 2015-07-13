@@ -37,6 +37,18 @@ limitations under the License.
     </Or>
   </Match>
 
+  <!-- Warnings triggered for mybatis shim classes. -->
+  <Match>
+    <Package name="org.apache.aurora.scheduler.storage.db.views" />
+    <Or>
+      <!-- The shim classes trip these warnings since we have no code that explicitly sets fields,
+           but mybatis reflects and sets them for us.
+       -->
+      <Bug pattern="NP_UNWRITTEN_FIELD" />
+      <Bug pattern="UWF_UNWRITTEN_FIELD" />
+    </Or>
+  </Match>
+
   <!-- We don't make use of Java serialization and this can prevent, for example, declaring an
        HttpServlet as an anonymous inner class for testing. -->
   <Match>

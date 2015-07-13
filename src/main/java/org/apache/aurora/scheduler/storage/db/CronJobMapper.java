@@ -17,7 +17,7 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
-import org.apache.aurora.scheduler.storage.db.views.CronJobWrapper;
+import org.apache.aurora.scheduler.storage.db.views.DbJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.ibatis.annotations.Param;
@@ -33,8 +33,8 @@ interface CronJobMapper {
 
   void truncate();
 
-  List<CronJobWrapper> selectAll();
+  List<DbJobConfiguration> selectAll();
 
   @Nullable
-  CronJobWrapper select(@Param("job") IJobKey job);
+  DbJobConfiguration select(@Param("job") IJobKey job);
 }
