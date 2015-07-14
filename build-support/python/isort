@@ -16,7 +16,7 @@
 set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-ISORT_VERSION=3.8.0
+ISORT_VERSION=4.0.0
 
 if ! [ -f "$HERE/isort.venv/BOOTSTRAPPED" ] || \
     [ x`cat "$HERE/isort.venv/BOOTSTRAPPED"` != x$ISORT_VERSION ]; then

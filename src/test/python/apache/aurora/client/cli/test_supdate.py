@@ -16,10 +16,10 @@ import time
 
 import mock
 import pytest
-from mock import ANY, call, create_autospec, Mock
+from mock import ANY, Mock, call, create_autospec
 from pystachio import Empty
 
-from apache.aurora.client.cli import Context, EXIT_API_ERROR, EXIT_INVALID_PARAMETER, EXIT_OK
+from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER, EXIT_OK, Context
 from apache.aurora.client.cli.options import TaskInstanceKey
 from apache.aurora.client.cli.update import (
     AbortUpdate,

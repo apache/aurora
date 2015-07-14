@@ -34,8 +34,8 @@ from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
 
 from apache.aurora.config.schema.base import (
-    HealthCheckConfig,
     MB,
+    HealthCheckConfig,
     MesosJob,
     MesosTaskInstance,
     Process,

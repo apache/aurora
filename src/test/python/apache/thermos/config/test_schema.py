@@ -16,19 +16,19 @@ import pytest
 from twitter.common.collections import OrderedDict
 
 from apache.thermos.config.schema import (
-    combine_tasks,
-    concat_tasks,
     Constraint,
-    java_options,
-    order,
     Process,
-    python_options,
     Resources,
     SequentialTask,
     SimpleTask,
     Task,
     Tasks,
-    Units
+    Units,
+    combine_tasks,
+    concat_tasks,
+    java_options,
+    order,
+    python_options
 )
 
 

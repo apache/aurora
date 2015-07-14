@@ -16,9 +16,9 @@ import pytest
 
 from apache.aurora.config.schema.base import Process
 from apache.aurora.executor.common.task_info import (
-    mesos_task_instance_from_assigned_task,
     TaskInfoError,
-    UnexpectedUnboundRefsError
+    UnexpectedUnboundRefsError,
+    mesos_task_instance_from_assigned_task
 )
 
 from .fixtures import (

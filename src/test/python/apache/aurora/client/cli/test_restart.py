@@ -20,7 +20,7 @@ from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api import UpdaterConfig
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
-from apache.aurora.client.cli import Context, EXIT_API_ERROR, EXIT_INVALID_PARAMETER
+from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER, Context
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.jobs import RestartCommand
 from apache.aurora.client.cli.options import TaskInstanceKey

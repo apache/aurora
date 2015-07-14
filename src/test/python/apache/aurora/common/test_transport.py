@@ -17,7 +17,7 @@ from threading import Thread
 
 import pytest
 import requests
-from mock import ANY, call, create_autospec, Mock
+from mock import ANY, Mock, call, create_autospec
 from requests import exceptions as request_exceptions
 from thrift.protocol import TJSONProtocol
 from thrift.server import THttpServer

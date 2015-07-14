@@ -23,7 +23,7 @@ import time
 
 import pytest
 from mesos.interface import mesos_pb2
-from mock import call, Mock, patch
+from mock import Mock, call, patch
 from twitter.common import log
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree

@@ -27,11 +27,11 @@ from apache.aurora.client.base import combine_messages
 from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
-    CommandOption,
     EXECUTOR_SANDBOX_OPTION,
     INSTANCES_SPEC_ARGUMENT,
     SSH_USER_OPTION,
-    TASK_INSTANCE_ARGUMENT
+    TASK_INSTANCE_ARGUMENT,
+    CommandOption
 )
 from apache.aurora.common.clusters import CLUSTERS
 

@@ -17,7 +17,7 @@ from copy import deepcopy
 
 from mock import call, create_autospec, patch
 
-from apache.aurora.client.api.quota_check import CapacityRequest, print_quota, QuotaCheck
+from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck, print_quota
 
 from ...api_util import SchedulerThriftApiSpec
 

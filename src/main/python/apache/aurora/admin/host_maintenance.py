@@ -18,7 +18,7 @@ from twitter.common.quantity import Amount, Time
 
 from apache.aurora.admin.admin_util import format_sla_results, print_results
 from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.client.base import check_and_log_response, DEFAULT_GROUPING, group_hosts
+from apache.aurora.client.base import DEFAULT_GROUPING, check_and_log_response, group_hosts
 
 from gen.apache.aurora.api.ttypes import Hosts, MaintenanceMode
 

@@ -14,7 +14,7 @@
 
 from twitter.common import app, log
 
-from apache.aurora.client.base import get_grouping_or_die, GROUPING_OPTION, requires
+from apache.aurora.client.base import GROUPING_OPTION, get_grouping_or_die, requires
 from apache.aurora.common.clusters import CLUSTERS
 
 from .admin_util import (
@@ -23,11 +23,11 @@ from .admin_util import (
     OVERRIDE_SLA_DURATION_OPTION,
     OVERRIDE_SLA_PERCENTAGE_OPTION,
     OVERRIDE_SLA_REASON_OPTION,
+    POST_DRAIN_SCRIPT_OPTION,
+    UNSAFE_SLA_HOSTS_FILE_OPTION,
     parse_and_validate_sla_overrides,
     parse_hostnames,
-    parse_script,
-    POST_DRAIN_SCRIPT_OPTION,
-    UNSAFE_SLA_HOSTS_FILE_OPTION
+    parse_script
 )
 from .host_maintenance import HostMaintenance
 

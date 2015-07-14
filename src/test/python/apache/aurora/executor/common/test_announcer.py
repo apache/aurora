@@ -17,7 +17,7 @@ import threading
 import pytest
 from kazoo.client import KazooClient
 from kazoo.exceptions import KazooException
-from mock import create_autospec, MagicMock, patch
+from mock import MagicMock, create_autospec, patch
 from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 from twitter.common.zookeeper.serverset import Endpoint, ServerSet
@@ -26,8 +26,8 @@ from apache.aurora.config.schema.base import HealthCheckConfig
 from apache.aurora.executor.common.announcer import (
     Announcer,
     DefaultAnnouncerCheckerProvider,
-    make_endpoints,
-    ServerSetJoinThread
+    ServerSetJoinThread,
+    make_endpoints
 )
 
 

@@ -23,10 +23,10 @@ from apache.aurora.client.config import get_config as get_aurora_config
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
 from apache.aurora.config.schema.base import (
+    MB,
     Announcer,
     HealthCheckConfig,
     Job,
-    MB,
     Resources,
     Task,
     UpdateConfig

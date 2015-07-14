@@ -27,11 +27,11 @@ from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import JobUpTimeLimit
 from apache.aurora.client.base import (
     AURORA_ADMIN_USER_AGENT_NAME,
+    GROUPING_OPTION,
     check_and_log_response,
     combine_messages,
     die,
     get_grouping_or_die,
-    GROUPING_OPTION,
     requires
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -40,8 +40,8 @@ from apache.aurora.common.shellify import shellify
 
 from .admin_util import (
     FILENAME_OPTION,
-    format_sla_results,
     HOSTS_OPTION,
+    format_sla_results,
     parse_hostnames,
     parse_hostnames_optional,
     parse_sla_percentage,

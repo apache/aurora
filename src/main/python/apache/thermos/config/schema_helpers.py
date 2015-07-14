@@ -21,7 +21,7 @@ import itertools
 from pystachio import Empty, List
 from twitter.common.lang import Compatibility
 
-from .schema_base import Constraint, GB, Process, Resources, Task
+from .schema_base import GB, Constraint, Process, Resources, Task
 
 __all__ = (
   # shorthand for process ordering constraint

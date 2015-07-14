@@ -16,13 +16,13 @@ import contextlib
 import unittest
 
 import pytest
-from mock import call, Mock, patch
+from mock import Mock, call, patch
 
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.cli import Context
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.jobs import KillAllJobCommand, KillCommand
-from apache.aurora.client.cli.options import parse_instances, TaskInstanceKey
+from apache.aurora.client.cli.options import TaskInstanceKey, parse_instances
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 

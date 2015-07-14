@@ -20,7 +20,7 @@ from urlparse import urljoin
 
 from twitter.common import log
 
-from apache.aurora.common.pex_version import pex_version, UnknownVersion
+from apache.aurora.common.pex_version import UnknownVersion, pex_version
 
 from gen.apache.aurora.api.ttypes import ResponseCode
 

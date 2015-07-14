@@ -48,7 +48,6 @@ from apache.aurora.client.cli.options import (
     BATCH_OPTION,
     BIND_OPTION,
     BROWSER_OPTION,
-    CommandOption,
     CONFIG_ARGUMENT,
     CONFIG_OPTION,
     FORCE_OPTION,
@@ -60,7 +59,8 @@ from apache.aurora.client.cli.options import (
     MAX_TOTAL_FAILURES_OPTION,
     NO_BATCHING_OPTION,
     STRICT_OPTION,
-    WATCH_OPTION
+    WATCH_OPTION,
+    CommandOption
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 

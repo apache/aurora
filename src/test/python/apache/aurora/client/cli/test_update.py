@@ -15,7 +15,7 @@ import contextlib
 import functools
 
 import pytest
-from mock import call, create_autospec, Mock, patch
+from mock import Mock, call, create_autospec, patch
 from pystachio import Empty
 from twitter.common.contextutil import temporary_file
 
@@ -23,7 +23,7 @@ from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.api.scheduler_mux import SchedulerMux
-from apache.aurora.client.cli import Context, EXIT_INVALID_CONFIGURATION, EXIT_OK
+from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION, EXIT_OK, Context
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.jobs import CLIENT_UPDATER_DEPRECATION, UpdateCommand
 from apache.aurora.client.cli.options import TaskInstanceKey

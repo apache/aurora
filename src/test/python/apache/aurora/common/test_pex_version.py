@@ -18,7 +18,7 @@ import mock
 import pytest
 from pex.pex import PexInfo
 
-from apache.aurora.common.pex_version import pex_version, UnknownVersion
+from apache.aurora.common.pex_version import UnknownVersion, pex_version
 
 SHA = 'foo'
 DATE = 'some-date'

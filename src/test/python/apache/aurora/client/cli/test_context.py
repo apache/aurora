@@ -15,7 +15,7 @@ import mock
 import pytest
 
 from apache.aurora.client.api import AuroraClientAPI, SchedulerProxy
-from apache.aurora.client.cli import Context, EXIT_AUTH_ERROR
+from apache.aurora.client.cli import EXIT_AUTH_ERROR, Context
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey

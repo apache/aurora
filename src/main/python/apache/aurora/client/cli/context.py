@@ -21,12 +21,12 @@ from fnmatch import fnmatch
 from apache.aurora.client.api import AuroraClientAPI, SchedulerProxy
 from apache.aurora.client.base import AURORA_V2_USER_AGENT_NAME, combine_messages
 from apache.aurora.client.cli import (
-    Context,
     EXIT_API_ERROR,
     EXIT_AUTH_ERROR,
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
-    EXIT_INVALID_PARAMETER
+    EXIT_INVALID_PARAMETER,
+    Context
 )
 from apache.aurora.client.config import get_config
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI

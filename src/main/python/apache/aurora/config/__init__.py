@@ -24,8 +24,8 @@ from apache.thermos.config.loader import ThermosTaskWrapper
 
 from .loader import AuroraConfigLoader
 from .port_resolver import PortResolver
-from .thrift import convert as convert_thrift
 from .thrift import InvalidConfig as InvalidThriftConfig
+from .thrift import convert as convert_thrift
 
 __all__ = ('AuroraConfig', 'PortResolver')
 

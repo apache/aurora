@@ -15,8 +15,8 @@
 import getpass
 
 from apache.aurora.config.schema.base import (
-    DefaultLifecycleConfig,
     MB,
+    DefaultLifecycleConfig,
     MesosJob,
     MesosTaskInstance,
     Process,

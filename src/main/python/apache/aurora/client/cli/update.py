@@ -36,14 +36,14 @@ from apache.aurora.client.cli.options import (
     ALL_INSTANCES,
     BIND_OPTION,
     BROWSER_OPTION,
-    CommandOption,
     CONFIG_ARGUMENT,
     HEALTHCHECK_OPTION,
     INSTANCES_SPEC_ARGUMENT,
     JOBSPEC_ARGUMENT,
     JSON_READ_OPTION,
     JSON_WRITE_OPTION,
-    STRICT_OPTION
+    STRICT_OPTION,
+    CommandOption
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 

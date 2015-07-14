@@ -21,15 +21,15 @@ from pystachio import Default, Integer, String
 from thrift.protocol import TJSONProtocol
 from thrift.transport import TTransport
 from twitter.common import log
-from twitter.common.concurrent import deadline, Timeout
+from twitter.common.concurrent import Timeout, deadline
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset import ServerSet
 
 from apache.aurora.common.auth.auth_module_manager import (
+    SessionKeyError,
     get_auth_handler,
-    make_session_key,
-    SessionKeyError
+    make_session_key
 )
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.transport import TRequestsTransport

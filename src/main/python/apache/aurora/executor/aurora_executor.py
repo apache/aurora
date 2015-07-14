@@ -18,7 +18,7 @@ import traceback
 
 from mesos.interface import mesos_pb2
 from twitter.common import log
-from twitter.common.concurrent import deadline, defer, Timeout
+from twitter.common.concurrent import Timeout, deadline, defer
 from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
 

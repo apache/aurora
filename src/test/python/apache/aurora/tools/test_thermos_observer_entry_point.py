@@ -14,7 +14,7 @@
 import os
 import unittest
 
-from mock import create_autospec, Mock, patch
+from mock import Mock, create_autospec, patch
 from twitter.common.quantity import Amount, Time
 
 from apache.aurora.tools.thermos_observer import initialize

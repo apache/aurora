@@ -15,15 +15,15 @@
 import contextlib
 
 import pytest
-from mock import call, create_autospec, Mock, patch
+from mock import Mock, call, create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import (
-    Context,
     EXIT_COMMAND_FAILURE,
     EXIT_INTERRUPTED,
     EXIT_INVALID_CONFIGURATION,
-    EXIT_OK
+    EXIT_OK,
+    Context
 )
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.jobs import CreateJobCommand

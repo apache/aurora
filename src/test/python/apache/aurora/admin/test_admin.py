@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import create_autospec, patch, PropertyMock
+from mock import PropertyMock, create_autospec, patch
 
 from apache.aurora.admin.admin import get_locks, get_scheduler, increase_quota, query, set_quota
 from apache.aurora.client.api import AuroraClientAPI
