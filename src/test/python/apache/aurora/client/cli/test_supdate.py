@@ -19,7 +19,14 @@ import pytest
 from mock import ANY, Mock, call, create_autospec
 from pystachio import Empty
 
-from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER, EXIT_OK, Context
+from apache.aurora.client.cli import (
+    EXIT_API_ERROR,
+    EXIT_COMMAND_FAILURE,
+    EXIT_INVALID_PARAMETER,
+    EXIT_OK,
+    EXIT_UNKNOWN_ERROR,
+    Context
+)
 from apache.aurora.client.cli.options import TaskInstanceKey
 from apache.aurora.client.cli.update import (
     AbortUpdate,
@@ -155,7 +162,7 @@ class TestStartUpdate(AuroraClientCommandTest):
     ]
     assert self._fake_context.get_err() == []
 
-  def test_start_update_and_wait(self):
+  def test_start_update_and_wait_success(self):
     mock_config = self.create_mock_config()
     self._fake_context.get_job_config = Mock(return_value=mock_config)
     self._mock_options.wait = True
@@ -180,6 +187,36 @@ class TestStartUpdate(AuroraClientCommandTest):
         'Current state ROLLED_FORWARD'
     ]
     assert self._fake_context.get_err() == []
+
+  def test_start_update_and_wait_rollback(self):
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    self._mock_options.wait = True
+
+    resp = self.create_simple_success_response()
+    resp.result = Result(startJobUpdateResult=StartJobUpdateResult(
+        key=JobUpdateKey(job=JobKey(role="role", environment="env", name="name"), id="id")))
+    self._mock_api.start_job_update.return_value = resp
+    self._mock_api.query_job_updates.side_effect = [
+        get_status_query_response(status=JobUpdateStatus.ROLLED_BACK)
+    ]
+
+    assert self._command.execute(self._fake_context) == EXIT_COMMAND_FAILURE
+
+  def test_start_update_and_wait_error(self):
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    self._mock_options.wait = True
+
+    resp = self.create_simple_success_response()
+    resp.result = Result(startJobUpdateResult=StartJobUpdateResult(
+        key=JobUpdateKey(job=JobKey(role="role", environment="env", name="name"), id="id")))
+    self._mock_api.start_job_update.return_value = resp
+    self._mock_api.query_job_updates.side_effect = [
+        get_status_query_response(status=JobUpdateStatus.ERROR)
+    ]
+
+    assert self._command.execute(self._fake_context) == EXIT_UNKNOWN_ERROR
 
   def test_start_update_command_line_succeeds_noop_update(self):
     resp = self.create_simple_success_response()
@@ -586,7 +623,7 @@ class TestUpdateWait(AuroraClientCommandTest):
     self._fetch_call = call(
         update_key=JobUpdateKey(job=self.TEST_JOBKEY.to_thrift(), id=self._mock_options.id))
 
-  def test_wait(self):
+  def test_wait_success(self):
     updating_response = get_status_query_response(status=JobUpdateStatus.ROLLING_FORWARD)
     updated_response = get_status_query_response(status=JobUpdateStatus.ROLLED_FORWARD)
 
@@ -597,6 +634,13 @@ class TestUpdateWait(AuroraClientCommandTest):
                                             'Current state ROLLED_FORWARD']
 
     assert self._mock_api.query_job_updates.mock_calls == [self._fetch_call, self._fetch_call]
+
+  def test_wait_rolled_back(self):
+    response = get_status_query_response(status=JobUpdateStatus.ROLLED_BACK)
+
+    self._mock_api.query_job_updates.side_effect = [response]
+
+    assert self._command.execute(self._fake_context) == EXIT_COMMAND_FAILURE
 
   def test_wait_non_ok_response(self):
     self._mock_api.query_job_updates.return_value = Response(

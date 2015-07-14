@@ -28,6 +28,7 @@ from apache.aurora.client.cli import (
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER,
     EXIT_OK,
+    EXIT_UNKNOWN_ERROR,
     Noun,
     Verb
 )
@@ -185,7 +186,7 @@ class StartUpdate(Verb):
       context.print_out(self.UPDATE_MSG_TEMPLATE % url)
 
       if context.options.wait:
-        wait_for_update(context, self._clock, api, update_key)
+        return wait_for_update(context, self._clock, api, update_key)
     else:
       context.print_out(combine_messages(resp))
 
@@ -205,7 +206,12 @@ def wait_for_update(context, clock, api, update_key):
         cur_state = new_state
         context.print_out('Current state %s' % JobUpdateStatus._VALUES_TO_NAMES[cur_state])
         if cur_state not in ACTIVE_JOB_UPDATE_STATES:
-          break
+          if cur_state == JobUpdateStatus.ROLLED_FORWARD:
+            return EXIT_OK
+          elif cur_state == JobUpdateStatus.ROLLED_BACK:
+            return EXIT_COMMAND_FAILURE
+          else:
+            return EXIT_UNKNOWN_ERROR
       clock.sleep(5)
     elif len(summaries) == 0:
       raise context.CommandError(EXIT_INVALID_PARAMETER, 'Job update not found.')
@@ -239,12 +245,11 @@ class UpdateWait(Verb):
     return 'Block until an update has entered a terminal state.'
 
   def execute(self, context):
-    wait_for_update(
+    return wait_for_update(
         context,
         self._clock,
         context.get_api(context.options.jobspec.cluster),
         JobUpdateKey(job=context.options.jobspec.to_thrift(), id=context.options.id))
-    return EXIT_OK
 
 
 class PauseUpdate(Verb):
