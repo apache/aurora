@@ -85,7 +85,9 @@ BuildRequires: unzip
 BuildRequires: wget
 BuildRequires: zlib-devel
 
+%if 0%{?rhel} && 0%{?rhel} < 7
 Requires:      daemonize
+%endif
 Requires:      java-%{JAVA_VERSION}-openjdk
 Requires:      mesos = %{MESOS_VERSION}
 
