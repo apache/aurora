@@ -136,10 +136,17 @@ function test_audit_logging_enabled {
 }
 
 function tear_down {
+  local retcode=$1
   sudo cp /vagrant/examples/vagrant/clusters.json /etc/aurora/clusters.json
   sudo stop aurora-scheduler-kerberos || true
   sudo rm -f /etc/init/aurora-scheduler-kerberos.conf
   sudo start aurora-scheduler || true
+  if [[ $retcode -ne 0 ]]; then
+    echo
+    echo '!!! FAILED'
+    echo
+  fi
+  exit $retcode
 }
 
 function main {
@@ -148,7 +155,7 @@ function main {
   elif [[ -z "${KRB5_CONFIG:-}" ]]; then
     enter_testrealm "$@"
   else
-    trap tear_down EXIT
+    trap 'tear_down 1' EXIT
     setup
     test_audit_logging_enabled
     test_snapshot
@@ -158,6 +165,8 @@ function main {
     echo
     echo '*** OK (All tests passed) ***'
     echo
+    trap '' EXIT
+    tear_down 0
   fi
 }
 
