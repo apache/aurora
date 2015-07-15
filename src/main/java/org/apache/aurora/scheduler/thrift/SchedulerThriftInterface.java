@@ -161,9 +161,20 @@ import static org.apache.aurora.scheduler.thrift.Responses.ok;
  */
 @DecoratedThrift
 class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
+  private static final int DEFAULT_MAX_TASKS_PER_JOB = 4000;
+  private static final int DEFAULT_MAX_UPDATE_INSTANCE_FAILURES =
+      DEFAULT_MAX_TASKS_PER_JOB * 5;
+
   @Positive
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
-  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(4000);
+  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(DEFAULT_MAX_TASKS_PER_JOB);
+
+  @Positive
+  @CmdLine(name = "max_update_instance_failures", help = "Upper limit on the number of "
+      + "failures allowed during a job update. This helps cap potentially unbounded entries into "
+      + "storage.")
+  public static final Arg<Integer> MAX_UPDATE_INSTANCE_FAILURES = Arg.create(
+      DEFAULT_MAX_UPDATE_INSTANCE_FAILURES);
 
   // This number is derived from the maximum file name length limit on most UNIX systems, less
   // the number of characters we've observed being added by mesos for the executor ID, prefix, and
@@ -1113,6 +1124,11 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       return invalidRequest(INVALID_MAX_FAILED_INSTANCES);
     }
 
+    if (settings.getMaxPerInstanceFailures() * mutableRequest.getInstanceCount()
+            > MAX_UPDATE_INSTANCE_FAILURES.get()) {
+      return invalidRequest(TOO_MANY_POTENTIAL_FAILED_INSTANCES);
+    }
+
     if (settings.getMinWaitInInstanceRunningMs() < 0) {
       return invalidRequest(INVALID_MIN_WAIT_TO_RUNNING);
     }
@@ -1376,8 +1392,12 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   static final String INVALID_MAX_FAILED_INSTANCES = "maxFailedInstances must be non-negative.";
 
   @VisibleForTesting
-  static final String INVALID_MAX_INSTANCE_FAILURES =
-      "maxPerInstanceFailures must be non-negative.";
+  static final String TOO_MANY_POTENTIAL_FAILED_INSTANCES = "Your update allows too many failures "
+      + "to occur, consider decreasing the per-instance failures or maxFailedInstances.";
+
+  @VisibleForTesting
+  static final String INVALID_MAX_INSTANCE_FAILURES
+      = "maxPerInstanceFailures must be non-negative.";
 
   @VisibleForTesting
   static final String INVALID_MIN_WAIT_TO_RUNNING =

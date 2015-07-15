@@ -53,6 +53,7 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdatePulseStatus;
+import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateSummary;
@@ -1932,6 +1933,20 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartUpdateFailsTooManyPerInstanceFailures() throws Exception {
+    control.replay();
+
+    JobUpdateRequest updateRequest = buildServiceJobUpdateRequest();
+    updateRequest.getSettings()
+        .setMaxPerInstanceFailures(SchedulerThriftInterface.MAX_UPDATE_INSTANCE_FAILURES.get()
+            + 10);
+
+    assertEquals(
+        invalidResponse(SchedulerThriftInterface.TOO_MANY_POTENTIAL_FAILED_INSTANCES),
+        thrift.startJobUpdate(updateRequest, AUDIT_MESSAGE, SESSION));
+  }
+
+  @Test
   public void testStartUpdateFailsInvalidMaxFailedInstances() throws Exception {
     control.replay();
 
@@ -2329,7 +2344,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        okResponse(Result.pulseJobUpdateResult(new PulseJobUpdateResult(JobUpdatePulseStatus.OK))),
+        okResponse(Result.pulseJobUpdateResult(
+            new PulseJobUpdateResult(JobUpdatePulseStatus.OK))),
         thrift.pulseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
   }
 
@@ -2364,6 +2380,19 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertResponse(AUTH_FAILED, thrift.pulseJobUpdate(UPDATE_KEY.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testGetJobUpdateSummaries() throws Exception {
+    Response updateSummary = Responses.empty()
+        .setResponseCode(OK)
+        .setDetails(ImmutableList.of(new ResponseDetail("summary")));
+
+    expect(readOnlyScheduler.getJobUpdateSummaries(
+        anyObject(JobUpdateQuery.class))).andReturn(updateSummary);
+    control.replay();
+
+    assertEquals(updateSummary, thrift.getJobUpdateSummaries(new JobUpdateQuery()));
   }
 
   private static final String AUTH_DENIED_MESSAGE = "Denied!";
