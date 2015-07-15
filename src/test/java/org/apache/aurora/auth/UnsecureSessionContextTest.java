@@ -13,86 +13,53 @@
  */
 package org.apache.aurora.auth;
 
-import javax.inject.Provider;
+import java.util.Optional;
 
-import com.google.common.base.Supplier;
-import com.google.inject.util.Providers;
-import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import org.apache.shiro.subject.SimplePrincipalCollection;
+import org.apache.shiro.subject.PrincipalCollection;
 import org.apache.shiro.subject.Subject;
-import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.eq;
+import static org.apache.aurora.auth.UnsecureSessionContext.UNSECURE;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class UnsecureSessionContextTest extends EasyMockTest {
-  private StatsProvider statsProvider;
   private Subject subject;
-  private Provider<Subject> subjectProvider;
-
-  private UnsecureSessionContext sessionContext;
-
-  private Supplier<Integer> gauge;
+  private PrincipalCollection principalCollection;
 
   @Before
   public void setUp() {
-    statsProvider = createMock(StatsProvider.class);
     subject = createMock(Subject.class);
-    subjectProvider = Providers.of(subject);
-
+    principalCollection = createMock(PrincipalCollection.class);
   }
 
-  private void constructAndReplay() {
-    Capture<Supplier<Integer>> gaugeCapture = createCapture();
-    expect(statsProvider.makeGauge(
-        eq(UnsecureSessionContext.SHIRO_AUDIT_LOGGING_ENABLED),
-        capture(gaugeCapture))).andReturn(null);
+  @Test
+  public void testNonStringPrincipal() {
+    expect(subject.getPrincipals()).andReturn(principalCollection);
+    expect(principalCollection.oneByType(String.class)).andReturn(null);
 
     control.replay();
 
-    sessionContext = new UnsecureSessionContext(statsProvider);
-    gauge = gaugeCapture.getValue();
-    assertEquals(0, (int) gauge.get());
-  }
-
-  private void assertIdentityEquals(String identity) {
-    assertEquals(identity, sessionContext.getIdentity());
+    assertEquals(UNSECURE, new UnsecureSessionContext(() -> Optional.of(subject)).getIdentity());
   }
 
   @Test
-  public void testNoSubjectProvider() {
-    constructAndReplay();
+  public void testEmptySubject() {
+    control.replay();
 
-    assertIdentityEquals(UnsecureSessionContext.UNSECURE);
+    assertEquals(UNSECURE, new UnsecureSessionContext(Optional::empty).getIdentity());
   }
 
   @Test
-  public void testSubjectProviderReturnsNull() {
-    expect(subject.getPrincipals()).andReturn(new SimplePrincipalCollection());
+  public void testStringSubject() {
+    expect(subject.getPrincipals()).andReturn(principalCollection);
+    expect(principalCollection.oneByType(String.class)).andReturn("jsmith");
 
-    constructAndReplay();
+    control.replay();
 
-    sessionContext.setSubjectProvider(subjectProvider);
-    assertIdentityEquals(UnsecureSessionContext.UNSECURE);
-    assertEquals(1, (int) gauge.get());
-  }
-
-  @Test
-  public void testSubjectProviderReturnsValue() {
-    String userName = "jsmith";
-
-    expect(subject.getPrincipals()).andReturn(new SimplePrincipalCollection(userName, "realm"));
-
-    constructAndReplay();
-
-    sessionContext.setSubjectProvider(subjectProvider);
-    assertIdentityEquals(userName);
-    assertEquals(1, (int) gauge.get());
+    assertEquals("jsmith", new UnsecureSessionContext(() -> Optional.of(subject)).getIdentity());
   }
 }

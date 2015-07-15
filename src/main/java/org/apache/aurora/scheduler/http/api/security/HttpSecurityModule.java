@@ -14,15 +14,18 @@
 package org.apache.aurora.scheduler.http.api.security;
 
 import java.lang.reflect.Method;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.servlet.Filter;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.Provides;
+import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matcher;
 import com.google.inject.matcher.Matchers;
 import com.google.inject.name.Names;
@@ -124,12 +127,28 @@ public class HttpSecurityModule extends ServletModule {
 
   @Override
   protected void configureServlets() {
-    if (mechanism != HttpAuthenticationMechanism.NONE) {
+    if (mechanism == HttpAuthenticationMechanism.NONE) {
+      // TODO(ksweeney): Use an OptionalBinder here once we're on Guice 4.0.
+      bind(new TypeLiteral<Optional<Subject>>() { }).toInstance(Optional.empty());
+    } else {
       doConfigureServlets();
     }
   }
 
   private void doConfigureServlets() {
+    bind(Subject.class).toProvider(SecurityUtils::getSubject).in(RequestScoped.class);
+    install(new AbstractModule() {
+      @Override
+      protected void configure() {
+        // Provides-only module to provide Optional<Subject>.
+        // TODO(ksweeney): Use an OptionalBinder here once we're on Guice 4.0.
+      }
+
+      @Provides
+      Optional<Subject> provideOptionalSubject(Subject subject) {
+        return Optional.of(subject);
+      }
+    });
     install(guiceFilterModule(API_PATH));
     install(guiceFilterModule(H2_PATH));
     install(guiceFilterModule(H2_PATH + "/*"));
@@ -193,11 +212,5 @@ public class HttpSecurityModule extends ServletModule {
         Matchers.subclassesOf(AnnotatedAuroraAdmin.class),
         AURORA_ADMIN_SERVICE,
         adminInterceptor);
-  }
-
-  @Provides
-  @RequestScoped
-  Subject provideSubject() {
-    return SecurityUtils.getSubject();
   }
 }

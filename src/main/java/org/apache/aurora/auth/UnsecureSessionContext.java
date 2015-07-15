@@ -13,14 +13,13 @@
  */
 package org.apache.aurora.auth;
 
+import java.util.Objects;
 import java.util.Optional;
 
-import javax.annotation.Nullable;
 import javax.inject.Provider;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
-import com.twitter.common.stats.StatsProvider;
 
 import org.apache.shiro.subject.Subject;
 
@@ -30,30 +29,20 @@ import org.apache.shiro.subject.Subject;
  */
 class UnsecureSessionContext implements SessionValidator.SessionContext {
   @VisibleForTesting
-  static final String SHIRO_AUDIT_LOGGING_ENABLED = "shiro_audit_logging_enabled";
-
-  @VisibleForTesting
   static final String UNSECURE = "UNSECURE";
 
+  private final Provider<Optional<Subject>> subjectProvider;
+
   @Inject
-  UnsecureSessionContext(StatsProvider statsProvider) {
-    statsProvider.makeGauge(SHIRO_AUDIT_LOGGING_ENABLED, () -> subjectProvider == null ? 0 : 1);
-  }
-
-  @Nullable
-  private Provider<Subject> subjectProvider;
-
-  @Inject(optional = true)
-  void setSubjectProvider(Provider<Subject> subjectProvider) {
-    this.subjectProvider = subjectProvider;
+  UnsecureSessionContext(Provider<Optional<Subject>> subjectProvider) {
+    this.subjectProvider = Objects.requireNonNull(subjectProvider);
   }
 
   @Override
   public String getIdentity() {
-    return Optional.ofNullable(subjectProvider)
-        .map(Provider::get)
+    return subjectProvider.get()
         .map(Subject::getPrincipals)
-        .map((principalCollection) -> principalCollection.oneByType(String.class))
+        .map(principalCollection -> principalCollection.oneByType(String.class))
         .orElse(UNSECURE);
   }
 }
