@@ -20,7 +20,7 @@ Architecture: any
 Section: net
 Depends: ${shlibs:Depends}, ${misc:Depends},
  adduser,
- openjdk-8-jre-headless | java-runtime-headless (>= 8),
+ openjdk-8-jre-headless | java8-runtime-headless,
  mesos (>= 0.21.1)
 Recommends: aurora-tools
 Suggests: aurora-doc
