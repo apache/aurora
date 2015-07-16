@@ -37,7 +37,7 @@ allprojects {
   repositories {
     mavenCentral()
     maven {
-      url 'http://maven.twttr.com/'
+      url 'https://maven.twttr.com/'
     }
   }
 
