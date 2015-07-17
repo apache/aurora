@@ -101,6 +101,7 @@ public class LocalSchedulerMain extends SchedulerMain {
         .add("-shiro_ini_path="
             + ResourceUtils.CLASSPATH_PREFIX
             + "org/apache/aurora/scheduler/http/api/security/shiro-example.ini")
+        .add("-enable_h2_console=true")
         .build();
 
     AppLauncher.launch(LocalSchedulerMain.class, arguments.toArray(new String[0]));

@@ -115,6 +115,11 @@ public final class DbModule extends PrivateModule {
         // previous behavior of the map-based store, and allow this type of pattern to work without
         // regression.
         .put("LOCK_MODE", "0")
+        // Error-level reporting for H2.
+        // See http://www.h2database.com/html/features.html#trace_options
+        // TODO(wfarner): H2 can ship these to slf4j, but is too noisy at our default level (info).
+        // Use this logging and reduce the default level for h2's logger.
+        .put("TRACE_LEVEL_SYSTEM_OUT", "1")
         .build();
     this.jdbcSchema = dbName + ";" + Joiner.on(";").withKeyValueSeparator("=").join(args);
   }
