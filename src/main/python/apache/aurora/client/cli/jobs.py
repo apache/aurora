@@ -25,6 +25,7 @@ import webbrowser
 from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime
+from pipes import quote
 from tempfile import NamedTemporaryFile
 
 from thrift.protocol import TJSONProtocol
@@ -149,7 +150,7 @@ class DiffCommand(Verb):
     return textwrap.dedent("""\
         Compare a job configuration against a running job.
         By default the diff will be displayed using 'diff', though you may choose an
-        alternate diff program by setting the DIFF_VIEWER environment variable.""")
+        alternate diff command by setting the DIFF_VIEWER environment variable.""")
 
   @property
   def name(self):
@@ -164,9 +165,22 @@ class DiffCommand(Verb):
 
   def pretty_print_task(self, task):
     task.configuration = None
+    executor_config = json.loads(task.executorConfig.data)
+    pretty_executor = json.dumps(executor_config, indent=2, sort_keys=True)
+    pretty_executor = '\n'.join(["    %s" % s for s in pretty_executor.split("\n")])
+    # Make start cleaner, and display multi-line commands across multiple lines.
+    pretty_executor = '\n    ' + pretty_executor.replace(r'\n', '\n')
+    # Avoid re-escaping as it's already pretty printed.
+    class RawRepr(object):
+      def __init__(self, data):
+        self.data = data
+
+      def __repr__(self):
+        return self.data
+
     task.executorConfig = ExecutorConfig(
         name=AURORA_EXECUTOR_NAME,
-        data=json.loads(task.executorConfig.data))
+        data=RawRepr(pretty_executor))
     return self.prettyprinter.pformat(vars(task))
 
   def pretty_print_tasks(self, tasks):
@@ -210,7 +224,8 @@ class DiffCommand(Verb):
       self.dump_tasks(local_tasks, local)
       with NamedTemporaryFile() as remote:
         self.dump_tasks(remote_tasks, remote)
-        result = subprocess.call([diff_program, remote.name, local.name])
+        result = subprocess.call("%s %s %s" % (
+            diff_program, quote(remote.name), quote(local.name)), shell=True)
         # Unlike most commands, diff doesn't return zero on success; it returns
         # 1 when a successful diff is non-empty.
         if result not in (0, 1):

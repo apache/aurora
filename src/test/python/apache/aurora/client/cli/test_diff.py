@@ -73,7 +73,7 @@ class TestDiffCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('subprocess.call', return_value=0),
-        patch('json.loads', return_value=Mock())) as (_, subprocess_patch, _):
+        patch('json.loads', return_value={})) as (_, subprocess_patch, _):
 
       mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
       self.setup_populate_job_config(mock_scheduler_proxy)
@@ -91,10 +91,10 @@ class TestDiffCommand(AuroraClientCommandTest):
         assert isinstance(mock_scheduler_proxy.populateJobConfig.call_args[0][0], JobConfiguration)
         assert (mock_scheduler_proxy.populateJobConfig.call_args[0][0].key ==
             JobKey(environment=u'test', role=u'bozo', name=u'hello'))
-        # Subprocess should have been used to invoke diff with two parameters.
+        # Subprocess should have been used to invoke diff.
         assert subprocess_patch.call_count == 1
-        assert len(subprocess_patch.call_args[0][0]) == 3
-        assert subprocess_patch.call_args[0][0][0] == os.environ.get('DIFF_VIEWER', 'diff')
+        assert subprocess_patch.call_args[0][0].startswith(
+            os.environ.get('DIFF_VIEWER', 'diff') + ' ')
 
   def test_diff_invalid_config(self):
     """Test the diff command if the user passes a config with an error in it."""
