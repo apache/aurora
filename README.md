@@ -57,6 +57,7 @@ scheduler itself, you may want to explore developing your own
 [framework](http://mesos.apache.org/documentation/latest/app-framework-development-guide).
 
 ### Companies using Aurora
+- [Boxever](http://www.boxever.com)
 - [Foursquare](https://foursquare.com)
 - [Gutefrage.net](https://www.gutefrage.net)
 - [Magine TV](https://magine.com)
