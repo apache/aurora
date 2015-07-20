@@ -1,3 +1,75 @@
+Aurora 0.9.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1401] - DB deadlock caused stuck job update
+    * [AURORA-1325] - `src/test/python/apache/aurora/api_util.py` is not apart of any pants targets
+    * [AURORA-1315] - UpdateStoreBenchmarks broken
+    * [AURORA-1400] - Debian packages cannot be used with oracle-java8
+    * [AURORA-1361] - Explicit reconciliation must use SLAVE_ASSIGNED_STATES
+    * [AURORA-1391] - RPMS for Centos 7 have hard dependency for daemonize package
+    * [AURORA-1296] - INSTANCES_SPEC_ARGUMENT client option does not validate instance range
+    * [AURORA-1339] - TaskReconciler does not block implicit reconciliation
+    * [AURORA-1356] - Thermos observer fails to start
+    * [AURORA-1378] - False positive in test_kerberos_end_to_end.sh
+    * [AURORA-1386] - Transaction isolation on DB stores is too strict
+    * [AURORA-1316] - Consolidate last_modified in client update output
+    * [AURORA-1399] - update start --wait should exit non-zero when the update was non-successful
+    * [AURORA-1382] - Repo URL is incorrect on website
+    * [AURORA-1392] - DbCronJobStore does not go through TaskConfig de-dupe code, breaking uniqueness assumptions elsewhere
+    * [AURORA-698] - aurora executor _shutdown deadline calls should be daemonized
+    * [AURORA-1353] - MesosPathDetector double-counts checkpoint roots
+    * [AURORA-1332] - Updater does not skip already updated instances with /INSTANCES option.
+    * [AURORA-1390] - Primary key violation when modifying cron jobs with DbCronJobStore
+    * [AURORA-1307] - API hooks no longer supported for certain client commands
+    * [AURORA-1379] - Referential integrity violation when replaying storage
+    * [AURORA-1322] - DB task store is enabled by default when staging a recovery
+    * [AURORA-1363] - Please delete old releases from mirroring system
+    * [AURORA-1074] - Remove the "enable_legacy_constraints" flag.
+    * [AURORA-1383] - Unique constraint on task_config_metadata.key should be removed
+
+## Epic
+    * [AURORA-334] - Replace in-memory storage with H2
+    * [AURORA-715] - Retire GC Executor
+    * [AURORA-1079] - 0.9.0 deprecations
+
+## Story
+    * [AURORA-274] - Use JDK8 features in scheduler development
+    * [AURORA-1298] - Make DbTaskStore suitable for use in production
+    * [AURORA-1369] - Scheduler warns about unoptimized Operation SAVE_JOB_INSTANCE_UPDATE_EVENT
+    * [AURORA-1350] - Non-prod SLA stats
+    * [AURORA-570] - LeaderRedirectFilter should be applied to admin endpoints that depend on storage
+    * [AURORA-1397] - Python style checker should only report errors
+    * [AURORA-1352] - Audit log doesn't capture Shiro subject principal
+    * [AURORA-1096] - Scheduler updater should limit the number of job/instance events
+    * [AURORA-1375] - When setting quota, the scheduler should prevent setting below current usage
+
+## Task
+    * [AURORA-951] - Debian packaging for Aurora
+    * [AURORA-1351] - Make observer POLLING_INTERVAL configurable
+    * [AURORA-415] - H2-backed implementation of JobStore
+    * [AURORA-1344] - Create Aurora oversubscription design summary
+    * [AURORA-1333] - Remove GC executor code
+    * [AURORA-1327] - MesosSchedulerImpl should check if reason is present when posting status updates
+    * [AURORA-316] - in health_check_config allow override for uri and expected_response 
+    * [AURORA-1368] - shutdown_endpoint fields should be in the aurora schema
+    * [AURORA-1371] - Add exact times to events in update UI
+    * [AURORA-1228] - Use explicit status update acknowledgements to improve driver throughput.
+    * [AURORA-1116] - RPM packaging for Aurora
+    * [AURORA-1287] - Scheduler in-memory DB needs a direct console access
+    * [AURORA-1346] - Upgrade requests-kerberos to 0.7.0
+    * [AURORA-1337] - aurora executor should write checkpoints into sandbox
+    * [AURORA-1318] - Benchmark snapshot restore
+    * [AURORA-1239] - Add a way to watch a scheduler-driven update until it's complete
+    * [AURORA-556] - H2-backed implementation of TaskStore
+    * [AURORA-1277] - Create a design document for Health Checks for Updates
+    * [AURORA-1311] - Upgrade to latest h2 version
+    * [AURORA-1341] - Use TaskStatus reason field to populate the memory limit exceeded field in UserTaskLauncher
+    * [AURORA-1334] - Remove GCExecutorLauncher code
+    * [AURORA-1267] - Investigate upgrading pants to 0.0.32+
+    * [AURORA-1139] - Remove backwards compatibility shims from JobUpdateKey introduction
+    * [AURORA-1047] - Implement state reconciliation within the scheduler
+
+
 Aurora 0.8.0
 --------------------------------------------------------------------------------
 ## Bug
