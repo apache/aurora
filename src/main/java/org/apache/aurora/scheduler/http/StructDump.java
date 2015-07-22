@@ -109,7 +109,7 @@ public class StructDump extends JerseyTemplateServlet {
           @Override
           public Optional<JobConfiguration> apply(StoreProvider storeProvider) {
             return storeProvider.getCronJobStore().fetchJob(jobKey)
-                .transform(IJobConfiguration.TO_BUILDER);
+                .transform(IJobConfiguration::newBuilder);
           }
         });
   }

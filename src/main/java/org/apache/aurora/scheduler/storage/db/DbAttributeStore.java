@@ -88,7 +88,7 @@ class DbAttributeStore implements AttributeStore.Mutable {
   @Timed("attribute_store_fetch_one")
   @Override
   public Optional<IHostAttributes> getHostAttributes(String host) {
-    return Optional.fromNullable(mapper.select(host)).transform(IHostAttributes.FROM_BUILDER);
+    return Optional.fromNullable(mapper.select(host)).transform(IHostAttributes::build);
   }
 
   @Timed("attribute_store_fetch_all")

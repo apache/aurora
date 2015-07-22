@@ -131,7 +131,7 @@ IMMUTABLE_COLLECTION_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
 STRUCT_COLLECTION_FIELD_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
         ? Immutable%(collection)s.<%(params)s>of()
         : FluentIterable.from(wrapped.%(fn_name)s())
-              .transform(%(params)s.FROM_BUILDER)
+              .transform(%(params)s::build)
               .to%(collection)s();'''
 
 PACKAGE_NAME = 'org.apache.aurora.scheduler.storage.entities'
@@ -162,36 +162,20 @@ public final class %(name)s {
     return buildNoCopy(wrapped.deepCopy());
   }
 
-  public static final Function<%(name)s, %(wrapped)s> TO_BUILDER =
-      new Function<%(name)s, %(wrapped)s>() {
-        @Override
-        public %(wrapped)s apply(%(name)s input) {
-          return input.newBuilder();
-        }
-      };
-
-  public static final Function<%(wrapped)s, %(name)s> FROM_BUILDER =
-      new Function<%(wrapped)s, %(name)s>() {
-        @Override
-        public %(name)s apply(%(wrapped)s input) {
-          return %(name)s.build(input);
-        }
-      };
-
   public static ImmutableList<%(wrapped)s> toBuildersList(Iterable<%(name)s> w) {
-    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+    return FluentIterable.from(w).transform(%(name)s::newBuilder).toList();
   }
 
   public static ImmutableList<%(name)s> listFromBuilders(Iterable<%(wrapped)s> b) {
-    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+    return FluentIterable.from(b).transform(%(name)s::build).toList();
   }
 
   public static ImmutableSet<%(wrapped)s> toBuildersSet(Iterable<%(name)s> w) {
-    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+    return FluentIterable.from(w).transform(%(name)s::newBuilder).toSet();
   }
 
   public static ImmutableSet<%(name)s> setFromBuilders(Iterable<%(wrapped)s> b) {
-    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+    return FluentIterable.from(b).transform(%(name)s::build).toSet();
   }
 
   public %(wrapped)s newBuilder() {
@@ -462,7 +446,6 @@ def parse_services(service_defs):
 def generate_java(struct):
   code = GeneratedCode(struct.codegen_name, struct.name)
   code.add_import('java.util.Objects')
-  code.add_import('com.google.common.base.Function')
   code.add_import('com.google.common.collect.ImmutableList')
   code.add_import('com.google.common.collect.ImmutableSet')
   code.add_import('com.google.common.collect.FluentIterable')

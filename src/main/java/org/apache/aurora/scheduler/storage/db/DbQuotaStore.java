@@ -43,7 +43,7 @@ class DbQuotaStore implements QuotaStore.Mutable {
   @Override
   public Optional<IResourceAggregate> fetchQuota(String role) {
     return Optional.fromNullable(mapper.select(role))
-        .transform(IResourceAggregate.FROM_BUILDER);
+        .transform(IResourceAggregate::build);
   }
 
   @Timed("quota_store_fetch_quotas")

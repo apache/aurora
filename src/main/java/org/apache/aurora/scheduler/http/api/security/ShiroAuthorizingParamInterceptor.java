@@ -100,7 +100,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
           Optional<Set<IJobKey>> targetJobs = JobKeys.from(Query.arbitrary(input));
           if (targetJobs.isPresent() && targetJobs.get().size() == 1) {
             return Optional.of(Iterables.getOnlyElement(targetJobs.get()))
-                .transform(IJobKey.TO_BUILDER);
+                .transform(IJobKey::newBuilder);
           } else {
             return Optional.absent();
           }
@@ -336,7 +336,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
     Optional<IJobKey> jobKey = authorizingParamGetters
         .getUnchecked(invocation.getMethod())
         .apply(invocation.getArguments())
-        .transform(IJobKey.FROM_BUILDER);
+        .transform(IJobKey::build);
     if (jobKey.isPresent() && JobKeys.isValid(jobKey.get())) {
       Permission targetPermission = makeTargetPermission(method.getName(), jobKey.get());
       if (subject.isPermitted(targetPermission)) {
