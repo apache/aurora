@@ -17,9 +17,9 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent;
+import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.mesos.Protos;
 

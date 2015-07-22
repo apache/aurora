@@ -1,0 +1,118 @@
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.aurora.scheduler.reconciliation;
+
+import javax.inject.Singleton;
+
+import com.google.inject.AbstractModule;
+import com.google.inject.PrivateModule;
+import com.google.inject.TypeLiteral;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.Positive;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.common.util.BackoffStrategy;
+import com.twitter.common.util.TruncatedBinaryBackoff;
+
+import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.reconciliation.TaskReconciler.TaskReconcilerSettings;
+
+/**
+ * Binding module for state reconciliation and retry logic.
+ */
+public class ReconciliationModule extends AbstractModule {
+
+  @CmdLine(name = "transient_task_state_timeout",
+      help = "The amount of time after which to treat a task stuck in a transient state as LOST.")
+  private static final Arg<Amount<Long, Time>> TRANSIENT_TASK_STATE_TIMEOUT =
+      Arg.create(Amount.of(5L, Time.MINUTES));
+
+  @CmdLine(name = "initial_task_kill_retry_interval",
+      help = "When killing a task, retry after this delay if mesos has not responded,"
+          + " backing off up to transient_task_state_timeout")
+  private static final Arg<Amount<Long, Time>> INITIAL_TASK_KILL_RETRY_INTERVAL =
+      Arg.create(Amount.of(5L, Time.SECONDS));
+
+  // Reconciliation may create a big surge of status updates in a large cluster. Setting the default
+  // initial delay to 1 minute to ease up storage contention during scheduler start up.
+  @CmdLine(name = "reconciliation_initial_delay",
+      help = "Initial amount of time to delay task reconciliation after scheduler start up.")
+  private static final Arg<Amount<Long, Time>> RECONCILIATION_INITIAL_DELAY =
+      Arg.create(Amount.of(1L, Time.MINUTES));
+
+  @Positive
+  @CmdLine(name = "reconciliation_explicit_interval",
+      help = "Interval on which scheduler will ask Mesos for status updates of all non-terminal "
+          + "tasks known to scheduler.")
+  private static final Arg<Amount<Long, Time>> RECONCILIATION_EXPLICIT_INTERVAL =
+      Arg.create(Amount.of(60L, Time.MINUTES));
+
+  @Positive
+  @CmdLine(name = "reconciliation_implicit_interval",
+      help = "Interval on which scheduler will ask Mesos for status updates of all non-terminal "
+          + "tasks known to Mesos.")
+  private static final Arg<Amount<Long, Time>> RECONCILIATION_IMPLICIT_INTERVAL =
+      Arg.create(Amount.of(60L, Time.MINUTES));
+
+  @CmdLine(name = "reconciliation_schedule_spread",
+      help = "Difference between explicit and implicit reconciliation intervals intended to "
+          + "create a non-overlapping task reconciliation schedule.")
+  private static final Arg<Amount<Long, Time>> RECONCILIATION_SCHEDULE_SPREAD =
+      Arg.create(Amount.of(30L, Time.MINUTES));
+
+  @Override
+  protected void configure() {
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(new TypeLiteral<Amount<Long, Time>>() { })
+            .toInstance(TRANSIENT_TASK_STATE_TIMEOUT.get());
+
+        bind(TaskTimeout.class).in(Singleton.class);
+        expose(TaskTimeout.class);
+      }
+    });
+    PubsubEventModule.bindSubscriber(binder(), TaskTimeout.class);
+    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(TaskTimeout.class);
+
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(BackoffStrategy.class).toInstance(
+            new TruncatedBinaryBackoff(
+                INITIAL_TASK_KILL_RETRY_INTERVAL.get(),
+                TRANSIENT_TASK_STATE_TIMEOUT.get()));
+        bind(KillRetry.class).in(Singleton.class);
+        expose(KillRetry.class);
+      }
+    });
+    PubsubEventModule.bindSubscriber(binder(), KillRetry.class);
+
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(TaskReconcilerSettings.class).toInstance(new TaskReconcilerSettings(
+            RECONCILIATION_INITIAL_DELAY.get(),
+            RECONCILIATION_EXPLICIT_INTERVAL.get(),
+            RECONCILIATION_IMPLICIT_INTERVAL.get(),
+            RECONCILIATION_SCHEDULE_SPREAD.get()));
+        bind(TaskReconciler.class).in(Singleton.class);
+        expose(TaskReconciler.class);
+      }
+    });
+    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(TaskReconciler.class);
+  }
+}

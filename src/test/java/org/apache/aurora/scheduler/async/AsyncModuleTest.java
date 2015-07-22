@@ -29,13 +29,6 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.scheduler.AppStartup;
-import org.apache.aurora.scheduler.async.preemptor.Preemptor;
-import org.apache.aurora.scheduler.filter.SchedulingFilter;
-import org.apache.aurora.scheduler.mesos.Driver;
-import org.apache.aurora.scheduler.state.MaintenanceController;
-import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.state.TaskAssigner;
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Before;
@@ -73,14 +66,7 @@ public class AsyncModuleTest extends EasyMockTest {
           protected void configure() {
             bind(StatsProvider.class).toInstance(statsProvider);
             bindMock(Clock.class);
-            bindMock(Driver.class);
-            bindMock(SchedulingFilter.class);
-            bindMock(MaintenanceController.class);
-            bindMock(Preemptor.class);
-            bindMock(StateManager.class);
-            bindMock(TaskAssigner.class);
             bindMock(Thread.UncaughtExceptionHandler.class);
-            bind(Storage.class).toInstance(storageUtil.storage);
           }
         });
   }

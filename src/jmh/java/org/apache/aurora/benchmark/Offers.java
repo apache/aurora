@@ -20,8 +20,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.OfferManager;
 import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos;
 
@@ -34,9 +34,9 @@ final class Offers {
   }
 
   /**
-   * Saves offers into the {@link org.apache.aurora.scheduler.async.OfferManager}.
+   * Saves offers into the {@link OfferManager}.
    *
-   * @param offerManager {@link org.apache.aurora.scheduler.async.OfferManager} to save into.
+   * @param offerManager {@link OfferManager} to save into.
    * @param offers Offers to save.
    */
   static void addOffers(OfferManager offerManager, Iterable<HostOffer> offers) {
