@@ -12,6 +12,7 @@
  * limitations under the License.
  */
 import org.apache.aurora.build.CoverageReportCheck
+import org.gradle.api.JavaVersion
 
 plugins {
   id 'com.eriwen.gradle.js' version '1.12.1'
@@ -25,6 +26,8 @@ apply plugin: 'checkstyle'
 apply plugin: 'findbugs'
 apply plugin: 'jacoco'
 apply plugin: 'pmd'
+
+def minJavaVersion = JavaVersion.VERSION_1_8;
 
 allprojects {
   apply plugin: 'java'
@@ -42,8 +45,8 @@ allprojects {
   }
 
   compileJava {
-    sourceCompatibility = 1.8
-    targetCompatibility = 1.8
+    sourceCompatibility = minJavaVersion
+    targetCompatibility = minJavaVersion
   }
 
   group 'org.apache.aurora'
@@ -212,6 +215,16 @@ compileJava {
   // Don't fail for serialVersionUID warnings.
   options.compilerArgs << '-Xlint:-serial'
 }
+
+task enforceVersion {
+  def foundVersion = JavaVersion.current();
+  if (foundVersion < minJavaVersion) {
+    throw new GradleException("Build requires at least Java ${minJavaVersion}; but ${foundVersion}"
+        + " was found. Consider setting JAVA_HOME to select a specific JDK on your system.");
+  }
+}
+
+compileJava.dependsOn(enforceVersion);
 
 task wrapper(type: Wrapper) {
   gradleVersion = project(':buildSrc').GRADLE_VERSION
