@@ -18,7 +18,14 @@ import re
 import pytest
 
 from apache.aurora.config import AuroraConfig
-from apache.aurora.config.schema.base import HealthCheckConfig, Job, SimpleTask
+from apache.aurora.config.schema.base import (
+    Container,
+    Docker,
+    HealthCheckConfig,
+    Job,
+    Parameter,
+    SimpleTask
+)
 from apache.aurora.config.thrift import convert as convert_pystachio_to_thrift
 from apache.aurora.config.thrift import InvalidConfig, task_instance_from_job
 from apache.thermos.config.schema import Process, Resources, Task
@@ -64,6 +71,16 @@ def test_simple_config():
   assert tti.constraints == set()
   assert tti.metadata == set()
   assert tti.environment == HELLO_WORLD.environment().get()
+
+
+def test_docker_with_parameters():
+  helloworld = HELLO_WORLD(
+    container=Container(
+      docker=Docker(image='test_image', parameters=[Parameter(name='foo', value='bar')])
+    )
+  )
+  job = convert_pystachio_to_thrift(helloworld)
+  assert job.taskConfig.container.docker.image == 'test_image'
 
 
 def test_config_with_options():

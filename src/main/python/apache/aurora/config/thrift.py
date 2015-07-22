@@ -27,6 +27,7 @@ from gen.apache.aurora.api.ttypes import (
     Container,
     CronCollisionPolicy,
     DockerContainer,
+    DockerParameter,
     ExecutorConfig,
     Identity,
     JobConfiguration,
@@ -129,7 +130,11 @@ def create_container_config(container):
   if container is Empty:
     return Container(MesosContainer(), None)
   elif container.docker() is not Empty:
-    return Container(None, DockerContainer(fully_interpolated(container.docker().image())))
+    params = list()
+    if container.docker().parameters() is not Empty:
+      for p in fully_interpolated(container.docker().parameters()):
+        params.append(DockerParameter(p['name'], p['value']))
+    return Container(None, DockerContainer(fully_interpolated(container.docker().image()), params))
   else:
     raise InvalidConfig('If a container is specified it must set one type.')
 

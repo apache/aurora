@@ -63,6 +63,10 @@ public final class ConfigurationManager {
   private static final Arg<List<Container._Fields>> ALLOWED_CONTAINER_TYPES =
       Arg.create(ImmutableList.of(Container._Fields.MESOS));
 
+  @CmdLine(name = "allow_docker_parameters",
+      help = "Allow to pass docker container parameters in the job.")
+  private static final Arg<Boolean> ENABLE_DOCKER_PARAMETERS = Arg.create(false);
+
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
 
   private static final Pattern GOOD_IDENTIFIER = Pattern.compile(GOOD_IDENTIFIER_PATTERN_JVM);
@@ -336,8 +340,15 @@ public final class ConfigurationManager {
     if (config.isSetContainer()) {
       IContainer containerConfig = config.getContainer();
       containerType = Optional.of(containerConfig.getSetField());
-      if (containerConfig.isSetDocker() && !containerConfig.getDocker().isSetImage()) {
-        throw new TaskDescriptionException("A container must specify an image");
+      if (containerConfig.isSetDocker()) {
+        if (!containerConfig.getDocker().isSetImage()) {
+          throw new TaskDescriptionException("A container must specify an image");
+        }
+        if (containerConfig.getDocker().isSetParameters()
+            && !containerConfig.getDocker().getParameters().isEmpty()
+            && !ENABLE_DOCKER_PARAMETERS.get()) {
+          throw new TaskDescriptionException("Docker parameters not allowed.");
+        }
       }
     } else {
       // Default to mesos container type if unset.

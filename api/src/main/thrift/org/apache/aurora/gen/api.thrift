@@ -208,10 +208,20 @@ struct Volume {
 struct MesosContainer {
 }
 
+/** Describes a parameter passed to docker cli */
+struct DockerParameter {
+  /** a parameter to pass to docker. (e.g. volume) */
+  1: string name
+  /** the value to pass to a parameter (e.g. /src/webapp:/opt/webapp) */
+  2: string value
+}
+
 /** Describes a docker container */
 struct DockerContainer {
   /** The container image to be run */
   1: string image
+  /** The arbitrary parameters to pass to container */
+  2: optional list<DockerParameter> parameters
 }
 
 /** Describes a container to be used in a task */

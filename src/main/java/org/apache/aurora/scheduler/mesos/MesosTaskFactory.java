@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
+import com.twitter.common.base.Function;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
@@ -36,8 +37,10 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
+import org.apache.aurora.scheduler.storage.entities.IDockerParameter;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.ExecutorID;
@@ -180,9 +183,16 @@ public interface MesosTaskFactory {
         TaskInfo.Builder taskBuilder) {
 
       IDockerContainer config = taskConfig.getContainer().getDocker();
-      ContainerInfo.DockerInfo.Builder dockerBuilder = ContainerInfo.DockerInfo.newBuilder()
-          .setImage(config.getImage());
+      Iterable<Protos.Parameter> parameters = Iterables.transform(config.getParameters(),
+          new Function<IDockerParameter, Protos.Parameter>() {
+            @Override public Protos.Parameter apply(IDockerParameter item) {
+              return Protos.Parameter.newBuilder().setKey(item.getName())
+                .setValue(item.getValue()).build();
+            }
+          });
 
+      ContainerInfo.DockerInfo.Builder dockerBuilder = ContainerInfo.DockerInfo.newBuilder()
+          .setImage(config.getImage()).addAllParameters(parameters);
       ContainerInfo.Builder containerBuilder = ContainerInfo.newBuilder()
           .setType(ContainerInfo.Type.DOCKER)
           .setDocker(dockerBuilder.build());
