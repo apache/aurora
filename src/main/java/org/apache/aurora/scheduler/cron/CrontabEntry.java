@@ -21,7 +21,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.BiMap;
@@ -218,7 +217,7 @@ public final class CrontabEntry {
         components.add(set.first() + "-" + set.last());
       }
     }
-    return Joiner.on(",").join(components);
+    return String.join(",", components);
   }
 
   /**
@@ -262,7 +261,8 @@ public final class CrontabEntry {
    */
   @Override
   public String toString() {
-    return Joiner.on(" ").join(
+    return String.join(
+        " ",
         getMinuteAsString(),
         getHourAsString(),
         getDayOfMonthAsString(),

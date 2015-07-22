@@ -20,7 +20,6 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
@@ -131,7 +130,7 @@ public final class JobKeys {
    * @return Canonical "/"-delimited representation of the key.
    */
   public static String canonicalString(IJobKey jobKey) {
-    return Joiner.on("/").join(jobKey.getRole(), jobKey.getEnvironment(), jobKey.getName());
+    return String.join("/", jobKey.getRole(), jobKey.getEnvironment(), jobKey.getName());
   }
 
   /**

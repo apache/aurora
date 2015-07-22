@@ -69,7 +69,8 @@ final class Quartz {
       dayOfWeek = Joiner.on(",").join(daysOfWeek);
     }
 
-    String rawCronExpresion = Joiner.on(" ").join(
+    String rawCronExpresion = String.join(
+        " ",
         "0",
         entry.getMinuteAsString(),
         entry.getHourAsString(),

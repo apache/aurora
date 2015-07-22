@@ -22,8 +22,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.HttpMethod;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HttpHeaders;
 import com.twitter.common.base.MorePreconditions;
 
@@ -34,22 +32,22 @@ import com.twitter.common.base.MorePreconditions;
 public class CorsFilter extends AbstractFilter {
 
   @VisibleForTesting
-  static final String ALLOWED_METHODS = Joiner.on(",")
-      .join(ImmutableSet.of(
-          HttpMethod.DELETE,
-          HttpMethod.GET,
-          HttpMethod.HEAD,
-          HttpMethod.OPTIONS,
-          HttpMethod.POST,
-          HttpMethod.PUT));
+  static final String ALLOWED_METHODS = String.join(
+      ",",
+      HttpMethod.DELETE,
+      HttpMethod.GET,
+      HttpMethod.HEAD,
+      HttpMethod.OPTIONS,
+      HttpMethod.POST,
+      HttpMethod.PUT);
 
   @VisibleForTesting
-  static final String ALLOWED_HEADERS = Joiner.on(",")
-      .join(ImmutableSet.of(
-          HttpHeaders.ACCEPT,
-          HttpHeaders.CONTENT_TYPE,
-          HttpHeaders.ORIGIN,
-          HttpHeaders.X_REQUESTED_WITH));
+  static final String ALLOWED_HEADERS = String.join(
+      ",",
+      HttpHeaders.ACCEPT,
+      HttpHeaders.CONTENT_TYPE,
+      HttpHeaders.ORIGIN,
+      HttpHeaders.X_REQUESTED_WITH);
 
   private final String allowedOriginDomain;
 

@@ -22,7 +22,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -96,7 +95,7 @@ class LoggingInterceptor implements MethodInterceptor {
       }
     }
     String methodName = invocation.getMethod().getName();
-    String message = String.format("%s(%s)", methodName, Joiner.on(", ").join(argStrings));
+    String message = String.format("%s(%s)", methodName, String.join(", ", argStrings));
     LOG.info(message);
     try {
       return invocation.proceed();
