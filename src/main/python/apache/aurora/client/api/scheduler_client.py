@@ -120,7 +120,8 @@ class ZookeeperSchedulerClient(SchedulerClient):
     if cluster.scheduler_zk_path is None:
       raise ValueError('Cluster has no defined scheduler path, must specify scheduler_zk_path '
                        'in your cluster config!')
-    zk = TwitterKazooClient.make(str('%s:%s' % (cluster.zk, port)), verbose=verbose)
+    hosts = [h + ':{p}' for h in cluster.zk.split(',')]
+    zk = TwitterKazooClient.make(str(','.join(hosts).format(p=port)), verbose=verbose)
     return zk, ServerSet(zk, cluster.scheduler_zk_path, **kw)
 
   def __init__(self, cluster, port=2181, verbose=False, _deadline=deadline, **kwargs):
