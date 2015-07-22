@@ -34,10 +34,6 @@ update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
 
 readonly IP_ADDRESS=192.168.33.7
 
-# Set the hostname to the IP address.  This simplifies things for components
-# that want to advertise the hostname to the user, or other components.
-hostname $IP_ADDRESS
-
 readonly MESOS_VERSION=0.22.0
 
 function prepare_extras() {
@@ -91,7 +87,7 @@ EOF
 
 function configure_netrc {
   cat > /home/vagrant/.netrc <<EOF
-machine $IP_ADDRESS
+machine $(hostname -f)
 login aurora
 password secret
 EOF
