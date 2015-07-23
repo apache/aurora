@@ -37,6 +37,7 @@ import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -47,8 +48,6 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.scheduler.base.Tasks.INFO_TO_JOB_KEY;
-import static org.apache.aurora.scheduler.base.Tasks.IS_PRODUCTION;
 import static org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
 import static org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
 import static org.apache.aurora.scheduler.stats.ResourceCounter.MetricType.DEDICATED_CONSUMED;
@@ -84,7 +83,7 @@ public class ResourceCounterTest {
     Map<IJobKey, Metric> aggregates = resourceCounter.computeAggregates(
         Query.unscoped(),
         Predicates.alwaysTrue(),
-        INFO_TO_JOB_KEY);
+        ITaskConfig::getJob);
     assertEquals(ImmutableMap.of(), aggregates);
 
     for (Metric metric : resourceCounter.computeConsumptionTotals()) {
@@ -149,7 +148,10 @@ public class ResourceCounterTest {
             JobKeys.from("bob", "test", "jobA"), new Metric(1, 1 * GB, 1 * GB),
             JobKeys.from("bob", "test", "jobB"), new Metric(2, 2 * GB, 2 * GB)
         ),
-        resourceCounter.computeAggregates(Query.roleScoped("bob"), IS_PRODUCTION, INFO_TO_JOB_KEY)
+        resourceCounter.computeAggregates(
+            Query.roleScoped("bob"),
+            ITaskConfig::isProduction,
+            ITaskConfig::getJob)
     );
   }
 

@@ -66,7 +66,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
 
 /**
  * Attempts to find preemption slots for all PENDING tasks eligible for preemption.
@@ -187,7 +186,7 @@ public class PendingTaskProcessor implements Runnable {
     Multiset<TaskGroupKey> taskGroupCounts = HashMultiset.create(
         FluentIterable.from(store.getTaskStore().fetchTasks(Query.statusScoped(PENDING)))
             .filter(Predicates.and(isIdleTask, Predicates.not(hasCachedSlot)))
-            .transform(Functions.compose(ASSIGNED_TO_GROUP_KEY, SCHEDULED_TO_ASSIGNED)));
+            .transform(Functions.compose(ASSIGNED_TO_GROUP_KEY, IScheduledTask::getAssignedTask)));
 
     return getPreemptionSequence(taskGroupCounts);
   }

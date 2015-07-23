@@ -197,7 +197,7 @@ class WriteAheadStorage extends ForwardingStore implements
     Map<String, IScheduledTask> tasksById = Tasks.mapById(mutated);
     if (log.isLoggable(Level.FINE)) {
       log.fine("Storing updated tasks to log: "
-          + Maps.transformValues(tasksById, Tasks.GET_STATUS));
+          + Maps.transformValues(tasksById, IScheduledTask::getStatus));
     }
 
     // TODO(William Farner): Avoid writing an op when mutated is empty.

@@ -224,7 +224,7 @@ public class TaskGroups implements EventSubscriber {
   @Subscribe
   public synchronized void tasksDeleted(TasksDeleted deleted) {
     for (IAssignedTask task
-        : Iterables.transform(deleted.getTasks(), Tasks.SCHEDULED_TO_ASSIGNED)) {
+        : Iterables.transform(deleted.getTasks(), IScheduledTask::getAssignedTask)) {
       TaskGroup group = groups.get(TaskGroupKey.from(task.getTask()));
       if (group != null) {
         group.remove(task.getTaskId());

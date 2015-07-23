@@ -18,8 +18,6 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
@@ -40,40 +38,9 @@ public final class JobKeys {
     // Utility class.
   }
 
-  public static final Function<IJobConfiguration, IJobKey> FROM_CONFIG =
-      new Function<IJobConfiguration, IJobKey>() {
-        @Override
-        public IJobKey apply(IJobConfiguration job) {
-          return job.getKey();
-        }
-      };
-
-  public static final Function<IJobKey, String> TO_ROLE =
-      new Function<IJobKey, String>() {
-        @Override
-        public String apply(IJobKey jobKey) {
-          return jobKey.getRole();
-        }
-      };
-
-  public static final Function<IJobKey, String> TO_ENVIRONMENT =
-      new Function<IJobKey, String>() {
-        @Override
-        public String apply(IJobKey jobKey) {
-          return jobKey.getEnvironment();
-        }
-      };
-
-  public static final Function<IJobKey, String> TO_JOB_NAME =
-      new Function<IJobKey, String>() {
-        @Override
-        public String apply(IJobKey jobKey) {
-          return jobKey.getName();
-        }
-      };
-
-  public static final Function<IJobConfiguration, String> CONFIG_TO_ROLE =
-      Functions.compose(TO_ROLE, FROM_CONFIG);
+  public static String getRole(IJobConfiguration jobConfiguration) {
+    return jobConfiguration.getKey().getRole();
+  }
 
   /**
    * Check that a jobKey struct is valid.

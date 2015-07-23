@@ -93,7 +93,7 @@ public interface RescheduleCalculator {
 
         // Avoid penalizing tasks that were interrupted by outside action, such as a user
         // restarting them.
-        if (Iterables.any(Iterables.transform(events, Tasks.TASK_EVENT_TO_STATUS),
+        if (Iterables.any(Iterables.transform(events, ITaskEvent::getStatus),
             Predicates.in(INTERRUPTED_TASK_STATES))) {
           return false;
         }
@@ -104,7 +104,7 @@ public interface RescheduleCalculator {
 
         ITaskEvent activeEvent = Iterables.find(
             events,
-            Predicates.compose(IS_ACTIVE_STATUS, Tasks.TASK_EVENT_TO_STATUS));
+            Predicates.compose(IS_ACTIVE_STATUS, ITaskEvent::getStatus));
 
         long thresholdMs = settings.flappingTaskThreashold.as(Time.MILLISECONDS);
 

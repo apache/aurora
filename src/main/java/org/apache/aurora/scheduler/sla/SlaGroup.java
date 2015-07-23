@@ -119,7 +119,7 @@ interface SlaGroup {
         public String apply(IJobKey jobKey) {
           return "sla_" + JobKeys.canonicalString(jobKey) + "_";
         }
-      }, Tasks.SCHEDULED_TO_JOB_KEY));
+      }, Tasks::getJob));
     }
   }
 

@@ -54,7 +54,7 @@ public class ResourceCounter {
   private Iterable<ITaskConfig> getTasks(Query.Builder query) throws StorageException {
     return Iterables.transform(
         Storage.Util.fetchTasks(storage, query),
-        Tasks.SCHEDULED_TO_INFO);
+        Tasks::getConfig);
   }
 
   private static final Function<MetricType, GlobalMetric> TO_GLOBAL_METRIC =

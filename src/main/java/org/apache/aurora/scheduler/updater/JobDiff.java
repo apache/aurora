@@ -181,8 +181,8 @@ public final class JobDiff {
         Maps.transformValues(
             Maps.uniqueIndex(
                 taskStore.fetchTasks(Query.jobScoped(job).active()),
-                Tasks.SCHEDULED_TO_INSTANCE_ID),
-            Tasks.SCHEDULED_TO_INFO));
+                Tasks::getInstanceId),
+            Tasks::getConfig));
 
     JobDiff diff = computeUnscoped(currentState, job, proposedState);
     if (scope.isEmpty()) {

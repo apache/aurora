@@ -33,7 +33,6 @@ import com.twitter.common.stats.Stats;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
@@ -48,6 +47,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -178,7 +178,7 @@ public interface TaskScheduler extends EventSubscriber {
       IAssignedTask assignedTask = Iterables.getOnlyElement(
           Iterables.transform(
               store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
-              Tasks.SCHEDULED_TO_ASSIGNED),
+              IScheduledTask::getAssignedTask),
           null);
 
       if (assignedTask == null) {

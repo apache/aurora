@@ -13,7 +13,6 @@
  */
 package org.apache.aurora;
 
-import com.google.common.base.Function;
 import com.google.protobuf.Message;
 import com.google.protobuf.TextFormat;
 
@@ -25,16 +24,6 @@ public final class Protobufs {
   private Protobufs() {
     // Utility class.
   }
-
-  /**
-   * Function to call {@link #toString(Message)} on message objects.
-   */
-  public static final Function<Message, String> SHORT_TOSTRING = new Function<Message, String>() {
-    @Override
-    public String apply(Message message) {
-      return Protobufs.toString(message);
-    }
-  };
 
   /**
    * Alternative to the default protobuf toString implementation, which omits newlines.

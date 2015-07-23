@@ -98,7 +98,7 @@ public class NearestFit implements EventSubscriber {
             return TaskGroupKey.from(task);
           }
         },
-        Tasks.SCHEDULED_TO_INFO)));
+        Tasks::getConfig)));
   }
 
   /**

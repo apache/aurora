@@ -186,12 +186,12 @@ class MetricCalculator implements Runnable {
         FluentIterable.from(Storage.Util.fetchTasks(storage, Query.unscoped()));
 
     List<IScheduledTask> prodTasks = tasks.filter(Predicates.compose(
-        Predicates.and(Tasks.IS_PRODUCTION, IS_SERVICE),
-        Tasks.SCHEDULED_TO_INFO)).toList();
+        Predicates.and(ITaskConfig::isProduction, IS_SERVICE),
+        Tasks::getConfig)).toList();
 
     List<IScheduledTask> nonProdTasks = tasks.filter(Predicates.compose(
-        Predicates.and(Predicates.not(Tasks.IS_PRODUCTION), IS_SERVICE),
-        Tasks.SCHEDULED_TO_INFO)).toList();
+        Predicates.and(Predicates.not(ITaskConfig::isProduction), IS_SERVICE),
+        Tasks::getConfig)).toList();
 
     long nowMs = clock.nowMillis();
     Range<Long> timeRange = Range.closedOpen(nowMs - settings.refreshRateMs, nowMs);

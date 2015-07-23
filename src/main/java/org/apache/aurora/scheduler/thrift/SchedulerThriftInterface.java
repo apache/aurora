@@ -186,7 +186,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
   private static final Function<IScheduledTask, String> GET_ROLE = Functions.compose(
       task -> task.getJob().getRole(),
-      Tasks.SCHEDULED_TO_INFO);
+      Tasks::getConfig);
 
   private final NonVolatileStorage storage;
   private final LockManager lockManager;
@@ -477,7 +477,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       throws LockException {
 
     ImmutableSet<IJobKey> uniqueKeys = FluentIterable.from(tasks)
-        .transform(Tasks.SCHEDULED_TO_JOB_KEY)
+        .transform(Tasks::getJob)
         .toSet();
 
     // Validate lock against every unique job key derived from the tasks.
@@ -500,7 +500,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     // role-scoped query.
     ImmutableSet.Builder<String> targetRoles = ImmutableSet.builder();
     Set<IJobKey> keys = JobKeys.from(taskQuery).or(ImmutableSet.of());
-    targetRoles.addAll(FluentIterable.from(keys).transform(JobKeys.TO_ROLE));
+    targetRoles.addAll(FluentIterable.from(keys).transform(IJobKey::getRole));
 
     if (taskQuery.get().isSetRole()) {
       targetRoles.add(taskQuery.get().getRole());
@@ -867,7 +867,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
             .active());
     Optional<IAssignedTask> task =
         Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
-            .transform(Tasks.SCHEDULED_TO_ASSIGNED);
+            .transform(IScheduledTask::getAssignedTask);
 
     if (task.isPresent()) {
       if (task.get().getTask().newBuilder().equals(instanceRewrite.getOldTask())) {

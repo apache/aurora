@@ -141,11 +141,11 @@ public interface MesosTaskFactory {
 
       if (LOG.isLoggable(Level.FINE)) {
         LOG.fine("Setting task resources to "
-            + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
+            + Iterables.transform(resources, Protobufs::toString));
       }
       TaskInfo.Builder taskBuilder =
           TaskInfo.newBuilder()
-              .setName(JobKeys.canonicalString(Tasks.ASSIGNED_TO_JOB_KEY.apply(task)))
+              .setName(JobKeys.canonicalString(Tasks.getJob(task)))
               .setTaskId(TaskID.newBuilder().setValue(task.getTaskId()))
               .setSlaveId(slaveId)
               .addAllResources(resources)

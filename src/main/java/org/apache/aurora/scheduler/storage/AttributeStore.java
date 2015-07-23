@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage;
 
 import java.util.Set;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 
@@ -114,14 +113,6 @@ public interface AttributeStore {
       }
     }
 
-    public static final Function<IHostAttributes, MaintenanceMode> GET_MODE =
-        new Function<IHostAttributes, MaintenanceMode>() {
-          @Override
-          public MaintenanceMode apply(IHostAttributes attrs) {
-            return attrs.getMode();
-          }
-        };
-
     /**
      * Merges the attributes from an offer, applying the default maintenance mode.
      *
@@ -131,8 +122,9 @@ public interface AttributeStore {
      */
     public static IHostAttributes mergeOffer(AttributeStore store, Protos.Offer offer) {
       IHostAttributes fromOffer = Conversions.getAttributes(offer);
-      MaintenanceMode mode =
-          store.getHostAttributes(fromOffer.getHost()).transform(GET_MODE).or(MaintenanceMode.NONE);
+      MaintenanceMode mode = store.getHostAttributes(fromOffer.getHost())
+          .transform(IHostAttributes::getMode)
+          .or(MaintenanceMode.NONE);
       return IHostAttributes.build(fromOffer.newBuilder().setMode(mode));
     }
   }

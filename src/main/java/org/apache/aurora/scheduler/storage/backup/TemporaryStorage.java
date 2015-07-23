@@ -79,7 +79,7 @@ interface TemporaryStorage {
             @Override
             public void execute(MutableStoreProvider storeProvider) {
               Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
-                  .transform(Tasks.SCHEDULED_TO_ID)
+                  .transform(Tasks::id)
                   .toSet();
               storeProvider.getUnsafeTaskStore().deleteTasks(ids);
             }

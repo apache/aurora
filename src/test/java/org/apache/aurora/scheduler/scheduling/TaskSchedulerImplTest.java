@@ -52,6 +52,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
@@ -317,7 +318,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private void expectActiveJobFetch(IScheduledTask task) {
     storageUtil.expectTaskFetch(
-        Query.jobScoped(Tasks.SCHEDULED_TO_JOB_KEY.apply(task))
+        Query.jobScoped(((Function<IScheduledTask, IJobKey>) Tasks::getJob).apply(task))
             .byStatus(Tasks.SLAVE_ASSIGNED_STATES),
         ImmutableSet.of());
   }

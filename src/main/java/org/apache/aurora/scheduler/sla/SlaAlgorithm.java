@@ -118,7 +118,8 @@ interface SlaAlgorithm {
     @Override
     public Number calculate(Iterable<IScheduledTask> tasks, Range<Long> timeFrame) {
       Iterable<IScheduledTask> activeTasks = FluentIterable.from(tasks)
-          .filter(Predicates.compose(Predicates.in(Tasks.ACTIVE_STATES), Tasks.GET_STATUS));
+          .filter(
+              Predicates.compose(Predicates.in(Tasks.ACTIVE_STATES), IScheduledTask::getStatus));
 
       List<Long> waitTimes = Lists.newLinkedList();
       for (IScheduledTask task : activeTasks) {
@@ -156,7 +157,7 @@ interface SlaAlgorithm {
     private static final Predicate<IScheduledTask> IS_RUNNING =
         Predicates.compose(
             Predicates.in(ImmutableSet.of(RUNNING)),
-            Tasks.GET_STATUS);
+            IScheduledTask::getStatus);
 
     private static final Function<IScheduledTask, ITaskEvent> TASK_TO_EVENT =
         new Function<IScheduledTask, ITaskEvent>() {

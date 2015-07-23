@@ -67,9 +67,7 @@ class JobUpdateEventSubscriber extends AbstractIdleService implements PubsubEven
       try {
         if (!Tasks.isTerminated(task.getStatus())) {
           controller.instanceDeleted(
-              InstanceKeys.from(
-                  Tasks.SCHEDULED_TO_JOB_KEY.apply(task),
-                  task.getAssignedTask().getInstanceId()));
+              InstanceKeys.from(Tasks.getJob(task), task.getAssignedTask().getInstanceId()));
         }
       } catch (RuntimeException e) {
         LOG.log(Level.SEVERE, "Failed to handle instance deletion: " + e, e);

@@ -115,7 +115,7 @@ public class TaskHistoryPruner implements EventSubscriber {
           ? clock.nowMillis()
           : Iterables.getLast(change.getTask().getTaskEvents()).getTimestamp();
       registerInactiveTask(
-          Tasks.SCHEDULED_TO_JOB_KEY.apply(change.getTask()),
+          Tasks.getJob(change.getTask()),
           change.getTaskId(),
           calculateTimeout(timeoutBasis));
     }
@@ -165,7 +165,7 @@ public class TaskHistoryPruner implements EventSubscriber {
               .from(Tasks.LATEST_ACTIVITY.sortedCopy(inactiveTasks))
               .filter(safeToDelete)
               .limit(tasksToPrune)
-              .transform(Tasks.SCHEDULED_TO_ID)
+              .transform(Tasks::id)
               .toSet();
           deleteTasks(toPrune);
         }

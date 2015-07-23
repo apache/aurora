@@ -211,10 +211,10 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
 
     Iterable<IAssignedTask> assignedTasks = Iterables.transform(
         Storage.Util.fetchTasks(storage, Query.jobScoped(jobKey).active()),
-        Tasks.SCHEDULED_TO_ASSIGNED);
+        IScheduledTask::getAssignedTask);
     Map<Integer, ITaskConfig> tasksByInstance = Maps.transformValues(
-        Maps.uniqueIndex(assignedTasks, Tasks.ASSIGNED_TO_INSTANCE_ID),
-        Tasks.ASSIGNED_TO_INFO);
+        Maps.uniqueIndex(assignedTasks, IAssignedTask::getInstanceId),
+        IAssignedTask::getTask);
     Multimap<ITaskConfig, Integer> instancesByDetails = Multimaps.invertFrom(
         Multimaps.forMap(tasksByInstance),
         HashMultimap.create());
@@ -230,13 +230,13 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
     Multimap<String, IJobKey> jobsByRole = storage.read(new Quiet<Multimap<String, IJobKey>>() {
       @Override
       public Multimap<String, IJobKey> apply(StoreProvider storeProvider) {
-        return Multimaps.index(storeProvider.getTaskStore().getJobKeys(), JobKeys.TO_ROLE);
+        return Multimaps.index(storeProvider.getTaskStore().getJobKeys(), IJobKey::getRole);
       }
     });
 
     Multimap<String, IJobKey> cronJobsByRole = Multimaps.index(
-        Iterables.transform(Storage.Util.fetchCronJobs(storage), JobKeys.FROM_CONFIG),
-        JobKeys.TO_ROLE);
+        Iterables.transform(Storage.Util.fetchCronJobs(storage), IJobConfiguration::getKey),
+        IJobKey::getRole);
 
     Set<RoleSummary> summaries = FluentIterable.from(
         Sets.union(jobsByRole.keySet(), cronJobsByRole.keySet()))
@@ -399,11 +399,11 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
     // template JobConfiguration for a cron job will overwrite the synthesized one that could have
     // been created above.
     Predicate<IJobConfiguration> configFilter = ownerRole.isPresent()
-        ? Predicates.compose(Predicates.equalTo(ownerRole.get()), JobKeys.CONFIG_TO_ROLE)
+        ? Predicates.compose(Predicates.equalTo(ownerRole.get()), JobKeys::getRole)
         : Predicates.alwaysTrue();
     jobs.putAll(Maps.uniqueIndex(
         FluentIterable.from(Storage.Util.fetchCronJobs(storage)).filter(configFilter),
-        JobKeys.FROM_CONFIG));
+        IJobConfiguration::getKey));
 
     return jobs;
   }

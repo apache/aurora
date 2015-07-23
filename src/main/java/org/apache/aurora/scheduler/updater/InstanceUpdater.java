@@ -27,6 +27,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 import static java.util.Objects.requireNonNull;
 
@@ -75,7 +76,7 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
     boolean wasKilling =
         Iterables.any(
             task.getTaskEvents(),
-            Predicates.compose(Predicates.equalTo(KILLING), Tasks.TASK_EVENT_TO_STATUS));
+            Predicates.compose(Predicates.equalTo(KILLING), ITaskEvent::getStatus));
     return task.getStatus() != KILLING && wasKilling;
   }
 

@@ -35,6 +35,7 @@ import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ResourceAggregates;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
@@ -48,17 +49,13 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.updater.Updates;
 
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.base.ResourceAggregates.EMPTY;
-import static org.apache.aurora.scheduler.base.Tasks.ASSIGNED_TO_INFO;
-import static org.apache.aurora.scheduler.base.Tasks.ASSIGNED_TO_JOB_KEY;
-import static org.apache.aurora.scheduler.base.Tasks.INFO_TO_JOB_KEY;
-import static org.apache.aurora.scheduler.base.Tasks.IS_PRODUCTION;
-import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.updater.Updates.getInstanceIds;
 
@@ -249,7 +246,7 @@ public interface QuotaManager {
 
       FluentIterable<IAssignedTask> tasks = FluentIterable
           .from(storeProvider.getTaskStore().fetchTasks(Query.roleScoped(role).active()))
-          .transform(SCHEDULED_TO_ASSIGNED);
+          .transform(IScheduledTask::getAssignedTask);
 
       Map<IJobKey, IJobUpdateInstructions> updates = Maps.newHashMap(
           fetchActiveJobUpdates(storeProvider.getJobUpdateStore(), role));
@@ -265,8 +262,8 @@ public interface QuotaManager {
 
       Map<IJobKey, IJobConfiguration> cronTemplates =
           FluentIterable.from(storeProvider.getCronJobStore().fetchJobs())
-              .filter(Predicates.compose(Predicates.equalTo(role), JobKeys.CONFIG_TO_ROLE))
-              .uniqueIndex(JobKeys.FROM_CONFIG);
+              .filter(Predicates.compose(Predicates.equalTo(role), JobKeys::getRole))
+              .uniqueIndex(IJobConfiguration::getKey);
 
       IResourceAggregate prodConsumed = getConsumption(tasks, updates, cronTemplates, true);
 
@@ -284,14 +281,16 @@ public interface QuotaManager {
         Map<IJobKey, IJobConfiguration> cronTemplatesByKey,
         boolean isProd) {
 
-      Predicate<ITaskConfig> prodFilter = isProd ? IS_PRODUCTION : Predicates.not(IS_PRODUCTION);
+      Predicate<ITaskConfig> prodFilter = isProd
+          ? ITaskConfig::isProduction
+          : Predicates.not(ITaskConfig::isProduction);
 
       FluentIterable<IAssignedTask> filteredTasks =
-          tasks.filter(Predicates.compose(prodFilter, ASSIGNED_TO_INFO));
+          tasks.filter(Predicates.compose(prodFilter, IAssignedTask::getTask));
 
       Predicate<IAssignedTask> excludeCron = Predicates.compose(
           Predicates.not(Predicates.in(cronTemplatesByKey.keySet())),
-          ASSIGNED_TO_JOB_KEY);
+          Tasks::getJob);
 
       IResourceAggregate nonCronConsumption = getNonCronConsumption(
           updatesByKey,
@@ -302,7 +301,7 @@ public interface QuotaManager {
           Iterables.filter(
               cronTemplatesByKey.values(),
               Predicates.compose(prodFilter, IJobConfiguration::getTaskConfig)),
-          filteredTasks.transform(ASSIGNED_TO_INFO));
+          filteredTasks.transform(IAssignedTask::getTask));
 
       return add(nonCronConsumption, cronConsumption);
     }
@@ -325,7 +324,7 @@ public interface QuotaManager {
 
       IResourceAggregate nonUpdateConsumption = fromTasks(tasks
           .filter(buildNonUpdatingTasksFilter(updatesByKey))
-          .transform(ASSIGNED_TO_INFO));
+          .transform(IAssignedTask::getTask));
 
       final Predicate<IInstanceTaskConfig> instanceFilter =
           Predicates.compose(configFilter, IInstanceTaskConfig::getTask);
@@ -348,7 +347,7 @@ public interface QuotaManager {
       // cron scheduling, it's the simplest approach possible given the system constraints (e.g.:
       // lack of enforcement on a cron job run duration).
 
-      final Multimap<IJobKey, ITaskConfig> taskConfigsByKey = tasks.index(INFO_TO_JOB_KEY);
+      final Multimap<IJobKey, ITaskConfig> taskConfigsByKey = tasks.index(ITaskConfig::getJob);
       return addAll(Iterables.transform(
           cronTemplates,
           new Function<IJobConfiguration, IResourceAggregate>() {

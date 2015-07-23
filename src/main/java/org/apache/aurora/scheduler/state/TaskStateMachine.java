@@ -99,7 +99,7 @@ class TaskStateMachine {
       };
 
   private static final Function<IScheduledTask, TaskState> SCHEDULED_TO_TASK_STATE =
-      Functions.compose(STATUS_TO_TASK_STATE, Tasks.GET_STATUS);
+      Functions.compose(STATUS_TO_TASK_STATE, IScheduledTask::getStatus);
 
   /**
    * ScheduleStatus enum extension to account for cases where no direct state mapping exists.

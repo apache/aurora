@@ -339,7 +339,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
     );
 
     IJobKey jobKey = Iterables.getOnlyElement(
-        FluentIterable.from(tasksInJob).transform(Tasks.SCHEDULED_TO_JOB_KEY).toSet());
+        FluentIterable.from(tasksInJob).transform(Tasks::getJob).toSet());
     storageUtil.expectTaskFetch(TaskHistoryPruner.jobHistoryQuery(jobKey), tasksInJob);
     if (pruned.length > 0) {
       stateManager.deleteTasks(storageUtil.mutableStoreProvider, Tasks.ids(pruned));

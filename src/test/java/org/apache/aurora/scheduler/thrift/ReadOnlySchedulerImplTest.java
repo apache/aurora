@@ -132,9 +132,9 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     long nextCronRunMs = 100;
     TaskConfig ownedCronJobTask = nonProductionTask()
         .setJob(JOB_KEY.newBuilder())
-        .setJobName(JobKeys.TO_JOB_NAME.apply(JOB_KEY))
+        .setJobName(JOB_KEY.getName())
         .setOwner(ROLE_IDENTITY)
-        .setEnvironment(JobKeys.TO_ENVIRONMENT.apply(JOB_KEY));
+        .setEnvironment(JOB_KEY.getEnvironment());
     JobConfiguration ownedCronJob = makeJob()
         .setCronSchedule(CRON_SCHEDULE)
         .setTaskConfig(ownedCronJobTask);
@@ -374,9 +374,9 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   @Test
   public void testGetJobs() throws Exception {
     TaskConfig ownedCronJobTask = nonProductionTask()
-        .setJobName(JobKeys.TO_JOB_NAME.apply(JOB_KEY))
+        .setJobName(JOB_KEY.getName())
         .setOwner(ROLE_IDENTITY)
-        .setEnvironment(JobKeys.TO_ENVIRONMENT.apply(JOB_KEY));
+        .setEnvironment(JOB_KEY.getEnvironment());
     JobConfiguration ownedCronJob = makeJob()
         .setCronSchedule(CRON_SCHEDULE)
         .setTaskConfig(ownedCronJobTask);
@@ -638,7 +638,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     expect(storageUtil.taskStore.getJobKeys()).andReturn(
         FluentIterable.from(ImmutableSet.of(task1, task2, task3, task4))
-            .transform(Tasks.SCHEDULED_TO_JOB_KEY)
+            .transform(Tasks::getJob)
             .toSet());
     expect(storageUtil.jobStore.fetchJobs()).andReturn(IJobConfiguration.setFromBuilders(crons));
 

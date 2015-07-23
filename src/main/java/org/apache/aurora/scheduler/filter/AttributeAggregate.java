@@ -95,7 +95,7 @@ public final class AttributeAggregate {
           @Override
           public Iterable<IAttribute> apply(Iterable<IScheduledTask> tasks) {
             return FluentIterable.from(tasks)
-                .transform(Tasks.SCHEDULED_TO_SLAVE_HOST)
+                .transform(Tasks::scheduledToSlaveHost)
                 .transformAndConcat(getHostAttributes);
           }
         },

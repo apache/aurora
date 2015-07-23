@@ -132,7 +132,7 @@ public class StateManagerImpl implements StateManager {
         Query.jobScoped(task.getJob()).active());
 
     Set<Integer> existingInstanceIds =
-        FluentIterable.from(existingTasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet();
+        FluentIterable.from(existingTasks).transform(Tasks::getInstanceId).toSet();
 
     if (!Sets.intersection(existingInstanceIds, instanceIds).isEmpty()) {
       throw new IllegalArgumentException("Instance ID collision detected.");
@@ -208,7 +208,7 @@ public class StateManagerImpl implements StateManager {
     return Iterables.getOnlyElement(
         Iterables.transform(
             storeProvider.getTaskStore().fetchTasks(query),
-            Tasks.SCHEDULED_TO_ASSIGNED));
+            IScheduledTask::getAssignedTask));
   }
 
   @VisibleForTesting
@@ -408,7 +408,7 @@ public class StateManagerImpl implements StateManager {
   public void deleteTasks(MutableStoreProvider storeProvider, final Set<String> taskIds) {
     Map<String, IScheduledTask> tasks = Maps.uniqueIndex(
         storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskIds)),
-        Tasks.SCHEDULED_TO_ID);
+        Tasks::id);
 
     for (Map.Entry<String, IScheduledTask> entry : tasks.entrySet()) {
       updateTaskAndExternalState(

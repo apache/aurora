@@ -130,7 +130,7 @@ public class StorageTransactionTest extends TearDownTestCase {
       public Void apply(StoreProvider storeProvider) {
         Query.Builder query = Query.unscoped();
         Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
-            .transform(Tasks.SCHEDULED_TO_ID)
+            .transform(Tasks::id)
             .toSet();
         assertEquals(ImmutableSet.<String>builder().add(taskIds).build(), ids);
         return null;

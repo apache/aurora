@@ -32,7 +32,6 @@ import com.google.common.collect.Multimaps;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
@@ -65,7 +64,7 @@ public class Maintenance {
             Multimaps.transformValues(
               Multimaps.index(
                   storeProvider.getAttributeStore().getHostAttributes(),
-                  AttributeStore.Util.GET_MODE),
+                  IHostAttributes::getMode),
               HOST_NAME);
 
         Map<MaintenanceMode, Object> hosts = Maps.newHashMap();
@@ -81,8 +80,8 @@ public class Maintenance {
     ImmutableSet.Builder<IScheduledTask> drainingTasks = ImmutableSet.builder();
     drainingTasks.addAll(provider.getTaskStore().fetchTasks(Query.slaveScoped(hosts).active()));
     return Multimaps.transformValues(
-        Multimaps.index(drainingTasks.build(), Tasks.SCHEDULED_TO_SLAVE_HOST),
-        Tasks.SCHEDULED_TO_ID);
+        Multimaps.index(drainingTasks.build(), Tasks::scheduledToSlaveHost),
+        Tasks::id);
   }
 
   private static final Function<IHostAttributes, String> HOST_NAME =

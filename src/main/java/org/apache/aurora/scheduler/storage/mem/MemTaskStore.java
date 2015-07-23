@@ -111,12 +111,12 @@ class MemTaskStore implements TaskStore.Mutable {
   MemTaskStore(StatsProvider statsProvider) {
     secondaryIndices = ImmutableList.of(
         new SecondaryIndex<>(
-            Tasks.SCHEDULED_TO_JOB_KEY,
+            Tasks::getJob,
             QUERY_TO_JOB_KEY,
             statsProvider,
             "job"),
         new SecondaryIndex<>(
-            Tasks.SCHEDULED_TO_SLAVE_HOST,
+            Tasks::scheduledToSlaveHost,
             QUERY_TO_SLAVE_HOST,
             statsProvider,
             "host"));
@@ -145,7 +145,7 @@ class MemTaskStore implements TaskStore.Mutable {
   @Override
   public Set<IJobKey> getJobKeys() {
     return FluentIterable.from(fetchTasks(Query.unscoped()))
-        .transform(Tasks.SCHEDULED_TO_JOB_KEY)
+        .transform(Tasks::getJob)
         .toSet();
   }
 
@@ -299,7 +299,7 @@ class MemTaskStore implements TaskStore.Mutable {
       };
 
   private static final Function<Task, String> TO_ID =
-      Functions.compose(Tasks.SCHEDULED_TO_ID, TO_SCHEDULED);
+      Functions.compose(Tasks::id, TO_SCHEDULED);
 
   private static class Task {
     private final IScheduledTask storedTask;

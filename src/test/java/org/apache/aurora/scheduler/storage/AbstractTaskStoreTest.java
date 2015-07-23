@@ -411,17 +411,17 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     Set<IScheduledTask> inserted = ImmutableSet.of(a, b, c);
 
     Set<ITaskConfig> storedConfigs = FluentIterable.from(fetchTasks(Query.unscoped()))
-        .transform(Tasks.SCHEDULED_TO_INFO)
+        .transform(Tasks::getConfig)
         .toSet();
     assertEquals(
-        FluentIterable.from(inserted).transform(Tasks.SCHEDULED_TO_INFO).toSet(),
+        FluentIterable.from(inserted).transform(Tasks::getConfig).toSet(),
         storedConfigs);
     Map<ITaskConfig, ITaskConfig> identityMap = Maps.newIdentityHashMap();
     for (ITaskConfig stored : storedConfigs) {
       identityMap.put(stored, stored);
     }
     assertEquals(
-        ImmutableMap.of(Tasks.SCHEDULED_TO_INFO.apply(a), Tasks.SCHEDULED_TO_INFO.apply(a)),
+        ImmutableMap.of(Tasks.getConfig(a), Tasks.getConfig(a)),
         identityMap);
   }
 
@@ -537,7 +537,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
 
   private Set<IJobKey> toJobKeys(IScheduledTask... tasks) {
     return FluentIterable.from(ImmutableSet.copyOf(tasks))
-        .transform(Tasks.SCHEDULED_TO_JOB_KEY)
+        .transform(Tasks::getJob)
         .toSet();
   }
 

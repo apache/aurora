@@ -327,10 +327,10 @@ public class JobUpdaterIT extends EasyMockTest {
         Storage.Util.fetchTasks(storage, Query.jobScoped(job).active());
 
     Map<Integer, IScheduledTask> tasksByInstance =
-        Maps.uniqueIndex(tasks, Tasks.SCHEDULED_TO_INSTANCE_ID);
+        Maps.uniqueIndex(tasks, Tasks::getInstanceId);
     assertEquals(
         expected,
-        ImmutableMap.copyOf(Maps.transformValues(tasksByInstance, Tasks.SCHEDULED_TO_INFO)));
+        ImmutableMap.copyOf(Maps.transformValues(tasksByInstance, Tasks::getConfig)));
   }
 
   @Test
