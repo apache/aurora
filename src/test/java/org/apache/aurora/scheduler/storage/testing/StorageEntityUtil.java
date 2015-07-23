@@ -24,6 +24,8 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.internal.Primitives;
 
+import org.apache.thrift.TUnion;
+
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
@@ -51,6 +53,12 @@ public final class StorageEntityUtil {
         assertFullyPopulated(name + " key", entry.getKey(), ignoredFields);
         assertFullyPopulated(name + "[" + entry.getKey() + "]", entry.getValue(), ignoredFields);
       }
+    } else if (object instanceof TUnion) {
+      TUnion<?, ?> union = (TUnion<?, ?>) object;
+      assertFullyPopulated(
+          name + "." + union.getSetField().getFieldName(),
+          union.getFieldValue(),
+          ignoredFields);
     } else if (!(object instanceof String) && !(object instanceof Enum)) {
       for (Field field : object.getClass().getDeclaredFields()) {
         if (!Modifier.isStatic(field.getModifiers())) {

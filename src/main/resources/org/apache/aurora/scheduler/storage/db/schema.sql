@@ -254,6 +254,13 @@ CREATE TABLE task_config_docker_containers(
   UNIQUE(task_config_id)
 );
 
+CREATE TABLE task_config_docker_container_parameters(
+  id IDENTITY,
+  container_id INT NOT NULL REFERENCES task_config_docker_containers(id) ON DELETE CASCADE,
+  name VARCHAR NOT NULL,
+  value VARCHAR NOT NULL
+);
+
 CREATE TABLE task_states(
   id INT PRIMARY KEY,
   name VARCHAR NOT NULL,

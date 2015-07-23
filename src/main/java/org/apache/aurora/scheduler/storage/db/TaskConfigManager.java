@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import org.apache.aurora.scheduler.storage.db.views.DbTaskConfig;
 import org.apache.aurora.scheduler.storage.db.views.Pairs;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
+import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 
@@ -104,7 +105,12 @@ class TaskConfigManager {
 
     // TODO(wfarner): It would be nice if this generalized to different Container types.
     if (config.getContainer().isSetDocker()) {
-      configMapper.insertContainer(configInsert.getId(), config.getContainer().getDocker());
+      IDockerContainer container = config.getContainer().getDocker();
+      InsertResult containerInsert = new InsertResult();
+      configMapper.insertContainer(configInsert.getId(), container, containerInsert);
+      if (!container.getParameters().isEmpty()) {
+        configMapper.insertDockerParameters(containerInsert.getId(), container.getParameters());
+      }
     }
 
     return configInsert.getId();

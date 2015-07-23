@@ -21,6 +21,7 @@ import com.twitter.common.collections.Pair;
 import org.apache.aurora.scheduler.storage.db.views.DbTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
+import org.apache.aurora.scheduler.storage.entities.IDockerParameter;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILimitConstraint;
 import org.apache.aurora.scheduler.storage.entities.IMetadata;
@@ -50,14 +51,6 @@ interface TaskConfigMapper extends GarbageCollectedTableMapper {
    * @return Task config row container.
    */
   List<DbTaskConfig> selectConfigsByJob(IJobKey job);
-
-  /**
-   * Looks up task config IDs by task IDs.
-   *
-   * @param taskIds Task IDs to look up.
-   * @return Task config row IDs.
-   */
-  Set<Long> selectConfigsByTaskId(@Param("taskIds") Set<String> taskIds);
 
   /**
    * Inserts the constraint association within an {@link ITaskConfig}.
@@ -131,7 +124,18 @@ interface TaskConfigMapper extends GarbageCollectedTableMapper {
    */
   void insertContainer(
       @Param("configId") long configId,
-      @Param("container") IDockerContainer container);
+      @Param("container") IDockerContainer container,
+      @Param("result") InsertResult result);
+
+  /**
+   * Inserts docker parameters in associationw ith an {@link IDockerContainer}.
+   *
+   * @param containerId Docker container row ID.
+   * @param parameters Parameters to insert.
+   */
+  void insertDockerParameters(
+      @Param("containerId") long containerId,
+      @Param("parameters") List<IDockerParameter> parameters);
 
   /**
    * Inserts the metadata association within an {@link ITaskConfig}.

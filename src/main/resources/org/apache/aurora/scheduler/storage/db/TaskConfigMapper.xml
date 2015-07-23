@@ -93,8 +93,27 @@
     WHERE tc.task_config_id = #{id}
   </select>
 
+  <resultMap id="dockerParameterMap" type="org.apache.aurora.gen.DockerParameter">
+    <id column="id"/>
+  </resultMap>
+
+  <select id="selectDockerParameters" resultMap="dockerParameterMap">
+    SELECT
+      id,
+      name,
+      value
+    FROM task_config_docker_container_parameters
+    WHERE container_id = #{id}
+  </select>
+
   <resultMap id="dockerContainerMap" type="org.apache.aurora.gen.DockerContainer">
+    <id column="id"/>
     <result column="image" property="image"/>
+    <collection
+        property="parameters"
+        select="selectDockerParameters"
+        column="id"
+        foreignColumn="container_id"/>
   </resultMap>
 
   <resultMap id="containerMap" type="org.apache.aurora.scheduler.storage.db.views.DbContainer">
@@ -174,18 +193,6 @@
     WHERE j.role = #{role}
       AND j.environment = #{environment}
       AND j.name = #{name}
-  </select>
-
-  <select id="selectConfigsByTaskId" resultType="long">
-    SELECT
-      c.id AS id
-    FROM task_configs AS c
-    INNER JOIN tasks AS t ON t.task_config_row_id = c.id
-    WHERE t.task_id IN (
-      <foreach item="taskId" collection="taskIds" separator=",">
-        #{taskId}
-      </foreach>
-    )
   </select>
 
   <insert id="insertConstraint" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
@@ -272,13 +279,27 @@
     WHERE task_config_id = #{id}
   </select>
 
-  <insert id="insertContainer">
+  <insert id="insertContainer" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
     INSERT INTO task_config_docker_containers (
       task_config_id,
       image
     ) VALUES (
       #{configId},
       #{container.image}
+    )
+  </insert>
+
+  <insert id="insertDockerParameters">
+    INSERT INTO task_config_docker_container_parameters (
+      container_id,
+      name,
+      value
+    ) VALUES (
+    <foreach item="parameter" collection="parameters" separator="),(">
+      #{containerId},
+      #{parameter.name},
+      #{parameter.value}
+    </foreach>
     )
   </insert>
 

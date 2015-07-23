@@ -21,6 +21,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.DockerContainer;
+import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.LimitConstraint;
@@ -66,7 +67,7 @@ public final class TaskTestUtil {
             new Constraint(
                 "valueConstraint",
                 TaskConstraint.value(
-                    new ValueConstraint(false, ImmutableSet.of("value1", "value2")))),
+                    new ValueConstraint(true, ImmutableSet.of("value1", "value2")))),
             new Constraint(
                 "limitConstraint",
                 TaskConstraint.limit(new LimitConstraint(5)))))
@@ -75,7 +76,11 @@ public final class TaskTestUtil {
         .setContactEmail("foo@bar.com")
         .setMetadata(ImmutableSet.of(new Metadata("key", "value")))
         .setExecutorConfig(new ExecutorConfig("name", "config"))
-        .setContainer(Container.docker(new DockerContainer("imagename"))));
+        .setContainer(Container.docker(
+            new DockerContainer("imagename")
+                .setParameters(ImmutableList.of(
+                    new DockerParameter("a", "b"),
+                    new DockerParameter("c", "d"))))));
   }
 
   public static IScheduledTask makeTask(String id, IJobKey job) {
