@@ -54,7 +54,7 @@ public class StorageBackfillTest {
     final Set<IScheduledTask> backfilledTasks = ImmutableSet.of(IScheduledTask.build(task));
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(backfilledTasks);
       }
     });
@@ -69,7 +69,7 @@ public class StorageBackfillTest {
   private void backfill() {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         StorageBackfill.backfill(storeProvider);
       }
     });

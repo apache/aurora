@@ -114,7 +114,7 @@ public class StateManagerImplTest extends EasyMockTest {
         rescheduleCalculator);
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         AttributeStore.Mutable attributeStore = storeProvider.getAttributeStore();
         attributeStore.saveHostAttributes(HOST_A);
       }
@@ -408,7 +408,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(taskId, FINISHED);
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         stateManager.deleteTasks(storeProvider, ImmutableSet.of(taskId));
       }
     });
@@ -474,7 +474,7 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         stateManager.insertPendingTasks(
             storeProvider,
             NON_SERVICE_CONFIG,
@@ -545,7 +545,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private void insertTask(final ITaskConfig task, final int instanceId) {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         stateManager.insertPendingTasks(storeProvider, task, ImmutableSet.of(instanceId));
       }
     });
@@ -589,7 +589,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         stateManager.assignTask(
             storeProvider,
             taskId,

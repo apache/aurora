@@ -148,7 +148,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider)
+      public void execute(MutableStoreProvider storeProvider)
           throws UpdateStateException {
 
         IJobUpdateSummary summary = update.getSummary();
@@ -216,7 +216,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     LOG.info("Attempting to resume update " + key);
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) throws UpdateStateException {
+      public void execute(MutableStoreProvider storeProvider) throws UpdateStateException {
         IJobUpdateDetails details = Iterables.getOnlyElement(
             storeProvider.getJobUpdateStore().fetchJobUpdateDetails(queryByUpdate(key)), null);
 
@@ -262,7 +262,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   public void systemResume() {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         for (IJobUpdateDetails details
             : storeProvider.getJobUpdateStore().fetchJobUpdateDetails(ACTIVE_QUERY)) {
 
@@ -346,7 +346,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   private void instanceChanged(final IInstanceKey instance, final Optional<IScheduledTask> state) {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         IJobKey job = instance.getJobKey();
         UpdateFactory.Update update = updates.get(job);
         if (update != null) {
@@ -398,7 +398,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider)
+      public void execute(MutableStoreProvider storeProvider)
           throws UpdateStateException {
 
         IJobUpdateSummary update = Iterables.getOnlyElement(
@@ -740,7 +740,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       public void run() {
         storage.write(new MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(MutableStoreProvider storeProvider) {
+          public void execute(MutableStoreProvider storeProvider) {
             IJobUpdateSummary summary =
                 getOnlyMatch(storeProvider.getJobUpdateStore(), queryByUpdate(key));
             JobUpdateStatus status = summary.getState().getStatus();

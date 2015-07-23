@@ -54,7 +54,7 @@ public class InMemTaskStoreTest extends AbstractTaskStoreTest {
     // Test for regression of AURORA-1305.
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
         taskStore.saveTasks(ImmutableSet.of(TASK_A));
         taskStore.deleteTasks(Tasks.ids(TASK_A));

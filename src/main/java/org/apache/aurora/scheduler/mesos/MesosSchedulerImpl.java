@@ -132,7 +132,7 @@ public class MesosSchedulerImpl implements Scheduler {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getSchedulerStore().saveFrameworkId(frameworkId.getValue());
       }
     });
@@ -165,7 +165,7 @@ public class MesosSchedulerImpl implements Scheduler {
         //                offers when the host attributes cannot be found. (AURORA-137)
         storage.write(new MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(MutableStoreProvider storeProvider) {
+          public void execute(MutableStoreProvider storeProvider) {
             for (Offer offer : offers) {
               IHostAttributes attributes =
                   AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);

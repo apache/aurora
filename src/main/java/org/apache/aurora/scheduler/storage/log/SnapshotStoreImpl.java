@@ -280,7 +280,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         LOG.info("Restoring snapshot.");
 
         for (SnapshotField field : SNAPSHOT_FIELDS) {

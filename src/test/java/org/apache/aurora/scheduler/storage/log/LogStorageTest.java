@@ -202,7 +202,7 @@ public class LogStorageTest extends EasyMockTest {
     final AtomicBoolean initialized = new AtomicBoolean(false);
     MutateWork.NoResult.Quiet initializationLogic = new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider provider) {
+      public void execute(MutableStoreProvider provider) {
         // Creating a mock and expecting apply(storeProvider) does not work here for whatever
         // reason.
         initialized.set(true);
@@ -429,7 +429,7 @@ public class LogStorageTest extends EasyMockTest {
       // reason.
       MutateWork.NoResult.Quiet initializationLogic = new NoResult.Quiet() {
         @Override
-        protected void execute(Storage.MutableStoreProvider storeProvider) {
+        public void execute(Storage.MutableStoreProvider storeProvider) {
           // No-op.
         }
       };
@@ -492,7 +492,7 @@ public class LogStorageTest extends EasyMockTest {
     protected void runTest() {
       logStorage.write(new MutateWork.NoResult.Quiet() {
         @Override
-        protected void execute(MutableStoreProvider storeProvider) {
+        public void execute(MutableStoreProvider storeProvider) {
           performMutations(storeProvider);
         }
       });
@@ -656,7 +656,7 @@ public class LogStorageTest extends EasyMockTest {
 
         logStorage.write(new MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(MutableStoreProvider innerProvider) {
+          public void execute(MutableStoreProvider innerProvider) {
             innerProvider.getUnsafeTaskStore().deleteTasks(tasksToRemove);
           }
         });

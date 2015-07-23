@@ -71,7 +71,7 @@ public class UpdateStoreBenchmarks {
     public void setUpIteration() {
       storage.write(new Storage.MutateWork.NoResult.Quiet() {
         @Override
-        protected void execute(Storage.MutableStoreProvider storeProvider) {
+        public void execute(Storage.MutableStoreProvider storeProvider) {
           JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
           Set<IJobUpdateDetails> updates =
               new JobUpdates.Builder().setNumInstanceEvents(instances).build(1);
@@ -103,7 +103,7 @@ public class UpdateStoreBenchmarks {
     public void tearDownIteration() {
       storage.write(new Storage.MutateWork.NoResult.Quiet() {
         @Override
-        protected void execute(Storage.MutableStoreProvider storeProvider) {
+        public void execute(Storage.MutableStoreProvider storeProvider) {
           storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
           storeProvider.getLockStore().deleteLocks();
         }

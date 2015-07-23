@@ -160,7 +160,7 @@ public class ThriftApiBenchmarks {
     // interface requires considerably more binding setup.
     storage.bulkLoad(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         for (int roleId = 0; roleId < config.roles; roleId++) {
           String role = "role" + roleId;
           for (int envId = 0; envId < config.envs; envId++) {

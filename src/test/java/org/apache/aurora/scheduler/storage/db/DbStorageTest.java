@@ -99,7 +99,7 @@ public class DbStorageTest extends EasyMockTest {
   public void testBulkLoad() {
     expect(sessionFactory.openSession(false)).andReturn(session);
     expect(session.update(DbStorage.DISABLE_UNDO_LOG)).andReturn(0);
-    writeWork.apply(EasyMock.anyObject());
+    expect(writeWork.apply(EasyMock.anyObject())).andReturn(null);
     session.close();
     expect(session.update(DbStorage.ENABLE_UNDO_LOG)).andReturn(0);
 

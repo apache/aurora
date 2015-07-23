@@ -146,7 +146,7 @@ public class StorageTransactionTest extends TearDownTestCase {
     try {
       storage.write(new MutateWork.NoResult.Quiet() {
         @Override
-        protected void execute(MutableStoreProvider storeProvider) {
+        public void execute(MutableStoreProvider storeProvider) {
           storeProvider.getQuotaStore().saveQuota("a", quota);
           throw new CustomException();
         }
@@ -171,7 +171,7 @@ public class StorageTransactionTest extends TearDownTestCase {
   public void testOperations() {
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
         throw new CustomException();
       }
@@ -180,7 +180,7 @@ public class StorageTransactionTest extends TearDownTestCase {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
       }
     });
@@ -188,7 +188,7 @@ public class StorageTransactionTest extends TearDownTestCase {
 
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().deleteAllTasks();
         throw new CustomException();
       }
@@ -197,14 +197,14 @@ public class StorageTransactionTest extends TearDownTestCase {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().deleteAllTasks();
       }
     });
 
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a")));
         throw new CustomException();
       }
@@ -213,7 +213,7 @@ public class StorageTransactionTest extends TearDownTestCase {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a")));
       }
     });
@@ -221,11 +221,11 @@ public class StorageTransactionTest extends TearDownTestCase {
     // Nested transaction where inner transaction fails.
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
         storage.write(new MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(MutableStoreProvider storeProvider) {
+          public void execute(MutableStoreProvider storeProvider) {
             storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
             throw new CustomException();
           }
@@ -237,11 +237,11 @@ public class StorageTransactionTest extends TearDownTestCase {
     // Nested transaction where outer transaction fails.
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
         storage.write(new MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(MutableStoreProvider storeProvider) {
+          public void execute(MutableStoreProvider storeProvider) {
             storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
           }
         });

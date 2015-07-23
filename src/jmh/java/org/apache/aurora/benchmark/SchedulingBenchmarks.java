@@ -206,7 +206,7 @@ public class SchedulingBenchmarks {
     private void saveTasks(final Set<IScheduledTask> tasks) {
       storage.write(new Storage.MutateWork.NoResult.Quiet() {
         @Override
-        protected void execute(Storage.MutableStoreProvider storeProvider) {
+        public void execute(Storage.MutableStoreProvider storeProvider) {
           storeProvider.getUnsafeTaskStore().saveTasks(tasks);
         }
       });
@@ -215,7 +215,7 @@ public class SchedulingBenchmarks {
     private void saveHostAttributes(final Set<IHostAttributes> hostAttributesToSave) {
       storage.write(new Storage.MutateWork.NoResult.Quiet() {
         @Override
-        protected void execute(Storage.MutableStoreProvider storeProvider) {
+        public void execute(Storage.MutableStoreProvider storeProvider) {
           for (IHostAttributes attributes : hostAttributesToSave) {
             storeProvider.getAttributeStore().saveHostAttributes(attributes);
           }

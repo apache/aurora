@@ -74,7 +74,7 @@ class RowGarbageCollector extends AbstractScheduledService {
     for (Class<? extends GarbageCollectedTableMapper> tableClass : TABLES) {
       storage.write(new Storage.MutateWork.NoResult.Quiet() {
         @Override
-        protected void execute(Storage.MutableStoreProvider storeProvider) {
+        public void execute(Storage.MutableStoreProvider storeProvider) {
           try (SqlSession session = sessionFactory.openSession(true)) {
             GarbageCollectedTableMapper table = session.getMapper(tableClass);
             for (long rowId : table.selectAllRowIds()) {

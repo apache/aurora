@@ -72,6 +72,7 @@ public interface Storage {
    * @param <T> Return type of the operation.
    * @param <E> Exception type thrown by the operation.
    */
+  @FunctionalInterface
   interface StorageOperation<S extends StoreProvider, T, E extends Exception> {
     /**
      * Abstracts a unit of work that has a result, but may also throw a specific exception.
@@ -89,14 +90,16 @@ public interface Storage {
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.
    */
-  abstract class Work<T, E extends Exception> implements StorageOperation<StoreProvider, T, E> {
+  @FunctionalInterface
+  interface Work<T, E extends Exception> extends StorageOperation<StoreProvider, T, E> {
 
     /**
      * A convenient typedef for Work that throws no checked exceptions - it runs quietly.
      *
      * @param <T> The type of result this unit of work produces.
      */
-    public abstract static class Quiet<T> extends Work<T, RuntimeException> {
+    @FunctionalInterface
+    interface Quiet<T> extends Work<T, RuntimeException> {
       // typedef
     }
   }
@@ -107,15 +110,17 @@ public interface Storage {
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.
    */
-  abstract class MutateWork<T, E extends Exception>
-      implements StorageOperation<MutableStoreProvider, T, E> {
+  @FunctionalInterface
+  interface MutateWork<T, E extends Exception>
+      extends StorageOperation<MutableStoreProvider, T, E> {
 
     /**
      * A convenient typedef for Work that throws no checked exceptions - it runs quietly.
      *
      * @param <T> The type of result this unit of work produces.
      */
-    public abstract static class Quiet<T> extends MutateWork<T, RuntimeException> {
+    @FunctionalInterface
+    interface Quiet<T> extends MutateWork<T, RuntimeException> {
       // typedef
     }
 
@@ -124,10 +129,11 @@ public interface Storage {
      *
      * @param <E> The type of exception this unit of work can throw.
      */
-    public abstract static class NoResult<E extends Exception> extends MutateWork<Void, E> {
+    @FunctionalInterface
+    interface NoResult<E extends Exception> extends MutateWork<Void, E> {
 
       @Override
-      public final Void apply(MutableStoreProvider storeProvider) throws E {
+      default Void apply(MutableStoreProvider storeProvider) throws E {
         execute(storeProvider);
         return null;
       }
@@ -139,13 +145,14 @@ public interface Storage {
        * @param storeProvider A provider to give access to different available stores.
        * @throws E if the unit of work could not be completed
        */
-      protected abstract void execute(MutableStoreProvider storeProvider) throws E;
+      void execute(MutableStoreProvider storeProvider) throws E;
 
       /**
        * A convenient typedef for Work with no result that throws no checked exceptions - it runs
        * quitely.
        */
-      public abstract static class Quiet extends NoResult<RuntimeException> {
+      @FunctionalInterface
+      interface Quiet extends NoResult<RuntimeException> {
         // typedef
       }
     }

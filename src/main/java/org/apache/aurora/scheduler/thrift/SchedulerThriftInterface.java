@@ -631,7 +631,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         LOG.info("Restarting shards matching " + query);
         storage.write(new MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(MutableStoreProvider storeProvider) {
+          public void execute(MutableStoreProvider storeProvider) {
             for (String taskId : Tasks.ids(matchingTasks)) {
               stateManager.changeState(
                   storeProvider,
@@ -666,7 +666,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     try {
       storage.write(new MutateWork.NoResult<QuotaException>() {
         @Override
-        protected void execute(MutableStoreProvider store) throws QuotaException {
+        public void execute(MutableStoreProvider store) throws QuotaException {
           quotaManager.saveQuota(
               ownerRole,
               IResourceAggregate.build(resourceAggregate),
@@ -729,7 +729,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         stateManager.changeState(
             storeProvider,
             taskId,
@@ -953,7 +953,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
           storage.write(new NoResult.Quiet() {
             @Override
-            protected void execute(MutableStoreProvider storeProvider) {
+            public void execute(MutableStoreProvider storeProvider) {
               stateManager.insertPendingTasks(
                   storeProvider,
                   task,

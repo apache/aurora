@@ -179,7 +179,7 @@ class AuroraCronJob implements Job {
 
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         for (String taskId : deferredLaunch.get().activeTaskIds) {
           stateManager.changeState(
               storeProvider,
@@ -204,7 +204,7 @@ class AuroraCronJob implements Job {
             LOG.info("Initiating delayed launch of cron " + path);
             storage.write(new Storage.MutateWork.NoResult.Quiet() {
               @Override
-              protected void execute(Storage.MutableStoreProvider storeProvider) {
+              public void execute(Storage.MutableStoreProvider storeProvider) {
                 stateManager.insertPendingTasks(
                     storeProvider,
                     deferredLaunch.get().task,

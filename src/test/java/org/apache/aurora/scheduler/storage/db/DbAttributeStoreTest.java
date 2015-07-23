@@ -149,7 +149,7 @@ public class DbAttributeStoreTest {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(taskA));
       }
     });
@@ -165,7 +165,7 @@ public class DbAttributeStoreTest {
   private void insert(final IHostAttributes attributes) {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getAttributeStore().saveHostAttributes(attributes);
       }
     });
@@ -192,7 +192,7 @@ public class DbAttributeStoreTest {
   private void truncate() {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getAttributeStore().deleteHostAttributes();
       }
     });

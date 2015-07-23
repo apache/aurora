@@ -113,7 +113,7 @@ public abstract class AbstractCronJobStoreTest {
     final IScheduledTask instance = TaskTestUtil.makeTask("a", JOB_A.getTaskConfig());
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(instance));
       }
     });
@@ -122,7 +122,7 @@ public abstract class AbstractCronJobStoreTest {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().mutateTasks(Query.taskScoped(Tasks.id(instance)),
             new TaskStore.Mutable.TaskMutation() {
               @Override
@@ -182,7 +182,7 @@ public abstract class AbstractCronJobStoreTest {
   private void saveAcceptedJob(final IJobConfiguration jobConfig) {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getCronJobStore().saveAcceptedJob(jobConfig);
       }
     });
@@ -191,7 +191,7 @@ public abstract class AbstractCronJobStoreTest {
   private void removeJob(final IJobKey jobKey) {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getCronJobStore().removeJob(jobKey);
       }
     });
@@ -200,7 +200,7 @@ public abstract class AbstractCronJobStoreTest {
   private void deleteJobs() {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getCronJobStore().deleteJobs();
       }
     });

@@ -122,7 +122,7 @@ public class AuroraCronJobTest extends EasyMockTest {
     storage.write(
         new Storage.MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(MutableStoreProvider storeProvider) {
+          public void execute(MutableStoreProvider storeProvider) {
             storeProvider.getUnsafeTaskStore().deleteAllTasks();
           }
         });
@@ -132,7 +132,7 @@ public class AuroraCronJobTest extends EasyMockTest {
   private void populateTaskStore() {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
             IScheduledTask.build(new ScheduledTask()
                 .setStatus(ScheduleStatus.RUNNING)

@@ -315,7 +315,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
           public void execute(final LogEntry logEntry) {
             write(new MutateWork.NoResult.Quiet() {
               @Override
-              protected void execute(MutableStoreProvider unused) {
+              public void execute(MutableStoreProvider unused) {
                 for (Op op : logEntry.getTransaction().getOps()) {
                   replayOp(op);
                 }
@@ -470,7 +470,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   public synchronized void start(final MutateWork.NoResult.Quiet initializationLogic) {
     write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider unused) {
+      public void execute(MutableStoreProvider unused) {
         // Must have the underlying storage started so we can query it for the last checkpoint.
         // We replay these entries in the forwarded storage system's transactions but not ours - we
         // do not want to re-record these ops to the log.
@@ -495,7 +495,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   void recover() throws RecoveryFailedException {
     writeBehindStorage.bulkLoad(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         try {
           streamManager.readFromBeginning(new Closure<LogEntry>() {
             @Override
@@ -564,7 +564,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   void doSnapshot() throws CodingException, InvalidPositionException, StreamAccessException {
     write(new MutateWork.NoResult<CodingException>() {
       @Override
-      protected void execute(MutableStoreProvider unused)
+      public void execute(MutableStoreProvider unused)
           throws CodingException, InvalidPositionException, StreamAccessException {
 
         LOG.info("Creating snapshot.");

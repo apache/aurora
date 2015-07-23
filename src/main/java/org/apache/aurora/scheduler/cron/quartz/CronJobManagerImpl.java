@@ -124,7 +124,7 @@ class CronJobManagerImpl implements CronJobManager {
     final IJobKey jobKey = cronJob.getSanitizedConfig().getJobConfig().getKey();
     storage.write(new MutateWork.NoResult<CronException>() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) throws CronException {
+      public void execute(Storage.MutableStoreProvider storeProvider) throws CronException {
         checkNotExists(jobKey, storeProvider.getCronJobStore());
 
         saveJob(cronJob, storeProvider.getCronJobStore());

@@ -184,7 +184,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     // Insert the task if it doesn't already exist.
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
         if (Iterables.isEmpty(taskStore.fetchTasks(Query.taskScoped(Tasks.id(copy))))) {
           taskStore.saveTasks(ImmutableSet.of(copy));
@@ -260,7 +260,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider store) {
+      public void execute(MutableStoreProvider store) {
         store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(a, b, c));
       }
     });
@@ -626,7 +626,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     changeState(task, INIT, PENDING);
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().deleteTasks(Tasks.ids(task));
       }
     });

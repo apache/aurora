@@ -93,7 +93,7 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
     stateMachine.transition(State.READY);
     wrapped.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         Iterable<IScheduledTask> tasks = Tasks.LATEST_ACTIVITY.sortedCopy(
             storeProvider.getTaskStore().fetchTasks(Query.unscoped()));
         for (IScheduledTask task : tasks) {

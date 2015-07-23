@@ -98,7 +98,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
 
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         AttributeStore.Mutable attributeStore = storeProvider.getAttributeStore();
         attributeStore.saveHostAttributes(HOST_A);
         attributeStore.saveHostAttributes(HOST_B);
@@ -122,7 +122,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   private void saveTasks(final Set<IScheduledTask> tasks) {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.copyOf(tasks));
       }
     });
@@ -152,7 +152,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   protected void deleteTasks(final String... taskIds) {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().deleteTasks(ImmutableSet.copyOf(taskIds));
       }
     });
@@ -161,7 +161,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   protected void deleteAllTasks() {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().deleteAllTasks();
       }
     });
@@ -617,7 +617,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     saveTasks(TASK_A);
     storage.write(new Storage.MutateWork.NoResult<Exception>() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) throws Exception {
+      public void execute(Storage.MutableStoreProvider storeProvider) throws Exception {
         IScheduledTask taskARunning = TaskTestUtil.addStateTransition(TASK_A, RUNNING, 1000L);
         saveTasks(taskARunning);
 

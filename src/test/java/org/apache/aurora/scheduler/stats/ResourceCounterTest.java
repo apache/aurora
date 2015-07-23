@@ -120,7 +120,7 @@ public class ResourceCounterTest {
   public void testComputeQuotaAllocationTotals() {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getQuotaStore()
             .saveQuota("a", IResourceAggregate.build(new ResourceAggregate(1, 1, 1)));
         storeProvider.getQuotaStore()
@@ -184,7 +184,7 @@ public class ResourceCounterTest {
   private void insertTasks(final IScheduledTask... tasks) {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
           storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.copyOf(tasks));
       }
     });

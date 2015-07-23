@@ -285,7 +285,7 @@ public class StatusUpdateBenchmark {
 
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(tasks);
       }
     });

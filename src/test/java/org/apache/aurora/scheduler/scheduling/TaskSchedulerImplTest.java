@@ -259,7 +259,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     memStorage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(MutableStoreProvider store) {
+      public void execute(MutableStoreProvider store) {
         store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(taskA, taskB));
       }
     });

@@ -247,7 +247,7 @@ public class CronJobManagerImplTest extends EasyMockTest {
   private void populateStorage() throws Exception {
     storage.write(new Storage.MutateWork.NoResult<Exception>() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) throws Exception {
+      public void execute(Storage.MutableStoreProvider storeProvider) throws Exception {
         storeProvider.getCronJobStore().saveAcceptedJob(
             QuartzTestUtil.makeSanitizedCronJob().getSanitizedConfig().getJobConfig());
       }

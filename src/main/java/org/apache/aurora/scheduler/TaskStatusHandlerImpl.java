@@ -149,7 +149,7 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
       try {
         storage.write(new Storage.MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(Storage.MutableStoreProvider storeProvider) {
+          public void execute(Storage.MutableStoreProvider storeProvider) {
             for (TaskStatus status : updates) {
               ScheduleStatus translatedState = Conversions.convertProtoState(status.getState());
 
