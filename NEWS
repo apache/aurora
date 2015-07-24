@@ -9,3 +9,12 @@
 - SLA metrics for non-production jobs have been disabled by default. They can
   be enabled via the scheduler command line. Metric names have changed from
   '...nonprod_ms' to "...ms_nonprod" (AURORA-1350).
+
+0.8.0
+-----
+
+- A new command line argument was added to the observer: --mesos-root
+  This must point to the same path as --work_dir on the mesos slave.
+- Build targets for thermos and observer have changed, they are now:
+  * src/main/python/apache/aurora/tools:thermos
+  * src/main/python/apache/aurora/tools:thermos_observer
