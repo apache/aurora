@@ -69,7 +69,6 @@ python_library(
   dependencies = [
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
-    '3rdparty/python:twitter.common.rpc',
     '3rdparty/python:twitter.common.zookeeper',
     'src/main/python/apache/aurora/common/auth',
     'src/main/python/apache/aurora/common:cluster',

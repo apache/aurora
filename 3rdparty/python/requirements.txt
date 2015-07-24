@@ -9,7 +9,7 @@ pex==0.8.2
 protobuf==2.6.1
 psutil==2.1.3
 pystachio==0.8.0
-requests==2.3.0
+requests==2.7.0
 requests-kerberos==0.7.0
 thrift==0.9.1
 twitter.common.app==0.3.3
@@ -27,7 +27,6 @@ twitter.common.options==0.3.3
 twitter.common.process==0.3.3
 twitter.common.quantity==0.3.3
 twitter.common.recordio==0.3.3
-twitter.common.rpc==0.3.3
 twitter.common.string==0.3.3
 twitter.common.testing==0.3.3
 twitter.common.zookeeper==0.3.3
