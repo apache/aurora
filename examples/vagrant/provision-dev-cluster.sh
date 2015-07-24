@@ -71,7 +71,7 @@ function install_ssh_config {
   cat >> /etc/ssh/ssh_config <<EOF
 
 # Allow local ssh w/out strict host checking
-Host $(hostname)
+Host *
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
 EOF
