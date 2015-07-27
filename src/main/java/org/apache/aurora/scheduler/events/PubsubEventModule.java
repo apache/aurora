@@ -75,6 +75,7 @@ public final class PubsubEventModule extends AbstractModule {
     this.async = requireNonNull(async);
   }
 
+  // TODO(wfarner): Remove the async argument and accept an Executor instead.
   public PubsubEventModule(boolean async) {
     this(async, Logger.getLogger(PubsubEventModule.class.getName()));
   }
