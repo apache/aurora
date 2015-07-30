@@ -182,10 +182,9 @@ popd
 
 # Builds Aurora Thermos and GC executor PEX binaries.
 ./pants binary src/main/python/apache/aurora/executor/bin:thermos_executor
-./pants binary src/main/python/apache/thermos/cli/bin:thermos
-./pants binary src/main/python/apache/thermos/bin:thermos_ckpt
+./pants binary src/main/python/apache/aurora/tools:thermos
 ./pants binary src/main/python/apache/thermos/bin:thermos_runner
-./pants binary src/main/python/apache/thermos/observer/bin:thermos_observer
+./pants binary src/main/python/apache/aurora/tools:thermos_observer
 
 # Packages the Thermos runner within the Thermos executor.
 python <<EOF
