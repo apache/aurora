@@ -22,6 +22,7 @@ readonly KRB5_URL_BASE=http://web.mit.edu/kerberos/dist/krb5/
 readonly KRB5_SIGNED_TARBALL=krb5-$KRB5_VERSION-signed.tar
 readonly KRB5_TARBALL=krb5-$KRB5_VERSION.tar.gz
 readonly KRB5_KEY_ID=0x749D7889
+readonly SCHEDULER_HOSTNAME=aurora.local
 
 function enter_vagrant {
   exec vagrant ssh -- /vagrant/src/test/sh/org/apache/aurora/e2e/test_kerberos_end_to_end.sh "$@"
@@ -56,7 +57,7 @@ function snapshot_as {
   kinit -k -t "testdir/${principal}.keytab" $principal
   curl -u : --negotiate -w '%{http_code}\n' \
     -o $(printf $SNAPSHOT_RESPONSE_OUTFILE $principal) \
-    -s 'http://192.168.33.7:8081/api' \
+    -v "http://$SCHEDULER_HOSTNAME:8081/api" \
     --data-binary "$SNAPSHOT_RPC_DATA"
   kdestroy
 }
@@ -67,7 +68,7 @@ function h2console_as {
   kinit -k -t "testdir/${principal}.keytab" $principal
   curl -u : --negotiate -w '%{http_code}\n' \
     -o $(printf $H2_RESPONSE_OUTFILE $principal) \
-    -s 'http://192.168.33.7:8081/h2console/'
+    -s "http://$SCHEDULER_HOSTNAME:8081/h2console/"
   kdestroy
 }
 
@@ -84,9 +85,9 @@ EOF
   sudo start aurora-scheduler-kerberos
   await_scheduler_ready
 
-  kadmin.local -q "addprinc -randkey HTTP/192.168.33.7"
-  rm -f testdir/HTTP-192.168.33.7.keytab.keytab
-  kadmin.local -q "ktadd -keytab testdir/HTTP-192.168.33.7.keytab HTTP/192.168.33.7"
+  kadmin.local -q "addprinc -randkey HTTP/$SCHEDULER_HOSTNAME"
+  rm -f testdir/HTTP-$SCHEDULER_HOSTNAME.keytab.keytab
+  kadmin.local -q "ktadd -keytab testdir/HTTP-$SCHEDULER_HOSTNAME.keytab HTTP/$SCHEDULER_HOSTNAME"
 
   kadmin.local -q "addprinc -randkey vagrant"
   rm -f testdir/vagrant.keytab
