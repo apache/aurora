@@ -25,8 +25,7 @@ python_tests(
   sources = ['test_file_browser.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/thermos/observer:task_observer',
-    'src/main/python/apache/thermos/monitoring:detector',
-    'src/main/python/apache/thermos/observer/http:file_browser',
+    'src/main/python/apache/thermos/monitoring',
+    'src/main/python/apache/thermos/observer',
   ]
 )

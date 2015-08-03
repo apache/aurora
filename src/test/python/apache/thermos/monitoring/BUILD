@@ -23,7 +23,7 @@ python_test_suite(name = 'all',
 python_tests(name = 'test_disk',
   sources = ['test_disk.py'],
   dependencies = [
-    'src/main/python/apache/thermos/monitoring:disk',
+    'src/main/python/apache/thermos/monitoring',
     '3rdparty/python:twitter.common.quantity',
   ]
 )
@@ -33,8 +33,8 @@ python_tests(name = 'test_detector',
   dependencies = [
     '3rdparty/python:twitter.common.contextutil',
     '3rdparty/python:twitter.common.dirutil',
-    'src/main/python/apache/thermos/common:constants',
-    'src/main/python/apache/thermos/monitoring:detector',
+    'src/main/python/apache/thermos/common',
+    'src/main/python/apache/thermos/monitoring',
   ]
 )
 
@@ -42,7 +42,7 @@ python_tests(name = 'test_resource',
   sources = ['test_resource.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/thermos/common:path',
-    'src/main/python/apache/thermos/monitoring:resource',
+    'src/main/python/apache/thermos/common',
+    'src/main/python/apache/thermos/monitoring',
   ]
 )

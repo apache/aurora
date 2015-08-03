@@ -39,7 +39,7 @@ python_library(
   sources = [ 'util.py' ],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client/cli',
+    'src/main/python/apache/aurora/client',
     'src/test/python/apache/aurora:api_util',
   ]
 )
@@ -51,8 +51,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -63,8 +62,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -75,8 +73,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -87,8 +84,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -100,8 +96,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -112,8 +107,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -132,8 +126,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -146,8 +139,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -159,8 +151,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -171,8 +162,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -183,8 +173,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -195,8 +184,7 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -204,7 +192,7 @@ python_tests(
   name = 'client',
   sources = [ 'test_client.py' ],
   dependencies = [
-    'src/main/python/apache/aurora/client/cli',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -213,7 +201,7 @@ python_tests(
   sources = [ 'test_version.py' ],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client/cli',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -222,7 +210,7 @@ python_tests(
   sources = [ 'test_context.py' ],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client/cli',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
@@ -230,6 +218,6 @@ python_tests(
   name = 'options',
   sources = [ 'test_options.py' ],
   dependencies = [
-    'src/main/python/apache/aurora/client/cli',
+    'src/main/python/apache/aurora/client',
   ]
 )

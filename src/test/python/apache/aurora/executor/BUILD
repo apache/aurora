@@ -48,16 +48,11 @@ python_tests(name = 'thermos_executor',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.exceptions',
     '3rdparty/python:twitter.common.quantity',
+    'api/src/main/thrift/org/apache/aurora/gen',
+    'src/main/python/apache/aurora/config',
+    'src/main/python/apache/aurora/executor',
     'src/main/python/apache/thermos/core',
-    'src/main/python/apache/thermos/monitoring:monitor',
-    'src/main/python/apache/aurora/config:schema',
-    'src/main/python/apache/aurora/executor/common:executor_timeout',
-    'src/main/python/apache/aurora/executor/common:health_checker',
-    'src/main/python/apache/aurora/executor/common:sandbox',
-    'src/main/python/apache/aurora/executor/common:task_runner',
-    'src/main/python/apache/aurora/executor:aurora_executor',
-    'src/main/python/apache/aurora/executor:thermos_task_runner',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/main/python/apache/thermos/monitoring',
   ]
 )
 
@@ -70,9 +65,8 @@ python_tests(name = 'thermos_task_runner',
     '3rdparty/python:twitter.common.dirutil',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
-    'src/main/python/apache/aurora/config:schema',
-    'src/main/python/apache/aurora/executor/common:sandbox',
-    'src/main/python/apache/aurora/executor:thermos_task_runner',
+    'src/main/python/apache/aurora/config',
+    'src/main/python/apache/aurora/executor',
   ]
 )
 
@@ -82,7 +76,7 @@ python_tests(name = 'executor_base',
     '3rdparty/python:mesos.interface',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.log',
-    'src/main/python/apache/aurora/executor:executor_base',
+    'src/main/python/apache/aurora/executor',
   ],
 )
 
@@ -91,8 +85,7 @@ python_tests(name = 'status_manager',
   dependencies = [
     '3rdparty/python:mesos.interface',
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/executor:status_manager',
-    'src/main/python/apache/aurora/executor/common:status_checker',
+    'src/main/python/apache/aurora/executor',
   ],
 )
 
@@ -101,7 +94,7 @@ python_tests(name = 'executor_vars',
   dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/executor:executor_vars',
+    'src/main/python/apache/aurora/executor',
   ]
 )
 
@@ -109,8 +102,7 @@ python_tests(name = 'http_lifecycle',
   sources = ['test_http_lifecycle.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/config:schema',
-    'src/main/python/apache/aurora/executor:http_lifecycle',
-    'src/main/python/apache/aurora/executor:thermos_task_runner',
+    'src/main/python/apache/aurora/config',
+    'src/main/python/apache/aurora/executor',
   ],
 )

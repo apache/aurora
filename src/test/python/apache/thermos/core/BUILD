@@ -47,14 +47,14 @@ python_test_suite(name = 'large',
 python_tests(name = 'test_runner_integration',
   sources = ['test_runner_integration.py'],
   dependencies = [
-    'src/main/python/apache/thermos/testing:runner',
+    'src/main/python/apache/thermos/testing',
   ],
 )
 
 python_tests(name = 'test_angry',
   sources = ['test_angry.py'],
   dependencies = [
-    'src/main/python/apache/thermos/testing:runner',
+    'src/main/python/apache/thermos/testing',
   ],
 #  timeout = Amount(5, Time.MINUTES)
 )
@@ -62,28 +62,28 @@ python_tests(name = 'test_angry',
 python_tests(name = 'test_ephemerals',
   sources = ['test_ephemerals.py'],
   dependencies = [
-    'src/main/python/apache/thermos/testing:runner',
+    'src/main/python/apache/thermos/testing',
   ],
 )
 
 python_tests(name = 'test_failing_runner',
   sources = ['test_failing_runner.py'],
   dependencies = [
-    'src/main/python/apache/thermos/testing:runner',
+    'src/main/python/apache/thermos/testing',
   ],
 )
 
 python_tests(name = 'test_finalization',
   sources = ['test_finalization.py'],
   dependencies = [
-    'src/main/python/apache/thermos/testing:runner',
+    'src/main/python/apache/thermos/testing',
   ],
 )
 
 python_tests(name = 'test_failure_limit',
   sources = ['test_failure_limit.py'],
   dependencies = [
-    'src/main/python/apache/thermos/testing:runner',
+    'src/main/python/apache/thermos/testing',
   ],
 )
 
@@ -92,7 +92,7 @@ python_tests(name = 'test_helper',
   dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:psutil',
-    'src/main/python/apache/thermos/core:helper',
+    'src/main/python/apache/thermos/core',
   ]
 )
 
@@ -101,7 +101,7 @@ python_tests(name = 'test_process',
   dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/thermos/testing:runner',
+    'src/main/python/apache/thermos/testing',
   ],
 )
 
@@ -109,7 +109,7 @@ python_tests(name = 'test_staged_kill',
   sources = ['test_staged_kill.py'],
   dependencies = [
      '3rdparty/python:twitter.common.process',
-     'src/main/python/apache/thermos/testing:runner',
-     'src/main/python/apache/thermos/monitoring:monitor',
+     'src/main/python/apache/thermos/testing',
+     'src/main/python/apache/thermos/monitoring',
   ]
 )

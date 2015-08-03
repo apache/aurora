@@ -11,35 +11,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import os
 
-python_binary(
-  name = 'thermos_ckpt',
-  source = 'thermos_ckpt.py',
-  dependencies = [
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.recordio',
-    'src/main/python/apache/thermos/common',
-    'api/src/main/thrift/org/apache/thermos:py-thrift'
-  ]
-)
 
 python_library(
-  name = 'thermos_runner_source',
-  sources = ['thermos_runner.py'],
+  name = '_runner',
+  sources = rglobs('*.py'),
   dependencies = [
-    'src/main/python/apache/thermos/common:planner',
-    'src/main/python/apache/thermos/common:statuses',
-    'src/main/python/apache/thermos/config:schema',
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/thermos/common',
+    'src/main/python/apache/thermos/config',
     'src/main/python/apache/thermos/core',
   ],
 )
 
+python_library(
+  name = 'runner',
+  dependencies = [
+    ':_runner',
+  ],
+  provides = setup_py(
+    name = 'apache.thermos.runner',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
+  ).with_binaries(
+    thermos_runner = ':thermos_runner',
+  ),
+)
+
 python_binary(
   name = 'thermos_runner',
-  entry_point = 'apache.thermos.bin.thermos_runner',
+  entry_point = 'apache.thermos.runner.thermos_runner',
   dependencies = [
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.log',
-    ':thermos_runner_source',
+    ':_runner',
   ],
 )

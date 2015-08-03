@@ -11,26 +11,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-python_library(
-  name = 'auth',
-  sources = [
-    '__init__.py',
-    'auth_module.py',
-    'auth_module_manager.py',
-  ],
-  dependencies = [
-    '3rdparty/python:twitter.common.lang',
-    '3rdparty/python:twitter.common.log',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
-  ]
-)
-
-python_library(
-  name = 'kerberos',
-  sources = ['kerberos.py'],
-  dependencies = [
-     '3rdparty/python:requests-kerberos',
-     ':auth'
-  ]
-)

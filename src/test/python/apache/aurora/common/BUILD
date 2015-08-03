@@ -29,7 +29,7 @@ python_test_suite(
 python_tests(name = 'test_aurora_job_key',
   sources = ['test_aurora_job_key.py'],
   dependencies = [
-    'src/main/python/apache/aurora/common:aurora_job_key'
+    'src/main/python/apache/aurora/common'
   ],
 )
 
@@ -38,7 +38,7 @@ python_tests(
   sources = ['test_pex_version.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/common:pex_version',
+    'src/main/python/apache/aurora/common',
   ]
 )
 
@@ -46,7 +46,7 @@ python_tests(
   name = 'test_cluster',
   sources = ['test_cluster.py'],
   dependencies = [
-    'src/main/python/apache/aurora/common:cluster',
+    'src/main/python/apache/aurora/common',
   ]
 )
 
@@ -55,7 +55,7 @@ python_tests(
   sources = ['test_clusters.py'],
   dependencies = [
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/common:clusters',
+    'src/main/python/apache/aurora/common',
   ]
 )
 
@@ -64,9 +64,7 @@ python_tests(
   sources = ['test_cluster_option.py'],
   dependencies = [
     '3rdparty/python:twitter.common.options',
-    'src/main/python/apache/aurora/common:cluster',
-    'src/main/python/apache/aurora/common:cluster_option',
-    'src/main/python/apache/aurora/common:clusters',
+    'src/main/python/apache/aurora/common',
   ]
 )
 
@@ -75,7 +73,7 @@ python_tests(
   sources = ['test_http_signaler.py'],
   dependencies = [
     '3rdparty/python:mox',
-    'src/main/python/apache/aurora/common:http_signaler',
+    'src/main/python/apache/aurora/common',
   ]
 )
 
@@ -83,7 +81,7 @@ python_tests(
   name = 'test_shellify',
   sources = ['test_shellify.py'],
   dependencies = [
-    'src/main/python/apache/aurora/common:shellify',
+    'src/main/python/apache/aurora/common',
   ]
 )
 
@@ -91,8 +89,8 @@ python_tests(
   name = 'test_transport',
   sources = ['test_transport.py'],
   dependencies = [
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
-    'src/main/python/apache/aurora/common:transport',
+    'api/src/main/thrift/org/apache/aurora/gen',
+    'src/main/python/apache/aurora/common',
     '3rdparty/python:mock',
   ]
 )

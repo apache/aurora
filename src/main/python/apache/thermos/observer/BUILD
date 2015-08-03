@@ -14,52 +14,23 @@
 
 import os
 
-python_library(
-  name = 'observed_task',
-  sources = ['observed_task.py'],
-  dependencies = [
-    '3rdparty/python:pystachio',
-    '3rdparty/python:twitter.common.lang',
-    '3rdparty/python:twitter.common.log',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
-    'src/main/python/apache/thermos/common:ckpt',
-    'src/main/python/apache/thermos/common:path',
-    'src/main/python/apache/thermos/config',
-  ]
-)
-
-python_library(
-  name = 'detector',
-  sources = ['detector.py'],
-  dependencies = [
-    'src/main/python/apache/thermos/monitoring:detector',
-  ]
-)
-
-
-python_library(
-  name = 'task_observer',
-  sources = ['task_observer.py'],
-  dependencies = [
-    ':detector',
-    ':observed_task',
-    '3rdparty/python:twitter.common.exceptions',
-    '3rdparty/python:twitter.common.lang',
-    '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.quantity',
-    'src/main/python/apache/thermos/common:path',
-    'src/main/python/apache/thermos/monitoring:monitor',
-    'src/main/python/apache/thermos/monitoring:process',
-    'src/main/python/apache/thermos/monitoring:resource',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
-  ]
-)
 
 python_library(
   name = 'observer',
+  sources = rglobs('*.py'),
+  resources = zglobs('**/assets/*') + rglobs('*.tpl'),
   dependencies = [
-    ':task_observer',
-    'src/main/python/apache/thermos/observer/http:http_observer',
+    '3rdparty/python:bottle',
+    '3rdparty/python:mako',
+    '3rdparty/python:pex',
+    '3rdparty/python:pystachio',
+    '3rdparty/python:twitter.common.exceptions',
+    '3rdparty/python:twitter.common.http',
+    '3rdparty/python:twitter.common.lang',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.metrics',
+    '3rdparty/python:twitter.common.quantity',
+    'api/src/main/thrift/org/apache/thermos',
 
     # covering libraries
     'src/main/python/apache/thermos/common',
@@ -69,8 +40,6 @@ python_library(
   provides = setup_py(
     name = 'apache.thermos.observer',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
-    description = 'The Thermos observer web interface.',
-  ).with_binaries(
-    thermos_observer = 'src/main/python/apache/thermos/observer/bin:thermos_observer',
-  )
+    description = 'The Thermos observer web interface libraries.',
+  ),
 )

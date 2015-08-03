@@ -14,62 +14,16 @@
 import os
 
 python_library(
-  name = 'admin',
-  sources = ['admin.py', 'admin_util.py'],
+  name = '_admin',
+  sources = rglobs('*.py'),
   dependencies = [
-    ':help',
-    ':util',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
-    'src/main/python/apache/aurora/client/api',
-    'src/main/python/apache/aurora/client:base',
+    'api/src/main/thrift/org/apache/aurora/gen',
+    'src/main/python/apache/aurora/client',
     'src/main/python/apache/aurora/common',
-    'src/main/python/apache/aurora/client:config',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
-  ]
-)
-
-python_library(
-  name = 'help',
-  sources = ['help.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.log',
-    'src/main/python/apache/aurora/client:base'
-  ]
-)
-
-python_library(
-  name = 'host_maintenance',
-  sources = ['host_maintenance.py'],
-  dependencies = [
-    ':util',
-    '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.quantity',
-    'src/main/python/apache/aurora/client:api',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
-  ]
-)
-
-python_library(
-  name = 'maintenance',
-  sources = ['maintenance.py'],
-  dependencies = [
-    ':util',
-    ':host_maintenance',
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.log',
-    'src/main/python/apache/aurora/client:base',
-    'src/main/python/apache/aurora/common:clusters',
-  ]
-)
-
-python_library(
-  name = 'util',
-  sources = ['admin_util.py'],
-  dependencies = [
-    'src/main/python/apache/aurora/client:base',
+    'src/main/python/apache/aurora/config',
   ]
 )
 
@@ -77,39 +31,19 @@ python_binary(
   name = 'aurora_admin',
   entry_point = 'apache.aurora.admin.aurora_admin:proxy_main',
   dependencies = [
-    ':aurora_admin_lib'
+    ':_admin',
   ]
 )
 
-# TODO(maxim): consider making this default ("aurora_admin") target along with kerberos auth.
-python_binary(
-  name = 'kaurora_admin',
-  entry_point = 'apache.aurora.admin.aurora_admin:proxy_main',
-  dependencies = [
-    ':aurora_admin_lib',
-    'src/main/python/apache/aurora/common/auth:kerberos',
-  ],
-)
-
 python_library(
-  name = 'aurora_admin_lib',
-  sources = [ 'aurora_admin.py' ],
+  name = 'admin',
   dependencies = [
-      ':admin',
-      ':maintenance',
-    ]
-)
-
-python_library(
-  name = 'admin-packaged',
-  dependencies = [
-    ':aurora_admin_lib',
-    'src/main/python/apache/aurora/config:config-packaged',
+    ':_admin',
   ],
   provides = setup_py(
     name = 'apache.aurora.admin',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
-  ).with_binaries(
-    aurora_admin = ':aurora_admin',
-  )
+  ).with_binaries({
+    'aurora_admin': ':aurora_admin',
+  }),
 )

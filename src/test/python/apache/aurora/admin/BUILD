@@ -31,8 +31,8 @@ python_tests(
     ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/admin:admin',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/main/python/apache/aurora/admin',
+    'api/src/main/thrift/org/apache/aurora/gen',
   ],
 )
 
@@ -43,10 +43,10 @@ python_tests(name = 'host_maintenance',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
-    'src/main/python/apache/aurora/client:api',
-    'src/main/python/apache/aurora/common:cluster',
-    'src/main/python/apache/aurora/admin:host_maintenance',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/main/python/apache/aurora/admin',
+    'src/main/python/apache/aurora/client',
+    'src/main/python/apache/aurora/common',
+    'api/src/main/thrift/org/apache/aurora/gen',
   ],
 )
 
@@ -58,7 +58,7 @@ python_tests(
   dependencies = [
     ':util',
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/admin:maintenance',
+    'src/main/python/apache/aurora/admin',
   ],
 )
 
@@ -67,9 +67,8 @@ python_library(
   sources = [ 'util.py' ],
   dependencies = [
     '3rdparty/python:mock',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
-    'src/main/python/apache/aurora/client/hooks:hooks',
-    'src/main/python/apache/aurora/client:config',
+    'api/src/main/thrift/org/apache/aurora/gen',
+    'src/main/python/apache/aurora/client',
     'src/test/python/apache/aurora:api_util',
   ],
 )

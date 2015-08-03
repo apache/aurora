@@ -17,6 +17,6 @@ python_tests(
   sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/thermos/cli/commands',
+    'src/main/python/apache/thermos/cli',
   ]
 )

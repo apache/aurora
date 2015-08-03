@@ -11,10 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 from requests_kerberos import DISABLED, HTTPKerberosAuth
 
-from .auth_module import AuthModule
+from apache.aurora.common.auth_module import AuthModule
 
 
 class KerberosAuthModule(AuthModule):

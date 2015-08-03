@@ -33,12 +33,12 @@ function upstart_update {
 }
 
 function build_client {
-  ./pants binary src/main/python/apache/aurora/client/cli:kaurora
+  ./pants binary src/main/python/apache/aurora/kerberos:kaurora
   sudo ln -sf $DIST_DIR/kaurora.pex /usr/local/bin/aurora
 }
 
 function build_admin_client {
-  ./pants binary src/main/python/apache/aurora/admin:kaurora_admin
+  ./pants binary src/main/python/apache/aurora/kerberos:kaurora_admin
   sudo ln -sf $DIST_DIR/kaurora_admin.pex /usr/local/bin/aurora_admin
 }
 
@@ -58,8 +58,8 @@ function build_scheduler {
 }
 
 function build_executor {
-  ./pants binary src/main/python/apache/aurora/executor/bin:thermos_executor
-  ./pants binary src/main/python/apache/thermos/bin:thermos_runner
+  ./pants binary src/main/python/apache/aurora/executor:thermos_executor
+  ./pants binary src/main/python/apache/thermos/runner:thermos_runner
 
   # Package runner within executor.
   build-support/embed_runner_in_executor.py
@@ -69,6 +69,8 @@ function build_executor {
 
 function build_observer {
   ./pants binary src/main/python/apache/aurora/tools:thermos_observer
+  ./pants binary src/main/python/apache/aurora/tools:thermos
+  sudo ln -sf $DIST_DIR/thermos.pex /usr/local/bin/thermos
   upstart_update aurora-thermos-observer
 }
 

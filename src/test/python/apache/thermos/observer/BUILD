@@ -25,6 +25,6 @@ python_tests(
   sources = ['test_detector.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/thermos/observer:detector',
+    'src/main/python/apache/thermos/observer',
   ]
 )

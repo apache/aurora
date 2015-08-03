@@ -14,73 +14,20 @@
 
 import os
 
+
 python_library(
-  name = 'helper',
-  sources = ['helper.py'],
+  name = 'core',
+  sources = rglobs('*.py'),
   dependencies = [
     '3rdparty/python:psutil',
-    '3rdparty/python:twitter.common.dirutil',
-    '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.quantity',
-    '3rdparty/python:twitter.common.recordio',
-    'src/main/python/apache/thermos/common:ckpt',
-    'src/main/python/apache/thermos/common:path',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
-  ]
-)
-
-python_library(
-  name = 'muxer',
-  sources = ['muxer.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.recordio',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
-  ]
-)
-
-python_library(
-  name = 'process',
-  sources = ['process.py'],
-  dependencies = [
     '3rdparty/python:twitter.common.dirutil',
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
     '3rdparty/python:twitter.common.recordio',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
-  ]
-)
-
-python_library(
-  name = 'runner',
-  sources = ['__init__.py', 'runner.py'],
-  dependencies = [
-    ':helper',
-    ':muxer',
-    ':process',
-    '3rdparty/python:psutil',
-    '3rdparty/python:twitter.common.dirutil',
-    '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.quantity',
-    '3rdparty/python:twitter.common.recordio',
-    'src/main/python/apache/thermos/common:ckpt',
-    'src/main/python/apache/thermos/common:path',
-    'src/main/python/apache/thermos/common:planner',
-    'src/main/python/apache/thermos/config:schema',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
-  ]
-)
-
-python_library(
-  name = 'core',
-  dependencies = [
-    ':runner',
-
-    # covering libs
+    'api/src/main/thrift/org/apache/thermos',
     'src/main/python/apache/thermos/common',
     'src/main/python/apache/thermos/config',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ],
   provides = setup_py(
     name = 'apache.thermos.core',

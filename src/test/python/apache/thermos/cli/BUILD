@@ -26,7 +26,7 @@ python_tests(
   sources = ['test_common.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/thermos/cli:common',
+    'src/main/python/apache/thermos/cli',
   ]
 )
 
@@ -34,6 +34,6 @@ python_tests(
   name = 'main',
   sources = ['test_main.py'],
   dependencies = [
-    'src/main/python/apache/thermos/cli:main',
+    'src/main/python/apache/thermos/cli',
   ]
 )

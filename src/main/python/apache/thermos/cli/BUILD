@@ -11,27 +11,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import os
+
 
 python_library(
-  name = 'common',
-  sources = ['common.py'],
+  name = 'cli',
+  sources = rglobs('*.py'),
   dependencies = [
+    '3rdparty/python:pystachio',
     '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.dirutil',
     '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.recordio',
+    'api/src/main/thrift/org/apache/thermos',
+    'src/main/python/apache/thermos/common',
     'src/main/python/apache/thermos/config',
-    'src/main/python/apache/thermos/core:runner',
-    'src/main/python/apache/thermos/monitoring:detector',
-  ]
-)
-
-python_library(
-  name = 'main',
-  sources = ['main.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.app',
-    ':common',
-    'src/main/python/apache/thermos/cli/commands',
-    'src/main/python/apache/thermos/common:constants',
-    'src/main/python/apache/thermos/monitoring:detector',
-  ]
+    'src/main/python/apache/thermos/core',
+    'src/main/python/apache/thermos/monitoring',
+  ],
+  provides = setup_py(
+    name = 'apache.thermos.cli',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
+  )
 )

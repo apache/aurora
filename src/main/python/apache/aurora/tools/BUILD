@@ -11,29 +11,74 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import os
 
-python_binary(
-  name = 'thermos',
-  source = 'thermos.py',
-  dependencies = [
-    'src/main/python/apache/thermos/cli:common',
-    'src/main/python/apache/thermos/cli:main',
-    'src/main/python/apache/aurora/executor/common:path_detector',
-  ]
-)
 
-python_binary(
-  name = 'thermos_observer',
-  source = 'thermos_observer.py',
+THERMOS_SOURCE = 'thermos.py'
+OBSERVER_SOURCE = 'thermos_observer.py'
+
+python_library(
+  name = '_tools',
+  sources = rglobs('*.py') - [THERMOS_SOURCE] - [OBSERVER_SOURCE],
   dependencies = [
     '3rdparty/python:CherryPy',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.exceptions',
     '3rdparty/python:twitter.common.log',
-    'src/main/python/apache/aurora/executor/common:path_detector',
-    'src/main/python/apache/thermos/common:constants',
-    'src/main/python/apache/thermos/monitoring:detector',
-    'src/main/python/apache/thermos/observer:task_observer',
-    'src/main/python/apache/thermos/observer/http:configure',
+    'src/main/python/apache/aurora/executor',
+    'src/main/python/apache/thermos/cli',
+    'src/main/python/apache/thermos/common',
+    'src/main/python/apache/thermos/monitoring',
+    'src/main/python/apache/thermos/observer',
+  ],
+)
+
+python_library(
+  name = '_thermos',
+  sources = [THERMOS_SOURCE],
+  dependencies = [
+    ':_tools',
+  ],
+)
+
+python_binary(
+  name = 'thermos',
+  # TODO(ksweeney): Investigate making this use entry_point instead.
+  source = THERMOS_SOURCE,
+  dependencies = [
+    ':_tools',
   ]
+)
+
+python_library(
+  name = '_thermos_observer',
+  sources = [OBSERVER_SOURCE],
+  dependencies = [
+    ':_tools',
+  ],
+)
+
+python_binary(
+  name = 'thermos_observer',
+  # TODO(ksweeney): Investigate making this use entry_point instead.
+  source = OBSERVER_SOURCE,
+  dependencies = [
+    ':_tools',
+  ]
+)
+
+python_library(
+  name = 'tools',
+  dependencies = [
+    ':_thermos',
+    ':_thermos_observer',
+    ':_tools',
+  ],
+  provides = setup_py(
+    name = 'apache.aurora.tools',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
+  ).with_binaries({
+    'thermos': ':thermos',
+    'thermos_observer': ':thermos_observer',
+  }),
 )

@@ -23,14 +23,14 @@ python_test_suite(name = 'all',
 python_tests(name = 'test_pathspec',
   sources = ['test_pathspec.py'],
   dependencies = [
-    'src/main/python/apache/thermos/common:path',
+    'src/main/python/apache/thermos/common',
   ],
 )
 
 python_tests(name = 'test_planner',
   sources = ['test_planner.py'],
   dependencies = [
-    'src/main/python/apache/thermos/common:planner',
+    'src/main/python/apache/thermos/common',
   ],
 )
 
@@ -38,7 +38,7 @@ python_tests(name = 'test_task_planner',
   sources = ['test_task_planner.py'],
   dependencies = [
     '3rdparty/python:twitter.common.testing',
-    'src/main/python/apache/thermos/common:planner',
-    'src/main/python/apache/thermos/config:schema',
+    'src/main/python/apache/thermos/common',
+    'src/main/python/apache/thermos/config',
   ],
 )

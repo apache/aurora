@@ -66,7 +66,7 @@ class AuroraAuthConfigurationPlugin(ConfigurationPlugin):
 
   def before_execution(self, context):
     try:
-      from apache.aurora.common.auth.kerberos import KerberosAuthModule
+      from apache.aurora.kerberos.auth_module import KerberosAuthModule
       register_auth_module(KerberosAuthModule())
     except ImportError:
       # Use default auth implementation if kerberos is not available.

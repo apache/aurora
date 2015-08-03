@@ -11,41 +11,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 import os
 
-# Alias for src/main/python/apache/aurora/config/schema
-python_library(
-  name = 'schema',
-  dependencies = [
-    'src/main/python/apache/aurora/config/schema',
-  ]
-)
 
 python_library(
   name = 'config',
-  sources = (
-    '__init__.py',
-    'loader.py',
-    'port_resolver.py',
-    'thrift.py',
-  ),
+  sources = rglobs('*.py'),
   dependencies = [
     '3rdparty/python:pystachio',
     '3rdparty/python:twitter.common.lang',
+    'api/src/main/thrift/org/apache/aurora/gen',
     'src/main/python/apache/aurora/common',
-    'src/main/python/apache/aurora/config/schema',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
-  ],
-
-)
-
-python_library(
-  name = 'config-packaged',
-  dependencies = [
-    ':config',
-
-    # covering dependencies
     'src/main/python/apache/thermos/config',
   ],
   provides = setup_py(

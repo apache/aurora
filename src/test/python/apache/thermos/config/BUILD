@@ -22,6 +22,6 @@ python_tests(name = 'test_schema',
   sources = ['test_schema.py'],
   dependencies = [
     '3rdparty/python:twitter.common.collections',
-    'src/main/python/apache/thermos/config:schema'
+    'src/main/python/apache/thermos/config',
   ]
 )

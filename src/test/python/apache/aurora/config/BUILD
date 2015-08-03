@@ -52,6 +52,6 @@ python_tests(name = 'test_thrift',
   sources = ['test_thrift.py'],
   dependencies = [
     'src/main/python/apache/aurora/config',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift-test',
+    'api/src/main/thrift/org/apache/aurora/gen',
   ]
 )

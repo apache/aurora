@@ -14,79 +14,21 @@
 
 import os
 
-python_library(
-  name = 'detector',
-  sources = ['detector.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.lang',
-    'src/main/python/apache/thermos/common:constants',
-    'src/main/python/apache/thermos/common:path',
-  ]
-)
 
 python_library(
-  name = 'monitor',
-  sources = ['monitor.py'],
+  name = 'monitoring',
+  sources = rglobs('*.py'),
   dependencies = [
-    '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.recordio',
-    'src/main/python/apache/thermos/common:ckpt',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
-  ]
-)
-
-python_library(
-  name = 'disk',
-  sources = ['disk.py'],
-  dependencies = [
+    '3rdparty/python:psutil',
+    '3rdparty/python:twitter.common.collections',
+    '3rdparty/python:twitter.common.concurrent',
     '3rdparty/python:twitter.common.dirutil',
     '3rdparty/python:twitter.common.exceptions',
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
-  ]
-)
-
-python_library(
-  name = 'process',
-  sources = ['process.py'],
-)
-
-python_library(
-  name = 'process_collector_psutil',
-  sources = ['process_collector_psutil.py'],
-  dependencies = [
-    ':process',
-    '3rdparty/python:psutil',
-    '3rdparty/python:twitter.common.log',
-  ]
-)
-
-python_library(
-  name = 'resource',
-  sources = ['resource.py'],
-  dependencies = [
-    ':disk',
-    ':monitor',
-    ':process',
-    ':process_collector_psutil',
-    '3rdparty/python:twitter.common.collections',
-    '3rdparty/python:twitter.common.concurrent',
-    '3rdparty/python:twitter.common.lang',
-    '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
-  ]
-)
-
-python_library(
-  name = 'monitoring',
-  dependencies = [
-    ':detector',
-    ':disk',
-    ':monitor',
-    ':process',
-    ':resource',
-
-    # covering dependency for common
+    '3rdparty/python:twitter.common.recordio',
+    'api/src/main/thrift/org/apache/thermos',
     'src/main/python/apache/thermos/common',
   ],
   provides = setup_py(

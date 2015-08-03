@@ -29,7 +29,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:pystachio',
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client:binding_helper',
+    'src/main/python/apache/aurora/client',
     'src/main/python/apache/aurora/config',
   ],
 )
@@ -37,7 +37,7 @@ python_tests(
 python_tests(name = 'base',
   sources = ['test_base.py'],
   dependencies = [
-    'src/main/python/apache/aurora/client:base',
+    'src/main/python/apache/aurora/client',
   ],
 )
 
@@ -45,7 +45,7 @@ python_tests(name = 'config',
   sources = ['test_config.py'],
   dependencies = [
     '3rdparty/python:mox',
-    'src/main/python/apache/aurora/client:config',
+    'src/main/python/apache/aurora/client',
   ],
 )
 
@@ -53,6 +53,6 @@ python_library(
   name = 'fake_scheduler_proxy',
   sources = ['fake_scheduler_proxy.py'],
   dependencies = [
-    'src/main/python/apache/aurora/client/api:scheduler_client',
+    'src/main/python/apache/aurora/client',
   ]
 )

@@ -11,18 +11,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-python_binary(
-  name = 'thermos_observer',
-  source = 'thermos_observer.py',
-  entry_point = 'apache.thermos.observer.bin.thermos_observer:run',
-  dependencies = [
-    '3rdparty/python:CherryPy',
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.exceptions',
-    'src/main/python/apache/thermos/common:constants',
-    'src/main/python/apache/thermos/monitoring:detector',
-    'src/main/python/apache/thermos/observer/http:configure',
-    'src/main/python/apache/thermos/observer:task_observer',
-  ],
-)

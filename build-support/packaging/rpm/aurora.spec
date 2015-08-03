@@ -178,12 +178,12 @@ popd
 
 # Builds Aurora client PEX binaries.
 ./pants binary src/main/python/apache/aurora/admin:aurora_admin
-./pants binary src/main/python/apache/aurora/client/cli:aurora
+./pants binary src/main/python/apache/aurora/client:aurora
 
 # Builds Aurora Thermos and GC executor PEX binaries.
-./pants binary src/main/python/apache/aurora/executor/bin:thermos_executor
+./pants binary src/main/python/apache/aurora/executor:thermos_executor
 ./pants binary src/main/python/apache/aurora/tools:thermos
-./pants binary src/main/python/apache/thermos/bin:thermos_runner
+./pants binary src/main/python/apache/thermos/runner:thermos_runner
 ./pants binary src/main/python/apache/aurora/tools:thermos_observer
 
 # Packages the Thermos runner within the Thermos executor.

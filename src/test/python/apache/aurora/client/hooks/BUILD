@@ -23,16 +23,15 @@ python_tests(name = 'hooked_api',
   sources = ['test_hooked_api.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/common:cluster',
-    'src/main/python/apache/aurora/client:api',
-    'src/main/python/apache/aurora/client/hooks',
+    'src/main/python/apache/aurora/common',
+    'src/main/python/apache/aurora/client',
   ]
 )
 
 python_tests(name = 'non_hooked_api',
   sources = ['test_non_hooked_api.py'],
   dependencies = [
-    'src/main/python/apache/aurora/common:aurora_job_key',
-    'src/main/python/apache/aurora/client/hooks',
+    'src/main/python/apache/aurora/common',
+    'src/main/python/apache/aurora/client',
   ],
 )

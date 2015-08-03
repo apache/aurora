@@ -11,94 +11,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 import os
 
-python_library(
-  name = 'aurora_job_key',
-  sources = ['aurora_job_key.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.lang',
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
-  ]
-)
-
-python_library(
-  name = 'cluster',
-  sources = ['cluster.py'],
-  dependencies = [
-    '3rdparty/python:pystachio',
-  ]
-)
-
-python_library(
-  name = 'clusters',
-  sources = ['clusters.py'],
-  dependencies = [
-    ':cluster',
-    '3rdparty/python:pystachio',
-    '3rdparty/python:twitter.common.collections',
-  ]
-)
-
-python_library(
-  name = 'cluster_option',
-  sources = ['cluster_option.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.lang',
-  ]
-)
-
-python_library(
-  name = 'http_signaler',
-  sources = ['http_signaler.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.lang',
-    '3rdparty/python:twitter.common.log',
-  ]
-)
-
-python_library(
-  name = 'pex_version',
-  sources = ['pex_version.py'],
-  dependencies = [
-    '3rdparty/python:pex',
-  ]
-)
-
-python_library(
-  name = 'shellify',
-  sources = ['shellify.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.lang',
-  ],
-)
-
-python_library(
-  name = 'transport',
-  sources = ['transport.py'],
-  dependencies = [
-    '3rdparty/python:requests',
-    '3rdparty/python:thrift',
-    '3rdparty/python:twitter.common.log',
-  ],
-)
 
 python_library(
   name = 'common',
+  sources = rglobs('*.py'),
   dependencies = [
-    ':aurora_job_key',
-    ':cluster',
-    ':cluster_option',
-    ':clusters',
-    ':pex_version',
-    ':http_signaler',
-    ':shellify',
-    ':transport',
-    'src/main/python/apache/aurora/common/auth',
-
-    # covering dependency on gen.*
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift-packaged',
+    '3rdparty/python:pex',
+    '3rdparty/python:pystachio',
+    '3rdparty/python:requests',
+    '3rdparty/python:thrift',
+    '3rdparty/python:twitter.common.collections',
+    '3rdparty/python:twitter.common.lang',
+    '3rdparty/python:twitter.common.log',
+    'api/src/main/thrift/org/apache/aurora/gen',
   ],
   provides = setup_py(
     name = 'apache.aurora.common',

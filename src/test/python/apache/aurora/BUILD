@@ -28,7 +28,7 @@ python_library(
   name = 'api_util',
   sources = [ 'api_util.py' ],
   dependencies = [
-    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
-    'src/main/python/apache/aurora/client/api:scheduler_client',
+    'api/src/main/thrift/org/apache/aurora/gen',
+    'src/main/python/apache/aurora/client',
   ]
 )

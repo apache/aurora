@@ -22,8 +22,8 @@ PROJECT_NAME=${PWD##*/}
 
 pushd "$BUILDROOT"
   ./pants dependencies --external-only src/test/python:: | sort -u > requirements.txt
-  ./pants setup-py api/src/main/thrift/org/apache/aurora/gen:py-thrift-packaged
-  ./pants setup-py api/src/main/thrift/org/apache/thermos:py-thrift
+  ./pants setup-py api/src/main/thrift/org/apache/aurora/gen
+  ./pants setup-py api/src/main/thrift/org/apache/thermos
   source build-support/pants.venv/bin/activate
     pytest_requirement=$(python -m pip freeze | grep pytest==)
     pytest_cov_requirement=$(python -m pip freeze | grep pytest-cov==)
@@ -35,8 +35,8 @@ pushd "$BUILDROOT"
     # the namespace packages in twitter.common.
     python -m pip install --egg -r requirements.txt
     python -m pip install --egg -f dist \
-      apache.gen.aurora==$(< .auroraversion) \
-      apache.gen.thermos==$(<.auroraversion)
+      apache.aurora.thrift==$(< .auroraversion) \
+      apache.thermos.thrift==$(<.auroraversion)
     # Use same py.test version embedded into pants
     python -m pip install $pytest_requirement $pytest_cov_requirement
   deactivate

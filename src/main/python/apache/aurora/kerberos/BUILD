@@ -15,44 +15,43 @@ import os
 
 
 python_library(
-  name = '_client',
+  name = '_kerberos',
   sources = rglobs('*.py'),
   dependencies = [
-    '3rdparty/python:pex',
-    '3rdparty/python:pystachio',
-    '3rdparty/python:requests',
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.decorators',
-    '3rdparty/python:twitter.common.lang',
-    '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.quantity',
-    '3rdparty/python:twitter.common.zookeeper',
-    'api/src/main/thrift/org/apache/aurora/gen',
+    '3rdparty/python:requests-kerberos',
+    'src/main/python/apache/aurora/admin',
+    'src/main/python/apache/aurora/client',
     'src/main/python/apache/aurora/common',
-    'src/main/python/apache/aurora/config',
-    'src/main/python/apache/thermos/common',
-    'src/main/python/apache/thermos/config',
-    'src/main/resources/apache/aurora/client/cli:auroraversion',
   ],
 )
 
 python_binary(
-  name='aurora',
+  name = 'kaurora',
   entry_point = 'apache.aurora.client.cli.client:proxy_main',
   dependencies = [
-    ':_client'
+    ':_kerberos',
+  ],
+)
+
+python_binary(
+  name = 'kaurora_admin',
+  entry_point = 'apache.aurora.admin.aurora_admin:proxy_main',
+  dependencies = [
+    ':_kerberos',
   ],
 )
 
 python_library(
-  name = 'client',
+  name = 'kerberos',
   dependencies = [
-    ':_client',
+    ':_kerberos',
   ],
   provides = setup_py(
-    name = 'apache.aurora.client',
+    name = 'apache.aurora.kerberos',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
   ).with_binaries({
-    'aurora': ':aurora',
+    # TODO(ksweeney): Reconsider these as separate binaries in favor of extras_require or plugins.
+    'kaurora': ':kaurora',
+    'kaurora_admin': ':kaurora_admin',
   }),
 )

@@ -14,21 +14,14 @@
 
 import os
 
-python_library(
-  name = 'schema',
-  sources = globs('*.py'),
-  dependencies = [
-    '3rdparty/python:pystachio',
-    '3rdparty/python:twitter.common.lang',
-    'src/main/python/apache/thermos/common:planner'
-  ],
-)
 
 python_library(
   name = 'config',
+  sources = rglobs('*.py'),
   dependencies = [
-    ':schema',
-    'src/main/python/apache/thermos/common',  # cover common:planner
+    '3rdparty/python:pystachio',
+    '3rdparty/python:twitter.common.lang',
+    'src/main/python/apache/thermos/common',
   ],
   provides = setup_py(
     name = 'apache.thermos.config',

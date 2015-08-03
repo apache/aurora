@@ -13,16 +13,16 @@
 #
 
 python_library(
-  name = 'runner',
-  sources = ['runner.py'],
+  name = 'testing',
+  sources = rglobs('*.py'),
   dependencies = [
     '3rdparty/python:thrift',
     '3rdparty/python:twitter.common.contextutil',
     '3rdparty/python:twitter.common.log',
-    'src/main/python/apache/thermos/common:ckpt',
-    'src/main/python/apache/thermos/common:path',
+    'src/main/python/apache/thermos/common',
     'src/main/python/apache/thermos/config',
     'src/main/python/apache/thermos/core',
-    'api/src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos',
   ]
+  # NOTE: This is not exported as a setup-py because it's only depended-on by test code.
 )

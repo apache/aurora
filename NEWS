@@ -1,3 +1,14 @@
+0.10.0
+------
+- The Python build layout has changed:
+  * The apache.thermos package has been removed.
+  * The apache.gen.aurora package has been renamed to apache.aurora.thrift.
+  * The apache.gen.thermos package has been renamed to apache.thermos.thrift.
+  * A new apache.thermos.runner package has been introduced, providing the thermos_runner binary.
+  * A new apache.aurora.kerberos package has been introduced, containing the Kerberos-supporting
+    versions of aurora and aurora_admin (kaurora and kaurora_admin).
+  * Most BUILD targets under src/main have been removed, see http://s.apache.org/b8z for details.
+
 0.9.0
 -----
 
