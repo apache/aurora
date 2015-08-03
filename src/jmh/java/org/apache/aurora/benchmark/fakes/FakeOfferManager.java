@@ -13,14 +13,12 @@
  */
 package org.apache.aurora.benchmark.fakes;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.offers.OfferManager;
-import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.mesos.Protos;
 
 public class FakeOfferManager implements OfferManager {
@@ -30,15 +28,23 @@ public class FakeOfferManager implements OfferManager {
   }
 
   @Override
-  public void cancelOffer(Protos.OfferID offer) {
+  public void cancelOffer(Protos.OfferID offerId) {
     // no-op
   }
 
   @Override
-  public boolean launchFirst(
-      Function<HostOffer, TaskAssigner.Assignment> acceptor,
-      TaskGroupKey groupKey) throws LaunchException {
-    return false;
+  public void launchTask(Protos.OfferID offerId, Protos.TaskInfo taskInfo) throws LaunchException {
+    // no-op
+  }
+
+  @Override
+  public void banOffer(Protos.OfferID offerId, TaskGroupKey groupKey) {
+    // no-op
+  }
+
+  @Override
+  public Iterable<HostOffer> getOffers(TaskGroupKey groupKey) {
+    return null;
   }
 
   @Override

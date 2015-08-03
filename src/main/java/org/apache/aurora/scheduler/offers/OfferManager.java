@@ -20,7 +20,6 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
@@ -29,6 +28,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -47,8 +47,8 @@ import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
-import org.apache.aurora.scheduler.state.TaskAssigner.Assignment;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 
@@ -76,22 +76,27 @@ public interface OfferManager extends EventSubscriber {
    * Invalidates an offer.  This indicates that the scheduler should not attempt to match any
    * tasks against the offer.
    *
-   * @param offer Canceled offer.
+   * @param offerId Canceled offer.
    */
-  void cancelOffer(OfferID offer);
+  void cancelOffer(OfferID offerId);
 
   /**
-   * Launches the first task that satisfies the {@code acceptor} by returning a {@link Assignment}.
+   * Exclude an offer that results in a static mismatch from further attempts to match against all
+   * tasks from the same group.
    *
-   * @param acceptor Function that determines if an offer is accepted.
-   * @param groupKey Task group key.
-   * @return {@code true} if the task was launched, {@code false} if no offers satisfied the
-   *         {@code acceptor}.
-   * @throws LaunchException If the acceptor accepted an offer, but there was an error launching the
-   *                         task.
+   * @param offerId Offer ID to exclude for the given {@code groupKey}.
+   * @param groupKey Task group key to exclude.
    */
-  boolean launchFirst(Function<HostOffer, Assignment> acceptor, TaskGroupKey groupKey)
-      throws LaunchException;
+  void banOffer(OfferID offerId, TaskGroupKey groupKey);
+
+  /**
+   * Launches the task matched against the offer.
+   *
+   * @param offerId Matched offer ID.
+   * @param task Matched task info.
+   * @throws LaunchException If there was an error launching the task.
+   */
+  void launchTask(OfferID offerId, Protos.TaskInfo task) throws LaunchException;
 
   /**
    * Notifies the offer queue that a host's attributes have changed.
@@ -106,6 +111,14 @@ public interface OfferManager extends EventSubscriber {
    * @return A snapshot of the offers that the scheduler is currently holding.
    */
   Iterable<HostOffer> getOffers();
+
+  /**
+   * Gets all offers that are not statically banned for the given {@code groupKey}.
+   *
+   * @param groupKey Task group key to check offers for.
+   * @return A snapshot of all offers eligible for the given {@code groupKey}.
+   */
+  Iterable<HostOffer> getOffers(TaskGroupKey groupKey);
 
   /**
    * Gets an offer for the given slave ID.
@@ -127,7 +140,8 @@ public interface OfferManager extends EventSubscriber {
    * Thrown when there was an unexpected failure trying to launch a task.
    */
   class LaunchException extends Exception {
-    LaunchException(String msg) {
+    @VisibleForTesting
+    public LaunchException(String msg) {
       super(msg);
     }
 
@@ -218,6 +232,11 @@ public interface OfferManager extends EventSubscriber {
     }
 
     @Override
+    public Iterable<HostOffer> getOffers(TaskGroupKey groupKey) {
+      return hostOffers.getWeaklyConsistentOffers(groupKey);
+    }
+
+    @Override
     public Optional<HostOffer> getOffer(SlaveID slaveId) {
       return hostOffers.get(slaveId);
     }
@@ -268,7 +287,7 @@ public interface OfferManager extends EventSubscriber {
       private final Map<String, HostOffer> offersByHost = Maps.newHashMap();
       // TODO(maxim): Expose via a debug endpoint. AURORA-1136.
       // Keep track of offer->groupKey mappings that will never be matched to avoid redundant
-      // scheduling attempts. See Assignment.Result for more details on static ban.
+      // scheduling attempts. See VetoGroup for more details on static ban.
       private final Multimap<OfferID, TaskGroupKey> staticallyBannedOffers = HashMultimap.create();
 
       HostOffers() {
@@ -304,7 +323,7 @@ public interface OfferManager extends EventSubscriber {
         if (offer != null) {
           // Remove and re-add a host's offer to re-sort based on its new hostStatus
           remove(offer.getOffer().getId());
-          add(new HostOffer(offer.getOffer(),  attributes));
+          add(new HostOffer(offer.getOffer(), attributes));
         }
       }
 
@@ -312,27 +331,14 @@ public interface OfferManager extends EventSubscriber {
         return Iterables.unmodifiableIterable(offers);
       }
 
-      synchronized boolean isStaticallyBanned(HostOffer offer, TaskGroupKey groupKey) {
-        boolean result = staticallyBannedOffers.containsEntry(offer.getOffer().getId(), groupKey);
-        if (LOG.isLoggable(Level.FINE)) {
-          LOG.fine(String.format(
-              "Host offer %s is statically banned for %s: %s",
-              offer,
-              groupKey,
-              result));
-        }
-        return result;
+      synchronized Iterable<HostOffer> getWeaklyConsistentOffers(TaskGroupKey groupKey) {
+        return Iterables.unmodifiableIterable(FluentIterable.from(offers).filter(
+            e -> !staticallyBannedOffers.containsEntry(e.getOffer().getId(), groupKey)));
       }
 
-      synchronized void addStaticGroupBan(HostOffer offer, TaskGroupKey groupKey) {
-        OfferID offerId = offer.getOffer().getId();
+      synchronized void addStaticGroupBan(OfferID offerId, TaskGroupKey groupKey) {
         if (offersById.containsKey(offerId)) {
           staticallyBannedOffers.put(offerId, groupKey);
-
-          if (LOG.isLoggable(Level.FINE)) {
-            LOG.fine(
-                String.format("Adding static ban for offer: %s, groupKey: %s", offer, groupKey));
-          }
         }
       }
 
@@ -345,63 +351,31 @@ public interface OfferManager extends EventSubscriber {
       }
     }
 
-    @Timed("offer_queue_launch_first")
     @Override
-    public boolean launchFirst(Function<HostOffer, Assignment> acceptor, TaskGroupKey groupKey)
-        throws LaunchException {
-
-      // It's important that this method is not called concurrently - doing so would open up the
-      // possibility of a race between the same offers being accepted by different threads.
-
-      for (HostOffer offer : hostOffers.getWeaklyConsistentOffers()) {
-        if (!hostOffers.isStaticallyBanned(offer, groupKey)
-            && acceptOffer(offer, acceptor, groupKey)) {
-          return true;
-        }
-      }
-
-      return false;
+    public void banOffer(OfferID offerId, TaskGroupKey groupKey) {
+      hostOffers.addStaticGroupBan(offerId, groupKey);
     }
 
-    @Timed("offer_queue_accept_offer")
-    protected boolean acceptOffer(
-        HostOffer offer,
-        Function<HostOffer, Assignment> acceptor,
-        TaskGroupKey groupKey) throws LaunchException {
-
-      Assignment assignment = acceptor.apply(offer);
-      switch (assignment.getResult()) {
-
-        case SUCCESS:
-          // Guard against an offer being removed after we grabbed it from the iterator.
-          // If that happens, the offer will not exist in hostOffers, and we can immediately
-          // send it back to LOST for quick reschedule.
-          // Removing while iterating counts on the use of a weakly-consistent iterator being used,
-          // which is a feature of ConcurrentSkipListSet.
-          if (hostOffers.remove(offer.getOffer().getId())) {
-            try {
-              driver.launchTask(offer.getOffer().getId(), assignment.getTaskInfo().get());
-              return true;
-            } catch (IllegalStateException e) {
-              // TODO(William Farner): Catch only the checked exception produced by Driver
-              // once it changes from throwing IllegalStateException when the driver is not yet
-              // registered.
-              throw new LaunchException("Failed to launch task.", e);
-            }
-          } else {
-            offerRaces.incrementAndGet();
-            throw new LaunchException(
-                "Accepted offer no longer exists in offer queue, likely data race.");
-          }
-
-        case FAILURE_STATIC_MISMATCH:
-          // Exclude an offer that results in a static mismatch from further attempts to match
-          // against all tasks from the same group.
-          hostOffers.addStaticGroupBan(offer, groupKey);
-          return false;
-
-        default:
-          return false;
+    @Timed("offer_manager_launch_task")
+    @Override
+    public void launchTask(OfferID offerId, Protos.TaskInfo task) throws LaunchException {
+      // Guard against an offer being removed after we grabbed it from the iterator.
+      // If that happens, the offer will not exist in hostOffers, and we can immediately
+      // send it back to LOST for quick reschedule.
+      // Removing while iterating counts on the use of a weakly-consistent iterator being used,
+      // which is a feature of ConcurrentSkipListSet.
+      if (hostOffers.remove(offerId)) {
+        try {
+          driver.launchTask(offerId, task);
+        } catch (IllegalStateException e) {
+          // TODO(William Farner): Catch only the checked exception produced by Driver
+          // once it changes from throwing IllegalStateException when the driver is not yet
+          // registered.
+          throw new LaunchException("Failed to launch task.", e);
+        }
+      } else {
+        offerRaces.incrementAndGet();
+        throw new LaunchException("Offer no longer exists in offer queue, likely data race.");
       }
     }
   }

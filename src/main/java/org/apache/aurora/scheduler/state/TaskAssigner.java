@@ -16,20 +16,22 @@ package org.apache.aurora.scheduler.state;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableSet;
-import com.twitter.common.base.MorePreconditions;
+import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
@@ -37,161 +39,64 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
+import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.Protos.TaskInfo;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.gen.ScheduleStatus.LOST;
+import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.mesos.Protos.Offer;
 
 /**
- * Responsible for matching a task against an offer.
+ * Responsible for matching a task against an offer and launching it.
  */
 public interface TaskAssigner {
-
-  final class Assignment {
-
-    public enum Result {
-      /**
-       * Assignment successful.
-       */
-      SUCCESS,
-
-      /**
-       * Assignment failed.
-       */
-      FAILURE,
-
-      /**
-       * Assignment failed with static mismatch (i.e. all {@link Veto} instances group
-       * as {@link VetoGroup}).
-       * @see VetoGroup#STATIC
-       */
-      FAILURE_STATIC_MISMATCH,
-    }
-
-    private static final Optional<TaskInfo> NO_TASK_INFO = Optional.absent();
-    private static final ImmutableSet<Veto> NO_VETOES = ImmutableSet.of();
-    private final Optional<TaskInfo> taskInfo;
-    private final Set<Veto> vetoes;
-
-    private Assignment(Optional<TaskInfo> taskInfo, Set<Veto> vetoes) {
-      this.taskInfo = taskInfo;
-      this.vetoes = vetoes;
-    }
-
-    /**
-     * Creates a successful assignment instance.
-     *
-     * @param taskInfo {@link TaskInfo} to launch.
-     * @return A successful {@link Assignment}.
-     */
-    public static Assignment success(TaskInfo taskInfo) {
-      return new Assignment(Optional.of(taskInfo), NO_VETOES);
-    }
-
-    /**
-     * Creates a failed assignment instance with a set of {@link Veto} applied.
-     *
-     * @param vetoes Set of {@link Veto} instances issued for the failed offer/task match.
-     * @return A failed {@link Assignment}.
-     */
-    public static Assignment failure(Set<Veto> vetoes) {
-      return new Assignment(NO_TASK_INFO, MorePreconditions.checkNotBlank(vetoes));
-    }
-
-    /**
-     * Creates a failed assignment instance.
-     *
-     * @return A failed {@link Assignment}.
-     */
-    public static Assignment failure() {
-      return new Assignment(NO_TASK_INFO, NO_VETOES);
-    }
-
-    /**
-     * Generates the {@link Result} based on the assignment details.
-     *
-     * @return An assignment {@link Result}.
-     */
-    public Result getResult() {
-      if (taskInfo.isPresent()) {
-        return Result.SUCCESS;
-      }
-
-      return Veto.identifyGroup(vetoes) == VetoGroup.STATIC
-          ? Result.FAILURE_STATIC_MISMATCH
-          : Result.FAILURE;
-    }
-
-    /**
-     * A {@link TaskInfo} to launch.
-     *
-     * @return Optional of {@link TaskInfo}.
-     */
-    public Optional<TaskInfo> getTaskInfo() {
-      return taskInfo;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof Assignment)) {
-        return false;
-      }
-
-      Assignment other = (Assignment) o;
-
-      return Objects.equal(taskInfo, other.taskInfo)
-          && Objects.equal(vetoes, other.vetoes);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hashCode(taskInfo, vetoes);
-    }
-
-    @Override
-    public String toString() {
-      return Objects.toStringHelper(this)
-          .add("taskInfo", taskInfo)
-          .add("vetoes", vetoes)
-          .toString();
-    }
-  }
-
   /**
-   * Tries to match a task against an offer.  If a match is found, the assigner should
-   * make the appropriate changes to the task and provide an {@link Assignment} result.
+   * Tries to match a task against an offer.  If a match is found, the assigner makes the
+   * appropriate changes to the task and requests task launch.
    *
    * @param storeProvider Storage provider.
-   * @param offer The resource offer.
    * @param resourceRequest The request for resources being scheduled.
+   * @param groupKey Task group key.
    * @param taskId Task id to assign.
-   * @return {@link Assignment} with assignment result.
+   * @param slaveReservation Slave reservation for a given {@code groupKey}.
+   * @return Assignment result.
    */
-  Assignment maybeAssign(
+  boolean maybeAssign(
       MutableStoreProvider storeProvider,
-      HostOffer offer,
       ResourceRequest resourceRequest,
-      String taskId);
+      TaskGroupKey groupKey,
+      String taskId,
+      Optional<String> slaveReservation);
 
   class TaskAssignerImpl implements TaskAssigner {
     private static final Logger LOG = Logger.getLogger(TaskAssignerImpl.class.getName());
 
+    @VisibleForTesting
+    static final Optional<String> LAUNCH_FAILED_MSG =
+        Optional.of("Unknown exception attempting to schedule task.");
+
+    private final AtomicLong launchFailures = Stats.exportLong("assigner_launch_failures");
+
     private final StateManager stateManager;
     private final SchedulingFilter filter;
     private final MesosTaskFactory taskFactory;
+    private final OfferManager offerManager;
 
     @Inject
     public TaskAssignerImpl(
         StateManager stateManager,
         SchedulingFilter filter,
-        MesosTaskFactory taskFactory) {
+        MesosTaskFactory taskFactory,
+        OfferManager offerManager) {
 
       this.stateManager = requireNonNull(stateManager);
       this.filter = requireNonNull(filter);
       this.taskFactory = requireNonNull(taskFactory);
+      this.offerManager = requireNonNull(offerManager);
     }
 
     private TaskInfo assign(
@@ -225,26 +130,61 @@ public interface TaskAssigner {
     }
 
     @Override
-    public Assignment maybeAssign(
+    public boolean maybeAssign(
         MutableStoreProvider storeProvider,
-        HostOffer offer,
         ResourceRequest resourceRequest,
-        String taskId) {
+        TaskGroupKey groupKey,
+        String taskId,
+        Optional<String> slaveReservation) {
 
-      Set<Veto> vetoes = filter.filter(
-          new UnusedResource(ResourceSlot.from(offer.getOffer()), offer.getAttributes()),
-          resourceRequest);
-      if (vetoes.isEmpty()) {
-        return Assignment.success(assign(
-            storeProvider,
-            offer.getOffer(),
-            resourceRequest.getRequestedPorts(),
-            taskId));
-      } else {
-        LOG.fine("Slave " + offer.getOffer().getHostname()
-            + " vetoed task " + taskId + ": " + vetoes);
-        return Assignment.failure(vetoes);
+      for (HostOffer offer : offerManager.getOffers(groupKey)) {
+        if (slaveReservation.isPresent()
+            && !slaveReservation.get().equals(offer.getOffer().getSlaveId().getValue())) {
+          // Task group has a slave reserved but this offer is for a different slave -> skip.
+          continue;
+        }
+        Set<Veto> vetoes = filter.filter(
+            new UnusedResource(ResourceSlot.from(offer.getOffer()), offer.getAttributes()),
+            resourceRequest);
+        if (vetoes.isEmpty()) {
+          TaskInfo taskInfo = assign(
+              storeProvider,
+              offer.getOffer(),
+              resourceRequest.getRequestedPorts(),
+              taskId);
+
+          try {
+            offerManager.launchTask(offer.getOffer().getId(), taskInfo);
+            return true;
+          } catch (OfferManager.LaunchException e) {
+            LOG.log(Level.WARNING, "Failed to launch task.", e);
+            launchFailures.incrementAndGet();
+
+            // The attempt to schedule the task failed, so we need to backpedal on the
+            // assignment.
+            // It is in the LOST state and a new task will move to PENDING to replace it.
+            // Should the state change fail due to storage issues, that's okay.  The task will
+            // time out in the ASSIGNED state and be moved to LOST.
+            stateManager.changeState(
+                storeProvider,
+                taskId,
+                Optional.of(PENDING),
+                LOST,
+                LAUNCH_FAILED_MSG);
+            return false;
+          }
+        } else {
+          if (Veto.identifyGroup(vetoes) == VetoGroup.STATIC) {
+            // Never attempt to match this offer/groupKey pair again.
+            offerManager.banOffer(offer.getOffer().getId(), groupKey);
+          }
+
+          LOG.fine("Slave " + offer.getOffer().getHostname()
+              + " vetoed task " + taskId + ": " + vetoes);
+          return false;
+        }
       }
+      return false;
     }
   }
 }

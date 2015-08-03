@@ -38,6 +38,7 @@ import org.apache.aurora.benchmark.fakes.FakeRescheduleCalculator;
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskIdGenerator;
+import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -117,7 +118,9 @@ public class SchedulingBenchmarks {
           new PrivateModule() {
             @Override
             protected void configure() {
-              bind(ScheduledExecutorService.class).toInstance(executor);
+              bind(ScheduledExecutorService.class)
+                  .annotatedWith(AsyncModule.AsyncExecutor.class)
+                  .toInstance(executor);
               bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
               bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
               bind(OfferManager.OfferReturnDelay.class).toInstance(
