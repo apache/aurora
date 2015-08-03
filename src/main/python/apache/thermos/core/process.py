@@ -208,8 +208,8 @@ class ProcessBase(object):
     uid, gid = user.pw_uid, user.pw_gid
     self._fork_time = self._platform.clock().time()
     self._setup_ckpt()
-    self._stdout = safe_open(self._pathspec.with_filename('stdout').getpath('process_logdir'), "w")
-    self._stderr = safe_open(self._pathspec.with_filename('stderr').getpath('process_logdir'), "w")
+    self._stdout = safe_open(self._pathspec.with_filename('stdout').getpath('process_logdir'), "a")
+    self._stderr = safe_open(self._pathspec.with_filename('stderr').getpath('process_logdir'), "a")
     os.chown(self._stdout.name, user.pw_uid, user.pw_gid)
     os.chown(self._stderr.name, user.pw_uid, user.pw_gid)
 
