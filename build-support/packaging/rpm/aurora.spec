@@ -70,6 +70,7 @@ BuildRequires: gcc
 BuildRequires: gcc-c++
 BuildRequires: git
 BuildRequires: java-%{JAVA_VERSION}-openjdk-devel
+BuildRequires: krb5-devel
 BuildRequires: libcurl-devel
 BuildRequires: patch
 %if 0%{?rhel} && 0%{?rhel} < 7
@@ -102,6 +103,7 @@ resource isolation.
 Summary: A client for scheduling services against the Aurora scheduler
 Group: Development/Tools
 
+Requires: krb5-libs
 %if 0%{?rhel} && 0%{?rhel} < 7
 Requires: python27
 %else
@@ -177,8 +179,8 @@ popd
 ./gradle-%{GRADLE_VERSION}/bin/gradle installDist
 
 # Builds Aurora client PEX binaries.
-./pants binary src/main/python/apache/aurora/admin:aurora_admin
-./pants binary src/main/python/apache/aurora/client:aurora
+./pants binary src/main/python/apache/aurora/kerberos:kaurora
+./pants binary src/main/python/apache/aurora/kerberos:kaurora_admin
 
 # Builds Aurora Thermos and GC executor PEX binaries.
 ./pants binary src/main/python/apache/aurora/executor:thermos_executor
@@ -221,6 +223,10 @@ cp -r dist/install/aurora-scheduler/* %{buildroot}%{_prefix}/lib/%{name}
 for pex_binary in %{PEX_BINARIES}; do
   install -m 755 dist/${pex_binary}.pex %{buildroot}%{_bindir}/${pex_binary}
 done
+
+# Strip the "k" from Kerberized client binaries.
+mv %{buildroot}%{_bindir}/kaurora %{buildroot}%{_bindir}/aurora
+mv %{buildroot}%{_bindir}/kaurora_admin %{buildroot}%{_bindir}/aurora_admin
 
 # Installs all support scripting.
 %if 0%{?fedora} || 0%{?rhel} > 6
