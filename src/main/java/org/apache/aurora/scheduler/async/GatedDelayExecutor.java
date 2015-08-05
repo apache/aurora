@@ -16,6 +16,8 @@ package org.apache.aurora.scheduler.async;
 import java.util.Queue;
 import java.util.concurrent.ScheduledExecutorService;
 
+import javax.inject.Inject;
+
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.twitter.common.quantity.Amount;
@@ -36,8 +38,13 @@ class GatedDelayExecutor implements DelayExecutor, FlushableWorkQueue {
    *
    * @param delegate Delegate to execute work with when flushed.
    */
+  @Inject
   GatedDelayExecutor(ScheduledExecutorService delegate) {
     this.executor = requireNonNull(delegate);
+  }
+
+  synchronized int getQueueSize() {
+    return queue.size();
   }
 
   private synchronized void enqueue(Runnable work) {

@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.reconciliation;
 
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Optional;
@@ -30,6 +28,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -52,7 +51,6 @@ import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 
 public class TaskTimeoutTest extends EasyMockTest {
@@ -61,9 +59,8 @@ public class TaskTimeoutTest extends EasyMockTest {
   private static final Amount<Long, Time> TIMEOUT = Amount.of(1L, Time.MINUTES);
 
   private AtomicLong timedOutTaskCounter;
-  private ScheduledExecutorService executor;
+  private DelayExecutor executor;
   private StorageTestUtil storageUtil;
-  private ScheduledFuture<?> future;
   private StateManager stateManager;
   private FakeClock clock;
   private TaskTimeout timeout;
@@ -71,10 +68,9 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    executor = createMock(ScheduledExecutorService.class);
+    executor = createMock(DelayExecutor.class);
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
-    future = createMock(new Clazz<ScheduledFuture<?>>() { });
     stateManager = createMock(StateManager.class);
     clock = new FakeClock();
     statsProvider = createMock(StatsProvider.class);
@@ -96,11 +92,7 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   private Capture<Runnable> expectTaskWatch(Amount<Long, Time> expireIn) {
     Capture<Runnable> capture = createCapture();
-    executor.schedule(
-        EasyMock.capture(capture),
-        eq((long) expireIn.getValue()),
-        eq(expireIn.getUnit().getTimeUnit()));
-    expectLastCall().andReturn(future);
+    executor.execute(EasyMock.capture(capture), eq(expireIn));
     return capture;
   }
 

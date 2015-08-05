@@ -14,13 +14,9 @@
 package org.apache.aurora.scheduler.scheduling;
 
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
@@ -28,16 +24,13 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.RateLimiter;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.SlidingStats;
-import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
-import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
-import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -47,7 +40,6 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.util.Objects.requireNonNull;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 
@@ -63,10 +55,8 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
  */
 public class TaskGroups implements EventSubscriber {
 
-  private static final Logger LOG = Logger.getLogger(TaskGroups.class.getName());
-
   private final ConcurrentMap<TaskGroupKey, TaskGroup> groups = Maps.newConcurrentMap();
-  private final ScheduledExecutorService executor;
+  private final DelayExecutor executor;
   private final TaskScheduler taskScheduler;
   private final long firstScheduleDelay;
   private final BackoffStrategy backoff;
@@ -95,43 +85,25 @@ public class TaskGroups implements EventSubscriber {
 
   @Inject
   TaskGroups(
-      ShutdownRegistry shutdownRegistry,
+      @AsyncExecutor DelayExecutor executor,
       TaskGroupsSettings settings,
       TaskScheduler taskScheduler,
       RescheduleCalculator rescheduleCalculator) {
 
-    this(
-        createThreadPool(shutdownRegistry),
-        settings.firstScheduleDelay,
-        settings.taskGroupBackoff,
-        settings.rateLimiter,
-        taskScheduler,
-        rescheduleCalculator);
-  }
-
-  @VisibleForTesting
-  TaskGroups(
-      final ScheduledExecutorService executor,
-      final Amount<Long, Time> firstScheduleDelay,
-      final BackoffStrategy backoff,
-      final RateLimiter rateLimiter,
-      final TaskScheduler taskScheduler,
-      final RescheduleCalculator rescheduleCalculator) {
-
-    requireNonNull(firstScheduleDelay);
-    Preconditions.checkArgument(firstScheduleDelay.getValue() > 0);
+    requireNonNull(settings.firstScheduleDelay);
+    Preconditions.checkArgument(settings.firstScheduleDelay.getValue() > 0);
 
     this.executor = requireNonNull(executor);
-    requireNonNull(rateLimiter);
+    requireNonNull(settings.rateLimiter);
     requireNonNull(taskScheduler);
-    this.firstScheduleDelay = firstScheduleDelay.as(Time.MILLISECONDS);
-    this.backoff = requireNonNull(backoff);
+    this.firstScheduleDelay = settings.firstScheduleDelay.as(Time.MILLISECONDS);
+    this.backoff = requireNonNull(settings.taskGroupBackoff);
     this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
 
     this.taskScheduler = new TaskScheduler() {
       @Override
       public boolean schedule(String taskId) {
-        rateLimiter.acquire();
+        settings.rateLimiter.acquire();
         return taskScheduler.schedule(taskId);
       }
     };
@@ -141,7 +113,7 @@ public class TaskGroups implements EventSubscriber {
     // Avoid check-then-act by holding the intrinsic lock.  If not done atomically, we could
     // remove a group while a task is being added to it.
     if (group.hasMore()) {
-      executor.schedule(evaluate, group.getPenaltyMs(), MILLISECONDS);
+      executor.execute(evaluate, Amount.of(group.getPenaltyMs(), Time.MILLISECONDS));
     } else {
       groups.remove(group.getKey());
     }
@@ -170,20 +142,6 @@ public class TaskGroups implements EventSubscriber {
       }
     };
     evaluateGroupLater(monitor, group);
-  }
-
-  private static ScheduledExecutorService createThreadPool(ShutdownRegistry shutdownRegistry) {
-    final ScheduledThreadPoolExecutor executor =
-        AsyncUtil.singleThreadLoggingScheduledExecutor("TaskScheduler-%d", LOG);
-
-    Stats.exportSize("schedule_queue_size", executor.getQueue());
-    shutdownRegistry.addAction(new Command() {
-      @Override
-      public void execute() {
-        new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
-      }
-    });
-    return executor;
   }
 
   /**

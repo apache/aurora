@@ -13,17 +13,17 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
 import com.google.common.eventbus.Subscribe;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.SlidingStats;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -45,7 +45,7 @@ class TaskThrottler implements EventSubscriber {
 
   private final RescheduleCalculator rescheduleCalculator;
   private final Clock clock;
-  private final ScheduledExecutorService executor;
+  private final DelayExecutor executor;
   private final Storage storage;
   private final StateManager stateManager;
 
@@ -55,7 +55,7 @@ class TaskThrottler implements EventSubscriber {
   TaskThrottler(
       RescheduleCalculator rescheduleCalculator,
       Clock clock,
-      @AsyncExecutor ScheduledExecutorService executor,
+      @AsyncExecutor DelayExecutor executor,
       Storage storage,
       StateManager stateManager) {
 
@@ -73,7 +73,7 @@ class TaskThrottler implements EventSubscriber {
           + rescheduleCalculator.getFlappingPenaltyMs(stateChange.getTask());
       long delayMs = Math.max(0, readyAtMs - clock.nowMillis());
       throttleStats.accumulate(delayMs);
-      executor.schedule(
+      executor.execute(
           new Runnable() {
             @Override
             public void run() {
@@ -90,8 +90,7 @@ class TaskThrottler implements EventSubscriber {
               });
             }
           },
-          delayMs,
-          TimeUnit.MILLISECONDS);
+          Amount.of(delayMs, Time.MILLISECONDS));
     }
   }
 }

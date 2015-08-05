@@ -41,12 +41,14 @@ import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.thrift.ServiceInstance;
 
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler;
 import org.apache.aurora.scheduler.offers.OfferManager;
@@ -57,6 +59,7 @@ import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.Capture;
 import org.junit.Before;
 
@@ -96,6 +99,7 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
         new StatsModule(),
         new LifecycleModule(),
         new SchedulerServicesModule(),
+        new AsyncModule(),
         new AbstractModule() {
           <T> T bindMock(Class<T> clazz) {
             T mock = createMock(clazz);
@@ -105,6 +109,7 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
 
           @Override
           protected void configure() {
+            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(Storage.class).toInstance(storage.storage);
             bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo()
                 .setClusterName("unittest")

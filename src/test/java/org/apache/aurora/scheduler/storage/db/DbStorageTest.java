@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.storage.db;
 
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.scheduler.async.FlushableWorkQueue;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -40,6 +41,7 @@ public class DbStorageTest extends EasyMockTest {
   private SqlSessionFactory sessionFactory;
   private SqlSession session;
   private EnumValueMapper enumMapper;
+  private FlushableWorkQueue flusher;
   private Work.Quiet<String> readWork;
   private MutateWork.NoResult.Quiet writeWork;
 
@@ -50,12 +52,14 @@ public class DbStorageTest extends EasyMockTest {
     sessionFactory = createMock(SqlSessionFactory.class);
     session = createMock(SqlSession.class);
     enumMapper = createMock(EnumValueMapper.class);
+    flusher = createMock(FlushableWorkQueue.class);
     readWork = createMock(new Clazz<Work.Quiet<String>>() { });
     writeWork = createMock(new Clazz<MutateWork.NoResult.Quiet>() { });
 
     storage = new DbStorage(
         sessionFactory,
         enumMapper,
+        flusher,
         createMock(CronJobStore.Mutable.class),
         createMock(TaskStore.Mutable.class),
         createMock(SchedulerStore.Mutable.class),
@@ -89,6 +93,7 @@ public class DbStorageTest extends EasyMockTest {
     expect(sessionFactory.openSession(false)).andReturn(session);
     expect(session.update(DbStorage.DISABLE_UNDO_LOG)).andThrow(new PersistenceException());
     expect(session.update(DbStorage.ENABLE_UNDO_LOG)).andReturn(0);
+    flusher.flush();
 
     control.replay();
 
@@ -102,6 +107,7 @@ public class DbStorageTest extends EasyMockTest {
     expect(writeWork.apply(EasyMock.anyObject())).andReturn(null);
     session.close();
     expect(session.update(DbStorage.ENABLE_UNDO_LOG)).andReturn(0);
+    flusher.flush();
 
     control.replay();
 

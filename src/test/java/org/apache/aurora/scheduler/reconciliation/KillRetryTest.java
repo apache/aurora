@@ -14,12 +14,10 @@
 package org.apache.aurora.scheduler.reconciliation;
 
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.util.concurrent.ScheduledExecutorService;
 
 import javax.inject.Singleton;
 
 import com.google.common.eventbus.EventBus;
-import com.google.common.testing.TearDown;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -34,6 +32,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
@@ -67,14 +66,9 @@ public class KillRetryTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     backoffStrategy = createMock(BackoffStrategy.class);
-    final ScheduledExecutorService executorMock = createMock(ScheduledExecutorService.class);
-    clock = FakeScheduledExecutor.scheduleExecutor(executorMock);
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() {
-        clock.assertEmpty();
-      }
-    });
+    final DelayExecutor executorMock = createMock(DelayExecutor.class);
+    clock = FakeScheduledExecutor.fromDelayExecutor(executorMock);
+    addTearDown(clock::assertEmpty);
     statsProvider = new FakeStatsProvider();
 
     Injector injector = Guice.createInjector(
@@ -85,8 +79,7 @@ public class KillRetryTest extends EasyMockTest {
           protected void configure() {
             bind(Driver.class).toInstance(driver);
             bind(Storage.class).toInstance(storageUtil.storage);
-            bind(ScheduledExecutorService.class).annotatedWith(AsyncExecutor.class)
-                .toInstance(executorMock);
+            bind(DelayExecutor.class).annotatedWith(AsyncExecutor.class).toInstance(executorMock);
             PubsubEventModule.bindSubscriber(binder(), KillRetry.class);
             bind(KillRetry.class).in(Singleton.class);
             bind(BackoffStrategy.class).toInstance(backoffStrategy);

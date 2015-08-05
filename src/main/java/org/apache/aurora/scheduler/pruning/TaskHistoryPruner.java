@@ -14,8 +14,6 @@
 package org.apache.aurora.scheduler.pruning;
 
 import java.util.Set;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
@@ -32,6 +30,7 @@ import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -51,7 +50,7 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 public class TaskHistoryPruner implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskHistoryPruner.class.getName());
 
-  private final ScheduledExecutorService executor;
+  private final DelayExecutor executor;
   private final StateManager stateManager;
   private final Clock clock;
   private final HistoryPrunnerSettings settings;
@@ -83,7 +82,7 @@ public class TaskHistoryPruner implements EventSubscriber {
 
   @Inject
   TaskHistoryPruner(
-      @AsyncExecutor ScheduledExecutorService executor,
+      @AsyncExecutor DelayExecutor executor,
       StateManager stateManager,
       Clock clock,
       HistoryPrunnerSettings settings,
@@ -142,7 +141,7 @@ public class TaskHistoryPruner implements EventSubscriber {
       long timeRemaining) {
 
     LOG.fine("Prune task " + taskId + " in " + timeRemaining + " ms.");
-    executor.schedule(
+    executor.execute(
         new Runnable() {
           @Override
           public void run() {
@@ -150,10 +149,9 @@ public class TaskHistoryPruner implements EventSubscriber {
             deleteTasks(ImmutableSet.of(taskId));
           }
         },
-        timeRemaining,
-        TimeUnit.MILLISECONDS);
+        Amount.of(timeRemaining, Time.MILLISECONDS));
 
-    executor.submit(new Runnable() {
+    executor.execute(new Runnable() {
       @Override
       public void run() {
         Iterable<IScheduledTask> inactiveTasks =

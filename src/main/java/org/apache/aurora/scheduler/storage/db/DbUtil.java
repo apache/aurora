@@ -63,6 +63,8 @@ public final class DbUtil {
 
   /**
    * Creates a new, empty test storage system.
+   * <p>
+   * TODO(wfarner): Rename this to createTestStorage() to avoid misuse.
    *
    * @return A new storage instance.
    */

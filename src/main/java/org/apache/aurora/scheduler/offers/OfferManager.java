@@ -17,8 +17,6 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
@@ -43,6 +41,7 @@ import com.twitter.common.stats.Stats;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -159,14 +158,14 @@ public interface OfferManager extends EventSubscriber {
 
     private final Driver driver;
     private final OfferReturnDelay returnDelay;
-    private final ScheduledExecutorService executor;
+    private final DelayExecutor executor;
 
     @Inject
     @VisibleForTesting
     public OfferManagerImpl(
         Driver driver,
         OfferReturnDelay returnDelay,
-        @AsyncExecutor ScheduledExecutorService executor) {
+        @AsyncExecutor DelayExecutor executor) {
 
       this.driver = requireNonNull(driver);
       this.returnDelay = requireNonNull(returnDelay);
@@ -190,15 +189,14 @@ public interface OfferManager extends EventSubscriber {
         removeAndDecline(sameSlave.get().getOffer().getId());
       } else {
         hostOffers.add(offer);
-        executor.schedule(
+        executor.execute(
             new Runnable() {
               @Override
               public void run() {
                 removeAndDecline(offer.getOffer().getId());
               }
             },
-            returnDelay.get().as(Time.MILLISECONDS),
-            TimeUnit.MILLISECONDS);
+            returnDelay.get());
       }
     }
 

@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.reconciliation;
 
 import java.util.EnumSet;
 import java.util.Set;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
@@ -31,6 +30,7 @@ import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateChangeResult;
@@ -65,7 +65,7 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
       ScheduleStatus.KILLING,
       ScheduleStatus.DRAINING);
 
-  private final ScheduledExecutorService executor;
+  private final DelayExecutor executor;
   private final Storage storage;
   private final StateManager stateManager;
   private final Amount<Long, Time> timeout;
@@ -73,7 +73,7 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
 
   @Inject
   TaskTimeout(
-      @AsyncExecutor ScheduledExecutorService executor,
+      @AsyncExecutor DelayExecutor executor,
       Storage storage,
       StateManager stateManager,
       Amount<Long, Time> timeout,
@@ -138,10 +138,9 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
         // Our service is not yet started.  We don't want to lose track of the task, so
         // we will try again later.
         LOG.fine("Retrying timeout of task " + taskId + " in " + NOT_STARTED_RETRY);
-        executor.schedule(
-            this,
-            NOT_STARTED_RETRY.getValue(),
-            NOT_STARTED_RETRY.getUnit().getTimeUnit());
+        // TODO(wfarner): This execution should not wait for a transaction, but a second executor
+        // would be weird.
+        executor.execute(this, NOT_STARTED_RETRY);
       }
     }
   }
@@ -149,10 +148,9 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
   @Subscribe
   public void recordStateChange(TaskStateChange change) {
     if (isTransient(change.getNewState())) {
-      executor.schedule(
+      executor.execute(
           new TimedOutTaskHandler(change.getTaskId(), change.getNewState()),
-          timeout.getValue(),
-          timeout.getUnit().getTimeUnit());
+          timeout);
     }
   }
 }

@@ -27,6 +27,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 
@@ -43,6 +44,7 @@ public final class FakeScheduledExecutor extends FakeClock {
 
   private FakeScheduledExecutor() { }
 
+  // TODO(wfarner): Rename to fromScheduledExecutor().
   public static FakeScheduledExecutor scheduleExecutor(ScheduledExecutorService mock) {
     FakeScheduledExecutor executor = new FakeScheduledExecutor();
     mock.schedule(
@@ -50,6 +52,33 @@ public final class FakeScheduledExecutor extends FakeClock {
         EasyMock.anyLong(),
         EasyMock.anyObject());
     expectLastCall().andAnswer(answerSchedule(executor)).anyTimes();
+
+    mock.execute(EasyMock.anyObject());
+    expectLastCall().andAnswer(answerExecute()).anyTimes();
+
+    return executor;
+  }
+
+  private static IAnswer<Object> answerExecuteWithDelay(final FakeScheduledExecutor executor) {
+    return new IAnswer<Object>() {
+      @Override
+      public Object answer() {
+        Object[] args = EasyMock.getCurrentArguments();
+        Runnable work = (Runnable) args[0];
+        @SuppressWarnings("unchecked")
+        Amount<Long, Time> delay = (Amount<Long, Time>) args[1];
+        addDelayedWork(executor, delay.as(Time.MILLISECONDS), work);
+        return null;
+      }
+    };
+  }
+
+  public static FakeScheduledExecutor fromDelayExecutor(DelayExecutor mock) {
+    FakeScheduledExecutor executor = new FakeScheduledExecutor();
+    mock.execute(
+        EasyMock.<Runnable>anyObject(),
+        EasyMock.<Amount<Long, Time>>anyObject());
+    expectLastCall().andAnswer(answerExecuteWithDelay(executor)).anyTimes();
 
     mock.execute(EasyMock.anyObject());
     expectLastCall().andAnswer(answerExecute()).anyTimes();
@@ -69,10 +98,10 @@ public final class FakeScheduledExecutor extends FakeClock {
     };
   }
 
-  private static IAnswer<ScheduledFuture<?>> answerSchedule(final FakeScheduledExecutor executor) {
-    return new IAnswer<ScheduledFuture<?>>() {
+  private static IAnswer<Object> answerSchedule(final FakeScheduledExecutor executor) {
+    return new IAnswer<Object>() {
       @Override
-      public ScheduledFuture<?> answer() {
+      public Object answer() {
         Object[] args = EasyMock.getCurrentArguments();
         Runnable work = (Runnable) args[0];
         long value = (Long) args[1];

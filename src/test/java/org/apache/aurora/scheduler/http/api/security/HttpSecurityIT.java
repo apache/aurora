@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.http.api.security;
 
 import java.io.IOException;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
@@ -25,7 +24,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
 import com.sun.jersey.api.client.ClientResponse;
-import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Lock;
@@ -62,7 +60,6 @@ import org.junit.Test;
 import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PATH;
 import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PERM;
 import static org.apache.aurora.scheduler.http.api.ApiModule.API_PATH;
-import static org.easymock.EasyMock.anyString;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -98,7 +95,6 @@ public class HttpSecurityIT extends JettyServerModuleTest {
 
   private Ini ini;
   private AnnotatedAuroraAdmin auroraAdmin;
-  private StatsProvider statsProvider;
 
   private static final Joiner COMMA_JOINER = Joiner.on(", ");
   private static final String ADMIN_ROLE = "admin";
@@ -138,8 +134,6 @@ public class HttpSecurityIT extends JettyServerModuleTest {
     roles.put(H2_ROLE, H2_PERM);
 
     auroraAdmin = createMock(AnnotatedAuroraAdmin.class);
-    statsProvider = createMock(StatsProvider.class);
-    expect(statsProvider.makeCounter(anyString())).andStubReturn(new AtomicLong());
   }
 
   @Override
@@ -152,7 +146,6 @@ public class HttpSecurityIT extends JettyServerModuleTest {
           @Override
           protected void configure() {
             MockDecoratedThrift.bindForwardedMock(binder(), auroraAdmin);
-            bind(StatsProvider.class).toInstance(statsProvider);
           }
         });
   }

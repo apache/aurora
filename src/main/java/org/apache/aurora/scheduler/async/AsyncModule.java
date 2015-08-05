@@ -15,18 +15,18 @@ package org.apache.aurora.scheduler.async;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
+import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
+import com.google.inject.PrivateModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.stats.StatsProvider;
@@ -48,61 +48,77 @@ public class AsyncModule extends AbstractModule {
 
   @CmdLine(name = "async_worker_threads",
       help = "The number of worker threads to process async task operations with.")
-  private static final Arg<Integer> ASYNC_WORKER_THREADS = Arg.create(1);
+  private static final Arg<Integer> ASYNC_WORKER_THREADS = Arg.create(8);
+  private final ScheduledThreadPoolExecutor afterTransaction;
 
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface AsyncExecutor { }
 
-  @VisibleForTesting
-  static final String TIMEOUT_QUEUE_GAUGE = "timeout_queue_size";
+  public AsyncModule() {
+    // Don't worry about clean shutdown, these can be daemon and cleanup-free.
+    // TODO(wfarner): Should we use a bounded caching thread pool executor instead?
+    this(AsyncUtil.loggingScheduledExecutor(ASYNC_WORKER_THREADS.get(), "AsyncProcessor-%d", LOG));
+  }
 
   @VisibleForTesting
-  static final String ASYNC_TASKS_GAUGE = "async_tasks_completed";
+  public AsyncModule(ScheduledThreadPoolExecutor executor) {
+    this.afterTransaction = requireNonNull(executor);
+  }
 
   @Override
   protected void configure() {
-    // Don't worry about clean shutdown, these can be daemon and cleanup-free.
-    final ScheduledThreadPoolExecutor executor =
-        AsyncUtil.loggingScheduledExecutor(ASYNC_WORKER_THREADS.get(), "AsyncProcessor-%d", LOG);
-    bind(ScheduledThreadPoolExecutor.class).annotatedWith(AsyncExecutor.class).toInstance(executor);
-    bind(ScheduledExecutorService.class).annotatedWith(AsyncExecutor.class).toInstance(executor);
-    bind(ExecutorService.class).annotatedWith(AsyncExecutor.class).toInstance(executor);
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(ScheduledThreadPoolExecutor.class).toInstance(afterTransaction);
+        bind(ScheduledExecutorService.class).toInstance(afterTransaction);
+
+        bind(GatedDelayExecutor.class).in(Singleton.class);
+        expose(GatedDelayExecutor.class);
+
+        bind(RegisterGauges.class).in(Singleton.class);
+        expose(RegisterGauges.class);
+      }
+    });
     SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RegisterGauges.class);
+
+    bind(DelayExecutor.class).annotatedWith(AsyncExecutor.class).to(GatedDelayExecutor.class);
+    bind(FlushableWorkQueue.class).annotatedWith(AsyncExecutor.class).to(GatedDelayExecutor.class);
   }
 
   static class RegisterGauges extends AbstractIdleService {
+    @VisibleForTesting
+    static final String TIMEOUT_QUEUE_GAUGE = "timeout_queue_size";
+
+    @VisibleForTesting
+    static final String ASYNC_TASKS_GAUGE = "async_tasks_completed";
+
+    @VisibleForTesting
+    static final String DELAY_QUEUE_GAUGE = "delay_executor_queue_size";
+
     private final StatsProvider statsProvider;
     private final ScheduledThreadPoolExecutor executor;
+    private final GatedDelayExecutor delayExecutor;
 
     @Inject
     RegisterGauges(
         StatsProvider statsProvider,
-        @AsyncExecutor ScheduledThreadPoolExecutor executor) {
+        ScheduledThreadPoolExecutor executor,
+        GatedDelayExecutor delayExecutor) {
 
       this.statsProvider = requireNonNull(statsProvider);
       this.executor = requireNonNull(executor);
+      this.delayExecutor = requireNonNull(delayExecutor);
     }
 
     @Override
     protected void startUp() {
-      statsProvider.makeGauge(
-          TIMEOUT_QUEUE_GAUGE,
-          new Supplier<Integer>() {
-            @Override
-            public Integer get() {
-              return executor.getQueue().size();
-            }
-          });
-      statsProvider.makeGauge(
-          ASYNC_TASKS_GAUGE,
-          new Supplier<Long>() {
-            @Override
-            public Long get() {
-              return executor.getCompletedTaskCount();
-            }
-          }
-      );
+      statsProvider.makeGauge(TIMEOUT_QUEUE_GAUGE, () -> executor.getQueue().size());
+      statsProvider.makeGauge(ASYNC_TASKS_GAUGE, executor::getCompletedTaskCount);
+      // Using a lambda rather than method ref to sidestep a bug in PMD that makes it think
+      // delayExecutor is unused.
+      statsProvider.makeGauge(DELAY_QUEUE_GAUGE, () -> delayExecutor.getQueueSize());
     }
 
     @Override

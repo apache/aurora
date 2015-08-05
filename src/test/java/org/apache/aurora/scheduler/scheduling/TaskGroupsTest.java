@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
-import java.util.concurrent.ScheduledExecutorService;
-
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
 import com.twitter.common.quantity.Amount;
@@ -27,9 +25,11 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
+import org.apache.aurora.scheduler.scheduling.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
@@ -56,17 +56,15 @@ public class TaskGroupsTest extends EasyMockTest {
 
   @Before
   public void setUp() throws Exception {
-    ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
-    clock = FakeScheduledExecutor.scheduleExecutor(executor);
+    DelayExecutor executor = createMock(DelayExecutor.class);
+    clock = FakeScheduledExecutor.fromDelayExecutor(executor);
     backoffStrategy = createMock(BackoffStrategy.class);
     taskScheduler = createMock(TaskScheduler.class);
     rateLimiter = createMock(RateLimiter.class);
     rescheduleCalculator = createMock(RescheduleCalculator.class);
     taskGroups = new TaskGroups(
         executor,
-        FIRST_SCHEDULE_DELAY,
-        backoffStrategy,
-        rateLimiter,
+        new TaskGroupsSettings(FIRST_SCHEDULE_DELAY, backoffStrategy, rateLimiter),
         taskScheduler,
         rescheduleCalculator);
   }

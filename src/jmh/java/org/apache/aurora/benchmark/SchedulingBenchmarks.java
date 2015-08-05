@@ -14,14 +14,11 @@
 package org.apache.aurora.benchmark;
 
 import java.util.Set;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
 import com.google.common.eventbus.EventBus;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -39,6 +36,7 @@ import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.async.AsyncModule;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -90,7 +88,6 @@ public class SchedulingBenchmarks {
     private static final Amount<Long, Time> DELAY_FOREVER = Amount.of(30L, Time.DAYS);
     protected Storage storage;
     protected PendingTaskProcessor pendingTaskProcessor;
-    protected ScheduledThreadPoolExecutor executor;
     private TaskScheduler taskScheduler;
     private OfferManager offerManager;
     private EventBus eventBus;
@@ -105,11 +102,6 @@ public class SchedulingBenchmarks {
       eventBus = new EventBus();
       final FakeClock clock = new FakeClock();
       clock.setNowMillis(System.currentTimeMillis());
-      executor = new ScheduledThreadPoolExecutor(
-          1,
-          new ThreadFactoryBuilder()
-              .setDaemon(true)
-              .setNameFormat("TestProcessor-%d").build());
 
       // TODO(maxim): Find a way to DRY it and reuse existing modules instead.
       Injector injector = Guice.createInjector(
@@ -118,18 +110,23 @@ public class SchedulingBenchmarks {
           new PrivateModule() {
             @Override
             protected void configure() {
-              bind(ScheduledExecutorService.class)
-                  .annotatedWith(AsyncModule.AsyncExecutor.class)
-                  .toInstance(executor);
-              bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
-              bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
-              bind(OfferManager.OfferReturnDelay.class).toInstance(
-                  new OfferManager.OfferReturnDelay() {
+              // We use a no-op executor for async work, as this benchmark is focused on the
+              // synchronous scheduling operations.
+              bind(DelayExecutor.class).annotatedWith(AsyncModule.AsyncExecutor.class)
+                  .toInstance(new DelayExecutor() {
                     @Override
-                    public Amount<Long, Time> get() {
-                      return DELAY_FOREVER;
+                    public void execute(Runnable work, Amount<Long, Time> minDelay) {
+                      // No-op.
+                    }
+
+                    @Override
+                    public void execute(Runnable command) {
+                      // No-op.
                     }
                   });
+              bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
+              bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
+              bind(OfferManager.OfferReturnDelay.class).toInstance(() -> DELAY_FOREVER);
               bind(BiCache.BiCacheSettings.class).toInstance(
                   new BiCache.BiCacheSettings(DELAY_FOREVER, ""));
               bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
@@ -181,13 +178,6 @@ public class SchedulingBenchmarks {
       fillUpCluster(offers.size());
 
       saveTasks(settings.getTasks());
-    }
-
-    @Setup(Level.Iteration)
-    public void setUpIteration() {
-      // Clear executor queue between iterations. Otherwise, executor tasks keep piling up and
-      // affect benchmark performance due to memory pressure and excessive GC.
-      executor.getQueue().clear();
     }
 
     private Set<IScheduledTask> buildClusterTasks(int numOffers) {

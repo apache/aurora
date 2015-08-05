@@ -29,6 +29,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.scheduler.AppStartup;
+import org.apache.aurora.scheduler.async.AsyncModule.RegisterGauges;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Before;
@@ -86,7 +87,10 @@ public class AsyncModuleTest extends EasyMockTest {
     injector.getBindings();
 
     assertEquals(
-        ImmutableMap.of(AsyncModule.TIMEOUT_QUEUE_GAUGE, 0, AsyncModule.ASYNC_TASKS_GAUGE, 0L),
+        ImmutableMap.of(
+            RegisterGauges.TIMEOUT_QUEUE_GAUGE, 0,
+            RegisterGauges.ASYNC_TASKS_GAUGE, 0L,
+            RegisterGauges.DELAY_QUEUE_GAUGE, 0),
         statsProvider.getAllValues()
     );
   }

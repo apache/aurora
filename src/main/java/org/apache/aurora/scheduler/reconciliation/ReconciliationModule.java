@@ -13,6 +13,12 @@
  */
 package org.apache.aurora.scheduler.reconciliation;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.logging.Logger;
+
+import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
@@ -27,13 +33,21 @@ import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.reconciliation.TaskReconciler.TaskReconcilerSettings;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Binding module for state reconciliation and retry logic.
  */
 public class ReconciliationModule extends AbstractModule {
+
+  private static final Logger LOG = Logger.getLogger(ReconciliationModule.class.getName());
 
   @CmdLine(name = "transient_task_state_timeout",
       help = "The amount of time after which to treat a task stuck in a transient state as LOST.")
@@ -73,6 +87,10 @@ public class ReconciliationModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> RECONCILIATION_SCHEDULE_SPREAD =
       Arg.create(Amount.of(30L, Time.MINUTES));
 
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  @interface BackgroundWorker { }
+
   @Override
   protected void configure() {
     install(new PrivateModule() {
@@ -109,6 +127,8 @@ public class ReconciliationModule extends AbstractModule {
             RECONCILIATION_EXPLICIT_INTERVAL.get(),
             RECONCILIATION_IMPLICIT_INTERVAL.get(),
             RECONCILIATION_SCHEDULE_SPREAD.get()));
+        bind(ScheduledExecutorService.class).annotatedWith(BackgroundWorker.class)
+            .toInstance(AsyncUtil.loggingScheduledExecutor(1, "TaskReconciler-%d", LOG));
         bind(TaskReconciler.class).in(Singleton.class);
         expose(TaskReconciler.class);
       }

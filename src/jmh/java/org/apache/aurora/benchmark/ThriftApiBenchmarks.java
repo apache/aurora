@@ -32,6 +32,7 @@ import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
@@ -151,6 +152,7 @@ public class ThriftApiBenchmarks {
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
           }
         },
+        new AsyncModule(),
         DbModule.productionModule(Bindings.KeyFactory.PLAIN),
         new ThriftModule.ReadOnly());
   }

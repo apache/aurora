@@ -14,20 +14,22 @@
 package org.apache.aurora.scheduler.pruning;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -39,6 +41,10 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.async.AsyncModule;
+import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.DelayExecutor;
+import org.apache.aurora.scheduler.async.FlushableWorkQueue;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.pruning.TaskHistoryPruner.HistoryPrunnerSettings;
@@ -46,6 +52,7 @@ import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
@@ -72,8 +79,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
   private static final Amount<Long, Time> ONE_HOUR = Amount.of(1L, Time.HOURS);
   private static final int PER_JOB_HISTORY = 2;
 
-  private ScheduledFuture<?> future;
-  private ScheduledExecutorService executor;
+  private DelayExecutor executor;
   private FakeClock clock;
   private StateManager stateManager;
   private StorageTestUtil storageUtil;
@@ -81,8 +87,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    future = createMock(new Clazz<ScheduledFuture<?>>() { });
-    executor = createMock(ScheduledExecutorService.class);
+    executor = createMock(DelayExecutor.class);
     clock = new FakeClock();
     stateManager = createMock(StateManager.class);
     storageUtil = new StorageTestUtil(this);
@@ -232,14 +237,29 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
     // lock. This causes a deadlock when the executor tries to acquire a lock held by the event
     // fired.
 
-    pruner = prunerWithRealExecutor();
+    ScheduledThreadPoolExecutor realExecutor = new ScheduledThreadPoolExecutor(1,
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat("testThreadSafeEvents-executor")
+            .build());
+    Injector injector = Guice.createInjector(
+        new AsyncModule(realExecutor),
+        new AbstractModule() {
+          @Override
+          protected void configure() {
+            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
+          }
+        });
+    executor = injector.getInstance(Key.get(DelayExecutor.class, AsyncExecutor.class));
+    FlushableWorkQueue flusher =
+        injector.getInstance(Key.get(FlushableWorkQueue.class, AsyncExecutor.class));
+
+    pruner = buildPruner(executor);
     Command onDeleted = new Command() {
       @Override
       public void execute() {
         // The goal is to verify that the call does not deadlock. We do not care about the outcome.
-        IScheduledTask b = makeTask("b", ASSIGNED);
-
-        changeState(b, STARTING);
+        changeState(makeTask("b", ASSIGNED), STARTING);
       }
     };
     CountDownLatch taskDeleted = expectTaskDeleted(onDeleted, TASK_ID);
@@ -248,17 +268,13 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
 
     // Change the task to a terminal state and wait for it to be pruned.
     changeState(makeTask(TASK_ID, RUNNING), KILLED);
+    flusher.flush();
     taskDeleted.await();
   }
 
-  private TaskHistoryPruner prunerWithRealExecutor() {
-    ScheduledExecutorService realExecutor = Executors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder()
-            .setDaemon(true)
-            .setNameFormat("testThreadSafeEvents-executor")
-            .build());
+  private TaskHistoryPruner buildPruner(DelayExecutor delayExecutor) {
     return new TaskHistoryPruner(
-        realExecutor,
+        delayExecutor,
         stateManager,
         clock,
         new HistoryPrunnerSettings(Amount.of(1L, Time.MILLISECONDS), ONE_MS, PER_JOB_HISTORY),
@@ -326,7 +342,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
       IScheduledTask... pruned) {
 
     // Expect a deferred prune operation when a new task is being watched.
-    executor.submit(EasyMock.<Runnable>anyObject());
+    executor.execute(EasyMock.<Runnable>anyObject());
     expectLastCall().andAnswer(
         new IAnswer<Future<?>>() {
           @Override
@@ -348,11 +364,9 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
 
   private Capture<Runnable> expectDelayedPrune(long timestampMillis, int count) {
     Capture<Runnable> capture = createCapture();
-    executor.schedule(
+    executor.execute(
         EasyMock.capture(capture),
-        eq(pruner.calculateTimeout(timestampMillis)),
-        eq(TimeUnit.MILLISECONDS));
-    expectLastCall().andReturn(future).times(count);
+        eq(Amount.of(pruner.calculateTimeout(timestampMillis), Time.MILLISECONDS)));
     return capture;
   }
 

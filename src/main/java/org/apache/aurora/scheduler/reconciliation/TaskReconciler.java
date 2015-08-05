@@ -27,10 +27,10 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatsProvider;
 
-import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.mesos.Driver;
+import org.apache.aurora.scheduler.reconciliation.ReconciliationModule.BackgroundWorker;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos;
@@ -91,7 +91,7 @@ public class TaskReconciler extends AbstractIdleService {
       TaskReconcilerSettings settings,
       Storage storage,
       Driver driver,
-      @AsyncExecutor ScheduledExecutorService executor,
+      @BackgroundWorker ScheduledExecutorService executor,
       StatsProvider stats) {
 
     this.settings = requireNonNull(settings);

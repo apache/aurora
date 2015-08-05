@@ -13,9 +13,6 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.twitter.common.quantity.Amount;
@@ -27,6 +24,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateChangeResult;
@@ -49,7 +47,7 @@ public class TaskThrottlerTest extends EasyMockTest {
 
   private RescheduleCalculator rescheduleCalculator;
   private FakeClock clock;
-  private ScheduledExecutorService executor;
+  private DelayExecutor executor;
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private TaskThrottler throttler;
@@ -58,7 +56,7 @@ public class TaskThrottlerTest extends EasyMockTest {
   public void setUp() throws Exception {
     rescheduleCalculator = createMock(RescheduleCalculator.class);
     clock = new FakeClock();
-    executor = createMock(ScheduledExecutorService.class);
+    executor = createMock(DelayExecutor.class);
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
@@ -116,11 +114,9 @@ public class TaskThrottlerTest extends EasyMockTest {
 
   private Capture<Runnable> expectThrottled(long penaltyMs) {
     Capture<Runnable> stateChangeCapture = createCapture();
-    expect(executor.schedule(
+    executor.execute(
         capture(stateChangeCapture),
-        eq(penaltyMs),
-        eq(TimeUnit.MILLISECONDS)))
-        .andReturn(null);
+        eq(Amount.of(penaltyMs, Time.MILLISECONDS)));
     return stateChangeCapture;
   }
 

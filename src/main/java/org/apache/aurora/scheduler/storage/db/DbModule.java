@@ -30,6 +30,7 @@ import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
+import com.google.inject.util.Modules;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.inject.Bindings.KeyFactory;
@@ -37,6 +38,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.FlushableWorkQueue;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -149,15 +152,23 @@ public final class DbModule extends PrivateModule {
    */
   @VisibleForTesting
   public static Module testModule(KeyFactory keyFactory, Optional<Module> taskStoreModule) {
-    return new DbModule(
-        keyFactory,
-        taskStoreModule.isPresent() ? taskStoreModule.get() : getTaskStoreModule(keyFactory),
-        "testdb-" + UUID.randomUUID().toString(),
-        // A non-zero close delay is used here to avoid eager database cleanup in tests that
-        // make use of multiple threads.  Since all test databases are separately scoped by the
-        // included UUID, multiple DB instances will overlap in time but they should be distinct
-        // in content.
-        ImmutableMap.of("DB_CLOSE_DELAY", "5"));
+    return Modules.combine(
+        new AbstractModule() {
+          @Override
+          protected void configure() {
+            bind(FlushableWorkQueue.class).annotatedWith(AsyncExecutor.class).toInstance(() -> { });
+          }
+        },
+        new DbModule(
+            keyFactory,
+            taskStoreModule.isPresent() ? taskStoreModule.get() : getTaskStoreModule(keyFactory),
+            "testdb-" + UUID.randomUUID().toString(),
+            // A non-zero close delay is used here to avoid eager database cleanup in tests that
+            // make use of multiple threads.  Since all test databases are separately scoped by the
+            // included UUID, multiple DB instances will overlap in time but they should be distinct
+            // in content.
+            ImmutableMap.of("DB_CLOSE_DELAY", "5"))
+    );
   }
 
   /**

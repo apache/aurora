@@ -28,6 +28,8 @@ import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.FlushableWorkQueue;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -59,11 +61,13 @@ class DbStorage extends AbstractIdleService implements Storage {
   private final SqlSessionFactory sessionFactory;
   private final MutableStoreProvider storeProvider;
   private final EnumValueMapper enumValueMapper;
+  private final FlushableWorkQueue postTransactionWork;
 
   @Inject
   DbStorage(
       SqlSessionFactory sessionFactory,
       EnumValueMapper enumValueMapper,
+      @AsyncExecutor FlushableWorkQueue postTransactionWork,
       final CronJobStore.Mutable cronJobStore,
       final TaskStore.Mutable taskStore,
       final SchedulerStore.Mutable schedulerStore,
@@ -74,6 +78,7 @@ class DbStorage extends AbstractIdleService implements Storage {
 
     this.sessionFactory = requireNonNull(sessionFactory);
     this.enumValueMapper = requireNonNull(enumValueMapper);
+    this.postTransactionWork = requireNonNull(postTransactionWork);
     requireNonNull(cronJobStore);
     requireNonNull(taskStore);
     requireNonNull(schedulerStore);
@@ -139,11 +144,23 @@ class DbStorage extends AbstractIdleService implements Storage {
   @Override
   @Transactional
   public <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E {
-    try {
-      return work.apply(storeProvider);
+    T result;
+    try (SqlSession session = sessionFactory.openSession(false)) {
+      result = work.apply(storeProvider);
+      session.commit();
     } catch (PersistenceException e) {
       throw new StorageException(e.getMessage(), e);
+    } finally {
+      // NOTE: Async work is intentionally executed regardless of whether the transaction succeeded.
+      // Doing otherwise runs the risk of cross-talk between transactions and losing async tasks
+      // due to failure of an unrelated transaction.  This matches behavior prior to the
+      // introduction of DbStorage, but should be revisited.
+      // TODO(wfarner): Consider revisiting to execute async work only when the transaction is
+      // successful.
+      postTransactionWork.flush();
     }
+
+    return result;
   }
 
   @VisibleForTesting
@@ -169,6 +186,8 @@ class DbStorage extends AbstractIdleService implements Storage {
       } finally {
         session.update(ENABLE_UNDO_LOG);
       }
+    } finally {
+      postTransactionWork.flush();
     }
   }
 
