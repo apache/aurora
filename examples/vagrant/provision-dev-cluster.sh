@@ -94,6 +94,11 @@ EOF
   chown vagrant:vagrant /home/vagrant/.netrc
 }
 
+function sudoless_docker_setup {
+  gpasswd -a vagrant docker
+  service docker restart
+}
+
 function start_services {
   #Executing true on failure to please bash -e in case services are already running
   start zookeeper    || true
@@ -123,4 +128,5 @@ install_ssh_config
 start_services
 enable_gradle_daemon
 configure_netrc
+sudoless_docker_setup
 su vagrant -c "aurorabuild all"
