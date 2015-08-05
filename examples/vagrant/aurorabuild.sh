@@ -43,7 +43,9 @@ function build_admin_client {
 }
 
 function build_scheduler {
-  ./gradlew installDist
+  # This CLASSPATH_PREFIX is inserted at the front of the CLASSPATH to enable "hot" reloads of the
+  # UI code (c.f. the startScripts task in build.gradle).
+  CLASSPATH_PREFIX=/vagrant/dist/resources/main ./gradlew installDist
 
   export LD_LIBRARY_PATH=/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server
   sudo mkdir -p /var/db/aurora

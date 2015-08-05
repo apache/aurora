@@ -496,3 +496,15 @@ run {
   main = 'org.apache.aurora.scheduler.app.local.LocalSchedulerMain'
   classpath += sourceSets.test.output
 }
+
+startScripts {
+  def environmentClasspathPrefix = System.env.CLASSPATH_PREFIX
+
+  if (!environmentClasspathPrefix?.trim()) {
+    return
+  }
+
+  doLast {
+    unixScript.text = unixScript.text.replace('CLASSPATH=', "CLASSPATH=${environmentClasspathPrefix}:")
+  }
+}
