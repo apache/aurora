@@ -199,4 +199,11 @@
       templateUrl: '/assets/latestUpdates.html'
     };
   });
+
+  auroraUI.directive('loadingFooter', function () {
+    return {
+      restrict: 'A',
+      templateUrl: '/assets/loadingFooter.html'
+    };
+  });
 })();

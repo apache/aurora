@@ -84,37 +84,47 @@
         <div class="col-md-6">
           <h4>Update Events</h4>
           <table class="table table-bordered table-striped">
-            <tr>
-              <th>event</th>
-              <th>time</th>
-              <th>user</th>
-              <th>message</th>
-            </tr>
-            <tr ng-repeat="e in update.updateEvents">
-              <td>{{e.status | toNiceStatus}}</td>
-              <td><span tooltip="{{e.timestampMs | toUtcTime}}">{{e.timestampMs | toElapsedTime }} ago</span></td>
-              <td>{{e.user}}</td>
-              <td>{{e.message}}</td>
-            </tr>
+            <thead>
+              <tr>
+                <th>event</th>
+                <th>time</th>
+                <th>user</th>
+                <th>message</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr ng-repeat="e in update.updateEvents">
+                <td>{{e.status | toNiceStatus}}</td>
+                <td><span tooltip="{{e.timestampMs | toUtcTime}}">{{e.timestampMs | toElapsedTime }} ago</span></td>
+                <td>{{e.user}}</td>
+                <td>{{e.message}}</td>
+              </tr>
+            </tbody>
+            <tfoot loading-footer ng-if="inProgress"></tfoot>
           </table>
         </div>
 
         <div class="col-md-6">
           <h4>Instance Events</h4>
           <table class="table table-bordered table-striped">
-          <tr>
-            <th>instance</th>
-            <th>event</th>
-            <th>time</th>
-          </tr>
-          <tr ng-repeat="e in instanceEvents">
-            <td>{{e.instanceId}}</td>
-            <td>{{e.action | toNiceAction}}</td>
-            <td><span tooltip="{{e.timestampMs | toUtcTime}}">{{e.timestampMs | toElapsedTime}} ago</span></td>
-          </tr>
+            <thead>
+              <tr>
+                <th>instance</th>
+                <th>event</th>
+                <th>time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr ng-repeat="e in instanceEvents">
+                <td>{{e.instanceId}}</td>
+                <td>{{e.action | toNiceAction}}</td>
+                <td><span tooltip="{{e.timestampMs | toUtcTime}}">{{e.timestampMs | toElapsedTime}} ago</span></td>
+              </tr>
+            </tbody>
+            <tfoot loading-footer ng-if="inProgress"></tfoot>
           </table>
 
-            <pagination ng-change="changeInstancePage()" max-size="5" total-items="totalEvents" ng-model="currentPage" items-per-page="eventsPerPage"></pagination>
+          <pagination ng-change="changeInstancePage()" max-size="5" total-items="totalEvents" ng-model="currentPage" items-per-page="eventsPerPage"></pagination>
         </div>
       </div>
     </div>
