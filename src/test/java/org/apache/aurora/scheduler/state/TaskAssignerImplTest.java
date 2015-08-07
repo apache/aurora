@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Map;
+
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -37,6 +39,7 @@ import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
@@ -63,10 +66,11 @@ import static org.junit.Assert.assertTrue;
 public class TaskAssignerImplTest extends EasyMockTest {
 
   private static final int PORT = 5000;
+  private static final String SLAVE_ID = "slaveId";
   private static final Offer MESOS_OFFER = Offer.newBuilder()
       .setId(OfferID.newBuilder().setValue("offerId"))
       .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
-      .setSlaveId(SlaveID.newBuilder().setValue("slaveId"))
+      .setSlaveId(SlaveID.newBuilder().setValue(SLAVE_ID))
       .setHostname("hostName")
       .addResources(Resource.newBuilder()
           .setName("ports")
@@ -91,6 +95,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
       .setTaskId(TaskID.newBuilder().setValue(Tasks.id(TASK)))
       .setSlaveId(MESOS_OFFER.getSlaveId())
       .build();
+  private static final Map<String, TaskGroupKey> NO_RESERVATION = ImmutableMap.of();
 
   private MutableStoreProvider storeProvider;
   private StateManager stateManager;
@@ -134,7 +139,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
-        Optional.of(MESOS_OFFER.getSlaveId().getValue())));
+        ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
   }
 
   @Test
@@ -153,7 +158,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
-        Optional.<String>absent()));
+        NO_RESERVATION));
   }
 
   @Test
@@ -171,7 +176,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
-        Optional.<String>absent()));
+        NO_RESERVATION));
   }
 
   @Test
@@ -207,7 +212,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
-        Optional.<String>absent()));
+        NO_RESERVATION));
   }
 
   @Test
@@ -221,6 +226,52 @@ public class TaskAssignerImplTest extends EasyMockTest {
         new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
-        Optional.of("invalid")));
+        ImmutableMap.of(SLAVE_ID, TaskGroupKey.from(
+            ITaskConfig.build(new TaskConfig().setJob(new JobKey("other", "e", "n")))))));
+  }
+
+  @Test
+  public void testTaskWithReservedSlaveLandsElsewhere() throws Exception {
+    // Ensures slave/task reservation relationship is only enforced in slave->task direction
+    // and permissive in task->slave direction. In other words, a task with a slave reservation
+    // should still be tried against other unreserved slaves.
+    HostOffer offer = new HostOffer(
+        Offer.newBuilder()
+            .setId(OfferID.newBuilder().setValue("offerId0"))
+            .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
+            .setSlaveId(SlaveID.newBuilder().setValue("slaveId0"))
+            .setHostname("hostName0")
+            .addResources(Resource.newBuilder()
+                .setName("ports")
+                .setType(Type.RANGES)
+                .setRanges(
+                    Ranges.newBuilder().addRange(Range.newBuilder().setBegin(PORT).setEnd(PORT))))
+            .build(),
+        IHostAttributes.build(new HostAttributes()));
+
+    expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(offer, OFFER));
+    expect(filter.filter(
+        new UnusedResource(ResourceSlot.from(offer.getOffer()), offer.getAttributes()),
+        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
+        .andReturn(ImmutableSet.of());
+    expect(stateManager.assignTask(
+        storeProvider,
+        Tasks.id(TASK),
+        offer.getOffer().getHostname(),
+        offer.getOffer().getSlaveId(),
+        ImmutableMap.of(PORT_NAME, PORT)))
+        .andReturn(TASK.getAssignedTask());
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), offer.getOffer().getSlaveId()))
+        .andReturn(TASK_INFO);
+    offerManager.launchTask(offer.getOffer().getId(), TASK_INFO);
+
+    control.replay();
+
+    assertTrue(assigner.maybeAssign(
+        storeProvider,
+        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+        TaskGroupKey.from(TASK.getAssignedTask().getTask()),
+        Tasks.id(TASK),
+        ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
   }
 }

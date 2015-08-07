@@ -27,6 +27,8 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
+
+import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.scheduler.HostOffer;
@@ -62,7 +64,7 @@ public interface TaskAssigner {
    * @param resourceRequest The request for resources being scheduled.
    * @param groupKey Task group key.
    * @param taskId Task id to assign.
-   * @param slaveReservation Slave reservation for a given {@code groupKey}.
+   * @param slaveReservations Slave reservations.
    * @return Assignment result.
    */
   boolean maybeAssign(
@@ -70,7 +72,7 @@ public interface TaskAssigner {
       ResourceRequest resourceRequest,
       TaskGroupKey groupKey,
       String taskId,
-      Optional<String> slaveReservation);
+      Map<String, TaskGroupKey> slaveReservations);
 
   class TaskAssignerImpl implements TaskAssigner {
     private static final Logger LOG = Logger.getLogger(TaskAssignerImpl.class.getName());
@@ -129,18 +131,21 @@ public interface TaskAssigner {
       return taskFactory.createFrom(assigned, offer.getSlaveId());
     }
 
+    @Timed("assigner_maybe_assign")
     @Override
     public boolean maybeAssign(
         MutableStoreProvider storeProvider,
         ResourceRequest resourceRequest,
         TaskGroupKey groupKey,
         String taskId,
-        Optional<String> slaveReservation) {
+        Map<String, TaskGroupKey> slaveReservations) {
 
       for (HostOffer offer : offerManager.getOffers(groupKey)) {
-        if (slaveReservation.isPresent()
-            && !slaveReservation.get().equals(offer.getOffer().getSlaveId().getValue())) {
-          // Task group has a slave reserved but this offer is for a different slave -> skip.
+        Optional<TaskGroupKey> reservedGroup = Optional.fromNullable(
+            slaveReservations.get(offer.getOffer().getSlaveId().getValue()));
+
+        if (reservedGroup.isPresent() && !reservedGroup.get().equals(groupKey)) {
+          // This slave is reserved for a different task group -> skip.
           continue;
         }
         Set<Veto> vetoes = filter.filter(

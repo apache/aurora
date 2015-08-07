@@ -13,8 +13,11 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
+import java.util.Map;
+
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -65,14 +68,16 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private static final IScheduledTask TASK_A =
       TaskTestUtil.makeTask("a", JobKeys.from("a", "a", "a"));
+  private static final TaskGroupKey GROUP_KEY =
+      TaskGroupKey.from(TASK_A.getAssignedTask().getTask());
   private static final String SLAVE_ID = "HOST_A";
-  private static final Optional<String> NO_RESERVATION = Optional.absent();
+  private static final Map<String, TaskGroupKey> NO_RESERVATION = ImmutableMap.of();
 
   private StorageTestUtil storageUtil;
   private TaskAssigner assigner;
   private TaskScheduler scheduler;
   private Preemptor preemptor;
-  private BiCache<TaskGroupKey, String> reservations;
+  private BiCache<String, TaskGroupKey> reservations;
   private EventSink eventSink;
 
   @Before
@@ -80,7 +85,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     assigner = createMock(TaskAssigner.class);
     preemptor = createMock(Preemptor.class);
-    reservations = createMock(new Clazz<BiCache<TaskGroupKey, String>>() { });
+    reservations = createMock(new Clazz<BiCache<String, TaskGroupKey>>() { });
 
     Injector injector = getInjector(storageUtil.storage);
     scheduler = injector.getInstance(TaskScheduler.class);
@@ -93,7 +98,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         new AbstractModule() {
           @Override
           protected void configure() {
-            bind(new TypeLiteral<BiCache<TaskGroupKey, String>>() { }).toInstance(reservations);
+            bind(new TypeLiteral<BiCache<String, TaskGroupKey>>() { }).toInstance(reservations);
             bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
             bind(Preemptor.class).toInstance(preemptor);
             bind(TaskAssigner.class).toInstance(assigner);
@@ -113,21 +118,21 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private IExpectationSetters<Boolean> expectAssigned(
       IScheduledTask task,
-      Optional<String> reservation) {
+      Map<String, TaskGroupKey> reservationMap) {
 
     return expect(assigner.maybeAssign(
         storageUtil.mutableStoreProvider,
         new ResourceRequest(task.getAssignedTask().getTask(), EMPTY),
         TaskGroupKey.from(task.getAssignedTask().getTask()),
         Tasks.id(task),
-        reservation));
+        reservationMap));
   }
 
   @Test
   public void testSchedule() throws Exception {
     storageUtil.expectOperations();
 
-    expectReservationCheck(TASK_A);
+    expectAsMap(NO_RESERVATION);
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
     expectAssigned(TASK_A, NO_RESERVATION).andReturn(true);
@@ -157,22 +162,24 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
     expectAssigned(TASK_A, NO_RESERVATION).andReturn(false);
-    expectReservationCheck(TASK_A).times(2);
-    expectPreemptorCall(TASK_A, NO_RESERVATION);
+    expectAsMap(NO_RESERVATION);
+    expectNoReservation(TASK_A);
+    expectPreemptorCall(TASK_A, Optional.<String>absent());
 
     // Slave is reserved.
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
     expectAssigned(TASK_A, NO_RESERVATION).andReturn(false);
-    expectReservationCheck(TASK_A).times(2);
+    expectAsMap(NO_RESERVATION);
+    expectNoReservation(TASK_A);
     expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
     expectAddReservation(TASK_A, SLAVE_ID);
 
     // Use previously created reservation.
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    expectGetReservation(TASK_A, SLAVE_ID);
-    expectAssigned(TASK_A, Optional.of(SLAVE_ID)).andReturn(true);
+    expectAsMap(ImmutableMap.of(SLAVE_ID, GROUP_KEY));
+    expectAssigned(TASK_A, ImmutableMap.of(SLAVE_ID, GROUP_KEY)).andReturn(true);
 
     control.replay();
 
@@ -187,7 +194,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    expectReservationCheck(TASK_A);
+    expectAsMap(NO_RESERVATION);
     expectAssigned(TASK_A, NO_RESERVATION).andReturn(false);
     expectGetReservation(TASK_A, SLAVE_ID);
 
@@ -202,7 +209,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    expectReservationCheck(TASK_A);
+    expectAsMap(NO_RESERVATION);
     expectAssigned(TASK_A, NO_RESERVATION).andReturn(false);
     expectGetReservation(TASK_A, SLAVE_ID);
 
@@ -220,7 +227,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testPendingDeletedHandled() throws Exception {
-    reservations.remove(TaskGroupKey.from(TASK_A.getAssignedTask().getTask()), SLAVE_ID);
+    reservations.remove(SLAVE_ID, TaskGroupKey.from(TASK_A.getAssignedTask().getTask()));
 
     control.replay();
 
@@ -250,7 +257,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
       }
     });
 
-    expectReservationCheck(TASK_A);
+    expectAsMap(NO_RESERVATION);
     expect(assigner.maybeAssign(
         EasyMock.anyObject(),
         eq(new ResourceRequest(taskA.getAssignedTask().getTask(), EMPTY)),
@@ -267,7 +274,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   public void testScheduleThrows() throws Exception {
     storageUtil.expectOperations();
 
-    expectReservationCheck(TASK_A);
+    expectAsMap(NO_RESERVATION);
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
     expectAssigned(TASK_A, NO_RESERVATION).andThrow(new IllegalArgumentException("expected"));
@@ -292,16 +299,20 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   private void expectAddReservation(IScheduledTask task, String slaveId) {
-    reservations.put(TaskGroupKey.from(task.getAssignedTask().getTask()), slaveId);
+    reservations.put(slaveId, TaskGroupKey.from(task.getAssignedTask().getTask()));
   }
 
   private IExpectationSetters<?> expectGetReservation(IScheduledTask task, String slaveId) {
-    return expect(reservations.get(TaskGroupKey.from(task.getAssignedTask().getTask())))
-        .andReturn(Optional.of(slaveId));
+    return expect(reservations.getByValue(TaskGroupKey.from(task.getAssignedTask().getTask())))
+        .andReturn(ImmutableSet.of(slaveId));
   }
 
-  private IExpectationSetters<?> expectReservationCheck(IScheduledTask task) {
-    return expect(reservations.get(TaskGroupKey.from(task.getAssignedTask().getTask())))
-        .andReturn(Optional.<String>absent());
+  private IExpectationSetters<?> expectNoReservation(IScheduledTask task) {
+    return expect(reservations.getByValue(TaskGroupKey.from(task.getAssignedTask().getTask())))
+        .andReturn(ImmutableSet.of());
+  }
+
+  private IExpectationSetters<?> expectAsMap(Map<String, TaskGroupKey> map) {
+    return expect(reservations.asMap()).andReturn(map);
   }
 }

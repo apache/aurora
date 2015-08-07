@@ -87,7 +87,7 @@ public interface TaskScheduler extends EventSubscriber {
     private final Storage storage;
     private final TaskAssigner assigner;
     private final Preemptor preemptor;
-    private final BiCache<TaskGroupKey, String> reservations;
+    private final BiCache<String, TaskGroupKey> reservations;
 
     private final AtomicLong attemptsFired = Stats.exportLong("schedule_attempts_fired");
     private final AtomicLong attemptsFailed = Stats.exportLong("schedule_attempts_failed");
@@ -98,7 +98,7 @@ public interface TaskScheduler extends EventSubscriber {
         Storage storage,
         TaskAssigner assigner,
         Preemptor preemptor,
-        BiCache<TaskGroupKey, String> reservations) {
+        BiCache<String, TaskGroupKey> reservations) {
 
       this.storage = requireNonNull(storage);
       this.assigner = requireNonNull(assigner);
@@ -146,7 +146,7 @@ public interface TaskScheduler extends EventSubscriber {
             new ResourceRequest(task, aggregate),
             TaskGroupKey.from(task),
             taskId,
-            reservations.get(TaskGroupKey.from(task)));
+            reservations.asMap());
 
         if (!launched) {
           // Task could not be scheduled.
@@ -167,12 +167,12 @@ public interface TaskScheduler extends EventSubscriber {
         AttributeAggregate jobState,
         MutableStoreProvider storeProvider) {
 
-      if (reservations.get(TaskGroupKey.from(task.getTask())).isPresent()) {
+      if (!reservations.getByValue(TaskGroupKey.from(task.getTask())).isEmpty()) {
         return;
       }
       Optional<String> slaveId = preemptor.attemptPreemptionFor(task, jobState, storeProvider);
       if (slaveId.isPresent()) {
-        reservations.put(TaskGroupKey.from(task.getTask()), slaveId.get());
+        reservations.put(slaveId.get(), TaskGroupKey.from(task.getTask()));
       }
     }
 
@@ -181,7 +181,7 @@ public interface TaskScheduler extends EventSubscriber {
       if (Optional.of(PENDING).equals(stateChangeEvent.getOldState())) {
         IAssignedTask assigned = stateChangeEvent.getTask().getAssignedTask();
         if (assigned.getSlaveId() != null) {
-          reservations.remove(TaskGroupKey.from(assigned.getTask()), assigned.getSlaveId());
+          reservations.remove(assigned.getSlaveId(), TaskGroupKey.from(assigned.getTask()));
         }
       }
     }

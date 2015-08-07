@@ -112,7 +112,7 @@ public class SchedulingModule extends AbstractModule {
     install(new PrivateModule() {
       @Override
       protected void configure() {
-        bind(new TypeLiteral<BiCache<TaskGroupKey, String>>() { }).in(Singleton.class);
+        bind(new TypeLiteral<BiCache<String, TaskGroupKey>>() { }).in(Singleton.class);
         bind(BiCache.BiCacheSettings.class).toInstance(
             new BiCache.BiCacheSettings(RESERVATION_DURATION.get(), "reservation_cache_size"));
         bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);

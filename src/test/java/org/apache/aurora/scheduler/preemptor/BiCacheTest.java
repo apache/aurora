@@ -13,7 +13,10 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
+import java.util.Map;
+
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -62,6 +65,7 @@ public class BiCacheTest {
     biCache.put(KEY_1, 1);
     assertEquals(1L, statsProvider.getLongValue(STAT_NAME));
     assertEquals(Optional.of(1), biCache.get(KEY_1));
+    assertEquals(NO_VALUE, biCache.get(KEY_2));
     biCache.remove(KEY_1, 1);
     assertEquals(NO_VALUE, biCache.get(KEY_1));
     assertEquals(0L, statsProvider.getLongValue(STAT_NAME));
@@ -103,5 +107,15 @@ public class BiCacheTest {
     assertEquals(ImmutableSet.of(), biCache.getByValue(1));
     assertEquals(ImmutableSet.of(KEY_1), biCache.getByValue(2));
     assertEquals(1L, statsProvider.getLongValue(STAT_NAME));
+  }
+
+  @Test
+  public void testAsMap() {
+    biCache.put(KEY_1, 1);
+    assertEquals(Optional.of(1), biCache.get(KEY_1));
+    Map<String, Integer> map = biCache.asMap();
+
+    biCache.put(KEY_1, 2);
+    assertEquals(ImmutableMap.of(KEY_1, 1), map);
   }
 }

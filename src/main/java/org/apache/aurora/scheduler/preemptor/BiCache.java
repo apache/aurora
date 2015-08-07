@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -26,6 +27,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.twitter.common.quantity.Amount;
@@ -135,5 +137,14 @@ public class BiCache<K, V> {
   public synchronized void remove(K key, V value) {
     inverse.remove(value, key);
     cache.invalidate(key);
+  }
+
+  /**
+   * Returns an immutable copy of entries stored in this cache.
+   *
+   * @return Immutable map of cache entries.
+   */
+  public synchronized Map<K, V> asMap() {
+    return ImmutableMap.copyOf(cache.asMap());
   }
 }
