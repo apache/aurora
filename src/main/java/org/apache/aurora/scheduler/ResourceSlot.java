@@ -18,8 +18,10 @@ import java.util.List;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
-import com.google.common.collect.Iterables;
+import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
@@ -65,7 +67,7 @@ public final class ResourceSlot {
 
   private static ResourceSlot from(Resources resources, ExecutorSettings executorSettings) {
     // Apply a flat 'tax' of executor overhead resources to the task.
-    Resources requiredTaskResources = Resources.sum(
+    Resources requiredTaskResources = sum(
         resources,
         executorSettings.getExecutorOverhead());
 
@@ -135,18 +137,37 @@ public final class ResourceSlot {
   }
 
   public static ResourceSlot sum(Iterable<ResourceSlot> rs) {
-    Resources r = Resources.sum(Iterables.transform(rs, new Function<ResourceSlot, Resources>() {
-      @Override
-      public Resources apply(ResourceSlot input) {
-        return input.resources;
-      }
-    }));
+    Resources sum = Resources.NONE;
 
-    return new ResourceSlot(r);
+    for (ResourceSlot r : rs) {
+      double numCpus = sum.getNumCpus() + r.getNumCpus();
+      Amount<Long, Data> disk =
+          Amount.of(sum.getDisk().as(Data.BYTES) + r.getDisk().as(Data.BYTES), Data.BYTES);
+      Amount<Long, Data> ram =
+          Amount.of(sum.getRam().as(Data.BYTES) + r.getRam().as(Data.BYTES), Data.BYTES);
+      int ports = sum.getNumPorts() + r.getNumPorts();
+      sum = new Resources(numCpus, ram, disk, ports);
+    }
+
+    return new ResourceSlot(sum);
+  }
+
+  @VisibleForTesting
+  public static Resources sum(Resources a, Resources b) {
+    return sum(ImmutableList.of(new ResourceSlot(a), new ResourceSlot(b))).resources;
   }
 
   public static ResourceSlot subtract(ResourceSlot a, Resources b) {
-    return new ResourceSlot(Resources.subtract(a.resources, b));
+    return new ResourceSlot(subtract(a.resources, b));
+  }
+
+  @VisibleForTesting
+  static Resources subtract(Resources a, Resources b) {
+    return new Resources(
+        a.getNumCpus() - b.getNumCpus(),
+        Amount.of(a.getRam().as(Data.MB) - b.getRam().as(Data.MB), Data.MB),
+        Amount.of(a.getDisk().as(Data.MB) - b.getDisk().as(Data.MB), Data.MB),
+        a.getNumPorts() - b.getNumPorts());
   }
 
   public List<Protos.Resource> toResourceList(Set<Integer> selectedPorts) {
@@ -156,7 +177,41 @@ public final class ResourceSlot {
   public static final Ordering<ResourceSlot> ORDER = new Ordering<ResourceSlot>() {
     @Override
     public int compare(ResourceSlot left, ResourceSlot right) {
-      return Resources.RESOURCE_ORDER.compare(left.resources, right.resources);
+      return RESOURCE_ORDER.compare(left.resources, right.resources);
     }
   };
+
+  /**
+   * A Resources object is greater than another iff _all_ of its resource components are greater
+   * or equal. A Resources object compares as equal if some but not all components are greater than
+   * or equal to the other.
+   */
+  public static final Ordering<Resources> RESOURCE_ORDER = new Ordering<Resources>() {
+    @Override
+    public int compare(Resources left, Resources right) {
+      int diskC = left.getDisk().compareTo(right.getDisk());
+      int ramC = left.getRam().compareTo(right.getRam());
+      int portC = Integer.compare(left.getNumPorts(), right.getNumPorts());
+      int cpuC = Double.compare(left.getNumCpus(), right.getNumCpus());
+
+      FluentIterable<Integer> vector =
+          FluentIterable.from(ImmutableList.of(diskC, ramC, portC, cpuC));
+
+      if (vector.allMatch(IS_ZERO))  {
+        return 0;
+      }
+
+      if (vector.filter(Predicates.not(IS_ZERO)).allMatch(e -> e > 0)) {
+        return 1;
+      }
+
+      if (vector.filter(Predicates.not(IS_ZERO)).allMatch(e -> e < 0)) {
+        return -1;
+      }
+
+      return 0;
+    }
+  };
+
+  private static final Predicate<Integer> IS_ZERO = e -> e == 0;
 }

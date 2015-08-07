@@ -33,9 +33,7 @@ import org.apache.mesos.Protos.Value.Type;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class ResourcesTest {
@@ -85,30 +83,6 @@ public class ResourcesTest {
   public void testGetNoPorts() {
     Resource portsResource = createPortRange(Pair.of(1, 5));
     assertEquals(ImmutableSet.of(), Resources.getPorts(createOffer(portsResource), 0));
-  }
-
-  private static final Resources NEGATIVE_ONE =
-      new Resources(-1.0, Amount.of(-1L, Data.MB), Amount.of(-1L, Data.MB), -1);
-  private static final Resources ONE =
-      new Resources(1.0, Amount.of(1L, Data.MB), Amount.of(1L, Data.MB), 1);
-  private static final Resources TWO =
-      new Resources(2.0, Amount.of(2L, Data.MB), Amount.of(2L, Data.MB), 2);
-  private static final Resources THREE =
-      new Resources(3.0, Amount.of(3L, Data.MB), Amount.of(3L, Data.MB), 3);
-
-  @Test
-  public void testSum() {
-    assertEquals(TWO, Resources.sum(ONE, ONE));
-    assertEquals(THREE, Resources.sum(ONE, TWO));
-    assertEquals(THREE, Resources.sum(TWO, ONE));
-  }
-
-  @Test
-  public void testSubtract() {
-    assertEquals(ONE, Resources.subtract(TWO, ONE));
-    assertEquals(TWO, Resources.subtract(THREE, ONE));
-    assertEquals(NEGATIVE_ONE, Resources.subtract(ONE, TWO));
-    assertEquals(NEGATIVE_ONE, Resources.subtract(TWO, THREE));
   }
 
   @Test(expected = Resources.InsufficientResourcesException.class)
@@ -177,11 +151,6 @@ public class ResourcesTest {
       .setDiskMb(2048)
       .setRequestedPorts(ImmutableSet.of("http", "debug")));
 
-  private static void assertLeftIsLarger(Resources left, Resources right) {
-    assertTrue(left.greaterThanOrEqual(right));
-    assertFalse(right.greaterThanOrEqual(left));
-  }
-
   @Test
   public void testAccessors() {
     Resources resources = Resources.from(TASK);
@@ -189,21 +158,6 @@ public class ResourcesTest {
     assertEquals(Amount.of(TASK.getRamMb(), Data.MB), resources.getRam());
     assertEquals(Amount.of(TASK.getDiskMb(), Data.MB), resources.getDisk());
     assertEquals(TASK.getRequestedPorts().size(), resources.getNumPorts());
-
-    assertTrue(resources.greaterThanOrEqual(resources));
-    assertLeftIsLarger(
-        resources,
-        Resources.from(ITaskConfig.build(TASK.newBuilder().setNumCpus(0.5))));
-    assertLeftIsLarger(
-        resources,
-        Resources.from(ITaskConfig.build(TASK.newBuilder().setRamMb(512))));
-    assertLeftIsLarger(
-        resources,
-        Resources.from(ITaskConfig.build(TASK.newBuilder().setDiskMb(1024))));
-    assertLeftIsLarger(
-        resources,
-        Resources.from(
-            ITaskConfig.build(TASK.newBuilder().setRequestedPorts(ImmutableSet.of("http")))));
   }
 
   @Test

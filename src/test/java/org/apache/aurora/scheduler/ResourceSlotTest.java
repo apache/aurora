@@ -23,6 +23,15 @@ import static org.junit.Assert.assertEquals;
 
 public class ResourceSlotTest {
 
+  private static final Resources NEGATIVE_ONE =
+      new Resources(-1.0, Amount.of(-1L, Data.MB), Amount.of(-1L, Data.MB), -1);
+  private static final Resources ONE =
+      new Resources(1.0, Amount.of(1L, Data.MB), Amount.of(1L, Data.MB), 1);
+  private static final Resources TWO =
+      new Resources(2.0, Amount.of(2L, Data.MB), Amount.of(2L, Data.MB), 2);
+  private static final Resources THREE =
+      new Resources(3.0, Amount.of(3L, Data.MB), Amount.of(3L, Data.MB), 3);
+
   @Test
   public void testMaxElements() {
     Resources highRAM = new Resources(1, Amount.of(8L, Data.GB), Amount.of(10L, Data.MB), 0);
@@ -33,5 +42,20 @@ public class ResourceSlotTest {
     assertEquals(result.getRam(), Amount.of(8L, Data.GB));
     assertEquals(result.getDisk(), Amount.of(10L, Data.GB));
     assertEquals(result.getNumPorts(), 1);
+  }
+
+  @Test
+  public void testSubtract() {
+    assertEquals(ONE, ResourceSlot.subtract(TWO, ONE));
+    assertEquals(TWO, ResourceSlot.subtract(THREE, ONE));
+    assertEquals(NEGATIVE_ONE, ResourceSlot.subtract(ONE, TWO));
+    assertEquals(NEGATIVE_ONE, ResourceSlot.subtract(TWO, THREE));
+  }
+
+  @Test
+  public void testSum() {
+    assertEquals(TWO, ResourceSlot.sum(ONE, ONE));
+    assertEquals(THREE, ResourceSlot.sum(ONE, TWO));
+    assertEquals(THREE, ResourceSlot.sum(TWO, ONE));
   }
 }

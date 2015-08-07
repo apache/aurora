@@ -21,15 +21,12 @@ import java.util.Set;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
@@ -84,20 +81,6 @@ public class Resources {
     this.ram = requireNonNull(ram);
     this.disk = requireNonNull(disk);
     this.numPorts = numPorts;
-  }
-
-  /**
-   * Tests whether this bundle of resources is greater than or equal to another bundle of resources.
-   *
-   * @param other Resources being compared to.
-   * @return {@code true} if all resources in this bundle are greater than or equal to the
-   *    equivalents from {@code other}, otherwise {@code false}.
-   */
-  public boolean greaterThanOrEqual(Resources other) {
-    return numCpus >= other.numCpus
-        && disk.as(Data.MB) >= other.disk.as(Data.MB)
-        && ram.as(Data.MB) >= other.ram.as(Data.MB)
-        && numPorts >= other.numPorts;
   }
 
   /**
@@ -206,43 +189,6 @@ public class Resources {
   @VisibleForTesting
   public static final Resources NONE =
       new Resources(0, Amount.of(0L, Data.BITS), Amount.of(0L, Data.BITS), 0);
-
-  /**
-   * a - b.
-   */
-  public static Resources subtract(Resources a, Resources b) {
-    return new Resources(
-        a.getNumCpus() - b.getNumCpus(),
-        Amount.of(a.getRam().as(Data.MB) - b.getRam().as(Data.MB), Data.MB),
-        Amount.of(a.getDisk().as(Data.MB) - b.getDisk().as(Data.MB), Data.MB),
-        a.getNumPorts() - b.getNumPorts());
-  }
-
-  /**
-   * sum(a, b).
-   */
-  public static Resources sum(Resources a, Resources b) {
-    return sum(ImmutableList.of(a, b));
-  }
-
-  /**
-   * sum(rs).
-   */
-  public static Resources sum(Iterable<Resources> rs) {
-    Resources sum = NONE;
-
-    for (Resources r : rs) {
-      double numCpus = sum.getNumCpus() + r.getNumCpus();
-      Amount<Long, Data> disk =
-          Amount.of(sum.getDisk().as(Data.BYTES) + r.getDisk().as(Data.BYTES), Data.BYTES);
-      Amount<Long, Data> ram =
-          Amount.of(sum.getRam().as(Data.BYTES) + r.getRam().as(Data.BYTES), Data.BYTES);
-      int ports = sum.getNumPorts() + r.getNumPorts();
-      sum =  new Resources(numCpus, ram, disk, ports);
-    }
-
-    return sum;
-  }
 
   private static int getNumAvailablePorts(List<Resource> resource) {
     int offeredPorts = 0;
@@ -401,57 +347,4 @@ public class Resources {
     Collections.shuffle(availablePorts);
     return ImmutableSet.copyOf(availablePorts.subList(0, numPorts));
   }
-
-  /**
-   * A Resources object is greater than another iff _all_ of its resource components are greater
-   * or equal. A Resources object compares as equal if some but not all components are greater than
-   * or equal to the other.
-   */
-  public static final Ordering<Resources> RESOURCE_ORDER = new Ordering<Resources>() {
-    @Override
-    public int compare(Resources left, Resources right) {
-      int diskC = left.getDisk().compareTo(right.getDisk());
-      int ramC = left.getRam().compareTo(right.getRam());
-      int portC = Integer.compare(left.getNumPorts(), right.getNumPorts());
-      int cpuC = Double.compare(left.getNumCpus(), right.getNumCpus());
-
-      FluentIterable<Integer> vector =
-          FluentIterable.from(ImmutableList.of(diskC, ramC, portC, cpuC));
-
-      if (vector.allMatch(IS_ZERO))  {
-        return 0;
-      }
-
-      if (vector.filter(Predicates.not(IS_ZERO)).allMatch(IS_POSITIVE)) {
-        return 1;
-      }
-
-      if (vector.filter(Predicates.not(IS_ZERO)).allMatch(IS_NEGATIVE)) {
-        return -1;
-      }
-
-      return 0;
-    }
-  };
-
-  private static final Predicate<Integer> IS_POSITIVE = new Predicate<Integer>() {
-    @Override
-    public boolean apply(Integer input) {
-      return input > 0;
-    }
-  };
-
-  private static final Predicate<Integer> IS_NEGATIVE = new Predicate<Integer>() {
-    @Override
-    public boolean apply(Integer input) {
-      return input < 0;
-    }
-  };
-
-  private static final Predicate<Integer> IS_ZERO = new Predicate<Integer>() {
-    @Override
-    public boolean apply(Integer input) {
-      return input == 0;
-    }
-  };
 }
