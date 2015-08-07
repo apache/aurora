@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.configuration;
+package org.apache.aurora.scheduler;
 
 import java.util.Set;
 
@@ -23,7 +23,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.configuration.Resources.InsufficientResourcesException;
+import org.apache.aurora.scheduler.Resources.InsufficientResourcesException;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Resource;

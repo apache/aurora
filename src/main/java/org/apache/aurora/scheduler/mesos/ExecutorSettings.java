@@ -19,7 +19,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.gen.Volume;
-import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.Resources;
 
 import static java.util.Objects.requireNonNull;
 

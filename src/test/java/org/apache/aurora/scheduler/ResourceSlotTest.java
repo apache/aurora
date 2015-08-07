@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
-import org.apache.aurora.scheduler.configuration.Resources;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

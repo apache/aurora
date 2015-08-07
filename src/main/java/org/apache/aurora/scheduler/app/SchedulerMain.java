@@ -47,8 +47,8 @@ import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientCon
 import com.twitter.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 
 import org.apache.aurora.gen.Volume;
+import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
-import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.http.HttpService;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;

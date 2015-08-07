@@ -16,7 +16,7 @@ package org.apache.aurora.scheduler.mesos;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
-import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.Resources;
 
 /**
  * Utility class to contain constants related to setting up executor settings.

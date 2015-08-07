@@ -15,7 +15,7 @@ package org.apache.aurora.scheduler.mesos;
 
 import com.twitter.common.collections.Pair;
 
-import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.Resources;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;

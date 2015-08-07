@@ -20,7 +20,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos;

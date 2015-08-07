@@ -15,7 +15,7 @@ package org.apache.aurora.scheduler.preemptor;
 
 import java.util.Objects;
 
-import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 

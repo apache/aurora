@@ -30,9 +30,9 @@ import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.Conversions;
-import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;

@@ -29,7 +29,7 @@ import org.apache.aurora.gen.Mode;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
