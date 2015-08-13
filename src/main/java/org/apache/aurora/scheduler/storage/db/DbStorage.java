@@ -140,14 +140,29 @@ class DbStorage extends AbstractIdleService implements Storage {
     }
   }
 
+  private final ThreadLocal<Boolean> inTransaction = new ThreadLocal<Boolean>() {
+    @Override
+    protected Boolean initialValue() {
+      return false;
+    }
+  };
+
+  @Transactional
+  <T, E extends Exception> T transactionedWrite(MutateWork<T, E> work) throws E {
+    return work.apply(storeProvider);
+  }
+
   @Timed("db_storage_write_operation")
   @Override
-  @Transactional
   public <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E {
-    T result;
-    try (SqlSession session = sessionFactory.openSession(false)) {
-      result = work.apply(storeProvider);
-      session.commit();
+    // Only flush for the top-level write() call when calls are reentrant.
+    boolean shouldFlush = !inTransaction.get();
+    if (shouldFlush) {
+      inTransaction.set(true);
+    }
+
+    try {
+      return transactionedWrite(work);
     } catch (PersistenceException e) {
       throw new StorageException(e.getMessage(), e);
     } finally {
@@ -157,10 +172,11 @@ class DbStorage extends AbstractIdleService implements Storage {
       // introduction of DbStorage, but should be revisited.
       // TODO(wfarner): Consider revisiting to execute async work only when the transaction is
       // successful.
-      postTransactionWork.flush();
+      if (shouldFlush) {
+        postTransactionWork.flush();
+        inTransaction.set(false);
+      }
     }
-
-    return result;
   }
 
   @VisibleForTesting

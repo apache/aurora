@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.async.FlushableWorkQueue;
@@ -22,6 +24,7 @@ import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
+import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.Storage.Work;
@@ -30,11 +33,14 @@ import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.easymock.EasyMock;
+import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 public class DbStorageTest extends EasyMockTest {
 
@@ -112,5 +118,50 @@ public class DbStorageTest extends EasyMockTest {
     control.replay();
 
     storage.bulkLoad(writeWork);
+  }
+
+  @Test
+  public void testFlushWithReentrantWrites() {
+    final AtomicBoolean flushed = new AtomicBoolean(false);
+    flusher.flush();
+    expectLastCall().andAnswer(new IAnswer<Void>() {
+      @Override
+      public Void answer() {
+        flushed.set(true);
+        return null;
+      }
+    });
+
+    control.replay();
+
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      public void execute(MutableStoreProvider storeProvider) {
+        noopWrite();
+
+        // Should not have flushed yet.
+        assertFalse("flush() should not be called until outer write() completes.", flushed.get());
+      }
+    });
+  }
+
+  private void noopWrite() {
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      public void execute(MutableStoreProvider storeProvider) {
+        // No-op.
+      }
+    });
+  }
+
+  @Test
+  public void testFlushWithSeqentialWrites() {
+    flusher.flush();
+    expectLastCall().times(2);
+
+    control.replay();
+
+    noopWrite();
+    noopWrite();
   }
 }
