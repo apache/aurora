@@ -186,7 +186,6 @@ public interface TaskAssigner {
 
           LOG.fine("Slave " + offer.getOffer().getHostname()
               + " vetoed task " + taskId + ": " + vetoes);
-          return false;
         }
       }
       return false;

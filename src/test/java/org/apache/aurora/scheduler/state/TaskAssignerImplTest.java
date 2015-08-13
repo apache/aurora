@@ -274,4 +274,53 @@ public class TaskAssignerImplTest extends EasyMockTest {
         Tasks.id(TASK),
         ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
   }
+
+  @Test
+  public void testAssignerDoesNotReturnOnFirstMismatch() throws Exception {
+    // Ensures scheduling loop does not terminate prematurely when the first mismatch is identified.
+    HostOffer mismatched = new HostOffer(
+        Offer.newBuilder()
+            .setId(OfferID.newBuilder().setValue("offerId0"))
+            .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
+            .setSlaveId(SlaveID.newBuilder().setValue("slaveId0"))
+            .setHostname("hostName0")
+            .addResources(Resource.newBuilder()
+                .setName("ports")
+                .setType(Type.RANGES)
+                .setRanges(
+                    Ranges.newBuilder().addRange(Range.newBuilder().setBegin(PORT).setEnd(PORT))))
+            .build(),
+        IHostAttributes.build(new HostAttributes()));
+
+    expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(mismatched, OFFER));
+    expect(filter.filter(
+        new UnusedResource(ResourceSlot.from(mismatched.getOffer()), mismatched.getAttributes()),
+        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
+        .andReturn(ImmutableSet.of(Veto.constraintMismatch("constraint mismatch")));
+    offerManager.banOffer(mismatched.getOffer().getId(), GROUP_KEY);
+    expect(filter.filter(
+        new UnusedResource(ResourceSlot.from(OFFER.getOffer()), OFFER.getAttributes()),
+        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
+        .andReturn(ImmutableSet.of());
+
+    expect(stateManager.assignTask(
+        storeProvider,
+        Tasks.id(TASK),
+        OFFER.getOffer().getHostname(),
+        OFFER.getOffer().getSlaveId(),
+        ImmutableMap.of(PORT_NAME, PORT)))
+        .andReturn(TASK.getAssignedTask());
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), OFFER.getOffer().getSlaveId()))
+        .andReturn(TASK_INFO);
+    offerManager.launchTask(OFFER.getOffer().getId(), TASK_INFO);
+
+    control.replay();
+
+    assertTrue(assigner.maybeAssign(
+        storeProvider,
+        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+        TaskGroupKey.from(TASK.getAssignedTask().getTask()),
+        Tasks.id(TASK),
+        ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
+  }
 }
