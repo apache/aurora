@@ -14,9 +14,11 @@
 package org.apache.aurora.scheduler.state;
 
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -31,6 +33,7 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -71,7 +74,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
 
     Injector injector = Guice.createInjector(
-        new PubsubEventModule(false),
+        new PubsubEventModule(),
         new AbstractModule() {
           @Override
           protected void configure() {
@@ -79,6 +82,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
             bind(Storage.class).toInstance(storageUtil.storage);
             bind(StateManager.class).toInstance(stateManager);
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
+            bind(Executor.class).annotatedWith(AsyncExecutor.class)
+                .toInstance(MoreExecutors.sameThreadExecutor());
           }
         });
     maintenance = injector.getInstance(MaintenanceController.class);

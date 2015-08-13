@@ -111,8 +111,8 @@ public class AppModule extends AbstractModule {
                 .setThriftAPIVersion(THRIFT_API_VERSION)
                 .setStatsUrlPrefix(statsUrlPrefix)));
 
+    install(new PubsubEventModule());
     // Filter layering: notifier filter -> base impl
-    install(new PubsubEventModule(true));
     PubsubEventModule.bindSchedulingFilterDelegate(binder()).to(SchedulingFilterImpl.class);
     bind(SchedulingFilterImpl.class).in(Singleton.class);
 

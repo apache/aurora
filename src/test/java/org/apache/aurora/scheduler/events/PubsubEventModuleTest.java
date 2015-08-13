@@ -13,11 +13,14 @@
  */
 package org.apache.aurora.scheduler.events;
 
+import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -30,6 +33,7 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.EasyMock;
@@ -44,51 +48,39 @@ public class PubsubEventModuleTest extends EasyMockTest {
 
   private FakeStatsProvider statsProvider;
   private Logger logger;
+  private UncaughtExceptionHandler exceptionHandler;
+  private SchedulingFilter schedulingFilter;
 
   @Before
   public void setUp() {
     statsProvider = new FakeStatsProvider();
     logger = createMock(Logger.class);
+    exceptionHandler = createMock(UncaughtExceptionHandler.class);
+    schedulingFilter = createMock(SchedulingFilter.class);
   }
 
   @Test
   public void testHandlesDeadEvent() {
     logger.warning(String.format(PubsubEventModule.DEAD_EVENT_MESSAGE, "hello"));
-    Injector injector = getInjector(false);
 
     control.replay();
 
-    injector.getInstance(EventBus.class).post("hello");
-  }
-
-  @Test
-  public void testPubsubQueueGauge() throws Exception {
-    Injector injector = getInjector(true);
-
-    control.replay();
-
-    injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
-    assertEquals(
-        0L,
-        statsProvider.getLongValue(PubsubEventModule.PUBSUB_EXECUTOR_QUEUE_GAUGE)
-    );
+    getInjector().getInstance(EventBus.class).post("hello");
   }
 
   @Test
   public void testPubsubExceptionTracking() throws Exception {
+    logger.log(eq(Level.SEVERE), anyString(), EasyMock.<Throwable>anyObject());
+
+    control.replay();
+
     Injector injector = getInjector(
-        false,
         new AbstractModule() {
           @Override
           protected void configure() {
             PubsubEventModule.bindSubscriber(binder(), ThrowingSubscriber.class);
           }
         });
-
-    logger.log(eq(Level.SEVERE), anyString(), EasyMock.<Throwable>anyObject());
-
-    control.replay();
-
     injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
     assertEquals(0L, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
     injector.getInstance(EventBus.class).post("hello");
@@ -102,20 +94,21 @@ public class PubsubEventModuleTest extends EasyMockTest {
     }
   }
 
-  public Injector getInjector(boolean isAsync, Module... additionalModules) {
+  public Injector getInjector(Module... additionalModules) {
     return Guice.createInjector(
         new LifecycleModule(),
-        new PubsubEventModule(isAsync, logger),
+        new PubsubEventModule(logger),
         new SchedulerServicesModule(),
         new AbstractModule() {
           @Override
           protected void configure() {
-            bind(Thread.UncaughtExceptionHandler.class)
-                .toInstance(createMock(Thread.UncaughtExceptionHandler.class));
+            bind(Executor.class).annotatedWith(AsyncExecutor.class)
+                .toInstance(MoreExecutors.sameThreadExecutor());
+
+            bind(UncaughtExceptionHandler.class).toInstance(exceptionHandler);
 
             bind(StatsProvider.class).toInstance(statsProvider);
-            PubsubEventModule.bindSchedulingFilterDelegate(binder())
-                .toInstance(createMock(SchedulingFilter.class));
+            PubsubEventModule.bindSchedulingFilterDelegate(binder()).toInstance(schedulingFilter);
             for (Module module : additionalModules) {
               install(module);
             }

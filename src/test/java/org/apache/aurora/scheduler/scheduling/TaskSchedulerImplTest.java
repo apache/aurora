@@ -14,11 +14,13 @@
 package org.apache.aurora.scheduler.scheduling;
 
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -28,6 +30,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
@@ -94,10 +97,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private Injector getInjector(final Storage storageImpl) {
     return Guice.createInjector(
-        new PubsubEventModule(false),
+        new PubsubEventModule(),
         new AbstractModule() {
           @Override
           protected void configure() {
+
+            bind(Executor.class).annotatedWith(AsyncExecutor.class)
+                .toInstance(MoreExecutors.sameThreadExecutor());
             bind(new TypeLiteral<BiCache<String, TaskGroupKey>>() { }).toInstance(reservations);
             bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
             bind(Preemptor.class).toInstance(preemptor);

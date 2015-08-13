@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.events;
 
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,19 +30,15 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.eventbus.SubscriberExceptionContext;
 import com.google.common.eventbus.SubscriberExceptionHandler;
 import com.google.common.util.concurrent.AbstractIdleService;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.Provides;
 import com.google.inject.binder.LinkedBindingBuilder;
 import com.google.inject.multibindings.Multibinder;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
-import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -55,29 +50,18 @@ import static java.util.Objects.requireNonNull;
  */
 public final class PubsubEventModule extends AbstractModule {
 
-  private final boolean async;
   private final Logger log;
-
-  @VisibleForTesting
-  static final String PUBSUB_EXECUTOR_QUEUE_GAUGE = "pubsub_executor_queue_size";
 
   @VisibleForTesting
   static final String EXCEPTIONS_STAT = "event_bus_exceptions";
 
-  @Positive
-  @CmdLine(name = "max_async_event_bus_threads",
-      help = "Maximum number of concurrent threads to allow for the async event processing bus.")
-  private static final Arg<Integer> MAX_ASYNC_EVENT_BUS_THREADS = Arg.create(4);
-
   @VisibleForTesting
-  PubsubEventModule(boolean async, Logger log) {
+  PubsubEventModule(Logger log) {
     this.log = requireNonNull(log);
-    this.async = requireNonNull(async);
   }
 
-  // TODO(wfarner): Remove the async argument and accept an Executor instead.
-  public PubsubEventModule(boolean async) {
-    this(async, Logger.getLogger(PubsubEventModule.class.getName()));
+  public PubsubEventModule() {
+    this(Logger.getLogger(PubsubEventModule.class.getName()));
   }
 
   @VisibleForTesting
@@ -93,22 +77,7 @@ public final class PubsubEventModule extends AbstractModule {
 
   @Provides
   @Singleton
-  EventBus provideEventBus(StatsProvider statsProvider) {
-    Executor executor;
-    if (async) {
-      LinkedBlockingQueue<Runnable> executorQueue = new LinkedBlockingQueue<>();
-      statsProvider.makeGauge(PUBSUB_EXECUTOR_QUEUE_GAUGE, executorQueue::size);
-
-      executor = AsyncUtil.loggingExecutor(
-          MAX_ASYNC_EVENT_BUS_THREADS.get(),
-          MAX_ASYNC_EVENT_BUS_THREADS.get(),
-          executorQueue,
-          "AsyncTaskEvents-%d",
-          log);
-    } else {
-      executor = MoreExecutors.sameThreadExecutor();
-    }
-
+  EventBus provideEventBus(@AsyncExecutor Executor executor, StatsProvider statsProvider) {
     final AtomicLong subscriberExceptions = statsProvider.makeCounter(EXCEPTIONS_STAT);
     EventBus eventBus = new AsyncEventBus(
         executor,
@@ -188,7 +157,7 @@ public final class PubsubEventModule extends AbstractModule {
    * @param binder Binder to bind against.
    */
   public static void bind(Binder binder) {
-    binder.install(new PubsubEventModule(true));
+    binder.install(new PubsubEventModule());
   }
 
   private static Multibinder<EventSubscriber> getSubscriberBinder(Binder binder) {

@@ -14,10 +14,12 @@
 package org.apache.aurora.scheduler.reconciliation;
 
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.concurrent.Executor;
 
 import javax.inject.Singleton;
 
 import com.google.common.eventbus.EventBus;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -73,7 +75,7 @@ public class KillRetryTest extends EasyMockTest {
 
     Injector injector = Guice.createInjector(
         new LifecycleModule(),
-        new PubsubEventModule(false),
+        new PubsubEventModule(),
         new AbstractModule() {
           @Override
           protected void configure() {
@@ -86,6 +88,8 @@ public class KillRetryTest extends EasyMockTest {
             bind(StatsProvider.class).toInstance(statsProvider);
             bind(UncaughtExceptionHandler.class)
                 .toInstance(createMock(UncaughtExceptionHandler.class));
+            bind(Executor.class).annotatedWith(AsyncExecutor.class)
+                .toInstance(MoreExecutors.sameThreadExecutor());
           }
         }
     );

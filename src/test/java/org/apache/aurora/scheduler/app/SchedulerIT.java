@@ -77,6 +77,8 @@ import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
+import org.apache.aurora.scheduler.async.FlushableWorkQueue;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
@@ -384,6 +386,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
     scheduler.getValue().registered(driver,
         FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
         MasterInfo.getDefaultInstance());
+    // Registration is published on the event bus, which will be gated until a flush.
+    injector.getInstance(Key.get(FlushableWorkQueue.class, AsyncExecutor.class)).flush();
 
     awaitSchedulerReady();
 

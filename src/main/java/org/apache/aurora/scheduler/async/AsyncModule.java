@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.async;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Logger;
@@ -83,6 +84,7 @@ public class AsyncModule extends AbstractModule {
     });
     SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RegisterGauges.class);
 
+    bind(Executor.class).annotatedWith(AsyncExecutor.class).to(GatedDelayExecutor.class);
     bind(DelayExecutor.class).annotatedWith(AsyncExecutor.class).to(GatedDelayExecutor.class);
     bind(FlushableWorkQueue.class).annotatedWith(AsyncExecutor.class).to(GatedDelayExecutor.class);
   }
