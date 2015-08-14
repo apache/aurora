@@ -30,11 +30,11 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static org.apache.aurora.scheduler.base.ResourceAggregates.EMPTY;
-import static org.apache.aurora.scheduler.base.ResourceAggregates.LARGE;
-import static org.apache.aurora.scheduler.base.ResourceAggregates.MEDIUM;
-import static org.apache.aurora.scheduler.base.ResourceAggregates.SMALL;
-import static org.apache.aurora.scheduler.base.ResourceAggregates.XLARGE;
+import static org.apache.aurora.scheduler.ResourceAggregates.EMPTY;
+import static org.apache.aurora.scheduler.ResourceAggregates.LARGE;
+import static org.apache.aurora.scheduler.ResourceAggregates.MEDIUM;
+import static org.apache.aurora.scheduler.ResourceAggregates.SMALL;
+import static org.apache.aurora.scheduler.ResourceAggregates.XLARGE;
 
 /**
  * Defines a logical grouping criteria to be applied over a set of tasks.

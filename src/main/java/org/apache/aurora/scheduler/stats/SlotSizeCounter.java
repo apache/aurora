@@ -23,7 +23,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.aurora.scheduler.base.ResourceAggregates;
+import org.apache.aurora.scheduler.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static java.util.Objects.requireNonNull;

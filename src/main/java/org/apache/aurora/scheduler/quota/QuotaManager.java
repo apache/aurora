@@ -32,9 +32,9 @@ import com.google.common.collect.RangeSet;
 
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.scheduler.ResourceAggregates;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -55,7 +55,7 @@ import org.apache.aurora.scheduler.updater.Updates;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.base.ResourceAggregates.EMPTY;
+import static org.apache.aurora.scheduler.ResourceAggregates.EMPTY;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.updater.Updates.getInstanceIds;
 
