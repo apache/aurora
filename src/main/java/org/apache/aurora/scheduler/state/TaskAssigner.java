@@ -107,7 +107,7 @@ public interface TaskAssigner {
         String taskId) {
 
       String host = offer.getHostname();
-      Set<Integer> selectedPorts = Resources.getPorts(offer, requestedPorts.size());
+      Set<Integer> selectedPorts = Resources.from(offer).getPorts(requestedPorts.size());
       Preconditions.checkState(selectedPorts.size() == requestedPorts.size());
 
       final Iterator<String> names = requestedPorts.iterator();

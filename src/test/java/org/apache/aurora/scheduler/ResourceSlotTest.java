@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler;
 import java.util.Set;
 
 import com.google.common.base.Function;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
@@ -24,12 +25,16 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.ResourceSlot.MIN_THERMOS_RESOURCES;
 import static org.apache.aurora.scheduler.ResourceSlot.makeMesosRangeResource;
 import static org.apache.aurora.scheduler.ResourceSlot.makeMesosResource;
+import static org.apache.aurora.scheduler.ResourceSlot.maxElements;
+import static org.apache.aurora.scheduler.ResourceSlot.sum;
 import static org.apache.aurora.scheduler.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.ResourceType.PORTS;
@@ -78,6 +83,21 @@ public class ResourceSlotTest {
     assertEquals(TWO, ONE.add(ONE));
     assertEquals(THREE, ONE.add(TWO));
     assertEquals(THREE, TWO.add(ONE));
+  }
+
+  @Test
+  public void testSum() {
+    assertEquals(THREE, sum(ImmutableList.of(ONE, ONE, ONE)));
+  }
+
+  @Test
+  public void testWithOverhead() {
+    assertEquals(maxElements(TWO, MIN_THERMOS_RESOURCES), ONE.withOverhead(
+        ExecutorSettings.newBuilder()
+            .setExecutorOverhead(ONE)
+            .setExecutorPath("ignored")
+            .setThermosObserverRoot("ignored")
+            .build()));
   }
 
   @Test
@@ -132,6 +152,13 @@ public class ResourceSlotTest {
     ResourceSlot resources = ResourceSlot.from(TASK);
     assertNotEquals(resources, "Hello");
     assertNotEquals(resources, null);
+  }
+
+  @Test
+  public void testOrder() {
+    assertEquals(
+        ImmutableList.of(ONE, TWO, THREE, THREE),
+        ResourceSlot.ORDER.sortedCopy(ImmutableList.of(THREE, ONE, TWO, THREE)));
   }
 
   private void expectRanges(Set<Pair<Long, Long>> expected, Set<Integer> values) {
