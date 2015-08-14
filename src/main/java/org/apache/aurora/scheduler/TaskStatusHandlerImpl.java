@@ -153,22 +153,12 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
             for (TaskStatus status : updates) {
               ScheduleStatus translatedState = Conversions.convertProtoState(status.getState());
 
-              Optional<String> message = Optional.absent();
-              if (status.hasMessage()) {
-                message = Optional.of(status.getMessage());
-              }
-
-              if (translatedState == ScheduleStatus.FAILED && status.hasReason()
-                  && status.getReason() == TaskStatus.Reason.REASON_MEMORY_LIMIT) {
-                message = Optional.of(MEMORY_LIMIT_DISPLAY);
-              }
-
               StateChangeResult result = stateManager.changeState(
                   storeProvider,
                   status.getTaskId().getValue(),
                   Optional.absent(),
                   translatedState,
-                  message);
+                  formatMessage(status));
 
               if (status.hasReason()) {
                 counters.get(statName(status, result)).incrementAndGet();
@@ -189,5 +179,32 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
   @VisibleForTesting
   static String statName(TaskStatus status, StateChangeResult result) {
     return String.format(STATUS_STAT_FORMAT, status.getReason(), result);
+  }
+
+  private static Optional<String> formatMessage(TaskStatus status) {
+    Optional<String> message = Optional.absent();
+    if (status.hasMessage()) {
+      message = Optional.of(status.getMessage());
+    }
+
+    if (status.hasReason()) {
+      switch (status.getReason()) {
+        case REASON_MEMORY_LIMIT:
+          // Add a failure explanation to the user
+          message = Optional.of(MEMORY_LIMIT_DISPLAY);
+          break;
+
+        case REASON_EXECUTOR_UNREGISTERED:
+          // Suppress "Unregistered executor" message as it bears no meaning to the user.
+          message = Optional.absent();
+          break;
+
+        default:
+          // Message is already populated above.
+          break;
+      }
+    }
+
+    return message;
   }
 }

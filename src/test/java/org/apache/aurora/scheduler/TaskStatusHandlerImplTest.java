@@ -32,11 +32,13 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
 import org.easymock.EasyMock;
+import org.easymock.IAnswer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
+import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.TaskStatusHandlerImpl.statName;
 import static org.easymock.EasyMock.expect;
@@ -102,10 +104,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     final CountDownLatch latch = new CountDownLatch(1);
 
     driver.acknowledgeStatusUpdate(status);
-    expectLastCall().andAnswer(() -> {
-        latch.countDown();
-        return null;
-      });
+    waitAndAnswer(latch);
 
     control.replay();
 
@@ -126,10 +125,13 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
         Optional.absent(),
         RUNNING,
         Optional.of("fake message")))
-        .andAnswer(() -> {
+        .andAnswer(new IAnswer<StateChangeResult>() {
+          @Override
+          public StateChangeResult answer() throws Throwable {
             latch.countDown();
             throw new StorageException("Injected error");
-          });
+          }
+        });
 
     control.replay();
 
@@ -166,10 +168,38 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     final CountDownLatch latch = new CountDownLatch(1);
 
     driver.acknowledgeStatusUpdate(status);
-    expectLastCall().andAnswer(() -> {
-        latch.countDown();
-        return null;
-      });
+    waitAndAnswer(latch);
+
+    control.replay();
+
+    statusHandler.statusUpdate(status);
+
+    assertTrue(latch.await(5L, TimeUnit.SECONDS));
+  }
+
+  @Test
+  public void testSuppressUnregisteredExecutorMessage() throws Exception {
+    storageUtil.expectWrite();
+
+    TaskStatus status = TaskStatus.newBuilder()
+        .setState(TaskState.TASK_KILLED)
+        .setTaskId(TaskID.newBuilder().setValue(TASK_ID_A))
+        .setReason(TaskStatus.Reason.REASON_EXECUTOR_UNREGISTERED)
+        .setMessage("Unregistered executor")
+        .build();
+
+    expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
+        TASK_ID_A,
+        Optional.absent(),
+        KILLED,
+        Optional.absent()))
+        .andReturn(StateChangeResult.SUCCESS);
+
+    final CountDownLatch latch = new CountDownLatch(1);
+
+    driver.acknowledgeStatusUpdate(status);
+    waitAndAnswer(latch);
 
     control.replay();
 
@@ -197,21 +227,19 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
         1000,
         new CachedCounters(stats));
 
-    expect(queue.add(EasyMock.anyObject()))
-        .andReturn(true);
+    expect(queue.add(EasyMock.anyObject())).andReturn(true);
 
-    expect(queue.take())
-        .andAnswer(() -> {
-            throw new RuntimeException();
-          });
+    expect(queue.take()).andAnswer(new IAnswer<TaskStatus>() {
+      @Override
+      public TaskStatus answer() throws Throwable {
+        throw new RuntimeException();
+      }
+    });
 
     final CountDownLatch latch = new CountDownLatch(1);
 
     driver.abort();
-    expectLastCall().andAnswer(() -> {
-        latch.countDown();
-        return null;
-      });
+    waitAndAnswer(latch);
 
     control.replay();
 
@@ -226,5 +254,15 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     statusHandler.statusUpdate(status);
 
     assertTrue(latch.await(5L, TimeUnit.SECONDS));
+  }
+
+  private static void waitAndAnswer(CountDownLatch latch) {
+    expectLastCall().andAnswer(new IAnswer<StateChangeResult>() {
+      @Override
+      public StateChangeResult answer() {
+        latch.countDown();
+        return null;
+      }
+    });
   }
 }
