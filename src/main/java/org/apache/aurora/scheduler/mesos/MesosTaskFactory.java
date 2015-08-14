@@ -30,7 +30,6 @@ import com.twitter.common.quantity.Data;
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.base.CommandUtil;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.SchedulerException;
@@ -110,7 +109,7 @@ public interface MesosTaskFactory {
      * anyway.
      */
     @VisibleForTesting
-    static final Resources RESOURCES_EPSILON = new Resources(
+    static final ResourceSlot RESOURCES_EPSILON = new ResourceSlot(
         0.01,
         Amount.of(32L, Data.MB),
         Amount.of(1L, Data.MB),
@@ -130,12 +129,13 @@ public interface MesosTaskFactory {
       }
 
       ITaskConfig config = task.getTask();
-      ResourceSlot resourceSlot =
-          ResourceSlot.subtract(ResourceSlot.from(config, executorSettings), RESOURCES_EPSILON);
+      ResourceSlot resourceSlot = ResourceSlot.from(config)
+          .withOverhead(executorSettings)
+          .subtract(RESOURCES_EPSILON);
 
       // TODO(wfarner): Re-evaluate if/why we need to continue handling unset assignedPorts field.
-      List<Resource> resources = resourceSlot
-          .toResourceList(task.isSetAssignedPorts()
+      List<Resource> resources = resourceSlot.toResourceList(
+          task.isSetAssignedPorts()
               ? ImmutableSet.copyOf(task.getAssignedPorts().values())
               : ImmutableSet.of());
 

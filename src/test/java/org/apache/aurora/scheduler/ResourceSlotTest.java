@@ -13,30 +13,52 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.util.Set;
+
+import com.google.common.base.Function;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+
+import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.mesos.Protos;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.ResourceSlot.makeMesosRangeResource;
+import static org.apache.aurora.scheduler.ResourceSlot.makeMesosResource;
+import static org.apache.aurora.scheduler.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 public class ResourceSlotTest {
 
-  private static final Resources NEGATIVE_ONE =
-      new Resources(-1.0, Amount.of(-1L, Data.MB), Amount.of(-1L, Data.MB), -1);
-  private static final Resources ONE =
-      new Resources(1.0, Amount.of(1L, Data.MB), Amount.of(1L, Data.MB), 1);
-  private static final Resources TWO =
-      new Resources(2.0, Amount.of(2L, Data.MB), Amount.of(2L, Data.MB), 2);
-  private static final Resources THREE =
-      new Resources(3.0, Amount.of(3L, Data.MB), Amount.of(3L, Data.MB), 3);
+  private static final ResourceSlot NEGATIVE_ONE =
+      new ResourceSlot(-1.0, Amount.of(-1L, Data.MB), Amount.of(-1L, Data.MB), -1);
+  private static final ResourceSlot ONE =
+      new ResourceSlot(1.0, Amount.of(1L, Data.MB), Amount.of(1L, Data.MB), 1);
+  private static final ResourceSlot TWO =
+      new ResourceSlot(2.0, Amount.of(2L, Data.MB), Amount.of(2L, Data.MB), 2);
+  private static final ResourceSlot THREE =
+      new ResourceSlot(3.0, Amount.of(3L, Data.MB), Amount.of(3L, Data.MB), 3);
+  private static final ITaskConfig TASK = ITaskConfig.build(new TaskConfig()
+      .setNumCpus(1.0)
+      .setRamMb(1024)
+      .setDiskMb(2048)
+      .setRequestedPorts(ImmutableSet.of("http", "debug")));
 
   @Test
   public void testMaxElements() {
-    Resources highRAM = new Resources(1, Amount.of(8L, Data.GB), Amount.of(10L, Data.MB), 0);
-    Resources rest = new Resources(10, Amount.of(1L, Data.MB), Amount.of(10L, Data.GB), 1);
+    ResourceSlot highRAM = new ResourceSlot(1, Amount.of(8L, Data.GB), Amount.of(10L, Data.MB), 0);
+    ResourceSlot rest = new ResourceSlot(10, Amount.of(1L, Data.MB), Amount.of(10L, Data.GB), 1);
 
-    Resources result = ResourceSlot.maxElements(highRAM, rest);
+    ResourceSlot result = ResourceSlot.maxElements(highRAM, rest);
     assertEquals(result.getNumCpus(), 10, 0.001);
     assertEquals(result.getRam(), Amount.of(8L, Data.GB));
     assertEquals(result.getDisk(), Amount.of(10L, Data.GB));
@@ -45,16 +67,86 @@ public class ResourceSlotTest {
 
   @Test
   public void testSubtract() {
-    assertEquals(ONE, ResourceSlot.subtract(TWO, ONE));
-    assertEquals(TWO, ResourceSlot.subtract(THREE, ONE));
-    assertEquals(NEGATIVE_ONE, ResourceSlot.subtract(ONE, TWO));
-    assertEquals(NEGATIVE_ONE, ResourceSlot.subtract(TWO, THREE));
+    assertEquals(ONE, TWO.subtract(ONE));
+    assertEquals(TWO, THREE.subtract(ONE));
+    assertEquals(NEGATIVE_ONE, ONE.subtract(TWO));
+    assertEquals(NEGATIVE_ONE, TWO.subtract(THREE));
   }
 
   @Test
-  public void testSum() {
-    assertEquals(TWO, ResourceSlot.sum(ONE, ONE));
-    assertEquals(THREE, ResourceSlot.sum(ONE, TWO));
-    assertEquals(THREE, ResourceSlot.sum(TWO, ONE));
+  public void testAdd() {
+    assertEquals(TWO, ONE.add(ONE));
+    assertEquals(THREE, ONE.add(TWO));
+    assertEquals(THREE, TWO.add(ONE));
+  }
+
+  @Test
+  public void testToResourceList() {
+    ResourceSlot resources = ResourceSlot.from(TASK);
+    Set<Integer> ports = ImmutableSet.of(80, 443);
+    assertEquals(
+        ImmutableSet.of(
+            makeMesosResource(CPUS, TASK.getNumCpus()),
+            makeMesosResource(RAM_MB, TASK.getRamMb()),
+            makeMesosResource(DISK_MB, TASK.getDiskMb()),
+            makeMesosRangeResource(PORTS, ports)),
+        ImmutableSet.copyOf(resources.toResourceList(ports)));
+  }
+
+  @Test
+  public void testToResourceListNoPorts() {
+    ResourceSlot resources = ResourceSlot.from(TASK);
+    assertEquals(
+        ImmutableSet.of(
+            makeMesosResource(CPUS, TASK.getNumCpus()),
+            makeMesosResource(RAM_MB, TASK.getRamMb()),
+            makeMesosResource(DISK_MB, TASK.getDiskMb())),
+        ImmutableSet.copyOf(resources.toResourceList(ImmutableSet.of())));
+  }
+
+  @Test
+  public void testRangeResourceEmpty() {
+    expectRanges(ImmutableSet.of(), ImmutableSet.of());
+  }
+
+  @Test
+  public void testRangeResourceOneEntry() {
+    expectRanges(ImmutableSet.of(Pair.of(5L, 5L)), ImmutableSet.of(5));
+    expectRanges(ImmutableSet.of(Pair.of(0L, 0L)), ImmutableSet.of(0));
+  }
+
+  @Test
+  public void testRangeResourceNonContiguous() {
+    expectRanges(ImmutableSet.of(Pair.of(1L, 1L), Pair.of(3L, 3L), Pair.of(5L, 5L)),
+        ImmutableSet.of(5, 1, 3));
+  }
+
+  @Test
+  public void testRangeResourceContiguous() {
+    expectRanges(ImmutableSet.of(Pair.of(1L, 2L), Pair.of(4L, 5L), Pair.of(7L, 9L)),
+        ImmutableSet.of(8, 2, 4, 5, 7, 9, 1));
+  }
+
+  @Test
+  public void testEqualsBadType() {
+    ResourceSlot resources = ResourceSlot.from(TASK);
+    assertNotEquals(resources, "Hello");
+    assertNotEquals(resources, null);
+  }
+
+  private void expectRanges(Set<Pair<Long, Long>> expected, Set<Integer> values) {
+    Protos.Resource resource = makeMesosRangeResource(PORTS, values);
+    assertEquals(Protos.Value.Type.RANGES, resource.getType());
+    assertEquals(PORTS.getName(), resource.getName());
+
+    Set<Pair<Long, Long>> actual = ImmutableSet.copyOf(Iterables.transform(
+        resource.getRanges().getRangeList(),
+        new Function<Protos.Value.Range, Pair<Long, Long>>() {
+          @Override
+          public Pair<Long, Long> apply(Protos.Value.Range range) {
+            return Pair.of(range.getBegin(), range.getEnd());
+          }
+        }));
+    assertEquals(expected, actual);
   }
 }

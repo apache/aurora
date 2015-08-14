@@ -32,7 +32,6 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -149,7 +148,7 @@ public interface TaskAssigner {
           continue;
         }
         Set<Veto> vetoes = filter.filter(
-            new UnusedResource(ResourceSlot.from(offer.getOffer()), offer.getAttributes()),
+            new UnusedResource(Resources.from(offer.getOffer()).slot(), offer.getAttributes()),
             resourceRequest);
         if (vetoes.isEmpty()) {
           TaskInfo taskInfo = assign(

@@ -24,12 +24,15 @@ import com.google.inject.multibindings.Multibinder;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.Command;
 
-import org.apache.aurora.scheduler.Resources;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.mesos.Protos.Value.Type.RANGES;
 import static org.apache.mesos.Protos.Value.Type.SCALAR;
@@ -86,13 +89,13 @@ public class ClusterSimulatorModule extends AbstractModule {
 
     String host = slaveId + "-hostname";
     return Offer.newBuilder()
-        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(Resources.CPUS)
+        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(CPUS.getName())
             .setScalar(Protos.Value.Scalar.newBuilder().setValue(cpu)))
-        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(Resources.RAM_MB)
+        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(RAM_MB.getName())
             .setScalar(Protos.Value.Scalar.newBuilder().setValue(ramMb)))
-        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(Resources.DISK_MB)
+        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(DISK_MB.getName())
             .setScalar(Protos.Value.Scalar.newBuilder().setValue(diskMb)))
-        .addResources(Protos.Resource.newBuilder().setType(RANGES).setName(Resources.PORTS)
+        .addResources(Protos.Resource.newBuilder().setType(RANGES).setName(PORTS.getName())
             .setRanges(portRanges))
         .addAttributes(Protos.Attribute.newBuilder().setType(Protos.Value.Type.TEXT)
             .setName("host")

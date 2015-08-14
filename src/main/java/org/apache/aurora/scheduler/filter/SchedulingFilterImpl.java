@@ -73,7 +73,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
       return range;
     }
 
-    private ResourceVector(String name, int range) {
+    ResourceVector(String name, int range) {
       this.name = name;
       this.range = range;
     }
@@ -204,6 +204,6 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     // 4. Resource check (lowest score).
     return getResourceVetoes(
         resource.getResourceSlot(),
-        ResourceSlot.from(request.getTask(), executorSettings));
+        ResourceSlot.from(request.getTask()).withOverhead(executorSettings));
   }
 }

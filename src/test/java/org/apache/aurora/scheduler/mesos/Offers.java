@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.mesos;
 
 import com.twitter.common.collections.Pair;
 
-import org.apache.aurora.scheduler.Resources;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
@@ -25,6 +24,11 @@ import org.apache.mesos.Protos.Value.Range;
 import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Type;
+
+import static org.apache.aurora.scheduler.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
 
 public final class Offers {
   private Offers() {
@@ -43,13 +47,13 @@ public final class Offers {
         .build();
 
     return Offer.newBuilder()
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.CPUS)
+        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(CPUS.getName())
             .setScalar(Scalar.newBuilder().setValue(cpu)))
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.RAM_MB)
+        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(RAM_MB.getName())
             .setScalar(Scalar.newBuilder().setValue(ramMb)))
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.DISK_MB)
+        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(DISK_MB.getName())
             .setScalar(Scalar.newBuilder().setValue(diskMb)))
-        .addResources(Resource.newBuilder().setType(Type.RANGES).setName(Resources.PORTS)
+        .addResources(Resource.newBuilder().setType(Type.RANGES).setName(PORTS.getName())
             .setRanges(portRanges))
         .addAttributes(Protos.Attribute.newBuilder().setType(Type.TEXT)
             .setName("host")

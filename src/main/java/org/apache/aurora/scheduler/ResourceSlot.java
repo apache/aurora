@@ -13,77 +13,181 @@
  */
 package org.apache.aurora.scheduler;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
+import com.google.common.collect.Range;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
+import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
-import org.apache.aurora.scheduler.preemptor.PreemptionVictim;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 
-import static org.apache.mesos.Protos.Offer;
+import static java.util.Objects.requireNonNull;
+
+import static com.twitter.common.quantity.Data.BYTES;
+
+import static org.apache.aurora.scheduler.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
 
 /**
- * Resource containing class that is aware of executor overhead.
+ * Represents a single task/host aggregate resource vector unaware of any Mesos resource traits.
  */
 public final class ResourceSlot {
-  // TODO(zmanji): Remove this class and overhead in 0.8.0 (AURORA-906)
 
-  private final Resources resources;
+  private final double numCpus;
+  private final Amount<Long, Data> disk;
+  private final Amount<Long, Data> ram;
+  private final int numPorts;
+
+  /**
+   * Empty ResourceSlot value.
+   */
+  public static final ResourceSlot NONE =
+      new ResourceSlot(0, Amount.of(0L, Data.BITS), Amount.of(0L, Data.BITS), 0);
+
+  public ResourceSlot(
+      double numCpus,
+      Amount<Long, Data> ram,
+      Amount<Long, Data> disk,
+      int numPorts) {
+
+    this.numCpus = numCpus;
+    this.ram = requireNonNull(ram);
+    this.disk = requireNonNull(disk);
+    this.numPorts = numPorts;
+  }
 
   /**
    * Minimum resources required to run Thermos. In the wild Thermos needs about 0.01 CPU and
    * about 170MB (peak usage) of RAM. The RAM requirement has been rounded up to a power of 2.
    */
   @VisibleForTesting
-  public static final Resources MIN_THERMOS_RESOURCES = new Resources(
+  public static final ResourceSlot MIN_THERMOS_RESOURCES = new ResourceSlot(
       0.01,
       Amount.of(256L, Data.MB),
       Amount.of(1L, Data.MB),
       0);
 
-  private ResourceSlot(Resources r) {
-    this.resources = r;
-  }
-
-  public static ResourceSlot from(ITaskConfig task, ExecutorSettings executorSettings) {
-    return from(Resources.from(task), executorSettings);
-  }
-
-  public static ResourceSlot from(PreemptionVictim victim, ExecutorSettings executorSettings) {
-    return from(victim.getResources(), executorSettings);
-  }
-
-  private static ResourceSlot from(Resources resources, ExecutorSettings executorSettings) {
-    // Apply a flat 'tax' of executor overhead resources to the task.
-    Resources requiredTaskResources = sum(
-        resources,
-        executorSettings.getExecutorOverhead());
-
-    // Upsize tasks smaller than the minimum resources required to run the executor.
-    return new ResourceSlot(maxElements(requiredTaskResources, MIN_THERMOS_RESOURCES));
+  /**
+   * Extracts the resources required from a task.
+   *
+   * @param task Task to get resources from.
+   * @return The resources required by the task.
+   */
+  public static ResourceSlot from(ITaskConfig task) {
+    requireNonNull(task);
+    return new ResourceSlot(
+        task.getNumCpus(),
+        Amount.of(task.getRamMb(), Data.MB),
+        Amount.of(task.getDiskMb(), Data.MB),
+        task.getRequestedPorts().size());
   }
 
   /**
-   * Generates a Resource where each resource component is a max out of the two components.
+   * Adapts this slot object to a list of mesos resources.
+   *
+   * @param selectedPorts The ports selected, to be applied as concrete task ranges.
+   * @return Mesos resources.
+   */
+  public List<Protos.Resource> toResourceList(Set<Integer> selectedPorts) {
+    ImmutableList.Builder<Protos.Resource> resourceBuilder =
+        ImmutableList.<Protos.Resource>builder()
+            .add(makeMesosResource(CPUS, numCpus))
+            .add(makeMesosResource(DISK_MB, disk.as(Data.MB)))
+            .add(makeMesosResource(RAM_MB, ram.as(Data.MB)));
+    if (!selectedPorts.isEmpty()) {
+      resourceBuilder.add(makeMesosRangeResource(PORTS, selectedPorts));
+    }
+
+    return resourceBuilder.build();
+  }
+
+  /**
+   * Convenience method for adapting to mesos resources without applying a port range.
+   *
+   * @see {@link #toResourceList(java.util.Set)}
+   * @return Mesos resources.
+   */
+  public List<Protos.Resource> toResourceList() {
+    return toResourceList(ImmutableSet.of());
+  }
+
+  /**
+   * Adds executor resource overhead.
+   *
+   * @param executorSettings Executor settings to get executor overhead from.
+   * @return ResourceSlot with overhead applied.
+   */
+  public ResourceSlot withOverhead(ExecutorSettings executorSettings) {
+    // Apply a flat 'tax' of executor overhead resources to the task.
+    ResourceSlot requiredTaskResources = add(executorSettings.getExecutorOverhead());
+
+    // Upsize tasks smaller than the minimum resources required to run the executor.
+    return maxElements(requiredTaskResources, MIN_THERMOS_RESOURCES);
+  }
+
+  /**
+   * Creates a mesos resource of integer ranges.
+   *
+   * @param resourceType Resource type.
+   * @param values Values to translate into ranges.
+   * @return A mesos ranges resource.
+   */
+  @VisibleForTesting
+  static Protos.Resource makeMesosRangeResource(
+      ResourceType resourceType,
+      Set<Integer> values) {
+
+    return Protos.Resource.newBuilder()
+        .setName(resourceType.getName())
+        .setType(Protos.Value.Type.RANGES)
+        .setRanges(Protos.Value.Ranges.newBuilder()
+            .addAllRange(Iterables.transform(Numbers.toRanges(values), RANGE_TRANSFORM)))
+        .build();
+  }
+
+  /**
+   * Creates a scalar mesos resource.
+   *
+   * @param resourceType Resource type.
+   * @param value Value for the resource.
+   * @return A mesos resource.
+   */
+  @VisibleForTesting
+  static Protos.Resource makeMesosResource(ResourceType resourceType, double value) {
+    return Protos.Resource.newBuilder()
+        .setName(resourceType.getName())
+        .setType(Protos.Value.Type.SCALAR)
+        .setScalar(Protos.Value.Scalar.newBuilder().setValue(value))
+        .build();
+  }
+
+  /**
+   * Generates a ResourceSlot where each resource component is a max out of the two components.
    *
    * @param a A resource to compare.
    * @param b A resource to compare.
    *
-   * @return Returns a Resources instance where each component is a max of the two components.
+   * @return Returns a ResourceSlot instance where each component is a max of the two components.
    */
   @VisibleForTesting
-  static Resources maxElements(Resources a, Resources b) {
+  static ResourceSlot maxElements(ResourceSlot a, ResourceSlot b) {
     double maxCPU = Math.max(a.getNumCpus(), b.getNumCpus());
     Amount<Long, Data> maxRAM = Amount.of(
         Math.max(a.getRam().as(Data.MB), b.getRam().as(Data.MB)),
@@ -93,27 +197,43 @@ public final class ResourceSlot {
         Data.MB);
     int maxPorts = Math.max(a.getNumPorts(), b.getNumPorts());
 
-    return new Resources(maxCPU, maxRAM, maxDisk, maxPorts);
+    return new ResourceSlot(maxCPU, maxRAM, maxDisk, maxPorts);
   }
 
-  public static ResourceSlot from(Offer offer) {
-    return new ResourceSlot(Resources.from(offer));
-  }
-
+  /**
+   * Number of CPUs.
+   *
+   * @return CPUs.
+   */
   public double getNumCpus() {
-    return resources.getNumCpus();
+    return numCpus;
   }
 
-  public Amount<Long, Data> getRam() {
-    return resources.getRam();
-  }
-
+  /**
+   * Disk amount.
+   *
+   * @return Disk.
+   */
   public Amount<Long, Data> getDisk() {
-    return resources.getDisk();
+    return disk;
   }
 
+  /**
+   * RAM amount.
+   *
+   * @return RAM.
+   */
+  public Amount<Long, Data> getRam() {
+    return ram;
+  }
+
+  /**
+   * Number of ports.
+   *
+   * @return Port count.
+   */
   public int getNumPorts() {
-    return resources.getNumPorts();
+    return numPorts;
   }
 
   @Override
@@ -123,71 +243,69 @@ public final class ResourceSlot {
     }
 
     ResourceSlot other = (ResourceSlot) o;
-    return resources.equals(other.resources);
+    return Objects.equals(numCpus, other.numCpus)
+        && Objects.equals(ram, other.ram)
+        && Objects.equals(disk, other.disk)
+        && Objects.equals(numPorts, other.numPorts);
   }
 
   @Override
   public int hashCode() {
-    return resources.hashCode();
+    return Objects.hash(numCpus, ram, disk, numPorts);
   }
 
-  public static ResourceSlot sum(ResourceSlot... rs) {
-    return sum(Arrays.asList(rs));
-  }
+  /**
+   * Sums up all resources in {@code slots}.
+   *
+   * @param slots Resource slots to sum up.
+   * @return Sum of all resource slots.
+   */
+  public static ResourceSlot sum(Iterable<ResourceSlot> slots) {
+    ResourceSlot sum = NONE;
 
-  public static ResourceSlot sum(Iterable<ResourceSlot> rs) {
-    Resources sum = Resources.NONE;
-
-    for (ResourceSlot r : rs) {
-      double numCpus = sum.getNumCpus() + r.getNumCpus();
-      Amount<Long, Data> disk =
-          Amount.of(sum.getDisk().as(Data.BYTES) + r.getDisk().as(Data.BYTES), Data.BYTES);
-      Amount<Long, Data> ram =
-          Amount.of(sum.getRam().as(Data.BYTES) + r.getRam().as(Data.BYTES), Data.BYTES);
-      int ports = sum.getNumPorts() + r.getNumPorts();
-      sum = new Resources(numCpus, ram, disk, ports);
+    for (ResourceSlot r : slots) {
+      sum = sum.add(r);
     }
 
-    return new ResourceSlot(sum);
+    return sum;
   }
 
-  @VisibleForTesting
-  public static Resources sum(Resources a, Resources b) {
-    return sum(ImmutableList.of(new ResourceSlot(a), new ResourceSlot(b))).resources;
+  /**
+   * Adds {@code other}.
+   *
+   * @param other Resource slot to add.
+   * @return Result.
+   */
+  public ResourceSlot add(ResourceSlot other) {
+    return new ResourceSlot(
+        getNumCpus() + other.getNumCpus(),
+        Amount.of(getRam().as(BYTES) + other.getRam().as(BYTES), BYTES),
+        Amount.of(getDisk().as(BYTES) + other.getDisk().as(BYTES), BYTES),
+        getNumPorts() + other.getNumPorts());
   }
 
-  public static ResourceSlot subtract(ResourceSlot a, Resources b) {
-    return new ResourceSlot(subtract(a.resources, b));
+  /**
+   * Subtracts {@code other}.
+   *
+   * @param other Resource slot to subtract.
+   * @return Result.
+   */
+  public ResourceSlot subtract(ResourceSlot other) {
+    return new ResourceSlot(
+        getNumCpus() - other.getNumCpus(),
+        Amount.of(getRam().as(BYTES) - other.getRam().as(BYTES), BYTES),
+        Amount.of(getDisk().as(BYTES) - other.getDisk().as(BYTES), BYTES),
+        getNumPorts() - other.getNumPorts());
   }
-
-  @VisibleForTesting
-  static Resources subtract(Resources a, Resources b) {
-    return new Resources(
-        a.getNumCpus() - b.getNumCpus(),
-        Amount.of(a.getRam().as(Data.MB) - b.getRam().as(Data.MB), Data.MB),
-        Amount.of(a.getDisk().as(Data.MB) - b.getDisk().as(Data.MB), Data.MB),
-        a.getNumPorts() - b.getNumPorts());
-  }
-
-  public List<Protos.Resource> toResourceList(Set<Integer> selectedPorts) {
-    return resources.toResourceList(selectedPorts);
-  }
-
-  public static final Ordering<ResourceSlot> ORDER = new Ordering<ResourceSlot>() {
-    @Override
-    public int compare(ResourceSlot left, ResourceSlot right) {
-      return RESOURCE_ORDER.compare(left.resources, right.resources);
-    }
-  };
 
   /**
    * A Resources object is greater than another iff _all_ of its resource components are greater
    * or equal. A Resources object compares as equal if some but not all components are greater than
    * or equal to the other.
    */
-  public static final Ordering<Resources> RESOURCE_ORDER = new Ordering<Resources>() {
+  public static final Ordering<ResourceSlot> ORDER = new Ordering<ResourceSlot>() {
     @Override
-    public int compare(Resources left, Resources right) {
+    public int compare(ResourceSlot left, ResourceSlot right) {
       int diskC = left.getDisk().compareTo(right.getDisk());
       int ramC = left.getRam().compareTo(right.getRam());
       int portC = Integer.compare(left.getNumPorts(), right.getNumPorts());
@@ -213,4 +331,15 @@ public final class ResourceSlot {
   };
 
   private static final Predicate<Integer> IS_ZERO = e -> e == 0;
+
+  private static final Function<Range<Integer>, Protos.Value.Range> RANGE_TRANSFORM =
+      new Function<Range<Integer>, Protos.Value.Range>() {
+        @Override
+        public Protos.Value.Range apply(Range<Integer> input) {
+          return Protos.Value.Range.newBuilder()
+              .setBegin(input.lowerEndpoint())
+              .setEnd(input.upperEndpoint())
+              .build();
+        }
+      };
 }

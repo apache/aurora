@@ -76,7 +76,7 @@ import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
-import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.FlushableWorkQueue;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
@@ -197,7 +197,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         bind(DriverFactory.class).toInstance(driverFactory);
         bind(DriverSettings.class).toInstance(SETTINGS);
         bind(Log.class).toInstance(log);
-        Resources executorOverhead = new Resources(
+        ResourceSlot executorOverhead = new ResourceSlot(
             0.1,
             Amount.of(1L, Data.MB),
             Amount.of(0L, Data.MB),

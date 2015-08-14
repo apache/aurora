@@ -16,7 +16,7 @@ package org.apache.aurora.scheduler.mesos;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
-import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.ResourceSlot;
 
 /**
  * Utility class to contain constants related to setting up executor settings.
@@ -40,6 +40,6 @@ public final class TaskExecutors {
           .setExecutorPath(EXECUTOR_PATH)
           .setThermosObserverRoot("/var/run/thermos")
           .setExecutorOverhead(
-              new Resources(0.01, Amount.of(256L, Data.MB), Amount.of(0L, Data.MB), 0))
+              new ResourceSlot(0.01, Amount.of(256L, Data.MB), Amount.of(0L, Data.MB), 0))
           .build();
 }

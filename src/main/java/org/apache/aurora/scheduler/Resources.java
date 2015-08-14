@@ -18,9 +18,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableList;
@@ -31,28 +29,22 @@ import com.google.common.collect.Sets;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
-import org.apache.aurora.scheduler.base.Numbers;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Value.Range;
-import org.apache.mesos.Protos.Value.Ranges;
-import org.apache.mesos.Protos.Value.Scalar;
-import org.apache.mesos.Protos.Value.Type;
 
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.scheduler.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
 
 /**
  * A container for multiple resource vectors.
  * TODO(wfarner): Collapse this in with ResourceAggregates AURORA-105.
  */
-public class Resources {
-
-  public static final String CPUS = "cpus";
-  public static final String RAM_MB = "mem";
-  public static final String DISK_MB = "disk";
-  public static final String PORTS = "ports";
-
+public final class Resources {
   private static final Function<Range, Set<Integer>> RANGE_TO_MEMBERS =
       new Function<Range, Set<Integer>>() {
         @Override
@@ -68,48 +60,11 @@ public class Resources {
   private final Amount<Long, Data> ram;
   private final int numPorts;
 
-  /**
-   * Creates a new resources object.
-   *
-   * @param numCpus Number of CPUs.
-   * @param ram Amount of RAM.
-   * @param disk Amount of disk.
-   * @param numPorts Number of ports.
-   */
-  public Resources(double numCpus, Amount<Long, Data> ram, Amount<Long, Data> disk, int numPorts) {
+  private Resources(double numCpus, Amount<Long, Data> ram, Amount<Long, Data> disk, int numPorts) {
     this.numCpus = numCpus;
     this.ram = requireNonNull(ram);
     this.disk = requireNonNull(disk);
     this.numPorts = numPorts;
-  }
-
-  /**
-   * Adapts this resources object to a list of mesos resources.
-   *
-   * @param selectedPorts The ports selected, to be applied as concrete task ranges.
-   * @return Mesos resources.
-   */
-  public List<Resource> toResourceList(Set<Integer> selectedPorts) {
-    ImmutableList.Builder<Resource> resourceBuilder =
-        ImmutableList.<Resource>builder()
-            .add(Resources.makeMesosResource(CPUS, numCpus))
-            .add(Resources.makeMesosResource(DISK_MB, disk.as(Data.MB)))
-            .add(Resources.makeMesosResource(RAM_MB, ram.as(Data.MB)));
-    if (!selectedPorts.isEmpty()) {
-      resourceBuilder.add(Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts));
-    }
-
-    return resourceBuilder.build();
-  }
-
-  /**
-   * Convenience method for adapting to mesos resources without applying a port range.
-   *
-   * @see {@link #toResourceList(java.util.Set)}
-   * @return Mesos resources.
-   */
-  public List<Resource> toResourceList() {
-    return toResourceList(ImmutableSet.of());
   }
 
   @Override
@@ -141,37 +96,6 @@ public class Resources {
   }
 
   /**
-   * Extracts the resources required from a task.
-   *
-   * @param task Task to get resources from.
-   * @return The resources required by the task.
-   */
-  public static Resources from(ITaskConfig task) {
-    requireNonNull(task);
-    return new Resources(
-        task.getNumCpus(),
-        Amount.of(task.getRamMb(), Data.MB),
-        Amount.of(task.getDiskMb(), Data.MB),
-        task.getRequestedPorts().size());
-  }
-
-  /**
-   * Extracts the resources specified in a list of resource objects.
-   *
-   * @param resources Resources to translate.
-   * @return The canonical resources.
-   */
-  public static Resources from(List<Resource> resources) {
-    requireNonNull(resources);
-    return new Resources(
-        getScalarValue(resources, CPUS),
-        Amount.of((long) getScalarValue(resources, RAM_MB), Data.MB),
-        Amount.of((long) getScalarValue(resources, DISK_MB), Data.MB),
-        getNumAvailablePorts(resources)
-    );
-  }
-
-  /**
    * Extracts the resources available in a slave offer.
    *
    * @param offer Offer to get resources from.
@@ -180,15 +104,11 @@ public class Resources {
   public static Resources from(Offer offer) {
     requireNonNull(offer);
     return new Resources(
-        getScalarValue(offer, CPUS),
-        Amount.of((long) getScalarValue(offer, RAM_MB), Data.MB),
-        Amount.of((long) getScalarValue(offer, DISK_MB), Data.MB),
+        getScalarValue(offer, CPUS.getName()),
+        Amount.of((long) getScalarValue(offer, RAM_MB.getName()), Data.MB),
+        Amount.of((long) getScalarValue(offer, DISK_MB.getName()), Data.MB),
         getNumAvailablePorts(offer.getResourcesList()));
   }
-
-  @VisibleForTesting
-  public static final Resources NONE =
-      new Resources(0, Amount.of(0L, Data.BITS), Amount.of(0L, Data.BITS), 0);
 
   private static int getNumAvailablePorts(List<Resource> resource) {
     int offeredPorts = 0;
@@ -212,20 +132,11 @@ public class Resources {
   }
 
   private static Resource getResource(List<Resource> resource, String key) {
-    return Iterables.find(resource, withName(key), null);
-  }
-
-  private static Predicate<Resource> withName(final String name) {
-    return new Predicate<Resource>() {
-      @Override
-      public boolean apply(Resource resource) {
-        return resource.getName().equals(name);
-      }
-    };
+    return Iterables.find(resource, e -> e.getName().equals(key), null);
   }
 
   private static Iterable<Range> getPortRanges(List<Resource> resources) {
-    Resource resource = getResource(resources, Resources.PORTS);
+    Resource resource = getResource(resources, PORTS.getName());
     if (resource == null) {
       return ImmutableList.of();
     }
@@ -234,79 +145,12 @@ public class Resources {
   }
 
   /**
-   * Creates a scalar mesos resource.
+   * Gets generalized aggregated resource view.
    *
-   * @param name Name of the resource.
-   * @param value Value for the resource.
-   * @return A mesos resource.
+   * @return {@code ResourceSlot} instance.
    */
-  public static Resource makeMesosResource(String name, double value) {
-    return Resource.newBuilder().setName(name).setType(Type.SCALAR)
-        .setScalar(Scalar.newBuilder().setValue(value)).build();
-  }
-
-  private static final Function<com.google.common.collect.Range<Integer>, Range> RANGE_TRANSFORM =
-      new Function<com.google.common.collect.Range<Integer>, Range>() {
-        @Override
-        public Range apply(com.google.common.collect.Range<Integer> input) {
-          return Range.newBuilder()
-              .setBegin(input.lowerEndpoint())
-              .setEnd(input.upperEndpoint())
-              .build();
-        }
-      };
-
-  /**
-   * Creates a mesos resource of integer ranges.
-   *
-   * @param name Name of the resource
-   * @param values Values to translate into ranges.
-   * @return A mesos ranges resource.
-   */
-  @VisibleForTesting
-  public static Resource makeMesosRangeResource(String name, Set<Integer> values) {
-    return Resource.newBuilder()
-        .setName(name)
-        .setType(Type.RANGES)
-        .setRanges(Ranges.newBuilder()
-            .addAllRange(Iterables.transform(Numbers.toRanges(values), RANGE_TRANSFORM)))
-        .build();
-  }
-
-  /**
-   * Number of CPUs.
-   *
-   * @return CPUs.
-   */
-  public double getNumCpus() {
-    return numCpus;
-  }
-
-  /**
-   * Disk amount.
-   *
-   * @return Disk.
-   */
-  public Amount<Long, Data> getDisk() {
-    return disk;
-  }
-
-  /**
-   * RAM amount.
-   *
-   * @return RAM.
-   */
-  public Amount<Long, Data> getRam() {
-    return ram;
-  }
-
-  /**
-   * Number of ports.
-   *
-   * @return Port count.
-   */
-  public int getNumPorts() {
-    return numPorts;
+  public ResourceSlot slot() {
+    return new ResourceSlot(numCpus, ram, disk, numPorts);
   }
 
   /**

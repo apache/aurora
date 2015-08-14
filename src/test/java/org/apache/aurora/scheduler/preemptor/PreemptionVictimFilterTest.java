@@ -36,7 +36,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
@@ -412,7 +412,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
       Amount<Long, Data> disk,
       int numPorts) {
 
-    List<Resource> resources = new Resources(cpu, ram, disk, numPorts).toResourceList();
+    List<Resource> resources = new ResourceSlot(cpu, ram, disk, numPorts).toResourceList();
     Offer.Builder builder = Offer.newBuilder();
     builder.getIdBuilder().setValue(offerId);
     builder.getFrameworkIdBuilder().setValue("framework-id");

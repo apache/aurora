@@ -34,6 +34,7 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
@@ -57,9 +58,6 @@ import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVe
 import static org.junit.Assert.assertEquals;
 
 public class SchedulingFilterImplTest extends EasyMockTest {
-
-  private static final String TASK_ID = "taskId";
-
   private static final String HOST_A = "hostA";
   private static final String HOST_B = "hostB";
   private static final String HOST_C = "hostC";
@@ -84,8 +82,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final int DEFAULT_CPUS = 4;
   private static final long DEFAULT_RAM = 1000;
   private static final long DEFAULT_DISK = 2000;
-  private static final ResourceSlot DEFAULT_OFFER = ResourceSlot.from(
-      Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 80)));
+  private static final ResourceSlot DEFAULT_OFFER = Resources.from(
+      Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 80))).slot();
 
   private SchedulingFilter defaultFilter;
 
@@ -109,8 +107,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testSufficientPorts() {
     control.replay();
 
-    ResourceSlot twoPorts = ResourceSlot.from(
-        Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 81)));
+    ResourceSlot twoPorts = Resources.from(
+        Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 81))).slot();
 
     ITaskConfig noPortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .newBuilder()

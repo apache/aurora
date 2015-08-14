@@ -20,7 +20,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos;
@@ -88,7 +88,7 @@ final class Offers {
       int id = 0;
       for (IHostAttributes attributes : hostAttributes) {
         Protos.Offer offer = Protos.Offer.newBuilder()
-            .addAllResources(new Resources(cpu, ram, disk, ports).toResourceList())
+            .addAllResources(new ResourceSlot(cpu, ram, disk, ports).toResourceList())
             .setId(Protos.OfferID.newBuilder().setValue(String.format(OFFER_ID_FORMAT, id++)))
             .setFrameworkId(Protos.FrameworkID.newBuilder().setValue(FRAMEWORK_ID))
             .setSlaveId(Protos.SlaveID.newBuilder().setValue(attributes.getSlaveId()))

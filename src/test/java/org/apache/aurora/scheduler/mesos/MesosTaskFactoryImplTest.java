@@ -45,6 +45,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.ResourceSlot.MIN_THERMOS_RESOURCES;
+import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.RESOURCES_EPSILON;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.NO_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.SOME_OVERHEAD_EXECUTOR;
 import static org.junit.Assert.assertEquals;
@@ -88,7 +89,7 @@ public class MesosTaskFactoryImplTest {
       .setExecutorId(MesosTaskFactoryImpl.getExecutorId(TASK.getTaskId()))
       .setName(MesosTaskFactoryImpl.EXECUTOR_NAME)
       .setSource(MesosTaskFactoryImpl.getInstanceSourceName(TASK.getTask(), TASK.getInstanceId()))
-      .addAllResources(MesosTaskFactoryImpl.RESOURCES_EPSILON.toResourceList())
+      .addAllResources(RESOURCES_EPSILON.toResourceList())
       .setCommand(CommandInfo.newBuilder()
           .setValue("./executor.pex")
           .addUris(URI.newBuilder().setValue(NO_OVERHEAD_EXECUTOR.getExecutorPath())
@@ -166,7 +167,7 @@ public class MesosTaskFactoryImplTest {
 
   private void checkTaskResources(ITaskConfig task, TaskInfo taskInfo) {
     assertEquals(
-        ResourceSlot.sum(Resources.from(task), config.getExecutorOverhead()),
+        ResourceSlot.from(task).withOverhead(config),
         getTotalTaskResources(taskInfo));
   }
 
@@ -235,9 +236,18 @@ public class MesosTaskFactoryImplTest {
     assertTrue(taskInfo.getExecutor().getContainer().getVolumesList().contains(expected));
   }
 
-  private static Resources getTotalTaskResources(TaskInfo task) {
-    Resources taskResources = Resources.from(task.getResourcesList());
-    Resources executorResources = Resources.from(task.getExecutor().getResourcesList());
-    return ResourceSlot.sum(taskResources, executorResources);
+  private static ResourceSlot getTotalTaskResources(TaskInfo task) {
+    Resources taskResources = fromResourceList(task.getResourcesList());
+    Resources executorResources = fromResourceList(task.getExecutor().getResourcesList());
+    return taskResources.slot().add(executorResources.slot());
+  }
+
+  private static Resources fromResourceList(Iterable<Protos.Resource> resources) {
+    return Resources.from(Protos.Offer.newBuilder()
+        .setId(Protos.OfferID.newBuilder().setValue("ignored"))
+        .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("ignored"))
+        .setSlaveId(SlaveID.newBuilder().setValue("ignored"))
+        .setHostname("ignored")
+        .addAllResources(resources).build());
   }
 }

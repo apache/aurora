@@ -46,7 +46,7 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
       .setDiskMb(1024));
   private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(TASK);
   private static final UnusedResource RESOURCE = new UnusedResource(
-      ResourceSlot.from(TASK, TaskExecutors.NO_OVERHEAD_EXECUTOR),
+      ResourceSlot.from(TASK).withOverhead(TaskExecutors.NO_OVERHEAD_EXECUTOR),
       IHostAttributes.build(new HostAttributes().setHost("host").setMode(MaintenanceMode.NONE)));
   private static final ResourceRequest REQUEST =
       new ResourceRequest(TASK, AttributeAggregate.EMPTY);

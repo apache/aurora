@@ -47,7 +47,7 @@ import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientCon
 import com.twitter.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 
 import org.apache.aurora.gen.Volume;
-import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.http.HttpService;
@@ -195,7 +195,7 @@ public class SchedulerMain extends AbstractApplication {
         .add(new AbstractModule() {
           @Override
           protected void configure() {
-            Resources executorOverhead = new Resources(
+            ResourceSlot executorOverhead = new ResourceSlot(
                 EXECUTOR_OVERHEAD_CPUS.get(),
                 EXECUTOR_OVERHEAD_RAM.get(),
                 Amount.of(0L, Data.MB),

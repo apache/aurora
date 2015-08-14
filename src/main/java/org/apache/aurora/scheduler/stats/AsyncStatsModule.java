@@ -30,6 +30,7 @@ import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.Conversions;
@@ -139,7 +140,7 @@ public class AsyncStatsModule extends AbstractModule {
         new Function<HostOffer, MachineResource>() {
           @Override
           public MachineResource apply(HostOffer offer) {
-            Resources resources = Resources.from(offer.getOffer());
+            ResourceSlot resources = Resources.from(offer.getOffer()).slot();
             IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate()
                 .setNumCpus(resources.getNumCpus())
                 .setRamMb(resources.getRam().as(Data.MB))
