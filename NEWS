@@ -8,6 +8,11 @@
   * A new apache.aurora.kerberos package has been introduced, containing the Kerberos-supporting
     versions of aurora and aurora_admin (kaurora and kaurora_admin).
   * Most BUILD targets under src/main have been removed, see http://s.apache.org/b8z for details.
+- Upgraded Mesos to 0.23.0. NOTE: Aurora executor now requires openssl runtime dependencies that
+  were not previously enforced. You will need libcurl available on every Mesos slave (or Docker
+  container) to successfully launch Aurora executor. See
+  https://github.com/apache/mesos/blob/ebcf8cc2f2f6c236f6e9315447c247e6348141e1/docs/getting-started.md
+  for more details on Mesos runtime dependencies.
 
 0.9.0
 -----

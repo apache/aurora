@@ -14,4 +14,7 @@
 
 FROM python:2.7
 
+# mesos.native requires libcurl-nss to initialize MesosExecutorDriver
+RUN apt-get update && apt-get -y install libcurl4-nss-dev
+
 COPY http_example.py /tmp/

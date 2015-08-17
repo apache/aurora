@@ -306,6 +306,14 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public Status acceptOffers(
+      Collection<OfferID> offerIds,
+      Collection<Offer.Operation> operations,
+      Filters filters) {
+    throw new UnsupportedOperationException();
+  }
+
   private static final class Task {
     private final Offer offer;
     private final TaskInfo task;

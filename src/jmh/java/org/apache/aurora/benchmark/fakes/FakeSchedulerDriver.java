@@ -92,6 +92,14 @@ public class FakeSchedulerDriver implements SchedulerDriver {
   }
 
   @Override
+  public Protos.Status acceptOffers(
+      Collection<Protos.OfferID> offerIds,
+      Collection<Protos.Offer.Operation> operations,
+      Protos.Filters filters) {
+    return null;
+  }
+
+  @Override
   public Protos.Status declineOffer(
       Protos.OfferID offerId,
       Protos.Filters filters) {

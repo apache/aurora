@@ -22,7 +22,7 @@ apt-get -y install \
     curl \
     git \
     libapr1-dev \
-    libcurl4-openssl-dev \
+    libcurl4-nss-dev \
     libsasl2-dev \
     libsvn-dev \
     lxc-docker \
@@ -34,7 +34,7 @@ update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
 
 readonly IP_ADDRESS=192.168.33.7
 
-readonly MESOS_VERSION=0.22.0
+readonly MESOS_VERSION=0.23.0
 
 function prepare_extras() {
   pushd aurora

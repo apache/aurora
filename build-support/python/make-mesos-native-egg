@@ -20,7 +20,7 @@ EOF
 }
 
 setup_tempdir() {
-  TMPDIR=""
+  TMPDIR="/tmp"
   cleanup() {
     if [[ -f Vagrantfile ]]; then
       vagrant destroy -f
@@ -91,7 +91,10 @@ EOF
 CENTOS6_X86_64_DEPENDENCIES=(
   apr-devel
   cyrus-sasl-devel
-  gcc-c++
+  cyrus-sasl-md5
+  devtoolset-2-binutils
+  devtoolset-2-gcc
+  devtoolset-2-gcc-c++
   libcurl-devel
   patch
   python27-python-devel
@@ -111,7 +114,13 @@ build_centos6() {
 
     # We need Software Collections for Python 2.7 (we dropped support for 2.6).
     sudo yum -y install centos-release-SCL
+
+    # Mesos requires gcc 4.8, which is available in devtools-2 on centos 6.
+    # TODO(maxim): Consider using signed packages when/if available.
+    sudo wget http://people.centos.org/tru/devtools-2/devtools-2.repo -O /etc/yum.repos.d/devtools-2.repo
+
     sudo yum -y install ${CENTOS6_X86_64_DEPENDENCIES[*]}
+    scl enable devtoolset-2 bash
     scl enable python27 - <<EOS
         $(fetch_and_build_mesos "$mesos_version")
 EOS
@@ -124,6 +133,7 @@ EOF
 CENTOS7_X86_64_DEPENDENCIES=(
   apr-devel
   cyrus-sasl-devel
+  cyrus-sasl-md5
   gcc-c++
   libcurl-devel
   patch
