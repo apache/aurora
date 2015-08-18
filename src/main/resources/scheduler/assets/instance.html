@@ -1,0 +1,106 @@
+<div class='container-fluid'>
+  <!--
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+   -->
+  <div ng-show='error'>
+    <error></error>
+  </div>
+
+  <div ng-hide='error'>
+    <breadcrumb></breadcrumb>
+
+    <div class='row'>
+      <div class='col-md-12'>
+        <div class='page-header'>
+          <h2 class='text-center'>
+            Instance <em>{{instance}}</em> of job <em>{{job}}</em> in role <em>{{role}}</em> and
+            environment <em>{{environment}}</em>
+          </h2>
+        </div>
+      </div>
+    </div>
+
+    <div ng-if="!tasksReady">
+      <div class="row">
+        <div class="col-md-12">
+          Loading instance information.
+          <span class="glyphicon glyphicon-refresh loading" aria-hidden="true"></span>
+        </div>
+      </div>
+    </div>
+
+    <div ng-if="tasksReady">
+      <div ng-if="activeTasks.length === 0">
+        <h3>No Active Tasks</h3>
+      </div>
+      <div ng-if="activeTasks.length > 0">
+        <h3>Active Task</h3>
+        <div class="row">
+          <div class="col-md-6">
+            <h4>Task Details</h4>
+            <table class="table table-bordered table-striped">
+              <tbody>
+                <tr>
+                  <td><strong>Current Status</strong></td>
+                  <td>{{activeTasks[0].status}}</td>
+                </tr>
+                <tr>
+                  <td><strong>Task ID</strong></td>
+                  <td><a ng-href="/structdump/task/{{activeTasks[0].taskId}}">{{activeTasks[0].taskId}}</a></td>
+                </tr>
+                <tr>
+                  <td><strong>Host</strong></td>
+                  <td><a ng-href="http://{{activeTasks[0].host}}:1338/task/{{activeTasks[0].taskId}}">{{activeTasks[0].host}}</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="col-md-6">
+            <h4>Status History</h4>
+            <table class="table table-bordered table-striped">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Timestamp</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="e in activeTasks[0].taskEvents">
+                  <td>{{e.status}}</td>
+                  <td>{{e.timestamp | toUtcTime}}</td>
+                  <td>{{e.message}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div ng-if="completedTasks.length === 0">
+        <h3>No Completed Tasks</h3>
+      </div>
+      <div ng-if="completedTasks.length > 0">
+        <h3>Completed Tasks</h3>
+        <div class='container-fluid'>
+          <smart-table config='completedTasksTableConfig'
+                       columns='completedTasksTableColumns'
+                       rows='completedTasks'
+                       class='table table-striped table-hover table-bordered table-condensed'>
+          </smart-table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

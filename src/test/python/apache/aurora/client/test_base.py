@@ -56,3 +56,25 @@ class TestBase(unittest.TestCase):
     resp = Response(responseCode=ResponseCode.OK, result=Result(populateJobResult=PopulateJobResult(
         taskConfig=config)))
     assert config == resp.result.populateJobResult.taskConfig
+
+  def test_synthesize_url(self):
+    base_url = 'http://example.com'
+    role = 'some-role'
+    environment = 'some-environment'
+    job = 'some-job'
+    update_id = 'some-update-id'
+
+    assert (('%s/scheduler/%s/%s/%s/update/%s' % (base_url, role, environment, job, update_id)) ==
+        base.synthesize_url(base_url, role, environment, job, update_id=update_id))
+
+    assert (('%s/scheduler/%s/%s/%s' % (base_url, role, environment, job)) ==
+        base.synthesize_url(base_url, role, environment, job))
+
+    assert (('%s/scheduler/%s/%s' % (base_url, role, environment)) ==
+        base.synthesize_url(base_url, role, environment))
+
+    assert (('%s/scheduler/%s' % (base_url, role)) ==
+        base.synthesize_url(base_url, role))
+
+    assert (('%s/scheduler/%s' % (base_url, role)) ==
+        base.synthesize_url(base_url, role))

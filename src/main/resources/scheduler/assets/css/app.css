@@ -441,6 +441,7 @@ li.instance-rolled-back {
     -webkit-transform: rotate(360deg);
   }
 }
+
 @keyframes spin {
   0% {
     transform: rotate(0deg);
@@ -454,7 +455,8 @@ li.instance-rolled-back {
   text-align: center;
 }
 
-.loading span {
+.loading span,
+span.loading {
   -webkit-animation: spin 1.1s infinite linear;
   animation: spin 1.1s infinite linear;
 }

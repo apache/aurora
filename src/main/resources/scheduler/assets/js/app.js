@@ -32,7 +32,10 @@ var auroraUI;
     $routeProvider.when('/scheduler/:role/:environment/:job',
       {templateUrl: '/assets/job.html', controller: 'JobController'});
 
-    $routeProvider.when('/scheduler/:role/:environment/:job/:update',
+    $routeProvider.when('/scheduler/:role/:environment/:job/:instance',
+      {templateUrl: '/assets/instance.html', controller: 'JobInstanceController'});
+
+    $routeProvider.when('/scheduler/:role/:environment/:job/update/:update',
       {templateUrl: '/assets/update.html', controller: 'UpdateController'});
 
     $routeProvider.when('/updates',

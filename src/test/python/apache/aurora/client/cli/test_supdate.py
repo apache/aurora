@@ -158,7 +158,8 @@ class TestStartUpdate(AuroraClientCommandTest):
         call(ANY, 'hello', None)
     ]
     assert self._fake_context.get_out() == [
-        StartUpdate.UPDATE_MSG_TEMPLATE % ('http://something_or_other/scheduler/role/env/name/id')
+        StartUpdate.UPDATE_MSG_TEMPLATE %
+        ('http://something_or_other/scheduler/role/env/name/update/id')
     ]
     assert self._fake_context.get_err() == []
 
@@ -183,7 +184,8 @@ class TestStartUpdate(AuroraClientCommandTest):
     ]
 
     assert self._fake_context.get_out() == [
-        StartUpdate.UPDATE_MSG_TEMPLATE % ('http://something_or_other/scheduler/role/env/name/id'),
+        StartUpdate.UPDATE_MSG_TEMPLATE %
+        ('http://something_or_other/scheduler/role/env/name/update/id'),
         'Current state ROLLED_FORWARD'
     ]
     assert self._fake_context.get_err() == []

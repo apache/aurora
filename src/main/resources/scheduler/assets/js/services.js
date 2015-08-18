@@ -28,13 +28,18 @@
   */
   'use strict';
 
-  function makeJobTaskQuery(role, environment, jobName) {
+  function makeJobTaskQuery(role, environment, jobName, instance) {
     var id = new Identity();
     id.role = role;
     var taskQuery = new TaskQuery();
     taskQuery.owner = id;
     taskQuery.environment = environment;
     taskQuery.jobName = jobName;
+
+    if (instance) {
+      taskQuery.instanceIds = [ instance ];
+    }
+
     return taskQuery;
   }
 
@@ -99,8 +104,8 @@
             });
           },
 
-          getTasksWithoutConfigs: function (role, environment, jobName) {
-            var query = makeJobTaskQuery(role, environment, jobName);
+          getTasksWithoutConfigs: function (role, environment, jobName, instance) {
+            var query = makeJobTaskQuery(role, environment, jobName, instance);
 
             return async(function (deferred) {
               var tasksPromise = async(function (d1) {
@@ -608,4 +613,176 @@
         };
         return cronJobSmrySvc;
       }]);
+
+  auroraUI.factory(
+    'jobTasksService',
+    ['auroraClient', 'taskUtil', function jobTasksServiceFactory(auroraClient, taskUtil) {
+      var baseTableConfig = {
+        isGlobalSearchActivated: false,
+        isPaginationEnabled: true,
+        itemsByPage: 50,
+        maxSize: 8,
+        selectionMode: 'single'
+      };
+
+      function addColumn(afterLabel, currentColumns, newColumn) {
+        var idxPosition = -1;
+        currentColumns.some(function (column, index) {
+          if (column.label === afterLabel) {
+            idxPosition = index + 1;
+            return true;
+          }
+
+          return false;
+        });
+
+        if (idxPosition === -1) {
+          return;
+        }
+
+        return _.union(
+          _.first(currentColumns, idxPosition),
+          [newColumn],
+          _.last(currentColumns, currentColumns.length - idxPosition));
+      }
+
+      var baseColumns = [
+        {label: 'Instance', map: 'instanceId', cellTemplateUrl: '/assets/taskInstance.html'},
+        {label: 'Status', map: 'status', cellTemplateUrl: '/assets/taskStatus.html'},
+        {label: 'Host', map: 'host', cellTemplateUrl: '/assets/taskSandbox.html'}
+      ];
+
+      var completedTaskColumns = addColumn(
+        'Status',
+        baseColumns,
+        {
+          label: 'Running duration',
+          map: 'duration',
+          formatFunction: function (duration) {
+            return moment.duration(duration).humanize();
+          }
+        });
+
+      function summarizeTask(task) {
+        var isActive = taskUtil.isActiveTask(task);
+        var sortedTaskEvents = _.sortBy(task.taskEvents, function (taskEvent) {
+          return taskEvent.timestamp;
+        });
+
+        var latestTaskEvent = _.last(sortedTaskEvents);
+
+        return {
+          instanceId: task.assignedTask.instanceId,
+          jobKey: task.assignedTask.task.job,
+          status: _.invert(ScheduleStatus)[latestTaskEvent.status],
+          statusMessage: latestTaskEvent.message,
+          host: task.assignedTask.slaveHost || '',
+          latestActivity: _.isEmpty(sortedTaskEvents) ? 0 : latestTaskEvent.timestamp,
+          duration: getDuration(sortedTaskEvents),
+          isActive: isActive,
+          taskId: task.assignedTask.taskId,
+          taskEvents: summarizeTaskEvents(sortedTaskEvents),
+          showDetails: false,
+          // TODO(maxim): Revisit this approach when the UI fix in AURORA-715 is finalized.
+          sandboxExists: true
+        };
+      }
+
+      function getDuration(sortedTaskEvents) {
+        var runningTaskEvent = _.find(sortedTaskEvents, function (taskEvent) {
+          return taskEvent.status === ScheduleStatus.RUNNING;
+        });
+
+        if (runningTaskEvent) {
+          var nextEvent = sortedTaskEvents[_.indexOf(sortedTaskEvents, runningTaskEvent) + 1];
+
+          return nextEvent ?
+            nextEvent.timestamp - runningTaskEvent.timestamp :
+            moment().valueOf() - runningTaskEvent.timestamp;
+        }
+
+        return 0;
+      }
+
+      function summarizeTaskEvents(taskEvents) {
+        return _.map(taskEvents, function (taskEvent) {
+          return {
+            timestamp: taskEvent.timestamp,
+            status: _.invert(ScheduleStatus)[taskEvent.status],
+            message: taskEvent.message
+          };
+        });
+      }
+
+      function getJobDashboardUrl(statsUrlPrefix, role, environment, job) {
+        return _.isEmpty(statsUrlPrefix) ?
+          '' :
+          statsUrlPrefix + role + '.' + environment + '.' + job;
+      }
+
+      return {
+        taskIdColumn:  {
+          label: 'Task ID',
+          map: 'taskId',
+          cellTemplateUrl: '/assets/taskLink.html'
+        },
+
+        taskColumns: baseColumns,
+        completedTaskColumns: completedTaskColumns,
+        addColumn: addColumn,
+
+        getTasksForJob: function getTasksForJob($scope) {
+          $scope.activeTasksTableColumns = baseColumns;
+          $scope.completedTasksTableColumns = completedTaskColumns;
+
+          $scope.activeTasksTableConfig = baseTableConfig;
+          $scope.completedTasksTableConfig = baseTableConfig;
+
+          auroraClient.getTasksWithoutConfigs(
+              $scope.role,
+              $scope.environment,
+              $scope.job,
+              $scope.instance)
+            .then(function (response) {
+              if (response.error) {
+                $scope.error = 'Error fetching tasks: ' + response.error;
+                return [];
+              }
+
+              $scope.jobDashboardUrl = getJobDashboardUrl(
+                response.statsUrlPrefix,
+                $scope.role,
+                $scope.environment,
+                $scope.job);
+
+              var tasks = _.map(response.tasks, function (task) {
+                return summarizeTask(task);
+              });
+
+              var activeTaskPredicate = function (task) {
+                return task.isActive;
+              };
+
+              $scope.activeTasks = _.chain(tasks)
+                .filter(activeTaskPredicate)
+                .sortBy('instanceId')
+                .value();
+
+              $scope.completedTasks = _.chain(tasks)
+                .reject(activeTaskPredicate)
+                .sortBy(function (task) {
+                  return -task.latestActivity; //sort in descending order
+                })
+                .value();
+
+              $scope.activeTasksTableConfig.isPaginationEnabled =
+                  $scope.activeTasks.length > $scope.activeTasksTableConfig.itemsByPage;
+              $scope.completedTasksTableConfig.isPaginationEnabled =
+                  $scope.completedTasks.length > $scope.completedTasksTableConfig.itemsByPage;
+
+              $scope.tasksReady = true;
+            });
+        }
+      };
+    }]);
 })();

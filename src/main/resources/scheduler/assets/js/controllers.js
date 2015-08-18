@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 (function () {
-  /* global ScheduleStatus:false, JobUpdateKey:false, JobUpdateQuery:false, JobKey:false */
+  /* global JobUpdateKey:false, JobUpdateQuery:false, JobKey:false */
   'use strict';
 
   /* Controllers */
@@ -330,239 +330,159 @@
     }
   );
 
-  auroraUIControllers.controller('JobController',
-    function ($scope, $routeParams, $timeout, $q, auroraClient, taskUtil, updateUtil) {
-      $scope.error = '';
+  function initializeJobController($scope, $routeParams) {
+    $scope.error = '';
 
-      $scope.role = $routeParams.role;
-      $scope.environment = $routeParams.environment;
-      $scope.job = $routeParams.job;
+    $scope.role = $routeParams.role;
+    $scope.environment = $routeParams.environment;
+    $scope.job = $routeParams.job;
+    $scope.instance = $routeParams.instance;
 
-      var taskTableConfig = {
-        isGlobalSearchActivated: false,
-        isPaginationEnabled: true,
-        itemsByPage: 50,
-        maxSize: 8,
-        selectionMode: 'single'
-      };
+    // These two task arrays need to be initialized due to a quirk in SmartTable's behavior.
+    $scope.activeTasks = [];
+    $scope.completedTasks = [];
+    $scope.tasksReady = false;
+  }
 
-      $scope.activeTasksTableConfig = taskTableConfig;
-      $scope.completedTasksTableConfig = taskTableConfig;
+  function JobController(
+      $scope,
+      $routeParams,
+      $timeout,
+      $q,
+      auroraClient,
+      taskUtil,
+      updateUtil,
+      jobTasksService) {
 
-      var taskColumns = [
-        {label: 'Instance', map: 'instanceId'},
-        {label: 'Status', map: 'status', cellTemplateUrl: '/assets/taskStatus.html'},
-        {label: 'Host', map: 'host', cellTemplateUrl: '/assets/taskSandbox.html'}
+    initializeJobController($scope, $routeParams);
+
+    $scope.showTaskInfoLink = false;
+    $scope.jobDashboardUrl = '';
+
+    $scope.toggleTaskInfoLinkVisibility = function () {
+      $scope.showTaskInfoLink = !$scope.showTaskInfoLink;
+
+      $scope.activeTasksTableColumns = $scope.showTaskInfoLink ?
+        jobTasksService.addColumn(
+          'Status',
+          jobTasksService.taskColumns,
+          jobTasksService.taskIdColumn) :
+        jobTasksService.taskColumns;
+
+      $scope.completedTasksTableColumns = $scope.showTaskInfoLink ?
+        jobTasksService.addColumn(
+          'Running duration',
+          jobTasksService.completedTaskColumns,
+          jobTasksService.taskIdColumn) :
+        jobTasksService.completedTaskColumns;
+    };
+
+    jobTasksService.getTasksForJob($scope);
+
+    function buildGroupSummary(response) {
+      if (response.error) {
+        $scope.error = 'Error fetching configuration summary: ' + response.error;
+        return [];
+      }
+
+      var colors = [
+        'steelblue',
+        'darkseagreen',
+        'sandybrown',
+        'plum',
+        'khaki'
       ];
 
-      var completedTaskColumns = addColumn(2,
-        taskColumns,
-        {label: 'Running duration',
-          map: 'duration',
-          formatFunction: function (duration) {
-            return moment.duration(duration).humanize();
-          }
+      var total = _.reduce(response.groups, function (m, n) {
+        return m + n.instanceIds.length;
+      }, 0);
+
+      $scope.groupSummary = response.groups.map(function (group, i) {
+        var count = group.instanceIds.length;
+        var percentage = (count / total) * 100;
+
+        var ranges = taskUtil.toRanges(group.instanceIds).map(function (r) {
+          return (r.start === r.end) ? r.start : r.start + '-' + r.end;
         });
-
-      var taskIdColumn = {
-        label: 'Task ID',
-        map: 'taskId',
-        cellTemplateUrl: '/assets/taskLink.html'
-      };
-
-      $scope.activeTasksTableColumns = taskColumns;
-
-      $scope.completedTasksTableColumns = completedTaskColumns;
-
-      function addColumn(idxPosition, currentColumns, newColumn) {
-        return _.union(
-          _.first(currentColumns, idxPosition),
-          [newColumn],
-          _.last(currentColumns, currentColumns.length - idxPosition));
-      }
-
-      $scope.showTaskInfoLink = false;
-
-      $scope.toggleTaskInfoLinkVisibility = function () {
-        $scope.showTaskInfoLink = !$scope.showTaskInfoLink;
-
-        $scope.activeTasksTableColumns = $scope.showTaskInfoLink ?
-          addColumn(2, taskColumns, taskIdColumn) :
-          taskColumns;
-
-        $scope.completedTasksTableColumns = $scope.showTaskInfoLink ?
-          addColumn(3, completedTaskColumns, taskIdColumn) :
-          completedTaskColumns;
-      };
-
-      $scope.jobDashboardUrl = '';
-      // These two task arrays need to be initialized due to a quirk in SmartTable's behavior.
-      $scope.activeTasks = [];
-      $scope.completedTasks = [];
-      $scope.tasksReady = false;
-
-      function buildGroupSummary(response) {
-
-        if (response.error) {
-          $scope.error = 'Error fetching configuration summary: ' + response.error;
-          return [];
-        }
-
-        var colors = [
-          'steelblue',
-          'darkseagreen',
-          'sandybrown',
-          'plum',
-          'khaki'
-        ];
-
-        var total = _.reduce(response.groups, function (m, n) {
-          return m + n.instanceIds.length;
-        }, 0);
-
-        $scope.groupSummary = response.groups.map(function (group, i) {
-          var count = group.instanceIds.length;
-          var percentage = (count / total) * 100;
-
-          var ranges = taskUtil.toRanges(group.instanceIds).map(function (r) {
-            return (r.start === r.end) ? r.start : r.start + '-' + r.end;
-          });
-
-          return {
-            label: ranges.join(', '),
-            value: count,
-            percentage: percentage,
-            summary: { schedulingDetail: taskUtil.configToDetails(group.config)},
-            color: colors[i % colors.length]
-          };
-        });
-      }
-
-      auroraClient.getTasksWithoutConfigs($scope.role, $scope.environment, $scope.job)
-        .then(getTasksForJob);
-
-      auroraClient.getConfigSummary($scope.role, $scope.environment, $scope.job)
-        .then(buildGroupSummary);
-
-      var query = new JobUpdateQuery();
-      var jobKey = new JobKey();
-      jobKey.role = $scope.role;
-      jobKey.environment = $scope.environment;
-      jobKey.name = $scope.job;
-      query.jobKey = jobKey;
-
-      auroraClient.getJobUpdateSummaries(query).then(getUpdatesForJob);
-
-
-      function getUpdatesForJob(response) {
-        $scope.updates = response.summaries;
-
-        function getUpdateInProgress() {
-          auroraClient.getJobUpdateDetails($scope.updates[0].key).then(function (response) {
-            $scope.updateInProgress = response.details;
-
-            $scope.updateStats = updateUtil.getUpdateStats($scope.updateInProgress);
-
-            if (updateUtil.isInProgress($scope.updateInProgress.update.summary.state.status)) {
-              // Poll for updates as long as this update is in progress.
-              $timeout(function () {
-                getUpdateInProgress();
-              }, REFRESH_RATES.IN_PROGRESS_UPDATE_MS);
-            }
-          });
-        }
-
-        if ($scope.updates.length > 0 && updateUtil.isInProgress($scope.updates[0].state.status)) {
-          getUpdateInProgress();
-        }
-      }
-
-      function getTasksForJob(response) {
-        if (response.error) {
-          $scope.error = 'Error fetching tasks: ' + response.error;
-          return [];
-        }
-
-        $scope.jobDashboardUrl = getJobDashboardUrl(response.statsUrlPrefix);
-
-        var tasks = _.map(response.tasks, function (task) {
-          return summarizeTask(task);
-        });
-
-        var activeTaskPredicate = function (task) {
-          return task.isActive;
-        };
-
-        $scope.activeTasks = _.chain(tasks)
-          .filter(activeTaskPredicate)
-          .sortBy('instanceId')
-          .value();
-
-        $scope.completedTasks = _.chain(tasks)
-          .reject(activeTaskPredicate)
-          .sortBy(function (task) {
-            return -task.latestActivity; //sort in descending order
-          })
-          .value();
-
-        $scope.tasksReady = true;
-      }
-
-      function summarizeTask(task) {
-        var isActive = taskUtil.isActiveTask(task);
-        var sortedTaskEvents = _.sortBy(task.taskEvents, function (taskEvent) {
-          return taskEvent.timestamp;
-        });
-
-        var latestTaskEvent = _.last(sortedTaskEvents);
 
         return {
-          instanceId: task.assignedTask.instanceId,
-          status: _.invert(ScheduleStatus)[latestTaskEvent.status],
-          statusMessage: latestTaskEvent.message,
-          host: task.assignedTask.slaveHost || '',
-          latestActivity: _.isEmpty(sortedTaskEvents) ? 0 : latestTaskEvent.timestamp,
-          duration: getDuration(sortedTaskEvents),
-          isActive: isActive,
-          taskId: task.assignedTask.taskId,
-          taskEvents: summarizeTaskEvents(sortedTaskEvents),
-          showDetails: false,
-          // TODO(maxim): Revisit this approach when the UI fix in AURORA-715 is finalized.
-          sandboxExists: true
+          label: ranges.join(', '),
+          value: count,
+          percentage: percentage,
+          summary: { schedulingDetail: taskUtil.configToDetails(group.config)},
+          color: colors[i % colors.length]
         };
-      }
+      });
+    }
 
-      function getDuration(sortedTaskEvents) {
-        var runningTaskEvent = _.find(sortedTaskEvents, function (taskEvent) {
-          return taskEvent.status === ScheduleStatus.RUNNING;
+    auroraClient.getConfigSummary($scope.role, $scope.environment, $scope.job)
+      .then(buildGroupSummary);
+
+    var query = new JobUpdateQuery();
+    query.jobKey = new JobKey({
+        role: $scope.role,
+        environment: $scope.environment,
+        name: $scope.job
+      });
+
+    auroraClient.getJobUpdateSummaries(query).then(getUpdatesForJob);
+
+    function getUpdatesForJob(response) {
+      $scope.updates = response.summaries;
+
+      function getUpdateInProgress() {
+        auroraClient.getJobUpdateDetails($scope.updates[0].key).then(function (response) {
+          $scope.updateInProgress = response.details;
+
+          $scope.updateStats = updateUtil.getUpdateStats($scope.updateInProgress);
+
+          if (updateUtil.isInProgress($scope.updateInProgress.update.summary.state.status)) {
+            // Poll for updates as long as this update is in progress.
+            $timeout(function () {
+              getUpdateInProgress();
+            }, REFRESH_RATES.IN_PROGRESS_UPDATE_MS);
+          }
         });
-
-        if (runningTaskEvent) {
-          var nextEvent = sortedTaskEvents[_.indexOf(sortedTaskEvents, runningTaskEvent) + 1];
-
-          return nextEvent ?
-            nextEvent.timestamp - runningTaskEvent.timestamp :
-            moment().valueOf() - runningTaskEvent.timestamp;
-        }
-
-        return 0;
       }
 
-      function summarizeTaskEvents(taskEvents) {
-        return _.map(taskEvents, function (taskEvent) {
-          return {
-            timestamp: taskEvent.timestamp,
-            status: _.invert(ScheduleStatus)[taskEvent.status],
-            message: taskEvent.message
-          };
-        });
-      }
-
-      function getJobDashboardUrl(statsUrlPrefix) {
-        return _.isEmpty(statsUrlPrefix) ?
-          '' :
-          statsUrlPrefix + $scope.role + '.' + $scope.environment + '.' + $scope.job;
+      if ($scope.updates.length > 0 && updateUtil.isInProgress($scope.updates[0].state.status)) {
+        getUpdateInProgress();
       }
     }
-  );
+
+  }
+
+  auroraUIControllers.controller('JobController', JobController);
+
+  var guidPattern = new RegExp(
+      /^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$/);
+
+  function JobInstanceController($scope, $routeParams, $location, jobTasksService) {
+    if (guidPattern.test($routeParams.instance)) {
+      $location.path(
+        [
+          'scheduler',
+          $routeParams.role,
+          $routeParams.environment,
+          $routeParams.job,
+          'update',
+          $routeParams.instance
+        ].join('/'));
+      return;
+    }
+
+    initializeJobController($scope, $routeParams);
+    jobTasksService.getTasksForJob($scope);
+
+    $scope.completedTasksTableColumns = $scope.completedTasksTableColumns.filter(function (column) {
+      return column.label !== 'Instance';
+    });
+
+    $scope.completedTasksTableColumns = jobTasksService.addColumn(
+        'Status',
+        $scope.completedTasksTableColumns,
+        jobTasksService.taskIdColumn);
+  }
+
+  auroraUIControllers.controller('JobInstanceController', JobInstanceController);
 })();

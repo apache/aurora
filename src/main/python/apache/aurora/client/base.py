@@ -191,7 +191,7 @@ def synthesize_url(scheduler_url, role=None, env=None, job=None, update_id=None)
       if job:
         scheduler_url += '/' + job
         if update_id:
-          scheduler_url += '/' + update_id
+          scheduler_url += '/update/' + update_id
   return scheduler_url
 
 

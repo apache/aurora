@@ -24,10 +24,11 @@
       <a href='/scheduler/{{role}}/{{environment}}'>Environment: {{environment}}</a>
     </li>
 
-    <li ng-if='job && !update' class='active'>Job: {{job}}</li>
+    <li ng-if='job && (!update && !(instance >= 0))' class='active'>Job: {{job}}</li>
 
-    <li ng-if='job && update'><a href='/scheduler/{{role}}/{{environment}}/{{job}}'>Job: {{job}}</a></li>
+    <li ng-if='job && (update || instance >= 0)'><a href='/scheduler/{{role}}/{{environment}}/{{job}}'>Job: {{job}}</a></li>
 
+    <li ng-if='instance >= 0' class='active'>Instance: {{instance}}</li>
     <li ng-if='update' class='active'>Update: {{update.update.summary.key.id}}</li>
   </ul>
   </div>
