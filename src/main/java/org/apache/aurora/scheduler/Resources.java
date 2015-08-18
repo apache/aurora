@@ -17,8 +17,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableList;
@@ -48,7 +50,19 @@ public final class Resources {
   /**
    * CPU resource filter.
    */
-  public static final Predicate<Resource> CPU = e -> e.getName().equals(CPUS.getName());
+  private static final Predicate<Resource> CPU = e -> e.getName().equals(CPUS.getName());
+
+  /**
+   * Revocable resource filter.
+   */
+  @VisibleForTesting
+  static final Predicate<Resource> REVOCABLE =
+      Predicates.or(Predicates.not(CPU), Predicates.and(CPU, Resource::hasRevocable));
+
+  /**
+   * Non-revocable resource filter.
+   */
+  private static final Predicate<Resource> NON_REVOCABLE = Predicates.not(Resource::hasRevocable);
 
   private final Iterable<Resource> mesosResources;
 
@@ -74,6 +88,16 @@ public final class Resources {
    */
   public Resources filter(Predicate<Resource> predicate) {
     return new Resources(Iterables.filter(mesosResources, predicate));
+  }
+
+  /**
+   * Filters resources using the provided {@code tierInfo} instance.
+   *
+   * @param tierInfo Tier info.
+   * @return A new {@code Resources} object containing only filtered Mesos resources.
+   */
+  public Resources filter(TierInfo tierInfo) {
+    return filter(tierInfo.isRevocable() ? REVOCABLE : NON_REVOCABLE);
   }
 
   /**

@@ -93,7 +93,7 @@ public class ResourcesTest {
   @Test
   public void testGetSlot() {
     ImmutableList<Resource> resources = ImmutableList.<Resource>builder()
-        .add(createCpuResource(8.0))
+        .add(createCpuResource(8.0, false))
         .add(createMemResource(1024, RAM_MB))
         .add(createMemResource(2048, DISK_MB))
         .add(createPortRange(Pair.of(1, 10)))
@@ -112,13 +112,30 @@ public class ResourcesTest {
   @Test
   public void testFilter() {
     ImmutableList<Resource> resources = ImmutableList.<Resource>builder()
-        .add(createCpuResource(8.0))
+        .add(createCpuResource(8.0, true))
         .add(createMemResource(1024, RAM_MB))
         .build();
 
     assertEquals(
-        Resources.from(createOffer(createCpuResource(8.0))).slot(),
-        Resources.from(createOffer(resources)).filter(Resources.CPU).slot());
+        new ResourceSlot(8.0, Amount.of(1024L, MB), Amount.of(0L, MB), 0),
+        Resources.from(createOffer(resources)).filter(Resources.REVOCABLE).slot());
+  }
+
+  @Test
+  public void testFilterByTier() {
+    ImmutableList<Resource> resources = ImmutableList.<Resource>builder()
+        .add(createCpuResource(8.0, true))
+        .add(createCpuResource(8.0, false))
+        .add(createMemResource(1024, RAM_MB))
+        .build();
+
+    assertEquals(
+        new ResourceSlot(8.0, Amount.of(1024L, MB), Amount.of(0L, MB), 0),
+        Resources.from(createOffer(resources)).filter(new TierInfo(true)).slot());
+
+    assertEquals(
+        new ResourceSlot(8.0, Amount.of(1024L, MB), Amount.of(0L, MB), 0),
+        Resources.from(createOffer(resources)).filter(new TierInfo(false)).slot());
   }
 
   private Resource createPortRange(Pair<Integer, Integer> range) {
@@ -143,12 +160,17 @@ public class ResourcesTest {
         .build();
   }
 
-  private static Resource createCpuResource(double cpus) {
-    return Resource.newBuilder()
+  private static Resource createCpuResource(double cpus, boolean revocable) {
+    Protos.Resource.Builder builder = Resource.newBuilder()
         .setName(CPUS.getName())
         .setType(SCALAR)
-        .setScalar(Protos.Value.Scalar.newBuilder().setValue(cpus))
-        .build();
+        .setScalar(Protos.Value.Scalar.newBuilder().setValue(cpus));
+
+    if (revocable) {
+      builder.setRevocable(Resource.RevocableInfo.newBuilder().build());
+    }
+
+    return builder.build();
   }
 
   private static Resource createMemResource(long mem, ResourceType resourceType) {

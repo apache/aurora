@@ -28,6 +28,8 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.TierInfo;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -100,6 +102,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
       new UnusedResource(Resources.from(MESOS_OFFER).slot(), OFFER.getAttributes());
   private static final ResourceRequest RESOURCE_REQUEST =
       new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY);
+  private static final TierInfo DEFAULT_TIER = new TierInfo(false);
 
   private MutableStoreProvider storeProvider;
   private StateManager stateManager;
@@ -107,6 +110,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
   private MesosTaskFactory taskFactory;
   private OfferManager offerManager;
   private TaskAssigner assigner;
+  private TierManager tierManager;
 
   @Before
   public void setUp() throws Exception {
@@ -115,13 +119,15 @@ public class TaskAssignerImplTest extends EasyMockTest {
     taskFactory = createMock(MesosTaskFactory.class);
     stateManager = createMock(StateManager.class);
     offerManager = createMock(OfferManager.class);
-    assigner = new TaskAssignerImpl(stateManager, filter, taskFactory, offerManager);
+    tierManager = createMock(TierManager.class);
+    assigner = new TaskAssignerImpl(stateManager, filter, taskFactory, offerManager, tierManager);
   }
 
   @Test
   public void testAssignNoVetoes() throws Exception {
     expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(OFFER));
     offerManager.launchTask(MESOS_OFFER.getId(), TASK_INFO);
+    expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEFAULT_TIER);
     expect(filter.filter(UNUSED, RESOURCE_REQUEST)).andReturn(ImmutableSet.of());
     expect(stateManager.assignTask(
         storeProvider,
@@ -147,6 +153,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
   public void testAssignVetoesWithStaticBan() throws Exception {
     expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(OFFER));
     offerManager.banOffer(MESOS_OFFER.getId(), GROUP_KEY);
+    expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEFAULT_TIER);
     expect(filter.filter(UNUSED, RESOURCE_REQUEST))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("denied")));
 
@@ -163,6 +170,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
   @Test
   public void testAssignVetoesWithNoStaticBan() throws Exception {
     expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(OFFER));
+    expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEFAULT_TIER);
     expect(filter.filter(UNUSED, RESOURCE_REQUEST))
         .andReturn(ImmutableSet.of(Veto.unsatisfiedLimit("limit")));
 
@@ -181,6 +189,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(OFFER));
     offerManager.launchTask(MESOS_OFFER.getId(), TASK_INFO);
     expectLastCall().andThrow(new OfferManager.LaunchException("expected"));
+    expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEFAULT_TIER);
     expect(filter.filter(UNUSED, RESOURCE_REQUEST)).andReturn(ImmutableSet.of());
     expect(stateManager.assignTask(
         storeProvider,
@@ -244,6 +253,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         IHostAttributes.build(new HostAttributes()));
 
     expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(offer, OFFER));
+    expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEFAULT_TIER);
     expect(filter.filter(UNUSED, RESOURCE_REQUEST)).andReturn(ImmutableSet.of());
     expect(stateManager.assignTask(
         storeProvider,
@@ -284,6 +294,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         IHostAttributes.build(new HostAttributes()));
 
     expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(mismatched, OFFER));
+    expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEFAULT_TIER).times(2);
     expect(filter.filter(
         new UnusedResource(
             Resources.from(mismatched.getOffer()).slot(),

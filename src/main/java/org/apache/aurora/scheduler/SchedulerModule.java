@@ -31,6 +31,7 @@ import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
+import org.apache.aurora.scheduler.TierManager.TierManagerImpl;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.mesos.Protos;
@@ -92,6 +93,9 @@ public class SchedulerModule extends AbstractModule {
 
     bind(TaskStatusHandler.class).to(TaskStatusHandlerImpl.class);
     bind(TaskStatusHandlerImpl.class).in(Singleton.class);
+
+    bind(TierManager.class).to(TierManagerImpl.class);
+    bind(TierManagerImpl.class).in(Singleton.class);
     addSchedulerActiveServiceBinding(binder()).to(TaskStatusHandlerImpl.class);
   }
 }

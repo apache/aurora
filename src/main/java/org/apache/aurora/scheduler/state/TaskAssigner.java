@@ -33,6 +33,8 @@ import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.TierInfo;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
@@ -86,18 +88,21 @@ public interface TaskAssigner {
     private final SchedulingFilter filter;
     private final MesosTaskFactory taskFactory;
     private final OfferManager offerManager;
+    private final TierManager tierManager;
 
     @Inject
     public TaskAssignerImpl(
         StateManager stateManager,
         SchedulingFilter filter,
         MesosTaskFactory taskFactory,
-        OfferManager offerManager) {
+        OfferManager offerManager,
+        TierManager tierManager) {
 
       this.stateManager = requireNonNull(stateManager);
       this.filter = requireNonNull(filter);
       this.taskFactory = requireNonNull(taskFactory);
       this.offerManager = requireNonNull(offerManager);
+      this.tierManager = requireNonNull(tierManager);
     }
 
     private TaskInfo assign(
@@ -147,9 +152,14 @@ public interface TaskAssigner {
           // This slave is reserved for a different task group -> skip.
           continue;
         }
+
+        TierInfo tierInfo = tierManager.getTier(groupKey.getTask());
         Set<Veto> vetoes = filter.filter(
-            new UnusedResource(Resources.from(offer.getOffer()).slot(), offer.getAttributes()),
+            new UnusedResource(
+                Resources.from(offer.getOffer()).filter(tierInfo).slot(),
+                offer.getAttributes()),
             resourceRequest);
+
         if (vetoes.isEmpty()) {
           TaskInfo taskInfo = assign(
               storeProvider,
