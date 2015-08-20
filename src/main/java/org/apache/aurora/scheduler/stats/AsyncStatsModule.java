@@ -16,8 +16,7 @@ package org.apache.aurora.scheduler.stats;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import com.google.common.base.Function;
-import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractScheduledService;
 import com.google.common.util.concurrent.AbstractScheduledService.Scheduler;
 import com.google.inject.AbstractModule;
@@ -40,6 +39,10 @@ import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.scheduler.ResourceSlot.NONE;
+import static org.apache.aurora.scheduler.Resources.NON_REVOCABLE;
+import static org.apache.aurora.scheduler.Resources.REVOCABLE;
 
 /**
  * Module to configure export of cluster-wide resource allocation and consumption statistics.
@@ -136,19 +139,6 @@ public class AsyncStatsModule extends AbstractModule {
   }
 
   static class OfferAdapter implements MachineResourceProvider {
-    private static final Function<HostOffer, MachineResource> TO_RESOURCE =
-        new Function<HostOffer, MachineResource>() {
-          @Override
-          public MachineResource apply(HostOffer offer) {
-            ResourceSlot resources = Resources.from(offer.getOffer()).slot();
-            IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate()
-                .setNumCpus(resources.getNumCpus())
-                .setRamMb(resources.getRam().as(Data.MB))
-                .setDiskMb(resources.getDisk().as(Data.MB)));
-            return new MachineResource(quota, Conversions.isDedicated(offer.getOffer()));
-          }
-        };
-
     private final OfferManager offerManager;
 
     @Inject
@@ -159,7 +149,33 @@ public class AsyncStatsModule extends AbstractModule {
     @Override
     public Iterable<MachineResource> get() {
       Iterable<HostOffer> offers = offerManager.getOffers();
-      return FluentIterable.from(offers).transform(TO_RESOURCE);
+
+      ImmutableList.Builder<MachineResource> builder = ImmutableList.builder();
+      for (HostOffer offer : offers) {
+        ResourceSlot revocable = Resources.from(offer.getOffer()).filter(REVOCABLE).slot();
+        ResourceSlot nonRevocable =
+            Resources.from(offer.getOffer()).filter(NON_REVOCABLE).slot();
+        boolean isDedicated = Conversions.isDedicated(offer.getOffer());
+
+        // It's insufficient to compare revocable against NONE here as RAM, DISK and PORTS
+        // are always rolled in to revocable as non-compressible resources. Only if revocable
+        // CPU is non-zero should we expose the revocable resources as aggregates.
+        if (revocable.getNumCpus() > 0.0) {
+          builder.add(new MachineResource(fromSlot(revocable), isDedicated, true));
+        }
+
+        if (!nonRevocable.equals(NONE)) {
+          builder.add(new MachineResource(fromSlot(nonRevocable), isDedicated, false));
+        }
+      }
+      return builder.build();
+    }
+
+    private static IResourceAggregate fromSlot(ResourceSlot slot) {
+      return IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(slot.getNumCpus())
+          .setRamMb(slot.getRam().as(Data.MB))
+          .setDiskMb(slot.getDisk().as(Data.MB)));
     }
   }
 }

@@ -132,7 +132,7 @@ public class ResourceCounter {
   }
 
   public enum MetricType {
-    TOTAL_CONSUMED(Predicates.alwaysTrue()),
+    TOTAL_CONSUMED(Predicates.<ITaskConfig>alwaysTrue()),
     DEDICATED_CONSUMED(new Predicate<ITaskConfig>() {
       @Override
       public boolean apply(ITaskConfig task) {

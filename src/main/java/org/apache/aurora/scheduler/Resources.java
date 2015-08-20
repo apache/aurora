@@ -17,7 +17,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -55,14 +54,13 @@ public final class Resources {
   /**
    * Revocable resource filter.
    */
-  @VisibleForTesting
-  static final Predicate<Resource> REVOCABLE =
+  public static final Predicate<Resource> REVOCABLE =
       Predicates.or(Predicates.not(CPU), Predicates.and(CPU, Resource::hasRevocable));
 
   /**
    * Non-revocable resource filter.
    */
-  private static final Predicate<Resource> NON_REVOCABLE = Predicates.not(Resource::hasRevocable);
+  public static final Predicate<Resource> NON_REVOCABLE = Predicates.not(Resource::hasRevocable);
 
   private final Iterable<Resource> mesosResources;
 

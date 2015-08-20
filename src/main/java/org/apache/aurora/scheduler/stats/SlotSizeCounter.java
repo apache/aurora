@@ -14,14 +14,16 @@
 package org.apache.aurora.scheduler.stats;
 
 import java.util.Map;
+import java.util.Objects;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
 
 import org.apache.aurora.scheduler.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -38,6 +40,14 @@ class SlotSizeCounter implements Runnable {
       "medium", ResourceAggregates.MEDIUM,
       "large", ResourceAggregates.LARGE,
       "xlarge", ResourceAggregates.XLARGE);
+
+  // Ensures all counters are always initialized regardless of the Resource availability.
+  private static final Iterable<String> SLOT_GROUPS = ImmutableList.of(
+      getPrefix(false, false),
+      getPrefix(false, true),
+      getPrefix(true, false),
+      getPrefix(true, true)
+  );
 
   private final Map<String, IResourceAggregate> slotSizes;
   private final MachineResourceProvider machineResourceProvider;
@@ -57,10 +67,12 @@ class SlotSizeCounter implements Runnable {
   static class MachineResource {
     private final IResourceAggregate size;
     private final boolean dedicated;
+    private final boolean revocable;
 
-    public MachineResource(IResourceAggregate size, boolean dedicated) {
+    public MachineResource(IResourceAggregate size, boolean dedicated, boolean revocable) {
       this.size = requireNonNull(size);
       this.dedicated = dedicated;
+      this.revocable = revocable;
     }
 
     public IResourceAggregate getSize() {
@@ -69,6 +81,27 @@ class SlotSizeCounter implements Runnable {
 
     public boolean isDedicated() {
       return dedicated;
+    }
+
+    public boolean isRevocable() {
+      return revocable;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(size, dedicated, revocable);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (!(obj instanceof MachineResource)) {
+        return false;
+      }
+
+      MachineResource other = (MachineResource) obj;
+      return Objects.equals(size, other.size)
+          && Objects.equals(dedicated, other.dedicated)
+          && Objects.equals(revocable, other.revocable);
     }
   }
 
@@ -81,13 +114,15 @@ class SlotSizeCounter implements Runnable {
     this(SLOT_SIZES, machineResourceProvider, cachedCounters);
   }
 
+  private static String getPrefix(boolean dedicated, boolean revocable) {
+    String dedicatedSuffix = dedicated ? "dedicated_" : "";
+    String revocableSuffix = revocable ? "revocable_" : "";
+    return "empty_slots_" + dedicatedSuffix + revocableSuffix;
+  }
+
   @VisibleForTesting
-  static String getStatName(String slotName, boolean dedicated) {
-    if (dedicated) {
-      return "empty_slots_dedicated_" + slotName;
-    } else {
-      return "empty_slots_" + slotName;
-    }
+  static String getStatName(String slotName, boolean dedicated, boolean revocable) {
+    return getPrefix(dedicated, revocable) + slotName;
   }
 
   private int countSlots(Iterable<IResourceAggregate> slots, final IResourceAggregate slotSize) {
@@ -105,40 +140,27 @@ class SlotSizeCounter implements Runnable {
     return sum;
   }
 
-  private static Predicate<MachineResource> isDedicated(final boolean dedicated) {
-    return new Predicate<MachineResource>() {
-      @Override
-      public boolean apply(MachineResource slot) {
-        return slot.isDedicated() == dedicated;
-      }
-    };
-  }
-
-  private static final Function<MachineResource, IResourceAggregate> GET_SIZE =
-      new Function<MachineResource, IResourceAggregate>() {
-        @Override
-        public IResourceAggregate apply(MachineResource slot) {
-          return slot.getSize();
-        }
-      };
-
   private void updateStats(
       String name,
-      boolean dedicated,
       Iterable<MachineResource> slots,
       IResourceAggregate slotSize) {
 
-    Iterable<IResourceAggregate> sizes =
-        FluentIterable.from(slots).filter(isDedicated(dedicated)).transform(GET_SIZE);
-    cachedCounters.get(getStatName(name, dedicated)).set(countSlots(sizes, slotSize));
+    ImmutableMultimap.Builder<String, IResourceAggregate> builder = ImmutableMultimap.builder();
+    for (MachineResource slot : slots) {
+      builder.put(getStatName(name, slot.isDedicated(), slot.isRevocable()), slot.getSize());
+    }
+
+    ImmutableMultimap<String, IResourceAggregate> sizes = builder.build();
+
+    for (String slotGroup : SLOT_GROUPS) {
+      String statName = slotGroup + name;
+      cachedCounters.get(statName).set(countSlots(sizes.get(statName), slotSize));
+    }
   }
 
   @Override
   public void run() {
     Iterable<MachineResource> slots = machineResourceProvider.get();
-    for (Map.Entry<String, IResourceAggregate> entry : slotSizes.entrySet()) {
-      updateStats(entry.getKey(), false, slots, entry.getValue());
-      updateStats(entry.getKey(), true, slots, entry.getValue());
-    }
+    slotSizes.entrySet().stream().forEach(e -> updateStats(e.getKey(), slots, e.getValue()));
   }
 }

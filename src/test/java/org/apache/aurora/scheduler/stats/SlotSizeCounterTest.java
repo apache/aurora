@@ -48,8 +48,12 @@ public class SlotSizeCounterTest extends EasyMockTest {
 
   private AtomicLong smallCounter = new AtomicLong();
   private AtomicLong smallDedicatedCounter = new AtomicLong();
+  private AtomicLong smallRevocableCounter = new AtomicLong();
+  private AtomicLong smallDedicatedRevocableCounter = new AtomicLong();
   private AtomicLong largeCounter = new AtomicLong();
   private AtomicLong largeDedicatedCounter = new AtomicLong();
+  private AtomicLong largeRevocableCounter = new AtomicLong();
+  private AtomicLong largeDedicatedRevocableCounter = new AtomicLong();
 
   @Before
   public void setUp() {
@@ -59,14 +63,22 @@ public class SlotSizeCounterTest extends EasyMockTest {
   }
 
   private void expectStatExport() {
-    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("small", false)))
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("small", false, false)))
         .andReturn(smallCounter);
-    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("small", true)))
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("small", true, false)))
         .andReturn(smallDedicatedCounter);
-    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("large", false)))
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("small", false, true)))
+        .andReturn(smallRevocableCounter);
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("small", true, true)))
+        .andReturn(smallDedicatedRevocableCounter);
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("large", false, false)))
         .andReturn(largeCounter);
-    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("large", true)))
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("large", true, false)))
         .andReturn(largeDedicatedCounter);
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("large", false, true)))
+        .andReturn(largeRevocableCounter);
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("large", true, true)))
+        .andReturn(largeDedicatedRevocableCounter);
   }
 
   private void expectGetSlots(MachineResource... returned) {
@@ -83,23 +95,31 @@ public class SlotSizeCounterTest extends EasyMockTest {
     slotCounter.run();
     assertEquals(0, smallCounter.get());
     assertEquals(0, smallDedicatedCounter.get());
+    assertEquals(0, smallRevocableCounter.get());
+    assertEquals(0, smallDedicatedRevocableCounter.get());
     assertEquals(0, largeCounter.get());
     assertEquals(0, largeDedicatedCounter.get());
+    assertEquals(0, largeRevocableCounter.get());
+    assertEquals(0, largeDedicatedRevocableCounter.get());
   }
 
   @Test
   public void testTinyOffers() {
     expectStatExport();
-    expectGetSlots(
-        new MachineResource(IResourceAggregate.build(new ResourceAggregate(0.1, 1, 1)), false));
+    expectGetSlots(new MachineResource(
+        IResourceAggregate.build(new ResourceAggregate(0.1, 1, 1)), false, false));
 
     control.replay();
 
     slotCounter.run();
     assertEquals(0, smallCounter.get());
     assertEquals(0, smallDedicatedCounter.get());
+    assertEquals(0, smallRevocableCounter.get());
+    assertEquals(0, smallDedicatedRevocableCounter.get());
     assertEquals(0, largeCounter.get());
     assertEquals(0, largeDedicatedCounter.get());
+    assertEquals(0, largeRevocableCounter.get());
+    assertEquals(0, largeDedicatedRevocableCounter.get());
   }
 
   @Test
@@ -107,36 +127,46 @@ public class SlotSizeCounterTest extends EasyMockTest {
     expectStatExport();
     expectGetSlots(
         new MachineResource(
-            IResourceAggregate.build(new ResourceAggregate(1000, 16384, 1)), false));
+            IResourceAggregate.build(new ResourceAggregate(1000, 16384, 1)), false, false));
 
     control.replay();
 
     slotCounter.run();
     assertEquals(0, smallCounter.get());
     assertEquals(0, smallDedicatedCounter.get());
+    assertEquals(0, smallRevocableCounter.get());
+    assertEquals(0, smallDedicatedRevocableCounter.get());
     assertEquals(0, largeCounter.get());
     assertEquals(0, largeDedicatedCounter.get());
+    assertEquals(0, largeRevocableCounter.get());
+    assertEquals(0, largeDedicatedRevocableCounter.get());
   }
 
   @Test
   public void testCountSlots() {
     expectStatExport();
     expectGetSlots(
-        new MachineResource(SMALL, false),
-        new MachineResource(SMALL, false),
-        new MachineResource(LARGE, false),
-        new MachineResource(ResourceAggregates.scale(LARGE, 4), false),
-        new MachineResource(IResourceAggregate.build(new ResourceAggregate(1, 1, 1)), false),
-        new MachineResource(SMALL, true),
-        new MachineResource(SMALL, true),
-        new MachineResource(ResourceAggregates.scale(SMALL, 2), true));
+        new MachineResource(SMALL, false, false),
+        new MachineResource(SMALL, false, false),
+        new MachineResource(LARGE, false, false),
+        new MachineResource(LARGE, false, true),
+        new MachineResource(LARGE, true, true),
+        new MachineResource(ResourceAggregates.scale(LARGE, 4), false, false),
+        new MachineResource(IResourceAggregate.build(new ResourceAggregate(1, 1, 1)), false, false),
+        new MachineResource(SMALL, true, false),
+        new MachineResource(SMALL, true, false),
+        new MachineResource(ResourceAggregates.scale(SMALL, 2), true, false));
 
     control.replay();
 
     slotCounter.run();
     assertEquals(22, smallCounter.get());
     assertEquals(4, smallDedicatedCounter.get());
+    assertEquals(4, smallRevocableCounter.get());
+    assertEquals(4, smallDedicatedRevocableCounter.get());
     assertEquals(5, largeCounter.get());
     assertEquals(0, largeDedicatedCounter.get());
+    assertEquals(1, largeRevocableCounter.get());
+    assertEquals(1, largeDedicatedRevocableCounter.get());
   }
 }
