@@ -19,66 +19,48 @@ import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * A victim to be considered as a candidate for preemption.
  */
 public final class PreemptionVictim {
-  private final String slaveHost;
-  private final boolean production;
-  private final String role;
-  private final int priority;
-  private final ResourceSlot resourceSlot;
-  private final String taskId;
+  private final IAssignedTask task;
 
-  private PreemptionVictim(
-      String slaveHost,
-      boolean production,
-      String role,
-      int priority,
-      ResourceSlot resourceSlot,
-      String taskId) {
-
-    this.slaveHost = slaveHost;
-    this.production = production;
-    this.role = role;
-    this.priority = priority;
-    this.resourceSlot = resourceSlot;
-    this.taskId = taskId;
+  private PreemptionVictim(IAssignedTask task) {
+    this.task = requireNonNull(task);
   }
 
   public static PreemptionVictim fromTask(IAssignedTask task) {
-    ITaskConfig config = task.getTask();
-    return new PreemptionVictim(
-        task.getSlaveHost(),
-        config.isProduction(),
-        config.getJob().getRole(),
-        config.getPriority(),
-        ResourceSlot.from(task.getTask()),
-        task.getTaskId());
+    return new PreemptionVictim(task);
   }
 
   public String getSlaveHost() {
-    return slaveHost;
+    return task.getSlaveHost();
   }
 
   public boolean isProduction() {
-    return production;
+    return task.getTask().isProduction();
   }
 
   public String getRole() {
-    return role;
+    return task.getTask().getJob().getRole();
   }
 
   public int getPriority() {
-    return priority;
+    return task.getTask().getPriority();
   }
 
   public ResourceSlot getResourceSlot() {
-    return resourceSlot;
+    return ResourceSlot.from(task.getTask());
   }
 
   public String getTaskId() {
-    return taskId;
+    return task.getTaskId();
+  }
+
+  public ITaskConfig getConfig() {
+    return task.getTask();
   }
 
   @Override
@@ -88,28 +70,18 @@ public final class PreemptionVictim {
     }
 
     PreemptionVictim other = (PreemptionVictim) o;
-    return Objects.equals(getSlaveHost(), other.getSlaveHost())
-        && Objects.equals(isProduction(), other.isProduction())
-        && Objects.equals(getRole(), other.getRole())
-        && Objects.equals(getPriority(), other.getPriority())
-        && Objects.equals(getResourceSlot(), other.getResourceSlot())
-        && Objects.equals(getTaskId(), other.getTaskId());
+    return Objects.equals(task, other.task);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(slaveHost, production, role, priority, resourceSlot, taskId);
+    return Objects.hashCode(task);
   }
 
   @Override
   public String toString() {
     return com.google.common.base.Objects.toStringHelper(this)
-        .add("slaveHost", getSlaveHost())
-        .add("production", isProduction())
-        .add("role", getRole())
-        .add("priority", getPriority())
-        .add("resourceSlot", getResourceSlot())
-        .add("taskId", getTaskId())
+        .add("task", task)
         .toString();
   }
 }

@@ -29,6 +29,7 @@ import com.google.common.collect.Sets;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
@@ -80,23 +81,26 @@ public interface PreemptionVictimFilter {
     private final SchedulingFilter schedulingFilter;
     private final ExecutorSettings executorSettings;
     private final PreemptorMetrics metrics;
+    private final TierManager tierManager;
 
     @Inject
     PreemptionVictimFilterImpl(
         SchedulingFilter schedulingFilter,
         ExecutorSettings executorSettings,
-        PreemptorMetrics metrics) {
+        PreemptorMetrics metrics,
+        TierManager tierManager) {
 
       this.schedulingFilter = requireNonNull(schedulingFilter);
       this.executorSettings = requireNonNull(executorSettings);
       this.metrics = requireNonNull(metrics);
+      this.tierManager = requireNonNull(tierManager);
     }
 
     private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
         new Function<HostOffer, ResourceSlot>() {
           @Override
           public ResourceSlot apply(HostOffer offer) {
-            return Resources.from(offer.getOffer()).slot();
+            return Resources.from(offer.getOffer()).filter(Resources.NON_REVOCABLE).slot();
           }
         };
 
@@ -120,7 +124,13 @@ public interface PreemptionVictimFilter {
         new Function<PreemptionVictim, ResourceSlot>() {
           @Override
           public ResourceSlot apply(PreemptionVictim victim) {
-            return victim.getResourceSlot().withOverhead(executorSettings);
+            ResourceSlot slot = victim.getResourceSlot();
+            if (tierManager.getTier(victim.getConfig()).isRevocable()) {
+              // Revocable task CPU cannot be used for preemption purposes as it's a compressible
+              // resource. We can still use RAM, DISK and PORTS as they are not compressible.
+              slot = new ResourceSlot(0.0, slot.getRam(), slot.getDisk(), slot.getNumPorts());
+            }
+            return slot.withOverhead(executorSettings);
           }
         };
 
