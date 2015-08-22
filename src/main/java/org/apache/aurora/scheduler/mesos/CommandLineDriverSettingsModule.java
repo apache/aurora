@@ -36,6 +36,8 @@ import com.twitter.common.quantity.Time;
 import org.apache.mesos.Protos;
 
 import static org.apache.mesos.Protos.FrameworkInfo;
+import static org.apache.mesos.Protos.FrameworkInfo.Capability;
+import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RESOURCES;
 
 /**
  * Creates and binds {@link DriverSettings} based on values found on the command line.
@@ -75,20 +77,22 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
           + "to exist on the mesos slaves.")
   private static final Arg<String> EXECUTOR_USER = Arg.create("root");
 
+  @CmdLine(name = "receive_revocable_resources",
+      help = "Allows receiving revocable resource offers from Mesos.")
+  private static final Arg<Boolean> RECEIVE_REVOCABLE_RESOURCES = Arg.create(false);
+
   // TODO(wfarner): Figure out a way to change this without risk of fallout (MESOS-703).
   private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
 
   @Override
   protected void configure() {
-    FrameworkInfo frameworkInfo = FrameworkInfo.newBuilder()
-        .setUser(EXECUTOR_USER.get())
-        .setName(TWITTER_FRAMEWORK_NAME)
-        // Require slave checkpointing.  Assumes slaves have '--checkpoint=true' arg set.
-        .setCheckpoint(true)
-        .setFailoverTimeout(FRAMEWORK_FAILOVER_TIMEOUT.get().as(Time.SECONDS))
-        .build();
-    DriverSettings settings =
-        new DriverSettings(MESOS_MASTER_ADDRESS.get(), getCredentials(), frameworkInfo);
+    DriverSettings settings = new DriverSettings(
+        MESOS_MASTER_ADDRESS.get(),
+        getCredentials(),
+        buildFrameworkInfo(
+            EXECUTOR_USER.get(),
+            FRAMEWORK_FAILOVER_TIMEOUT.get(),
+            RECEIVE_REVOCABLE_RESOURCES.get()));
     bind(DriverSettings.class).toInstance(settings);
   }
 
@@ -112,6 +116,25 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
     } else {
       return Optional.absent();
     }
+  }
+
+  @VisibleForTesting
+  static FrameworkInfo buildFrameworkInfo(
+      String executorUser,
+      Amount<Long, Time> failoverTimeout,
+      boolean revocable) {
+
+    FrameworkInfo.Builder infoBuilder = FrameworkInfo.newBuilder()
+        .setUser(executorUser)
+        .setName(TWITTER_FRAMEWORK_NAME)
+            // Require slave checkpointing.  Assumes slaves have '--checkpoint=true' arg set.
+        .setCheckpoint(true)
+        .setFailoverTimeout(failoverTimeout.as(Time.SECONDS));
+
+    if (revocable) {
+      infoBuilder.addCapabilities(Capability.newBuilder().setType(REVOCABLE_RESOURCES));
+    }
+    return infoBuilder.build();
   }
 
   @VisibleForTesting

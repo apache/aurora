@@ -19,9 +19,13 @@ import java.io.IOException;
 import java.util.Properties;
 
 import com.google.common.base.Throwables;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 
+import org.apache.mesos.Protos;
 import org.junit.Test;
 
+import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RESOURCES;
 import static org.junit.Assert.assertEquals;
 
 public class CommandLineDriverSettingsModuleTest {
@@ -59,5 +63,24 @@ public class CommandLineDriverSettingsModuleTest {
         testProperties,
         CommandLineDriverSettingsModule.parseCredentials(
             new ByteArrayInputStream(propertiesStream.toByteArray())));
+  }
+
+  @Test
+  public void testFrameworkInfoNoRevocable() {
+    Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "user",
+        Amount.of(1L, Time.MINUTES),
+        false);
+    assertEquals(0, info.getCapabilitiesCount());
+  }
+
+  @Test
+  public void testFrameworkInfoRevocable() {
+    Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "user",
+        Amount.of(1L, Time.MINUTES),
+        true);
+    assertEquals(1, info.getCapabilitiesCount());
+    assertEquals(REVOCABLE_RESOURCES, info.getCapabilities(0).getType());
   }
 }
