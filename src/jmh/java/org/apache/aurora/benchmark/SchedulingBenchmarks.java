@@ -35,6 +35,7 @@ import org.apache.aurora.benchmark.fakes.FakeRescheduleCalculator;
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskIdGenerator;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -131,6 +132,9 @@ public class SchedulingBenchmarks {
                   new BiCache.BiCacheSettings(DELAY_FOREVER, ""));
               bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
               bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
+              bind(TierManager.class).to(TierManager.TierManagerImpl.class);
+              bind(TierManager.TierManagerImpl.class).in(Singleton.class);
+              expose(TierManager.class);
               expose(TaskScheduler.class);
               expose(OfferManager.class);
             }

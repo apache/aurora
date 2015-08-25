@@ -49,6 +49,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.TaskStatusHandler;
 import org.apache.aurora.scheduler.TaskStatusHandlerImpl;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
@@ -247,6 +248,8 @@ public class StatusUpdateBenchmark {
                 .toInstance(1000);
             bind(TaskStatusHandler.class).to(TaskStatusHandlerImpl.class);
             bind(TaskStatusHandlerImpl.class).in(Singleton.class);
+            bind(TierManager.class).to(TierManager.TierManagerImpl.class);
+            bind(TierManager.TierManagerImpl.class).in(Singleton.class);
           }
         }
     );
