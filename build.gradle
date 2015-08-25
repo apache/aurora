@@ -133,12 +133,24 @@ project(':commons-args') {
     compile "com.google.code.findbugs:jsr305:${jsrRev}"
     compile "commons-lang:commons-lang:${commonsLangRev}"
   }
+
+  apply plugin: 'license'
+  license {
+    header rootProject.file('config/checkstyle/apache.header')
+    strictCheck true
+  }
 }
 
 project(':commons') {
   apply plugin: org.apache.aurora.build.ThriftPlugin
   thrift {
     version = thriftRev
+  }
+
+  apply plugin: 'license'
+  license {
+    header rootProject.file('config/checkstyle/apache.header')
+    strictCheck true
   }
 
   dependencies {
