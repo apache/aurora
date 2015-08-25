@@ -28,7 +28,7 @@ apt-get -y install \
     lxc-docker \
     openjdk-8-jdk \
     python-dev \
-    zookeeper
+    zookeeperd
 
 update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
 
