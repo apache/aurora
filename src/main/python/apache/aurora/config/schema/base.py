@@ -110,6 +110,7 @@ class MesosJob(Struct):
   instances     = Default(Integer, 1)
   task          = Required(Task)
   announce      = Announcer
+  tier          = String
 
   cron_schedule = String
   cron_collision_policy = Default(String, "KILL_EXISTING")

@@ -32,6 +32,7 @@
       contact_email,
       executor_name,
       executor_data,
+      tier
     ) VALUES (
       (
         SELECT ID
@@ -51,6 +52,7 @@
       #{config.contactEmail},
       #{config.executorConfig.name},
       #{config.executorConfig.data},
+      #{config.tier}
     )
   </insert>
 
@@ -167,6 +169,7 @@
       c.contact_email AS contact_email,
       c.executor_name AS executor_name,
       c.executor_data AS executor_data,
+      c.tier AS tier,
       j.role AS j_role,
       j.environment AS j_environment,
       j.name AS j_name,

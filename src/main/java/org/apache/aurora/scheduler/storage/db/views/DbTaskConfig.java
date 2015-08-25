@@ -48,6 +48,7 @@ public final class DbTaskConfig {
   private ExecutorConfig executorConfig;
   private List<Metadata> metadata;
   private DbContainer container;
+  private String tier;
 
   private DbTaskConfig() {
   }
@@ -69,6 +70,7 @@ public final class DbTaskConfig {
         .setPriority(priority)
         .setMaxTaskFailures(maxTaskFailures)
         .setProduction(production)
+        .setTier(tier)
         .setConstraints(constraints.stream()
             .map(DbConstraint::toThrift)
             .collect(GuavaUtils.toImmutableSet()))

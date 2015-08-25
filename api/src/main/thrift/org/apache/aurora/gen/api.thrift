@@ -251,6 +251,8 @@ struct TaskConfig {
  13: i32 maxTaskFailures
  /** Whether this is a production task, which can preempt. */
  18: optional bool production
+ /** Task tier type. */
+ 30: optional string tier
 
  20: set<Constraint> constraints
  /** a list of named ports this task requests */

@@ -71,6 +71,13 @@ def test_simple_config():
   assert tti.constraints == set()
   assert tti.metadata == set()
   assert tti.environment == HELLO_WORLD.environment().get()
+  assert tti.tier is None
+
+
+def test_config_with_tier():
+  config = HELLO_WORLD(tier='devel')
+  job = convert_pystachio_to_thrift(config)
+  assert job.taskConfig.tier == 'devel'
 
 
 def test_docker_with_parameters():

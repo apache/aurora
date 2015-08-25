@@ -63,6 +63,7 @@ public final class TaskTestUtil {
         .setPriority(1)
         .setMaxTaskFailures(-1)
         .setProduction(true)
+        .setTier("tier-" + job.getEnvironment())
         .setConstraints(ImmutableSet.of(
             new Constraint(
                 "valueConstraint",

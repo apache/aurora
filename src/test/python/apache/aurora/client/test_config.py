@@ -138,9 +138,11 @@ def test_include():
           get_aurora_config('hello_world', hello_include_fname_fp)
 
 
+BAD_ENV = ('Prod', ' prod', 'prod ', 'tEst', 'production', 'staging 2', 'stagingA')
+GOOD_ENV = ('prod', 'devel', 'test', 'staging', 'staging001', 'staging1', 'staging1234')
+
+
 def test_environment_names():
-  BAD = ('Prod', ' prod', 'prod ', 'tEst', 'production', 'staging 2', 'stagingA')
-  GOOD = ('prod', 'devel', 'test', 'staging', 'staging001', 'staging1', 'staging1234')
   base_job = Job(
       name='hello_world', role='john_doe', cluster='test-cluster',
       task=Task(name='main', processes=[],
@@ -148,11 +150,26 @@ def test_environment_names():
 
   with pytest.raises(ValueError):
     config._validate_environment_name(AuroraConfig(base_job))
-  for env_name in GOOD:
+  for env_name in GOOD_ENV:
     config._validate_environment_name(AuroraConfig(base_job(environment=env_name)))
-  for env_name in BAD:
+  for env_name in BAD_ENV:
     with pytest.raises(ValueError):
       config._validate_environment_name(AuroraConfig(base_job(environment=env_name)))
+
+
+def test_tier_names():
+  base_job = Job(
+      name='hello_world', role='john_doe', cluster='test-cluster',
+      task=Task(name='main', processes=[]))
+
+  # Make sure empty value does not raise.
+  config._validate_tier(AuroraConfig(base_job))
+
+  for tier in GOOD_ENV:
+    config._validate_tier(AuroraConfig(base_job(tier=tier)))
+  for tier in BAD_ENV:
+    with pytest.raises(ValueError):
+      config._validate_tier(AuroraConfig(base_job(tier=tier)))
 
 
 def test_dedicated_portmap():

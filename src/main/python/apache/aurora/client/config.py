@@ -22,6 +22,8 @@ import math
 import re
 import sys
 
+from pystachio import Empty
+
 from apache.aurora.client import binding_helper
 from apache.aurora.client.base import die
 from apache.aurora.config import AuroraConfig
@@ -55,13 +57,25 @@ def _validate_announce_configuration(config):
 STAGING_RE = re.compile(r'^staging\d*$')
 
 
+#TODO(maxim): Merge env and tier and move definitions to scheduler: AURORA-1443.
+def __validate_env(name, config_name):
+  if STAGING_RE.match(name):
+    return
+  if name not in ('prod', 'devel', 'test'):
+    raise ValueError('%s should be one of "prod", "devel", "test" or '
+                     'staging<number>!  Got %s' % (config_name, name))
+
+
 def _validate_environment_name(config):
   env_name = str(config.raw().environment())
-  if STAGING_RE.match(env_name):
-    return
-  if env_name not in ('prod', 'devel', 'test'):
-    raise ValueError('Environment name should be one of "prod", "devel", "test" or '
-                     'staging<number>!  Got %s' % env_name)
+  __validate_env(env_name, 'Environment')
+
+
+def _validate_tier(config):
+  tier_raw = config.raw().tier()
+  tier_name = str(tier_raw) if tier_raw is not Empty else None
+  if tier_name is not None:
+    __validate_env(tier_name, 'Tier')
 
 
 UPDATE_CONFIG_MAX_FAILURES_ERROR = '''
@@ -114,6 +128,7 @@ def validate_config(config, env=None):
   _validate_update_config(config)
   _validate_announce_configuration(config)
   _validate_environment_name(config)
+  _validate_tier(config)
 
 
 class GlobalHookRegistry(object):

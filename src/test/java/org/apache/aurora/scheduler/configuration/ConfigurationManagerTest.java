@@ -28,6 +28,7 @@ import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Test;
 
@@ -110,11 +111,21 @@ public class ConfigurationManagerTest {
     assertTrue(copy.isSetKey());
   }
 
-  @Test(expected = ConfigurationManager.TaskDescriptionException.class)
-  public void testBadContainerConfig() throws ConfigurationManager.TaskDescriptionException {
+  @Test(expected = TaskDescriptionException.class)
+  public void testBadContainerConfig() throws TaskDescriptionException {
     TaskConfig taskConfig = CONFIG_WITH_CONTAINER.deepCopy();
     taskConfig.getContainer().getDocker().setImage(null);
 
     ConfigurationManager.validateAndPopulate(ITaskConfig.build(taskConfig));
+  }
+
+  @Test(expected = TaskDescriptionException.class)
+  public void testInvalidTier() throws TaskDescriptionException {
+    ITaskConfig config = ITaskConfig.build(UNSANITIZED_JOB_CONFIGURATION.deepCopy().getTaskConfig()
+        .setJobName("job")
+        .setEnvironment("env")
+        .setTier("pr/d"));
+
+    ConfigurationManager.validateAndPopulate(config);
   }
 }

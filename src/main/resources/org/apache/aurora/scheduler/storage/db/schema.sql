@@ -187,7 +187,8 @@ CREATE TABLE task_configs(
   production BOOLEAN NOT NULL,
   contact_email VARCHAR,
   executor_name VARCHAR NOT NULL,
-  executor_data VARCHAR NOT NULL
+  executor_data VARCHAR NOT NULL,
+  tier VARCHAR
 );
 
 CREATE TABLE task_constraints(

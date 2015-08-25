@@ -197,6 +197,7 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   task.maxTaskFailures = fully_interpolated(job.max_task_failures())
   task.priority = fully_interpolated(job.priority())
   task.contactEmail = not_empty_or(job.contact(), None)
+  task.tier = not_empty_or(job.tier(), None)
 
   # Add metadata to a task, to display in the scheduler UI.
   task.metadata = frozenset(Metadata(key=str(key), value=str(value)) for key, value in metadata)

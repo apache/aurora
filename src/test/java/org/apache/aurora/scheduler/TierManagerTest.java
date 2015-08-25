@@ -23,7 +23,7 @@ import static org.junit.Assert.assertEquals;
 public class TierManagerTest {
 
   @Test
-  public void testIsRevocable() {
+  public void testIsNotRevocable() {
     TierInfo expected = new TierInfo(false);
     assertEquals(expected, new TierManagerImpl().getTier(ITaskConfig.build(new TaskConfig())));
   }

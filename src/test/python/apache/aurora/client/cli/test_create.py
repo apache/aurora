@@ -404,10 +404,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
             fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
       assert mock_context.get_out() == []
-      assert mock_context.get_err() == [
-            "Error loading configuration: "
-            "TypeCheck(FAILED): MesosJob[update_config] failed: "
-            "UpdateConfig[batch_size] failed: u'{{TEST_BATCH}}' not an integer"]
+      assert "Error loading configuration: TypeCheck(FAILED):" in mock_context.get_err()[0]
 
   def test_create_cron_job_fails(self):
     """Test a cron job is not accepted."""

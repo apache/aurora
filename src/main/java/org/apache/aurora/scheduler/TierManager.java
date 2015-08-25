@@ -17,8 +17,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Translates job tier configuration into a set of task traits/attributes.
- * TODO(maxim): Implement external configuration support defined here:
- * https://docs.google.com/document/d/1gexe2uM_9gjsV62cMmX0VjH85Uokko21vEoENY2jjF0
+ * TODO(maxim): Implement external configuration support: AURORA-1443.
  */
 public interface TierManager {
 
@@ -34,7 +33,6 @@ public interface TierManager {
 
     @Override
     public TierInfo getTier(ITaskConfig taskConfig) {
-      // TODO(maxim): Implement when schema changes are defined.
       return new TierInfo(false);
     }
   }

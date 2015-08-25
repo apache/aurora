@@ -287,6 +287,10 @@ public final class ConfigurationManager {
           "Environment contains illegal characters: " + config.getEnvironment());
     }
 
+    if (config.isSetTier() && !isGoodIdentifier(config.getTier())) {
+      throw new TaskDescriptionException("Tier contains illegal characters: " + config.getTier());
+    }
+
     if (config.isSetJob()) {
       if (!JobKeys.isValid(config.getJob())) {
         // Job key is set but invalid
