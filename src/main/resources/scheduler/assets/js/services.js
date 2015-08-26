@@ -720,6 +720,10 @@
           statsUrlPrefix + role + '.' + environment + '.' + job;
       }
 
+      function clone(obj) {
+        return JSON.parse(JSON.stringify(obj));
+      }
+
       return {
         taskIdColumn:  {
           label: 'Task ID',
@@ -735,8 +739,8 @@
           $scope.activeTasksTableColumns = baseColumns;
           $scope.completedTasksTableColumns = completedTaskColumns;
 
-          $scope.activeTasksTableConfig = baseTableConfig;
-          $scope.completedTasksTableConfig = baseTableConfig;
+          $scope.activeTasksTableConfig = clone(baseTableConfig);
+          $scope.completedTasksTableConfig = clone(baseTableConfig);
 
           auroraClient.getTasksWithoutConfigs(
               $scope.role,
