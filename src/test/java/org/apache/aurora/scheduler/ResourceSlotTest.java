@@ -101,16 +101,29 @@ public class ResourceSlotTest {
   }
 
   @Test
-  public void testToResourceList() {
+  public void testToResourceListNoRevocable() {
     ResourceSlot resources = ResourceSlot.from(TASK);
     Set<Integer> ports = ImmutableSet.of(80, 443);
     assertEquals(
         ImmutableSet.of(
-            makeMesosResource(CPUS, TASK.getNumCpus()),
-            makeMesosResource(RAM_MB, TASK.getRamMb()),
-            makeMesosResource(DISK_MB, TASK.getDiskMb()),
+            makeMesosResource(CPUS, TASK.getNumCpus(), false),
+            makeMesosResource(RAM_MB, TASK.getRamMb(), false),
+            makeMesosResource(DISK_MB, TASK.getDiskMb(), false),
             makeMesosRangeResource(PORTS, ports)),
-        ImmutableSet.copyOf(resources.toResourceList(ports)));
+        ImmutableSet.copyOf(resources.toResourceList(ports, new TierInfo(false))));
+  }
+
+  @Test
+  public void testToResourceListRevocable() {
+    ResourceSlot resources = ResourceSlot.from(TASK);
+    Set<Integer> ports = ImmutableSet.of(80, 443);
+    assertEquals(
+        ImmutableSet.of(
+            makeMesosResource(CPUS, TASK.getNumCpus(), true),
+            makeMesosResource(RAM_MB, TASK.getRamMb(), false),
+            makeMesosResource(DISK_MB, TASK.getDiskMb(), false),
+            makeMesosRangeResource(PORTS, ports)),
+        ImmutableSet.copyOf(resources.toResourceList(ports, new TierInfo(true))));
   }
 
   @Test
@@ -118,10 +131,10 @@ public class ResourceSlotTest {
     ResourceSlot resources = ResourceSlot.from(TASK);
     assertEquals(
         ImmutableSet.of(
-            makeMesosResource(CPUS, TASK.getNumCpus()),
-            makeMesosResource(RAM_MB, TASK.getRamMb()),
-            makeMesosResource(DISK_MB, TASK.getDiskMb())),
-        ImmutableSet.copyOf(resources.toResourceList(ImmutableSet.of())));
+            makeMesosResource(CPUS, TASK.getNumCpus(), true),
+            makeMesosResource(RAM_MB, TASK.getRamMb(), false),
+            makeMesosResource(DISK_MB, TASK.getDiskMb(), false)),
+        ImmutableSet.copyOf(resources.toResourceList(new TierInfo(true))));
   }
 
   @Test

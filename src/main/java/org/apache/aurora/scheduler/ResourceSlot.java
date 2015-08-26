@@ -100,17 +100,18 @@ public final class ResourceSlot {
   }
 
   /**
-   * Adapts this slot object to a list of mesos resources.
+   * Adapts this slot object to a list of Mesos resources.
    *
    * @param selectedPorts The ports selected, to be applied as concrete task ranges.
+   * @param tierInfo Task tier info.
    * @return Mesos resources.
    */
-  public List<Protos.Resource> toResourceList(Set<Integer> selectedPorts) {
+  public List<Protos.Resource> toResourceList(Set<Integer> selectedPorts, TierInfo tierInfo) {
     ImmutableList.Builder<Protos.Resource> resourceBuilder =
         ImmutableList.<Protos.Resource>builder()
-            .add(makeMesosResource(CPUS, numCpus))
-            .add(makeMesosResource(DISK_MB, disk.as(Data.MB)))
-            .add(makeMesosResource(RAM_MB, ram.as(Data.MB)));
+            .add(makeMesosResource(CPUS, numCpus, tierInfo.isRevocable()))
+            .add(makeMesosResource(DISK_MB, disk.as(Data.MB), false))
+            .add(makeMesosResource(RAM_MB, ram.as(Data.MB), false));
     if (!selectedPorts.isEmpty()) {
       resourceBuilder.add(makeMesosRangeResource(PORTS, selectedPorts));
     }
@@ -119,13 +120,14 @@ public final class ResourceSlot {
   }
 
   /**
-   * Convenience method for adapting to mesos resources without applying a port range.
+   * Convenience method for adapting to Mesos resources without applying a port range.
    *
-   * @see {@link #toResourceList(java.util.Set)}
+   * @see {@link #toResourceList(java.util.Set, TierInfo)}
+   * @param tierInfo Task tier info.
    * @return Mesos resources.
    */
-  public List<Protos.Resource> toResourceList() {
-    return toResourceList(ImmutableSet.of());
+  public List<Protos.Resource> toResourceList(TierInfo tierInfo) {
+    return toResourceList(ImmutableSet.of(), tierInfo);
   }
 
   /**
@@ -167,15 +169,25 @@ public final class ResourceSlot {
    *
    * @param resourceType Resource type.
    * @param value Value for the resource.
+   * @param revocable Flag indicating if this resource is revocable.
    * @return A mesos resource.
    */
   @VisibleForTesting
-  static Protos.Resource makeMesosResource(ResourceType resourceType, double value) {
-    return Protos.Resource.newBuilder()
+  static Protos.Resource makeMesosResource(
+      ResourceType resourceType,
+      double value,
+      boolean revocable) {
+
+    Protos.Resource.Builder builder = Protos.Resource.newBuilder()
         .setName(resourceType.getName())
         .setType(Protos.Value.Type.SCALAR)
-        .setScalar(Protos.Value.Scalar.newBuilder().setValue(value))
-        .build();
+        .setScalar(Protos.Value.Scalar.newBuilder().setValue(value));
+
+    if (revocable) {
+      builder.setRevocable(Protos.Resource.RevocableInfo.newBuilder());
+    }
+
+    return builder.build();
   }
 
   /**

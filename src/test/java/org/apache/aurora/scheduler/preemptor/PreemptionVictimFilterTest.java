@@ -503,7 +503,8 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
       int numPorts,
       boolean revocable) {
 
-    List<Resource> resources = new ResourceSlot(cpu, ram, disk, numPorts).toResourceList();
+    List<Resource> resources =
+        new ResourceSlot(cpu, ram, disk, numPorts).toResourceList(new TierInfo(false));
     if (revocable) {
       resources = ImmutableList.<Resource>builder()
           .addAll(FluentIterable.from(resources)

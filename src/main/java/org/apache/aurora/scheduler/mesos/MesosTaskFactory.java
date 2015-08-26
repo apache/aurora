@@ -30,6 +30,7 @@ import com.twitter.common.quantity.Data;
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.CommandUtil;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.SchedulerException;
@@ -79,10 +80,12 @@ public interface MesosTaskFactory {
     static final String EXECUTOR_NAME = "aurora.task";
 
     private final ExecutorSettings executorSettings;
+    private final TierManager tierManager;
 
     @Inject
-    MesosTaskFactoryImpl(ExecutorSettings executorSettings) {
+    MesosTaskFactoryImpl(ExecutorSettings executorSettings, TierManager tierManager) {
       this.executorSettings = requireNonNull(executorSettings);
+      this.tierManager = requireNonNull(tierManager);
     }
 
     @VisibleForTesting
@@ -137,7 +140,8 @@ public interface MesosTaskFactory {
       List<Resource> resources = resourceSlot.toResourceList(
           task.isSetAssignedPorts()
               ? ImmutableSet.copyOf(task.getAssignedPorts().values())
-              : ImmutableSet.of());
+              : ImmutableSet.of(),
+          tierManager.getTier(task.getTask()));
 
       if (LOG.isLoggable(Level.FINE)) {
         LOG.fine("Setting task resources to "
@@ -223,7 +227,7 @@ public interface MesosTaskFactory {
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setName(EXECUTOR_NAME)
           .setSource(getInstanceSourceName(config, task.getInstanceId()))
-          .addAllResources(RESOURCES_EPSILON.toResourceList());
+          .addAllResources(RESOURCES_EPSILON.toResourceList(tierManager.getTier(config)));
     }
 
     private void configureContainerVolumes(ContainerInfo.Builder containerBuilder) {
