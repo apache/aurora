@@ -116,7 +116,7 @@
             </thead>
             <tbody>
               <tr ng-repeat="e in instanceEvents">
-                <td>{{e.instanceId}}</td>
+                <td><a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{e.instanceId}}">{{e.instanceId}}</a></td>
                 <td>{{e.action | toNiceAction}}</td>
                 <td><span tooltip="{{e.timestampMs | toUtcTime}}">{{e.timestampMs | toElapsedTime}} ago</span></td>
               </tr>
