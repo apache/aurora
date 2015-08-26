@@ -27,13 +27,13 @@ import com.google.inject.Binder;
 import com.google.inject.Provides;
 import com.google.inject.binder.LinkedBindingBuilder;
 import com.google.inject.multibindings.Multibinder;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.base.Command;
-import com.twitter.common.base.ExceptionalCommand;
 
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
+import org.apache.aurora.common.application.ShutdownRegistry;
+import org.apache.aurora.common.application.modules.LifecycleModule;
+import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.scheduler.SchedulerLifecycle.SchedulerActive;
 
 import static java.util.Objects.requireNonNull;

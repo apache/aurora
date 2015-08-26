@@ -18,8 +18,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
-import com.twitter.common.stats.StatsProvider;
 
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -28,7 +28,7 @@ import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
-import static com.twitter.common.inject.Bindings.KeyFactory.PLAIN;
+import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
 
 import static org.junit.Assert.assertEquals;
 

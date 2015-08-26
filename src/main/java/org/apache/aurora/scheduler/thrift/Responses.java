@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.thrift;
 
 import com.google.common.collect.Lists;
-import com.twitter.common.base.MorePreconditions;
 
+import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.ResponseDetail;

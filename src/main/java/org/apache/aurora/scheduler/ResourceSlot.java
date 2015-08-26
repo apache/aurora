@@ -28,8 +28,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Range;
 
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
 
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
@@ -38,7 +38,7 @@ import org.apache.mesos.Protos;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.twitter.common.quantity.Data.BYTES;
+import static org.apache.aurora.common.quantity.Data.BYTES;
 
 import static org.apache.aurora.scheduler.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.ResourceType.DISK_MB;

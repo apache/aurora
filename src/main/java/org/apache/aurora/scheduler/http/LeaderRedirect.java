@@ -25,11 +25,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Atomics;
-import com.twitter.common.net.pool.DynamicHostSet;
-import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
-import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
-import com.twitter.thrift.Endpoint;
-import com.twitter.thrift.ServiceInstance;
+
+import org.apache.aurora.common.net.pool.DynamicHostSet;
+import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
+import org.apache.aurora.common.net.pool.DynamicHostSet.MonitorException;
+import org.apache.aurora.common.thrift.Endpoint;
+import org.apache.aurora.common.thrift.ServiceInstance;
 
 import static java.util.Objects.requireNonNull;
 

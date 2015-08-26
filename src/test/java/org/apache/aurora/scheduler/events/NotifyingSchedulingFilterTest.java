@@ -16,8 +16,8 @@ package org.apache.aurora.scheduler.events;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConfig;

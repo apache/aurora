@@ -24,9 +24,9 @@ import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.Module;
-import com.twitter.common.application.AppLauncher;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.common.application.AppLauncher;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.app.local.simulator.ClusterSimulatorModule;

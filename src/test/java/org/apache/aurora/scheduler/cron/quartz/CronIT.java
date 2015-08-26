@@ -20,9 +20,9 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.util.Modules;
-import com.twitter.common.testing.easymock.EasyMockTest;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;

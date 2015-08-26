@@ -16,10 +16,10 @@ package org.apache.aurora.scheduler.http;
 import java.util.Locale;
 import java.util.logging.Level;
 
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.testing.easymock.EasyMockTest;
-import com.twitter.common.util.testing.FakeClock;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.util.testing.FakeClock;
 
 import org.eclipse.jetty.http.HttpHeaders;
 import org.eclipse.jetty.http.HttpURI;

@@ -20,8 +20,8 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.Multiset;
-import com.twitter.common.collections.Pair;
 
+import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AttributeStore;

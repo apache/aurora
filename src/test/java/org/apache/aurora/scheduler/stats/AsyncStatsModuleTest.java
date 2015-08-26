@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.stats;
 
 import com.google.common.collect.ImmutableList;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.HostOffer;

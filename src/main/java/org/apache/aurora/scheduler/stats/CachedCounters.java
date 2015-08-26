@@ -21,7 +21,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.twitter.common.stats.StatsProvider;
+
+import org.apache.aurora.common.stats.StatsProvider;
 
 /**
  * A cache of stats, allowing counters to be fetched and reused based on their names.

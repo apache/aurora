@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.updater;
 
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateSettings;

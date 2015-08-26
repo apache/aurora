@@ -20,9 +20,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.matcher.Matchers;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;

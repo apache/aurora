@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.storage.testing;
 
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;

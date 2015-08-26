@@ -29,10 +29,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
-import com.twitter.common.base.Closure;
 
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.MesosContainer;

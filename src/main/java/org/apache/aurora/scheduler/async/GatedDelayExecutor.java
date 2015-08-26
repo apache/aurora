@@ -20,8 +20,9 @@ import javax.inject.Inject;
 
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
+
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 
 import static java.util.Objects.requireNonNull;
 

@@ -17,8 +17,8 @@ import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
-import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;

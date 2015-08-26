@@ -18,10 +18,10 @@ import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.Clock;
-import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.Clock;
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;

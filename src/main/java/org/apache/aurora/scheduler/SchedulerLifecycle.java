@@ -38,21 +38,21 @@ import com.google.common.base.Throwables;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Atomics;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.twitter.common.application.Lifecycle;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.Closure;
-import com.twitter.common.base.Closures;
-import com.twitter.common.base.ExceptionalCommand;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.StateMachine;
-import com.twitter.common.util.StateMachine.Transition;
-import com.twitter.common.zookeeper.Group.JoinException;
-import com.twitter.common.zookeeper.ServerSet;
-import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
+import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.application.ShutdownRegistry;
+import org.apache.aurora.common.base.Closure;
+import org.apache.aurora.common.base.Closures;
+import org.apache.aurora.common.base.ExceptionalCommand;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.StateMachine;
+import org.apache.aurora.common.util.StateMachine.Transition;
+import org.apache.aurora.common.zookeeper.Group.JoinException;
+import org.apache.aurora.common.zookeeper.ServerSet;
+import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -62,7 +62,7 @@ import org.apache.aurora.scheduler.storage.StorageBackfill;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.twitter.common.zookeeper.SingletonService.LeadershipListener;
+import static org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
 
 /**
  * The central driver of the scheduler runtime lifecycle.  Handles the transitions from startup and
@@ -85,7 +85,7 @@ import static com.twitter.common.zookeeper.SingletonService.LeadershipListener;
  * {@link java.lang.IllegalStateException}.
  * <p>
  * At any point in the lifecycle, the scheduler will respond to
- * {@link LeadershipListener#onDefeated(com.twitter.common.zookeeper.ServerSet.EndpointStatus)
+ * {@link LeadershipListener#onDefeated(ServerSet.EndpointStatus)
  * onDefeated()} by initiating a clean shutdown using {@link Lifecycle#shutdown() shutdown()}.
  * A clean shutdown will also be initiated if control actions fail during normal state transitions.
  */

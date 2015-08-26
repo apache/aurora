@@ -31,10 +31,10 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.util.concurrent.ExecutorServiceShutdown;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ExecutorConfig;

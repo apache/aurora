@@ -32,9 +32,9 @@ import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.sun.security.auth.module.Krb5LoginModule;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
 
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;

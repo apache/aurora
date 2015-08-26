@@ -17,9 +17,9 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
-import com.twitter.common.collections.Pair;
 
 import org.apache.aurora.GuavaUtils;
+import org.apache.aurora.common.collections.Pair;
 
 /**
  * Utility class for translating collections of {@link Pair} to and from maps.

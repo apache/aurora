@@ -19,9 +19,9 @@ import java.io.IOException;
 import java.util.Properties;
 
 import com.google.common.base.Throwables;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.mesos.Protos;
 import org.junit.Test;
 

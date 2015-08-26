@@ -212,7 +212,7 @@
     )
   </insert>
 
-  <resultMap id="portMap" type="com.twitter.common.collections.Pair">
+  <resultMap id="portMap" type="org.apache.aurora.common.collections.Pair">
     <constructor>
       <arg column="name"/>
       <arg column="port"/>

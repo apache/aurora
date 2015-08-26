@@ -17,10 +17,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.Nullable;
 
-import com.twitter.common.testing.easymock.EasyMockTest;
-
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;

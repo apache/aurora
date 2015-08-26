@@ -20,9 +20,9 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-import com.twitter.common.collections.Pair;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.collections.Pair;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.ExecutorConfig;

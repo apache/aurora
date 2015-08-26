@@ -13,8 +13,8 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
 
 import org.apache.aurora.scheduler.ResourceSlot;
 

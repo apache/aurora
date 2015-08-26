@@ -24,7 +24,8 @@ import javax.servlet.http.HttpServletResponseWrapper;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.twitter.common.stats.SlidingStats;
+
+import org.apache.aurora.common.stats.SlidingStats;
 
 /**
  * An HTTP filter that exports counts and timing for requests based on response code.

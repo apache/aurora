@@ -18,7 +18,7 @@ import java.util.TimeZone;
 
 import javax.inject.Inject;
 
-import com.twitter.common.util.Clock;
+import org.apache.aurora.common.util.Clock;
 
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;

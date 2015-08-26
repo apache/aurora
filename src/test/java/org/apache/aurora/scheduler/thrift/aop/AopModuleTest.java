@@ -20,9 +20,9 @@ import com.google.inject.AbstractModule;
 import com.google.inject.CreationException;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AuroraAdmin.Iface;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;

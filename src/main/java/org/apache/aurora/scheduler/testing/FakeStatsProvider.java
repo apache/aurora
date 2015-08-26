@@ -20,8 +20,9 @@ import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import com.twitter.common.stats.Stat;
-import com.twitter.common.stats.StatsProvider;
+
+import org.apache.aurora.common.stats.Stat;
+import org.apache.aurora.common.stats.StatsProvider;
 
 /**
  * A fake stats provider for use in testing.

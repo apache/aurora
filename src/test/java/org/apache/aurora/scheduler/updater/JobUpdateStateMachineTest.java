@@ -16,8 +16,8 @@ package org.apache.aurora.scheduler.updater;
 import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
-import com.twitter.common.collections.Pair;
 
+import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.junit.Test;
 

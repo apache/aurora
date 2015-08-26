@@ -28,12 +28,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
 import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator.AuthFailedException;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.AuroraAdmin;

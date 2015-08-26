@@ -19,8 +19,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;

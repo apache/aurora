@@ -20,9 +20,9 @@ import java.util.logging.Logger;
 import com.google.common.base.Function;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimaps;
-import com.twitter.common.inject.TimedInterceptor.Timed;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;

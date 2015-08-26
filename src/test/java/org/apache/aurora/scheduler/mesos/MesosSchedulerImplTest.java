@@ -24,10 +24,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.twitter.common.application.Lifecycle;
-import com.twitter.common.base.Command;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;

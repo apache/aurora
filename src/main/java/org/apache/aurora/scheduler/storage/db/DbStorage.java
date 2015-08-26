@@ -21,8 +21,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
-import com.twitter.common.inject.TimedInterceptor.Timed;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateStatus;

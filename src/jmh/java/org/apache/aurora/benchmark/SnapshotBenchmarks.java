@@ -25,11 +25,11 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
-import com.twitter.common.inject.Bindings;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.Clock;
 
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
+import org.apache.aurora.common.inject.Bindings;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.storage.Snapshot;

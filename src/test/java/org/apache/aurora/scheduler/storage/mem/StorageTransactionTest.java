@@ -26,10 +26,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.TearDown;
 import com.google.common.testing.junit4.TearDownTestCase;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.util.concurrent.ExecutorServiceShutdown;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;

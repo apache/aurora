@@ -17,9 +17,9 @@ import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.collections.Pair;
-import com.twitter.common.quantity.Amount;
 
+import org.apache.aurora.common.collections.Pair;
+import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.scheduler.Resources.InsufficientResourcesException;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Resource;
@@ -27,7 +27,7 @@ import org.apache.mesos.Protos.Value.Range;
 import org.apache.mesos.Protos.Value.Ranges;
 import org.junit.Test;
 
-import static com.twitter.common.quantity.Data.MB;
+import static org.apache.aurora.common.quantity.Data.MB;
 
 import static org.apache.aurora.scheduler.ResourceSlot.makeMesosResource;
 import static org.apache.aurora.scheduler.ResourceType.CPUS;

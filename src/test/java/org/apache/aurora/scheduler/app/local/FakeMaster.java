@@ -33,10 +33,10 @@ import com.google.common.collect.Maps;
 import com.google.common.eventbus.EventBus;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.SettableFuture;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.util.concurrent.ExecutorServiceShutdown;
 import org.apache.aurora.scheduler.app.local.simulator.Events.Started;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.mesos.Protos;

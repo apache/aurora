@@ -35,8 +35,8 @@ import com.google.inject.Binder;
 import com.google.inject.Provides;
 import com.google.inject.binder.LinkedBindingBuilder;
 import com.google.inject.multibindings.Multibinder;
-import com.twitter.common.stats.StatsProvider;
 
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;

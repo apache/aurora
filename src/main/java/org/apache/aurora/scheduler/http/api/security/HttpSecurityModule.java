@@ -31,11 +31,11 @@ import com.google.inject.matcher.Matchers;
 import com.google.inject.name.Names;
 import com.google.inject.servlet.RequestScoped;
 import com.google.inject.servlet.ServletModule;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.apache.aurora.GuiceUtils;
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraSchedulerManager;
 import org.apache.aurora.scheduler.app.Modules;

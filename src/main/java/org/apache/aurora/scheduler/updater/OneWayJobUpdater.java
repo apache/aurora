@@ -26,8 +26,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Maps.EntryTransformer;
-import com.twitter.common.util.StateMachine;
 
+import org.apache.aurora.common.util.StateMachine;
 import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
 
 import static java.util.Objects.requireNonNull;

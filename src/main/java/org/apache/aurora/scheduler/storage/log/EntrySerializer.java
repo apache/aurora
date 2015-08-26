@@ -23,10 +23,10 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.HashFunction;
-import com.twitter.common.inject.TimedInterceptor.Timed;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.gen.storage.Frame;
 import org.apache.aurora.gen.storage.FrameChunk;
 import org.apache.aurora.gen.storage.FrameHeader;

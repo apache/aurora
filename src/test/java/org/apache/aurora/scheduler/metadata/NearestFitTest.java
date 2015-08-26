@@ -16,10 +16,10 @@ package org.apache.aurora.scheduler.metadata;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.testing.FakeTicker;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.util.testing.FakeTicker;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;

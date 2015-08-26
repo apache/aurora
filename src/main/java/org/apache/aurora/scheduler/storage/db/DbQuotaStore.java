@@ -25,7 +25,7 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.twitter.common.inject.TimedInterceptor.Timed;
+import static org.apache.aurora.common.inject.TimedInterceptor.Timed;
 
 /**
  * Quota store backed by a relational database.

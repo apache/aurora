@@ -25,8 +25,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.SettableFuture;
-import com.twitter.common.stats.Stats;
 
+import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.FrameworkID;

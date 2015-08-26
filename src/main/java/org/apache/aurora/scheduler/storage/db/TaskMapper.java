@@ -18,7 +18,7 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import com.twitter.common.collections.Pair;
+import org.apache.aurora.common.collections.Pair;
 
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskQuery;

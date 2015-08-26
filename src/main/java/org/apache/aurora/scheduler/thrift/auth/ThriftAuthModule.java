@@ -22,14 +22,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.TypeLiteral;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.NotEmpty;
 
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator;
 import org.apache.aurora.auth.UnsecureAuthModule;
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.scheduler.app.Modules;
 
 import static java.util.Objects.requireNonNull;

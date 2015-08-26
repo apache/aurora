@@ -38,8 +38,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
@@ -62,7 +62,7 @@ import org.apache.mesos.Protos.SlaveID;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;

@@ -15,7 +15,7 @@ package org.apache.aurora.scheduler.storage.db;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.twitter.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.async.FlushableWorkQueue;
 import org.apache.aurora.scheduler.storage.AttributeStore;

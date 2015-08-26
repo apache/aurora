@@ -18,11 +18,10 @@ import java.io.StringWriter;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
-import com.twitter.common.base.Closure;
-import com.twitter.common.util.templating.StringTemplateHelper;
-import com.twitter.common.util.templating.StringTemplateHelper.TemplateException;
-
 import org.antlr.stringtemplate.StringTemplate;
+import org.apache.aurora.common.base.Closure;
+import org.apache.aurora.common.util.templating.StringTemplateHelper;
+import org.apache.aurora.common.util.templating.StringTemplateHelper.TemplateException;
 
 /**
  * Base class for common functions needed in a jersey stringtemplate servlet.

@@ -18,8 +18,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.util.Clock;
 import org.eclipse.jetty.http.HttpHeaders;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.RequestLog;

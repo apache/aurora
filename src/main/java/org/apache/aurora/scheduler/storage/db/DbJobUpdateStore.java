@@ -23,8 +23,8 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.base.MorePreconditions;
 
+import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateStatus;
@@ -44,7 +44,7 @@ import org.apache.aurora.scheduler.storage.entities.IRange;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.twitter.common.inject.TimedInterceptor.Timed;
+import static org.apache.aurora.common.inject.TimedInterceptor.Timed;
 
 /**
  * A relational database-backed job update store.

@@ -19,8 +19,8 @@ import java.util.Set;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
 import org.junit.Before;
 import org.junit.Test;

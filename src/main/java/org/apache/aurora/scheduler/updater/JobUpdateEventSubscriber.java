@@ -20,8 +20,8 @@ import java.util.logging.Logger;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
-import com.twitter.common.stats.Stats;
 
+import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent;

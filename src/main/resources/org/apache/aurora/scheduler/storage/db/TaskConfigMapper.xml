@@ -266,7 +266,7 @@
     )
   </insert>
 
-  <resultMap id="taskLinkMap" type="com.twitter.common.collections.Pair">
+  <resultMap id="taskLinkMap" type="org.apache.aurora.common.collections.Pair">
     <constructor>
       <arg column="label"/>
       <arg column="url"/>

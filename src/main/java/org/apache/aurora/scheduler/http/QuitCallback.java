@@ -16,7 +16,8 @@ package org.apache.aurora.scheduler.http;
 import java.util.logging.Logger;
 
 import com.google.inject.Inject;
-import com.twitter.common.application.Lifecycle;
+
+import org.apache.aurora.common.application.Lifecycle;
 
 /**
  * HTTP quit callback, which invokes {@link Lifecycle#shutdown()}.

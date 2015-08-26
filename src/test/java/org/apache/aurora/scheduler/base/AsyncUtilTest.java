@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.twitter.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;

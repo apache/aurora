@@ -23,8 +23,8 @@ import java.util.zip.InflaterInputStream;
 
 import javax.annotation.Nullable;
 
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
 
 import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;

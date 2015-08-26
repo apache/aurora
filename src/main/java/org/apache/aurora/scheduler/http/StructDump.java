@@ -24,10 +24,10 @@ import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
-import com.twitter.common.base.Closure;
-import com.twitter.common.thrift.Util;
 
 import org.antlr.stringtemplate.StringTemplate;
+import org.apache.aurora.common.base.Closure;
+import org.apache.aurora.common.thrift.Util;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;

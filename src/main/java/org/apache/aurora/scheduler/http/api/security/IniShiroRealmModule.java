@@ -18,9 +18,9 @@ import javax.inject.Singleton;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
 
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
 import org.apache.shiro.config.Ini;
 import org.apache.shiro.realm.text.IniRealm;
 

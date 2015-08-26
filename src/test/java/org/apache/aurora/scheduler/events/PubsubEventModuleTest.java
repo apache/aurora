@@ -26,12 +26,12 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
-import com.twitter.common.application.StartupStage;
-import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.base.ExceptionalCommand;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.application.StartupStage;
+import org.apache.aurora.common.application.modules.LifecycleModule;
+import org.apache.aurora.common.base.ExceptionalCommand;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;

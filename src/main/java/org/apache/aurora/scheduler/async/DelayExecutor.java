@@ -15,8 +15,8 @@ package org.apache.aurora.scheduler.async;
 
 import java.util.concurrent.Executor;
 
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 
 /**
  * An executor that supports executing work after a minimum time delay.

@@ -17,8 +17,8 @@ import javax.inject.Singleton;
 
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
-import com.twitter.common.inject.Bindings.KeyFactory;
 
+import org.apache.aurora.common.inject.Bindings.KeyFactory;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.TaskStore;
 

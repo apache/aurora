@@ -17,9 +17,9 @@ import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Module;
-import com.twitter.common.args.ArgParser;
-import com.twitter.common.args.parsers.NonParameterizedTypeParser;
 
+import org.apache.aurora.common.args.ArgParser;
+import org.apache.aurora.common.args.parsers.NonParameterizedTypeParser;
 import org.apache.aurora.scheduler.app.Modules;
 
 /**

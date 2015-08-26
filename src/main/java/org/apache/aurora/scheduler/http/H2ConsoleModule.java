@@ -16,9 +16,9 @@ package org.apache.aurora.scheduler.http;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.servlet.ServletModule;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
 
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
 import org.h2.server.web.WebServlet;
 
 /**

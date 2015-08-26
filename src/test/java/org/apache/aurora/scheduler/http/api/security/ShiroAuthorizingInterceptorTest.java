@@ -17,10 +17,10 @@ import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.inject.util.Providers;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;

@@ -16,11 +16,11 @@ package org.apache.aurora.scheduler.pruning;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.testing.easymock.EasyMockTest;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.scheduler.pruning.JobUpdateHistoryPruner.HistoryPrunerSettings;

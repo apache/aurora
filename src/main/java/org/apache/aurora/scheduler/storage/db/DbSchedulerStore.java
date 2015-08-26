@@ -20,7 +20,7 @@ import com.google.inject.Inject;
 
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 
-import static com.twitter.common.inject.TimedInterceptor.Timed;
+import static org.apache.aurora.common.inject.TimedInterceptor.Timed;
 
 /**
  * A relational database-backed scheduler store.

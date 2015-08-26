@@ -15,9 +15,9 @@ package org.apache.aurora.scheduler.app;
 
 import java.util.Objects;
 
-import com.twitter.common.logging.RootLogConfig;
-import com.twitter.common.logging.RootLogConfig.Configuration;
-import com.twitter.common.logging.log4j.GlogLayout;
+import org.apache.aurora.common.logging.RootLogConfig;
+import org.apache.aurora.common.logging.RootLogConfig.Configuration;
+import org.apache.aurora.common.logging.log4j.GlogLayout;
 
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.ConsoleAppender;

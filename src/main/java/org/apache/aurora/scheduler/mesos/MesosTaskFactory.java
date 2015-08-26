@@ -23,12 +23,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
-import com.twitter.common.base.Function;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
+import org.apache.aurora.common.base.Function;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.CommandUtil;

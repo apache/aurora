@@ -16,9 +16,9 @@ package org.apache.aurora.scheduler.storage.db.views;
 import java.util.List;
 
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.collections.Pair;
 
 import org.apache.aurora.GuavaUtils;
+import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;

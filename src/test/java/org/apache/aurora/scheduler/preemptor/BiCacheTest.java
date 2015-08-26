@@ -18,10 +18,10 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.preemptor.BiCache.BiCacheSettings;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Before;

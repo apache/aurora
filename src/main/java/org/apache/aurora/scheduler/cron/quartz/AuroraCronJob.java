@@ -24,10 +24,10 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
-import com.twitter.common.base.Supplier;
-import com.twitter.common.stats.Stats;
-import com.twitter.common.util.BackoffHelper;
 
+import org.apache.aurora.common.base.Supplier;
+import org.apache.aurora.common.stats.Stats;
+import org.apache.aurora.common.util.BackoffHelper;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;

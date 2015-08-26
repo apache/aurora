@@ -32,10 +32,10 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Range;
-import com.twitter.common.inject.TimedInterceptor.Timed;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType;

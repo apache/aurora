@@ -19,9 +19,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Sets;
-import com.twitter.common.args.ArgParser;
-import com.twitter.common.args.parsers.NonParameterizedTypeParser;
 
+import org.apache.aurora.common.args.ArgParser;
+import org.apache.aurora.common.args.parsers.NonParameterizedTypeParser;
 import org.apache.shiro.config.ConfigurationException;
 import org.apache.shiro.config.Ini;
 import org.apache.shiro.realm.text.IniRealm;

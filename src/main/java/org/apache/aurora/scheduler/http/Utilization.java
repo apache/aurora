@@ -32,12 +32,12 @@ import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
-import com.twitter.common.base.Closure;
-import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.util.templating.StringTemplateHelper;
-import com.twitter.common.util.templating.StringTemplateHelper.TemplateException;
 
 import org.antlr.stringtemplate.StringTemplate;
+import org.apache.aurora.common.base.Closure;
+import org.apache.aurora.common.base.MorePreconditions;
+import org.apache.aurora.common.util.templating.StringTemplateHelper;
+import org.apache.aurora.common.util.templating.StringTemplateHelper.TemplateException;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.stats.ResourceCounter;
 import org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;

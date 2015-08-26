@@ -22,11 +22,11 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.twitter.common.collections.Pair;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.common.collections.Pair;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;

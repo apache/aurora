@@ -22,12 +22,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator;
+import org.apache.aurora.common.application.ShutdownRegistry;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ServerInfo;

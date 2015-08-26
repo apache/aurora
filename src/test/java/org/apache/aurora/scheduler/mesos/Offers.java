@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import com.twitter.common.collections.Pair;
+import org.apache.aurora.common.collections.Pair;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;

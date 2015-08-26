@@ -25,24 +25,24 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.base.Command;
-import com.twitter.common.inject.TimedInterceptor;
-import com.twitter.common.net.pool.DynamicHostSet;
-import com.twitter.common.stats.Stats;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.Clock;
-import com.twitter.common.zookeeper.ServerSet;
-import com.twitter.common.zookeeper.ServerSetImpl;
-import com.twitter.common.zookeeper.SingletonService;
-import com.twitter.common.zookeeper.ZooKeeperClient;
-import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
-import com.twitter.common.zookeeper.ZooKeeperUtils;
-import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
-import com.twitter.thrift.ServiceInstance;
 
 import org.apache.aurora.GuiceUtils;
+import org.apache.aurora.common.application.ShutdownRegistry;
+import org.apache.aurora.common.application.modules.LifecycleModule;
+import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.inject.TimedInterceptor;
+import org.apache.aurora.common.net.pool.DynamicHostSet;
+import org.apache.aurora.common.stats.Stats;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.thrift.ServiceInstance;
+import org.apache.aurora.common.util.Clock;
+import org.apache.aurora.common.zookeeper.ServerSet;
+import org.apache.aurora.common.zookeeper.ServerSetImpl;
+import org.apache.aurora.common.zookeeper.SingletonService;
+import org.apache.aurora.common.zookeeper.ZooKeeperClient;
+import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
+import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
+import org.apache.aurora.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
@@ -68,7 +68,7 @@ import org.apache.zookeeper.data.ACL;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 

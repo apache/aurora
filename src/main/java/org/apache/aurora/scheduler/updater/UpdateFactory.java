@@ -23,10 +23,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;

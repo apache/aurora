@@ -17,13 +17,13 @@ import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
-import com.twitter.common.stats.StatsProvider;
 
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.storage.AbstractCronJobStoreTest;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 
-import static com.twitter.common.inject.Bindings.KeyFactory.PLAIN;
+import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
 
 public class MemCronJobStoreTest extends AbstractCronJobStoreTest {
   @Override

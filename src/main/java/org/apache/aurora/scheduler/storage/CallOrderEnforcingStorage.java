@@ -24,8 +24,8 @@ import javax.inject.Singleton;
 
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
-import com.twitter.common.util.StateMachine;
 
+import org.apache.aurora.common.util.StateMachine;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;

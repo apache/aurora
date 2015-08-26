@@ -17,9 +17,9 @@ import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.LimitConstraint;

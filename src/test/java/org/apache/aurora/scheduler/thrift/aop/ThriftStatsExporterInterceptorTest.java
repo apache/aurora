@@ -18,9 +18,9 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.matcher.Matchers;
-import com.twitter.common.stats.Stats;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.stats.Stats;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.GetJobsResult;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.Result;

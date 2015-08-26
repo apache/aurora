@@ -23,7 +23,8 @@ import javax.ws.rs.HttpMethod;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HttpHeaders;
-import com.twitter.common.base.MorePreconditions;
+
+import org.apache.aurora.common.base.MorePreconditions;
 
 /*
  * A filter that adds CORS headers to HTTP responses. This filter enables CORS support for a single

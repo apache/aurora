@@ -23,11 +23,11 @@ import com.google.gson.Gson;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.inject.Bindings;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.Clock;
 
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
+import org.apache.aurora.common.inject.Bindings;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ScheduleStatus;

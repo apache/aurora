@@ -21,8 +21,8 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.util.concurrent.AbstractIdleService;
-import com.twitter.common.stats.Stats;
 
+import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;

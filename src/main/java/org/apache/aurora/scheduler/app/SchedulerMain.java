@@ -27,25 +27,25 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HostAndPort;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
-import com.twitter.common.application.AbstractApplication;
-import com.twitter.common.application.AppLauncher;
-import com.twitter.common.application.Lifecycle;
-import com.twitter.common.application.modules.StatsModule;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.NotEmpty;
-import com.twitter.common.args.constraints.NotNull;
-import com.twitter.common.inject.Bindings;
-import com.twitter.common.logging.RootLogConfig;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
-import com.twitter.common.zookeeper.Group;
-import com.twitter.common.zookeeper.SingletonService;
-import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
-import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule;
-import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
-import com.twitter.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 
+import org.apache.aurora.common.application.AbstractApplication;
+import org.apache.aurora.common.application.AppLauncher;
+import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.application.modules.StatsModule;
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.common.args.constraints.NotEmpty;
+import org.apache.aurora.common.args.constraints.NotNull;
+import org.apache.aurora.common.inject.Bindings;
+import org.apache.aurora.common.logging.RootLogConfig;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
+import org.apache.aurora.common.zookeeper.Group;
+import org.apache.aurora.common.zookeeper.SingletonService;
+import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
+import org.apache.aurora.common.zookeeper.guice.client.ZooKeeperClientModule;
+import org.apache.aurora.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
+import org.apache.aurora.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
@@ -61,7 +61,7 @@ import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 
-import static com.twitter.common.logging.RootLogConfig.Configuration;
+import static org.apache.aurora.common.logging.RootLogConfig.Configuration;
 
 /**
  * Launcher for the aurora scheduler.

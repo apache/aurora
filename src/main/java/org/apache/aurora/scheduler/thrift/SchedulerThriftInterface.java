@@ -35,14 +35,14 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Range;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.Positive;
 
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
 import org.apache.aurora.auth.SessionValidator.AuthFailedException;
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.gen.AcquireLockResult;
 import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.ConfigRewrite;
@@ -133,13 +133,13 @@ import org.apache.thrift.TException;
 import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.CharMatcher.WHITESPACE;
-import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.auth.CapabilityValidator.Capability.MACHINE_MAINTAINER;
 import static org.apache.aurora.auth.CapabilityValidator.Capability.PROVISIONER;
 import static org.apache.aurora.auth.CapabilityValidator.Capability.ROOT;
 import static org.apache.aurora.auth.CapabilityValidator.Capability.UPDATE_COORDINATOR;
 import static org.apache.aurora.auth.SessionValidator.SessionContext;
+import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
 import static org.apache.aurora.gen.ResponseCode.AUTH_FAILED;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;

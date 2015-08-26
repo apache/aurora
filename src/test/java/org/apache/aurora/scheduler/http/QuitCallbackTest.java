@@ -15,9 +15,9 @@ package org.apache.aurora.scheduler.http;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 
-import com.twitter.common.application.Lifecycle;
-import com.twitter.common.base.Command;
-import com.twitter.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 
 import org.junit.Before;
 import org.junit.Test;

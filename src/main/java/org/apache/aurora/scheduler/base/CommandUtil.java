@@ -19,8 +19,8 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
-import com.twitter.common.base.MorePreconditions;
 
+import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;
 

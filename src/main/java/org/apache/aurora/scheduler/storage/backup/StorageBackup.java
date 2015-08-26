@@ -39,11 +39,11 @@ import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import com.google.common.io.Files;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.Stats;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.Stats;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.thrift.TException;

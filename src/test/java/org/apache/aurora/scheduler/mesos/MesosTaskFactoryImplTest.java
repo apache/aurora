@@ -16,9 +16,9 @@ package org.apache.aurora.scheduler.mesos;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.quantity.Data;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.quantity.Data;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.DockerContainer;

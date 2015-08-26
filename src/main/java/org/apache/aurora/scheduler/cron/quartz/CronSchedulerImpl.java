@@ -21,8 +21,8 @@ import javax.inject.Inject;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
-import com.twitter.common.base.Function;
 
+import org.apache.aurora.common.base.Function;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.apache.aurora.scheduler.cron.CrontabEntry;

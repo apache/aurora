@@ -23,10 +23,10 @@ import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AbstractIdleService;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatsProvider;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -38,7 +38,8 @@ import org.apache.mesos.Protos;
 import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.twitter.common.quantity.Time.MINUTES;
+
+import static org.apache.aurora.common.quantity.Time.MINUTES;
 
 /**
  * A task reconciler that periodically triggers Mesos (implicit) and Aurora (explicit) task

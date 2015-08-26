@@ -15,9 +15,9 @@ package org.apache.aurora.scheduler.async;
 
 import java.util.concurrent.ScheduledExecutorService;
 
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;

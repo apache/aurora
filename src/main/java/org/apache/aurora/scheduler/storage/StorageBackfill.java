@@ -16,7 +16,7 @@ package org.apache.aurora.scheduler.storage;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import com.twitter.common.stats.Stats;
+import org.apache.aurora.common.stats.Stats;
 
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;

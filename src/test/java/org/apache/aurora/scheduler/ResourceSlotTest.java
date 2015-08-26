@@ -20,9 +20,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
-import com.twitter.common.collections.Pair;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
+import org.apache.aurora.common.collections.Pair;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
 
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;

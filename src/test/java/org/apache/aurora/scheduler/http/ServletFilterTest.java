@@ -21,9 +21,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.ClientResponse.Status;
-import com.twitter.thrift.Endpoint;
-import com.twitter.thrift.ServiceInstance;
 
+import org.apache.aurora.common.thrift.Endpoint;
+import org.apache.aurora.common.thrift.ServiceInstance;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

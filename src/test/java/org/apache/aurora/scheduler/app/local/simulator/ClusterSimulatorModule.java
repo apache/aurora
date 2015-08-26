@@ -21,9 +21,9 @@ import javax.inject.Singleton;
 import com.google.common.eventbus.EventBus;
 import com.google.inject.AbstractModule;
 import com.google.inject.multibindings.Multibinder;
-import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.base.Command;
 
+import org.apache.aurora.common.application.modules.LifecycleModule;
+import org.apache.aurora.common.base.Command;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;
 

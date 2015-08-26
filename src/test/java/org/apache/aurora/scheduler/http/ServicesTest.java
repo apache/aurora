@@ -18,9 +18,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.util.concurrent.Service;
 import com.google.common.util.concurrent.Service.State;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.junit.Before;
 import org.junit.Test;
 

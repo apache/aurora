@@ -16,10 +16,10 @@ package org.apache.aurora.scheduler.storage.db;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.util.Clock;
-import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.Clock;
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 

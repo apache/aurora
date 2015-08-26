@@ -15,7 +15,7 @@ package org.apache.aurora.auth;
 
 import java.util.Optional;
 
-import com.twitter.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 
 import org.apache.shiro.subject.PrincipalCollection;
 import org.apache.shiro.subject.Subject;

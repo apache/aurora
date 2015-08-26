@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.mesos;
 
 import com.google.common.base.Optional;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Scheduler;

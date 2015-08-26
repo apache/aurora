@@ -15,8 +15,8 @@ package org.apache.aurora.scheduler.http.api.security;
 
 import javax.security.auth.kerberos.KerberosPrincipal;
 
-import com.twitter.common.args.ArgParser;
-import com.twitter.common.args.parsers.NonParameterizedTypeParser;
+import org.apache.aurora.common.args.ArgParser;
+import org.apache.aurora.common.args.parsers.NonParameterizedTypeParser;
 
 @ArgParser
 class KerberosPrincipalParser extends NonParameterizedTypeParser<KerberosPrincipal> {

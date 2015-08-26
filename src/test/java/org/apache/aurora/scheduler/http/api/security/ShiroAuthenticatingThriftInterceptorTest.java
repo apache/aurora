@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.http.api.security;
 
 import com.google.inject.util.Providers;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.shiro.authz.UnauthenticatedException;

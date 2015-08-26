@@ -25,9 +25,9 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
-import com.twitter.common.base.Closure;
 
 import org.antlr.stringtemplate.StringTemplate;
+import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
@@ -36,7 +36,7 @@ import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import static org.apache.aurora.scheduler.storage.Storage.Work;

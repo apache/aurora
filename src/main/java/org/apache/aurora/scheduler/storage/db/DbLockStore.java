@@ -27,7 +27,7 @@ import org.apache.aurora.scheduler.storage.entities.ILockKey;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.twitter.common.inject.TimedInterceptor.Timed;
+import static org.apache.aurora.common.inject.TimedInterceptor.Timed;
 
 /**
  * A relational database-backed lock store.

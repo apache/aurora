@@ -21,10 +21,10 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.twitter.common.stats.StatsProvider;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.scheduler.spi.Permissions;

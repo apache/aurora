@@ -22,10 +22,10 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.Inject;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.stats.StatsProvider.RequestTimer;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.stats.StatsProvider.RequestTimer;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStatusReceived;
 import org.apache.mesos.Protos;

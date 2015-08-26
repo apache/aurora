@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.app;
 
 import com.google.common.base.Joiner;
-import com.twitter.common.args.ArgParser;
-import com.twitter.common.args.parsers.NonParameterizedTypeParser;
 
+import org.apache.aurora.common.args.ArgParser;
+import org.apache.aurora.common.args.parsers.NonParameterizedTypeParser;
 import org.apache.aurora.gen.Mode;
 import org.apache.aurora.gen.Volume;
 

@@ -32,9 +32,9 @@ import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hasher;
 import com.google.common.primitives.Bytes;
 import com.google.inject.assistedinject.Assisted;
-import com.twitter.common.base.Closure;
-import com.twitter.common.stats.Stats;
 
+import org.apache.aurora.common.base.Closure;
+import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.storage.Frame;
 import org.apache.aurora.gen.storage.FrameHeader;
@@ -51,9 +51,8 @@ import org.apache.aurora.scheduler.log.Log.Stream;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.twitter.common.inject.TimedInterceptor.Timed;
-
 import static org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import static org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import static org.apache.aurora.scheduler.log.Log.Stream.InvalidPositionException;
 import static org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 import static org.apache.aurora.scheduler.storage.log.LogManager.DeduplicateSnapshots;

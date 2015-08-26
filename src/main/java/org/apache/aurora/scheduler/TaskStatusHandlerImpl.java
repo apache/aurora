@@ -29,8 +29,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.twitter.common.stats.Stats;
 
+import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.mesos.Driver;

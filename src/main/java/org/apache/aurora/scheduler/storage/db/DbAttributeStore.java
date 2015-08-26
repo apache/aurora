@@ -26,8 +26,9 @@ import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.twitter.common.base.MorePreconditions.checkNotBlank;
-import static com.twitter.common.inject.TimedInterceptor.Timed;
+
+import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
+import static org.apache.aurora.common.inject.TimedInterceptor.Timed;
 
 /**
  * Attribute store backed by a relational database.

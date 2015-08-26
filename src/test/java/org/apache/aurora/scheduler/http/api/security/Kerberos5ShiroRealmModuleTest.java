@@ -19,8 +19,8 @@ import javax.security.auth.kerberos.KerberosPrincipal;
 
 import com.google.inject.Guice;
 import com.google.inject.Module;
-import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.easymock.EasyMock;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSManager;

@@ -16,15 +16,14 @@ package org.apache.aurora.scheduler;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.concurrent.TimeUnit;
 
-import com.twitter.common.application.Lifecycle;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.Command;
-import com.twitter.common.base.ExceptionalCommand;
-import com.twitter.common.testing.easymock.EasyMockTest;
-import com.twitter.common.zookeeper.SingletonService.LeaderControl;
-import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
-
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
+import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.application.ShutdownRegistry;
+import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.base.ExceptionalCommand;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
+import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
 import org.apache.aurora.scheduler.SchedulerLifecycle.DelayedActions;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;

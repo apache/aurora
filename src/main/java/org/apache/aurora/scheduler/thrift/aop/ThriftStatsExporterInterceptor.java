@@ -18,11 +18,11 @@ import java.lang.reflect.Method;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.twitter.common.stats.SlidingStats;
-import com.twitter.common.stats.Stats;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.aurora.common.stats.SlidingStats;
+import org.apache.aurora.common.stats.Stats;
 
 /**
  * A method interceptor that exports counterStats about thrift calls.

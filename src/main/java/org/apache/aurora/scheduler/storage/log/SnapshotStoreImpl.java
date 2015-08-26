@@ -22,10 +22,10 @@ import javax.inject.Inject;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.inject.TimedInterceptor.Timed;
-import com.twitter.common.util.BuildInfo;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.common.util.BuildInfo;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdateDetails;

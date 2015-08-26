@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import com.twitter.common.base.Closure;
+import org.apache.aurora.common.base.Closure;
 
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Snapshot;
@@ -25,7 +25,7 @@ import static org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 
 /**
  * Manages interaction with the log stream.  Log entries can be
- * {@link #readFromBeginning(com.twitter.common.base.Closure) read from} the beginning,
+ * {@link #readFromBeginning(Closure) read from} the beginning,
  * a {@link #startTransaction() transaction} consisting of one or more local storage
  * operations can be committed atomically, or the log can be compacted by
  * {@link #snapshot(org.apache.aurora.gen.storage.Snapshot) snapshotting}.

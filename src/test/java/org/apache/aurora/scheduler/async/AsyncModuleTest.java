@@ -23,11 +23,11 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.TypeLiteral;
-import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.stats.StatsProvider;
-import com.twitter.common.testing.easymock.EasyMockTest;
-import com.twitter.common.util.Clock;
 
+import org.apache.aurora.common.application.modules.LifecycleModule;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.async.AsyncModule.RegisterGauges;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
