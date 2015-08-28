@@ -15,16 +15,10 @@ package org.apache.aurora.common.zookeeper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.Override;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
@@ -32,39 +26,27 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
-import com.google.common.testing.TearDown;
-import com.google.gson.GsonBuilder;
 
-import org.apache.thrift.protocol.TProtocol;
+import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.io.Codec;
+import org.apache.aurora.common.net.pool.DynamicHostSet;
+import org.apache.aurora.common.thrift.Endpoint;
+import org.apache.aurora.common.thrift.ServiceInstance;
+import org.apache.aurora.common.thrift.Status;
+import org.apache.aurora.common.zookeeper.Group.JoinException;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.easymock.IMocksControl;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
-
-import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.io.Codec;
-import org.apache.aurora.common.io.JsonCodec;
-import org.apache.aurora.common.net.pool.DynamicHostSet;
-import org.apache.aurora.common.thrift.TResourceExhaustedException;
-import org.apache.aurora.common.thrift.Thrift;
-import org.apache.aurora.common.thrift.ThriftFactory;
-import org.apache.aurora.common.thrift.ThriftFactory.ThriftFactoryException;
-import org.apache.aurora.common.zookeeper.Group.JoinException;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
-import org.apache.aurora.common.thrift.Endpoint;
-import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.common.thrift.Status;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -256,24 +238,15 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
     assertFalse(ServerSets.deserializeServiceInstance(data, codec).isSetShard());
   }
 
-  @Ignore("TODO(zmanji): Fix to work with thrift 0.9.0")
   @Test
-  public void testJsonCodecCompatibility() throws IOException {
+  public void testJsonCompatibility() throws IOException {
     ServiceInstance instance = new ServiceInstance(
         new Endpoint("foo", 1000),
         ImmutableMap.of("http", new Endpoint("foo", 8080)),
         Status.ALIVE).setShard(42);
 
-    ByteArrayOutputStream legacy = new ByteArrayOutputStream();
-    JsonCodec.create(
-        ServiceInstance.class,
-        new GsonBuilder().setExclusionStrategies(JsonCodec.getThriftExclusionStrategy())
-            .create()).serialize(instance, legacy);
-
     ByteArrayOutputStream results = new ByteArrayOutputStream();
     ServerSetImpl.createJsonCodec().serialize(instance, results);
-
-    assertEquals(legacy.toString(), results.toString());
 
     results = new ByteArrayOutputStream();
     ServerSetImpl.createJsonCodec().serialize(instance, results);
@@ -283,48 +256,6 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
             + "\"status\":\"ALIVE\","
             + "\"shard\":42}",
         results.toString());
-  }
-
-  //TODO(Jake Mannix) move this test method to ServerSetConnectionPoolTest, which should be renamed
-  // to DynamicBackendConnectionPoolTest, and refactor assertChangeFired* methods to be used both
-  // here and there
-  @Test
-  public void testThriftWithServerSet() throws Exception {
-    final AtomicReference<Socket> clientConnection = new AtomicReference<Socket>();
-    final CountDownLatch connected = new CountDownLatch(1);
-    final ServerSocket server = new ServerSocket(0);
-    Thread service = new Thread(new Runnable() {
-      @Override public void run() {
-        try {
-          clientConnection.set(server.accept());
-        } catch (IOException e) {
-          LOG.log(Level.WARNING, "Problem accepting a connection to thrift server", e);
-        } finally {
-          connected.countDown();
-        }
-      }
-    });
-    service.setDaemon(true);
-    service.start();
-
-    ServerSetImpl serverSetImpl = new ServerSetImpl(createZkClient(), SERVICE);
-    serverSetImpl.watch(serverSetMonitor);
-    assertChangeFiredEmpty();
-    InetSocketAddress localSocket = new InetSocketAddress(server.getLocalPort());
-    serverSetImpl.join(localSocket, Maps.<String, InetSocketAddress>newHashMap());
-    assertChangeFired(ImmutableMap.<InetSocketAddress, Status>of(localSocket, Status.ALIVE));
-
-    Service.Iface svc = createThriftClient(serverSetImpl);
-    try {
-      String value = svc.getString();
-      LOG.info("Got value: " + value + " from server");
-      assertEquals(Service.Iface.DONE, value);
-    } catch (TResourceExhaustedException e) {
-      fail("ServerSet is not empty, should not throw exception here");
-    } finally {
-      connected.await();
-      server.close();
-    }
   }
 
   @Test
@@ -356,36 +287,8 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
     control.verify();
   }
 
-  private Service.Iface createThriftClient(DynamicHostSet<ServiceInstance> serverSet)
-      throws ThriftFactoryException {
-
-    final Thrift<Service.Iface> thrift = ThriftFactory.create(Service.Iface.class).build(serverSet);
-    addTearDown(new TearDown() {
-      @Override public void tearDown() {
-        thrift.close();
-      }
-    });
-    return thrift.create();
-  }
-
   private static Map<String, InetSocketAddress> makePortMap(String name, int port) {
     return ImmutableMap.of(name, InetSocketAddress.createUnresolved("foo", port));
-  }
-
-  public static class Service {
-    public static interface Iface {
-      public static final String DONE = "done";
-      public String getString() throws TResourceExhaustedException;
-    }
-
-    public static class Client implements Iface {
-      public Client(TProtocol protocol) {
-        assertNotNull(protocol);
-      }
-      @Override public String getString() {
-        return DONE;
-      }
-    }
   }
 
   private ServerSet.EndpointStatus join(ServerSet serverSet, String host)

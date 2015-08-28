@@ -13,8 +13,12 @@
  */
 package org.apache.aurora.common.thrift.testing;
 
+import java.util.Map;
+import java.util.Map.Entry;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+
 import org.apache.thrift.TBase;
 import org.apache.thrift.TBaseHelper;
 import org.apache.thrift.TException;
@@ -23,9 +27,6 @@ import org.apache.thrift.protocol.TField;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.protocol.TStruct;
 import org.apache.thrift.protocol.TType;
-
-import java.util.Map;
-import java.util.Map.Entry;
 
 /**
  * Hand-coded thrift types for use in tests.

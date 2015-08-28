@@ -120,32 +120,6 @@ public class LifecycleModule extends AbstractModule {
   }
 
   /**
-   * Binds a service runner that will start and stop a local service.
-   *
-   * @param binder Binder to bind against.
-   * @param launcher Launcher class for a service.
-   */
-  public static void bindServiceRunner(Binder binder, Class<? extends ServiceRunner> launcher) {
-    runnerBinder(binder).addBinding().to(launcher);
-    binder.bind(launcher).in(Singleton.class);
-  }
-
-  /**
-   * Binds a local service instance, without attaching an explicit lifecycle.
-   *
-   * @param binder Binder to bind against.
-   * @param service Local service instance to bind.
-   */
-  public static void bindLocalService(Binder binder, final LocalServiceRegistry.LocalService service) {
-    runnerBinder(binder).addBinding().toInstance(
-        new ServiceRunner() {
-          @Override public LocalServiceRegistry.LocalService launch() {
-            return service;
-          }
-        });
-  }
-
-  /**
    * Adds a startup action to the startup registry binding.
    *
    * @param binder Binder to bind against.

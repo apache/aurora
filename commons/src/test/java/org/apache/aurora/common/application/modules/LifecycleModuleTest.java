@@ -24,20 +24,17 @@ import com.google.inject.Injector;
 import com.google.inject.Module;
 
 import org.apache.aurora.common.application.ShutdownRegistry;
-import org.junit.Test;
-
 import org.apache.aurora.common.application.modules.LifecycleModule.LaunchException;
 import org.apache.aurora.common.application.modules.LifecycleModule.ServiceRunner;
 import org.apache.aurora.common.application.modules.LocalServiceRegistry.LocalService;
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.junit.Test;
 
+import static org.apache.aurora.common.net.InetSocketAddressHelper.getLocalAddress;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
-
-import static org.apache.aurora.common.application.modules.LifecycleModule.bindLocalService;
-import static org.apache.aurora.common.net.InetSocketAddressHelper.getLocalAddress;
 
 /**
  * @author William Farner
@@ -64,32 +61,6 @@ public class LifecycleModuleTest extends EasyMockTest {
     LocalServiceRegistry registry = injector.getInstance(LocalServiceRegistry.class);
     assertEquals(Optional.<InetSocketAddress>absent(), registry.getPrimarySocket());
     assertEquals(ImmutableMap.<String, InetSocketAddress>of(), registry.getAuxiliarySockets());
-  }
-
-  @Test
-  public void testNoRunner() throws Exception {
-    final Command primaryShutdown = createMock(Command.class);
-    final Command auxShutdown = createMock(Command.class);
-
-    primaryShutdown.execute();
-    auxShutdown.execute();
-
-    Module testModule = new AbstractModule() {
-      @Override protected void configure() {
-        bindLocalService(binder(), LocalService.primaryService(99, primaryShutdown));
-        bindLocalService(binder(), LocalService.auxiliaryService("foo", 100, auxShutdown));
-      }
-    };
-
-    Injector injector = Guice.createInjector(new SystemModule(), testModule);
-    LocalServiceRegistry registry = injector.getInstance(LocalServiceRegistry.class);
-
-    control.replay();
-
-    assertEquals(Optional.of(getLocalAddress(99)), registry.getPrimarySocket());
-    assertEquals(ImmutableMap.of("foo", getLocalAddress(100)), registry.getAuxiliarySockets());
-
-    injector.getInstance(ShutdownRegistry.ShutdownRegistryImpl.class).execute();
   }
 
   @Test
