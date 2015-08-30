@@ -68,44 +68,12 @@ public class CandidateImpl implements Candidate {
       };
 
   private final Group group;
-  private final Function<Iterable<String>, String> judge;
-  private final Supplier<byte[]> dataSupplier;
 
   /**
-   * Equivalent to {@link #CandidateImpl(Group, com.google.common.base.Function, Supplier)} using a
-   * judge that always picks the lowest numbered candidate ephemeral node - by proxy the oldest or
-   * 1st candidate and a default supplier that provides the ip address of this host according to
-   * {@link java.net.InetAddress#getLocalHost()} as the leader identifying data.
+   * Creates a candidate that can be used to offer leadership for the given {@code group}.
    */
   public CandidateImpl(Group group) {
-    this(group, MOST_RECENT_JUDGE, IP_ADDRESS_DATA_SUPPLIER);
-  }
-
-  /**
-   * Creates a candidate that can be used to offer leadership for the given {@code group} using
-   * a judge that always picks the lowest numbered candidate ephemeral node - by proxy the oldest
-   * or 1st. The dataSupplier should produce bytes that identify this process as leader. These bytes
-   * will become available to all participants via the {@link Candidate#getLeaderData()} method.
-   */
-  public CandidateImpl(Group group, Supplier<byte[]> dataSupplier) {
-    this(group, MOST_RECENT_JUDGE, dataSupplier);
-  }
-
-  /**
-   * Creates a candidate that can be used to offer leadership for the given {@code group}.  The
-   * {@code judge} is used to pick the current leader from all group members whenever the group
-   * membership changes. To form a well-behaved election group with one leader, all candidates
-   * should use the same judge. The dataSupplier should produce bytes that identify this process
-   * as leader. These bytes will become available to all participants via the
-   * {@link Candidate#getLeaderData()} method.
-   */
-  public CandidateImpl(
-      Group group,
-      Function<Iterable<String>, String> judge,
-      Supplier<byte[]> dataSupplier) {
     this.group = Preconditions.checkNotNull(group);
-    this.judge = Preconditions.checkNotNull(judge);
-    this.dataSupplier = Preconditions.checkNotNull(dataSupplier);
   }
 
   @Override
@@ -122,7 +90,7 @@ public class CandidateImpl implements Candidate {
   public Supplier<Boolean> offerLeadership(final Leader leader)
       throws JoinException, WatchException, InterruptedException {
 
-    final Membership membership = group.join(dataSupplier, new Command() {
+    final Membership membership = group.join(IP_ADDRESS_DATA_SUPPLIER, new Command() {
       @Override public void execute() {
         leader.onDefeated();
       }
@@ -176,6 +144,6 @@ public class CandidateImpl implements Candidate {
 
   @Nullable
   private String getLeader(Iterable<String> memberIds) {
-    return Iterables.isEmpty(memberIds) ? null : judge.apply(memberIds);
+    return Iterables.isEmpty(memberIds) ? null : MOST_RECENT_JUDGE.apply(memberIds);
   }
 }

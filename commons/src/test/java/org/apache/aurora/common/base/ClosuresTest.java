@@ -15,17 +15,14 @@ package org.apache.aurora.common.base;
 
 import java.io.IOException;
 
-import com.google.common.base.Function;
 import com.google.common.base.Predicate;
-
-import org.easymock.EasyMock;
-import org.junit.Test;
+import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 
 /**
@@ -37,56 +34,7 @@ public class ClosuresTest extends EasyMockTest {
   private static final Clazz<ExceptionalClosure<Integer, IOException>> EXC_INT_CLOSURE_CLZ =
       new Clazz<ExceptionalClosure<Integer, IOException>>() { };
 
-  @Test(expected = NullPointerException.class)
-  public void testPreconditions() {
-    control.replay();
-
-    Closures.asFunction(null);
-  }
-
-  @Test
-  public void testApply() throws IOException {
-    ExceptionalClosure<Integer, IOException> work = createMock(EXC_INT_CLOSURE_CLZ);
-    work.execute(1);
-    control.replay();
-
-    Function<Integer, Void> workFunction = Closures.asFunction(work);
-    workFunction.apply(1);
-  }
-
   static class Thrown extends RuntimeException { }
-
-  @Test
-  public void testApplyThrows() throws IOException {
-    ExceptionalClosure<Integer, IOException> work = createMock(EXC_INT_CLOSURE_CLZ);
-    work.execute(1);
-    RuntimeException runtimeException = new Thrown();
-    EasyMock.expectLastCall().andThrow(runtimeException);
-    control.replay();
-
-    Function<Integer, Void> workFunction = Closures.asFunction(work);
-    try {
-      workFunction.apply(1);
-    } catch (Thrown e) {
-      assertSame(runtimeException, e);
-    }
-  }
-
-  @Test
-  public void testApplyThrowsTransparent() throws IOException {
-    Closure<Integer> work = createMock(INT_CLOSURE_CLZ);
-    work.execute(1);
-    RuntimeException runtimeException = new Thrown();
-    EasyMock.expectLastCall().andThrow(runtimeException);
-    control.replay();
-
-    Function<Integer, Void> workFunction = Closures.asFunction(work);
-    try {
-      workFunction.apply(1);
-    } catch (Thrown e) {
-      assertSame(runtimeException, e);
-    }
-  }
 
   @Test
   public void testCombine() {
@@ -94,7 +42,7 @@ public class ClosuresTest extends EasyMockTest {
     Closure<Integer> work2 = createMock(INT_CLOSURE_CLZ);
 
     @SuppressWarnings("unchecked") // Needed because type information lost in vargs.
-    Closure<Integer> wrapper = Closures.combine(work1, work2);
+    Closure<Integer> wrapper = Closures.combine(ImmutableList.of(work1, work2));
 
     work1.execute(1);
     work2.execute(1);
@@ -115,7 +63,7 @@ public class ClosuresTest extends EasyMockTest {
     Closure<Integer> work3 = createMock(INT_CLOSURE_CLZ);
 
     @SuppressWarnings("unchecked") // Needed because type information lost in vargs.
-    Closure<Integer> wrapper = Closures.combine(work1, work2, work3);
+    Closure<Integer> wrapper = Closures.combine(ImmutableList.of(work1, work2, work3));
 
     work1.execute(1);
     expectLastCall().andThrow(new Thrown());

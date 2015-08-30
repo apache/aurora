@@ -13,10 +13,8 @@
  */
 package org.apache.aurora.common.base;
 
-import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
@@ -38,38 +36,6 @@ public final class Closures {
 
   private Closures() {
     // utility
-  }
-
-  /**
-   * Converts a closure into a function returning {@code null}.
-   */
-  public static <T> Function<T, Void> asFunction(final ExceptionalClosure<T, ?> closure) {
-    checkNotNull(closure);
-
-    // CHECKSTYLE:OFF IllegalCatch
-    return new Function<T, Void>() {
-      @Override public Void apply(T item) {
-        try {
-          closure.execute(item);
-        } catch (Exception e) {
-          Throwables.propagate(e);
-        }
-        return null;
-      }
-    };
-    // CHECKSTYLE:ON IllegalCatch
-  }
-
-  /**
-   * Varargs equivalent of {@link #combine(Iterable)}.
-   *
-   * @param closures Closures to combine.
-   * @param <T> Type accepted by the closures.
-   * @return A single closure that will fan out all calls to {@link Closure#execute(Object)} to
-   *    the wrapped closures.
-   */
-  public static <T> Closure<T> combine(Closure<T>... closures) {
-    return combine(ImmutableList.copyOf(closures));
   }
 
   /**

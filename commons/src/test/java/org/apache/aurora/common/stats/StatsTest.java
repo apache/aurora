@@ -13,12 +13,10 @@
  */
 package org.apache.aurora.common.stats;
 
-import org.junit.After;
-import org.junit.Test;
-
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.util.concurrent.AtomicDouble;
+import org.junit.After;
+import org.junit.Test;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
@@ -43,16 +41,6 @@ public class StatsTest {
     assertCounter("test_long", 1);
     var.addAndGet(100);
     assertCounter("test_long", 101);
-  }
-
-  @Test
-  public void testDoubleExport() {
-    AtomicDouble var = Stats.exportDouble("test_double");
-    assertCounter("test_double", 0.0);
-    var.addAndGet(1.1);
-    assertCounter("test_double", 1.1);
-    var.addAndGet(5.55);
-    assertCounter("test_double", 6.65);
   }
 
   @Test

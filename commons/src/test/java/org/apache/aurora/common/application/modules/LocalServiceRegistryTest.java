@@ -72,19 +72,13 @@ public class LocalServiceRegistryTest extends EasyMockTest {
 
   @Test
   public void testCreate() throws LaunchException {
-    expect(serviceProvider.get()).andReturn(ImmutableSet.of(runner1, runner2));
-    expect(runner1.launch()).andReturn(primary(1));
-    expect(runner2.launch()).andReturn(auxiliary(A, 2));
+    expect(serviceProvider.get()).andReturn(ImmutableSet.of(runner1));
+    expect(runner1.launch()).andReturn(auxiliary(A, 2));
     shutdownRegistry.addAction(Commands.NOOP);
-    expectLastCall().times(2);
 
     control.replay();
 
-    checkPorts(Optional.of(1), ImmutableMap.of(A, 2));
-  }
-
-  private LocalService primary(int port) {
-    return LocalService.primaryService(port, Commands.NOOP);
+    checkPorts(ImmutableMap.of(A, 2));
   }
 
   private LocalService auxiliary(String name, int port) {
@@ -105,19 +99,6 @@ public class LocalServiceRegistryTest extends EasyMockTest {
     control.replay();
 
     assertFalse(registry.getPrimarySocket().isPresent());
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testMultiplePrimaries() throws LaunchException {
-    expect(serviceProvider.get()).andReturn(ImmutableSet.of(runner1, runner2));
-    expect(runner1.launch()).andReturn(primary(1));
-    expect(runner2.launch()).andReturn(primary(2));
-    shutdownRegistry.addAction(Commands.NOOP);
-    expectLastCall().times(2);
-
-    control.replay();
-
-    registry.getPrimarySocket();
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -143,7 +124,7 @@ public class LocalServiceRegistryTest extends EasyMockTest {
 
     control.replay();
 
-    checkPorts(Optional.<Integer>absent(), ImmutableMap.of(A, 2, B, 2));
+    checkPorts(ImmutableMap.of(A, 2, B, 2));
   }
 
   @Test
@@ -156,15 +137,11 @@ public class LocalServiceRegistryTest extends EasyMockTest {
 
     control.replay();
 
-    checkPorts(Optional.<Integer>absent(), ImmutableMap.of(A, 2, B, 6, C, 6));
+    checkPorts(ImmutableMap.of(A, 2, B, 6, C, 6));
   }
 
-  private void checkPorts(Optional<Integer> primary, Map<String, Integer> expected) {
-    Optional<InetSocketAddress> registeredSocket = registry.getPrimarySocket();
-    Optional<Integer> registeredPort = registeredSocket.isPresent()
-        ? Optional.of(registeredSocket.get().getPort()) : Optional.<Integer>absent();
-
-    assertEquals(primary, registeredPort);
+  private void checkPorts(Map<String, Integer> expected) {
+    assertEquals(Optional.<InetSocketAddress>absent(), registry.getPrimarySocket());
     assertEquals(expected, Maps.transformValues(registry.getAuxiliarySockets(), INET_TO_PORT));
   }
 }

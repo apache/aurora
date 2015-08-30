@@ -14,7 +14,6 @@
 package org.apache.aurora.common.stats;
 
 import java.util.Collection;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -53,7 +52,7 @@ public class Stats {
   // Store stats in the order they were registered, so that derived variables are
   // sampled after their inputs.
   private static final Collection<RecordingStat<? extends Number>> ORDERED_NUMERIC_STATS =
-      new ConcurrentLinkedQueue<RecordingStat<? extends Number>>();
+      new ConcurrentLinkedQueue<>();
 
   private static final Cache<String, RecordingStat<? extends Number>> NUMERIC_STATS =
       CacheBuilder.newBuilder().build();
@@ -128,11 +127,7 @@ public class Stats {
   /**
    * A {@link StatRegistry} that provides stats registered with the global {@link Stat}s repository.
    */
-  public static final StatRegistry STAT_REGISTRY = new StatRegistry() {
-    @Override public Iterable<RecordingStat<? extends Number>> getStats() {
-      return Stats.getNumericVariables();
-    }
-  };
+  public static final StatRegistry STAT_REGISTRY = Stats::getNumericVariables;
 
   private static class ExportStat implements Callable<RecordingStat<? extends Number>> {
     private final AtomicBoolean called = new AtomicBoolean(false);
@@ -144,7 +139,7 @@ public class Stats {
       this.name = name;
       this.stat = (stat instanceof RecordingStat)
           ? (RecordingStat<? extends Number>) stat
-          : new RecordingStatImpl<T>(stat);
+          : new RecordingStatImpl<>(stat);
     }
 
     @Override
@@ -299,27 +294,6 @@ public class Stats {
   }
 
   /**
-   * Creates and exports an {@link AtomicDouble}.
-   *
-   * @param name The name to export the stat with.
-   * @return A reference to the {@link AtomicDouble} created.
-   */
-  public static AtomicDouble exportDouble(String name) {
-    return exportDouble(name, 0.0);
-  }
-
-  /**
-   * Creates and exports an {@link AtomicDouble} with initial value.
-   *
-   * @param name The name to export the stat with.
-   * @param initialValue The initial stat value.
-   * @return A reference to the {@link AtomicDouble} created.
-   */
-  public static AtomicDouble exportDouble(String name, double initialValue) {
-    return export(name, new AtomicDouble(initialValue));
-  }
-
-  /**
    * Exports a metric that tracks the size of a collection.
    *
    * @param name Name of the stat to export.
@@ -329,34 +303,6 @@ public class Stats {
     export(new StatImpl<Integer>(name) {
       @Override public Integer read() {
         return collection.size();
-      }
-    });
-  }
-
-  /**
-   * Exports a metric that tracks the size of a map.
-   *
-   * @param name Name of the stat to export.
-   * @param map Map whose size should be tracked.
-   */
-  public static void exportSize(String name, final Map<?, ?> map) {
-    export(new StatImpl<Integer>(name) {
-      @Override public Integer read() {
-        return map.size();
-      }
-    });
-  }
-
-  /**
-   * Exports a metric that tracks the size of a cache.
-   *
-   * @param name Name of the stat to export.
-   * @param cache Cache whose size should be tracked.
-   */
-  public static void exportSize(String name, final Cache<?, ?> cache) {
-    export(new StatImpl<Long>(name) {
-      @Override public Long read() {
-        return cache.size();
       }
     });
   }

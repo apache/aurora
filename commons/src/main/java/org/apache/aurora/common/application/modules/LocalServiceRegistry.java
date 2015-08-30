@@ -216,17 +216,6 @@ public class LocalServiceRegistry {
     }
 
     /**
-     * Creates a primary local service.
-     *
-     * @param port Service port.
-     * @param shutdownCommand A command that will shut down the service.
-     * @return A new primary local service.
-     */
-    public static LocalService primaryService(int port, Command shutdownCommand) {
-      return new LocalService(true, ImmutableSet.<String>of(), port, shutdownCommand);
-    }
-
-    /**
      * Creates a named auxiliary service.
      *
      * @param name Service name.

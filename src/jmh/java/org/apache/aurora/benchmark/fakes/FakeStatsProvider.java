@@ -53,21 +53,6 @@ public class FakeStatsProvider implements StatsProvider {
       public void requestComplete(long latencyMicros) {
         // no-op
       }
-
-      @Override
-      public void incErrors() {
-        // no-op
-      }
-
-      @Override
-      public void incReconnects() {
-        // no-op
-      }
-
-      @Override
-      public void incTimeouts() {
-        // no-op
-      }
     };
   }
 }

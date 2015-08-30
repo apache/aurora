@@ -211,7 +211,7 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
 
   @Test
   public void testJsonCodecRoundtrip() throws Exception {
-    Codec<ServiceInstance> codec = ServerSetImpl.createJsonCodec();
+    Codec<ServiceInstance> codec = ServerSetImpl.createCodec();
     ServiceInstance instance1 = new ServiceInstance(
         new Endpoint("foo", 1000),
         ImmutableMap.of("http", new Endpoint("foo", 8080)),
@@ -246,10 +246,7 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
         Status.ALIVE).setShard(42);
 
     ByteArrayOutputStream results = new ByteArrayOutputStream();
-    ServerSetImpl.createJsonCodec().serialize(instance, results);
-
-    results = new ByteArrayOutputStream();
-    ServerSetImpl.createJsonCodec().serialize(instance, results);
+    ServerSetImpl.createCodec().serialize(instance, results);
     assertEquals(
         "{\"serviceEndpoint\":{\"host\":\"foo\",\"port\":1000},"
             + "\"additionalEndpoints\":{\"http\":{\"host\":\"foo\",\"port\":8080}},"

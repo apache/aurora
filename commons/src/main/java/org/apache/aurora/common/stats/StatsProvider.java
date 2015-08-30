@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.common.stats;
 
-import com.google.common.base.Supplier;
-
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.google.common.base.Supplier;
 
 /**
  * A minimal interface to a Stats repository.
@@ -61,21 +61,6 @@ public interface StatsProvider {
      * @param latencyMicros The elapsed time required to complete the request.
      */
     void requestComplete(long latencyMicros);
-
-    /**
-     * Accumulates the error counter and the request counter.
-     */
-    void incErrors();
-
-    /**
-     * Accumulates the reconnect counter.
-     */
-    void incReconnects();
-
-    /**
-     * Accumulates the timeout counter.
-     */
-    void incTimeouts();
   }
 
   /**

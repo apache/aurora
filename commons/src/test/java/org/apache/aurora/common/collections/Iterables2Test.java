@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.common.collections;
 
-import java.util.Arrays;
 import java.util.List;
 
 import com.google.common.base.Predicate;
@@ -60,17 +59,6 @@ public class Iterables2Test {
         list(2, 6),
         list(3, 7),
         list(4, 8)
-    );
-  }
-
-  @Test
-  @SuppressWarnings("unchecked") // Needed because type information lost in vargs.
-  public void testZipEmptyIterable() {
-    assertValues(Iterables2.zip(10, list(1, 2, 3, 4), Arrays.<Integer>asList()),
-        list(1, 10),
-        list(2, 10),
-        list(3, 10),
-        list(4, 10)
     );
   }
 

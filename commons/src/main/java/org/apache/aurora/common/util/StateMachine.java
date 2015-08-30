@@ -31,14 +31,13 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 
-import org.apache.commons.lang.builder.HashCodeBuilder;
-
 import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.base.Closures;
-import org.apache.aurora.common.base.ExceptionalSupplier;
+import org.apache.commons.lang.builder.HashCodeBuilder;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
 
 /**
@@ -126,34 +125,6 @@ public class StateMachine<T> {
         throw new IllegalStateException(
             String.format("In state %s, expected to be in %s.", currentState, allowedStates));
       }
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /**
-   * Executes the supplied {@code work} if the state machine is in the {@code expectedState},
-   * postponing any concurrently requested {@link #transition(Object)} until after the execution of
-   * the work.
-   *
-   * @param expectedState The expected state the work should be performed in.
-   * @param work The work to perform in the {@code expectedState}.
-   * @param <O> The type returned by the unit of work.
-   * @param <E> The type of exception that may be thrown by the unit of work.
-   * @return The result of the unit of work if the current state is the {@code expectedState}.
-   * @throws IllegalStateException if the current state is not the {@code expectedState}.
-   * @throws E if the unit of work throws.
-   */
-  public <O, E extends Exception> O doInState(T expectedState, ExceptionalSupplier<O, E> work)
-      throws E {
-
-    checkNotNull(expectedState);
-    checkNotNull(work);
-
-    readLock.lock();
-    try {
-      checkState(expectedState);
-      return work.get();
     } finally {
       readLock.unlock();
     }

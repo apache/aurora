@@ -34,7 +34,7 @@ public class ServerSetsTest {
     Map<String, Endpoint > additionalEndpoints = ImmutableMap.of();
     Status status = Status.ALIVE;
 
-    Codec<ServiceInstance> codec = ServerSetImpl.createDefaultCodec();
+    Codec<ServiceInstance> codec = ServerSetImpl.createCodec();
 
     byte[] data = ServerSets.serializeServiceInstance(
         endpoint, additionalEndpoints, status, codec);

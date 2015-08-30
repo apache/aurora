@@ -68,7 +68,7 @@ public class LifecycleModuleTest extends EasyMockTest {
     final ServiceRunner runner = createMock(ServiceRunner.class);
     Command shutdown = createMock(Command.class);
 
-    expect(runner.launch()).andReturn(LocalService.primaryService(100, shutdown));
+    expect(runner.launch()).andReturn(LocalService.auxiliaryService("a", 100, shutdown));
     shutdown.execute();
 
     Module testModule = new AbstractModule() {
@@ -82,7 +82,8 @@ public class LifecycleModuleTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(Optional.of(getLocalAddress(100)), registry.getPrimarySocket());
+    assertEquals(Optional.<InetSocketAddress>absent(), registry.getPrimarySocket());
+    assertEquals(ImmutableMap.of("a", getLocalAddress(100)), registry.getAuxiliarySockets());
     injector.getInstance(ShutdownRegistry.ShutdownRegistryImpl.class).execute();
   }
 

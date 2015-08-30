@@ -17,38 +17,27 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.testing.TearDown;
 
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.Watcher.Event.EventType;
-import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.aurora.common.base.ExceptionalCommand;
+import org.apache.aurora.common.zookeeper.Candidate.Leader;
+import org.apache.aurora.common.zookeeper.Group.JoinException;
+import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
+import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
 import org.easymock.Capture;
-import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 import org.easymock.IMocksControl;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.apache.aurora.common.base.ExceptionalCommand;
-import org.apache.aurora.common.zookeeper.Candidate.Leader;
-import org.apache.aurora.common.zookeeper.Group.JoinException;
-import org.apache.aurora.common.zookeeper.SingletonService.DefeatOnDisconnectLeader;
-import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
-import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
-
 import static org.apache.aurora.common.testing.easymock.EasyMockTest.createCapture;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.fail;
 
 public class SingletonServiceTest extends BaseZooKeeperTest {
@@ -256,93 +245,5 @@ public class SingletonServiceTest extends BaseZooKeeperTest {
   public void testLeaderLeaves() throws Exception {
     control.replay();
     shutdownNetwork();
-  }
-
-  private static IAnswer<?> countDownAnswer(final CountDownLatch latch) {
-    return new IAnswer<Void>() {
-      @Override public Void answer() {
-        latch.countDown();
-        return null;
-      }
-    };
-  }
-
-  @Test
-  public void testLeaderDisconnect() throws Exception {
-    Capture<LeaderControl> controlCapture = createCapture();
-
-    CountDownLatch leading = new CountDownLatch(1);
-    listener.onLeading(capture(controlCapture));
-    expectLastCall().andAnswer(countDownAnswer(leading));
-
-    CountDownLatch defeated = new CountDownLatch(1);
-    listener.onDefeated(null);
-    expectLastCall().andAnswer(countDownAnswer(defeated));
-
-    control.replay();
-
-    ZooKeeperClient zkClient = createZkClient();
-    serverSet = new ServerSetImpl(zkClient, "/fake/path");
-    candidate = new CandidateImpl(
-        new Group(zkClient, ZooKeeperUtils.OPEN_ACL_UNSAFE, "/fake/path"));
-    DefeatOnDisconnectLeader leader = new DefeatOnDisconnectLeader(zkClient, listener);
-    service = new SingletonService(serverSet, candidate);
-    service.lead(InetSocketAddress.createUnresolved("foo", PORT_A),
-        ImmutableMap.of("http-admin", InetSocketAddress.createUnresolved("foo", PORT_B)),
-        leader);
-
-    leading.await();
-
-    shutdownNetwork();
-    defeated.await();
-  }
-
-  @Test
-  public void testNonLeaderDisconnect() throws Exception {
-    CountDownLatch elected = new CountDownLatch(1);
-    listener.onLeading(EasyMock.<LeaderControl>anyObject());
-    expectLastCall().andAnswer(countDownAnswer(elected));
-    listener.onDefeated(null);
-    expectLastCall().anyTimes();
-
-    control.replay();
-
-    ZooKeeperClient zkClient = createZkClient();
-    String path = "/fake/path";
-    // Create a fake leading candidate node to ensure that the leader in this test is never
-    // elected.
-    ZooKeeperUtils.ensurePath(zkClient, ZooKeeperUtils.OPEN_ACL_UNSAFE, path);
-    String leaderNode = zkClient.get().create(
-        path + "/" + SingletonService.LEADER_ELECT_NODE_PREFIX,
-        "fake_leader".getBytes(),
-        ZooKeeperUtils.OPEN_ACL_UNSAFE,
-        CreateMode.PERSISTENT_SEQUENTIAL);
-
-    serverSet = new ServerSetImpl(zkClient, path);
-    candidate =
-        SingletonService.createSingletonCandidate(zkClient, path, ZooKeeperUtils.OPEN_ACL_UNSAFE);
-    DefeatOnDisconnectLeader leader = new DefeatOnDisconnectLeader(zkClient, listener);
-    service = new SingletonService(serverSet, candidate);
-    service.lead(InetSocketAddress.createUnresolved("foo", PORT_A),
-        ImmutableMap.of("http-admin", InetSocketAddress.createUnresolved("foo", PORT_B)),
-        leader);
-
-    final CountDownLatch disconnected = new CountDownLatch(1);
-    zkClient.register(new Watcher() {
-      @Override public void process(WatchedEvent event) {
-        if ((event.getType() == EventType.None)
-            && (event.getState() == KeeperState.Disconnected)) {
-          disconnected.countDown();
-        }
-      }
-    });
-
-    shutdownNetwork();
-    disconnected.await();
-
-    restartNetwork();
-    zkClient.get().delete(leaderNode, ZooKeeperUtils.ANY_VERSION);
-    // Upon deletion of the fake leader node, the candidate should become leader.
-    elected.await();
   }
 }

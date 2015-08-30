@@ -126,23 +126,6 @@ public class ZooKeeperClientModule extends PrivateModule {
      *
      * @param servers ZooKeeper server addresses.
      * @param inProcess Whether to run and create clients for an in-process ZooKeeper server.
-     * @param sessionTimeout Timeout duration for established sessions.
-     * @param credentials ZooKeeper authentication credentials.
-     */
-    public ClientConfig(
-        Iterable<InetSocketAddress> servers,
-        boolean inProcess,
-        Amount<Integer, Time> sessionTimeout,
-        Credentials credentials) {
-
-      this(servers, Optional.<String>absent(), inProcess, sessionTimeout, credentials);
-    }
-
-    /**
-     * Creates a new client configuration.
-     *
-     * @param servers ZooKeeper server addresses.
-     * @param inProcess Whether to run and create clients for an in-process ZooKeeper server.
      * @param chrootPath an optional chroot path
      * @param sessionTimeout Timeout duration for established sessions.
      * @param credentials ZooKeeper authentication credentials.
@@ -178,17 +161,6 @@ public class ZooKeeperClientModule extends PrivateModule {
 
     /**
      * Creates a new configuration identical to this configuration, but with the provided
-     * session timeout.
-     *
-     * @param sessionTimeout Timeout duration for established sessions.
-     * @return A modified clone of this configuration.
-     */
-    public ClientConfig withSessionTimeout(Amount<Integer, Time> sessionTimeout) {
-      return new ClientConfig(servers, chrootPath, inProcess, sessionTimeout, credentials);
-    }
-
-    /**
-     * Creates a new configuration identical to this configuration, but with the provided
      * credentials.
      *
      * @param credentials ZooKeeper authentication credentials.
@@ -196,40 +168,6 @@ public class ZooKeeperClientModule extends PrivateModule {
      */
     public ClientConfig withCredentials(Credentials credentials) {
       return new ClientConfig(servers, chrootPath, inProcess, sessionTimeout, credentials);
-    }
-
-    /**
-     * Convenience method for calling {@link #withCredentials(Credentials)} with digest credentials.
-     *
-     * @param username Digest authentication user.
-     * @param password Digest authentication raw password.
-     * @return A modified clone of this configuration.
-     */
-    public ClientConfig withDigestCredentials(String username, String password) {
-      return withCredentials(ZooKeeperClient.digestCredentials(username, password));
-    }
-
-    /**
-     * Creates a new configuration identical to this configuration, but with the provided
-     * in-process setting.
-     *
-     * @param inProcess If {@code true}, an in-process ZooKeeper server server will be used,
-     *                  and all clients will connect to it.
-     * @return A modified clone of this configuration.
-     */
-    public ClientConfig inProcess(boolean inProcess) {
-      return new ClientConfig(servers, chrootPath, inProcess, sessionTimeout, credentials);
-    }
-
-    /**
-     * Creates a new configuration identical to this configuration, but with the provided
-     * chroot path setting.
-     *
-     * @param chrootPath a valid ZooKeeper path used  as a chroot for ZooKeeper connections.
-     * @return A modified clone of this configuration.
-     */
-    public ClientConfig withChrootPath(String chrootPath) {
-      return new ClientConfig(servers, Optional.of(chrootPath), inProcess, sessionTimeout, credentials);
     }
   }
 }

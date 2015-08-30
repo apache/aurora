@@ -33,7 +33,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Throwables;
 import com.google.common.cache.CacheBuilder;
@@ -49,25 +48,19 @@ import com.google.common.collect.Sets.SetView;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.gson.Gson;
 
+import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.base.Function;
+import org.apache.aurora.common.base.Supplier;
+import org.apache.aurora.common.io.Codec;
+import org.apache.aurora.common.thrift.Endpoint;
+import org.apache.aurora.common.thrift.ServiceInstance;
+import org.apache.aurora.common.thrift.Status;
+import org.apache.aurora.common.util.BackoffHelper;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
-
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.Function;
-import org.apache.aurora.common.base.Supplier;
-import org.apache.aurora.common.io.Codec;
-import org.apache.aurora.common.io.CompatibilityCodec;
-import org.apache.aurora.common.io.ThriftCodec;
-import org.apache.aurora.common.util.BackoffHelper;
-
-import org.apache.aurora.common.thrift.Endpoint;
-import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.common.thrift.Status;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -76,11 +69,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class ServerSetImpl implements ServerSet {
   private static final Logger LOG = Logger.getLogger(ServerSetImpl.class.getName());
-
-  @CmdLine(name = "serverset_encode_json",
-           help = "If true, use JSON for encoding server set information."
-               + " Defaults to true (use JSON).")
-  private static final Arg<Boolean> ENCODE_JSON = Arg.create(true);
 
   private final ZooKeeperClient zkClient;
   private final Group group;
@@ -105,7 +93,7 @@ public class ServerSetImpl implements ServerSet {
    * @param path the name-service path of the service to connect to
    */
   public ServerSetImpl(ZooKeeperClient zkClient, Iterable<ACL> acl, String path) {
-    this(zkClient, new Group(zkClient, acl, path), createDefaultCodec());
+    this(zkClient, new Group(zkClient, acl, path), createCodec());
   }
 
   /**
@@ -115,7 +103,7 @@ public class ServerSetImpl implements ServerSet {
    * @param group the server group
    */
   public ServerSetImpl(ZooKeeperClient zkClient, Group group) {
-    this(zkClient, group, createDefaultCodec());
+    this(zkClient, group, createCodec());
   }
 
   /**
@@ -553,50 +541,12 @@ public class ServerSetImpl implements ServerSet {
     }
   }
 
-  private static Codec<ServiceInstance> createCodec(final boolean useJsonEncoding) {
-    final Codec<ServiceInstance> json = new AdaptedJsonCodec();
-    final Codec<ServiceInstance> thrift =
-        ThriftCodec.create(ServiceInstance.class, ThriftCodec.BINARY_PROTOCOL);
-    final Predicate<byte[]> recognizer = new Predicate<byte[]>() {
-      public boolean apply(byte[] input) {
-        return (input.length > 1 && input[0] == '{' && input[1] == '\"') == useJsonEncoding;
-      }
-    };
-
-    if (useJsonEncoding) {
-      return CompatibilityCodec.create(json, thrift, 2, recognizer);
-    }
-    return CompatibilityCodec.create(thrift, json, 2, recognizer);
-  }
-
   /**
-   * Creates a codec for {@link ServiceInstance} objects that uses Thrift binary encoding, and can
-   * decode both Thrift and JSON encodings.
+   * Returns a codec for {@link ServiceInstance} objects that translates to and from JSON.
    *
    * @return a new codec instance.
    */
-  public static Codec<ServiceInstance> createThriftCodec() {
-    return createCodec(false);
-  }
-
-  /**
-   * Creates a codec for {@link ServiceInstance} objects that uses JSON encoding, and can decode
-   * both Thrift and JSON encodings.
-   *
-   * @return a new codec instance.
-   */
-  public static Codec<ServiceInstance> createJsonCodec() {
-    return createCodec(true);
-  }
-
-  /**
-   * Returns a codec for {@link ServiceInstance} objects that uses either the Thrift or the JSON
-   * encoding, depending on whether the command line argument <tt>serverset_json_encofing</tt> is
-   * set to <tt>true</tt>, and can decode both Thrift and JSON encodings.
-   *
-   * @return a new codec instance.
-   */
-  public static Codec<ServiceInstance> createDefaultCodec() {
-    return createCodec(ENCODE_JSON.get());
+  public static Codec<ServiceInstance> createCodec() {
+    return new AdaptedJsonCodec();
   }
 }

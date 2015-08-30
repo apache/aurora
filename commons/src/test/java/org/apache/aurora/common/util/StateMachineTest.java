@@ -13,27 +13,15 @@
  */
 package org.apache.aurora.common.util;
 
-import com.google.common.collect.ImmutableSet;
-
 import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.base.Closures;
-import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.Commands;
-import org.apache.aurora.common.base.ExceptionalSupplier;
-import org.apache.aurora.common.base.Supplier;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.common.util.StateMachine.Transition;
 import org.apache.aurora.common.util.StateMachine.Rule;
-
+import org.apache.aurora.common.util.StateMachine.Transition;
 import org.junit.Test;
-
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -198,120 +186,6 @@ public class StateMachineTest extends EasyMockTest {
   }
 
   @Test
-  public void testDoInStateMatches() {
-    control.replay();
-
-    StateMachine<String> stateMachine = StateMachine.<String>builder(NAME)
-        .initialState(A)
-        .addState(Rule.from(A).to(B))
-        .build();
-
-    int amount = stateMachine.doInState(A, new Supplier<Integer>() {
-      @Override public Integer get() {
-        return 42;
-      }
-    });
-    assertThat(amount, is(42));
-
-    stateMachine.transition(B);
-
-    String name = stateMachine.doInState(B, new Supplier<String>() {
-      @Override public String get() {
-        return "jake";
-      }
-    });
-    assertThat(name, is("jake"));
-  }
-
-  @Test
-  public void testDoInStateConcurrently() throws InterruptedException {
-    control.replay();
-
-    final StateMachine<String> stateMachine = StateMachine.<String>builder(NAME)
-        .initialState(A)
-        .addState(A, B)
-        .build();
-
-    final BlockingQueue<Integer> results = new LinkedBlockingQueue<Integer>();
-
-    final CountDownLatch supplier1Proceed = new CountDownLatch(1);
-    final ExceptionalSupplier<Void, RuntimeException> supplier1 =
-        Commands.asSupplier(new Command() {
-          @Override public void execute() {
-            results.offer(1);
-            try {
-              supplier1Proceed.await();
-            } catch (InterruptedException e) {
-              throw new RuntimeException(e);
-            }
-          }
-        });
-
-    final CountDownLatch supplier2Proceed = new CountDownLatch(1);
-    final ExceptionalSupplier<Void, RuntimeException> supplier2 =
-        Commands.asSupplier(new Command() {
-          @Override public void execute() {
-            results.offer(2);
-            try {
-              supplier2Proceed.await();
-            } catch (InterruptedException e) {
-              throw new RuntimeException(e);
-            }
-          }
-        });
-
-    Thread thread1 = new Thread(new Runnable() {
-      @Override public void run() {
-        stateMachine.doInState(A, supplier1);
-      }
-    });
-
-    Thread thread2 = new Thread(new Runnable() {
-      @Override public void run() {
-        stateMachine.doInState(A, supplier2);
-      }
-    });
-
-    Thread thread3 = new Thread(new Runnable() {
-      @Override public void run() {
-        stateMachine.transition(B);
-      }
-    });
-
-    thread1.start();
-    thread2.start();
-
-    Integer result1 = results.take();
-    Integer result2 = results.take();
-    // we know 1 and 2 have the read lock held
-
-    thread3.start(); // should be blocked by read locks in place
-
-    assertThat(ImmutableSet.of(result1, result2), is(ImmutableSet.of(1, 2)));
-    assertTrue(results.isEmpty());
-
-    supplier1Proceed.countDown();
-    supplier2Proceed.countDown();
-
-    thread1.join();
-    thread2.join();
-    thread3.join();
-
-    assertThat(B, is(stateMachine.getState()));
-  }
-
-  @Test(expected = IllegalStateException.class)
-  public void testDoInStateFails() {
-    control.replay();
-
-    StateMachine.<String>builder(NAME)
-        .initialState(A)
-        .addState(A, B)
-        .build()
-        .doInState(B, Commands.asSupplier(Commands.NOOP));
-  }
-
-  @Test
   public void testNoThrowOnInvalidTransition() {
     control.replay();
 
@@ -334,21 +208,21 @@ public class StateMachineTest extends EasyMockTest {
     Closure<Transition<String>> fromA = createMock(TRANSITION_CLOSURE_CLZ);
     Closure<Transition<String>> fromB = createMock(TRANSITION_CLOSURE_CLZ);
 
-    Transition<String> aToB = new Transition<String>(A, B, true);
+    Transition<String> aToB = new Transition<>(A, B, true);
     anyTransition.execute(aToB);
     fromA.execute(aToB);
 
-    Transition<String> bToB = new Transition<String>(B, B, false);
+    Transition<String> bToB = new Transition<>(B, B, false);
     anyTransition.execute(bToB);
     fromB.execute(bToB);
 
-    Transition<String> bToC = new Transition<String>(B, C, true);
+    Transition<String> bToC = new Transition<>(B, C, true);
     anyTransition.execute(bToC);
     fromB.execute(bToC);
 
-    anyTransition.execute(new Transition<String>(C, B, true));
+    anyTransition.execute(new Transition<>(C, B, true));
 
-    Transition<String> bToD = new Transition<String>(B, D, true);
+    Transition<String> bToD = new Transition<>(B, D, true);
     anyTransition.execute(bToD);
     fromB.execute(bToD);
 
@@ -376,7 +250,7 @@ public class StateMachineTest extends EasyMockTest {
     Closure<Transition<String>> aToBHandler = createMock(TRANSITION_CLOSURE_CLZ);
     Closure<Transition<String>> impossibleHandler = createMock(TRANSITION_CLOSURE_CLZ);
 
-    aToBHandler.execute(new Transition<String>(A, B, true));
+    aToBHandler.execute(new Transition<>(A, B, true));
 
     control.replay();
 

@@ -13,13 +13,14 @@
  */
 package org.apache.aurora.common.util;
 
+import java.util.logging.Logger;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
 import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-
-import java.util.logging.Logger;
 
 /**
  * A utility for dealing with backoffs of retryable actions.
@@ -54,25 +55,6 @@ public class BackoffHelper {
    */
   public BackoffHelper(Amount<Long, Time> initialBackoff, Amount<Long, Time> maxBackoff) {
     this(new TruncatedBinaryBackoff(initialBackoff, maxBackoff));
-  }
-
-  /**
-   * Creates a new BackoffHelper that uses truncated binary backoff starting at the given
-   * {@code initialBackoff} and maxing out at the given {@code maxBackoff}. This will either:
-   * <ul>
-   *   <li>{@code stopAtMax == true} : throw {@code BackoffExpiredException} when maxBackoff is
-   *   reached</li>
-   *   <li>{@code stopAtMax == false} : continue backing off with maxBackoff</li>
-   * </ul>
-   *
-   * @param initialBackoff the initial amount of time to back off
-   * @param maxBackoff the maximum amount of time to back off
-   * @param stopAtMax if true, this will throw {@code BackoffStoppedException} when the max backoff is
-   * reached
-   */
-  public BackoffHelper(Amount<Long, Time> initialBackoff, Amount<Long, Time> maxBackoff,
-      boolean stopAtMax) {
-    this(new TruncatedBinaryBackoff(initialBackoff, maxBackoff, stopAtMax));
   }
 
   /**

@@ -18,23 +18,18 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingDeque;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
-import com.google.common.collect.Ordering;
 
+import org.apache.aurora.common.base.ExceptionalCommand;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.apache.aurora.common.base.ExceptionalCommand;
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
-
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -48,7 +43,7 @@ public class CandidateImplTest extends BaseZooKeeperTest {
 
   @Before
   public void mySetUp() throws IOException {
-    candidateBuffer = new LinkedBlockingDeque<CandidateImpl>();
+    candidateBuffer = new LinkedBlockingDeque<>();
   }
 
   private Group createGroup(ZooKeeperClient zkClient) throws IOException {
@@ -154,62 +149,6 @@ public class CandidateImplTest extends BaseZooKeeperTest {
       // Passive expiration should trigger defeat.
       candidate3Reign.expectDefeated();
     }
-  }
-
-  @Test
-  public void testCustomJudge() throws Exception {
-    Function<Iterable<String>, String> judge = new Function<Iterable<String>, String>() {
-      @Override public String apply(Iterable<String> input) {
-        return Ordering.natural().max(input);
-      }
-    };
-
-    ZooKeeperClient zkClient1 = createZkClient(TIMEOUT);
-    Group group1 = createGroup(zkClient1);
-    final CandidateImpl candidate1 =
-        new CandidateImpl(group1, judge, Suppliers.ofInstance("Leader1".getBytes())) {
-          @Override public String toString() {
-            return "Leader1";
-          }
-        };
-    ZooKeeperClient zkClient2 = createZkClient(TIMEOUT);
-    Group group2 = createGroup(zkClient2);
-    final CandidateImpl candidate2 =
-        new CandidateImpl(group2, judge, Suppliers.ofInstance("Leader2".getBytes())) {
-          @Override public String toString() {
-            return "Leader2";
-          }
-        };
-
-    Reign candidate1Reign = new Reign("1", candidate1);
-    Reign candidate2Reign = new Reign("2", candidate2);
-
-    candidate1.offerLeadership(candidate1Reign);
-    assertSame(candidate1, candidateBuffer.takeLast());
-
-    Supplier<Boolean> candidate2Leader = candidate2.offerLeadership(candidate2Reign);
-    assertSame(candidate2, candidateBuffer.takeLast());
-    candidate1Reign.expectDefeated();
-    assertTrue("Since the judge picks the newest member joining a group as leader candidate 1 "
-               + "should be defeated and candidate 2 leader", candidate2Leader.get());
-  }
-
-  @Test
-  public void testCustomDataSupplier() throws Exception {
-    byte[] DATA = "Leader1".getBytes();
-    ZooKeeperClient zkClient1 = createZkClient(TIMEOUT);
-    Group group1 = createGroup(zkClient1);
-    CandidateImpl candidate1 = new CandidateImpl(group1, Suppliers.ofInstance(DATA)) {
-      @Override public String toString() {
-        return "Leader1";
-      }
-    };
-    Reign candidate1Reign = new Reign("1", candidate1);
-
-    Supplier<Boolean> candidate1Leader = candidate1.offerLeadership(candidate1Reign);
-    assertSame(candidate1, candidateBuffer.takeLast());
-    assertTrue(candidate1Leader.get());
-    assertArrayEquals(DATA, candidate1.getLeaderData().get());
   }
 
   @Test
