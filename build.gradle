@@ -39,10 +39,6 @@ allprojects {
 
   repositories {
     mavenCentral()
-    // TODO(zmanji): Remove dependency on Twitter maven.
-    maven {
-      url 'https://maven.twttr.com/'
-    }
   }
 
   compileJava {
@@ -172,11 +168,6 @@ project(':commons') {
     compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"
     compile "org.easymock:easymock:3.2"
     compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
-
-    // TODO(zmanji): Remove dependency on this old jetty package
-    compile 'org.mortbay.jetty:jetty:6.1.25'
-    // TODO(zmanji): Remove dependency on this very old google package
-    compile 'com.google.testing:test-libraries-for-java:1.1.1'
 
     testCompile "junit:junit:${junitRev}"
     testCompile "com.sun.jersey:jersey-client:${jerseyRev}"

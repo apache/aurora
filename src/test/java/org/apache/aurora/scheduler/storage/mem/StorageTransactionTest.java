@@ -23,12 +23,11 @@ import java.util.concurrent.Future;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.testing.TearDown;
-import com.google.common.testing.junit4.TearDownTestCase;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.testing.TearDownTestCase;
 import org.apache.aurora.common.util.concurrent.ExecutorServiceShutdown;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.base.Query;

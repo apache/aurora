@@ -23,7 +23,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
-import com.google.common.testing.TearDown;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.common.quantity.Amount;
@@ -44,6 +43,7 @@ import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
+import org.apache.commons.io.FileUtils;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -67,12 +67,7 @@ public class StorageBackupTest extends EasyMockTest {
     final File backupDir = Files.createTempDir();
     ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
     clock = FakeScheduledExecutor.scheduleExecutor(executor);
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() throws Exception {
-        org.apache.commons.io.FileUtils.deleteDirectory(backupDir);
-      }
-    });
+    addTearDown(() -> FileUtils.deleteDirectory(backupDir));
     config = new BackupConfig(backupDir, MAX_BACKUPS, INTERVAL);
     clock.advance(Amount.of(365 * 30L, Time.DAYS));
     storageBackup = new StorageBackupImpl(delegate, clock, config, executor);

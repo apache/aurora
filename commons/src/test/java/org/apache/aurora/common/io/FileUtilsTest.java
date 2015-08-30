@@ -17,16 +17,13 @@ import java.io.File;
 import java.io.IOException;
 
 import com.google.common.io.Files;
-import com.google.common.testing.TearDown;
-import com.google.common.testing.junit4.JUnitAsserts;
-import com.google.common.testing.junit4.TearDownTestCase;
-
-import org.junit.Before;
-import org.junit.Test;
 
 import org.apache.aurora.common.base.ExceptionalClosure;
 import org.apache.aurora.common.base.ExceptionalFunction;
 import org.apache.aurora.common.base.Function;
+import org.apache.aurora.common.testing.TearDownTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -62,7 +59,7 @@ public class FileUtilsTest extends TearDownTestCase {
   public void testCreateFile() throws IOException {
     File tmpFile = temporary.createFile(".jake");
     assertEmptyFile(tmpFile);
-    JUnitAsserts.assertMatchesRegex(".+\\.jake$", tmpFile.getName());
+    assertTrue(tmpFile.getName().matches(".+\\.jake$"));
   }
 
   @Test

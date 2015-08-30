@@ -18,10 +18,9 @@ import com.google.common.collect.Ordering;
 
 import org.junit.Test;
 
-import static com.google.common.testing.junit4.JUnitAsserts.assertNotEqual;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -37,9 +36,9 @@ public class AmountTest {
     assertEquals("expected equality to be calculated from amounts converted to a common unit",
         Amount.of(1L, Time.DAYS), Amount.of(24L, Time.HOURS));
 
-    assertNotEqual("expected unit conversions for equality tests to not lose precision",
+    assertNotEquals("expected unit conversions for equality tests to not lose precision",
         Amount.of(25L, Time.HOURS), Amount.of(1L, Time.DAYS));
-    assertNotEqual("expected unit conversions for equality tests to not lose precision",
+    assertNotEquals("expected unit conversions for equality tests to not lose precision",
         Amount.of(1L, Time.DAYS), Amount.of(25L, Time.HOURS));
 
     assertFalse("expected value equality to work only for the same Number types",

@@ -18,7 +18,6 @@ import java.util.logging.Level;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.testing.TearDown;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -77,29 +76,13 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    offerManager.LOG.setLevel(Level.FINE);
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() throws Exception {
-        offerManager.LOG.setLevel(Level.INFO);
-      }
-    });
+    OfferManagerImpl.LOG.setLevel(Level.FINE);
+    addTearDown(() -> OfferManagerImpl.LOG.setLevel(Level.INFO));
     driver = createMock(Driver.class);
     DelayExecutor executorMock = createMock(DelayExecutor.class);
     clock = FakeScheduledExecutor.fromDelayExecutor(executorMock);
-
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() throws Exception {
-        clock.assertEmpty();
-      }
-    });
-    OfferReturnDelay returnDelay = new OfferReturnDelay() {
-      @Override
-      public Amount<Long, Time> get() {
-        return RETURN_DELAY;
-      }
-    };
+    addTearDown(clock::assertEmpty);
+    OfferReturnDelay returnDelay = () -> RETURN_DELAY;
     offerManager = new OfferManagerImpl(driver, returnDelay, executorMock);
   }
 

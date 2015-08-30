@@ -18,7 +18,6 @@ import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Throwables;
 import com.google.common.net.HostAndPort;
-import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;

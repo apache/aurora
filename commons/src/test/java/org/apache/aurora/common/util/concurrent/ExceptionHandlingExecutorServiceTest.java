@@ -18,7 +18,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.junit.Before;
@@ -50,15 +49,9 @@ public class ExceptionHandlingExecutorServiceTest extends EasyMockTest {
             .build()),
         signallingHandler);
 
-    final ExecutorServiceShutdown executorServiceShutdown = new ExecutorServiceShutdown(
+    ExecutorServiceShutdown executorServiceShutdown = new ExecutorServiceShutdown(
         executorService, Amount.of(3L, Time.SECONDS));
-
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() throws Exception {
-        executorServiceShutdown.execute();
-      }
-    });
+    addTearDown(executorServiceShutdown::execute);
   }
 
   @Test

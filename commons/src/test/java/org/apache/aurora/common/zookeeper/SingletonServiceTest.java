@@ -20,7 +20,6 @@ import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.testing.TearDown;
 
 import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.common.zookeeper.Candidate.Leader;

@@ -20,9 +20,8 @@ import java.lang.reflect.WildcardType;
 
 import com.google.common.base.Preconditions;
 import com.google.common.reflect.TypeToken;
-import com.google.common.testing.TearDown;
-import com.google.common.testing.junit4.TearDownTestCase;
 
+import org.apache.aurora.common.testing.TearDownTestCase;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IMocksControl;

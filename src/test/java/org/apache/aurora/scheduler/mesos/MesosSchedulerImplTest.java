@@ -22,7 +22,6 @@ import java.util.logging.Logger;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.MoreExecutors;
 
 import org.apache.aurora.common.application.Lifecycle;

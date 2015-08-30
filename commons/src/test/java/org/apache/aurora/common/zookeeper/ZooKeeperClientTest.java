@@ -30,11 +30,10 @@ import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionException;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
 
-import static com.google.common.testing.junit4.JUnitAsserts.assertNotEqual;
-
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
@@ -158,7 +157,7 @@ public class ZooKeeperClientTest extends BaseZooKeeperTest {
     // Close on an open client should force session re-establishment
     zkClient.close();
 
-    assertNotEqual(firstSessionId, zkClient.get().getSessionId());
+    assertNotEquals(firstSessionId, zkClient.get().getSessionId());
   }
 
   @Test

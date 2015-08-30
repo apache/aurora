@@ -22,9 +22,9 @@ import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.Stat;
 import org.junit.Test;
 
-import static com.google.common.testing.junit4.JUnitAsserts.assertNotEqual;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -83,7 +83,7 @@ public class ZooKeeperUtilsTest extends BaseZooKeeperTest {
 
     // expect using the correct version to work
     Stat rev2Stat = zkClient.get().setData(nodePath, "rev2".getBytes(), rev1Stat.getVersion());
-    assertNotEqual(ZooKeeperUtils.ANY_VERSION, rev2Stat.getVersion());
+    assertNotEquals(ZooKeeperUtils.ANY_VERSION, rev2Stat.getVersion());
 
     zkClient.get().setData(nodePath, "force-write".getBytes(), ZooKeeperUtils.ANY_VERSION);
     Stat forceWriteStat = new Stat();
@@ -91,7 +91,7 @@ public class ZooKeeperUtilsTest extends BaseZooKeeperTest {
     assertArrayEquals("force-write".getBytes(), forceWriteData);
 
     assertTrue(forceWriteStat.getVersion() > rev2Stat.getVersion());
-    assertNotEqual(ZooKeeperUtils.ANY_VERSION, forceWriteStat.getVersion());
+    assertNotEquals(ZooKeeperUtils.ANY_VERSION, forceWriteStat.getVersion());
   }
 
   @Test

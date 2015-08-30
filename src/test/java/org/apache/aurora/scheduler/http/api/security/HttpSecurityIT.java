@@ -19,7 +19,6 @@ import java.util.Set;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-import com.google.common.testing.TearDown;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
@@ -160,12 +159,7 @@ public class HttpSecurityIT extends JettyServerModuleTest {
 
   private AuroraAdmin.Client getClient(HttpClient httpClient) throws TTransportException {
     final TTransport httpClientTransport = new THttpClient(formatUrl(API_PATH), httpClient);
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() throws Exception {
-        httpClientTransport.close();
-      }
-    });
+    addTearDown(httpClientTransport::close);
     return new AuroraAdmin.Client(new TJSONProtocol(httpClientTransport));
   }
 

@@ -18,7 +18,6 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
-import com.google.common.testing.TearDown;
 
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.quantity.Amount;
@@ -42,6 +41,7 @@ import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImp
 import org.apache.aurora.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
+import org.apache.commons.io.FileUtils;
 import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
@@ -70,12 +70,7 @@ public class RecoveryTest extends EasyMockTest {
   @Before
   public void setUp() {
     final File backupDir = Files.createTempDir();
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() throws Exception {
-        org.apache.commons.io.FileUtils.deleteDirectory(backupDir);
-      }
-    });
+    addTearDown(() -> FileUtils.deleteDirectory(backupDir));
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
     distributedStore = createMock(DistributedSnapshotStore.class);
     primaryStorage = createMock(Storage.class);

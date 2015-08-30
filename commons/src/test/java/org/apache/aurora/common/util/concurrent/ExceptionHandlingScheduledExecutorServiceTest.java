@@ -21,8 +21,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.testing.TearDown;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -49,15 +47,9 @@ public class ExceptionHandlingScheduledExecutorServiceTest extends EasyMockTest 
     executorService = MoreExecutors.exceptionHandlingExecutor(
         Executors.newSingleThreadScheduledExecutor(), signallingHandler);
 
-    final ExecutorServiceShutdown executorServiceShutdown = new ExecutorServiceShutdown(
+    ExecutorServiceShutdown executorServiceShutdown = new ExecutorServiceShutdown(
         executorService, Amount.of(3L, Time.SECONDS));
-
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() throws Exception {
-        executorServiceShutdown.execute();
-      }
-    });
+    addTearDown(executorServiceShutdown::execute);
   }
 
   @Test

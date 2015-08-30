@@ -16,15 +16,13 @@ package org.apache.aurora.common.zookeeper.testing;
 import java.io.IOException;
 
 import com.google.common.base.Preconditions;
-import com.google.common.testing.TearDown;
-import com.google.common.testing.junit4.TearDownTestCase;
-
-import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.junit.Before;
 
 import org.apache.aurora.common.application.ShutdownRegistry.ShutdownRegistryImpl;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.testing.TearDownTestCase;
+import org.apache.aurora.common.zookeeper.ZooKeeperClient;
+import org.junit.Before;
 
 /**
  * A baseclass for in-process zookeeper tests.
