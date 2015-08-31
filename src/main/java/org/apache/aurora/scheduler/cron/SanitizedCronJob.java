@@ -13,10 +13,12 @@
  */
 package org.apache.aurora.scheduler.cron;
 
+import java.util.Objects;
+
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 
@@ -138,17 +140,17 @@ public final class SanitizedCronJob {
 
     SanitizedCronJob other = (SanitizedCronJob) o;
 
-    return Objects.equal(config, other.config) && Objects.equal(crontabEntry, other.crontabEntry);
+    return Objects.equals(config, other.config) && Objects.equals(crontabEntry, other.crontabEntry);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(config, crontabEntry);
+    return Objects.hash(config, crontabEntry);
   }
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("config", config)
         .add("crontabEntry", crontabEntry)
         .toString();

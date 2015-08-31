@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.preemptor;
 import java.util.Objects;
 import java.util.Set;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
 
 import static java.util.Objects.requireNonNull;
@@ -58,7 +59,7 @@ class PreemptionProposal {
 
   @Override
   public String toString() {
-    return com.google.common.base.Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("victims", getVictims())
         .add("slaveId", getSlaveId())
         .toString();

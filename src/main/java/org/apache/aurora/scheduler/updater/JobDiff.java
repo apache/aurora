@@ -19,6 +19,7 @@ import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
@@ -120,7 +121,7 @@ public final class JobDiff {
 
   @Override
   public String toString() {
-    return com.google.common.base.Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("replacedInstances", getReplacedInstances())
         .add("replacementInstances", getReplacementInstances())
         .add("unchangedInstances", getUnchangedInstances())

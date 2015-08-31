@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.updater;
 import java.util.Objects;
 import java.util.Set;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
@@ -110,7 +111,7 @@ public class SideEffect {
 
   @Override
   public String toString() {
-    return com.google.common.base.Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("action", getAction())
         .add("statusChanges", getStatusChanges())
         .toString();

@@ -21,7 +21,7 @@ import org.apache.shiro.authz.permission.WildcardPermission;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.google.common.base.Objects.toStringHelper;
+import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
  * Utilities for Aurora-specific Shiro permissions.

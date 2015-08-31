@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.state;
 
 import java.util.Objects;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 
@@ -72,7 +73,7 @@ public class TransitionResult {
 
   @Override
   public String toString() {
-    return com.google.common.base.Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("result", result)
         .add("sideEffects", sideEffects)
         .toString();

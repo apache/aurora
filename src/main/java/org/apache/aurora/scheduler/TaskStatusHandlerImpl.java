@@ -111,7 +111,7 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
             driver.abort();
           }
         },
-        MoreExecutors.sameThreadExecutor());
+        MoreExecutors.newDirectExecutorService());
   }
 
   @Override

@@ -14,32 +14,35 @@
 package org.apache.aurora.common.args.apt;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.CharMatcher;
-import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteSource;
+import com.google.common.io.CharSource;
 import com.google.common.io.CharStreams;
 import com.google.common.io.InputSupplier;
 import com.google.common.io.LineProcessor;
+import com.google.common.io.Resources;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
@@ -74,41 +77,16 @@ public final class Configuration {
   private static final Logger LOG = Logger.getLogger(Configuration.class.getName());
 
   private static final CharMatcher IDENTIFIER_START =
-      CharMatcher.forPredicate(new Predicate<Character>() {
-        @Override public boolean apply(Character c) {
-          return Character.isJavaIdentifierStart(c);
-        }
-      });
+      CharMatcher.forPredicate(Character::isJavaIdentifierStart);
 
   private static final CharMatcher IDENTIFIER_REST =
-      CharMatcher.forPredicate(new Predicate<Character>() {
-        @Override public boolean apply(Character c) {
-          return Character.isJavaIdentifierPart(c);
-        }
-      });
+      CharMatcher.forPredicate(Character::isJavaIdentifierPart);
 
-  private static final Function<URL, InputSupplier<? extends InputStream>> URL_TO_INPUT =
-      new Function<URL, InputSupplier<? extends InputStream>>() {
-        @Override public InputSupplier<? extends InputStream> apply(final URL resource) {
-          return new InputSupplier<InputStream>() {
-            @Override public InputStream getInput() throws IOException {
-              return resource.openStream();
-            }
-          };
-        }
-      };
-
-  private static final Function<InputSupplier<? extends InputStream>,
-                                InputSupplier<? extends Reader>> INPUT_TO_READER =
-      new Function<InputSupplier<? extends InputStream>, InputSupplier<? extends Reader>>() {
-        @Override public InputSupplier<? extends Reader> apply(
-            final InputSupplier<? extends InputStream> input) {
-          return CharStreams.newReaderSupplier(input, Charsets.UTF_8);
-        }
-      };
-
-  private static final Function<URL, InputSupplier<? extends Reader>> URL_TO_READER =
-      Functions.compose(INPUT_TO_READER, URL_TO_INPUT);
+  private static final Function<URL, CharSource> URL_TO_SOURCE = new Function<URL, CharSource>() {
+    @Override public CharSource apply(URL input) {
+      return Resources.asCharSource(input, StandardCharsets.UTF_8);
+    }
+  };
 
   private static final String DEFAULT_RESOURCE_NAME = "cmdline.arg.info.txt";
 
@@ -441,8 +419,10 @@ public final class Configuration {
 
   private static Configuration load(int nextIndex, List<URL> configs)
       throws ConfigurationException, IOException {
-    InputSupplier<Reader> input = CharStreams.join(Iterables.transform(configs, URL_TO_READER));
-    return CharStreams.readLines(input, new ConfigurationParser(nextIndex));
+    CharSource input = CharSource.concat(Iterables.transform(configs, URL_TO_SOURCE));
+    try(Reader reader = input.openStream()) {
+      return CharStreams.readLines(reader, new ConfigurationParser(nextIndex));
+    }
   }
 
   public boolean isEmpty() {

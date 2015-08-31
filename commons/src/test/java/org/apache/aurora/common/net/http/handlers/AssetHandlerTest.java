@@ -16,7 +16,6 @@ package org.apache.aurora.common.net.http.handlers;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.zip.GZIPInputStream;
 
@@ -24,8 +23,8 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
-import com.google.common.io.InputSupplier;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -34,6 +33,7 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 
 import static javax.servlet.http.HttpServletResponse.SC_NOT_MODIFIED;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
+import static org.easymock.EasyMock.createMockBuilder;
 import static org.easymock.EasyMock.expect;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
@@ -48,11 +48,11 @@ public class AssetHandlerTest extends EasyMockTest {
   private static final String TEST_DATA_CHECKSUM = "ePvVhtAeVRu85KSOLKL0oQ==";
   private static final String CONTENT_TYPE = "text/plain";
 
-  private InputSupplier<InputStream> inputSupplier;
+  private ByteSource byteSource;
 
   @Before
   public void setUp() {
-    inputSupplier = createMock(new Clazz<InputSupplier<InputStream>>() {});
+    byteSource = createMock(ByteSource.class);
   }
 
   private static class Request {
@@ -73,7 +73,7 @@ public class AssetHandlerTest extends EasyMockTest {
     HttpServletResponse resp = createMock(HttpServletResponse.class);
 
     if (expectRead) {
-      expect(inputSupplier.getInput()).andReturn(new ByteArrayInputStream(TEST_DATA.getBytes()));
+      expect(byteSource.openStream()).andReturn(new ByteArrayInputStream(TEST_DATA.getBytes()));
     }
 
     expect(req.getHeader("If-None-Match")).andReturn(suppliedChecksum);
@@ -121,7 +121,7 @@ public class AssetHandlerTest extends EasyMockTest {
 
     control.replay();
 
-    AssetHandler handler = new AssetHandler(new AssetHandler.StaticAsset(inputSupplier, CONTENT_TYPE, true));
+    AssetHandler handler = new AssetHandler(new AssetHandler.StaticAsset(byteSource, CONTENT_TYPE, true));
 
     handler.doGet(test1.req, test1.resp);
     assertThat(new String(test1.responseBody.toByteArray()), is(TEST_DATA));
@@ -162,7 +162,7 @@ public class AssetHandlerTest extends EasyMockTest {
 
     control.replay();
 
-    AssetHandler handler = new AssetHandler(new AssetHandler.StaticAsset(inputSupplier, CONTENT_TYPE, true));
+    AssetHandler handler = new AssetHandler(new AssetHandler.StaticAsset(byteSource, CONTENT_TYPE, true));
 
     handler.doGet(test1.req, test1.resp);
     assertThat(unzip(test1.responseBody), is(TEST_DATA));
@@ -203,7 +203,7 @@ public class AssetHandlerTest extends EasyMockTest {
 
     control.replay();
 
-    AssetHandler handler = new AssetHandler(new AssetHandler.StaticAsset(inputSupplier, CONTENT_TYPE, false));
+    AssetHandler handler = new AssetHandler(new AssetHandler.StaticAsset(byteSource, CONTENT_TYPE, false));
 
     handler.doGet(test1.req, test1.resp);
     assertThat(new String(test1.responseBody.toByteArray()), is(TEST_DATA));
@@ -244,7 +244,7 @@ public class AssetHandlerTest extends EasyMockTest {
 
     control.replay();
 
-    AssetHandler handler = new AssetHandler(new AssetHandler.StaticAsset(inputSupplier, CONTENT_TYPE, false));
+    AssetHandler handler = new AssetHandler(new AssetHandler.StaticAsset(byteSource, CONTENT_TYPE, false));
 
     handler.doGet(test1.req, test1.resp);
     assertThat(unzip(test1.responseBody), is(TEST_DATA));

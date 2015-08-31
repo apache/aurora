@@ -16,6 +16,8 @@ package org.apache.aurora.scheduler.filter;
 import java.util.Objects;
 import java.util.Set;
 
+import com.google.common.base.MoreObjects;
+
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -232,7 +234,7 @@ public interface SchedulingFilter {
 
     @Override
     public String toString() {
-      return com.google.common.base.Objects.toStringHelper(this)
+      return MoreObjects.toStringHelper(this)
           .add("vetoType", vetoType)
           .add("reason", reason)
           .add("score", score)

@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.base;
 import java.util.EnumSet;
 import java.util.Objects;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
@@ -171,7 +172,7 @@ public final class Query {
 
     @Override
     public String toString() {
-      return com.google.common.base.Objects.toStringHelper(this)
+      return MoreObjects.toStringHelper(this)
           .add("query", query)
           .toString();
     }

@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler;
 import java.util.Objects;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.MoreObjects;
 
 /**
  * Defines common task tier traits and behaviors.
@@ -54,7 +55,7 @@ public class TierInfo {
 
   @Override
   public String toString() {
-    return com.google.common.base.Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("revocable", revocable)
         .toString();
   }

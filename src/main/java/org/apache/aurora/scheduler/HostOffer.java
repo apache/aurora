@@ -15,6 +15,8 @@ package org.apache.aurora.scheduler;
 
 import java.util.Objects;
 
+import com.google.common.base.MoreObjects;
+
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
 import static java.util.Objects.requireNonNull;
@@ -58,7 +60,7 @@ public class HostOffer {
 
   @Override
   public String toString() {
-    return com.google.common.base.Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("offer", offer)
         .add("hostAttributes", hostAttributes)
         .toString();

@@ -15,6 +15,8 @@ package org.apache.aurora.scheduler.quota;
 
 import java.util.Objects;
 
+import com.google.common.base.MoreObjects;
+
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static java.util.Objects.requireNonNull;
@@ -84,7 +86,7 @@ public class QuotaInfo {
 
   @Override
   public String toString() {
-    return com.google.common.base.Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("quota", quota)
         .add("prodConsumption", prodConsumption)
         .add("nonProdConsumption", nonProdConsumption)

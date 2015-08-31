@@ -16,9 +16,9 @@ package org.apache.aurora.common.net.http.handlers;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
-import com.google.common.io.InputSupplier;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -55,7 +55,7 @@ public class AssetHandler extends HttpServlet {
   private final StaticAsset staticAsset;
 
   public static class StaticAsset {
-    private final InputSupplier<? extends InputStream> inputSupplier;
+    private final ByteSource byteSource;
     private final String contentType;
     private final boolean cacheLocally;
 
@@ -65,14 +65,14 @@ public class AssetHandler extends HttpServlet {
     /**
      * Creates a new static asset.
      *
-     * @param inputSupplier Supplier of the input stream from which to load the asset.
+     * @param byteSource Source of the asset.
      * @param contentType HTTP content type of the asset.
      * @param cacheLocally If {@code true} the asset will be loaded once and stored in memory, if
      *    {@code false} it will be loaded on each request.
      */
-    public StaticAsset(InputSupplier<? extends InputStream> inputSupplier,
+    public StaticAsset(ByteSource byteSource,
         String contentType, boolean cacheLocally) {
-      this.inputSupplier = checkNotNull(inputSupplier);
+      this.byteSource = checkNotNull(byteSource);
       this.contentType = checkNotNull(contentType);
       this.cacheLocally = cacheLocally;
     }
@@ -111,7 +111,9 @@ public class AssetHandler extends HttpServlet {
     private void load() throws IOException {
       ByteArrayOutputStream gzipBaos = new ByteArrayOutputStream();
       GZIPOutputStream gzipStream = new GZIPOutputStream(gzipBaos);
-      ByteStreams.copy(inputSupplier, gzipStream);
+      try (InputStream inputStream = byteSource.openStream()) {
+        ByteStreams.copy(inputStream, gzipStream);
+      }
       gzipStream.flush();  // copy() does not flush or close output stream.
       gzipStream.close();
       gzipData = gzipBaos.toByteArray();

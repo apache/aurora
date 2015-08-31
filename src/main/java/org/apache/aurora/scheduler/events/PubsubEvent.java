@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.events;
 import java.util.Objects;
 import java.util.Set;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.ScheduleStatus;
@@ -71,7 +72,7 @@ public interface PubsubEvent {
 
     @Override
     public String toString() {
-      return com.google.common.base.Objects.toStringHelper(this)
+      return MoreObjects.toStringHelper(this)
           .add("tasks", Tasks.ids(tasks))
           .toString();
     }
@@ -150,7 +151,7 @@ public interface PubsubEvent {
 
     @Override
     public String toString() {
-      return com.google.common.base.Objects.toStringHelper(this)
+      return MoreObjects.toStringHelper(this)
           .add("task", Tasks.id(task))
           .add("oldState", getOldState())
           .add("newState", getNewState())
@@ -189,7 +190,7 @@ public interface PubsubEvent {
 
     @Override
     public String toString() {
-      return com.google.common.base.Objects.toStringHelper(this)
+      return MoreObjects.toStringHelper(this)
           .add("attributes", getAttributes())
           .toString();
     }
@@ -233,7 +234,7 @@ public interface PubsubEvent {
 
     @Override
     public String toString() {
-      return com.google.common.base.Objects.toStringHelper(this)
+      return MoreObjects.toStringHelper(this)
           .add("groupKey", groupKey)
           .add("vetoes", vetoes)
           .toString();

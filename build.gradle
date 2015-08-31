@@ -82,7 +82,7 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.junitRev = '4.12'
   ext.log4jRev = '1.2.17'
   ext.gsonRev = '2.3.1'
-  ext.guavaRev = '16.0'
+  ext.guavaRev = '18.0'
   ext.slf4jRev = '1.7.12'
   ext.thriftRev = '0.9.1'
   ext.guiceRev = '3.0'

@@ -15,6 +15,8 @@ package org.apache.aurora.scheduler.preemptor;
 
 import java.util.Objects;
 
+import com.google.common.base.MoreObjects;
+
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -80,7 +82,7 @@ public final class PreemptionVictim {
 
   @Override
   public String toString() {
-    return com.google.common.base.Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("task", task)
         .toString();
   }
