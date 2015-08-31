@@ -31,7 +31,6 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.Resources;
-import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
@@ -49,6 +48,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.ResourceSlot.MIN_THERMOS_RESOURCES;
+import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.RESOURCES_EPSILON;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.NO_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.SOME_OVERHEAD_EXECUTOR;
@@ -69,7 +70,6 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
       .setNumCpus(5)
       .setContainer(Container.mesos(new MesosContainer()))
       .setRequestedPorts(ImmutableSet.of("http")));
-  private static final TierInfo DEFAULT_TIER = new TierInfo(false);
   private static final IAssignedTask TASK = IAssignedTask.build(new AssignedTask()
       .setInstanceId(2)
       .setTaskId("task-id")
@@ -97,7 +97,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
       .setExecutorId(MesosTaskFactoryImpl.getExecutorId(TASK.getTaskId()))
       .setName(MesosTaskFactoryImpl.EXECUTOR_NAME)
       .setSource(MesosTaskFactoryImpl.getInstanceSourceName(TASK.getTask(), TASK.getInstanceId()))
-      .addAllResources(RESOURCES_EPSILON.toResourceList(DEFAULT_TIER))
+      .addAllResources(RESOURCES_EPSILON.toResourceList(DEFAULT))
       .setCommand(CommandInfo.newBuilder()
           .setValue("./executor.pex")
           .addUris(URI.newBuilder().setValue(NO_OVERHEAD_EXECUTOR.getExecutorPath())
@@ -121,7 +121,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   @Test
   public void testExecutorInfoUnchanged() {
-    expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEFAULT_TIER).times(2);
+    expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEFAULT).times(2);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
     control.replay();
@@ -133,7 +133,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   @Test
   public void testTaskInfoRevocable() {
-    expect(tierManager.getTier(TASK_CONFIG)).andReturn(new TierInfo(true)).times(2);
+    expect(tierManager.getTier(TASK_CONFIG)).andReturn(REVOCABLE_TIER).times(2);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
     control.replay();
@@ -150,7 +150,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     builder.getTask().unsetRequestedPorts();
     builder.unsetAssignedPorts();
     IAssignedTask assignedTask = IAssignedTask.build(builder);
-    expect(tierManager.getTier(assignedTask.getTask())).andReturn(DEFAULT_TIER).times(2);
+    expect(tierManager.getTier(assignedTask.getTask())).andReturn(DEFAULT).times(2);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
     control.replay();
@@ -164,7 +164,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     // Here the ram required for the executor is greater than the sum of task resources
     // + executor overhead. We need to ensure we allocate a non-zero amount of ram in this case.
     config = NO_OVERHEAD_EXECUTOR;
-    expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEFAULT_TIER).times(2);
+    expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEFAULT).times(2);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
     control.replay();
@@ -192,7 +192,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         .setRequestedPorts(ImmutableSet.of());
     IAssignedTask assignedTask =
         IAssignedTask.build(builder.setAssignedPorts(ImmutableMap.of()));
-    expect(tierManager.getTier(assignedTask.getTask())).andReturn(DEFAULT_TIER).times(2);
+    expect(tierManager.getTier(assignedTask.getTask())).andReturn(DEFAULT).times(2);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
     control.replay();
@@ -214,7 +214,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   private TaskInfo getDockerTaskInfo(IAssignedTask task) {
     config = TaskExecutors.SOME_OVERHEAD_EXECUTOR;
-    expect(tierManager.getTier(task.getTask())).andReturn(DEFAULT_TIER).times(2);
+    expect(tierManager.getTier(task.getTask())).andReturn(DEFAULT).times(2);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
     control.replay();
@@ -255,7 +255,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         .setThermosObserverRoot("/var/run/thermos")
         .setExecutorOverhead(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())
         .build();
-    expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEFAULT_TIER).times(2);
+    expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEFAULT).times(2);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
     control.replay();
@@ -273,7 +273,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         .setExecutorOverhead(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())
         .setGlobalContainerMounts(ImmutableList.of(new Volume("/container", "/host", Mode.RO)))
         .build();
-    expect(tierManager.getTier(TASK_WITH_DOCKER.getTask())).andReturn(DEFAULT_TIER).times(2);
+    expect(tierManager.getTier(TASK_WITH_DOCKER.getTask())).andReturn(DEFAULT).times(2);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
     control.replay();

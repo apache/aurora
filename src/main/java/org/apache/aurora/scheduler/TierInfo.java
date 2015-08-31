@@ -15,16 +15,20 @@ package org.apache.aurora.scheduler;
 
 import java.util.Objects;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 
 /**
  * Defines common task tier traits and behaviors.
  */
-public class TierInfo {
+public final class TierInfo {
+  public static final TierInfo DEFAULT = new TierInfo();
+
   private final boolean revocable;
 
-  @VisibleForTesting
+  private TierInfo() {
+    this(false);
+  }
+
   public TierInfo(boolean revocable) {
     this.revocable = revocable;
   }

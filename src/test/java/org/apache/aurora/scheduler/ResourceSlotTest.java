@@ -39,6 +39,8 @@ import static org.apache.aurora.scheduler.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
+import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
@@ -110,7 +112,7 @@ public class ResourceSlotTest {
             makeMesosResource(RAM_MB, TASK.getRamMb(), false),
             makeMesosResource(DISK_MB, TASK.getDiskMb(), false),
             makeMesosRangeResource(PORTS, ports)),
-        ImmutableSet.copyOf(resources.toResourceList(ports, new TierInfo(false))));
+        ImmutableSet.copyOf(resources.toResourceList(ports, DEFAULT)));
   }
 
   @Test
@@ -123,7 +125,7 @@ public class ResourceSlotTest {
             makeMesosResource(RAM_MB, TASK.getRamMb(), false),
             makeMesosResource(DISK_MB, TASK.getDiskMb(), false),
             makeMesosRangeResource(PORTS, ports)),
-        ImmutableSet.copyOf(resources.toResourceList(ports, new TierInfo(true))));
+        ImmutableSet.copyOf(resources.toResourceList(ports, REVOCABLE_TIER)));
   }
 
   @Test
@@ -134,7 +136,7 @@ public class ResourceSlotTest {
             makeMesosResource(CPUS, TASK.getNumCpus(), true),
             makeMesosResource(RAM_MB, TASK.getRamMb(), false),
             makeMesosResource(DISK_MB, TASK.getDiskMb(), false)),
-        ImmutableSet.copyOf(resources.toResourceList(new TierInfo(true))));
+        ImmutableSet.copyOf(resources.toResourceList(REVOCABLE_TIER)));
   }
 
   @Test

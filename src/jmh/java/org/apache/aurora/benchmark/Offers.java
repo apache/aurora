@@ -21,10 +21,11 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos;
+
+import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
 
 /**
  * Offer factory.
@@ -90,7 +91,7 @@ final class Offers {
       for (IHostAttributes attributes : hostAttributes) {
         Protos.Offer offer = Protos.Offer.newBuilder()
             .addAllResources(new ResourceSlot(cpu, ram, disk, ports)
-                .toResourceList(new TierInfo(false)))
+                .toResourceList(DEFAULT))
             .setId(Protos.OfferID.newBuilder().setValue(String.format(OFFER_ID_FORMAT, id++)))
             .setFrameworkId(Protos.FrameworkID.newBuilder().setValue(FRAMEWORK_ID))
             .setSlaveId(Protos.SlaveID.newBuilder().setValue(attributes.getSlaveId()))

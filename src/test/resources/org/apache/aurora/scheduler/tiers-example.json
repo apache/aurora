@@ -1,0 +1,9 @@
+{
+  "tiers":
+  {
+    "revocable":
+    {
+      "revocable": true
+    }
+  }
+}

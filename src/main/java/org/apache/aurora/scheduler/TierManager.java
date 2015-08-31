@@ -13,11 +13,23 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.util.Map;
+
+import javax.inject.Inject;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.codehaus.jackson.annotate.JsonCreator;
+import org.codehaus.jackson.annotate.JsonProperty;
+
+import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
 
 /**
  * Translates job tier configuration into a set of task traits/attributes.
- * TODO(maxim): Implement external configuration support: AURORA-1443.
  */
 public interface TierManager {
 
@@ -30,10 +42,39 @@ public interface TierManager {
   TierInfo getTier(ITaskConfig taskConfig);
 
   class TierManagerImpl implements TierManager {
+    private final TierConfig tierConfig;
+
+    static class TierConfig {
+      static final TierConfig EMPTY = new TierConfig(ImmutableMap.of());
+
+      private final Map<String, TierInfo> tiers;
+
+      @JsonCreator
+      TierConfig(@JsonProperty("tiers") Map<String, TierInfo> tiers) {
+        this.tiers = ImmutableMap.copyOf(tiers);
+      }
+
+      @VisibleForTesting
+      public Map<String, TierInfo> getTiers() {
+        return tiers;
+      }
+    }
+
+    @Inject
+    TierManagerImpl(TierConfig tierConfig) {
+      this.tierConfig = requireNonNull(tierConfig);
+    }
 
     @Override
     public TierInfo getTier(ITaskConfig taskConfig) {
-      return new TierInfo(false);
+      if (taskConfig.isSetTier()) {
+        // The default behavior in case of tier config file absence or tier name mismatch is to use
+        // non-revocable resources. This is subject to change once the feature is ready.
+        // Tracked by AURORA-1443.
+        return tierConfig.tiers.getOrDefault(taskConfig.getTier(), DEFAULT);
+      }
+
+      return DEFAULT;
     }
   }
 }

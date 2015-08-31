@@ -34,6 +34,8 @@ import static org.apache.aurora.scheduler.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
+import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.apache.mesos.Protos.Value.Type.RANGES;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -131,11 +133,11 @@ public class ResourcesTest {
 
     assertEquals(
         new ResourceSlot(8.0, Amount.of(1024L, MB), Amount.of(0L, MB), 0),
-        Resources.from(createOffer(resources)).filter(new TierInfo(true)).slot());
+        Resources.from(createOffer(resources)).filter(REVOCABLE_TIER).slot());
 
     assertEquals(
         new ResourceSlot(8.0, Amount.of(1024L, MB), Amount.of(0L, MB), 0),
-        Resources.from(createOffer(resources)).filter(new TierInfo(false)).slot());
+        Resources.from(createOffer(resources)).filter(DEFAULT).slot());
   }
 
   private Resource createPortRange(Pair<Integer, Integer> range) {
