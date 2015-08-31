@@ -19,9 +19,9 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Map;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 
-import org.apache.aurora.common.base.Function;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
@@ -42,11 +42,7 @@ public class ServerSets {
    * A function that invokes {@link #toEndpoint(InetSocketAddress)}.
    */
   public static final Function<InetSocketAddress, Endpoint> TO_ENDPOINT =
-      new Function<InetSocketAddress, Endpoint>() {
-        @Override public Endpoint apply(InetSocketAddress address) {
-          return ServerSets.toEndpoint(address);
-        }
-      };
+      ServerSets::toEndpoint;
 
   /**
    * Creates a server set that registers at a single path applying the given ACL to all nodes

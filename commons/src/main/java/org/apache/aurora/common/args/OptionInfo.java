@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -32,7 +33,6 @@ import com.google.common.io.Files;
 import com.google.common.reflect.TypeToken;
 
 import org.apache.aurora.common.args.apt.Configuration;
-import org.apache.aurora.common.base.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
 

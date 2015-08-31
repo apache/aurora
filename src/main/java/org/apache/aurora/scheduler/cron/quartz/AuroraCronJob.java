@@ -25,7 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
 
-import org.apache.aurora.common.base.Supplier;
+import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.util.BackoffHelper;
 import org.apache.aurora.gen.CronCollisionPolicy;
@@ -197,7 +197,7 @@ class AuroraCronJob implements Job {
     try {
       // NOTE: We block the quartz execution thread here until we've successfully killed our
       // ancestor. We mitigate this by using a cached thread pool for quartz.
-      delayedStartBackoff.doUntilSuccess(new Supplier<Boolean>() {
+      delayedStartBackoff.doUntilSuccess(new ExceptionalSupplier<Boolean, RuntimeException>() {
         @Override
         public Boolean get() {
           if (Iterables.isEmpty(Storage.Util.fetchTasks(storage, query))) {

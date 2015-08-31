@@ -14,7 +14,6 @@
 package org.apache.aurora.common.util;
 
 import org.apache.aurora.common.base.ExceptionalSupplier;
-import org.apache.aurora.common.base.Supplier;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 
 import org.junit.Before;
@@ -43,7 +42,8 @@ public class BackoffHelperTest extends EasyMockTest {
 
   @Test
   public void testDoUntilSuccess() throws Exception {
-    Supplier<Boolean> task = createMock(new Clazz<Supplier<Boolean>>() { });
+    ExceptionalSupplier<Boolean, RuntimeException> task =
+        createMock(new Clazz<ExceptionalSupplier<Boolean, RuntimeException>>() { });
 
     expect(task.get()).andReturn(false);
     expect(backoffStrategy.shouldContinue(0L)).andReturn(true);
@@ -60,7 +60,8 @@ public class BackoffHelperTest extends EasyMockTest {
 
   @Test
   public void testDoUntilResult() throws Exception {
-    Supplier<String> task = createMock(new Clazz<Supplier<String>>() { });
+    ExceptionalSupplier<String, RuntimeException> task =
+        createMock(new Clazz<ExceptionalSupplier<String, RuntimeException>>() { });
 
     expect(task.get()).andReturn(null);
     expect(backoffStrategy.shouldContinue(0)).andReturn(true);
@@ -101,7 +102,8 @@ public class BackoffHelperTest extends EasyMockTest {
 
   @Test
   public void testDoUntilResultMaxSuccess() throws Exception {
-    Supplier<String> task = createMock(new Clazz<Supplier<String>>() { });
+    ExceptionalSupplier<String, RuntimeException> task =
+        createMock(new Clazz<ExceptionalSupplier<String, RuntimeException>>() { });
 
     BackoffHelper maxBackoffHelper = new BackoffHelper(clock, backoffStrategy);
 
@@ -124,7 +126,8 @@ public class BackoffHelperTest extends EasyMockTest {
 
   @Test
   public void testDoUntilResultMaxReached() throws Exception {
-    Supplier<String> task = createMock(new Clazz<Supplier<String>>() { });
+    ExceptionalSupplier<String, RuntimeException> task =
+        createMock(new Clazz<ExceptionalSupplier<String, RuntimeException>>() { });
 
     BackoffHelper maxBackoffHelper = new BackoffHelper(clock, backoffStrategy);
 
@@ -153,7 +156,8 @@ public class BackoffHelperTest extends EasyMockTest {
 
   @Test
   public void testDoUntilSuccessTransparentException() throws Exception {
-    Supplier<Boolean> task = createMock(new Clazz<Supplier<Boolean>>() { });
+    ExceptionalSupplier<Boolean, RuntimeException> task =
+        createMock(new Clazz<ExceptionalSupplier<Boolean, RuntimeException>>() { });
 
     IllegalArgumentException thrown = new IllegalArgumentException();
     expect(task.get()).andThrow(thrown);

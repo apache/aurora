@@ -16,7 +16,7 @@ package org.apache.aurora.scheduler.cron.quartz;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.common.base.Supplier;
+import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.BackoffHelper;
 import org.apache.aurora.gen.AssignedTask;
@@ -98,7 +98,7 @@ public class AuroraCronJobTest extends EasyMockTest {
 
   @Test
   public void testKillExisting() throws Exception {
-    Capture<Supplier<Boolean>> capture = createCapture();
+    Capture<ExceptionalSupplier<Boolean, RuntimeException>> capture = createCapture();
 
     expect(stateManager.changeState(
         EasyMock.anyObject(),

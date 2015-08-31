@@ -14,6 +14,7 @@
 package org.apache.aurora.common.base;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
 
 import org.junit.Test;
 

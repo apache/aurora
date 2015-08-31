@@ -16,6 +16,7 @@ package org.apache.aurora.common.zookeeper;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -25,7 +26,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.Supplier;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;

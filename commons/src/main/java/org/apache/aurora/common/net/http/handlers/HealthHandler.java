@@ -14,9 +14,9 @@
 package org.apache.aurora.common.net.http.handlers;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
-import org.apache.aurora.common.base.ExceptionalSupplier;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -51,7 +51,7 @@ public class HealthHandler extends HttpServlet {
 
   private static final Logger LOG = Logger.getLogger(HealthHandler.class.getName());
 
-  private final ExceptionalSupplier<Boolean, ?> healthChecker;
+  private final Supplier<Boolean> healthChecker;
 
   /**
    * Constructs a new Healthz that uses the given {@code healthChecker} to determine current health
@@ -62,7 +62,7 @@ public class HealthHandler extends HttpServlet {
    * @param healthChecker a supplier that is called to perform a health check
    */
   @Inject
-  public HealthHandler(@Named(HEALTH_CHECKER_KEY) ExceptionalSupplier<Boolean, ?> healthChecker) {
+  public HealthHandler(@Named(HEALTH_CHECKER_KEY) Supplier<Boolean> healthChecker) {
     this.healthChecker = Preconditions.checkNotNull(healthChecker);
   }
 

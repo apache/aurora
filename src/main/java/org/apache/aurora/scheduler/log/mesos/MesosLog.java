@@ -30,6 +30,7 @@ import javax.inject.Provider;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -37,7 +38,6 @@ import com.google.common.collect.UnmodifiableIterator;
 import com.google.common.primitives.Longs;
 
 import org.apache.aurora.common.application.Lifecycle;
-import org.apache.aurora.common.base.Function;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Amount;

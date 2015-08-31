@@ -20,6 +20,7 @@ import java.util.Arrays;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.io.Files;
 
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.apache.zookeeper.server.NIOServerCnxn;
@@ -30,7 +31,6 @@ import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.base.ExceptionalCommand;
-import org.apache.aurora.common.io.FileUtils;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 
@@ -210,7 +210,7 @@ public class ZooKeeperTestServer {
   }
 
   private File createTempDir() {
-    final File tempDir = FileUtils.createTempDir();
+    final File tempDir = Files.createTempDir();
     shutdownRegistry.addAction(new ExceptionalCommand<IOException>() {
       @Override public void execute() throws IOException {
         org.apache.commons.io.FileUtils.deleteDirectory(tempDir);

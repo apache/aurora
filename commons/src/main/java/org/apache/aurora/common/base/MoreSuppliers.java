@@ -20,6 +20,7 @@ import java.lang.reflect.Modifier;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
 
 /**
  * Utility methods for working with Suppliers.

@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -48,7 +49,6 @@ import org.junit.Test;
 import org.apache.aurora.common.args.ArgScannerTest.StandardArgs.Optimizations;
 import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.Function;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.common.quantity.Amount;

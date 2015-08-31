@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.common.stats;
 
-import org.apache.aurora.common.base.Supplier;
 import org.apache.aurora.common.util.testing.FakeTicker;
 import org.easymock.IMocksControl;
 import org.junit.After;
@@ -21,6 +20,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.google.common.base.Supplier;
 
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;

@@ -30,10 +30,12 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
+import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -49,8 +51,7 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.gson.Gson;
 
 import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.Function;
-import org.apache.aurora.common.base.Supplier;
+import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
@@ -308,7 +309,7 @@ public class ServerSetImpl implements ServerSet {
 
     private ServiceInstance getServiceInstance(final String nodePath) {
       try {
-        return backoffHelper.doUntilResult(new Supplier<ServiceInstance>() {
+        return backoffHelper.doUntilResult(new ExceptionalSupplier<ServiceInstance, RuntimeException>() {
           @Override public ServiceInstance get() {
             try {
               byte[] data = zkClient.get().getData(nodePath, false, null);
