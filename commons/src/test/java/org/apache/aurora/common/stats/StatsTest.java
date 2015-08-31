@@ -44,6 +44,13 @@ public class StatsTest {
   }
 
   @Test
+  public void testSlashesSupported() {
+    AtomicLong slash = Stats.exportLong("d/f");
+    slash.incrementAndGet();
+    assertCounter("d/f", 1);
+  }
+
+  @Test
   public void testNotSame() {
     AtomicLong firstExport = Stats.exportLong("somevar");
     firstExport.incrementAndGet();
@@ -74,16 +81,13 @@ public class StatsTest {
     AtomicLong colon = Stats.exportLong("a:b");
     AtomicLong plus = Stats.exportLong("b+c");
     AtomicLong hyphen = Stats.exportLong("c-d");
-    AtomicLong slash = Stats.exportLong("d/f");
 
     colon.incrementAndGet();
     plus.incrementAndGet();
     hyphen.incrementAndGet();
-    slash.incrementAndGet();
     assertCounter("a_b", 1);
     assertCounter("b_c", 1);
     assertCounter("c_d", 1);
-    assertCounter("d_f", 1);
   }
 
   private void assertCounter(String name, long value) {

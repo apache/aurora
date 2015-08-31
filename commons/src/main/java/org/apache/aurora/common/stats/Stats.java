@@ -45,7 +45,7 @@ import org.apache.aurora.common.base.MorePreconditions;
 public class Stats {
 
   private static final Logger LOG = Logger.getLogger(Stats.class.getName());
-  private static final Pattern NOT_NAME_CHAR = Pattern.compile("[^A-Za-z0-9_]");
+  private static final Pattern NOT_NAME_CHAR = Pattern.compile("[^A-Za-z0-9_/]");
 
   private static final ConcurrentMap<String, Stat<?>> VAR_MAP = new MapMaker().makeMap();
 
