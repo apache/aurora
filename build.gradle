@@ -318,7 +318,7 @@ sourceSets {
 }
 
 dependencies {
-  def shiroRev = '1.2.3'
+  def shiroRev = '1.2.4'
 
   def gsonDep = "com.google.code.gson:gson:${gsonRev}"
   def guavaDep = "com.google.guava:guava:${guavaRev}"
@@ -345,10 +345,7 @@ dependencies {
   compile "log4j:log4j:${log4jRev}"
   compile "org.antlr:stringtemplate:${stringTemplateRev}"
   compile 'org.apache.mesos:mesos:0.23.0'
-  compile("org.apache.shiro:shiro-guice:${shiroRev}") {
-    // TODO(ksweeney): Remove this exclusion when https://issues.apache.org/jira/browse/SHIRO-496 is resolved.
-    exclude group: 'com.google.guava'
-  }
+  compile("org.apache.shiro:shiro-guice:${shiroRev}")
   compile "org.apache.shiro:shiro-web:${shiroRev}"
   compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"
   compile "org.eclipse.jetty:jetty-rewrite:${jettyDep}"
