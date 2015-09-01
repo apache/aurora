@@ -30,6 +30,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HostAndPort;
@@ -50,7 +51,6 @@ import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.base.MoreSuppliers;
 import org.apache.aurora.common.net.http.handlers.AbortHandler;
 import org.apache.aurora.common.net.http.handlers.ContentionPrinter;
 import org.apache.aurora.common.net.http.handlers.HealthHandler;
@@ -141,7 +141,7 @@ public class JettyServerModule extends AbstractModule {
     bind(QuitCallback.class).in(Singleton.class);
     bind(new TypeLiteral<Supplier<Boolean>>() { })
         .annotatedWith(Names.named(HealthHandler.HEALTH_CHECKER_KEY))
-        .toInstance(MoreSuppliers.ofInstance(true));
+        .toInstance(Suppliers.ofInstance(true));
 
     bindConstant().annotatedWith(StringTemplateServlet.CacheTemplates.class).to(true);
 
