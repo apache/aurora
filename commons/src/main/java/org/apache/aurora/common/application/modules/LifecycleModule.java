@@ -16,7 +16,6 @@ package org.apache.aurora.common.application.modules;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.BindingAnnotation;
@@ -30,7 +29,6 @@ import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.application.ShutdownStage;
 import org.apache.aurora.common.application.StartupRegistry;
 import org.apache.aurora.common.application.StartupStage;
-
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.base.ExceptionalCommand;
 
@@ -50,10 +48,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *   <li>{@code ShutdownRegistry} - Registry for adding shutdown actions.
  *   <li>{@code @ShutdownStage Command} - Command to execute all shutdown commands.
  * </ul>
- *
- * If you would like to register a startup action that starts a local network service, please
- * consider using {@link LocalServiceRegistry}.
- *
  * @author William Farner
  */
 public class LifecycleModule extends AbstractModule {
@@ -78,13 +72,6 @@ public class LifecycleModule extends AbstractModule {
     bind(Key.get(Command.class, ShutdownStage.class)).to(ShutdownRegistry.ShutdownRegistryImpl.class);
     bind(ShutdownRegistry.ShutdownRegistryImpl.class).in(Singleton.class);
     bindStartupAction(binder(), ShutdownHookRegistration.class);
-
-    bind(LocalServiceRegistry.class).in(Singleton.class);
-
-    // Ensure that there is at least an empty set for the service runners.
-    runnerBinder(binder());
-
-    bindStartupAction(binder(), LocalServiceLauncher.class);
   }
 
   /**
@@ -98,25 +85,6 @@ public class LifecycleModule extends AbstractModule {
     public LaunchException(String msg, Throwable cause) {
       super(msg, cause);
     }
-  }
-
-  /**
-   * Responsible for starting and stopping a local service.
-   */
-  public interface ServiceRunner {
-
-    /**
-     * Launches the local service.
-     *
-     * @return Information about the launched service.
-     * @throws LaunchException If the service failed to launch.
-     */
-    LocalServiceRegistry.LocalService launch() throws LaunchException;
-  }
-
-  @VisibleForTesting
-  static Multibinder<ServiceRunner> runnerBinder(Binder binder) {
-    return Multibinder.newSetBinder(binder, ServiceRunner.class, Service.class);
   }
 
   /**
@@ -148,21 +116,6 @@ public class LifecycleModule extends AbstractModule {
           shutdownCommand.execute();
         }
       }, "ShutdownRegistry-Hook"));
-    }
-  }
-
-  /**
-   * Startup command that ensures startup and shutdown of local services.
-   */
-  private static class LocalServiceLauncher implements Command {
-    private final LocalServiceRegistry serviceRegistry;
-
-    @Inject LocalServiceLauncher(LocalServiceRegistry serviceRegistry) {
-      this.serviceRegistry = checkNotNull(serviceRegistry);
-    }
-
-    @Override public void execute() {
-      serviceRegistry.ensureLaunched();
     }
   }
 }

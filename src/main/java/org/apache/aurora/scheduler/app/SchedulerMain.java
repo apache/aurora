@@ -28,8 +28,8 @@ import com.google.common.net.HostAndPort;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 
-import org.apache.aurora.common.application.AbstractApplication;
 import org.apache.aurora.common.application.AppLauncher;
+import org.apache.aurora.common.application.Application;
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.application.modules.StatsModule;
 import org.apache.aurora.common.args.Arg;
@@ -66,8 +66,7 @@ import static org.apache.aurora.common.logging.RootLogConfig.Configuration;
 /**
  * Launcher for the aurora scheduler.
  */
-public class SchedulerMain extends AbstractApplication {
-
+public class SchedulerMain implements Application {
   private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
   @NotNull
@@ -216,7 +215,6 @@ public class SchedulerMain extends AbstractApplication {
         .build();
   }
 
-  @Override
   public void run() {
     // Setup log4j to match our jul glog config in order to pick up zookeeper logging.
     Configuration logConfiguration = RootLogConfig.configurationFromFlags();

@@ -19,12 +19,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.inject.AbstractModule;
-import com.google.inject.Singleton;
-
-import org.apache.aurora.common.stats.Stats;
-import org.apache.aurora.common.util.BuildInfo;
 
 import org.apache.aurora.common.application.AppLauncher;
+import org.apache.aurora.common.stats.Stats;
 
 /**
  * Binding module for the bare minimum requirements for the
@@ -39,7 +36,6 @@ public class AppLauncherModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(BuildInfo.class).in(Singleton.class);
     bind(UncaughtExceptionHandler.class).to(LoggingExceptionHandler.class);
   }
 

@@ -13,11 +13,9 @@
  */
 package org.apache.aurora.common.application.modules;
 
-import java.util.Properties;
 import java.util.logging.Logger;
 
 import com.google.common.base.Supplier;
-import com.google.common.primitives.Longs;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -32,12 +30,10 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.JvmStats;
 import org.apache.aurora.common.stats.Stat;
-import org.apache.aurora.common.stats.StatImpl;
 import org.apache.aurora.common.stats.StatRegistry;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.stats.TimeSeriesRepository;
 import org.apache.aurora.common.stats.TimeSeriesRepositoryImpl;
-import org.apache.aurora.common.util.BuildInfo;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -69,14 +65,9 @@ public class StatsModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> RETENTION_PERIOD =
       Arg.create(Amount.of(1L, Time.HOURS));
 
-  public static Amount<Long, Time> getSamplingInterval() {
-    return SAMPLING_INTERVAL.get();
-  }
-
   @Override
   protected void configure() {
     requireBinding(ShutdownRegistry.class);
-    requireBinding(BuildInfo.class);
 
     // Bindings for TimeSeriesRepositoryImpl.
     bind(StatRegistry.class).toInstance(Stats.STAT_REGISTRY);
@@ -102,43 +93,17 @@ public class StatsModule extends AbstractModule {
   public static final class StartStatPoller implements Command {
     private static final Logger LOG = Logger.getLogger(StartStatPoller.class.getName());
     private final ShutdownRegistry shutdownRegistry;
-    private final BuildInfo buildInfo;
     private final TimeSeriesRepository timeSeriesRepository;
 
     @Inject StartStatPoller(
         ShutdownRegistry shutdownRegistry,
-        BuildInfo buildInfo,
         TimeSeriesRepository timeSeriesRepository) {
 
       this.shutdownRegistry = checkNotNull(shutdownRegistry);
-      this.buildInfo = checkNotNull(buildInfo);
       this.timeSeriesRepository = checkNotNull(timeSeriesRepository);
     }
 
     @Override public void execute() {
-      Properties properties = buildInfo.getProperties();
-      LOG.info("Build information: " + properties);
-      for (String name : properties.stringPropertyNames()) {
-        final String stringValue = properties.getProperty(name);
-        if (stringValue == null) {
-          continue;
-        }
-        final Long longValue = Longs.tryParse(stringValue);
-        if (longValue != null) {
-          Stats.exportStatic(new StatImpl<Long>(Stats.normalizeName(name)) {
-            @Override public Long read() {
-              return longValue;
-            }
-          });
-        } else {
-          Stats.exportString(new StatImpl<String>(Stats.normalizeName(name)) {
-            @Override public String read() {
-              return stringValue;
-            }
-          });
-        }
-      }
-
       JvmStats.export();
       timeSeriesRepository.start(shutdownRegistry);
     }

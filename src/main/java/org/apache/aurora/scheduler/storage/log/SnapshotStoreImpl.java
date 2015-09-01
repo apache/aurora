@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage.log;
 
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Properties;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
@@ -24,7 +23,6 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
-import org.apache.aurora.common.util.BuildInfo;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
@@ -154,16 +152,9 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       new SnapshotField() {
         @Override
         public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
-          Properties props = new BuildInfo().getProperties();
-
           snapshot.setSchedulerMetadata(
                 new SchedulerMetadata()
                   .setFrameworkId(store.getSchedulerStore().fetchFrameworkId().orNull())
-                  .setRevision(props.getProperty(BuildInfo.Key.GIT_REVISION.value))
-                  .setTag(props.getProperty(BuildInfo.Key.GIT_TAG.value))
-                  .setTimestamp(props.getProperty(BuildInfo.Key.TIMESTAMP.value))
-                  .setUser(props.getProperty(BuildInfo.Key.USER.value))
-                  .setMachine(props.getProperty(BuildInfo.Key.MACHINE.value))
                   .setVersion(CURRENT_API_VERSION));
         }
 
