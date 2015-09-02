@@ -55,7 +55,7 @@ HELLO_WORLD = Job(
   cluster = 'smf1-test',
   task = Task(
     name = 'main',
-    processes = [Process(name = 'hello_world', cmdline = 'echo {{mesos.instance}}')],
+    processes = [Process(name='hello_world', cmdline='echo {{mesos.instance}} {{mesos.hostname}}')],
     resources = Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576),
   )
 )
@@ -93,7 +93,7 @@ REIFIED_CONFIG = Job(
   cluster='smf1-test',
   task=Task(
     name='main',
-    processes=[Process(name='hello_world', cmdline='echo {{mesos.instance}}')],
+    processes=[Process(name='hello_world', cmdline='echo {{mesos.instance}} {{mesos.hostname}}')],
     resources=Resources(cpu=0.1, ram=64 * 1048576, disk=64 * 1048576),
   )
 )

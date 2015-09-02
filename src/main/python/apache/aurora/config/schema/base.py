@@ -22,6 +22,7 @@ from apache.thermos.config.schema import *
 class MesosContext(Struct):
   # The instance id (i.e. replica id, shard id) in the context of a task
   instance    = Required(Integer)
+  hostname    = Required(String)
 
 
 class UpdateConfig(Struct):

@@ -197,7 +197,8 @@ def test_metadata_in_config():
 
 
 def test_task_instance_from_job():
-  instance = task_instance_from_job(Job(health_check_config=HealthCheckConfig(interval_secs=30)), 0)
+  instance = task_instance_from_job(
+      Job(health_check_config=HealthCheckConfig(interval_secs=30)), 0, '')
   assert instance is not None
 
 
@@ -207,3 +208,9 @@ def test_identifier_validation():
     assert matcher.match(identifier)
   for identifier in INVALID_IDENTIFIERS:
     assert not matcher.match(identifier)
+
+
+def test_mesos_hostname_in_task():
+  hw = HELLO_WORLD(task=Task(name="{{mesos.hostname}}"))
+  instance = task_instance_from_job(hw, 0, 'test_host')
+  assert str(instance.task().name()) == 'test_host'

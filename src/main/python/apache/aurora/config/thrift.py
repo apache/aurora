@@ -78,8 +78,8 @@ def constraints_to_thrift(constraints):
   return result
 
 
-def task_instance_from_job(job, instance):
-  instance_context = MesosContext(instance=instance)
+def task_instance_from_job(job, instance, hostname):
+  instance_context = MesosContext(instance=instance, hostname=hostname)
   health_check_config = HealthCheckConfig()
   if job.has_health_check_config():
     health_check_config = job.health_check_config()
@@ -168,6 +168,7 @@ def assert_valid_field(field, identifier):
 
 
 MESOS_INSTANCE_REF = Ref.from_address('mesos.instance')
+MESOS_HOSTNAME_REF = Ref.from_address('mesos.hostname')
 THERMOS_PORT_SCOPE_REF = Ref.from_address('thermos.ports')
 THERMOS_TASK_ID_REF = Ref.from_address('thermos.task_id')
 
@@ -229,7 +230,7 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   underlying, refs = job.interpolate()
 
   # need to fake an instance id for the sake of schema checking
-  underlying_checked = underlying.bind(mesos={'instance': 31337})
+  underlying_checked = underlying.bind(mesos={'instance': 31337, 'hostname': ''})
   try:
     ThermosTaskValidator.assert_valid_task(underlying_checked.task())
   except ThermosTaskValidator.InvalidTaskError as e:
@@ -239,7 +240,7 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
 
   unbound = []
   for ref in refs:
-    if ref == THERMOS_TASK_ID_REF or ref == MESOS_INSTANCE_REF or (
+    if ref in (THERMOS_TASK_ID_REF, MESOS_INSTANCE_REF, MESOS_HOSTNAME_REF) or (
         Ref.subscope(THERMOS_PORT_SCOPE_REF, ref)):
       continue
     unbound.append(ref)
