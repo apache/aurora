@@ -32,11 +32,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.eventbus.EventBus;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.util.concurrent.ExecutorServiceShutdown;
 import org.apache.aurora.scheduler.app.local.simulator.Events.Started;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.mesos.Protos;
@@ -160,7 +158,7 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
   @Override
   public Status stop() {
     stopped.countDown();
-    new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
+    MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS);
     return Status.DRIVER_RUNNING;
   }
 

@@ -27,15 +27,16 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.base.Closure;
+import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.SlidingStats;
-import org.apache.aurora.common.util.concurrent.ExecutorServiceShutdown;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.storage.LogEntry;
@@ -157,8 +158,16 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     ScheduledExecutorSchedulingService(ShutdownRegistry shutdownRegistry,
         Amount<Long, Time> shutdownGracePeriod) {
       scheduledExecutor = AsyncUtil.singleThreadLoggingScheduledExecutor("LogStorage-%d", LOG);
-      shutdownRegistry.addAction(
-          new ExecutorServiceShutdown(scheduledExecutor, shutdownGracePeriod));
+      shutdownRegistry.addAction(new Command() {
+
+        @Override
+        public void execute() throws RuntimeException {
+          MoreExecutors.shutdownAndAwaitTermination(
+              scheduledExecutor,
+              shutdownGracePeriod.getValue(),
+              shutdownGracePeriod.getUnit().getTimeUnit());
+        }
+      });
     }
 
     @Override

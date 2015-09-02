@@ -19,16 +19,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.TearDownTestCase;
-import org.apache.aurora.common.util.concurrent.ExecutorServiceShutdown;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
@@ -60,12 +59,7 @@ public class StorageTransactionTest extends TearDownTestCase {
   public void setUp() {
     executor = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder().setNameFormat("SlowRead-%d").setDaemon(true).build());
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() {
-        new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
-      }
-    });
+    addTearDown(() -> MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS));
     storage = DbUtil.createStorage();
   }
 

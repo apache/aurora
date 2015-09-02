@@ -35,6 +35,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.hash.Hashing;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.Atomics;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -51,10 +52,8 @@ import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
-import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.common.util.concurrent.ExecutorServiceShutdown;
 import org.apache.aurora.common.zookeeper.ServerSet;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
@@ -105,7 +104,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.common.testing.easymock.EasyMockTest.createCapture;
-
 import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
@@ -244,7 +242,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
       @Override
       public void tearDown() throws Exception {
         lifecycle.shutdown();
-        new ExecutorServiceShutdown(executor, Amount.of(10L, Time.SECONDS)).execute();
+        MoreExecutors.shutdownAndAwaitTermination(executor, 10, TimeUnit.SECONDS);
       }
     });
   }
