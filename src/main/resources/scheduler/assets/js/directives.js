@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 (function () {
-  /*global auroraUI:false */
+  /*global auroraUI:false,JobUpdateStatus:false */
   'use strict';
 
   auroraUI.directive('roleLink', function () {
@@ -152,12 +152,16 @@
   });
 
   auroraUI.directive('instanceSummary', function ($compile) {
+    var ABORTED = 'ABORTED';
+    var UPDATING = 'UPDATING';
+
     return {
       restrict: 'E',
       scope: {
         'instances': '=',
         'size': '=',
-        'stats': '='
+        'stats': '=',
+        'status': '='
       },
       link: function (scope, element, attrs) {
         scope.$watch('instances', function () {
@@ -165,12 +169,23 @@
           if (!scope.instances || scope.instances.length === 0) {
             return;
           }
-          var list = angular.element('<ul class="instance-grid ' + scope.size + '"></ul>');
+          var cssClasses = [ 'instance-grid', scope.size ];
+          var aborted = scope.status === JobUpdateStatus.ABORTED;
+          if (aborted) {
+            cssClasses.push(ABORTED.toLowerCase());
+          }
+
+          var list = angular.element('<ul class="' + cssClasses.join(' ') + '"></ul>');
 
           scope.instances.forEach(function (i) {
             var n = i.instanceId;
+            var statuses = [ i.className.toUpperCase().replace(/^INSTANCE\-/, '') ];
+            if (aborted && statuses[0] === UPDATING) {
+              statuses.push(ABORTED);
+            }
+
             list.append('<li class="' + i.className + '" tooltip="INSTANCE ' + n +
-              ': ' + i.className.toUpperCase() + '"><span class="instance-id">' + n +
+              ': ' + statuses.join(', ') + '"><span class="instance-id">' + n +
               '</span></li>');
           });
 

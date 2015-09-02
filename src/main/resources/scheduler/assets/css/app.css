@@ -317,6 +317,10 @@ div.pagination {
   animation: pulse 2s infinite;
 }
 
+.aborted > .instance-updating {
+  animation: none !important;
+}
+
 .instance-updating, .instance-added, .instance-rolling-back {
   background-color: khaki;
   fill: rgba(240, 230, 140, 0.5);
