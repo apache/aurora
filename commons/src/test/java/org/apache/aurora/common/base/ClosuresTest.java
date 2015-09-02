@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.common.base;
 
-import java.io.IOException;
-
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 
@@ -31,9 +29,6 @@ import static org.junit.Assert.fail;
 public class ClosuresTest extends EasyMockTest {
 
   private static final Clazz<Closure<Integer>> INT_CLOSURE_CLZ = new Clazz<Closure<Integer>>() { };
-  private static final Clazz<ExceptionalClosure<Integer, IOException>> EXC_INT_CLOSURE_CLZ =
-      new Clazz<ExceptionalClosure<Integer, IOException>>() { };
-
   static class Thrown extends RuntimeException { }
 
   @Test

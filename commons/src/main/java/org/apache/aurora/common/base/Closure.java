@@ -20,6 +20,14 @@ package org.apache.aurora.common.base;
  *
  * @author John Sirois
  */
-public interface Closure<T> extends ExceptionalClosure<T, RuntimeException> {
+@FunctionalInterface
+public interface Closure<T> {
   // convenience typedef
+
+  /**
+   * Performs a unit of work on item
+   *
+   * @param item the item to perform work against
+   */
+  void execute(T item);
 }
