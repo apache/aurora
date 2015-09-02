@@ -165,17 +165,18 @@
       },
       link: function (scope, element, attrs) {
         scope.$watch('instances', function () {
-          var parent = angular.element('<div></div>');
           if (!scope.instances || scope.instances.length === 0) {
             return;
           }
+
           var cssClasses = [ 'instance-grid', scope.size ];
           var aborted = scope.status === JobUpdateStatus.ABORTED;
           if (aborted) {
             cssClasses.push(ABORTED.toLowerCase());
           }
 
-          var list = angular.element('<ul class="' + cssClasses.join(' ') + '"></ul>');
+          var parent = angular.element('<div></div>');
+          var list = angular.element('<ul class="instance-grid ' + scope.size + '"></ul>');
 
           scope.instances.forEach(function (i) {
             var n = i.instanceId;
@@ -199,7 +200,7 @@
           parent.append(list);
           element.html(parent.html());
           $compile(element)(scope);
-        });
+        }, true);
       }
     };
   });
