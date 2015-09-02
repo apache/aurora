@@ -20,6 +20,7 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobKey;
@@ -34,8 +35,6 @@ import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.base.TaskTestUtil;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 
 /**
@@ -64,8 +63,9 @@ final class JobUpdates {
         JobKey job = new JobKey("role", "env", UUID.randomUUID().toString());
         JobUpdateKey key = new JobUpdateKey().setJob(job).setId(UUID.randomUUID().toString());
 
-        TaskConfig task = TaskTestUtil.makeConfig(IJobKey.build(job)).newBuilder();
-        task.getExecutorConfig().setData(string(10000));
+        TaskConfig task = new TaskConfig()
+            .setJob(job)
+            .setExecutorConfig(new ExecutorConfig("cfg", string(10000)));
 
         JobUpdate update = new JobUpdate()
             .setSummary(new JobUpdateSummary()

@@ -88,11 +88,11 @@
   <insert id="insertTaskConfig" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
     INSERT INTO job_update_configs (
       update_row_id,
-      task_config_row_id,
+      task_config,
       is_new
     ) VALUES (
       <include refid="select_update_row_id"/>,
-      #{taskConfigRow},
+      #{config, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.TaskConfigTypeHandler},
       #{isNew}
     )
   </insert>
@@ -157,15 +157,11 @@
     <id column="id" />
   </resultMap>
 
-  <resultMap
-      id="instanceConfigMap"
-      type="org.apache.aurora.scheduler.storage.db.views.DbInstanceTaskConfig">
+  <resultMap id="instanceConfigMap" type="org.apache.aurora.gen.InstanceTaskConfig">
     <id column="id" />
-    <association
-        property="task"
-        select="org.apache.aurora.scheduler.storage.db.TaskConfigMapper.selectConfig"
-        column="task_config_row_id"
-        foreignColumn="row_id"/>
+    <result property="task"
+            column="task"
+            typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.TaskConfigTypeHandler" />
     <collection property="instances" resultMap="rangeMap" columnPrefix="r_" notNullColumn="id" />
   </resultMap>
 
@@ -177,9 +173,7 @@
                 notNullColumn="id" />
   </resultMap>
 
-  <resultMap
-      id="jobUpdateInstructionMap"
-      type="org.apache.aurora.scheduler.storage.db.views.DbJobUpdateInstructions">
+  <resultMap id="jobUpdateInstructionMap" type="org.apache.aurora.gen.JobUpdateInstructions">
     <id column="id" />
     <association property="desiredState" resultMap="instanceConfigMap" columnPrefix="ditc_" />
     <association property="settings" resultMap="jobUpdateSettingsMap" columnPrefix="juse_"/>
@@ -189,7 +183,7 @@
                 notNullColumn="id" />
   </resultMap>
 
-  <resultMap id="jobUpdateMap" type="org.apache.aurora.scheduler.storage.db.views.DbJobUpdate">
+  <resultMap id="jobUpdateMap" type="org.apache.aurora.gen.JobUpdate">
     <id column="u_id" />
     <association property="summary" resultMap="jobUpdateSummaryMap" columnPrefix="jusm_"/>
     <association property="instructions" resultMap="jobUpdateInstructionMap" columnPrefix="jui_"/>
@@ -209,9 +203,8 @@
             typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler"/>
   </resultMap>
 
-  <resultMap
-      id="jobUpdateDetailsMap"
-      type="org.apache.aurora.scheduler.storage.db.views.DbStoredJobUpdateDetails">
+
+  <resultMap id="jobUpdateDetailsMap" type="org.apache.aurora.gen.storage.StoredJobUpdateDetails">
     <id column="u_id" />
     <association property="details.update" resultMap="jobUpdateMap" />
     <collection property="details.updateEvents"
@@ -350,12 +343,12 @@
       u.block_if_no_pulses_after_ms AS jui_juse_block_if_no_pulses_after_ms,
       u.id AS jui_id,
       cn.id AS jui_ditc_id,
-      cn.task_config_row_id AS jui_ditc_task_config_row_id,
+      cn.task_config AS jui_ditc_task,
       di.id AS jui_ditc_r_id,
       di.first AS jui_ditc_r_first,
       di.last AS jui_ditc_r_last,
       co.id AS jui_iitc_id,
-      co.task_config_row_id AS jui_iitc_task_config_row_id,
+      co.task_config AS jui_iitc_task,
       ci.id AS jui_iitc_r_id,
       ci.first AS jui_iitc_r_first,
       ci.last AS jui_iitc_r_last,
@@ -403,12 +396,12 @@
       u.block_if_no_pulses_after_ms AS juse_block_if_no_pulses_after_ms,
       u.id AS id,
       cn.id AS ditc_id,
-      cn.task_config_row_id AS ditc_task_config_row_id,
+      cn.task_config AS ditc_task,
       di.id AS ditc_r_id,
       di.first AS ditc_r_first,
       di.last AS ditc_r_last,
       co.id AS iitc_id,
-      co.task_config_row_id AS iitc_task_config_row_id,
+      co.task_config AS iitc_task,
       ci.id AS iitc_r_id,
       ci.first AS iitc_r_first,
       ci.last AS iitc_r_last,

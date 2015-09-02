@@ -25,13 +25,12 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.base.MorePreconditions;
+import org.apache.aurora.gen.JobUpdate;
+import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.db.views.DbJobUpdate;
-import org.apache.aurora.scheduler.storage.db.views.DbJobUpdateInstructions;
-import org.apache.aurora.scheduler.storage.db.views.DbStoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
@@ -56,7 +55,6 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
   private final JobUpdateDetailsMapper detailsMapper;
   private final JobUpdateEventMapper jobEventMapper;
   private final JobInstanceUpdateEventMapper instanceEventMapper;
-  private final TaskConfigManager taskConfigManager;
   private final CachedCounters stats;
 
   @Inject
@@ -65,14 +63,12 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
       JobUpdateDetailsMapper detailsMapper,
       JobUpdateEventMapper jobEventMapper,
       JobInstanceUpdateEventMapper instanceEventMapper,
-      TaskConfigManager taskConfigManager,
       CachedCounters stats) {
 
     this.jobKeyMapper = requireNonNull(jobKeyMapper);
     this.detailsMapper = requireNonNull(detailsMapper);
     this.jobEventMapper = requireNonNull(jobEventMapper);
     this.instanceEventMapper = requireNonNull(instanceEventMapper);
-    this.taskConfigManager = requireNonNull(taskConfigManager);
     this.stats = requireNonNull(stats);
   }
 
@@ -107,7 +103,7 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
       IInstanceTaskConfig desired = update.getInstructions().getDesiredState();
       detailsMapper.insertTaskConfig(
           key,
-          taskConfigManager.insert(desired.getTask()),
+          desired.getTask().newBuilder(),
           true,
           new InsertResult());
 
@@ -120,11 +116,7 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
     if (!update.getInstructions().getInitialState().isEmpty()) {
       for (IInstanceTaskConfig config : update.getInstructions().getInitialState()) {
         InsertResult result = new InsertResult();
-        detailsMapper.insertTaskConfig(
-            key,
-            taskConfigManager.insert(config.getTask()),
-            false,
-            result);
+        detailsMapper.insertTaskConfig(key, config.getTask().newBuilder(), false, result);
 
         detailsMapper.insertTaskConfigInstances(
             result.getId(),
@@ -157,6 +149,13 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
     detailsMapper.truncate();
   }
 
+  private static final Function<PruneVictim, Long> GET_ROW_ID = new Function<PruneVictim, Long>() {
+    @Override
+    public Long apply(PruneVictim victim) {
+      return victim.getRowId();
+    }
+  };
+
   private static final Function<PruneVictim, IJobUpdateKey> GET_UPDATE_KEY =
       new Function<PruneVictim, IJobUpdateKey>() {
         @Override
@@ -181,7 +180,7 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
           historyPruneThresholdMs);
 
       detailsMapper.deleteCompletedUpdates(
-          FluentIterable.from(pruneVictims).transform(PruneVictim::getRowId).toSet());
+          FluentIterable.from(pruneVictims).transform(GET_ROW_ID).toSet());
       pruned.addAll(FluentIterable.from(pruneVictims).transform(GET_UPDATE_KEY));
     }
 
@@ -199,41 +198,54 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
   public List<IJobUpdateDetails> fetchJobUpdateDetails(IJobUpdateQuery query) {
     return FluentIterable
         .from(detailsMapper.selectDetailsList(query.newBuilder()))
-        .transform(DbStoredJobUpdateDetails::toThrift)
-        .transform(StoredJobUpdateDetails::getDetails)
-        .transform(IJobUpdateDetails::build)
-        .toList();
+        .transform(new Function<StoredJobUpdateDetails, IJobUpdateDetails>() {
+          @Override
+          public IJobUpdateDetails apply(StoredJobUpdateDetails input) {
+            return IJobUpdateDetails.build(input.getDetails());
+          }
+        }).toList();
   }
 
   @Timed("job_update_store_fetch_details")
   @Override
   public Optional<IJobUpdateDetails> fetchJobUpdateDetails(final IJobUpdateKey key) {
     return Optional.fromNullable(detailsMapper.selectDetails(key))
-        .transform(DbStoredJobUpdateDetails::toThrift)
-        .transform(StoredJobUpdateDetails::getDetails)
-        .transform(IJobUpdateDetails::build);
+        .transform(new Function<StoredJobUpdateDetails, IJobUpdateDetails>() {
+          @Override
+          public IJobUpdateDetails apply(StoredJobUpdateDetails input) {
+            return IJobUpdateDetails.build(input.getDetails());
+          }
+        });
   }
 
   @Timed("job_update_store_fetch_update")
   @Override
   public Optional<IJobUpdate> fetchJobUpdate(IJobUpdateKey key) {
     return Optional.fromNullable(detailsMapper.selectUpdate(key))
-        .transform(DbJobUpdate::toImmutable);
+        .transform(new Function<JobUpdate, IJobUpdate>() {
+          @Override
+          public IJobUpdate apply(JobUpdate input) {
+            return IJobUpdate.build(input);
+          }
+        });
   }
 
   @Timed("job_update_store_fetch_instructions")
   @Override
   public Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(IJobUpdateKey key) {
     return Optional.fromNullable(detailsMapper.selectInstructions(key))
-        .transform(DbJobUpdateInstructions::toImmutable);
+        .transform(new Function<JobUpdateInstructions, IJobUpdateInstructions>() {
+          @Override
+          public IJobUpdateInstructions apply(JobUpdateInstructions input) {
+            return IJobUpdateInstructions.build(input);
+          }
+        });
   }
 
   @Timed("job_update_store_fetch_all_details")
   @Override
   public Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails() {
-    return FluentIterable.from(detailsMapper.selectAllDetails())
-        .transform(DbStoredJobUpdateDetails::toThrift)
-        .toSet();
+    return ImmutableSet.copyOf(detailsMapper.selectAllDetails());
   }
 
   @Timed("job_update_store_get_lock_token")

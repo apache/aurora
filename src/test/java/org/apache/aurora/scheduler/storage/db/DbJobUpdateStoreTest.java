@@ -186,9 +186,7 @@ public class DbJobUpdateStoreTest {
   public void testSaveEmptyInitialStateRangesThrows() {
     JobUpdate builder = makeJobUpdate(makeKey("u1")).newBuilder();
     builder.getInstructions().getInitialState().add(
-        new InstanceTaskConfig(
-            TaskTestUtil.makeConfig(TaskTestUtil.JOB).newBuilder(),
-            ImmutableSet.of()));
+        new InstanceTaskConfig(new TaskConfig(), ImmutableSet.of()));
 
     saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
   }

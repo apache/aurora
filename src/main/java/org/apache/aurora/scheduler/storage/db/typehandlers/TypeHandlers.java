@@ -34,6 +34,7 @@ public final class TypeHandlers {
         .add(JobUpdateStatusTypeHandler.class)
         .add(MaintenanceModeTypeHandler.class)
         .add(ScheduleStatusTypeHandler.class)
+        .add(TaskConfigTypeHandler.class)
         .build();
   }
 }
