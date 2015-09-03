@@ -349,6 +349,7 @@
       $routeParams,
       $timeout,
       $q,
+      $location,
       auroraClient,
       taskUtil,
       updateUtil,
@@ -358,6 +359,14 @@
 
     $scope.showTaskInfoLink = false;
     $scope.jobDashboardUrl = '';
+
+    function setTabState(tab) {
+      $scope.isActive = tab === 'active';
+      $scope.isCompleted = tab === 'completed';
+      $scope.isAll = tab === 'all';
+    }
+
+    setTabState($location.search().tab || 'active');
 
     $scope.toggleTaskInfoLinkVisibility = function () {
       $scope.showTaskInfoLink = !$scope.showTaskInfoLink;
@@ -375,6 +384,11 @@
           jobTasksService.completedTaskColumns,
           jobTasksService.taskIdColumn) :
         jobTasksService.completedTaskColumns;
+    };
+
+    $scope.switchTab = function (tab) {
+      $location.search('tab', tab);
+      setTabState(tab);
     };
 
     jobTasksService.getTasksForJob($scope);

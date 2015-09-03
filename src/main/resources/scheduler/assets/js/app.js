@@ -30,7 +30,7 @@ var auroraUI;
       {templateUrl: '/assets/role.html', controller: 'JobSummaryController'});
 
     $routeProvider.when('/scheduler/:role/:environment/:job',
-      {templateUrl: '/assets/job.html', controller: 'JobController'});
+      {templateUrl: '/assets/job.html', controller: 'JobController', reloadOnSearch: false});
 
     $routeProvider.when('/scheduler/:role/:environment/:job/:instance',
       {templateUrl: '/assets/instance.html', controller: 'JobInstanceController'});

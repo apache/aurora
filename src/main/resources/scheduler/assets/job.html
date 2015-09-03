@@ -79,7 +79,11 @@
     </div>
 
     <tabset ng-if="tasksReady" justified='true'>
-      <tab heading='Active tasks ({{activeTasks.length}})' title='All Active tasks for this job.'>
+      <tab
+          heading='Active tasks ({{activeTasks.length}})'
+          title='All Active tasks for this job.'
+          active='isActive'
+          ng-click='switchTab("active")'>
         <div class='task-tab'>
           <div class='group-summary'>
             <group-summary groups='groupSummary'></group-summary>
@@ -94,8 +98,11 @@
         </div>
       </tab>
 
-      <tab heading='Completed tasks ({{completedTasks.length}})'
-           title='All completed tasks for this job.'>
+      <tab
+          heading='Completed tasks ({{completedTasks.length}})'
+          title='All completed tasks for this job.'
+          active='isCompleted'
+          ng-click='switchTab("completed")'>
         <div class='task-tab container-fluid completed-tasks-tab'>
           <smart-table config='completedTasksTableConfig'
                        columns='completedTasksTableColumns'
@@ -105,7 +112,11 @@
         </div>
       </tab>
 
-      <tab heading='All tasks' title='Both active and completed tasks for this job.'>
+      <tab
+          heading='All tasks'
+          title='Both active and completed tasks for this job.'
+          active='isAll'
+          ng-click='switchTab("all")'>
         <div class='task-tab'>
           <div class='group-summary'>
             <group-summary groups='groupSummary'></group-summary>
