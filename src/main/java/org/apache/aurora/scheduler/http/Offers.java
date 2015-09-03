@@ -113,6 +113,9 @@ public class Offers {
           if (resource.hasSet()) {
             builder.put("set", resource.getSet().getItemList());
           }
+          if (resource.hasRevocable()) {
+            builder.put("revocable", "true");
+          }
           return builder.build();
         }
       };

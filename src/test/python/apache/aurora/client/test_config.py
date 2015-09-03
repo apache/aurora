@@ -157,21 +157,6 @@ def test_environment_names():
       config._validate_environment_name(AuroraConfig(base_job(environment=env_name)))
 
 
-def test_tier_names():
-  base_job = Job(
-      name='hello_world', role='john_doe', cluster='test-cluster',
-      task=Task(name='main', processes=[]))
-
-  # Make sure empty value does not raise.
-  config._validate_tier(AuroraConfig(base_job))
-
-  for tier in GOOD_ENV:
-    config._validate_tier(AuroraConfig(base_job(tier=tier)))
-  for tier in BAD_ENV:
-    with pytest.raises(ValueError):
-      config._validate_tier(AuroraConfig(base_job(tier=tier)))
-
-
 def test_dedicated_portmap():
   base_job = Job(
       name='hello_world', role='john_doe', cluster='test-cluster',

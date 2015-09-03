@@ -33,7 +33,7 @@ _curl() { curl --silent --fail --retry 4 --retry-delay 10 "$@" ; }
 tear_down() {
   set +x  # Disable command echo, as this makes it more difficult see which command failed.
 
-  for job in http_example http_example_docker; do
+  for job in http_example http_example_revocable http_example_docker; do
     aurora job cancel-update devcluster/vagrant/test/$job >/dev/null 2>&1
     aurora update abort devcluster/vagrant/test/$job || true >/dev/null 2>&1
     aurora job killall --no-batching devcluster/vagrant/test/$job >/dev/null 2>&1
@@ -65,7 +65,7 @@ test_config() {
   local _config=$1 _jobkey=$2
 
   joblist=$(aurora config list $_config | tr -dc '[[:print:]]')
-  [[ "$joblist" = "jobs=[$_jobkey]" ]]
+  [[ "$joblist" = *"$_jobkey"* ]]
 }
 
 test_inspect() {
@@ -225,8 +225,9 @@ test_quota() {
 }
 
 test_http_example() {
-  local _cluster=$1 _role=$2 _env=$3 _job=$4
-  local _base_config=$5 _updated_config=$6
+  local _cluster=$1 _role=$2 _env=$3
+  local _base_config=$4 _updated_config=$5
+  local _job=$6
   local _jobkey="$_cluster/$_role/$_env/$_job"
 
   test_config $_base_config $_jobkey
@@ -244,6 +245,17 @@ test_http_example() {
   test_quota $_cluster $_role
 }
 
+test_http_revocable_example() {
+  local _cluster=$1 _role=$2 _env=$3
+  local _base_config=$4
+  local _job=$6
+  local _jobkey="$_cluster/$_role/$_env/$_job"
+
+  test_create $_jobkey $_base_config
+  test_observer_ui $_cluster $_role $_job
+  test_kill $_jobkey
+}
+
 test_admin() {
   local _cluster=$1
   echo '== Testing admin commands'
@@ -256,8 +268,9 @@ restore_netrc() {
 }
 
 test_basic_auth_unauthenticated() {
-  local _cluster=$1 _role=$2 _env=$3 _job=$4
-  local _config=$5
+  local _cluster=$1 _role=$2 _env=$3
+  local _config=$4
+  local _job=$6
   local _jobkey="$_cluster/$_role/$_env/$_job"
 
   mv ~/.netrc ~/.netrc.bak
@@ -280,41 +293,41 @@ TEST_CLUSTER=devcluster
 TEST_ROLE=vagrant
 TEST_ENV=test
 TEST_JOB=http_example
-TEST_DOCKER_JOB=http_example_docker
-TEST_ARGS=(
+TEST_JOB_REVOCABLE=http_example_revocable
+TEST_JOB_DOCKER=http_example_docker
+TEST_CONFIG_FILE=$EXAMPLE_DIR/http_example.aurora
+TEST_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_updated.aurora
+
+BASE_ARGS=(
   $TEST_CLUSTER
   $TEST_ROLE
   $TEST_ENV
-  $TEST_JOB
-  $EXAMPLE_DIR/http_example.aurora
-  $EXAMPLE_DIR/http_example_updated.aurora
-  )
-
-TEST_ADMIN_ARGS=(
-  $TEST_CLUSTER
+  $TEST_CONFIG_FILE
+  $TEST_CONFIG_UPDATED_FILE
 )
 
-TEST_DOCKER_ARGS=(
-  $TEST_CLUSTER
-  $TEST_ROLE
-  $TEST_ENV
-  $TEST_DOCKER_JOB
-  $EXAMPLE_DIR/http_example_docker.aurora
-  $EXAMPLE_DIR/http_example_docker_updated.aurora
-)
+TEST_JOB_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB")
+
+TEST_JOB_REVOCABLE_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_REVOCABLE")
+
+TEST_JOB_DOCKER_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_DOCKER")
+
+TEST_ADMIN_ARGS=($TEST_CLUSTER)
 
 trap collect_result EXIT
 
 aurorabuild all
 test_version
-test_http_example "${TEST_ARGS[@]}"
+test_http_example "${TEST_JOB_ARGS[@]}"
+
+test_http_revocable_example "${TEST_JOB_REVOCABLE_ARGS[@]}"
 
 # build the test docker image
 sudo docker build -t http_example ${TEST_ROOT}
-test_http_example "${TEST_DOCKER_ARGS[@]}"
+test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
 
 test_admin "${TEST_ADMIN_ARGS[@]}"
-test_basic_auth_unauthenticated  "${TEST_ARGS[@]}"
+test_basic_auth_unauthenticated  "${TEST_JOB_ARGS[@]}"
 
 /vagrant/src/test/sh/org/apache/aurora/e2e/test_kerberos_end_to_end.sh
 RETCODE=0
