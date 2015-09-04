@@ -133,4 +133,4 @@ class TaskObserverFileBrowser(object):
     chroot, path = self._observer.valid_path(task_id, path)
     if path is None:
       bottle.abort(404, "No such file")
-    return bottle.static_file(path, root=chroot, download=True)
+    return bottle.static_file(path, root=chroot, download=True, mimetype='application/octet-stream')
