@@ -31,6 +31,9 @@ machines.  This guide helps you get the scheduler set up and troubleshoot some c
   - [Tasks are stuck in PENDING forever](#tasks-are-stuck-in-pending-forever)
     - [Symptoms](#symptoms-2)
     - [Solution](#solution-2)
+- [Changing Scheduler Quorum Size](#changing-scheduler-quorum-size)
+    - [Preparation](#preparation)
+    - [Adding New Schedulers](#adding-new-schedulers)
 
 ## Installing Aurora
 The Aurora scheduler is a standalone Java server. As part of the build process it creates a bundle
@@ -287,3 +290,19 @@ slaves are tagged with these two common failure domains to ensure that it can sa
 such that jobs are resilient to failure.
 
 See our [vagrant example](examples/vagrant/upstart/mesos-slave.conf) for details.
+
+## Changing Scheduler Quorum Size
+Special care needs to be taken when changing the size of the Aurora scheduler quorum.
+Since Aurora uses a Mesos replicated log, similar steps need to be followed as when
+[changing the mesos quorum size](http://mesos.apache.org/documentation/latest/operational-guide).
+
+### Preparation
+Increase [-native_log_quorum_size](storage-config.md#-native_log_quorum_size) on each
+existing scheduler and restart them. When updating from 3 to 5 schedulers, the quorum size
+would grow from 2 to 3.
+
+### Adding New Schedulers
+Start the new schedulers with `-native_log_quorum_size` set to the new value. Failing to
+first increase the quorum size on running schedulers can in some cases result in corruption
+or truncating of the replicated log used by Aurora. In that case, see the documentation on
+[recovering from backup](storage-config.md#recovering-from-a-scheduler-backup).
