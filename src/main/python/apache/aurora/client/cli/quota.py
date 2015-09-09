@@ -56,12 +56,12 @@ class GetQuotaCmd(Verb):
       quota_result = quota_resp.result.getQuotaResult
       result = ['Allocated:']
       result += get_quota_str(quota_result.quota)
-      if quota_result.prodConsumption:
+      if quota_result.prodSharedConsumption:
         result.append('Production resources consumed:')
-        result += get_quota_str(quota_result.prodConsumption)
-      if quota_result.nonProdConsumption:
+        result += get_quota_str(quota_result.prodSharedConsumption)
+      if quota_result.nonProdSharedConsumption:
         result.append('Non-production resources consumed:')
-        result += get_quota_str(quota_result.nonProdConsumption)
+        result += get_quota_str(quota_result.nonProdSharedConsumption)
       return '\n'.join(result)
 
   def execute(self, context):

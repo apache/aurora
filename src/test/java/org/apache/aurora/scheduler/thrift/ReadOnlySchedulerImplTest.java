@@ -33,6 +33,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ConfigGroup;
 import org.apache.aurora.gen.ConfigSummary;
 import org.apache.aurora.gen.ConfigSummaryResult;
+import org.apache.aurora.gen.GetQuotaResult;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
@@ -46,7 +47,6 @@ import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.PopulateJobResult;
 import org.apache.aurora.gen.ReadOnlyScheduler;
-import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.RoleSummary;
@@ -73,7 +73,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -81,7 +80,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
-import static org.apache.aurora.scheduler.thrift.Fixtures.CONSUMED;
+import static org.apache.aurora.scheduler.ResourceAggregates.LARGE;
+import static org.apache.aurora.scheduler.ResourceAggregates.MEDIUM;
+import static org.apache.aurora.scheduler.ResourceAggregates.SMALL;
+import static org.apache.aurora.scheduler.ResourceAggregates.XLARGE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_SCHEDULE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.JOB_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.LOCK;
@@ -297,19 +299,21 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     QuotaInfo infoMock = createMock(QuotaInfo.class);
     expect(quotaManager.getQuotaInfo(ROLE, storageUtil.storeProvider)).andReturn(infoMock);
     expect(infoMock.getQuota()).andReturn(QUOTA);
-    expect(infoMock.getProdConsumption()).andReturn(CONSUMED);
-    IResourceAggregate nonProdConsumed = IResourceAggregate.build(new ResourceAggregate(1, 0, 0));
-    expect(infoMock.getNonProdConsumption()).andReturn(nonProdConsumed);
+    expect(infoMock.getProdSharedConsumption()).andReturn(XLARGE);
+    expect(infoMock.getProdDedicatedConsumption()).andReturn(LARGE);
+    expect(infoMock.getNonProdSharedConsumption()).andReturn(MEDIUM);
+    expect(infoMock.getNonProdDedicatedConsumption()).andReturn(SMALL);
     control.replay();
 
+    GetQuotaResult expected = new GetQuotaResult()
+        .setQuota(QUOTA.newBuilder())
+        .setProdSharedConsumption(XLARGE.newBuilder())
+        .setProdDedicatedConsumption(LARGE.newBuilder())
+        .setNonProdSharedConsumption(MEDIUM.newBuilder())
+        .setNonProdDedicatedConsumption(SMALL.newBuilder());
+
     Response response = assertOkResponse(thrift.getQuota(ROLE));
-    assertEquals(QUOTA.newBuilder(), response.getResult().getGetQuotaResult().getQuota());
-    assertEquals(
-        CONSUMED.newBuilder(),
-        response.getResult().getGetQuotaResult().getProdConsumption());
-    assertEquals(
-        nonProdConsumed.newBuilder(),
-        response.getResult().getGetQuotaResult().getNonProdConsumption());
+    assertEquals(expected, response.getResult().getGetQuotaResult());
   }
 
   @Test

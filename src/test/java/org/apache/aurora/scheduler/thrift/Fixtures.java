@@ -42,7 +42,6 @@ import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.ResponseDetail;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
@@ -52,10 +51,8 @@ import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 
 import static org.apache.aurora.gen.ResponseCode.OK;
-import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
 import static org.junit.Assert.assertEquals;
@@ -75,11 +72,6 @@ final class Fixtures {
   static final IJobUpdateKey UPDATE_KEY =
       IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), UPDATE_ID));
   static final UUID UU_ID = UUID.fromString(UPDATE_ID);
-  static final IServerInfo SERVER_INFO =
-      IServerInfo.build(new ServerInfo()
-          .setClusterName("test")
-          .setThriftAPIVersion(THRIFT_API_VERSION)
-          .setStatsUrlPrefix("fake_url"));
   private static final Function<String, ResponseDetail> MESSAGE_TO_DETAIL =
       new Function<String, ResponseDetail>() {
         @Override
@@ -90,8 +82,6 @@ final class Fixtures {
   static final String CRON_SCHEDULE = "0 * * * *";
   static final IResourceAggregate QUOTA =
       IResourceAggregate.build(new ResourceAggregate(10.0, 1024, 2048));
-  static final IResourceAggregate CONSUMED =
-      IResourceAggregate.build(new ResourceAggregate(0.0, 0, 0));
   static final QuotaCheckResult ENOUGH_QUOTA = new QuotaCheckResult(SUFFICIENT_QUOTA);
   static final QuotaCheckResult NOT_ENOUGH_QUOTA = new QuotaCheckResult(INSUFFICIENT_QUOTA);
 

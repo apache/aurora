@@ -101,7 +101,7 @@ class QuotaCheck(object):
       return resp
 
     allocated = CapacityRequest(resp.result.getQuotaResult.quota)
-    consumed = CapacityRequest(resp.result.getQuotaResult.prodConsumption)
+    consumed = CapacityRequest(resp.result.getQuotaResult.prodSharedConsumption)
     requested = acquired - released
     effective = allocated - consumed - requested
 

@@ -160,9 +160,9 @@
 
       $scope.resourcesTableColumns = [
         {label: 'Resource', map: 'resource'},
-        {label: 'Production Consumption', map: 'prodConsumption'},
+        {label: 'Production Consumption', map: 'prodSharedConsumption'},
         {label: 'Quota', map: 'quota'},
-        {label: 'Non-Production Consumption', map: 'nonProdConsumption'}
+        {label: 'Non-Production Consumption', map: 'nonProdSharedConsumption'}
       ];
 
       $scope.resourcesTableConfig = summaryTableConfig;
@@ -183,21 +183,23 @@
         return [
           {
             resource: 'CPU',
-            prodConsumption: $filter('toCores')(consumption.prodConsumption.numCpus),
+            prodSharedConsumption: $filter('toCores')(consumption.prodSharedConsumption.numCpus),
             quota: $filter('toCores')(consumption.quota.numCpus),
-            nonProdConsumption: $filter('toCores')(consumption.nonProdConsumption.numCpus)
+            nonProdSharedConsumption:
+              $filter('toCores')(consumption.nonProdSharedConsumption.numCpus)
           },
           {
             resource: 'RAM',
-            prodConsumption: $filter('scaleMb')(consumption.prodConsumption.ramMb),
+            prodSharedConsumption: $filter('scaleMb')(consumption.prodSharedConsumption.ramMb),
             quota: $filter('scaleMb')(consumption.quota.ramMb),
-            nonProdConsumption: $filter('scaleMb')(consumption.nonProdConsumption.ramMb)
+            nonProdSharedConsumption: $filter('scaleMb')(consumption.nonProdSharedConsumption.ramMb)
           },
           {
             resource: 'Disk',
-            prodConsumption: $filter('scaleMb')(consumption.prodConsumption.diskMb),
+            prodSharedConsumption: $filter('scaleMb')(consumption.prodSharedConsumption.diskMb),
             quota: $filter('scaleMb')(consumption.quota.diskMb),
-            nonProdConsumption: $filter('scaleMb')(consumption.nonProdConsumption.diskMb)
+            nonProdSharedConsumption:
+              $filter('scaleMb')(consumption.nonProdSharedConsumption.diskMb)
           }
         ];
       }

@@ -43,15 +43,6 @@ public final class ResourceAggregates {
   }
 
   /**
-   * Returns a quota with all resource vectors zeroed.
-   *
-   * @return A resource aggregate with all resource vectors zeroed.
-   */
-  public static IResourceAggregate none() {
-    return EMPTY;
-  }
-
-  /**
    * a * m.
    */
   public static IResourceAggregate scale(IResourceAggregate a, int m) {

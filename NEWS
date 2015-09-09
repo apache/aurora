@@ -13,6 +13,7 @@
   container) to successfully launch Aurora executor. See
   https://github.com/apache/mesos/blob/ebcf8cc2f2f6c236f6e9315447c247e6348141e1/docs/getting-started.md
   for more details on Mesos runtime dependencies.
+- Resource quota is no longer consumed by production jobs with a dedicated constraint (AURORA-1457).
 
 0.9.0
 -----

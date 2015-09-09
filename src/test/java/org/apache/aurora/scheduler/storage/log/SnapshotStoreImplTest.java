@@ -88,7 +88,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         IScheduledTask.build(new ScheduledTask().setStatus(ScheduleStatus.PENDING)));
     Set<QuotaConfiguration> quotas =
         ImmutableSet.of(
-            new QuotaConfiguration("steve", ResourceAggregates.none().newBuilder()));
+            new QuotaConfiguration("steve", ResourceAggregates.EMPTY.newBuilder()));
     IHostAttributes attribute = IHostAttributes.build(
         new HostAttributes("host", ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))))
             .setSlaveId("slave id"));
@@ -122,7 +122,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
     expect(storageUtil.quotaStore.fetchQuotas())
-        .andReturn(ImmutableMap.of("steve", ResourceAggregates.none()));
+        .andReturn(ImmutableMap.of("steve", ResourceAggregates.EMPTY));
     expect(storageUtil.attributeStore.getHostAttributes())
         .andReturn(ImmutableSet.of(attribute, legacyAttribute));
     expect(storageUtil.jobStore.fetchJobs())
@@ -137,7 +137,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
 
     expectDataWipe();
     storageUtil.taskStore.saveTasks(tasks);
-    storageUtil.quotaStore.saveQuota("steve", ResourceAggregates.none());
+    storageUtil.quotaStore.saveQuota("steve", ResourceAggregates.EMPTY);
     expect(storageUtil.attributeStore.saveHostAttributes(attribute)).andReturn(true);
     storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(job.getJobConfiguration()));
     storageUtil.schedulerStore.saveFrameworkId(frameworkId);

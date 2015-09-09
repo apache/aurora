@@ -130,7 +130,7 @@ class TestIncreaseQuotaCommand(AuroraClientCommandTest):
         responseCode=response_code,
         details=[ResponseDetail(message='test')],
         result=Result(getQuotaResult=GetQuotaResult(
-            quota=quota, prodConsumption=prod, nonProdConsumption=non_prod))
+            quota=quota, prodSharedConsumption=prod, nonProdSharedConsumption=non_prod))
     )
 
   def test_increase_quota(self):
@@ -167,7 +167,7 @@ class TestSetQuotaCommand(AuroraClientCommandTest):
     response_code = ResponseCode.OK if response_code is None else response_code
     resp = Response(responseCode=response_code, details=[ResponseDetail(message='test')])
     resp.result = Result(getQuotaResult=GetQuotaResult(
-      quota=quota, prodConsumption=prod, nonProdConsumption=non_prod))
+      quota=quota, prodSharedConsumption=prod, nonProdSharedConsumption=non_prod))
     return resp
 
   def test_set_quota(self):

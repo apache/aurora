@@ -26,17 +26,23 @@ import static java.util.Objects.requireNonNull;
  */
 public class QuotaInfo {
   private final IResourceAggregate quota;
-  private final IResourceAggregate prodConsumption;
-  private final IResourceAggregate nonProdConsumption;
+  private final IResourceAggregate prodSharedConsumption;
+  private final IResourceAggregate prodDedicatedConsumption;
+  private final IResourceAggregate nonProdSharedConsumption;
+  private final IResourceAggregate nonProdDedicatedConsumption;
 
   QuotaInfo(
       IResourceAggregate quota,
-      IResourceAggregate prodConsumption,
-      IResourceAggregate nonProdConsumption) {
+      IResourceAggregate prodSharedConsumption,
+      IResourceAggregate prodDedicatedConsumption,
+      IResourceAggregate nonProdSharedConsumption,
+      IResourceAggregate nonProdDedicatedConsumption) {
 
     this.quota = requireNonNull(quota);
-    this.prodConsumption = requireNonNull(prodConsumption);
-    this.nonProdConsumption = requireNonNull(nonProdConsumption);
+    this.prodSharedConsumption = requireNonNull(prodSharedConsumption);
+    this.prodDedicatedConsumption = requireNonNull(prodDedicatedConsumption);
+    this.nonProdSharedConsumption = requireNonNull(nonProdSharedConsumption);
+    this.nonProdDedicatedConsumption = requireNonNull(nonProdDedicatedConsumption);
   }
 
   /**
@@ -49,21 +55,39 @@ public class QuotaInfo {
   }
 
   /**
-   * Quota consumed by production jobs.
+   * Quota consumed by production jobs from a shared resource pool.
    *
    * @return Production job consumption.
    */
-  public IResourceAggregate getProdConsumption() {
-    return prodConsumption;
+  public IResourceAggregate getProdSharedConsumption() {
+    return prodSharedConsumption;
   }
 
   /**
-   * Quota consumed by non-production jobs.
+   * Resources consumed by production jobs from a dedicated resource pool.
+   *
+   * @return Production dedicated job consumption.
+   */
+  public IResourceAggregate getProdDedicatedConsumption() {
+    return prodDedicatedConsumption;
+  }
+
+  /**
+   * Resources consumed by non-production jobs from a shared resource pool.
    *
    * @return Non production job consumption.
    */
-  public IResourceAggregate getNonProdConsumption() {
-    return nonProdConsumption;
+  public IResourceAggregate getNonProdSharedConsumption() {
+    return nonProdSharedConsumption;
+  }
+
+  /**
+   * Resources consumed by non-production jobs from a dedicated resource pool.
+   *
+   * @return Non production dedicated job consumption.
+   */
+  public IResourceAggregate getNonProdDedicatedConsumption() {
+    return nonProdDedicatedConsumption;
   }
 
   @Override
@@ -75,21 +99,30 @@ public class QuotaInfo {
     QuotaInfo other = (QuotaInfo) o;
 
     return Objects.equals(quota, other.quota)
-        && Objects.equals(prodConsumption, other.prodConsumption)
-        && Objects.equals(nonProdConsumption, other.nonProdConsumption);
+        && Objects.equals(prodSharedConsumption, other.prodSharedConsumption)
+        && Objects.equals(prodDedicatedConsumption, other.prodDedicatedConsumption)
+        && Objects.equals(nonProdSharedConsumption, other.nonProdSharedConsumption)
+        && Objects.equals(nonProdDedicatedConsumption, other.nonProdDedicatedConsumption);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(quota, prodConsumption, nonProdConsumption);
+    return Objects.hash(
+        quota,
+        prodSharedConsumption,
+        prodDedicatedConsumption,
+        nonProdSharedConsumption,
+        nonProdDedicatedConsumption);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
         .add("quota", quota)
-        .add("prodConsumption", prodConsumption)
-        .add("nonProdConsumption", nonProdConsumption)
+        .add("prodSharedConsumption", prodSharedConsumption)
+        .add("prodDedicatedConsumption", prodDedicatedConsumption)
+        .add("nonProdSharedConsumption", nonProdSharedConsumption)
+        .add("nonProdDedicatedConsumption", nonProdDedicatedConsumption)
         .toString();
   }
 }

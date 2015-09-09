@@ -22,7 +22,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -36,6 +35,7 @@ import org.apache.aurora.scheduler.ResourceAggregates;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
@@ -54,6 +54,13 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.updater.Updates;
 
 import static java.util.Objects.requireNonNull;
+
+import static com.google.common.base.Predicates.and;
+import static com.google.common.base.Predicates.compose;
+import static com.google.common.base.Predicates.equalTo;
+import static com.google.common.base.Predicates.in;
+import static com.google.common.base.Predicates.not;
+import static com.google.common.base.Predicates.or;
 
 import static org.apache.aurora.scheduler.ResourceAggregates.EMPTY;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
@@ -134,6 +141,15 @@ public interface QuotaManager {
    */
   class QuotaManagerImpl implements QuotaManager {
 
+    private static final Predicate<ITaskConfig> DEDICATED =
+        e -> ConfigurationManager.isDedicated(e.getConstraints());
+    private static final Predicate<ITaskConfig> PROD = ITaskConfig::isProduction;
+    private static final Predicate<ITaskConfig> PROD_SHARED = and(PROD, not(DEDICATED));
+    private static final Predicate<ITaskConfig> PROD_DEDICATED = and(PROD, DEDICATED);
+    private static final Predicate<ITaskConfig> NON_PROD_SHARED = and(not(PROD), not(DEDICATED));
+    private static final Predicate<ITaskConfig> NON_PROD_DEDICATED = and(not(PROD), DEDICATED);
+    private static final Predicate<ITaskConfig> NO_QUOTA_CHECK = or(PROD_DEDICATED, not(PROD));
+
     @Override
     public void saveQuota(
         final String ownerRole,
@@ -149,7 +165,7 @@ public interface QuotaManager {
       }
 
       QuotaInfo info = getQuotaInfo(ownerRole, Optional.absent(), storeProvider);
-      IResourceAggregate prodConsumption = info.getProdConsumption();
+      IResourceAggregate prodConsumption = info.getProdSharedConsumption();
       if (quota.getNumCpus() < prodConsumption.getNumCpus()
           || quota.getRamMb() < prodConsumption.getRamMb()
           || quota.getDiskMb() < prodConsumption.getDiskMb()) {
@@ -174,13 +190,13 @@ public interface QuotaManager {
         StoreProvider storeProvider) {
 
       Preconditions.checkArgument(instances >= 0);
-      if (!template.isProduction()) {
+      if (NO_QUOTA_CHECK.apply(template)) {
         return new QuotaCheckResult(SUFFICIENT_QUOTA);
       }
 
       QuotaInfo quotaInfo = getQuotaInfo(template.getJob().getRole(), storeProvider);
       IResourceAggregate requestedTotal =
-          add(quotaInfo.getProdConsumption(), scale(template, instances));
+          add(quotaInfo.getProdSharedConsumption(), scale(template, instances));
 
       return QuotaCheckResult.greaterOrEqual(quotaInfo.getQuota(), requestedTotal);
     }
@@ -189,7 +205,7 @@ public interface QuotaManager {
     public QuotaCheckResult checkJobUpdate(IJobUpdate jobUpdate, StoreProvider storeProvider) {
       requireNonNull(jobUpdate);
       if (!jobUpdate.getInstructions().isSetDesiredState()
-          || !jobUpdate.getInstructions().getDesiredState().getTask().isProduction()) {
+          || NO_QUOTA_CHECK.apply(jobUpdate.getInstructions().getDesiredState().getTask())) {
 
         return new QuotaCheckResult(SUFFICIENT_QUOTA);
       }
@@ -199,7 +215,9 @@ public interface QuotaManager {
           Optional.of(jobUpdate),
           storeProvider);
 
-      return QuotaCheckResult.greaterOrEqual(quotaInfo.getQuota(), quotaInfo.getProdConsumption());
+      return QuotaCheckResult.greaterOrEqual(
+          quotaInfo.getQuota(),
+          quotaInfo.getProdSharedConsumption());
     }
 
     @Override
@@ -222,7 +240,7 @@ public interface QuotaManager {
       // Calculate requested total as a sum of current prod consumption and a delta between
       // new and old cron templates.
       IResourceAggregate requestedTotal = add(
-          quotaInfo.getProdConsumption(),
+          quotaInfo.getProdSharedConsumption(),
           subtract(scale(cronConfig), oldResource));
 
       return QuotaCheckResult.greaterOrEqual(quotaInfo.getQuota(), requestedTotal);
@@ -262,45 +280,39 @@ public interface QuotaManager {
 
       Map<IJobKey, IJobConfiguration> cronTemplates =
           FluentIterable.from(storeProvider.getCronJobStore().fetchJobs())
-              .filter(Predicates.compose(Predicates.equalTo(role), JobKeys::getRole))
+              .filter(compose(equalTo(role), JobKeys::getRole))
               .uniqueIndex(IJobConfiguration::getKey);
 
-      IResourceAggregate prodConsumed = getConsumption(tasks, updates, cronTemplates, true);
-
-      IResourceAggregate nonProdConsumed = getConsumption(tasks, updates, cronTemplates, false);
-
-      IResourceAggregate quota =
-          storeProvider.getQuotaStore().fetchQuota(role).or(ResourceAggregates.none());
-
-      return new QuotaInfo(quota, prodConsumed, nonProdConsumed);
+      return new QuotaInfo(
+          storeProvider.getQuotaStore().fetchQuota(role).or(EMPTY),
+          getConsumption(tasks, updates, cronTemplates, PROD_SHARED),
+          getConsumption(tasks, updates, cronTemplates, PROD_DEDICATED),
+          getConsumption(tasks, updates, cronTemplates, NON_PROD_SHARED),
+          getConsumption(tasks, updates, cronTemplates, NON_PROD_DEDICATED));
     }
 
     private IResourceAggregate getConsumption(
         FluentIterable<IAssignedTask> tasks,
         Map<IJobKey, IJobUpdateInstructions> updatesByKey,
         Map<IJobKey, IJobConfiguration> cronTemplatesByKey,
-        boolean isProd) {
-
-      Predicate<ITaskConfig> prodFilter = isProd
-          ? ITaskConfig::isProduction
-          : Predicates.not(ITaskConfig::isProduction);
+        Predicate<ITaskConfig> filter) {
 
       FluentIterable<IAssignedTask> filteredTasks =
-          tasks.filter(Predicates.compose(prodFilter, IAssignedTask::getTask));
+          tasks.filter(compose(filter, IAssignedTask::getTask));
 
-      Predicate<IAssignedTask> excludeCron = Predicates.compose(
-          Predicates.not(Predicates.in(cronTemplatesByKey.keySet())),
+      Predicate<IAssignedTask> excludeCron = compose(
+          not(in(cronTemplatesByKey.keySet())),
           Tasks::getJob);
 
       IResourceAggregate nonCronConsumption = getNonCronConsumption(
           updatesByKey,
           filteredTasks.filter(excludeCron),
-          prodFilter);
+          filter);
 
       IResourceAggregate cronConsumption = getCronConsumption(
           Iterables.filter(
               cronTemplatesByKey.values(),
-              Predicates.compose(prodFilter, IJobConfiguration::getTaskConfig)),
+              compose(filter, IJobConfiguration::getTaskConfig)),
           filteredTasks.transform(IAssignedTask::getTask));
 
       return add(nonCronConsumption, cronConsumption);
@@ -327,7 +339,7 @@ public interface QuotaManager {
           .transform(IAssignedTask::getTask));
 
       final Predicate<IInstanceTaskConfig> instanceFilter =
-          Predicates.compose(configFilter, IInstanceTaskConfig::getTask);
+          compose(configFilter, IInstanceTaskConfig::getTask);
 
       IResourceAggregate updateConsumption =
           addAll(Iterables.transform(updatesByKey.values(), updateResources(instanceFilter)));
@@ -445,7 +457,8 @@ public interface QuotaManager {
      * <p/>
      * NOTE: In case of a job update converting the job production bit (i.e. prod -> non-prod or
      *       non-prod -> prod), only the matching state is counted towards consumption. For example,
-     *       prod -> non-prod AND {@code prodConsumption=True}: only the initial state is accounted.
+     *       prod -> non-prod AND {@code prodSharedConsumption=True}: only the initial state
+     *       is accounted.
      */
     private static Function<IJobUpdateInstructions, IResourceAggregate> updateResources(
         final Predicate<IInstanceTaskConfig> instanceFilter) {

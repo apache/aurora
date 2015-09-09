@@ -363,10 +363,14 @@ struct PopulateJobResult {
 struct GetQuotaResult {
   /** Total allocated resource quota. */
   1: ResourceAggregate quota
-  /** Resources consumed by production jobs. */
-  2: optional ResourceAggregate prodConsumption
-  /** Resources consumed by non-production jobs. */
-  3: optional ResourceAggregate nonProdConsumption
+  /** Resources consumed by production jobs from a shared resource pool. */
+  2: optional ResourceAggregate prodSharedConsumption
+  /** Resources consumed by non-production jobs from a shared resource pool. */
+  3: optional ResourceAggregate nonProdSharedConsumption
+  /** Resources consumed by production jobs from a dedicated resource pool. */
+  4: optional ResourceAggregate prodDedicatedConsumption
+  /** Resources consumed by non-production jobs from a dedicated resource pool. */
+  5: optional ResourceAggregate nonProdDedicatedConsumption
 }
 
 /** Wraps return results for the acquireLock API. */

@@ -30,8 +30,8 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     response = cls.create_simple_success_response()
     response.result = Result(getQuotaResult=GetQuotaResult(
         quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
-        prodConsumption=None,
-        nonProdConsumption=None
+        prodSharedConsumption=None,
+        nonProdSharedConsumption=None
     ))
     api.get_quota.return_value = response
 
@@ -41,8 +41,8 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     response = cls.create_simple_success_response()
     response.result = Result(getQuotaResult=GetQuotaResult(
       quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
-      prodConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
-      nonProdConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
+      prodSharedConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
+      nonProdSharedConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
     ))
     api.get_quota.return_value = response
 
@@ -63,9 +63,10 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
             json.loads(self._get_quota(False, ['quota', 'get', '--write-json', 'west/bozo'])))
 
   def test_get_quota_with_consumption_json(self):
-    expected_response = json.loads('{"quota":{"numCpus":5,"ramMb":20480,"diskMb":40960},'
-                                   '"prodConsumption":{"numCpus":1,"ramMb":1024,"diskMb":2048},'
-                                   '"nonProdConsumption":{"numCpus":1,"ramMb":1024,"diskMb":2048}}')
+    expected_response = json.loads(
+        '{"quota":{"numCpus":5,"ramMb":20480,"diskMb":40960},'
+        '"prodSharedConsumption":{"numCpus":1,"ramMb":1024,"diskMb":2048},'
+        '"nonProdSharedConsumption":{"numCpus":1,"ramMb":1024,"diskMb":2048}}')
     assert (expected_response ==
             json.loads(self._get_quota(True, ['quota', 'get', '--write-json', 'west/bozo'])))
 
