@@ -158,18 +158,31 @@
     function ($scope, $filter, auroraClient) {
       $scope.error = '';
 
-      $scope.resourcesTableColumns = [
-        {label: 'Resource', map: 'resource'},
-        {label: 'Production Consumption', map: 'prodSharedConsumption'},
-        {label: 'Quota', map: 'quota'},
-        {label: 'Non-Production Consumption', map: 'nonProdSharedConsumption'}
-      ];
-
       $scope.resourcesTableConfig = summaryTableConfig;
 
 
       auroraClient.getQuota($scope.role).then(function (quotaResponse) {
         $scope.resources = getQuota(quotaResponse);
+
+        var consumption = quotaResponse.quota;
+        var columns = [
+          {label: 'Resource', map: 'resource'},
+          {label: 'Quota', map: 'quota'},
+          {label: 'Quota Consumption', map: 'prodSharedConsumption'},
+          {label: 'Production Dedicated Consumption', map: 'prodDedicatedConsumption'},
+          {label: 'Non-Production Consumption', map: 'nonProdSharedConsumption'},
+          {label: 'Non-Production Dedicated Consumption', map: 'nonProdDedicatedConsumption'}
+        ];
+
+        columns = _.filter(columns, function (column) {
+          var vector = consumption[column.map];
+          return !vector || vector.numCpus > 0 || vector.ramMb > 0 || vector.diskMb > 0;
+        });
+        $scope.resourcesTableColumns = columns;
+
+        // Assuming the max column count of 6. Revisit this approach if that's no longer the case.
+        $scope.resourceClass = 'col-md-' + (columns.length * 2);
+
       });
 
       function getQuota(quotaResponse) {
@@ -179,28 +192,25 @@
           return [];
         }
 
-        var consumption = quotaResponse.quota;
+        function addResourceVector(name, filterSpec, vector) {
+          var consumption = quotaResponse.quota;
+          return {
+            resource: name,
+            quota: $filter(filterSpec)(consumption.quota[vector]),
+            prodSharedConsumption: $filter(filterSpec)(consumption.prodSharedConsumption[vector]),
+            prodDedicatedConsumption:
+              $filter(filterSpec)(consumption.prodDedicatedConsumption[vector]),
+            nonProdSharedConsumption:
+              $filter(filterSpec)(consumption.nonProdSharedConsumption[vector]),
+            nonProdDedicatedConsumption:
+              $filter(filterSpec)(consumption.nonProdDedicatedConsumption[vector])
+          };
+        }
+
         return [
-          {
-            resource: 'CPU',
-            prodSharedConsumption: $filter('toCores')(consumption.prodSharedConsumption.numCpus),
-            quota: $filter('toCores')(consumption.quota.numCpus),
-            nonProdSharedConsumption:
-              $filter('toCores')(consumption.nonProdSharedConsumption.numCpus)
-          },
-          {
-            resource: 'RAM',
-            prodSharedConsumption: $filter('scaleMb')(consumption.prodSharedConsumption.ramMb),
-            quota: $filter('scaleMb')(consumption.quota.ramMb),
-            nonProdSharedConsumption: $filter('scaleMb')(consumption.nonProdSharedConsumption.ramMb)
-          },
-          {
-            resource: 'Disk',
-            prodSharedConsumption: $filter('scaleMb')(consumption.prodSharedConsumption.diskMb),
-            quota: $filter('scaleMb')(consumption.quota.diskMb),
-            nonProdSharedConsumption:
-              $filter('scaleMb')(consumption.nonProdSharedConsumption.diskMb)
-          }
+          addResourceVector('CPU', 'toCores', 'numCpus'),
+          addResourceVector('RAM', 'scaleMb', 'ramMb'),
+          addResourceVector('Disk', 'scaleMb', 'diskMb')
         ];
       }
     }
