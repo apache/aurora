@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.EvictingQueue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -33,7 +34,6 @@ import com.google.inject.name.Named;
 
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.collections.BoundedQueue;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
@@ -65,7 +65,7 @@ public class TimeSeriesRepositoryImpl implements TimeSeriesRepository {
 
   // We store TimeSeriesImpl, which allows us to add samples.
   private final LoadingCache<String, TimeSeriesImpl> timeSeries;
-  private final BoundedQueue<Number> timestamps;
+  private final EvictingQueue<Number> timestamps;
 
   private final StatRegistry statRegistry;
   private final Amount<Long, Time> samplePeriod;
@@ -104,7 +104,7 @@ public class TimeSeriesRepositoryImpl implements TimeSeriesRepository {
           }
         });
 
-    timestamps = new BoundedQueue<Number>(retainedSampleLimit);
+    timestamps = EvictingQueue.create(retainedSampleLimit);
   }
 
   /**
@@ -175,11 +175,11 @@ public class TimeSeriesRepositoryImpl implements TimeSeriesRepository {
 
   private class TimeSeriesImpl implements TimeSeries {
     private final String name;
-    private final BoundedQueue<Number> samples;
+    private final EvictingQueue<Number> samples;
 
     TimeSeriesImpl(String name) {
       this.name = name;
-      samples = new BoundedQueue<Number>(retainedSampleLimit);
+      samples = EvictingQueue.create(retainedSampleLimit);
     }
 
     @Override public String getName() {
