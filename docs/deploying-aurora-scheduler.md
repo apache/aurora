@@ -21,6 +21,8 @@ machines.  This guide helps you get the scheduler set up and troubleshoot some c
     - [Dedicated attribute](#dedicated-attribute)
       - [Syntax](#syntax)
       - [Example](#example)
+- [Best practices](#best-practices)
+  - [Diversity](#diversity)
 - [Common problems](#common-problems)
   - [Replicated log not initialized](#replicated-log-not-initialized)
     - [Symptoms](#symptoms)
@@ -28,9 +30,6 @@ machines.  This guide helps you get the scheduler set up and troubleshoot some c
   - [Scheduler not registered](#scheduler-not-registered)
     - [Symptoms](#symptoms-1)
     - [Solution](#solution-1)
-  - [Tasks are stuck in PENDING forever](#tasks-are-stuck-in-pending-forever)
-    - [Symptoms](#symptoms-2)
-    - [Solution](#solution-2)
 - [Changing Scheduler Quorum Size](#changing-scheduler-quorum-size)
     - [Preparation](#preparation)
     - [Adding New Schedulers](#adding-new-schedulers)
@@ -220,7 +219,7 @@ enforce this.
 ##### Example
 Consider the following slave command line:
 
-    mesos-slave --attributes="host:$HOST;rack:$RACK;dedicated:db_team/redis" ...
+    mesos-slave --attributes="dedicated:db_team/redis" ...
 
 And this job configuration:
 
@@ -237,6 +236,19 @@ The job configuration is indicating that it should only be scheduled on slaves w
 `dedicated:db_team/redis`.  Additionally, Aurora will prevent any tasks that do _not_ have that
 constraint from running on those slaves.
 
+## Best practices
+### Diversity
+Data centers are often organized with hierarchical failure domains.  Common failure domains
+include hosts, racks, rows, and PDUs.  If you have this information available, it is wise to tag
+the mesos-slave with them as
+[attributes](https://mesos.apache.org/documentation/attributes-resources/).
+
+When it comes time to schedule jobs, Aurora will automatically spread them across the failure
+domains as specified in the
+[job configuration](configuration-reference.md#specifying-scheduling-constraints).
+
+Note: in virtualized environments like EC2, the only attribute that usually makes sense for this
+purpose is `host`.
 
 ## Common problems
 So you've started your first cluster and are running into some issues? We've collected some common
@@ -277,19 +289,6 @@ the master in ZooKeeper, make sure command line argument to the master:
 is the same as the one on the scheduler:
 
     -mesos_master_address=zk://$ZK_HOST:2181/mesos/master
-
-### Tasks are stuck in `PENDING` forever
-
-#### Symptoms
-The scheduler is registered, and [receiving offers](monitoring.md#scheduler_resource_offers),
-but tasks are perpetually shown as `PENDING - Constraint not satisfied: host`.
-
-#### Solution
-Check that your slaves are configured with `host` and `rack` attributes.  Aurora requires that
-slaves are tagged with these two common failure domains to ensure that it can safely place tasks
-such that jobs are resilient to failure.
-
-See our [vagrant example](examples/vagrant/upstart/mesos-slave.conf) for details.
 
 ## Changing Scheduler Quorum Size
 Special care needs to be taken when changing the size of the Aurora scheduler quorum.

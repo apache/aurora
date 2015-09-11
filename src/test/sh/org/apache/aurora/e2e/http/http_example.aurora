@@ -43,10 +43,6 @@ job = Service(
   role = getpass.getuser(),
   environment = 'test',
   contact = '{{role}}@localhost',
-  # Since there is only one slave in devcluster allow all instances to run there.
-  constraints = {
-    'host': 'limit:2',
-  },
   announce = Announcer(),
 )
 
