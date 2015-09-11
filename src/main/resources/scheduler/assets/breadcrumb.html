@@ -31,7 +31,7 @@
     <li ng-if='instance >= 0' class='active'>{{instance}}</li>
     <li ng-if='update' class='active'>{{update.update.summary.key.id}}</li>
 
-    <li ng-if='job && (!update && !(instance >= 0))' class='right'>
+    <li ng-if='job && (!update && !(instance >= 0)) && jobDashboardUrl' class='right'>
       <a ng-href='{{jobDashboardUrl}}' title='External dashboard for this job'>
         <span class='glyphicon glyphicon-stats'></span> Dashboard
       </a>
