@@ -221,21 +221,6 @@ public class SchedulerMain implements Application {
     logConfiguration.apply();
     Log4jConfigurator.configureConsole(logConfiguration);
 
-    String javaVersion = System.getProperty("java.version");
-    char javaVersionMinor = javaVersion.charAt(2);
-    if (javaVersionMinor < '8') {
-      LOG.warning(
-          "\n**************************************************************************\n"
-          + "*\n"
-          + "*\n"
-          + "*\tBeginning with Aurora 0.9.0, you'll need Java 1.8 to run aurora!\n"
-          + "*\tCurrently you're running \"" + javaVersion + "\"\n"
-          + "*\n"
-          + "*\n"
-          + "**************************************************************************"
-      );
-    }
-
     LeadershipListener leaderListener = schedulerLifecycle.prepare();
 
     HostAndPort httpAddress = httpService.getAddress();
