@@ -108,7 +108,7 @@ public class ResourceCounterTest {
     Set<GlobalMetric> expected = ImmutableSet.of(
         new GlobalMetric(TOTAL_CONSUMED,     8, 8 * GB, 8 * GB),
         new GlobalMetric(DEDICATED_CONSUMED, 2, 2 * GB, 2 * GB),
-        new GlobalMetric(QUOTA_CONSUMED,     5, 5 * GB, 5 * GB),
+        new GlobalMetric(QUOTA_CONSUMED,     4, 4 * GB, 4 * GB),
         new GlobalMetric(FREE_POOL_CONSUMED, 2, 2 * GB, 2 * GB)
     );
 

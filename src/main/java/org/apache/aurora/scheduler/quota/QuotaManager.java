@@ -70,6 +70,14 @@ import static org.apache.aurora.scheduler.updater.Updates.getInstanceIds;
  * Allows access to resource quotas, and tracks quota consumption.
  */
 public interface QuotaManager {
+  Predicate<ITaskConfig> PROD = ITaskConfig::isProduction;
+  Predicate<ITaskConfig> DEDICATED =
+      e -> ConfigurationManager.isDedicated(e.getConstraints());
+  Predicate<ITaskConfig> PROD_SHARED = and(PROD, not(DEDICATED));
+  Predicate<ITaskConfig> PROD_DEDICATED = and(PROD, DEDICATED);
+  Predicate<ITaskConfig> NON_PROD_SHARED = and(not(PROD), not(DEDICATED));
+  Predicate<ITaskConfig> NON_PROD_DEDICATED = and(not(PROD), DEDICATED);
+
   /**
    * Saves a new quota for the provided role or overrides the existing one.
    *
@@ -140,14 +148,6 @@ public interface QuotaManager {
    * Quota provider that stores quotas in the canonical store.
    */
   class QuotaManagerImpl implements QuotaManager {
-
-    private static final Predicate<ITaskConfig> DEDICATED =
-        e -> ConfigurationManager.isDedicated(e.getConstraints());
-    private static final Predicate<ITaskConfig> PROD = ITaskConfig::isProduction;
-    private static final Predicate<ITaskConfig> PROD_SHARED = and(PROD, not(DEDICATED));
-    private static final Predicate<ITaskConfig> PROD_DEDICATED = and(PROD, DEDICATED);
-    private static final Predicate<ITaskConfig> NON_PROD_SHARED = and(not(PROD), not(DEDICATED));
-    private static final Predicate<ITaskConfig> NON_PROD_DEDICATED = and(not(PROD), DEDICATED);
     private static final Predicate<ITaskConfig> NO_QUOTA_CHECK = or(PROD_DEDICATED, not(PROD));
 
     @Override

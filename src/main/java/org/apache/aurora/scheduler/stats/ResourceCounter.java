@@ -32,13 +32,16 @@ import com.google.common.collect.Iterables;
 
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
+import static org.apache.aurora.scheduler.quota.QuotaManager.DEDICATED;
+import static org.apache.aurora.scheduler.quota.QuotaManager.NON_PROD_SHARED;
+import static org.apache.aurora.scheduler.quota.QuotaManager.PROD_SHARED;
 
 /**
  * Computes aggregate metrics about resource allocation and consumption in the scheduler.
@@ -133,24 +136,9 @@ public class ResourceCounter {
 
   public enum MetricType {
     TOTAL_CONSUMED(Predicates.<ITaskConfig>alwaysTrue()),
-    DEDICATED_CONSUMED(new Predicate<ITaskConfig>() {
-      @Override
-      public boolean apply(ITaskConfig task) {
-        return ConfigurationManager.isDedicated(task.getConstraints());
-      }
-    }),
-    QUOTA_CONSUMED(new Predicate<ITaskConfig>() {
-      @Override
-      public boolean apply(ITaskConfig task) {
-        return task.isProduction();
-      }
-    }),
-    FREE_POOL_CONSUMED(new Predicate<ITaskConfig>() {
-      @Override
-      public boolean apply(ITaskConfig task) {
-        return !ConfigurationManager.isDedicated(task.getConstraints()) && !task.isProduction();
-      }
-    });
+    DEDICATED_CONSUMED(DEDICATED),
+    QUOTA_CONSUMED(PROD_SHARED),
+    FREE_POOL_CONSUMED(NON_PROD_SHARED);
 
     public final Predicate<ITaskConfig> filter;
 

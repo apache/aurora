@@ -31,7 +31,9 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     response.result = Result(getQuotaResult=GetQuotaResult(
         quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
         prodSharedConsumption=None,
-        nonProdSharedConsumption=None
+        prodDedicatedConsumption=None,
+        nonProdSharedConsumption=None,
+        nonProdDedicatedConsumption=None
     ))
     api.get_quota.return_value = response
 
@@ -41,8 +43,10 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     response = cls.create_simple_success_response()
     response.result = Result(getQuotaResult=GetQuotaResult(
       quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
-      prodSharedConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
-      nonProdSharedConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
+      prodSharedConsumption=ResourceAggregate(numCpus=1, ramMb=512, diskMb=1024),
+      prodDedicatedConsumption=ResourceAggregate(numCpus=2, ramMb=1024, diskMb=2048),
+      nonProdSharedConsumption=ResourceAggregate(numCpus=3, ramMb=2048, diskMb=4096),
+      nonProdDedicatedConsumption=ResourceAggregate(numCpus=4, ramMb=4096, diskMb=8192),
     ))
     api.get_quota.return_value = response
 
@@ -52,10 +56,14 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
 
   def test_get_quota_with_consumption(self):
     expected_output = ('Allocated:\n  CPU: 5\n  RAM: 20.000000 GB\n  Disk: 40.000000 GB\n'
-                       'Production resources consumed:\n'
-                       '  CPU: 1\n  RAM: 1.000000 GB\n  Disk: 2.000000 GB\n'
-                       'Non-production resources consumed:\n'
-                       '  CPU: 1\n  RAM: 1.000000 GB\n  Disk: 2.000000 GB')
+                       'Production shared pool resources consumed:\n'
+                       '  CPU: 1\n  RAM: 0.500000 GB\n  Disk: 1.000000 GB\n'
+                       'Production dedicated pool resources consumed:\n'
+                       '  CPU: 2\n  RAM: 1.000000 GB\n  Disk: 2.000000 GB\n'
+                       'Non-production shared pool resources consumed:\n'
+                       '  CPU: 3\n  RAM: 2.000000 GB\n  Disk: 4.000000 GB\n'
+                       'Non-production dedicated pool resources consumed:\n'
+                       '  CPU: 4\n  RAM: 4.000000 GB\n  Disk: 8.000000 GB')
     assert expected_output == self._get_quota(True, ['quota', 'get', 'west/bozo'])
 
   def test_get_quota_with_no_consumption_json(self):
@@ -65,8 +73,10 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
   def test_get_quota_with_consumption_json(self):
     expected_response = json.loads(
         '{"quota":{"numCpus":5,"ramMb":20480,"diskMb":40960},'
-        '"prodSharedConsumption":{"numCpus":1,"ramMb":1024,"diskMb":2048},'
-        '"nonProdSharedConsumption":{"numCpus":1,"ramMb":1024,"diskMb":2048}}')
+        '"prodSharedConsumption":{"numCpus":1,"ramMb":512,"diskMb":1024},'
+        '"prodDedicatedConsumption":{"numCpus":2,"ramMb":1024,"diskMb":2048},'
+        '"nonProdSharedConsumption":{"numCpus":3,"ramMb":2048,"diskMb":4096},'
+        '"nonProdDedicatedConsumption":{"numCpus":4,"ramMb":4096,"diskMb":8192}}')
     assert (expected_response ==
             json.loads(self._get_quota(True, ['quota', 'get', '--write-json', 'west/bozo'])))
 
