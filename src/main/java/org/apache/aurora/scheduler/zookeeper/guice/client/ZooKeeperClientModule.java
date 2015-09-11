@@ -11,16 +11,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.common.zookeeper.guice.client;
+package org.apache.aurora.scheduler.zookeeper.guice.client;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.logging.Logger;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-
+import com.google.common.util.concurrent.AbstractIdleService;
+import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
@@ -35,11 +34,14 @@ import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 import org.apache.aurora.common.zookeeper.testing.ZooKeeperTestServer;
+import org.apache.aurora.scheduler.SchedulerServicesModule;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A guice binding module that configures and binds a {@link ZooKeeperClient} instance.
  */
-public class ZooKeeperClientModule extends PrivateModule {
+public class ZooKeeperClientModule extends AbstractModule {
   private final KeyFactory keyFactory;
   private final ClientConfig config;
 
@@ -60,52 +62,77 @@ public class ZooKeeperClientModule extends PrivateModule {
    * @param config Configuration parameters for the client.
    */
   public ZooKeeperClientModule(KeyFactory keyFactory, ClientConfig config) {
-    this.keyFactory = Preconditions.checkNotNull(keyFactory);
-    this.config = Preconditions.checkNotNull(config);
+    this.keyFactory = checkNotNull(keyFactory);
+    this.config = checkNotNull(config);
   }
 
   @Override
   protected void configure() {
     Key<ZooKeeperClient> clientKey = keyFactory.create(ZooKeeperClient.class);
     if (config.inProcess) {
-      requireBinding(ShutdownRegistry.class);
-      // Bound privately to give the local provider access to configuration settings.
-      bind(ClientConfig.class).toInstance(config);
-      bind(clientKey).toProvider(LocalClientProvider.class).in(Singleton.class);
+      install(new PrivateModule() {
+        @Override
+        protected void configure() {
+          requireBinding(ShutdownRegistry.class);
+          // Bound privately to give the local provider access to configuration settings.
+          bind(ClientConfig.class).toInstance(config);
+          bind(clientKey).toProvider(LocalClientProvider.class).in(Singleton.class);
+          expose(clientKey);
+        }
+      });
+      bind(ZooKeeperTestServer.class).in(Singleton.class);
+      SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(TestServerService.class);
     } else {
-      ZooKeeperClient client =
-          new ZooKeeperClient(config.sessionTimeout, config.credentials, config.chrootPath, config.servers);
-      bind(clientKey).toInstance(client);
+      bind(clientKey).toInstance(new ZooKeeperClient(
+          config.sessionTimeout,
+          config.credentials,
+          config.chrootPath,
+          config.servers));
     }
-    expose(clientKey);
+  }
+
+  /**
+   * A service to wrap ZooKeeperTestServer.  ZooKeeperTestServer is not a service itself because
+   * some tests depend on stop/start routines that do not no-op, like startAsync and stopAsync may.
+   */
+  private static class TestServerService extends AbstractIdleService {
+    private final ZooKeeperTestServer testServer;
+
+    @Inject
+    TestServerService(ZooKeeperTestServer testServer) {
+      this.testServer = checkNotNull(testServer);
+    }
+
+    @Override
+    protected void startUp() {
+      // We actually start the test server on-demand rather than with the normal lifecycle.
+      // This is because a ZooKeeperClient binding is needed before scheduler services are started.
+    }
+
+    @Override
+    protected void shutDown() {
+      testServer.stop();
+    }
   }
 
   private static class LocalClientProvider implements Provider<ZooKeeperClient> {
-    private static final Logger LOG = Logger.getLogger(LocalClientProvider.class.getName());
-
     private final ClientConfig config;
-    private final ShutdownRegistry shutdownRegistry;
+    private final ZooKeeperTestServer testServer;
 
     @Inject
-    LocalClientProvider(ClientConfig config, ShutdownRegistry shutdownRegistry) {
-      this.config = Preconditions.checkNotNull(config);
-      this.shutdownRegistry = Preconditions.checkNotNull(shutdownRegistry);
+    LocalClientProvider(ClientConfig config, ZooKeeperTestServer testServer) {
+      this.config = checkNotNull(config);
+      this.testServer = checkNotNull(testServer);
     }
 
     @Override
     public ZooKeeperClient get() {
-      ZooKeeperTestServer zooKeeperServer;
       try {
-        zooKeeperServer = new ZooKeeperTestServer(0, shutdownRegistry);
-        zooKeeperServer.startNetwork();
-      } catch (IOException e) {
-        throw Throwables.propagate(e);
-      } catch (InterruptedException e) {
+        testServer.startNetwork();
+      } catch (IOException | InterruptedException e) {
         throw Throwables.propagate(e);
       }
-
-      LOG.info("Embedded zookeeper cluster started on port " + zooKeeperServer.getPort());
-      return zooKeeperServer.createClient(config.sessionTimeout, config.credentials);
+      return testServer.createClient(config.sessionTimeout, config.credentials);
     }
   }
 
@@ -163,11 +190,11 @@ public class ZooKeeperClientModule extends PrivateModule {
      * Creates a new configuration identical to this configuration, but with the provided
      * credentials.
      *
-     * @param credentials ZooKeeper authentication credentials.
+     * @param newCredentials ZooKeeper authentication credentials.
      * @return A modified clone of this configuration.
      */
-    public ClientConfig withCredentials(Credentials credentials) {
-      return new ClientConfig(servers, chrootPath, inProcess, sessionTimeout, credentials);
+    public ClientConfig withCredentials(Credentials newCredentials) {
+      return new ClientConfig(servers, chrootPath, inProcess, sessionTimeout, newCredentials);
     }
   }
 }

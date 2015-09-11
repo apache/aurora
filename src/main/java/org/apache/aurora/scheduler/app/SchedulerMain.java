@@ -46,9 +46,6 @@ import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.zookeeper.Group;
 import org.apache.aurora.common.zookeeper.SingletonService;
 import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
-import org.apache.aurora.common.zookeeper.guice.client.ZooKeeperClientModule;
-import org.apache.aurora.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
-import org.apache.aurora.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.ResourceSlot;
@@ -65,6 +62,9 @@ import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule;
+import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
+import org.apache.aurora.scheduler.zookeeper.guice.client.flagged.FlaggedClientConfig;
 
 import static org.apache.aurora.common.logging.RootLogConfig.Configuration;
 

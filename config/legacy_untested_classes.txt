@@ -60,3 +60,7 @@ org/apache/aurora/scheduler/storage/mem/Util
 org/apache/aurora/scheduler/storage/mem/Util$1
 org/apache/aurora/scheduler/testing/FakeStatsProvider$3
 org/apache/aurora/scheduler/updater/UpdateConfigurationException
+org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$LocalClientProvider
+org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$TestServerService
+org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$1
+org/apache/aurora/scheduler/zookeeper/guice/client/flagged/FlaggedClientConfig

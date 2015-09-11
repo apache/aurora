@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.common.zookeeper.guice.client.flagged;
+package org.apache.aurora.scheduler.zookeeper.guice.client.flagged;
 
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -28,31 +28,35 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
-import org.apache.aurora.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
+import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 
 /**
  * A factory that creates a {@link ClientConfig} instance based on command line argument values.
  */
-public class FlaggedClientConfig {
+public final class FlaggedClientConfig {
   @CmdLine(name = "zk_in_proc",
       help = "Launches an embedded zookeeper server for local testing causing -zk_endpoints "
           + "to be ignored if specified.")
   private static final Arg<Boolean> IN_PROCESS = Arg.create(false);
 
   @NotEmpty
-  @CmdLine(name = "zk_endpoints", help ="Endpoint specification for the ZooKeeper servers.")
+  @CmdLine(name = "zk_endpoints", help = "Endpoint specification for the ZooKeeper servers.")
   private static final Arg<List<InetSocketAddress>> ZK_ENDPOINTS = Arg.create();
 
   @CmdLine(name = "zk_chroot_path", help = "chroot path to use for the ZooKeeper connections")
   private static final Arg<String> CHROOT_PATH = Arg.create(null);
 
-  @CmdLine(name = "zk_session_timeout", help ="The ZooKeeper session timeout.")
+  @CmdLine(name = "zk_session_timeout", help = "The ZooKeeper session timeout.")
   private static final Arg<Amount<Integer, Time>> SESSION_TIMEOUT =
       Arg.create(ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT);
 
   @CmdLine(name = "zk_digest_credentials",
-           help ="user:password to use when authenticating with ZooKeeper.")
+           help = "user:password to use when authenticating with ZooKeeper.")
   private static final Arg<String> DIGEST_CREDENTIALS = Arg.create();
+
+  private FlaggedClientConfig() {
+    // Utility class.
+  }
 
   /**
    * Creates a configuration from command line arguments.

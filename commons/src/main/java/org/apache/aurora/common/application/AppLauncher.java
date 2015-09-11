@@ -20,7 +20,6 @@ import java.util.logging.Logger;
 import com.google.common.base.Preconditions;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.util.Modules;
 
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.ArgFilters;

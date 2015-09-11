@@ -17,22 +17,21 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.LinkedList;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.io.Files;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
+import org.apache.commons.io.FileUtils;
 import org.apache.zookeeper.server.NIOServerCnxn;
 import org.apache.zookeeper.server.ZooKeeperServer;
 import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
-
-import org.apache.aurora.common.application.ShutdownRegistry;
-import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.ExceptionalCommand;
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
 
 /**
  * A helper class for starting in-process ZooKeeper server and clients.
@@ -43,40 +42,30 @@ public class ZooKeeperTestServer {
 
   /**
    * The default session timeout for clients created by servers constructed with
-   * {@link #ZooKeeperTestServer(int, ShutdownRegistry)}.
+   * {@link #ZooKeeperTestServer()}.
    */
   public static final Amount<Integer, Time> DEFAULT_SESSION_TIMEOUT =
       Amount.of(100, Time.MILLISECONDS);
 
   protected final ZooKeeperServer zooKeeperServer;
-  private final ShutdownRegistry shutdownRegistry;
   private NIOServerCnxn.Factory connectionFactory;
   private int port;
   private final Amount<Integer, Time> defaultSessionTimeout;
+  private final LinkedList<Runnable> cleanupActions = Lists.newLinkedList();
 
   /**
-   * @param port the port to start the zoo keeper server on - {@code 0} picks an ephemeral port
-   * @param shutdownRegistry a registry that will be used to register client and server shutdown
-   *     commands.  It is up to the caller to execute the registered actions at an appropriate time.
    * @throws IOException if there was aproblem creating the server's database
    */
-  public ZooKeeperTestServer(int port, ShutdownRegistry shutdownRegistry) throws IOException {
-    this(port, shutdownRegistry, DEFAULT_SESSION_TIMEOUT);
+  public ZooKeeperTestServer() throws IOException {
+    this(DEFAULT_SESSION_TIMEOUT);
   }
 
   /**
-   * @param port the port to start the zoo keeper server on - {@code 0} picks an ephemeral port
-   * @param shutdownRegistry a registry that will be used to register client and server shutdown
-   *     commands.  It is up to the caller to execute the registered actions at an appropriate time.
    * @param defaultSessionTimeout the default session timeout for clients created with
    *     {@link #createClient()}.
    * @throws IOException if there was aproblem creating the server's database
    */
-  public ZooKeeperTestServer(int port, ShutdownRegistry shutdownRegistry,
-      Amount<Integer, Time> defaultSessionTimeout) throws IOException {
-    Preconditions.checkArgument(0 <= port && port <= 0xFFFF);
-    this.port = port;
-    this.shutdownRegistry = Preconditions.checkNotNull(shutdownRegistry);
+  public ZooKeeperTestServer(Amount<Integer, Time> defaultSessionTimeout) throws IOException {
     this.defaultSessionTimeout = Preconditions.checkNotNull(defaultSessionTimeout);
 
     zooKeeperServer =
@@ -93,19 +82,23 @@ public class ZooKeeperTestServer {
   }
 
   /**
-   * Starts zookeeper up on the configured port.  If the configured port is the ephemeral port
-   * (@{code 0}), then the actual chosen port is returned.
+   * Starts zookeeper up on an ephemeral port.
    */
-  public final int startNetwork() throws IOException, InterruptedException {
+  public void startNetwork() throws IOException, InterruptedException {
     connectionFactory = new NIOServerCnxn.Factory(new InetSocketAddress(port));
     connectionFactory.startup(zooKeeperServer);
-    shutdownRegistry.addAction(new Command() {
-      @Override public void execute() {
-        shutdownNetwork();
-      }
-    });
+    cleanupActions.addFirst((this::shutdownNetwork));
     port = zooKeeperServer.getClientPort();
-    return port;
+  }
+
+  /**
+   * Stops the zookeeper server.
+   */
+  public void stop() {
+    for (Runnable cleanup : cleanupActions) {
+      cleanup.run();
+    }
+    cleanupActions.clear();
   }
 
   /**
@@ -195,13 +188,10 @@ public class ZooKeeperTestServer {
    */
   public final ZooKeeperClient createClient(Amount<Integer, Time> sessionTimeout,
       ZooKeeperClient.Credentials credentials, Optional<String> chrootPath) {
+
     final ZooKeeperClient client = new ZooKeeperClient(sessionTimeout, credentials,
         chrootPath, Arrays.asList(InetSocketAddress.createUnresolved("127.0.0.1", port)));
-    shutdownRegistry.addAction(new ExceptionalCommand<InterruptedException>() {
-      @Override public void execute() {
-        client.close();
-      }
-    });
+    cleanupActions.addFirst(client::close);
     return client;
   }
 
@@ -211,9 +201,14 @@ public class ZooKeeperTestServer {
 
   private File createTempDir() {
     final File tempDir = Files.createTempDir();
-    shutdownRegistry.addAction(new ExceptionalCommand<IOException>() {
-      @Override public void execute() throws IOException {
-        org.apache.commons.io.FileUtils.deleteDirectory(tempDir);
+    cleanupActions.addFirst(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          FileUtils.deleteDirectory(tempDir);
+        } catch (IOException e) {
+          // No-op.
+        }
       }
     });
     return tempDir;

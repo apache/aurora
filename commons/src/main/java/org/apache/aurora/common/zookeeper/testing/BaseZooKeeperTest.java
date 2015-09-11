@@ -17,7 +17,6 @@ import java.io.IOException;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.aurora.common.application.ShutdownRegistry.ShutdownRegistryImpl;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.TearDownTestCase;
@@ -53,13 +52,8 @@ public abstract class BaseZooKeeperTest extends TearDownTestCase {
 
   @Before
   public final void setUp() throws Exception {
-    final ShutdownRegistryImpl shutdownRegistry = new ShutdownRegistryImpl();
-    addTearDown(new TearDown() {
-      @Override public void tearDown() {
-        shutdownRegistry.execute();
-      }
-    });
-    zkTestServer = new ZooKeeperTestServer(0, shutdownRegistry, defaultSessionTimeout);
+    zkTestServer = new ZooKeeperTestServer(defaultSessionTimeout);
+    addTearDown(zkTestServer::stop);
     zkTestServer.startNetwork();
   }
 
@@ -129,15 +123,6 @@ public abstract class BaseZooKeeperTest extends TearDownTestCase {
    */
   protected final ZooKeeperClient createZkClient(Amount<Integer, Time> sessionTimeout) {
     return zkTestServer.createClient(sessionTimeout);
-  }
-
-  /**
-   * Returns a new authenticated zookeeper client connected to the in-process zookeeper server with
-   * a custom {@code sessionTimeout}.
-   */
-  protected final ZooKeeperClient createZkClient(Amount<Integer, Time> sessionTimeout,
-      ZooKeeperClient.Credentials credentials) {
-    return zkTestServer.createClient(sessionTimeout, credentials);
   }
 
   /**
