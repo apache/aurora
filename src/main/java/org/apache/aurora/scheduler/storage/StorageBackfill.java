@@ -17,14 +17,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 import org.apache.aurora.common.stats.Stats;
-
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -50,7 +48,6 @@ public final class StorageBackfill {
   private static void backfillJobDefaults(CronJobStore.Mutable jobStore) {
     for (JobConfiguration job : IJobConfiguration.toBuildersList(jobStore.fetchJobs())) {
       populateJobKey(job.getTaskConfig(), BACKFILLED_JOB_CONFIG_KEYS);
-      ConfigurationManager.applyDefaultsIfUnset(job);
       jobStore.saveAcceptedJob(IJobConfiguration.build(job));
     }
   }
@@ -83,16 +80,6 @@ public final class StorageBackfill {
       public IScheduledTask apply(final IScheduledTask task) {
         ScheduledTask builder = task.newBuilder();
         populateJobKey(builder.getAssignedTask().getTask(), BACKFILLED_TASK_CONFIG_KEYS);
-        return IScheduledTask.build(builder);
-      }
-    });
-
-    LOG.info("Performing shard uniqueness sanity check.");
-    storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
-      @Override
-      public IScheduledTask apply(final IScheduledTask task) {
-        ScheduledTask builder = task.newBuilder();
-        ConfigurationManager.applyDefaultsIfUnset(builder.getAssignedTask().getTask());
         return IScheduledTask.build(builder);
       }
     });

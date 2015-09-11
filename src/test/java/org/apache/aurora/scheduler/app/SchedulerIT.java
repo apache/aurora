@@ -77,7 +77,6 @@ import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.FlushableWorkQueue;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
@@ -306,7 +305,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   }
 
   private static ScheduledTask makeTask(String id, ScheduleStatus status) {
-    ScheduledTask scheduledTask = new ScheduledTask()
+    return new ScheduledTask()
         .setStatus(status)
         .setTaskEvents(ImmutableList.of(new TaskEvent(100, status)))
         .setAssignedTask(new AssignedTask()
@@ -318,9 +317,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
                 .setEnvironment("test")
                 .setExecutorConfig(new org.apache.aurora.gen.ExecutorConfig("AuroraExecutor", ""))
                 .setOwner(new Identity("role-" + id, "user-" + id))));
-    // Apply defaults here so that we can expect the same task that will be written to the stream.
-    ConfigurationManager.applyDefaultsIfUnset(scheduledTask.getAssignedTask().getTask());
-    return scheduledTask;
   }
 
   @Test

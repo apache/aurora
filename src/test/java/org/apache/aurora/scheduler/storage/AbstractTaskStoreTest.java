@@ -632,6 +632,21 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     });
   }
 
+  @Test
+  public void testNullVsEmptyRelations() throws Exception {
+    // Test for regression of AURORA-1476.
+
+    ITaskConfig nullMetadata =
+        ITaskConfig.build(TaskTestUtil.makeConfig(TaskTestUtil.JOB).newBuilder().setMetadata(null));
+
+    IScheduledTask a = TaskTestUtil.makeTask("a", nullMetadata);
+    IScheduledTask b = TaskTestUtil.makeTask("a", nullMetadata);
+    IScheduledTask c = TaskTestUtil.makeTask("a", nullMetadata);
+    saveTasks(a);
+    saveTasks(b);
+    saveTasks(c);
+  }
+
   private void assertStoreContents(IScheduledTask... tasks) {
     assertQueryResults(Query.unscoped(), tasks);
   }

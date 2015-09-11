@@ -49,10 +49,7 @@ import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
 import org.apache.aurora.gen.Hosts;
-import org.apache.aurora.gen.InstanceConfigRewrite;
-import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.InstanceTaskConfig;
-import org.apache.aurora.gen.JobConfigRewrite;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
@@ -110,6 +107,10 @@ import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IConfigRewrite;
+import org.apache.aurora.scheduler.storage.entities.IInstanceConfigRewrite;
+import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
+import org.apache.aurora.scheduler.storage.entities.IJobConfigRewrite;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
@@ -802,7 +803,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         List<String> errors = Lists.newArrayList();
 
         for (ConfigRewrite command : request.getRewriteCommands()) {
-          Optional<String> error = rewriteConfig(command, storeProvider);
+          Optional<String> error = rewriteConfig(IConfigRewrite.build(command), storeProvider);
           if (error.isPresent()) {
             errors.add(error.get());
           }
@@ -821,13 +822,12 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     });
   }
 
-  private Optional<String> rewriteJob(JobConfigRewrite jobRewrite, CronJobStore.Mutable jobStore) {
-    IJobConfiguration existingJob = IJobConfiguration.build(jobRewrite.getOldJob());
+  private Optional<String> rewriteJob(IJobConfigRewrite jobRewrite, CronJobStore.Mutable jobStore) {
+    IJobConfiguration existingJob = jobRewrite.getOldJob();
     IJobConfiguration rewrittenJob;
     Optional<String> error = Optional.absent();
     try {
-      rewrittenJob = ConfigurationManager.validateAndPopulate(
-          IJobConfiguration.build(jobRewrite.getRewrittenJob()));
+      rewrittenJob = ConfigurationManager.validateAndPopulate(jobRewrite.getRewrittenJob());
     } catch (TaskDescriptionException e) {
       // We could add an error here, but this is probably a hint of something wrong in
       // the client that's causing a bad configuration to be applied.
@@ -856,13 +856,13 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   private Optional<String> rewriteInstance(
-      InstanceConfigRewrite instanceRewrite,
+      IInstanceConfigRewrite instanceRewrite,
       MutableStoreProvider storeProvider) {
 
-    InstanceKey instanceKey = instanceRewrite.getInstanceKey();
+    IInstanceKey instanceKey = instanceRewrite.getInstanceKey();
     Optional<String> error = Optional.absent();
     Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
-        Query.instanceScoped(IJobKey.build(instanceKey.getJobKey()),
+        Query.instanceScoped(instanceKey.getJobKey(),
             instanceKey.getInstanceId())
             .active());
     Optional<IAssignedTask> task =
@@ -870,9 +870,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
             .transform(IScheduledTask::getAssignedTask);
 
     if (task.isPresent()) {
-      if (task.get().getTask().newBuilder().equals(instanceRewrite.getOldTask())) {
-        ITaskConfig newConfiguration = ITaskConfig.build(
-            ConfigurationManager.applyDefaultsIfUnset(instanceRewrite.getRewrittenTask()));
+      if (task.get().getTask().equals(instanceRewrite.getOldTask())) {
+        ITaskConfig newConfiguration = instanceRewrite.getRewrittenTask();
         boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
             task.get().getTaskId(), newConfiguration);
         if (!changed) {
@@ -889,7 +888,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   private Optional<String> rewriteConfig(
-      ConfigRewrite command,
+      IConfigRewrite command,
       MutableStoreProvider storeProvider) {
 
     Optional<String> error;
@@ -1133,7 +1132,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       return invalidRequest(INVALID_MIN_WAIT_TO_RUNNING);
     }
 
-    if (settings.isSetBlockIfNoPulsesAfterMs() && settings.getBlockIfNoPulsesAfterMs() <= 0) {
+    if (settings.getBlockIfNoPulsesAfterMs() < 0) {
       return invalidRequest(INVALID_PULSE_TIMEOUT);
     }
 

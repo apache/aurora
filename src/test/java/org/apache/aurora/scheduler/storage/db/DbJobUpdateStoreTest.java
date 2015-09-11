@@ -17,6 +17,9 @@ package org.apache.aurora.scheduler.storage.db;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -108,12 +111,37 @@ public class DbJobUpdateStoreTest {
     truncateUpdates();
   }
 
+  private static IJobUpdate makeFullyPopulatedUpdate(IJobUpdateKey key) {
+    JobUpdate builder = makeJobUpdate(key).newBuilder();
+    JobUpdateInstructions instructions = builder.getInstructions();
+    Stream.of(
+        instructions.getInitialState().stream()
+            .map(InstanceTaskConfig::getInstances)
+            .flatMap(Set::stream)
+            .collect(Collectors.toSet()),
+        instructions.getDesiredState().getInstances(),
+        instructions.getSettings().getUpdateOnlyTheseInstances())
+        .flatMap(Set::stream)
+        .forEach(new Consumer<Range>() {
+          @Override
+          public void accept(Range range) {
+            if (range.getFirst() == 0) {
+              range.setFirst(1);
+            }
+            if (range.getLast() == 0) {
+              range.setLast(1);
+            }
+          }
+        });
+    return IJobUpdate.build(builder);
+  }
+
   @Test
   public void testSaveJobUpdates() {
     IJobUpdateKey updateId1 = makeKey(JobKeys.from("role", "env", "name1"), "u1");
     IJobUpdateKey updateId2 = makeKey(JobKeys.from("role", "env", "name2"), "u2");
 
-    IJobUpdate update1 = makeJobUpdate(updateId1);
+    IJobUpdate update1 = makeFullyPopulatedUpdate(updateId1);
     IJobUpdate update2 = makeJobUpdate(updateId2);
 
     assertEquals(Optional.absent(), getUpdate(updateId1));
@@ -1003,7 +1031,7 @@ public class DbJobUpdateStoreTest {
         .setInstanceEvents(IJobInstanceUpdateEvent.toBuildersList(instanceEvents)));
   }
 
-  private IJobUpdateSummary makeSummary(IJobUpdateKey key, String user) {
+  private static IJobUpdateSummary makeSummary(IJobUpdateKey key, String user) {
     return IJobUpdateSummary.build(new JobUpdateSummary()
         .setKey(key.newBuilder())
         .setUser(user));
@@ -1030,17 +1058,17 @@ public class DbJobUpdateStoreTest {
     return IJobUpdate.build(makeJobUpdate().newBuilder().setSummary(summary.newBuilder()));
   }
 
-  private IJobUpdate makeJobUpdate(IJobUpdateKey key) {
+  private static IJobUpdate makeJobUpdate(IJobUpdateKey key) {
     return IJobUpdate.build(makeJobUpdate().newBuilder()
         .setSummary(makeSummary(key, "user").newBuilder()));
   }
 
-  private IJobUpdate makeJobUpdate() {
+  private static IJobUpdate makeJobUpdate() {
     return IJobUpdate.build(new JobUpdate()
         .setInstructions(makeJobUpdateInstructions().newBuilder()));
   }
 
-  private IJobUpdateInstructions makeJobUpdateInstructions() {
+  private static IJobUpdateInstructions makeJobUpdateInstructions() {
     TaskConfig config = TaskTestUtil.makeConfig(JOB).newBuilder();
     return IJobUpdateInstructions.build(new JobUpdateInstructions()
         .setDesiredState(new InstanceTaskConfig()

@@ -22,7 +22,6 @@ import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
@@ -47,11 +46,8 @@ public class StorageBackfillTest {
   }
 
   @Test
-  public void testBackfillTask() throws Exception {
-    ScheduledTask task = TASK.newBuilder();
-    ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
-
-    final Set<IScheduledTask> backfilledTasks = ImmutableSet.of(IScheduledTask.build(task));
+  public void testBackfillTask() {
+    final Set<IScheduledTask> backfilledTasks = ImmutableSet.of(TASK);
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
       public void execute(Storage.MutableStoreProvider storeProvider) {
@@ -62,7 +58,7 @@ public class StorageBackfillTest {
     backfill();
 
     assertEquals(
-        ImmutableSet.of(IScheduledTask.build(task)),
+        ImmutableSet.of(TASK),
         Storage.Util.fetchTasks(storage, Query.unscoped()));
   }
 

@@ -103,14 +103,6 @@ public class ConfigurationManagerTest {
     }
   }
 
-  @Test
-  public void testApplyDefaultsIfUnsetUnsanitized() {
-    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
-
-    ConfigurationManager.applyDefaultsIfUnset(copy);
-    assertTrue(copy.isSetKey());
-  }
-
   @Test(expected = TaskDescriptionException.class)
   public void testBadContainerConfig() throws TaskDescriptionException {
     TaskConfig taskConfig = CONFIG_WITH_CONTAINER.deepCopy();

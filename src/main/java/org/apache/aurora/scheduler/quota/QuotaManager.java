@@ -156,10 +156,6 @@ public interface QuotaManager {
         final IResourceAggregate quota,
         MutableStoreProvider storeProvider) throws QuotaException {
 
-      if (!quota.isSetNumCpus() || !quota.isSetRamMb() || !quota.isSetDiskMb()) {
-        throw new QuotaException("Missing quota specification(s) in: " + quota.toString());
-      }
-
       if (quota.getNumCpus() < 0.0 || quota.getRamMb() < 0 || quota.getDiskMb() < 0) {
         throw new QuotaException("Negative values in: " + quota.toString());
       }

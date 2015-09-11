@@ -28,18 +28,19 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -58,13 +59,14 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class PendingTaskProcessorTest extends EasyMockTest {
   private static final String CACHE_STAT = "cache_size";
   private static final String SLAVE_ID_1 = "slave_id_1";
   private static final String SLAVE_ID_2 = "slave_id_2";
-  private static final JobKey JOB_A = new JobKey("role_a", "env", "job_a");
-  private static final JobKey JOB_B = new JobKey("role_b", "env", "job_b");
+  private static final IJobKey JOB_A = JobKeys.from("role_a", "env", "job_a");
+  private static final IJobKey JOB_B = JobKeys.from("role_b", "env", "job_b");
   private static final IScheduledTask TASK_A = makeTask(JOB_A, SLAVE_ID_1, "id1");
   private static final IScheduledTask TASK_B = makeTask(JOB_B, SLAVE_ID_2, "id2");
   private static final PreemptionProposal SLOT_A = createPreemptionProposal(TASK_A, SLAVE_ID_1);
@@ -194,7 +196,12 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     assertEquals(1L, statsProvider.getLongValue(TASK_PROCESSOR_RUN_NAME));
     assertEquals(3L, statsProvider.getLongValue(attemptsStatName(true)));
     assertEquals(2L, statsProvider.getLongValue(slotSearchStatName(true, true)));
-    assertEquals(2L, statsProvider.getLongValue(slotSearchStatName(false, true)));
+
+    // TODO(wfarner): This test depends on the iteration order of a hash set (the set containing
+    // task groups), and as a result this stat could be 1 or 2 depending on which group is
+    // evaluated first.
+    assertTrue(ImmutableSet.of(1L, 2L).contains(
+        statsProvider.getLongValue(slotSearchStatName(false, true))));
     assertEquals(2L, statsProvider.getLongValue(CACHE_STAT));
   }
 
@@ -258,7 +265,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
         slaveId);
   }
 
-  private static IScheduledTask makeTask(JobKey key, String taskId) {
+  private static IScheduledTask makeTask(IJobKey key, String taskId) {
     return makeTask(key, null, taskId);
   }
 
@@ -266,7 +273,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     return TaskGroupKey.from(task.getAssignedTask().getTask());
   }
 
-  private static IScheduledTask makeTask(JobKey key, @Nullable String slaveId, String taskId) {
+  private static IScheduledTask makeTask(IJobKey key, @Nullable String slaveId, String taskId) {
     ScheduledTask task = new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setSlaveId(slaveId)
@@ -274,7 +281,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
             .setTask(new TaskConfig()
                 .setPriority(1)
                 .setProduction(true)
-                .setJob(key)));
+                .setJob(key.newBuilder())));
     task.addToTaskEvents(new TaskEvent(0, PENDING));
     return IScheduledTask.build(task);
   }

@@ -35,7 +35,6 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.Resources;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
@@ -626,13 +625,13 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       long ramMb,
       long diskMb) {
 
-    return ITaskConfig.build(ConfigurationManager.applyDefaultsIfUnset(new TaskConfig()
+    return ITaskConfig.build(new TaskConfig()
         .setOwner(owner)
         .setJobName(jobName)
         .setNumCpus(cpus)
         .setRamMb(ramMb)
         .setDiskMb(diskMb)
-        .setExecutorConfig(new ExecutorConfig("aurora", "config"))));
+        .setExecutorConfig(new ExecutorConfig("aurora", "config")));
   }
 
   private ITaskConfig makeTask(int cpus, long ramMb, long diskMb) {

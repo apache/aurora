@@ -50,6 +50,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
+import org.apache.aurora.scheduler.storage.entities.IResult;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static org.apache.aurora.gen.ResponseCode.OK;
@@ -140,7 +141,7 @@ final class Fixtures {
   }
 
   static Response okResponse(Result result) {
-    return response(OK, Optional.of(result));
+    return response(OK, Optional.of(IResult.build(result).newBuilder()));
   }
 
   static JobConfiguration makeProdJob() {

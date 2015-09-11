@@ -470,7 +470,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateHomogeneousJobNoInstances() throws Exception {
     JobConfiguration job = makeJob();
-    job.unsetInstanceCount();
+    job.setInstanceCount(0);
     expectAuth(ROLE, true);
 
     control.replay();
@@ -481,7 +481,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobNegativeInstanceCount() throws Exception {
     JobConfiguration job = makeJob();
-    job.setInstanceCount(0 - 1);
+    job.setInstanceCount(-1);
     expectAuth(ROLE, true);
 
     control.replay();
@@ -496,9 +496,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TaskConfig task = productionTask();
-    task.unsetNumCpus();
-    task.unsetRamMb();
-    task.unsetDiskMb();
+    task.setNumCpus(0);
+    task.setRamMb(0);
+    task.setDiskMb(0);
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task), null, SESSION));
   }
 
@@ -562,7 +562,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setRequestedPorts(ImmutableSet.of())
         .setTaskLinks(ImmutableMap.of())
         .setConstraints(ImmutableSet.of())
-        .setMaxTaskFailures(1)
+        .setMaxTaskFailures(0)
         .setEnvironment("devel");
 
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
@@ -622,10 +622,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setInstanceId(instanceId)
-            .setTask(ConfigurationManager.applyDefaultsIfUnset(populatedTask()
+            .setTask(populatedTask()
                 .setRamMb(5)
                 .setIsService(true)
-                .setExecutorConfig(new ExecutorConfig().setData(executorData))))));
+                .setExecutorConfig(new ExecutorConfig().setData(executorData)))));
   }
 
   private IScheduledTask buildScheduledTask() {
@@ -1351,10 +1351,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     storageUtil.expectTaskFetch(
         Query.instanceScoped(IInstanceKey.build(instanceKey)).active(), storedTask);
-    expect(storageUtil.taskStore.unsafeModifyInPlace(
-        taskId,
-        ITaskConfig.build(ConfigurationManager.applyDefaultsIfUnset(modifiedConfig.newBuilder()))))
-        .andReturn(true);
+    expect(storageUtil.taskStore.unsafeModifyInPlace(taskId, modifiedConfig)) .andReturn(true);
 
     control.replay();
 
@@ -1383,7 +1380,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         Query.instanceScoped(IInstanceKey.build(instanceKey)).active(), task);
     expect(storageUtil.taskStore.unsafeModifyInPlace(
         taskId,
-        ITaskConfig.build(ConfigurationManager.applyDefaultsIfUnset(config.deepCopy()))))
+        ITaskConfig.build(config.deepCopy())))
         .andReturn(false);
 
     control.replay();
@@ -2458,7 +2455,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return new JobUpdateRequest()
         .setInstanceCount(6)
         .setSettings(buildJobUpdateSettings())
-        .setTaskConfig(ConfigurationManager.applyDefaultsIfUnset(config));
+        .setTaskConfig(config);
   }
 
   private static JobUpdateSettings buildJobUpdateSettings() {

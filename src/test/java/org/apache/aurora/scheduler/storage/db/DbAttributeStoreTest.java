@@ -118,12 +118,13 @@ public class DbAttributeStoreTest {
     insert(IHostAttributes.build(noMode));
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void testSaveAttributesNotSet() {
+  @Test
+  public void testSaveAttributesEmpty() {
     HostAttributes attributes = HOST_A_ATTRS.newBuilder();
     attributes.unsetAttributes();
 
     insert(IHostAttributes.build(attributes));
+    assertEquals(Optional.of(IHostAttributes.build(attributes)), read(HOST_A));
   }
 
   @Test

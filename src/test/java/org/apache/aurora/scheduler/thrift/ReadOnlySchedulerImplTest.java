@@ -68,11 +68,13 @@ import org.apache.aurora.scheduler.metadata.NearestFit;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
+import org.apache.aurora.scheduler.storage.entities.IConfigSummaryResult;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
+import org.apache.aurora.scheduler.storage.entities.IResponse;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -211,12 +213,9 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     assertEquals(jobSummaryResponse(ownedCronJobSummaryOnly), thrift.getJobSummary(ROLE));
 
     Response jobSummaryResponse = thrift.getJobSummary(ROLE);
-    assertEquals(jobSummaryResponse(ownedImmedieteJobSummaryOnly), jobSummaryResponse);
-    assertEquals(ownedImmediateTaskInfo,
-        Iterables.getOnlyElement(
-            jobSummaryResponse.getResult().getJobSummaryResult().getSummaries())
-            .getJob()
-            .getTaskConfig());
+    assertEquals(
+        jobSummaryResponse(ownedImmedieteJobSummaryOnly),
+        IResponse.build(jobSummaryResponse).newBuilder());
 
     assertEquals(jobSummaryResponse(ImmutableSet.of()), thrift.getJobSummary(ROLE));
 
@@ -372,7 +371,10 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     Set<JobConfiguration> allJobs =
         ImmutableSet.<JobConfiguration>builder().addAll(crons).add(immediateJob).build();
-    assertEquals(allJobs, thrift.getJobs(null).getResult().getGetJobsResult().getConfigs());
+    assertEquals(
+        IJobConfiguration.setFromBuilders(allJobs),
+        IJobConfiguration.setFromBuilders(
+            thrift.getJobs(null).getResult().getGetJobsResult().getConfigs()));
   }
 
   @Test
@@ -432,22 +434,28 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE)
+    assertJobsEqual(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE)
         .getResult().getGetJobsResult().getConfigs()));
 
-    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE)
+    assertJobsEqual(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE)
         .getResult().getGetJobsResult().getConfigs()));
 
     Set<JobConfiguration> queryResult3 =
         thrift.getJobs(ROLE).getResult().getGetJobsResult().getConfigs();
-    assertEquals(ownedImmediateJob, Iterables.getOnlyElement(queryResult3));
-    assertEquals(ownedImmediateTaskInfo, Iterables.getOnlyElement(queryResult3).getTaskConfig());
+    assertJobsEqual(ownedImmediateJob, Iterables.getOnlyElement(queryResult3));
+    assertEquals(
+        ITaskConfig.build(ownedImmediateTaskInfo),
+        ITaskConfig.build(Iterables.getOnlyElement(queryResult3).getTaskConfig()));
 
     assertTrue(thrift.getJobs(ROLE)
         .getResult().getGetJobsResult().getConfigs().isEmpty());
 
-    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE)
+    assertJobsEqual(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE)
         .getResult().getGetJobsResult().getConfigs()));
+  }
+
+  private static void assertJobsEqual(JobConfiguration expected, JobConfiguration actual) {
+    assertEquals(IJobConfiguration.build(expected), IJobConfiguration.build(actual));
   }
 
   @Test
@@ -526,7 +534,9 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     control.replay();
 
     Response response = assertOkResponse(thrift.getConfigSummary(key.newBuilder()));
-    assertEquals(expected, response.getResult().getConfigSummaryResult());
+    assertEquals(
+        IConfigSummaryResult.build(expected),
+        IConfigSummaryResult.build(response.getResult().getConfigSummaryResult()));
   }
 
   @Test
@@ -576,8 +586,8 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     Response response = assertOkResponse(thrift.getJobUpdateDetails(UPDATE_KEY.newBuilder()));
     assertEquals(
-        details,
-        response.getResult().getGetJobUpdateDetailsResult().getDetails());
+        IJobUpdateDetails.build(details),
+        IJobUpdateDetails.build(response.getResult().getGetJobUpdateDetailsResult().getDetails()));
   }
 
   private static List<JobUpdateSummary> createJobUpdateSummaries(int count) {

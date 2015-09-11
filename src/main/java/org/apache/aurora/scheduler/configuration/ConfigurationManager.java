@@ -19,7 +19,6 @@ import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
@@ -27,15 +26,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.JobConfiguration;
-import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConfig._Fields;
 import org.apache.aurora.gen.TaskConstraint;
@@ -72,23 +67,6 @@ public final class ConfigurationManager {
   private static final Pattern GOOD_IDENTIFIER = Pattern.compile(GOOD_IDENTIFIER_PATTERN_JVM);
 
   private static final int MAX_IDENTIFIER_LENGTH = 255;
-
-  private static class DefaultField implements Closure<TaskConfig> {
-    private final _Fields field;
-    private final Object defaultValue;
-
-    DefaultField(_Fields field, Object defaultValue) {
-      this.field = field;
-      this.defaultValue = defaultValue;
-    }
-
-    @Override
-    public void execute(TaskConfig task) {
-      if (!task.isSet(field)) {
-        task.setFieldValue(field, defaultValue);
-      }
-    }
-  }
 
   private interface Validator<T> {
     void validate(T value) throws TaskDescriptionException;
@@ -129,19 +107,6 @@ public final class ConfigurationManager {
       validator.validate(value);
     }
   }
-
-  private static final Iterable<Closure<TaskConfig>> DEFAULT_FIELD_POPULATORS =
-      ImmutableList.of(
-          new DefaultField(_Fields.IS_SERVICE, false),
-          new DefaultField(_Fields.PRIORITY, 0),
-          new DefaultField(_Fields.PRODUCTION, false),
-          new DefaultField(_Fields.MAX_TASK_FAILURES, 1),
-          new DefaultField(_Fields.TASK_LINKS, Maps.newHashMap()),
-          new DefaultField(_Fields.REQUESTED_PORTS, Sets.newHashSet()),
-          new DefaultField(_Fields.CONSTRAINTS, Sets.newHashSet()),
-          // TODO(wfarner): Explore replacing these with thrift defaults.
-          new DefaultField(_Fields.CONTAINER,
-              Container.mesos(new MesosContainer())));
 
   private static final Iterable<RequiredFieldValidator<?>> REQUIRED_FIELDS_VALIDATORS =
       ImmutableList.of(
@@ -220,10 +185,6 @@ public final class ConfigurationManager {
 
     if (!job.isSetTaskConfig()) {
       throw new TaskDescriptionException("Job configuration must have taskConfig set.");
-    }
-
-    if (!job.isSetInstanceCount()) {
-      throw new TaskDescriptionException("Job configuration does not have instanceCount set.");
     }
 
     if (job.getInstanceCount() <= 0) {
@@ -366,7 +327,7 @@ public final class ConfigurationManager {
           "The container type " + containerType.get().toString() + " is not allowed");
     }
 
-    return ITaskConfig.build(applyDefaultsIfUnset(builder));
+    return ITaskConfig.build(builder);
   }
 
   /**
@@ -377,28 +338,6 @@ public final class ConfigurationManager {
    */
   public static Predicate<IConstraint> getConstraintByName(final String name) {
     return constraint -> constraint.getName().equals(name);
-  }
-
-  /**
-   * Applies defaults to unset values in a task.
-   * @param task Task to apply defaults to.
-   * @return A reference to the (modified) {@code task}.
-   */
-  public static TaskConfig applyDefaultsIfUnset(TaskConfig task) {
-    for (Closure<TaskConfig> populator : DEFAULT_FIELD_POPULATORS) {
-      populator.execute(task);
-    }
-    return task;
-  }
-
-  /**
-   * Applies defaults to unset values in a job and its tasks.
-   *
-   * @param job Job to apply defaults to.
-   */
-  @VisibleForTesting
-  public static void applyDefaultsIfUnset(JobConfiguration job) {
-    ConfigurationManager.applyDefaultsIfUnset(job.getTaskConfig());
   }
 
   private static void maybeFillLinks(TaskConfig task) {
