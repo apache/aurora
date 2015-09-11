@@ -19,7 +19,11 @@ slave.
 
 """
 
+from __future__ import print_function
+
 import os
+import sys
+import traceback
 
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
@@ -39,6 +43,7 @@ from apache.aurora.executor.thermos_task_runner import (
 try:
   from mesos.native import MesosExecutorDriver
 except ImportError:
+  print(traceback.format_exc(), file=sys.stderr)
   MesosExecutorDriver = None
 
 
