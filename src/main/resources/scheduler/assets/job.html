@@ -19,22 +19,6 @@
   <div ng-hide='error'>
     <breadcrumb></breadcrumb>
 
-    <div class='row'>
-      <div class='col-md-12'>
-        <div class='page-header'>
-          <h2 class='text-center'>
-            Job <em>{{job}}</em> in role <em>{{role}}</em> and environment <em>{{environment}}</em>
-            <span ng-if='jobDashboardUrl'>
-            <a class='dashboard-url' ng-href='{{jobDashboardUrl}}'
-               title='Container stats for this job'>
-              <i class='glyphicon glyphicon-stats'></i>
-            </a>
-            </span>
-          </h2>
-        </div>
-      </div>
-    </div>
-
     <!-- begin update progress preview -->
     <div ng-if="updateInProgress" class="content-box in-progress-alert">
       <div class="row">

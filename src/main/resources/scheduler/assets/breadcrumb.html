@@ -14,22 +14,28 @@
    -->
   <div class='col-md-12'>
   <ul class='breadcrumb'>
-    <li><a href='/scheduler'>Home</a></li>
+    <li><a href='/scheduler'>{{clusterName}}</a></li>
 
-    <li ng-if='role && !environment' class='active'>Role: {{role}}</a></li>
-    <li ng-if='role && environment'><a href='/scheduler/{{role}}'>Role: {{role}}</a></li>
+    <li ng-if='role && !environment' class='active'>{{role}}</a></li>
+    <li ng-if='role && environment'><a href='/scheduler/{{role}}'>{{role}}</a></li>
 
-    <li ng-if='environment && !job' class='active'>Environment: {{environment}}</li>
+    <li ng-if='environment && !job' class='active'>{{environment}}</li>
     <li ng-if='environment && job'>
-      <a href='/scheduler/{{role}}/{{environment}}'>Environment: {{environment}}</a>
+      <a href='/scheduler/{{role}}/{{environment}}'>{{environment}}</a>
     </li>
 
-    <li ng-if='job && (!update && !(instance >= 0))' class='active'>Job: {{job}}</li>
+    <li ng-if='job && (!update && !(instance >= 0))' class='active'>{{job}}</li>
 
-    <li ng-if='job && (update || instance >= 0)'><a href='/scheduler/{{role}}/{{environment}}/{{job}}'>Job: {{job}}</a></li>
+    <li ng-if='job && (update || instance >= 0)'><a href='/scheduler/{{role}}/{{environment}}/{{job}}'>{{job}}</a></li>
 
-    <li ng-if='instance >= 0' class='active'>Instance: {{instance}}</li>
-    <li ng-if='update' class='active'>Update: {{update.update.summary.key.id}}</li>
+    <li ng-if='instance >= 0' class='active'>{{instance}}</li>
+    <li ng-if='update' class='active'>{{update.update.summary.key.id}}</li>
+
+    <li ng-if='job && (!update && !(instance >= 0))' class='right'>
+      <a ng-href='{{jobDashboardUrl}}' title='External dashboard for this job'>
+        <span class='glyphicon glyphicon-stats'></span> Dashboard
+      </a>
+    </li>
   </ul>
   </div>
 </div>

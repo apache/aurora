@@ -40,8 +40,6 @@
 
   auroraUIControllers.controller('RoleSummaryController',
     function ($scope, auroraClient) {
-      $scope.title = 'Scheduled Jobs Summary';
-
       $scope.error = '';
 
       auroraClient.getRoleSummary().then(function (roleSummaries) {

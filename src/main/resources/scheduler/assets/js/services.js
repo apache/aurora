@@ -45,8 +45,9 @@
 
   auroraUI.factory(
     'auroraClient',
-    ['$window', '$q',
-      function ($window, $q) {
+    ['$window', '$q', '$rootScope',
+      function ($window, $q, $rootScope) {
+
         function async(fn) {
           var deferred = $q.defer();
           fn(deferred);
@@ -211,6 +212,10 @@
           },
 
           processResponse: function (response) {
+            if (response.serverInfo && response.serverInfo.clusterName) {
+              $rootScope.clusterName = response.serverInfo.clusterName;
+            }
+
             auroraClient.setPageTitle(response.serverInfo);
             var error = response.responseCode !== 1 ?
                 (response.message || 'No error message returned by the scheduler') : '',

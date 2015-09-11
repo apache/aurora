@@ -29,11 +29,6 @@ a {
   width: 150px;
 }
 
-.dashboard-url {
-  font-size: .85em;
-  color: darkslategray;
-}
-
 .sort-ascent:before {
   content: "\25BE";
 }
@@ -43,7 +38,15 @@ a {
 }
 
 ul.breadcrumb {
-  margin: 0 0 0;
+  font-size: 20px;
+}
+
+ul.breadcrumb>li.right {
+  float: right;
+}
+
+ul.breadcrumb>li.right:before {
+  content: none;
 }
 
 .page-header {
