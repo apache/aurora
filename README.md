@@ -81,11 +81,11 @@ If you have questions, you can reach out to our mailing list: dev@aurora.apache.
 We're also often available in IRC: #aurora on
 [irc.freenode.net](http://webchat.freenode.net/?channels=#aurora).
 
-You can also file issues in our [JIRA queue](http://issues.apache.org/jira/browse/AURORA).
+You can also file bugs/issues in our [JIRA queue](http://issues.apache.org/jira/browse/AURORA).
 
 ## Requirements
 * Python 2.7 or higher
-* JDK 1.7 or higher
+* JDK 1.8 or higher
 
 * Source distribution requirements
        * [Gradle](http://gradle.org)
