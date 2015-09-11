@@ -20,12 +20,12 @@ import javax.annotation.Nullable;
 
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdate;
-import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Range;
-import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.db.views.DbJobUpdate;
+import org.apache.aurora.scheduler.storage.db.views.DbJobUpdateInstructions;
+import org.apache.aurora.scheduler.storage.db.views.DbStoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.ibatis.annotations.Param;
 
@@ -56,21 +56,21 @@ interface JobUpdateDetailsMapper {
    * Inserts a task configuration entry for an update.
    *
    * @param key Update to insert task configs for.
-   * @param taskConfig task configuration to insert.
+   * @param taskConfigRow task configuration row.
    * @param isNew Flag to identify if the task config is existing {@code false} or
    *              desired {@code true}.
    * @param result Container for auto-generated ID of the inserted job update row.
    */
   void insertTaskConfig(
       @Param("key") IJobUpdateKey key,
-      @Param("config") TaskConfig taskConfig,
+      @Param("taskConfigRow") long taskConfigRow,
       @Param("isNew") boolean isNew,
       @Param("result") InsertResult result);
 
   /**
    * Maps inserted task config with a set of associated instance ranges.
    *
-   * @param configId ID of the {@link TaskConfig} stored.
+   * @param configId ID of the task config stored.
    * @param ranges Set of instance ID ranges.
    */
   void insertTaskConfigInstances(
@@ -150,7 +150,7 @@ interface JobUpdateDetailsMapper {
    * @return Job update details for the provided update ID, if it exists.
    */
   @Nullable
-  StoredJobUpdateDetails selectDetails(@Param("key") IJobUpdateKey key);
+  DbStoredJobUpdateDetails selectDetails(@Param("key") IJobUpdateKey key);
 
   /**
    * Gets all job update details matching the provided {@code query}.
@@ -159,7 +159,7 @@ interface JobUpdateDetailsMapper {
    * @param query Query to filter results by.
    * @return Job update details matching the query.
    */
-  List<StoredJobUpdateDetails> selectDetailsList(JobUpdateQuery query);
+  List<DbStoredJobUpdateDetails> selectDetailsList(JobUpdateQuery query);
 
   /**
    * Gets job update for the provided {@code update}.
@@ -168,7 +168,7 @@ interface JobUpdateDetailsMapper {
    * @return Job update for the provided update ID, if it exists.
    */
   @Nullable
-  JobUpdate selectUpdate(@Param("key") IJobUpdateKey key);
+  DbJobUpdate selectUpdate(@Param("key") IJobUpdateKey key);
 
   /**
    * Gets job update instructions for the provided {@code update}.
@@ -177,14 +177,14 @@ interface JobUpdateDetailsMapper {
    * @return Job update instructions for the provided update ID, if it exists.
    */
   @Nullable
-  JobUpdateInstructions selectInstructions(@Param("key") IJobUpdateKey key);
+  DbJobUpdateInstructions selectInstructions(@Param("key") IJobUpdateKey key);
 
   /**
    * Gets all stored job update details.
    *
    * @return All stored job update details.
    */
-  Set<StoredJobUpdateDetails> selectAllDetails();
+  Set<DbStoredJobUpdateDetails> selectAllDetails();
 
   /**
    * Gets the token associated with an update.
