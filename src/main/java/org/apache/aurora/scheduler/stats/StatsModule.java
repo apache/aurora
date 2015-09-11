@@ -11,13 +11,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.common.application.modules;
-
-import java.util.logging.Logger;
+package org.apache.aurora.scheduler.stats;
 
 import com.google.common.base.Supplier;
 import com.google.inject.AbstractModule;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
@@ -25,34 +22,17 @@ import com.google.inject.name.Names;
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.stats.JvmStats;
 import org.apache.aurora.common.stats.Stat;
 import org.apache.aurora.common.stats.StatRegistry;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.stats.TimeSeriesRepository;
 import org.apache.aurora.common.stats.TimeSeriesRepositoryImpl;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 
 /**
  * Binding module for injections related to the in-process stats system.
- *
- * This modules supports two command line arguments:
- * <ul>
- *   <li>{@code stat_sampling_interval} - Statistic value sampling interval.
- *   <li>{@code stat_retention_period} - Time for a stat to be retained in memory before expring.
- * </ul>
- *
- * Bindings required by this module:
- * <ul>
- *   <li>{@code ShutdownRegistry} - Shutdown hook registry.
- *   <li>{@code BuildInfo} - Build information for the application.
- * </ul>
- *
- * @author William Farner
  */
 public class StatsModule extends AbstractModule {
 
@@ -77,35 +57,19 @@ public class StatsModule extends AbstractModule {
     bind(new TypeLiteral<Amount<Long, Time>>() { })
         .annotatedWith(Names.named(TimeSeriesRepositoryImpl.SAMPLE_PERIOD))
         .toInstance(SAMPLING_INTERVAL.get());
-    bind(TimeSeriesRepository.class).to(TimeSeriesRepositoryImpl.class).in(Singleton.class);
+    bind(TimeSeriesRepository.class).to(TimeSeriesRepositoryImpl.class);
+    bind(TimeSeriesRepositoryImpl.class).in(Singleton.class);
 
     bind(new TypeLiteral<Supplier<Iterable<Stat<?>>>>() { }).toInstance(
         new Supplier<Iterable<Stat<?>>>() {
-          @Override public Iterable<Stat<?>> get() {
+          @Override
+          public Iterable<Stat<?>> get() {
             return Stats.getVariables();
           }
         }
     );
 
-    LifecycleModule.bindStartupAction(binder(), StartStatPoller.class);
-  }
-
-  public static final class StartStatPoller implements Command {
-    private static final Logger LOG = Logger.getLogger(StartStatPoller.class.getName());
-    private final ShutdownRegistry shutdownRegistry;
-    private final TimeSeriesRepository timeSeriesRepository;
-
-    @Inject StartStatPoller(
-        ShutdownRegistry shutdownRegistry,
-        TimeSeriesRepository timeSeriesRepository) {
-
-      this.shutdownRegistry = checkNotNull(shutdownRegistry);
-      this.timeSeriesRepository = checkNotNull(timeSeriesRepository);
-    }
-
-    @Override public void execute() {
-      JvmStats.export();
-      timeSeriesRepository.start(shutdownRegistry);
-    }
+    SchedulerServicesModule.addAppStartupServiceBinding(binder())
+        .to(TimeSeriesRepositoryImpl.class);
   }
 }

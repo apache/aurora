@@ -22,6 +22,7 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.Provider;
 import com.google.inject.TypeLiteral;
@@ -32,10 +33,7 @@ import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.api.json.JSONConfiguration;
 
-import org.apache.aurora.common.application.ShutdownRegistry.ShutdownRegistryImpl;
-import org.apache.aurora.common.application.StartupRegistry;
-import org.apache.aurora.common.application.modules.LifecycleModule;
-import org.apache.aurora.common.application.modules.StatsModule;
+import org.apache.aurora.GuavaUtils.ServiceManagerIface;
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.net.pool.DynamicHostSet;
 import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
@@ -46,7 +44,9 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.util.BackoffStrategy;
 import org.apache.aurora.gen.ServerInfo;
+import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler;
@@ -55,6 +55,7 @@ import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.scheduling.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.scheduling.TaskScheduler;
 import org.apache.aurora.scheduler.state.LockManager;
+import org.apache.aurora.scheduler.stats.StatsModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -142,17 +143,9 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
 
   protected void replayAndStart() {
     control.replay();
-
-    final ShutdownRegistryImpl shutdownRegistry = injector.getInstance(ShutdownRegistryImpl.class);
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() {
-        shutdownRegistry.execute();
-      }
-    });
     try {
-
-      injector.getInstance(StartupRegistry.class).execute();
+      injector.getInstance(Key.get(ServiceManagerIface.class, AppStartup.class))
+          .startAsync().awaitHealthy();
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }

@@ -18,22 +18,15 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Key;
-import com.google.inject.Module;
 import com.google.inject.util.Modules;
 
-import org.apache.aurora.common.application.modules.AppLauncherModule;
-import org.apache.aurora.common.application.modules.LifecycleModule;
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.ArgFilters;
 import org.apache.aurora.common.args.ArgScanner;
 import org.apache.aurora.common.args.ArgScanner.ArgScanException;
 import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.base.ExceptionalCommand;
 
 /**
  * An application launcher that sets up a framework for pluggable binding modules.  This class
@@ -43,11 +36,6 @@ import org.apache.aurora.common.base.ExceptionalCommand;
  * If your application uses command line arguments all {@link Arg} fields annotated with
  * {@link CmdLine} will be discovered and command line arguments will be validated against this set,
  * parsed and applied.
- *
- * A bootstrap module will be automatically applied ({@link AppLauncherModule}), which provides
- * overridable default bindings for things like quit/abort hooks and a health check function.
- * A {@link LifecycleModule} is also automatically applied to perform startup and shutdown
- * actions.
  */
 public final class AppLauncher {
 
@@ -60,28 +48,9 @@ public final class AppLauncher {
   private void run(Application application) {
     Lifecycle lifecycle = null;
     try {
-      Iterable<Module> modules = ImmutableList.<Module>builder()
-          .add(new LifecycleModule())
-          .add(new AppLauncherModule())
-          .addAll(application.getModules())
-          .build();
-
-      Injector injector = Guice.createInjector(Modules.combine(modules));
-
-      ExceptionalCommand startupCommand =
-          injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class));
+      Injector injector = Guice.createInjector(application.getModules());
       lifecycle = injector.getInstance(Lifecycle.class);
-
       injector.injectMembers(application);
-
-      LOG.info("Executing startup actions.");
-      try {
-        startupCommand.execute();
-      } catch (Exception e) {
-        LOG.log(Level.SEVERE, "Startup action failed, quitting.", e);
-        throw Throwables.propagate(e);
-      }
-
       try {
         application.run();
       } finally {

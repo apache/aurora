@@ -27,7 +27,6 @@ import com.google.inject.Key;
 import com.google.inject.Module;
 
 import org.apache.aurora.common.application.modules.AppLauncherModule;
-import org.apache.aurora.common.application.modules.LifecycleModule;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stat;
@@ -35,6 +34,7 @@ import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.common.util.testing.FakeClock;
+import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.sla.SlaModule.SlaUpdater;
 import org.apache.aurora.scheduler.storage.Storage;

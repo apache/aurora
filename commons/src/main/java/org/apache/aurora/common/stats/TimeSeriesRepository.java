@@ -15,8 +15,6 @@ package org.apache.aurora.common.stats;
 
 import java.util.Set;
 
-import org.apache.aurora.common.application.ShutdownRegistry;
-
 /**
  * A repository for time series data.
  *
@@ -25,19 +23,11 @@ import org.apache.aurora.common.application.ShutdownRegistry;
 public interface TimeSeriesRepository {
 
   /**
-   * Starts the time series sampler.
-   *
-   * @param shutdownRegistry An action registry that the repository can use to register a shutdown
-   *    for the sampler.
-   */
-  public void start(ShutdownRegistry shutdownRegistry);
-
-  /**
    * Fetches the names of all available time series.
    *
    * @return Available time series, which can then be obtained by calling {@link #get(String)}.
    */
-  public Set<String> getAvailableSeries();
+  Set<String> getAvailableSeries();
 
   /**
    * Fetches a time series by name.
@@ -46,12 +36,12 @@ public interface TimeSeriesRepository {
    * @return The time series registered with the given name, or {@code null} if no such time series
    *     has been registered.
    */
-  public TimeSeries get(String name);
+  TimeSeries get(String name);
 
   /**
    * Gets an ordered iterable of the timestamps that all timeseries were sampled at.
    *
    * @return All current timestamps.
    */
-  public Iterable<Number> getTimestamps();
+  Iterable<Number> getTimestamps();
 }

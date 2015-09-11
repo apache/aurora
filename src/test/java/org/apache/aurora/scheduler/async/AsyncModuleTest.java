@@ -24,11 +24,11 @@ import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.TypeLiteral;
 
-import org.apache.aurora.common.application.modules.LifecycleModule;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.AppStartup;
+import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.async.AsyncModule.RegisterGauges;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;

@@ -17,12 +17,8 @@ import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Key;
 import com.google.inject.Module;
 
-import org.apache.aurora.common.application.StartupStage;
-import org.apache.aurora.common.application.modules.LifecycleModule;
-import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
@@ -52,7 +48,6 @@ public class PreemptorModuleTest extends EasyMockTest {
   private Injector createInjector(Module module) {
     return Guice.createInjector(
         module,
-        new LifecycleModule(),
         new AbstractModule() {
           private <T> void bindMock(Class<T> clazz) {
             bind(clazz).toInstance(createMock(clazz));
@@ -77,8 +72,6 @@ public class PreemptorModuleTest extends EasyMockTest {
         Amount.of(0L, Time.SECONDS)));
 
     control.replay();
-
-    injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
 
     injector.getBindings();
     assertEquals(

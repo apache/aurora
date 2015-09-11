@@ -13,23 +13,15 @@
  */
 package org.apache.aurora.scheduler.app;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import com.google.common.base.Function;
-import com.google.common.base.Joiner;
-import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 
 import org.apache.aurora.GuiceUtils;
-import org.apache.aurora.common.application.ShutdownRegistry;
-import org.apache.aurora.common.application.modules.LifecycleModule;
-import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.inject.TimedInterceptor;
 import org.apache.aurora.common.net.pool.DynamicHostSet;
 import org.apache.aurora.common.stats.Stats;
@@ -69,7 +61,6 @@ import org.apache.zookeeper.data.ACL;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
-
 import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 
 /**
@@ -116,8 +107,6 @@ public class AppModule extends AbstractModule {
     PubsubEventModule.bindSchedulingFilterDelegate(binder()).to(SchedulingFilterImpl.class);
     bind(SchedulingFilterImpl.class).in(Singleton.class);
 
-    LifecycleModule.bindStartupAction(binder(), RegisterShutdownStackPrinter.class);
-
     install(new AsyncModule());
     install(new OffersModule());
     install(new PruningModule());
@@ -135,46 +124,6 @@ public class AppModule extends AbstractModule {
     install(new SlaModule());
     install(new UpdaterModule());
     bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
-  }
-
-  /**
-   * Command to register a thread stack printer that identifies initiator of a shutdown.
-   */
-  private static class RegisterShutdownStackPrinter implements Command {
-    private static final Function<StackTraceElement, String> STACK_ELEM_TOSTRING =
-        new Function<StackTraceElement, String>() {
-          @Override
-          public String apply(StackTraceElement element) {
-            return element.getClassName() + "." + element.getMethodName()
-                + String.format("(%s:%s)", element.getFileName(), element.getLineNumber());
-          }
-        };
-
-    private final ShutdownRegistry shutdownRegistry;
-
-    @Inject
-    RegisterShutdownStackPrinter(ShutdownRegistry shutdownRegistry) {
-      this.shutdownRegistry = shutdownRegistry;
-    }
-
-    @Override
-    public void execute() {
-      shutdownRegistry.addAction(new Command() {
-        @Override
-        public void execute() {
-          Thread thread = Thread.currentThread();
-          String message = new StringBuilder()
-              .append("Thread: ").append(thread.getName())
-              .append(" (id ").append(thread.getId()).append(")")
-              .append("\n")
-              .append(Joiner.on("\n  ").join(
-                  Iterables.transform(Arrays.asList(thread.getStackTrace()), STACK_ELEM_TOSTRING)))
-              .toString();
-
-          LOG.info("Shutdown initiated by: " + message);
-        }
-      });
-    }
   }
 
   @Provides

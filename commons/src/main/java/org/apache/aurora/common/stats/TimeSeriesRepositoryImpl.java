@@ -16,8 +16,6 @@ package org.apache.aurora.common.stats;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -28,12 +26,11 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.EvictingQueue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.AbstractScheduledService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 
-import org.apache.aurora.common.application.ShutdownRegistry;
-import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
@@ -45,7 +42,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @author John Sirois
  */
-public class TimeSeriesRepositoryImpl implements TimeSeriesRepository {
+public class TimeSeriesRepositoryImpl
+    extends AbstractScheduledService implements TimeSeriesRepository {
 
   private static final Logger LOG = Logger.getLogger(TimeSeriesRepositoryImpl.class.getName());
 
@@ -107,42 +105,37 @@ public class TimeSeriesRepositoryImpl implements TimeSeriesRepository {
     timestamps = EvictingQueue.create(retainedSampleLimit);
   }
 
-  /**
-   * Starts the variable sampler, which will fetch variables {@link Stats} on the given period.
-   *
-   */
+  private final ScheduledExecutorService executor = new ScheduledThreadPoolExecutor(
+      1 /* One thread. */,
+      new ThreadFactoryBuilder().setNameFormat("VariableSampler-%d").setDaemon(true).build());
+
   @Override
-  public void start(ShutdownRegistry shutdownRegistry) {
-    checkNotNull(shutdownRegistry);
-    checkNotNull(samplePeriod);
-    Preconditions.checkArgument(samplePeriod.getValue() > 0);
+  protected void startUp() throws Exception {
+    JvmStats.export();
+  }
 
-    final ScheduledExecutorService executor = new ScheduledThreadPoolExecutor(1 /* One thread. */,
-        new ThreadFactoryBuilder().setNameFormat("VariableSampler-%d").setDaemon(true).build());
-
-    final AtomicBoolean shouldSample = new AtomicBoolean(true);
-    final Runnable sampler = new Runnable() {
-      @Override public void run() {
-        if (shouldSample.get()) {
-          try {
-            runSampler(Clock.SYSTEM_CLOCK);
-          } catch (Exception e) {
-            LOG.log(Level.SEVERE, "ignoring runSampler failure", e);
-          }
-        }
-      }
-    };
-
-    executor.scheduleAtFixedRate(sampler, samplePeriod.getValue(), samplePeriod.getValue(),
+  @Override
+  protected Scheduler scheduler() {
+    return Scheduler.newFixedRateSchedule(
+        samplePeriod.getValue(),
+        samplePeriod.getValue(),
         samplePeriod.getUnit().getTimeUnit());
-    shutdownRegistry.addAction(new Command() {
-      @Override
-      public void execute() throws RuntimeException {
-        shouldSample.set(false);
-        executor.shutdown();
-        LOG.info("Variable sampler shut down");
-      }
-    });
+  }
+
+  @Override
+  protected ScheduledExecutorService executor() {
+    return executor;
+  }
+
+  @Override
+  protected void runOneIteration() throws Exception {
+    runSampler(Clock.SYSTEM_CLOCK);
+  }
+
+  @Override
+  protected void shutDown() throws Exception {
+    executor.shutdown();
+    LOG.info("Variable sampler shut down");
   }
 
   @VisibleForTesting

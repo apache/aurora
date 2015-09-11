@@ -43,12 +43,10 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
 
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.Lifecycle;
-import org.apache.aurora.common.application.StartupStage;
 import org.apache.aurora.common.application.modules.AppLauncherModule;
-import org.apache.aurora.common.application.modules.LifecycleModule;
-import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
@@ -74,6 +72,7 @@ import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
+import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.FlushableWorkQueue;
@@ -223,8 +222,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
     injector.injectMembers(main);
     lifecycle = injector.getInstance(Lifecycle.class);
 
-    injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
-
     // Mimic AppLauncher running main.
     executor.submit(new Runnable() {
       @Override
@@ -244,6 +241,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
         MoreExecutors.shutdownAndAwaitTermination(executor, 10, TimeUnit.SECONDS);
       }
     });
+    injector.getInstance(Key.get(GuavaUtils.ServiceManagerIface.class, AppStartup.class))
+        .awaitHealthy();
   }
 
   private void awaitSchedulerReady() throws Exception {

@@ -14,10 +14,7 @@
 package org.apache.aurora.scheduler;
 
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import com.google.common.util.concurrent.Service;
@@ -30,13 +27,7 @@ import com.google.inject.multibindings.Multibinder;
 
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
-import org.apache.aurora.common.application.ShutdownRegistry;
-import org.apache.aurora.common.application.modules.LifecycleModule;
-import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.scheduler.SchedulerLifecycle.SchedulerActive;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * Coordinates scheduler startup.
@@ -69,42 +60,9 @@ public class SchedulerServicesModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    LifecycleModule.bindStartupAction(binder(), ServiceManagerAdapterCommand.class);
-
     // Add a binding.
     Multibinder.newSetBinder(binder(), Service.class, AppStartup.class);
     Multibinder.newSetBinder(binder(), Service.class, SchedulerActive.class);
-  }
-
-  /**
-   * Adapter to make twitter.common.application startup call into Guava's ServiceManager.
-   */
-  @Singleton
-  static class ServiceManagerAdapterCommand implements Command {
-    private final ShutdownRegistry shutdownRegistry;
-    private final ServiceManagerIface serviceManager;
-
-    @Inject
-    ServiceManagerAdapterCommand(
-        ShutdownRegistry shutdownRegistry,
-        @AppStartup final ServiceManagerIface serviceManager) {
-
-      this.shutdownRegistry = requireNonNull(shutdownRegistry);
-      this.serviceManager = requireNonNull(serviceManager);
-    }
-
-    @Override
-    public void execute() {
-      serviceManager.startAsync();
-      shutdownRegistry.addAction(new ExceptionalCommand<TimeoutException>() {
-        @Override
-        public void execute() throws TimeoutException {
-          serviceManager.stopAsync();
-          serviceManager.awaitStopped(5L, TimeUnit.SECONDS);
-        }
-      });
-      serviceManager.awaitHealthy();
-    }
   }
 
   @Provides

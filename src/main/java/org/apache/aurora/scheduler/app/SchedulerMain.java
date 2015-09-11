@@ -15,6 +15,8 @@ package org.apache.aurora.scheduler.app;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
@@ -28,10 +30,11 @@ import com.google.common.net.HostAndPort;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 
+import org.apache.aurora.GuavaUtils.ServiceManagerIface;
 import org.apache.aurora.common.application.AppLauncher;
 import org.apache.aurora.common.application.Application;
 import org.apache.aurora.common.application.Lifecycle;
-import org.apache.aurora.common.application.modules.StatsModule;
+import org.apache.aurora.common.application.modules.AppLauncherModule;
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.NotEmpty;
@@ -47,6 +50,7 @@ import org.apache.aurora.common.zookeeper.guice.client.ZooKeeperClientModule;
 import org.apache.aurora.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import org.apache.aurora.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 import org.apache.aurora.gen.Volume;
+import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
@@ -55,6 +59,7 @@ import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.mesos.LibMesosLoadingModule;
+import org.apache.aurora.scheduler.stats.StatsModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.db.DbModule;
@@ -129,6 +134,9 @@ public class SchedulerMain implements Application {
   @Inject private HttpService httpService;
   @Inject private SchedulerLifecycle schedulerLifecycle;
   @Inject private Lifecycle appLifecycle;
+  @Inject
+  @AppStartup
+  private ServiceManagerIface startupServices;
 
   private static Iterable<? extends Module> getExtraModules() {
     Builder<Module> modules = ImmutableList.builder();
@@ -183,6 +191,8 @@ public class SchedulerMain implements Application {
   public Iterable<? extends Module> getModules() {
     ClientConfig zkClientConfig = FlaggedClientConfig.create();
     return ImmutableList.<Module>builder()
+        .add(new LifecycleModule())
+        .add(new AppLauncherModule())
         .add(new BackupModule(SnapshotStoreImpl.class))
         .addAll(
             getModules(
@@ -215,7 +225,21 @@ public class SchedulerMain implements Application {
         .build();
   }
 
+  private void stop() {
+    LOG.info("Stopping scheduler services.");
+    try {
+      startupServices.stopAsync().awaitStopped(5L, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      LOG.info("Shutdown did not complete in time: " + e);
+    }
+    appLifecycle.shutdown();
+  }
+
   public void run() {
+    startupServices.startAsync();
+    Runtime.getRuntime().addShutdownHook(new Thread(SchedulerMain.this::stop, "ShutdownHook"));
+    startupServices.awaitHealthy();
+
     // Setup log4j to match our jul glog config in order to pick up zookeeper logging.
     Configuration logConfiguration = RootLogConfig.configurationFromFlags();
     logConfiguration.apply();
@@ -240,6 +264,7 @@ public class SchedulerMain implements Application {
     }
 
     appLifecycle.awaitShutdown();
+    stop();
   }
 
   public static void main(String... args) {

@@ -27,12 +27,12 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
 
-import org.apache.aurora.common.application.StartupStage;
-import org.apache.aurora.common.application.modules.LifecycleModule;
-import org.apache.aurora.common.base.ExceptionalCommand;
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
@@ -81,7 +81,8 @@ public class PubsubEventModuleTest extends EasyMockTest {
             PubsubEventModule.bindSubscriber(binder(), ThrowingSubscriber.class);
           }
         });
-    injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
+    injector.getInstance(Key.get(GuavaUtils.ServiceManagerIface.class, AppStartup.class))
+        .startAsync().awaitHealthy();
     assertEquals(0L, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
     injector.getInstance(EventBus.class).post("hello");
     assertEquals(1L, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));

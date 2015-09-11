@@ -19,11 +19,11 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import com.google.common.eventbus.EventBus;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.multibindings.Multibinder;
 
-import org.apache.aurora.common.application.modules.LifecycleModule;
-import org.apache.aurora.common.base.Command;
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;
 
@@ -58,10 +58,10 @@ public class ClusterSimulatorModule extends AbstractModule {
         .toInstance(dedicated(baseOffer("slave-5", "c", 24, 128 * 1024, 1824 * 1024), "database"));
     offers.addBinding()
         .toInstance(dedicated(baseOffer("slave-6", "c", 24, 128 * 1024, 1824 * 1024), "database"));
-    LifecycleModule.bindStartupAction(binder(), Register.class);
+    SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(Register.class);
   }
 
-  static class Register implements Command {
+  static class Register extends AbstractIdleService {
     private final EventBus eventBus;
     private final FakeSlaves slaves;
 
@@ -72,8 +72,13 @@ public class ClusterSimulatorModule extends AbstractModule {
     }
 
     @Override
-    public void execute() {
-      eventBus .register(slaves);
+    protected void startUp() throws Exception {
+      eventBus.register(slaves);
+    }
+
+    @Override
+    protected void shutDown() {
+      // No-op.
     }
   }
 
