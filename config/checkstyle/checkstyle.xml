@@ -266,12 +266,16 @@ limitations under the License.
     <module name="ArrayTypeStyle"/>
     <module name="OuterTypeFilename"/>
 
-    <!-- Regexp checks -->
+    <!-- Discourage use of System.exit() -->
     <module name="RegexpSinglelineJava">
       <property name="format" value="System.exit"/>
       <property name="ignoreComments" value="true"/>
       <property name="message"
         value="Don't System.exit(), throw a RuntimeException()" />
     </module>
+  </module>
+
+  <module name="SuppressionFilter">
+    <property name="file" value="config/checkstyle/suppressions.xml"/>
   </module>
 </module>

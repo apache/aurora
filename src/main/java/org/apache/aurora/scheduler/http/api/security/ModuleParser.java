@@ -20,7 +20,7 @@ import com.google.inject.Module;
 
 import org.apache.aurora.common.args.ArgParser;
 import org.apache.aurora.common.args.parsers.NonParameterizedTypeParser;
-import org.apache.aurora.scheduler.app.Modules;
+import org.apache.aurora.scheduler.app.MoreModules;
 
 /**
  * ArgParser for Guice modules. Constructs an instance of a Module with a given alias or FQCN if it
@@ -49,6 +49,6 @@ public class ModuleParser extends NonParameterizedTypeParser<Module> {
     @SuppressWarnings("unchecked")
     Class<? extends Module> moduleClass = (Class<? extends Module>) rawClass;
 
-    return Modules.lazilyInstantiated(moduleClass);
+    return MoreModules.lazilyInstantiated(moduleClass);
   }
 }

@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
@@ -82,12 +81,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
 
     schedulerLifecycle = new SchedulerLifecycle(
         storageUtil.storage,
-        new Lifecycle(shutdownRegistry, new UncaughtExceptionHandler() {
-          @Override
-          public void uncaughtException(Thread t, Throwable e) {
-            fail(e.getMessage());
-          }
-        }),
+        new Lifecycle(shutdownRegistry),
         driver,
         delayedActions,
         eventSink,

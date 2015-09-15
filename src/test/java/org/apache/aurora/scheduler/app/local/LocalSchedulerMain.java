@@ -24,10 +24,8 @@ import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.Module;
+import com.google.inject.util.Modules;
 
-import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
-import org.apache.aurora.common.application.AppLauncher;
-import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.app.local.simulator.ClusterSimulatorModule;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
@@ -42,7 +40,10 @@ import org.apache.shiro.io.ResourceUtils;
 /**
  * A main class that runs the scheduler in local mode, using fakes for external components.
  */
-public class LocalSchedulerMain extends SchedulerMain {
+public final class LocalSchedulerMain {
+  private LocalSchedulerMain() {
+    // Utility class.
+  }
 
   private static final DriverSettings DRIVER_SETTINGS = new DriverSettings(
       "fakemaster",
@@ -52,41 +53,9 @@ public class LocalSchedulerMain extends SchedulerMain {
           .setName("test framework")
           .build());
 
-  @Override
-  protected Module getPersistentStorageModule() {
-    return new AbstractModule() {
-      @Override
-      protected void configure() {
-        bind(Storage.class).to(Key.get(Storage.class, Storage.Volatile.class));
-        bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
-        bind(DistributedSnapshotStore.class).toInstance(new DistributedSnapshotStore() {
-          @Override
-          public void persist(Snapshot snapshot) throws CodingException {
-            // No-op.
-          }
-        });
-      }
-    };
-  }
-
-  @Override
-  protected Module getMesosModules() {
-    return new AbstractModule() {
-      @Override
-      protected void configure() {
-        bind(DriverSettings.class).toInstance(DRIVER_SETTINGS);
-        bind(SchedulerDriver.class).to(FakeMaster.class);
-        bind(DriverFactory.class).to(FakeMaster.class);
-        bind(FakeMaster.class).in(Singleton.class);
-        install(new ClusterSimulatorModule());
-      }
-    };
-  }
-
   public static void main(String[] args) {
     File backupDir = Files.createTempDir();
     backupDir.deleteOnExit();
-
     List<String> arguments = ImmutableList.<String>builder()
         .add(args)
         .add("-cluster_name=local")
@@ -103,7 +72,28 @@ public class LocalSchedulerMain extends SchedulerMain {
             + "org/apache/aurora/scheduler/http/api/security/shiro-example.ini")
         .add("-enable_h2_console=true")
         .build();
+    SchedulerMain.applyStaticArgumentValues(arguments.toArray(new String[] {}));
 
-    AppLauncher.launch(LocalSchedulerMain.class, arguments.toArray(new String[0]));
+    Module persistentStorage = new AbstractModule() {
+      @Override
+      protected void configure() {
+        bind(Storage.class).to(Key.get(Storage.class, Storage.Volatile.class));
+        bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
+        bind(DistributedSnapshotStore.class).toInstance(snapshot -> { });
+      }
+    };
+
+    Module fakeMesos = new AbstractModule() {
+      @Override
+      protected void configure() {
+        bind(DriverSettings.class).toInstance(DRIVER_SETTINGS);
+        bind(SchedulerDriver.class).to(FakeMaster.class);
+        bind(DriverFactory.class).to(FakeMaster.class);
+        bind(FakeMaster.class).in(Singleton.class);
+        install(new ClusterSimulatorModule());
+      }
+    };
+
+    SchedulerMain.flagConfiguredMain(Modules.combine(fakeMesos, persistentStorage));
   }
 }

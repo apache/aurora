@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.common.application;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.logging.Logger;
 
 import com.google.inject.Inject;
@@ -38,11 +37,8 @@ public class Lifecycle {
   private final Command shutdownRegistry;
 
   @Inject
-  public Lifecycle(@ShutdownStage Command shutdownRegistry,
-      UncaughtExceptionHandler exceptionHandler) {
-
+  public Lifecycle(@ShutdownStage Command shutdownRegistry) {
     this.shutdownRegistry = shutdownRegistry;
-    Thread.setDefaultUncaughtExceptionHandler(exceptionHandler);
   }
 
   /**

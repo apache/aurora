@@ -38,7 +38,7 @@ import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraSchedulerManager;
-import org.apache.aurora.scheduler.app.Modules;
+import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.guice.aop.ShiroAopModule;
@@ -74,7 +74,7 @@ public class HttpSecurityModule extends ServletModule {
   @CmdLine(name = "shiro_realm_modules",
       help = "Guice modules for configuring Shiro Realms.")
   private static final Arg<Set<Module>> SHIRO_REALM_MODULE = Arg.create(
-      ImmutableSet.of(Modules.lazilyInstantiated(IniShiroRealmModule.class)));
+      ImmutableSet.of(MoreModules.lazilyInstantiated(IniShiroRealmModule.class)));
 
   @VisibleForTesting
   static final Matcher<Method> AURORA_SCHEDULER_MANAGER_SERVICE =

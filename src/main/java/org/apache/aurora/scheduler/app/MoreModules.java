@@ -22,9 +22,9 @@ import static java.util.Objects.requireNonNull;
 /**
  * A utility class for managing guice modules.
  */
-public final class Modules {
+public final class MoreModules {
 
-  private Modules() {
+  private MoreModules() {
     // Utility class
   }
 

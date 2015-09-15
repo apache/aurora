@@ -46,7 +46,6 @@ import com.google.inject.Module;
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.Lifecycle;
-import org.apache.aurora.common.application.modules.AppLauncherModule;
 import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
@@ -55,12 +54,14 @@ import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.zookeeper.ServerSet;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
+import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.gen.storage.LogEntry;
@@ -80,6 +81,7 @@ import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.log.EntrySerializer;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
@@ -100,6 +102,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.common.testing.easymock.EasyMockTest.createCapture;
+import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
@@ -202,25 +205,32 @@ public class SchedulerIT extends BaseZooKeeperTest {
                 .setExecutorOverhead(executorOverhead)
                 .build());
         install(new BackupModule(backupDir, SnapshotStoreImpl.class));
+
+        bind(IServerInfo.class).toInstance(
+            IServerInfo.build(
+                new ServerInfo()
+                    .setClusterName(CLUSTER_NAME)
+                    .setThriftAPIVersion(THRIFT_API_VERSION)
+                    .setStatsUrlPrefix(STATS_URL_PREFIX)));
       }
     };
+    Credentials credentials = ZooKeeperClient.digestCredentials("mesos", "mesos");
     ClientConfig zkClientConfig = ClientConfig
         .create(ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
-        .withCredentials(ZooKeeperClient.digestCredentials("mesos", "mesos"));
-    final SchedulerMain main = SchedulerMain.class.newInstance();
+        .withCredentials(credentials);
+    SchedulerMain main = SchedulerMain.class.newInstance();
     injector = Guice.createInjector(
         ImmutableList.<Module>builder()
-            .addAll(main.getModules(CLUSTER_NAME, SERVERSET_PATH, zkClientConfig, STATS_URL_PREFIX))
-            .add(new LifecycleModule())
-            .add(new AppLauncherModule())
+            .add(SchedulerMain.getUniversalModule())
+            .add(new LogStorageModule())
             .add(new ZooKeeperClientModule(zkClientConfig))
+            .add(new ServiceDiscoveryModule(SERVERSET_PATH, credentials))
             .add(testModule)
             .build()
     );
     injector.injectMembers(main);
     lifecycle = injector.getInstance(Lifecycle.class);
 
-    // Mimic AppLauncher running main.
     executor.submit(new Runnable() {
       @Override
       public void run() {

@@ -26,7 +26,6 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
 
-import org.apache.aurora.common.application.modules.AppLauncherModule;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stat;
@@ -73,7 +72,6 @@ public class SlaModuleTest extends EasyMockTest {
         ImmutableList.<Module>builder()
             .add(module)
             .add(new LifecycleModule())
-            .add(new AppLauncherModule())
             .add(new AbstractModule() {
               @Override
               protected void configure() {

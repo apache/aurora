@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -153,15 +152,13 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   private void initializeScheduler(Logger logger) {
     storageUtil = new StorageTestUtil(this);
     shutdownCommand = createMock(Command.class);
-    final Lifecycle lifecycle =
-        new Lifecycle(shutdownCommand, createMock(UncaughtExceptionHandler.class));
     statusHandler = createMock(TaskStatusHandler.class);
     offerManager = createMock(OfferManager.class);
     eventSink = createMock(EventSink.class);
 
     scheduler = new MesosSchedulerImpl(
         storageUtil.storage,
-        lifecycle,
+        new Lifecycle(shutdownCommand),
         statusHandler,
         offerManager,
         eventSink,

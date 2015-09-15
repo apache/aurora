@@ -21,12 +21,12 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class ModulesTest {
+public class MoreModulesTest {
   private static final String STRING = "string";
 
   @Test
   public void testLazilyInstantiated() {
-    Injector injector = Guice.createInjector(Modules.lazilyInstantiated(StringInstaller.class));
+    Injector injector = Guice.createInjector(MoreModules.lazilyInstantiated(StringInstaller.class));
     assertEquals(STRING, injector.getInstance(String.class));
   }
 

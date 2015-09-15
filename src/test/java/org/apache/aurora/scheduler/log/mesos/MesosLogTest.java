@@ -79,7 +79,7 @@ public class MesosLogTest extends EasyMockTest {
             .toInstance(WRITE_TIMEOUT);
         bind(byte[].class).annotatedWith(MesosLog.NoopEntry.class)
             .toInstance(DUMMY_CONTENT.getBytes(StandardCharsets.UTF_8));
-        bind(Lifecycle.class).toInstance(new Lifecycle(shutdownHooks, null));
+        bind(Lifecycle.class).toInstance(new Lifecycle(shutdownHooks));
       }
     });
 

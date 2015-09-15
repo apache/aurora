@@ -13,28 +13,15 @@
  */
 package org.apache.aurora.scheduler.app;
 
-import java.util.List;
-import java.util.logging.Logger;
-
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
-import com.google.inject.Provides;
 
 import org.apache.aurora.GuiceUtils;
 import org.apache.aurora.common.inject.TimedInterceptor;
-import org.apache.aurora.common.net.pool.DynamicHostSet;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.util.Clock;
-import org.apache.aurora.common.zookeeper.ServerSet;
-import org.apache.aurora.common.zookeeper.ServerSetImpl;
-import org.apache.aurora.common.zookeeper.SingletonService;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
-import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
-import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.AsyncModule;
@@ -52,40 +39,13 @@ import org.apache.aurora.scheduler.scheduling.SchedulingModule;
 import org.apache.aurora.scheduler.sla.SlaModule;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.stats.AsyncStatsModule;
-import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.updater.UpdaterModule;
-import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import org.apache.mesos.Scheduler;
-import org.apache.zookeeper.data.ACL;
-
-import static java.util.Objects.requireNonNull;
-
-import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
-import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 
 /**
  * Binding module for the aurora scheduler application.
  */
 public class AppModule extends AbstractModule {
-  private static final Logger LOG = Logger.getLogger(AppModule.class.getName());
-
-  private final String clusterName;
-  private final String serverSetPath;
-  private final ClientConfig zkClientConfig;
-  private final String statsUrlPrefix;
-
-  AppModule(
-      String clusterName,
-      String serverSetPath,
-      ClientConfig zkClientConfig,
-      String statsUrlPrefix) {
-
-    this.clusterName = checkNotBlank(clusterName);
-    this.serverSetPath = checkNotBlank(serverSetPath);
-    this.zkClientConfig = requireNonNull(zkClientConfig);
-    this.statsUrlPrefix = statsUrlPrefix;
-  }
-
   @Override
   protected void configure() {
     // Enable intercepted method timings and context classloader repair.
@@ -94,14 +54,6 @@ public class AppModule extends AbstractModule {
     GuiceUtils.bindExceptionTrap(binder(), Scheduler.class);
 
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
-
-    bind(IServerInfo.class).toInstance(
-        IServerInfo.build(
-            new ServerInfo()
-                .setClusterName(clusterName)
-                .setThriftAPIVersion(THRIFT_API_VERSION)
-                .setStatsUrlPrefix(statsUrlPrefix)));
-
     install(new PubsubEventModule());
     // Filter layering: notifier filter -> base impl
     PubsubEventModule.bindSchedulingFilterDelegate(binder()).to(SchedulingFilterImpl.class);
@@ -124,41 +76,5 @@ public class AppModule extends AbstractModule {
     install(new SlaModule());
     install(new UpdaterModule());
     bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
-  }
-
-  @Provides
-  @Singleton
-  List<ACL> provideAcls() {
-    if (zkClientConfig.credentials == Credentials.NONE) {
-      LOG.warning("Running without ZooKeeper digest credentials. ZooKeeper ACLs are disabled.");
-      return ZooKeeperUtils.OPEN_ACL_UNSAFE;
-    } else {
-      return ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL;
-    }
-  }
-
-  @Provides
-  @Singleton
-  ServerSet provideServerSet(ZooKeeperClient client, List<ACL> zooKeeperAcls) {
-    return new ServerSetImpl(client, zooKeeperAcls, serverSetPath);
-  }
-
-  @Provides
-  @Singleton
-  DynamicHostSet<ServiceInstance> provideSchedulerHostSet(ServerSet serverSet) {
-    // Used for a type re-binding of the serverset.
-    return serverSet;
-  }
-
-  @Provides
-  @Singleton
-  SingletonService provideSingletonService(
-      ZooKeeperClient client,
-      ServerSet serverSet,
-      List<ACL> zookeeperAcls) {
-
-    return new SingletonService(
-        serverSet,
-        SingletonService.createSingletonCandidate(client, serverSetPath, zookeeperAcls));
   }
 }

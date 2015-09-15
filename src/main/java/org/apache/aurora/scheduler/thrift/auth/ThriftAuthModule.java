@@ -30,7 +30,7 @@ import org.apache.aurora.auth.UnsecureAuthModule;
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.NotEmpty;
-import org.apache.aurora.scheduler.app.Modules;
+import org.apache.aurora.scheduler.app.MoreModules;
 
 import static java.util.Objects.requireNonNull;
 
@@ -78,6 +78,6 @@ public class ThriftAuthModule extends AbstractModule {
     requireBinding(SessionValidator.class);
     requireBinding(CapabilityValidator.class);
 
-    install(Modules.wrapInPrivateModule(authModule, AUTH_MODULE_CLASSES));
+    install(MoreModules.wrapInPrivateModule(authModule, AUTH_MODULE_CLASSES));
   }
 }

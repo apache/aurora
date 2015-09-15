@@ -13,12 +13,9 @@
  */
 package org.apache.aurora.scheduler.http;
 
-import java.lang.Thread.UncaughtExceptionHandler;
-
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -30,8 +27,7 @@ public class QuitCallbackTest extends EasyMockTest {
   @Before
   public void setUp() {
     shutdownCommand = createMock(Command.class);
-    handler = new QuitCallback(
-        new Lifecycle(shutdownCommand, createMock(UncaughtExceptionHandler.class)));
+    handler = new QuitCallback(new Lifecycle(shutdownCommand));
   }
 
   @Test
