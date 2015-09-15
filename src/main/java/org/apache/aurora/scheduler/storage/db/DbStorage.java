@@ -29,7 +29,8 @@ import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.async.FlushableWorkQueue;
+import org.apache.aurora.scheduler.async.GatedWorkQueue;
+import org.apache.aurora.scheduler.async.GatedWorkQueue.GatedOperation;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -61,13 +62,13 @@ class DbStorage extends AbstractIdleService implements Storage {
   private final SqlSessionFactory sessionFactory;
   private final MutableStoreProvider storeProvider;
   private final EnumValueMapper enumValueMapper;
-  private final FlushableWorkQueue postTransactionWork;
+  private final GatedWorkQueue gatedWorkQueue;
 
   @Inject
   DbStorage(
       SqlSessionFactory sessionFactory,
       EnumValueMapper enumValueMapper,
-      @AsyncExecutor FlushableWorkQueue postTransactionWork,
+      @AsyncExecutor GatedWorkQueue gatedWorkQueue,
       final CronJobStore.Mutable cronJobStore,
       final TaskStore.Mutable taskStore,
       final SchedulerStore.Mutable schedulerStore,
@@ -78,7 +79,7 @@ class DbStorage extends AbstractIdleService implements Storage {
 
     this.sessionFactory = requireNonNull(sessionFactory);
     this.enumValueMapper = requireNonNull(enumValueMapper);
-    this.postTransactionWork = requireNonNull(postTransactionWork);
+    this.gatedWorkQueue = requireNonNull(gatedWorkQueue);
     requireNonNull(cronJobStore);
     requireNonNull(taskStore);
     requireNonNull(schedulerStore);
@@ -140,13 +141,6 @@ class DbStorage extends AbstractIdleService implements Storage {
     }
   }
 
-  private final ThreadLocal<Boolean> inTransaction = new ThreadLocal<Boolean>() {
-    @Override
-    protected Boolean initialValue() {
-      return false;
-    }
-  };
-
   @Transactional
   <T, E extends Exception> T transactionedWrite(MutateWork<T, E> work) throws E {
     return work.apply(storeProvider);
@@ -155,28 +149,22 @@ class DbStorage extends AbstractIdleService implements Storage {
   @Timed("db_storage_write_operation")
   @Override
   public <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E {
-    // Only flush for the top-level write() call when calls are reentrant.
-    boolean shouldFlush = !inTransaction.get();
-    if (shouldFlush) {
-      inTransaction.set(true);
-    }
-
-    try {
-      return transactionedWrite(work);
-    } catch (PersistenceException e) {
-      throw new StorageException(e.getMessage(), e);
-    } finally {
-      // NOTE: Async work is intentionally executed regardless of whether the transaction succeeded.
-      // Doing otherwise runs the risk of cross-talk between transactions and losing async tasks
-      // due to failure of an unrelated transaction.  This matches behavior prior to the
-      // introduction of DbStorage, but should be revisited.
-      // TODO(wfarner): Consider revisiting to execute async work only when the transaction is
-      // successful.
-      if (shouldFlush) {
-        postTransactionWork.flush();
-        inTransaction.set(false);
+    // NOTE: Async work is intentionally executed regardless of whether the transaction succeeded.
+    // Doing otherwise runs the risk of cross-talk between transactions and losing async tasks
+    // due to failure of an unrelated transaction.  This matches behavior prior to the
+    // introduction of DbStorage, but should be revisited.
+    // TODO(wfarner): Consider revisiting to execute async work only when the transaction is
+    // successful.
+    return gatedWorkQueue.closeDuring(new GatedOperation<T, E>() {
+      @Override
+      public T doWithGateClosed() throws E {
+        try {
+          return transactionedWrite(work);
+        } catch (PersistenceException e) {
+          throw new StorageException(e.getMessage(), e);
+        }
       }
-    }
+    });
   }
 
   @VisibleForTesting
@@ -191,20 +179,24 @@ class DbStorage extends AbstractIdleService implements Storage {
   public <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work)
       throws StorageException, E {
 
-    // Disabling the undo log disables transaction rollback, but dramatically speeds up a bulk
-    // insert.
-    try (SqlSession session = sessionFactory.openSession(false)) {
-      try {
-        session.update(DISABLE_UNDO_LOG);
-        work.apply(storeProvider);
-      } catch (PersistenceException e) {
-        throw new StorageException(e.getMessage(), e);
-      } finally {
-        session.update(ENABLE_UNDO_LOG);
+    gatedWorkQueue.closeDuring(new GatedOperation<Void, E>() {
+      @Override
+      public Void doWithGateClosed() throws E {
+        // Disabling the undo log disables transaction rollback, but dramatically speeds up a bulk
+        // insert.
+        try (SqlSession session = sessionFactory.openSession(false)) {
+          try {
+            session.update(DISABLE_UNDO_LOG);
+            work.apply(storeProvider);
+          } catch (PersistenceException e) {
+            throw new StorageException(e.getMessage(), e);
+          } finally {
+            session.update(ENABLE_UNDO_LOG);
+          }
+        }
+        return null;
       }
-    } finally {
-      postTransactionWork.flush();
-    }
+    });
   }
 
   @Override

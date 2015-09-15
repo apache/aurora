@@ -75,8 +75,8 @@ public class AsyncModule extends AbstractModule {
         bind(ScheduledThreadPoolExecutor.class).toInstance(afterTransaction);
         bind(ScheduledExecutorService.class).toInstance(afterTransaction);
 
-        bind(GatedDelayExecutor.class).in(Singleton.class);
-        expose(GatedDelayExecutor.class);
+        bind(GatingDelayExecutor.class).in(Singleton.class);
+        expose(GatingDelayExecutor.class);
 
         bind(RegisterGauges.class).in(Singleton.class);
         expose(RegisterGauges.class);
@@ -84,9 +84,9 @@ public class AsyncModule extends AbstractModule {
     });
     SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RegisterGauges.class);
 
-    bind(Executor.class).annotatedWith(AsyncExecutor.class).to(GatedDelayExecutor.class);
-    bind(DelayExecutor.class).annotatedWith(AsyncExecutor.class).to(GatedDelayExecutor.class);
-    bind(FlushableWorkQueue.class).annotatedWith(AsyncExecutor.class).to(GatedDelayExecutor.class);
+    bind(Executor.class).annotatedWith(AsyncExecutor.class).to(GatingDelayExecutor.class);
+    bind(DelayExecutor.class).annotatedWith(AsyncExecutor.class).to(GatingDelayExecutor.class);
+    bind(GatedWorkQueue.class).annotatedWith(AsyncExecutor.class).to(GatingDelayExecutor.class);
   }
 
   static class RegisterGauges extends AbstractIdleService {
@@ -101,13 +101,13 @@ public class AsyncModule extends AbstractModule {
 
     private final StatsProvider statsProvider;
     private final ScheduledThreadPoolExecutor executor;
-    private final GatedDelayExecutor delayExecutor;
+    private final GatingDelayExecutor delayExecutor;
 
     @Inject
     RegisterGauges(
         StatsProvider statsProvider,
         ScheduledThreadPoolExecutor executor,
-        GatedDelayExecutor delayExecutor) {
+        GatingDelayExecutor delayExecutor) {
 
       this.statsProvider = requireNonNull(statsProvider);
       this.executor = requireNonNull(executor);

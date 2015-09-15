@@ -13,11 +13,9 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-
-import org.apache.aurora.scheduler.async.FlushableWorkQueue;
+import org.apache.aurora.scheduler.async.GatedWorkQueue;
+import org.apache.aurora.scheduler.async.GatedWorkQueue.GatedOperation;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -34,20 +32,19 @@ import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
+import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 
 public class DbStorageTest extends EasyMockTest {
 
   private SqlSessionFactory sessionFactory;
   private SqlSession session;
   private EnumValueMapper enumMapper;
-  private FlushableWorkQueue flusher;
+  private GatedWorkQueue gatedWorkQueue;
   private Work.Quiet<String> readWork;
   private MutateWork.NoResult.Quiet writeWork;
 
@@ -58,14 +55,14 @@ public class DbStorageTest extends EasyMockTest {
     sessionFactory = createMock(SqlSessionFactory.class);
     session = createMock(SqlSession.class);
     enumMapper = createMock(EnumValueMapper.class);
-    flusher = createMock(FlushableWorkQueue.class);
+    gatedWorkQueue = createMock(GatedWorkQueue.class);
     readWork = createMock(new Clazz<Work.Quiet<String>>() { });
     writeWork = createMock(new Clazz<MutateWork.NoResult.Quiet>() { });
 
     storage = new DbStorage(
         sessionFactory,
         enumMapper,
-        flusher,
+        gatedWorkQueue,
         createMock(CronJobStore.Mutable.class),
         createMock(TaskStore.Mutable.class),
         createMock(SchedulerStore.Mutable.class),
@@ -94,12 +91,23 @@ public class DbStorageTest extends EasyMockTest {
     assertEquals("hi", storage.read(readWork));
   }
 
+  private IExpectationSetters<?> expectGateClosed() throws Exception {
+    return expect(gatedWorkQueue.closeDuring(EasyMock.anyObject()))
+        .andAnswer(new IAnswer<Object>() {
+          @Override
+          public Object answer() throws Throwable {
+            GatedOperation<?, ?> op = (GatedOperation<?, ?>) EasyMock.getCurrentArguments()[0];
+            return op.doWithGateClosed();
+          }
+        });
+  }
+
   @Test(expected = StorageException.class)
-  public void testBulkLoadFails() {
+  public void testBulkLoadFails() throws Exception {
     expect(sessionFactory.openSession(false)).andReturn(session);
     expect(session.update(DbStorage.DISABLE_UNDO_LOG)).andThrow(new PersistenceException());
     expect(session.update(DbStorage.ENABLE_UNDO_LOG)).andReturn(0);
-    flusher.flush();
+    expectGateClosed();
 
     control.replay();
 
@@ -107,13 +115,13 @@ public class DbStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testBulkLoad() {
+  public void testBulkLoad() throws Exception {
     expect(sessionFactory.openSession(false)).andReturn(session);
     expect(session.update(DbStorage.DISABLE_UNDO_LOG)).andReturn(0);
     expect(writeWork.apply(EasyMock.anyObject())).andReturn(null);
     session.close();
     expect(session.update(DbStorage.ENABLE_UNDO_LOG)).andReturn(0);
-    flusher.flush();
+    expectGateClosed();
 
     control.replay();
 
@@ -121,16 +129,8 @@ public class DbStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testFlushWithReentrantWrites() {
-    final AtomicBoolean flushed = new AtomicBoolean(false);
-    flusher.flush();
-    expectLastCall().andAnswer(new IAnswer<Void>() {
-      @Override
-      public Void answer() {
-        flushed.set(true);
-        return null;
-      }
-    });
+  public void testGateWithReentrantWrites() throws Exception {
+    expectGateClosed().times(2);
 
     control.replay();
 
@@ -138,9 +138,6 @@ public class DbStorageTest extends EasyMockTest {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
         noopWrite();
-
-        // Should not have flushed yet.
-        assertFalse("flush() should not be called until outer write() completes.", flushed.get());
       }
     });
   }
@@ -155,9 +152,8 @@ public class DbStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testFlushWithSeqentialWrites() {
-    flusher.flush();
-    expectLastCall().times(2);
+  public void testFlushWithSeqentialWrites() throws Exception {
+    expectGateClosed().times(2);
 
     control.replay();
 

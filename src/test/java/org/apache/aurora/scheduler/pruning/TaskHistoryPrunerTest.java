@@ -13,14 +13,19 @@
  */
 package org.apache.aurora.scheduler.pruning;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.io.Closer;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -44,7 +49,6 @@ import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.DelayExecutor;
-import org.apache.aurora.scheduler.async.FlushableWorkQueue;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.pruning.TaskHistoryPruner.HistoryPrunnerSettings;
@@ -56,6 +60,7 @@ import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -84,6 +89,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
   private StateManager stateManager;
   private StorageTestUtil storageUtil;
   private TaskHistoryPruner pruner;
+  private Closer closer;
 
   @Before
   public void setUp() {
@@ -98,6 +104,12 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
         clock,
         new HistoryPrunnerSettings(ONE_DAY, ONE_MINUTE, PER_JOB_HISTORY),
         storageUtil.storage);
+    closer = Closer.create();
+  }
+
+  @After
+  public void tearDownCloser() throws Exception {
+    closer.close();
   }
 
   @Test
@@ -242,6 +254,13 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
             .setDaemon(true)
             .setNameFormat("testThreadSafeEvents-executor")
             .build());
+    closer.register(new Closeable() {
+      @Override
+      public void close() throws IOException {
+        MoreExecutors.shutdownAndAwaitTermination(realExecutor, 1L, TimeUnit.SECONDS);
+      }
+    });
+
     Injector injector = Guice.createInjector(
         new AsyncModule(realExecutor),
         new AbstractModule() {
@@ -251,24 +270,16 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
           }
         });
     executor = injector.getInstance(Key.get(DelayExecutor.class, AsyncExecutor.class));
-    FlushableWorkQueue flusher =
-        injector.getInstance(Key.get(FlushableWorkQueue.class, AsyncExecutor.class));
 
     pruner = buildPruner(executor);
-    Command onDeleted = new Command() {
-      @Override
-      public void execute() {
-        // The goal is to verify that the call does not deadlock. We do not care about the outcome.
-        changeState(makeTask("b", ASSIGNED), STARTING);
-      }
-    };
+    // The goal is to verify that the call does not deadlock. We do not care about the outcome.
+    Command onDeleted = () -> changeState(makeTask("b", ASSIGNED), STARTING);
     CountDownLatch taskDeleted = expectTaskDeleted(onDeleted, TASK_ID);
 
     control.replay();
 
     // Change the task to a terminal state and wait for it to be pruned.
     changeState(makeTask(TASK_ID, RUNNING), KILLED);
-    flusher.flush();
     taskDeleted.await();
   }
 

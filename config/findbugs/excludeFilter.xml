@@ -114,7 +114,7 @@ limitations under the License.
   <Match>
     <!-- False positives on a check introduced in findbugs 3.0.1 -->
     <Or>
-      <Class name="org.apache.aurora.scheduler.storage.db.DbStorage" />
+      <Class name="org.apache.aurora.scheduler.storage.db.DbStorage$3" />
       <Class name="org.apache.aurora.scheduler.http.api.security.AuthorizeHeaderTokenTest" />
     </Or>
     <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />

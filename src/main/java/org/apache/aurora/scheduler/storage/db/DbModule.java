@@ -39,7 +39,7 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.async.FlushableWorkQueue;
+import org.apache.aurora.scheduler.async.GatedWorkQueue;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -156,7 +156,15 @@ public final class DbModule extends PrivateModule {
         new AbstractModule() {
           @Override
           protected void configure() {
-            bind(FlushableWorkQueue.class).annotatedWith(AsyncExecutor.class).toInstance(() -> { });
+            bind(GatedWorkQueue.class).annotatedWith(AsyncExecutor.class).toInstance(
+                new GatedWorkQueue() {
+                  @Override
+                  public <T, E extends Exception> T closeDuring(
+                      GatedOperation<T, E> operation) throws E {
+
+                    return operation.doWithGateClosed();
+                  }
+                });
           }
         },
         new DbModule(

@@ -27,21 +27,45 @@ import org.apache.aurora.common.quantity.Time;
 import static java.util.Objects.requireNonNull;
 
 /**
- * An executor that queues work until flushed.
+ * An executor that may be temporarily gated with {@link #closeDuring(GatedOperation)}.  When the
+ * executor is gated, newly-submitted work will be enqueued and executed once the gate is opened as
+ * a result of {@link #closeDuring(GatedOperation)} returning.
  */
-class GatedDelayExecutor implements DelayExecutor, FlushableWorkQueue {
+class GatingDelayExecutor implements DelayExecutor, GatedWorkQueue {
 
-  private final ScheduledExecutorService executor;
+  private final ScheduledExecutorService gated;
   private final Queue<Runnable> queue = Lists.newLinkedList();
 
   /**
-   * Creates a gated delay executor that will flush work to the provided {@code delegate}.
+   * Creates a gating delay executor that will gate work from the provided executor.
    *
-   * @param delegate Delegate to execute work with when flushed.
+   * @param gated Delegate to execute work with when ungated.
    */
   @Inject
-  GatedDelayExecutor(ScheduledExecutorService delegate) {
-    this.executor = requireNonNull(delegate);
+  GatingDelayExecutor(ScheduledExecutorService gated) {
+    this.gated = requireNonNull(gated);
+  }
+
+  private final ThreadLocal<Boolean> isOpen = new ThreadLocal<Boolean>() {
+    @Override
+    protected Boolean initialValue() {
+      return true;
+    }
+  };
+
+  @Override
+  public <T, E extends Exception> T closeDuring(GatedOperation<T, E> operation) throws E {
+    boolean startedOpen = isOpen.get();
+    isOpen.set(false);
+
+    try {
+      return operation.doWithGateClosed();
+    } finally {
+      if (startedOpen) {
+        isOpen.set(true);
+        flush();
+      }
+    }
   }
 
   synchronized int getQueueSize() {
@@ -49,11 +73,14 @@ class GatedDelayExecutor implements DelayExecutor, FlushableWorkQueue {
   }
 
   private synchronized void enqueue(Runnable work) {
-    queue.add(work);
+    if (isOpen.get()) {
+      work.run();
+    } else {
+      queue.add(work);
+    }
   }
 
-  @Override
-  public synchronized void flush() {
+  private synchronized void flush() {
     for (Runnable work : Iterables.consumingIterable(queue)) {
       work.run();
     }
@@ -61,11 +88,11 @@ class GatedDelayExecutor implements DelayExecutor, FlushableWorkQueue {
 
   @Override
   public synchronized void execute(Runnable command) {
-    enqueue(() -> executor.execute(command));
+    enqueue(() -> gated.execute(command));
   }
 
   @Override
   public synchronized void execute(Runnable work, Amount<Long, Time> minDelay) {
-    enqueue(() -> executor.schedule(work, minDelay.getValue(), minDelay.getUnit().getTimeUnit()));
+    enqueue(() -> gated.schedule(work, minDelay.getValue(), minDelay.getUnit().getTimeUnit()));
   }
 }
