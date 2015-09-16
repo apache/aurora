@@ -17,6 +17,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,15 +25,19 @@ import javax.annotation.Nonnegative;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.servlet.ServletContextListener;
-import javax.servlet.http.HttpServlet;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Multimap;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
@@ -56,7 +61,6 @@ import org.apache.aurora.common.net.http.handlers.ContentionPrinter;
 import org.apache.aurora.common.net.http.handlers.HealthHandler;
 import org.apache.aurora.common.net.http.handlers.LogConfig;
 import org.apache.aurora.common.net.http.handlers.QuitHandler;
-import org.apache.aurora.common.net.http.handlers.StringTemplateServlet;
 import org.apache.aurora.common.net.http.handlers.ThreadStackPrinter;
 import org.apache.aurora.common.net.http.handlers.TimeSeriesDataSource;
 import org.apache.aurora.common.net.http.handlers.VarsHandler;
@@ -143,8 +147,6 @@ public class JettyServerModule extends AbstractModule {
         .annotatedWith(Names.named(HealthHandler.HEALTH_CHECKER_KEY))
         .toInstance(Suppliers.ofInstance(true));
 
-    bindConstant().annotatedWith(StringTemplateServlet.CacheTemplates.class).to(true);
-
     final Optional<String> hostnameOverride = Optional.fromNullable(HOSTNAME_OVERRIDE.get());
     if (hostnameOverride.isPresent()) {
       try {
@@ -195,6 +197,48 @@ public class JettyServerModule extends AbstractModule {
     }
   };
 
+  private static final Set<String> LEADER_ENDPOINTS = ImmutableSet.of(
+      "api",
+      "cron",
+      "locks",
+      "maintenance",
+      "mname",
+      "offers",
+      "pendingtasks",
+      "quotas",
+      "slaves",
+      "utilization"
+  );
+
+  private static final Multimap<Class<?>, String> JAX_RS_ENDPOINTS =
+      ImmutableMultimap.<Class<?>, String>builder()
+          .put(AbortHandler.class, "abortabortabort")
+          .put(ContentionPrinter.class, "contention")
+          .put(Cron.class, "cron")
+          .put(Locks.class, "locks")
+          .put(LogConfig.class, "logconfig")
+          .put(Maintenance.class, "maintenance")
+          .put(Mname.class, "mname")
+          .put(Offers.class, "offers")
+          .put(PendingTasks.class, "pendingtasks")
+          .put(QuitHandler.class, "quitquitquit")
+          .put(Quotas.class, "quotas")
+          .put(Services.class, "services")
+          .put(Slaves.class, "slaves")
+          .put(StructDump.class, "structdump")
+          .put(ThreadStackPrinter.class, "threads")
+          .put(TimeSeriesDataSource.class, "graphdata")
+          .put(Utilization.class, "utilization")
+          .put(VarsHandler.class, "vars")
+          .put(VarsJsonHandler.class, "vars.json")
+          .build();
+
+  private static String allOf(Set<String> paths) {
+    return "^(?:"
+        + Joiner.on("|").join(Iterables.transform(paths, path -> "/" + path))
+        + ").*$";
+  }
+
   // TODO(ksweeney): Factor individual servlet configurations to their own ServletModules.
   @VisibleForTesting
   static ServletContextListener makeServletContextListener(
@@ -207,22 +251,18 @@ public class JettyServerModule extends AbstractModule {
         return parentInjector.createChildInjector(
             childModule,
             new JerseyServletModule() {
-              private void registerJerseyEndpoint(String indexPath, Class<?> servlet) {
-                filter(indexPath + "*").through(LeaderRedirectFilter.class);
-                filter(indexPath + "*").through(GuiceContainer.class, GUICE_CONTAINER_PARAMS);
-                bind(servlet);
-              }
-
-              private void registerServlet(String pathSpec, Class<? extends HttpServlet> servlet) {
-                bind(servlet).in(Singleton.class);
-                serve(pathSpec).with(servlet);
-              }
-
               @Override
               protected void configureServlets() {
                 bind(HttpStatsFilter.class).in(Singleton.class);
                 filter("*").through(HttpStatsFilter.class);
+
                 bind(LeaderRedirectFilter.class).in(Singleton.class);
+                filterRegex(allOf(LEADER_ENDPOINTS))
+                    .through(LeaderRedirectFilter.class);
+
+                bind(GuiceContainer.class).in(Singleton.class);
+                filterRegex(allOf(ImmutableSet.copyOf(JAX_RS_ENDPOINTS.values())))
+                    .through(GuiceContainer.class, GUICE_CONTAINER_PARAMS);
 
                 filterRegex("/assets/.*").through(new GzipFilter());
                 filterRegex("/assets/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
@@ -232,28 +272,9 @@ public class JettyServerModule extends AbstractModule {
                         "resourceBase", STATIC_ASSETS_ROOT,
                         "dirAllowed", "false"));
 
-                bind(GuiceContainer.class).in(Singleton.class);
-                registerJerseyEndpoint("/cron", Cron.class);
-                registerJerseyEndpoint("/locks", Locks.class);
-                registerJerseyEndpoint("/maintenance", Maintenance.class);
-                registerJerseyEndpoint("/mname", Mname.class);
-                registerJerseyEndpoint("/offers", Offers.class);
-                registerJerseyEndpoint("/pendingtasks", PendingTasks.class);
-                registerJerseyEndpoint("/quotas", Quotas.class);
-                registerJerseyEndpoint("/services", Services.class);
-                registerJerseyEndpoint("/slaves", Slaves.class);
-                registerJerseyEndpoint("/structdump", StructDump.class);
-                registerJerseyEndpoint("/utilization", Utilization.class);
-
-                registerServlet("/abortabortabort", AbortHandler.class);
-                registerServlet("/contention", ContentionPrinter.class);
-                registerServlet("/health", HealthHandler.class);
-                registerServlet("/logconfig", LogConfig.class);
-                registerServlet("/quitquitquit", QuitHandler.class);
-                registerServlet("/threads", ThreadStackPrinter.class);
-                registerServlet("/graphdata/", TimeSeriesDataSource.class);
-                registerServlet("/vars", VarsHandler.class);
-                registerServlet("/vars.json", VarsJsonHandler.class);
+                for (Class<?> jaxRsHandler : JAX_RS_ENDPOINTS.keySet()) {
+                  bind(jaxRsHandler);
+                }
               }
             });
       }
@@ -353,7 +374,7 @@ public class JettyServerModule extends AbstractModule {
           new ServletContextHandler(server, "/", ServletContextHandler.NO_SESSIONS);
 
       servletHandler.addServlet(DefaultServlet.class, "/");
-      servletHandler.addFilter(GuiceFilter.class,  "/*", EnumSet.allOf(DispatcherType.class));
+      servletHandler.addFilter(GuiceFilter.class, "/*", EnumSet.allOf(DispatcherType.class));
       servletHandler.addEventListener(servletContextListener);
 
       HandlerCollection rootHandler = new HandlerCollection();

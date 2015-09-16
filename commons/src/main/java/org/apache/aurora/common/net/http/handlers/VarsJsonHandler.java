@@ -13,14 +13,13 @@
  */
 package org.apache.aurora.common.net.http.handlers;
 
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.Map;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -45,9 +44,10 @@ import org.apache.aurora.common.stats.Stat;
  * If the optional URL parameter 'pretty' is used, the output will be pretty-printed
  * (similar to the above example).
  *
- * @author William Farner
+ * TODO(wfarner): Handle this request in VarsHandler.
  */
-public class VarsJsonHandler extends HttpServlet {
+@Path("/vars.json")
+public class VarsJsonHandler {
 
   private final Supplier<Iterable<Stat<?>>> statSupplier;
 
@@ -67,21 +67,14 @@ public class VarsJsonHandler extends HttpServlet {
     for (Stat<?> var : statSupplier.get()) {
       vars.put(var.getName(), var.read());
     }
+    // TODO(wfarner): Let the jax-rs provider handle serialization.
     return getGson(pretty).toJson(vars);
   }
 
-  @Override
-  protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException, IOException {
-
-    resp.setContentType("application/json");
-    resp.setStatus(HttpServletResponse.SC_OK);
-    PrintWriter responseBody = resp.getWriter();
-    try {
-      responseBody.print(getBody(req.getParameter("pretty") != null));
-    } finally {
-      responseBody.close();
-    }
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  public String getVars(@QueryParam("pretty") boolean pretty) {
+    return getBody(pretty);
   }
 
   private Gson getGson(boolean pretty) {

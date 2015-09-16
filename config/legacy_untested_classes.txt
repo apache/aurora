@@ -9,9 +9,9 @@ org/apache/aurora/scheduler/async/OfferQueue$OfferQueueImpl$2
 org/apache/aurora/scheduler/base/Conversions$1
 org/apache/aurora/scheduler/base/Conversions$2
 org/apache/aurora/scheduler/base/Conversions$3
-org/apache/aurora/scheduler/base/Conversions$4
 org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl
 org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl$1
+org/apache/aurora/scheduler/http/AbortCallback
 org/apache/aurora/scheduler/http/JerseyTemplateServlet
 org/apache/aurora/scheduler/http/Maintenance
 org/apache/aurora/scheduler/http/Maintenance$1

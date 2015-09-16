@@ -20,13 +20,11 @@ import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 
 import com.google.common.base.Supplier;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
+import org.apache.aurora.common.stats.Stat;
 import org.junit.Before;
 import org.junit.Test;
-
-import org.apache.aurora.common.stats.Stat;
 
 import static org.junit.Assert.assertEquals;
 
@@ -72,7 +70,6 @@ public class VarsHandlerTest extends StatSupplierTestBase {
   }
 
   private void checkOutput(List<String> expectedLines) {
-    assertEquals(expectedLines,
-        ImmutableList.copyOf(vars.getLines(request)));
+    assertEquals(String.join("\n", expectedLines), vars.getVars());
   }
 }

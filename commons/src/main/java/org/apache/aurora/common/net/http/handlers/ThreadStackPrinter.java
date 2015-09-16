@@ -13,20 +13,27 @@
  */
 package org.apache.aurora.common.net.http.handlers;
 
-import com.google.common.collect.Lists;
-
-import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 
 /**
  * HTTP handler to print the stacks of all live threads.
  *
  * @author William Farner
  */
-public class ThreadStackPrinter extends TextResponseHandler {
-  @Override
-  public Iterable<String> getLines(HttpServletRequest request) {
+@Path("/threads")
+public class ThreadStackPrinter {
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  public String getThreadStacks() {
     List<String> lines = Lists.newLinkedList();
     for (Map.Entry<Thread, StackTraceElement[]> entry : Thread.getAllStackTraces().entrySet()) {
       Thread t = entry.getKey();
@@ -36,6 +43,6 @@ public class ThreadStackPrinter extends TextResponseHandler {
         lines.add("    " + s.toString());
       }
     }
-    return lines;
+    return Joiner.on("\n").join(lines);
   }
 }

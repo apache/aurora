@@ -13,14 +13,14 @@
  */
 package org.apache.aurora.common.net.http.handlers;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
@@ -30,7 +30,8 @@ import com.google.inject.name.Named;
  * A servlet that provides a way to remotely signal the process to initiate a clean shutdown
  * sequence.
  */
-public class QuitHandler extends HttpServlet {
+@Path("/quitquitquit")
+public class QuitHandler {
   private static final Logger LOG = Logger.getLogger(QuitHandler.class.getName());
 
   /**
@@ -53,19 +54,13 @@ public class QuitHandler extends HttpServlet {
     this.quitListener = Preconditions.checkNotNull(quitListener);
   }
 
-  @Override
-  protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+  @POST
+  @Produces(MediaType.TEXT_PLAIN)
+  public String quit(@Context HttpServletRequest req) {
     LOG.info(String.format("Received quit HTTP signal from %s (%s)",
         req.getRemoteAddr(), req.getRemoteHost()));
 
-    resp.setContentType("text/plain");
-    PrintWriter writer = resp.getWriter();
-    try {
-      writer.println("Notifying quit listener.");
-      writer.close();
-      new Thread(quitListener).start();
-    } catch (Exception e) {
-      LOG.log(Level.WARNING, "Quit failed.", e);
-    }
+    new Thread(quitListener).start();
+    return "Notifying quit listener.";
   }
 }

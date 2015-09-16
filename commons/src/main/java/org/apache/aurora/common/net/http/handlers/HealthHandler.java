@@ -13,19 +13,15 @@
  */
 package org.apache.aurora.common.net.http.handlers;
 
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * A servlet that provides a crude mechanism for monitoring a service's health.  If the servlet
@@ -33,7 +29,8 @@ import java.util.logging.Logger;
  *
  * @author John Sirois
  */
-public class HealthHandler extends HttpServlet {
+@Path("/health")
+public class HealthHandler {
 
   /**
    * A {@literal @Named} binding key for the Healthz servlet health checker.
@@ -48,8 +45,6 @@ public class HealthHandler extends HttpServlet {
   public static final String IS_HEALTHY = "OK";
 
   private static final String IS_NOT_HEALTHY = "SICK";
-
-  private static final Logger LOG = Logger.getLogger(HealthHandler.class.getName());
 
   private final Supplier<Boolean> healthChecker;
 
@@ -66,17 +61,9 @@ public class HealthHandler extends HttpServlet {
     this.healthChecker = Preconditions.checkNotNull(healthChecker);
   }
 
-  @Override
-  protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException, IOException {
-
-    resp.setContentType("text/plain");
-    PrintWriter writer = resp.getWriter();
-    try {
-      writer.println(Boolean.TRUE.equals(healthChecker.get()) ? IS_HEALTHY : IS_NOT_HEALTHY);
-    } catch (Exception e) {
-      writer.println(IS_NOT_HEALTHY);
-      LOG.log(Level.WARNING, "Health check failed.", e);
-    }
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  public String getHealth() {
+    return healthChecker.get() ? IS_HEALTHY : IS_NOT_HEALTHY;
   }
 }

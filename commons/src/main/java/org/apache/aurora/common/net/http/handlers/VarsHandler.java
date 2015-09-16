@@ -16,9 +16,13 @@ package org.apache.aurora.common.net.http.handlers;
 import java.util.Collections;
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Iterables;
@@ -32,7 +36,8 @@ import org.apache.aurora.common.stats.Stat;
  *
  * @author William Farner
  */
-public class VarsHandler extends TextResponseHandler {
+@Path("/vars")
+public class VarsHandler {
 
   private static final Function<Stat, String> VAR_PRINTER = new Function<Stat, String>() {
     @Override public String apply(Stat stat) {
@@ -52,10 +57,11 @@ public class VarsHandler extends TextResponseHandler {
     this.statSupplier = Preconditions.checkNotNull(statSupplier);
   }
 
-  @Override
-  public Iterable<String> getLines(HttpServletRequest request) {
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  public String getVars() {
     List<String> lines = Lists.newArrayList(Iterables.transform(statSupplier.get(), VAR_PRINTER));
     Collections.sort(lines);
-    return lines;
+    return Joiner.on("\n").join(lines);
   }
 }

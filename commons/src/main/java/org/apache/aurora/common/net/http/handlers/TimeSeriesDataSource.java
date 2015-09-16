@@ -13,15 +13,14 @@
  */
 package org.apache.aurora.common.net.http.handlers;
 
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.List;
 
 import javax.annotation.Nullable;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -33,7 +32,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.net.MediaType;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.inject.Inject;
@@ -45,7 +43,8 @@ import org.apache.aurora.common.stats.TimeSeriesRepository;
 /**
  * A servlet that provides time series data in JSON format.
  */
-public class TimeSeriesDataSource extends HttpServlet {
+@Path("/graphdata/")
+public class TimeSeriesDataSource {
 
   @VisibleForTesting static final String TIME_METRIC = "time";
 
@@ -96,21 +95,17 @@ public class TimeSeriesDataSource extends HttpServlet {
     ResponseStruct response = new ResponseStruct(
         ImmutableList.<String>builder().add(TIME_METRIC).addAll(names).build(),
         FluentIterable.from(Iterables2.zip(tsData, 0)).filter(sinceFilter).toList());
+    // TODO(wfarner): Let the jax-rs provider handle serialization.
     return gson.toJson(response);
   }
 
-  @Override
-  protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException, IOException {
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  public String getData(
+      @QueryParam(METRICS) String metrics,
+      @QueryParam(SINCE) String since) throws MetricException {
 
-    resp.setContentType(MediaType.JSON_UTF_8.toString());
-    PrintWriter out = resp.getWriter();
-    try {
-      out.write(getResponse(req.getParameter(METRICS), req.getParameter(SINCE)));
-    } catch (MetricException e) {
-      resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-      out.write(e.getMessage());
-    }
+    return getResponse(metrics, since);
   }
 
   @VisibleForTesting

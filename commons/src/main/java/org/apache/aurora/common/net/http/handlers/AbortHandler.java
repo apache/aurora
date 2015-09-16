@@ -14,13 +14,14 @@
 package org.apache.aurora.common.net.http.handlers;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
@@ -29,7 +30,8 @@ import com.google.inject.name.Named;
 /**
  * A servlet that provides a way to remotely terminate the running process immediately.
  */
-public class AbortHandler extends HttpServlet {
+@Path("/abortabortabort")
+public class AbortHandler {
 
   /**
    * A {@literal @Named} binding key for the QuitHandler listener.
@@ -53,19 +55,12 @@ public class AbortHandler extends HttpServlet {
     this.abortListener = Preconditions.checkNotNull(abortListener);
   }
 
-  @Override
-  protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+  @POST
+  @Produces(MediaType.TEXT_PLAIN)
+  public void abort(@Context HttpServletRequest req) throws IOException {
     LOG.info(String.format("Received abort HTTP signal from %s (%s)",
         req.getRemoteAddr(), req.getRemoteHost()));
 
-    resp.setContentType("text/plain");
-    PrintWriter writer = resp.getWriter();
-    try {
-      writer.println("Aborting process NOW!");
-      writer.close();
-      abortListener.run();
-    } catch (Exception e) {
-      LOG.log(Level.WARNING, "Abort failed.", e);
-    }
+    abortListener.run();
   }
 }

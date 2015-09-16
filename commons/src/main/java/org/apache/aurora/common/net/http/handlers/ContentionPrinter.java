@@ -13,12 +13,6 @@
  */
 package org.apache.aurora.common.net.http.handlers;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.primitives.Longs;
-
-import javax.servlet.http.HttpServletRequest;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
@@ -26,18 +20,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.google.common.primitives.Longs;
+
 /**
  * HTTP request handler that prints information about blocked threads.
  *
  * @author William Farner
  */
-public class ContentionPrinter extends TextResponseHandler {
+@Path("/contention")
+public class ContentionPrinter {
   public ContentionPrinter() {
     ManagementFactory.getThreadMXBean().setThreadContentionMonitoringEnabled(true);
   }
 
-  @Override
-  public Iterable<String> getLines(HttpServletRequest request) {
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  public String getContention() {
     List<String> lines = Lists.newLinkedList();
     ThreadMXBean bean = ManagementFactory.getThreadMXBean();
 
@@ -67,7 +73,7 @@ public class ContentionPrinter extends TextResponseHandler {
       }
     }
 
-    return lines;
+    return String.join("\n", lines);
   }
 
   private static List<String> getThreadInfo(ThreadInfo t, StackTraceElement[] stack) {

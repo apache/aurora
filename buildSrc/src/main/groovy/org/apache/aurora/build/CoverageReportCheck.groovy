@@ -85,13 +85,15 @@ class CoverageReportCheck extends DefaultTask {
       def isAnonymous = { c -> c.@name ==~ /.*\$\d+/ }
       def methodFilter = isAnonymous(cls) ? { m -> m.@name != '<init>' } : { true }
 
-      def matchedMethods = cls.method.findAll(methodFilter)
-      if (isAnonymous(cls) && matchedMethods.isEmpty()) {
+      // Always ignore static code, it should not count as test coverage.
+      def matchedMethods = cls.method.findAll({ m -> m.@name != '<clinit>' }).findAll(methodFilter)
+      if (matchedMethods.isEmpty()) {
         // Ignore anonymous classes that only have a constructor. This will avoid tripping for
         // things like TypeLiteral and Clazz.
         if (cls.@name in legacyClassesWithoutCoverage) {
           return 'Please remove ' + cls.@name + ' from the legacyClassesWithoutCoverage list' \
-              + ', this check does not apply for constructor-only anonymous classes.'
+              + ', this check does not apply for constructor-only anonymous classes' \
+              + ' or classes with only static class initialization code.'
         } else {
           return null
         }
