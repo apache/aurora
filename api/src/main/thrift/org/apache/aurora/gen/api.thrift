@@ -272,7 +272,7 @@ struct TaskConfig {
  // This field is deliberately placed at the end to work around a bug in the immutable wrapper
  // code generator.  See AURORA-1185 for details.
  /** the container the task should use to execute */
- 29: optional Container container = { "mesos": {} }
+ 29: Container container = { "mesos": {} }
 }
 
 /** Defines the policy for launching a new cron job when one is already running. */
