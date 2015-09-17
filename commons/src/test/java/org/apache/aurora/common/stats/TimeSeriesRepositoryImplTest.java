@@ -22,6 +22,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.common.util.testing.FakeBuildInfo.generateBuildInfo;
 import static org.easymock.EasyMock.createStrictControl;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -42,7 +43,11 @@ public class TimeSeriesRepositoryImplTest extends EasyMockTest {
   public void setUp() {
     control = createStrictControl();
     statRegistry = control.createMock(StatRegistry.class);
-    repo = new TimeSeriesRepositoryImpl(statRegistry, SAMPLE_PERIOD, RETENTION_PERIOD);
+    repo = new TimeSeriesRepositoryImpl(
+        statRegistry,
+        SAMPLE_PERIOD,
+        RETENTION_PERIOD,
+        generateBuildInfo());
     clock = new FakeClock();
   }
 

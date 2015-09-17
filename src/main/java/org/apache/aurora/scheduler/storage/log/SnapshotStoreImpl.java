@@ -16,13 +16,13 @@ package org.apache.aurora.scheduler.storage.log;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.logging.Logger;
-
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.common.util.BuildInfo;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
@@ -152,10 +152,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       new SnapshotField() {
         @Override
         public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
-          snapshot.setSchedulerMetadata(
-                new SchedulerMetadata()
-                  .setFrameworkId(store.getSchedulerStore().fetchFrameworkId().orNull())
-                  .setVersion(CURRENT_API_VERSION));
+          // SchedulerMetadata is updated outside of the static list of SnapshotFields
         }
 
         @Override
@@ -233,11 +230,13 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       }
   );
 
+  private final BuildInfo buildInfo;
   private final Clock clock;
   private final Storage storage;
 
   @Inject
-  public SnapshotStoreImpl(Clock clock, @Volatile Storage storage) {
+  public SnapshotStoreImpl(BuildInfo buildInfo, Clock clock, @Volatile Storage storage) {
+    this.buildInfo = requireNonNull(buildInfo);
     this.clock = requireNonNull(clock);
     this.storage = requireNonNull(storage);
   }
@@ -258,6 +257,14 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         for (SnapshotField field : SNAPSHOT_FIELDS) {
           field.saveToSnapshot(storeProvider, snapshot);
         }
+
+        SchedulerMetadata metadata = new SchedulerMetadata()
+            .setFrameworkId(storeProvider.getSchedulerStore().fetchFrameworkId().orNull())
+            .setVersion(CURRENT_API_VERSION);
+
+        metadata.setDetails(buildInfo.getProperties());
+
+        snapshot.setSchedulerMetadata(metadata);
         snapshot.setTimestamp(timestamp);
         return snapshot;
       }

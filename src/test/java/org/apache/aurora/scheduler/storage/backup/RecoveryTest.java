@@ -23,6 +23,7 @@ import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.util.testing.FakeBuildInfo;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
@@ -152,10 +153,17 @@ public class RecoveryTest extends EasyMockTest {
   }
 
   private static Snapshot makeSnapshot(IScheduledTask... tasks) {
+    SchedulerMetadata metadata = new SchedulerMetadata()
+        .setVersion(CURRENT_API_VERSION);
+    metadata.setDetails(com.google.common.collect.Maps.newHashMap());
+    metadata.getDetails().put(FakeBuildInfo.DATE, FakeBuildInfo.DATE);
+    metadata.getDetails().put(FakeBuildInfo.GIT_REVISION, FakeBuildInfo.GIT_REVISION);
+    metadata.getDetails().put(FakeBuildInfo.GIT_TAG, FakeBuildInfo.GIT_TAG);
+
     return new Snapshot()
         .setHostAttributes(ImmutableSet.of())
         .setCronJobs(ImmutableSet.of())
-        .setSchedulerMetadata(new SchedulerMetadata().setVersion(CURRENT_API_VERSION))
+        .setSchedulerMetadata(metadata)
         .setQuotaConfigurations(ImmutableSet.of())
         .setTasks(IScheduledTask.toBuildersSet(ImmutableSet.copyOf(tasks)))
         .setLocks(ImmutableSet.of())

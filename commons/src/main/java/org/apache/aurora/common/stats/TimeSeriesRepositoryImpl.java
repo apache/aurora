@@ -13,12 +13,14 @@
  */
 package org.apache.aurora.common.stats;
 
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -26,6 +28,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.EvictingQueue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.AbstractScheduledService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
@@ -33,6 +36,7 @@ import com.google.inject.name.Named;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.util.BuildInfo;
 import org.apache.aurora.common.util.Clock;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -68,14 +72,17 @@ public class TimeSeriesRepositoryImpl
   private final StatRegistry statRegistry;
   private final Amount<Long, Time> samplePeriod;
   private final int retainedSampleLimit;
+  private final BuildInfo buildInfo;
 
   @Inject
   public TimeSeriesRepositoryImpl(
       StatRegistry statRegistry,
       @Named(SAMPLE_PERIOD) Amount<Long, Time> samplePeriod,
-      @Named(SAMPLE_RETENTION_PERIOD) final Amount<Long, Time> retentionPeriod) {
+      @Named(SAMPLE_RETENTION_PERIOD) final Amount<Long, Time> retentionPeriod,
+      BuildInfo buildInfo) {
     this.statRegistry = checkNotNull(statRegistry);
     this.samplePeriod = checkNotNull(samplePeriod);
+    this.buildInfo = checkNotNull(buildInfo);
     Preconditions.checkArgument(samplePeriod.getValue() > 0, "Sample period must be positive.");
     checkNotNull(retentionPeriod);
     Preconditions.checkArgument(retentionPeriod.getValue() > 0,
@@ -112,6 +119,30 @@ public class TimeSeriesRepositoryImpl
   @Override
   protected void startUp() throws Exception {
     JvmStats.export();
+
+    for (String name : buildInfo.getProperties().keySet()) {
+      final String stringValue = buildInfo.getProperties().get(name);
+      LOG.info("Build Info key: " + name + " has value " + stringValue);
+      if (stringValue == null) {
+        continue;
+      }
+      final Long longValue = Longs.tryParse(stringValue);
+      if (longValue != null) {
+        Stats.exportStatic(new StatImpl<Long>(Stats.normalizeName("build." + name)) {
+          @Override
+          public Long read() {
+            return longValue;
+          }
+        });
+      } else {
+        Stats.exportString(new StatImpl<String>(Stats.normalizeName("build." + name)) {
+          @Override
+          public String read() {
+            return stringValue;
+          }
+        });
+      }
+    }
   }
 
   @Override

@@ -18,6 +18,7 @@ import java.util.Set;
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 
+import org.apache.aurora.common.util.BuildInfo;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.base.Query;
@@ -31,6 +32,8 @@ import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+
+import static org.apache.aurora.common.util.testing.FakeBuildInfo.generateBuildInfo;
 
 /**
  * A short-lived in-memory storage system that can be converted to a {@link Snapshot}.
@@ -67,9 +70,13 @@ interface TemporaryStorage {
     @Override
     public TemporaryStorage apply(Snapshot snapshot) {
       final Storage storage = DbUtil.createFlaggedStorage();
+      final BuildInfo buildInfo = generateBuildInfo();
       FakeClock clock = new FakeClock();
       clock.setNowMillis(snapshot.getTimestamp());
-      final SnapshotStore<Snapshot> snapshotStore = new SnapshotStoreImpl(clock, storage);
+      final SnapshotStore<Snapshot> snapshotStore = new SnapshotStoreImpl(
+          buildInfo,
+          clock,
+          storage);
       snapshotStore.applySnapshot(snapshot);
 
       return new TemporaryStorage() {

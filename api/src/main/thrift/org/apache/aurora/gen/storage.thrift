@@ -128,6 +128,7 @@ struct StoredCronJob {
 struct SchedulerMetadata {
   1: string frameworkId
   7: api.APIVersion version
+  8: map<string, string> details
 }
 
 struct QuotaConfiguration {

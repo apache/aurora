@@ -309,8 +309,21 @@ publishing {
   }
 }
 
+task generateBuildProperties (type:Exec) {
+  def outputDir = file("${buildDir}/build-properties")
+  def outputFile = file("${outputDir}/build.properties")
+  inputs.dir rootDir
+  outputs.dir outputDir
+  doFirst {
+    outputDir.exists() || outputDir.mkdirs()
+  }
+
+  commandLine "${projectDir}/build-support/generate-build-properties", "${outputFile}"
+}
+
 sourceSets {
   main {
+    output.dir generateBuildProperties
     resources {
       srcDir '3rdparty/javascript'
     }
