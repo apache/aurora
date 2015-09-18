@@ -61,6 +61,10 @@ test_version() {
   [[ $(aurora --version 2>&1) = $(cat /vagrant/.auroraversion) ]]
 }
 
+test_health_check() {
+  [[ $(_curl "localhost:8081/health") == 'OK' ]]
+}
+
 test_config() {
   local _config=$1 _jobkey=$2
 
@@ -319,6 +323,7 @@ trap collect_result EXIT
 aurorabuild all
 test_version
 test_http_example "${TEST_JOB_ARGS[@]}"
+test_health_check
 
 test_http_revocable_example "${TEST_JOB_REVOCABLE_ARGS[@]}"
 
