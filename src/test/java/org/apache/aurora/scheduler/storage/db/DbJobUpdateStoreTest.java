@@ -170,6 +170,30 @@ public class DbJobUpdateStoreTest {
   }
 
   @Test
+  public void testSaveJobUpdateWithLargeTaskConfigValues() {
+    // AURORA-1494 regression test validating max resources values are allowed.
+    IJobUpdateKey updateId = makeKey(JobKeys.from("role", "env", "name1"), "u1");
+
+    JobUpdate builder = makeFullyPopulatedUpdate(updateId).newBuilder();
+    builder.getInstructions().getDesiredState().getTask().setNumCpus(Double.MAX_VALUE);
+    builder.getInstructions().getDesiredState().getTask().setRamMb(Long.MAX_VALUE);
+    builder.getInstructions().getDesiredState().getTask().setDiskMb(Long.MAX_VALUE);
+
+    IJobUpdate update = IJobUpdate.build(builder);
+
+    assertEquals(Optional.absent(), getUpdate(updateId));
+
+    StorageEntityUtil.assertFullyPopulated(
+        update,
+        StorageEntityUtil.getField(JobUpdateSummary.class, "state"),
+        StorageEntityUtil.getField(IJobUpdateSummary.class, "state"),
+        StorageEntityUtil.getField(Range.class, "first"),
+        StorageEntityUtil.getField(Range.class, "last"));
+    saveUpdate(update, Optional.of("lock1"));
+    assertUpdate(update);
+  }
+
+  @Test
   public void testSaveNullInitialState() {
     JobUpdate builder = makeJobUpdate(makeKey("u1")).newBuilder();
     builder.getInstructions().unsetInitialState();

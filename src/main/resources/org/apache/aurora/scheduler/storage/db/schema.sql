@@ -46,9 +46,9 @@ CREATE TABLE locks(
 CREATE TABLE quotas(
   id IDENTITY,
   role VARCHAR NOT NULL,
-  num_cpus FLOAT NOT NULL,
-  ram_mb INT NOT NULL,
-  disk_mb INT NOT NULL,
+  num_cpus DOUBLE NOT NULL,
+  ram_mb BIGINT NOT NULL,
+  disk_mb BIGINT NOT NULL,
 
   UNIQUE(role)
 );
@@ -85,12 +85,12 @@ CREATE TABLE host_attribute_values(
  */
 CREATE TABLE task_configs(
   id IDENTITY,
-  job_key_id INT NOT NULL REFERENCES job_keys(id),
+  job_key_id BIGINT NOT NULL REFERENCES job_keys(id),
   creator_user VARCHAR NOT NULL,
   service BOOLEAN NOT NULL,
-  num_cpus FLOAT8 NOT NULL,
-  ram_mb INTEGER NOT NULL,
-  disk_mb INTEGER NOT NULL,
+  num_cpus DOUBLE NOT NULL,
+  ram_mb BIGINT NOT NULL,
+  disk_mb BIGINT NOT NULL,
   priority INTEGER NOT NULL,
   max_task_failures INTEGER NOT NULL,
   production BOOLEAN NOT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE task_configs(
 
 CREATE TABLE task_constraints(
   id IDENTITY,
-  task_config_id INT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
+  task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
   name VARCHAR NOT NULL,
 
   UNIQUE(task_config_id, name)
@@ -110,7 +110,7 @@ CREATE TABLE task_constraints(
 
 CREATE TABLE value_constraints(
   id IDENTITY,
-  constraint_id INT NOT NULL REFERENCES task_constraints(id) ON DELETE CASCADE,
+  constraint_id BIGINT NOT NULL REFERENCES task_constraints(id) ON DELETE CASCADE,
   negated BOOLEAN NOT NULL,
 
   UNIQUE(constraint_id)
@@ -118,7 +118,7 @@ CREATE TABLE value_constraints(
 
 CREATE TABLE value_constraint_values(
   id IDENTITY,
-  value_constraint_id INT NOT NULL REFERENCES value_constraints(id) ON DELETE CASCADE,
+  value_constraint_id BIGINT NOT NULL REFERENCES value_constraints(id) ON DELETE CASCADE,
   value VARCHAR NOT NULL,
 
   UNIQUE(value_constraint_id, value)
@@ -126,7 +126,7 @@ CREATE TABLE value_constraint_values(
 
 CREATE TABLE limit_constraints(
   id IDENTITY,
-  constraint_id INT NOT NULL REFERENCES task_constraints(id) ON DELETE CASCADE,
+  constraint_id BIGINT NOT NULL REFERENCES task_constraints(id) ON DELETE CASCADE,
   value INTEGER NOT NULL,
 
   UNIQUE(constraint_id)
@@ -134,7 +134,7 @@ CREATE TABLE limit_constraints(
 
 CREATE TABLE task_config_requested_ports(
   id IDENTITY,
-  task_config_id INT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
+  task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
   port_name VARCHAR NOT NULL,
 
   UNIQUE(task_config_id, port_name)
@@ -142,7 +142,7 @@ CREATE TABLE task_config_requested_ports(
 
 CREATE TABLE task_config_task_links(
   id IDENTITY,
-  task_config_id INT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
+  task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
   label VARCHAR NOT NULL,
   url VARCHAR NOT NULL,
 
@@ -151,14 +151,14 @@ CREATE TABLE task_config_task_links(
 
 CREATE TABLE task_config_metadata(
   id IDENTITY,
-  task_config_id INT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
+  task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
   key VARCHAR NOT NULL,
   value VARCHAR NOT NULL
 );
 
 CREATE TABLE task_config_docker_containers(
   id IDENTITY,
-  task_config_id INT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
+  task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
   image VARCHAR NOT NULL,
 
   UNIQUE(task_config_id)
@@ -166,7 +166,7 @@ CREATE TABLE task_config_docker_containers(
 
 CREATE TABLE task_config_docker_container_parameters(
   id IDENTITY,
-  container_id INT NOT NULL REFERENCES task_config_docker_containers(id) ON DELETE CASCADE,
+  container_id BIGINT NOT NULL REFERENCES task_config_docker_containers(id) ON DELETE CASCADE,
   name VARCHAR NOT NULL,
   value VARCHAR NOT NULL
 );
@@ -181,19 +181,19 @@ CREATE TABLE task_states(
 CREATE TABLE tasks(
   id IDENTITY,
   task_id VARCHAR NOT NULL,
-  slave_row_id INT REFERENCES host_attributes(id),
+  slave_row_id BIGINT REFERENCES host_attributes(id),
   instance_id INTEGER NOT NULL,
   status INT NOT NULL REFERENCES task_states(id),
   failure_count INTEGER NOT NULL,
   ancestor_task_id VARCHAR NULL,
-  task_config_row_id INT NOT NULL REFERENCES task_configs(id),
+  task_config_row_id BIGINT NOT NULL REFERENCES task_configs(id),
 
   UNIQUE(task_id)
 );
 
 CREATE TABLE task_events(
   id IDENTITY,
-  task_row_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  task_row_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   timestamp_ms BIGINT NOT NULL,
   status INT NOT NULL REFERENCES task_states(id),
   message VARCHAR NULL,
@@ -202,7 +202,7 @@ CREATE TABLE task_events(
 
 CREATE TABLE task_ports(
   id IDENTITY,
-  task_row_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  task_row_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   name VARCHAR NOT NULL,
   port INT NOT NULL,
 
@@ -218,11 +218,11 @@ CREATE TABLE cron_policies(
 
 CREATE TABLE cron_jobs(
   id IDENTITY,
-  job_key_id INT NOT NULL REFERENCES job_keys(id),
+  job_key_id BIGINT NOT NULL REFERENCES job_keys(id),
   creator_user VARCHAR NOT NULL,
   cron_schedule VARCHAR NOT NULL,
   cron_collision_policy INT REFERENCES cron_policies(id),
-  task_config_row_id INT NOT NULL REFERENCES task_configs(id),
+  task_config_row_id BIGINT NOT NULL REFERENCES task_configs(id),
   instance_count INT NOT NULL,
 
   UNIQUE(job_key_id)
@@ -271,7 +271,7 @@ CREATE TABLE job_update_locks(
 CREATE TABLE job_update_configs(
   id IDENTITY,
   update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
-  task_config_row_id INT NOT NULL REFERENCES task_configs(id),
+  task_config_row_id BIGINT NOT NULL REFERENCES task_configs(id),
   is_new BOOLEAN NOT NULL
 );
 
