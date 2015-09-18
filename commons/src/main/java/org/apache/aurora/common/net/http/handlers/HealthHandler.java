@@ -42,9 +42,9 @@ public class HealthHandler {
    * The plain text response string this servlet returns in the body of its responses to health
    * check requests when its containing service is healthy.
    */
-  public static final String IS_HEALTHY = "OK";
+  public static final String IS_HEALTHY = "OK\n";
 
-  private static final String IS_NOT_HEALTHY = "SICK";
+  private static final String IS_NOT_HEALTHY = "SICK\n";
 
   private final Supplier<Boolean> healthChecker;
 
