@@ -14,6 +14,7 @@ machines.  This guide helps you get the scheduler set up and troubleshoot some c
   - [Network considerations](#network-considerations)
   - [Considerations for running jobs in docker](#considerations-for-running-jobs-in-docker)
   - [Security Considerations](#security-considerations)
+  - [Configuring Resource Oversubscription](#configuring-resource-oversubscription)
 - [Running Aurora](#running-aurora)
   - [Maintaining an Aurora Installation](#maintaining-an-aurora-installation)
   - [Monitoring](#monitoring)
@@ -189,6 +190,21 @@ assuming you set `-http_port=8081`.
 ## Security Considerations
 
 See [security.md](security.md).
+
+## Configuring Resource Oversubscription
+
+**WARNING**: This feature is currently in alpha status. Do not use it in production clusters!
+See [this document](configuration-reference.md#revocable-jobs) for more feature details.
+
+Set these scheduler flag to allow receiving revocable Mesos offers:
+
+    -receive_revocable_resources=true
+
+Specify a tier configuration file path:
+
+    -tier_config=path/to/tiers/config.json
+
+Example [tier configuration file](../src/test/resources/org/apache/aurora/scheduler/tiers-example.json).
 
 ### Maintaining an Aurora Installation
 
