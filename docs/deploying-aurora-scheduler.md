@@ -225,6 +225,9 @@ constraints are arbitrary and available for custom use.  There is one exception,
 `dedicated` attribute.  Aurora treats this specially, and only allows matching jobs to run on these
 machines, and will only schedule matching jobs on these machines.
 
+See the [section](resources.md#resource-quota) about resource quotas to learn how quotas apply to
+dedicated jobs.
+
 ##### Syntax
 The dedicated attribute has semantic meaning. The format is `$role(/.*)?`. When a job is created,
 the scheduler requires that the `$role` component matches the `role` field in the job

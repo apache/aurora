@@ -23,7 +23,7 @@ We encourage you to ask questions on the [Aurora developer list](http://aurora.a
  * [Scheduler Storage](storage.md)
  * [Scheduler Storage and Maintenance](storage-config.md)
  * [SLA Measurement](sla.md)
- * [Resource Isolation and Sizing](resource-isolation.md)
+ * [Resource Isolation and Sizing](resources.md)
  * [Generating test resources](test-resource-generation.md)
 
 ## Developers
