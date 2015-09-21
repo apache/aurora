@@ -75,8 +75,7 @@ class DistributedCommandRunner(object):
   def query_from(cls, role, env, job):
     return TaskQuery(statuses=LIVE_STATES, jobKeys=[JobKey(role=role, environment=env, name=job)])
 
-  def __init__(self, cluster, role, env, jobs, ssh_user=None,
-      log_fn=log.log):
+  def __init__(self, cluster, role, env, jobs, ssh_user=None, ssh_options=None, log_fn=log.log):
     self._cluster = cluster
     self._api = AuroraClientAPI(
         cluster=cluster,
@@ -85,11 +84,14 @@ class DistributedCommandRunner(object):
     self._env = env
     self._jobs = jobs
     self._ssh_user = ssh_user if ssh_user else self._role
+    self._ssh_options = ssh_options if ssh_options else []
     self._log = log_fn
 
   def execute(self, args):
     hostname, role, command = args
-    ssh_command = ['ssh', '-n', '-q', '%s@%s' % (role, hostname), command]
+    ssh_command = ['ssh', '-n', '-q']
+    ssh_command += self._ssh_options
+    ssh_command += ['%s@%s' % (role, hostname), command]
     self._log(logging.DEBUG, "Running command: %s" % ssh_command)
     po = subprocess.Popen(ssh_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = po.communicate()
@@ -125,8 +127,22 @@ class InstanceDistributedCommandRunner(DistributedCommandRunner):
         jobKeys=[JobKey(role=role, environment=env, name=job)],
         instanceIds=instances)
 
-  def __init__(self, cluster, role, env, job, ssh_user=None, instances=None, log_fn=logging.log):
-    super(InstanceDistributedCommandRunner, self).__init__(cluster, role, env, [job], ssh_user,
+  def __init__(self,
+               cluster,
+               role,
+               env,
+               job,
+               ssh_user=None,
+               ssh_options=None,
+               instances=None,
+               log_fn=logging.log):
+    super(InstanceDistributedCommandRunner, self).__init__(
+        cluster,
+        role,
+        env,
+        [job],
+        ssh_user,
+        ssh_options,
         log_fn)
     self._job = job
     self._ssh_user = ssh_user if ssh_user else self._role

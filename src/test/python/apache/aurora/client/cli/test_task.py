@@ -58,7 +58,13 @@ class TestRunCommand(AuroraClientCommandTest):
     """Test the run command."""
     self.generic_test_successful_run(['task', 'run', 'west/bozo/test/hello/1-3', 'ls'], [1, 2, 3])
 
-  def generic_test_successful_run(self, cmd_args, instances):
+  def test_successful_run_with_ssh_options(self):
+    self.generic_test_successful_run(
+        ['task', 'run', '--ssh-options=-v -k', 'west/bozo/test/hello', 'ls'],
+        None,
+        ssh_options=['-v', '-k'])
+
+  def generic_test_successful_run(self, cmd_args, instances, ssh_options=None):
     """Common structure of all successful run tests.
     Params:
       cmd_args: the arguments to pass to the aurora command line to run this test.
@@ -92,10 +98,12 @@ class TestRunCommand(AuroraClientCommandTest):
 
       # The mock status call returns 3 three ScheduledTasks, so three commands should have been run
       assert mock_subprocess.call_count == 3
-      mock_subprocess.assert_called_with(['ssh', '-n', '-q', 'bozo@slavehost',
+      expected = ['ssh', '-n', '-q']
+      expected += ssh_options if ssh_options else []
+      expected += ['bozo@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
-          'slaverun/sandbox;ls'],
-          stderr=-2, stdout=-1)
+          'slaverun/sandbox;ls']
+      mock_subprocess.assert_called_with(expected, stderr=-2, stdout=-1)
 
 
 class TestSshCommand(AuroraClientCommandTest):
@@ -131,7 +139,7 @@ class TestSshCommand(AuroraClientCommandTest):
             mock_runner_args_patch,
             mock_subprocess):
       cmd = AuroraCommandLine()
-      cmd.execute(['task', 'ssh', 'west/bozo/test/hello/1', '--command=ls'])
+      cmd.execute(['task', 'ssh', '--ssh-options=-v', 'west/bozo/test/hello/1', '--command=ls'])
 
       # The status command sends a getTasksStatus query to the scheduler,
       # and then prints the result.
@@ -141,7 +149,7 @@ class TestSshCommand(AuroraClientCommandTest):
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
               ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING
               ])))
-      mock_subprocess.assert_called_with(['ssh', '-t', 'bozo@slavehost',
+      mock_subprocess.assert_called_with(['ssh', '-t', '-v', 'bozo@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])
 

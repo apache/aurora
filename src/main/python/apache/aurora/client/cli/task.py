@@ -29,6 +29,7 @@ from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
     EXECUTOR_SANDBOX_OPTION,
     INSTANCES_SPEC_ARGUMENT,
+    SSH_OPTIONS,
     SSH_USER_OPTION,
     TASK_INSTANCE_ARGUMENT,
     CommandOption
@@ -54,6 +55,7 @@ class RunCommand(Verb):
         CommandOption('--threads', '-t', type=int, default=1, dest='num_threads',
             help='Number of threads to use'),
         SSH_USER_OPTION,
+        SSH_OPTIONS,
         EXECUTOR_SANDBOX_OPTION,
         INSTANCES_SPEC_ARGUMENT,
         CommandOption('cmd', type=str, metavar="unix_command_line")
@@ -62,8 +64,14 @@ class RunCommand(Verb):
   def execute(self, context):
     (cluster_name, role, env, name), instances = context.options.instance_spec
     cluster = CLUSTERS[cluster_name]
-    dcr = InstanceDistributedCommandRunner(cluster, role, env, name,
-        context.options.ssh_user, instances)
+    dcr = InstanceDistributedCommandRunner(
+        cluster,
+        role,
+        env,
+        name,
+        context.options.ssh_user,
+        context.options.ssh_options,
+        instances)
     dcr.run(context.options.cmd, parallelism=context.options.num_threads,
         executor_sandbox=context.options.executor_sandbox)
     return EXIT_OK
@@ -82,6 +90,7 @@ class SshCommand(Verb):
   def get_options(self):
     return [
         SSH_USER_OPTION,
+        SSH_OPTIONS,
         EXECUTOR_SANDBOX_OPTION,
         CommandOption('--tunnels', '-L', dest='tunnels', action='append', metavar='PORT:NAME',
             default=[],
@@ -106,10 +115,14 @@ class SshCommand(Verb):
           "Job %s not found" % context.options.task_instance.jobkey)
     first_task = resp.result.scheduleStatusResult.tasks[0]
     remote_cmd = context.options.command or 'bash'
-    command = DistributedCommandRunner.substitute(remote_cmd, first_task,
-        api.cluster, executor_sandbox=context.options.executor_sandbox)
+    command = DistributedCommandRunner.substitute(
+        remote_cmd,
+        first_task,
+        api.cluster,
+        executor_sandbox=context.options.executor_sandbox)
 
     ssh_command = ['ssh', '-t']
+    ssh_command += context.options.ssh_options if context.options.ssh_options else []
     assigned = first_task.assignedTask
     role = assigned.task.job.role if assigned.task.job else assigned.task.owner.role
     slave_host = assigned.slaveHost

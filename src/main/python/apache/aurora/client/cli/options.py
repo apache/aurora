@@ -157,6 +157,16 @@ def binding_parser(binding):
   return {ref: binding_parts[1]}
 
 
+def parse_options(options):
+  """Parses list of space separated options.
+
+  :param options: String of options
+  :type options: string
+  :rtype: list of options
+  """
+  return options.split() if options is not None else []
+
+
 BATCH_OPTION = CommandOption('--batch-size', type=int, default=1,
         help='Number of instances to be operate on in one iteration')
 
@@ -251,6 +261,8 @@ ROLE_OPTION = CommandOption('--role', metavar='ROLENAME', default=None,
 SSH_USER_OPTION = CommandOption('--ssh-user', '-l', default=None, metavar="ssh_username",
     help='ssh as this username instead of the job\'s role')
 
+SSH_OPTIONS = CommandOption('--ssh-options', type=parse_options, dest='ssh_options',
+    default=None, metavar="ssh_options", help='A string of space separated system ssh options.')
 
 STRICT_OPTION = CommandOption('--strict', default=False, action='store_true',
     help=("Check instances and generate an error for instance ranges in parameters "
