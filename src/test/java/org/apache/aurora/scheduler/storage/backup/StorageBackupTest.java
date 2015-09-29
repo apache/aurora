@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.storage.backup;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -43,9 +44,10 @@ import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
-import org.apache.commons.io.FileUtils;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -60,14 +62,15 @@ public class StorageBackupTest extends EasyMockTest {
   private FakeClock clock;
   private BackupConfig config;
   private StorageBackupImpl storageBackup;
+  @Rule
+  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     delegate = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
-    final File backupDir = Files.createTempDir();
+    final File backupDir = temporaryFolder.newFolder();
     ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
     clock = FakeScheduledExecutor.scheduleExecutor(executor);
-    addTearDown(() -> FileUtils.deleteDirectory(backupDir));
     config = new BackupConfig(backupDir, MAX_BACKUPS, INTERVAL);
     clock.advance(Amount.of(365 * 30L, Time.DAYS));
     storageBackup = new StorageBackupImpl(delegate, clock, config, executor);

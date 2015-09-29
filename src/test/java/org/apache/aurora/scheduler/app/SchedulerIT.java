@@ -33,7 +33,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.Hashing;
-import com.google.common.io.Files;
 import com.google.common.util.concurrent.Atomics;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -99,7 +98,9 @@ import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import static org.apache.aurora.common.testing.easymock.EasyMockTest.createCapture;
 import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
@@ -146,6 +147,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private ZooKeeperClient zkClient;
   private File backupDir;
   private Lifecycle lifecycle;
+  @Rule
+  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   @Before
   public void mySetUp() throws Exception {
@@ -161,14 +164,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         control.verify();
       }
     });
-    backupDir = Files.createTempDir();
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() throws Exception {
-        org.apache.commons.io.FileUtils.deleteDirectory(backupDir);
-      }
-    });
-
+    backupDir = temporaryFolder.newFolder();
     driver = control.createMock(SchedulerDriver.class);
     // This is necessary to allow driver to block, otherwise it would stall other mocks.
     EasyMock.makeThreadSafe(driver, false);

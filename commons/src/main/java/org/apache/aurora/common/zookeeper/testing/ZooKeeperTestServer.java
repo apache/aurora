@@ -22,12 +22,10 @@ import java.util.LinkedList;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.io.Files;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.apache.commons.io.FileUtils;
 import org.apache.zookeeper.server.NIOServerCnxn;
 import org.apache.zookeeper.server.ZooKeeperServer;
 import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
@@ -40,10 +38,6 @@ import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
  */
 public class ZooKeeperTestServer {
 
-  /**
-   * The default session timeout for clients created by servers constructed with
-   * {@link #ZooKeeperTestServer()}.
-   */
   public static final Amount<Integer, Time> DEFAULT_SESSION_TIMEOUT =
       Amount.of(100, Time.MILLISECONDS);
 
@@ -54,23 +48,20 @@ public class ZooKeeperTestServer {
   private final LinkedList<Runnable> cleanupActions = Lists.newLinkedList();
 
   /**
-   * @throws IOException if there was aproblem creating the server's database
-   */
-  public ZooKeeperTestServer() throws IOException {
-    this(DEFAULT_SESSION_TIMEOUT);
-  }
-
-  /**
    * @param defaultSessionTimeout the default session timeout for clients created with
    *     {@link #createClient()}.
    * @throws IOException if there was aproblem creating the server's database
    */
-  public ZooKeeperTestServer(Amount<Integer, Time> defaultSessionTimeout) throws IOException {
+  public ZooKeeperTestServer(
+      Amount<Integer, Time> defaultSessionTimeout,
+      File dataDir,
+      File snapDir) throws IOException {
+
     this.defaultSessionTimeout = Preconditions.checkNotNull(defaultSessionTimeout);
 
     zooKeeperServer =
         new ZooKeeperServer(
-            new FileTxnSnapLog(createTempDir(), createTempDir()),
+            new FileTxnSnapLog(dataDir, snapDir),
             new BasicDataTreeBuilder()) {
 
           // TODO(John Sirois): Introduce a builder to configure the in-process server if and when
@@ -197,20 +188,5 @@ public class ZooKeeperTestServer {
 
   private void checkEphemeralPortAssigned() {
     Preconditions.checkState(port > 0, "startNetwork must be called first");
-  }
-
-  private File createTempDir() {
-    final File tempDir = Files.createTempDir();
-    cleanupActions.addFirst(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          FileUtils.deleteDirectory(tempDir);
-        } catch (IOException e) {
-          // No-op.
-        }
-      }
-    });
-    return tempDir;
   }
 }

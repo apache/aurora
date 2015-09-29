@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.storage.backup;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.io.Files;
 
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.quantity.Amount;
@@ -42,10 +42,11 @@ import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImp
 import org.apache.aurora.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
-import org.apache.commons.io.FileUtils;
 import org.easymock.Capture;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 import static org.easymock.EasyMock.capture;
@@ -67,11 +68,12 @@ public class RecoveryTest extends EasyMockTest {
   private FakeClock clock;
   private StorageBackupImpl storageBackup;
   private RecoveryImpl recovery;
+  @Rule
+  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   @Before
-  public void setUp() {
-    final File backupDir = Files.createTempDir();
-    addTearDown(() -> FileUtils.deleteDirectory(backupDir));
+  public void setUp() throws IOException {
+    final File backupDir = temporaryFolder.newFolder();
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
     distributedStore = createMock(DistributedSnapshotStore.class);
     primaryStorage = createMock(Storage.class);

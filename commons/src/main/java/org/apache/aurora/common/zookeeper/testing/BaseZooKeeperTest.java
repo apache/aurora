@@ -22,6 +22,8 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.TearDownTestCase;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.junit.Before;
+import org.junit.Rule;
+import org.junit.rules.TemporaryFolder;
 
 /**
  * A baseclass for in-process zookeeper tests.
@@ -32,6 +34,8 @@ public abstract class BaseZooKeeperTest extends TearDownTestCase {
 
   private final Amount<Integer, Time> defaultSessionTimeout;
   private ZooKeeperTestServer zkTestServer;
+  @Rule
+  public TemporaryFolder tmpFolder = new TemporaryFolder();
 
   /**
    * Creates a test case where the test server uses its
@@ -52,7 +56,10 @@ public abstract class BaseZooKeeperTest extends TearDownTestCase {
 
   @Before
   public final void setUp() throws Exception {
-    zkTestServer = new ZooKeeperTestServer(defaultSessionTimeout);
+    zkTestServer = new ZooKeeperTestServer(
+        defaultSessionTimeout,
+        tmpFolder.newFolder(),
+        tmpFolder.newFolder());
     addTearDown(zkTestServer::stop);
     zkTestServer.startNetwork();
   }

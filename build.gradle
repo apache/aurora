@@ -159,7 +159,6 @@ project(':commons') {
     compile "com.sun.jersey:jersey-json:${jerseyRev}"
     compile "com.sun.jersey:jersey-server:${jerseyRev}"
     compile "com.sun.jersey:jersey-servlet:${jerseyRev}"
-    compile "commons-io:commons-io:2.1"
     compile "commons-lang:commons-lang:${commonsLangRev}"
     compile "javax.servlet:servlet-api:${servletRev}"
     compile "joda-time:joda-time:2.3"
