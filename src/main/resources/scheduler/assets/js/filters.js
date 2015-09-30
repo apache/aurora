@@ -73,8 +73,8 @@
 
   auroraUI.filter('toNiceRanges', function () {
     return function (ranges) {
-      return ranges.map(function (range) {
-        return range.first + '-' + range.last;
+      return ranges.sort(function (a, b) { return a.first - b.first; }).map(function (range) {
+        return range.first === range.last ? '' + range.first : range.first + '-' + range.last;
       }).join(', ');
     };
   });
