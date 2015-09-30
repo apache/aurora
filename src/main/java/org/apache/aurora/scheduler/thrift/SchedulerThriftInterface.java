@@ -202,6 +202,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   private final UUIDGenerator uuidGenerator;
   private final JobUpdateController jobUpdateController;
   private final ReadOnlyScheduler.Iface readOnlyScheduler;
+  private final AuditMessages auditMessages;
 
   @Inject
   SchedulerThriftInterface(
@@ -217,7 +218,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       TaskIdGenerator taskIdGenerator,
       UUIDGenerator uuidGenerator,
       JobUpdateController jobUpdateController,
-      ReadOnlyScheduler.Iface readOnlyScheduler) {
+      ReadOnlyScheduler.Iface readOnlyScheduler,
+      AuditMessages auditMessages) {
 
     this.storage = requireNonNull(storage);
     this.lockManager = requireNonNull(lockManager);
@@ -232,6 +234,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     this.uuidGenerator = requireNonNull(uuidGenerator);
     this.jobUpdateController = requireNonNull(jobUpdateController);
     this.readOnlyScheduler = requireNonNull(readOnlyScheduler);
+    this.auditMessages = requireNonNull(auditMessages);
   }
 
   @Override
@@ -583,7 +586,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
               taskId,
               Optional.absent(),
               ScheduleStatus.KILLING,
-              killedByMessage(context.getIdentity()));
+              auditMessages.killedBy(context.getIdentity()));
         }
 
         return tasksKilled
@@ -639,7 +642,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
                   taskId,
                   Optional.absent(),
                   ScheduleStatus.RESTARTING,
-                  restartedByMessage(context.getIdentity()));
+                  auditMessages.restartedBy(context.getIdentity()));
             }
           }
         });
@@ -736,7 +739,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
             taskId,
             Optional.absent(),
             status,
-            transitionMessage(context.getIdentity()));
+            auditMessages.transitionedBy(context.getIdentity()));
       }
     });
 
@@ -1340,21 +1343,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     JobKeys.assertValid(key.getJob());
     checkNotBlank(key.getId());
     return key;
-  }
-
-  @VisibleForTesting
-  static Optional<String> transitionMessage(String user) {
-    return Optional.of("Transition forced by " + user);
-  }
-
-  @VisibleForTesting
-  static Optional<String> killedByMessage(String user) {
-    return Optional.of("Killed by " + user);
-  }
-
-  @VisibleForTesting
-  static Optional<String> restartedByMessage(String user) {
-    return Optional.of("Restarted by " + user);
   }
 
   @VisibleForTesting

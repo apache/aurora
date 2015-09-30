@@ -159,11 +159,8 @@ import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TA
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NO_CRON;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.jobAlreadyExistsMessage;
-import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.killedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.noCronScheduleMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.notScheduledCronMessage;
-import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.restartedByMessage;
-import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 import static org.easymock.EasyMock.anyInt;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
@@ -195,6 +192,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private UUIDGenerator uuidGenerator;
   private JobUpdateController jobUpdateController;
   private ReadOnlyScheduler.Iface readOnlyScheduler;
+  private AuditMessages auditMessages;
 
   @Before
   public void setUp() throws Exception {
@@ -214,6 +212,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     uuidGenerator = createMock(UUIDGenerator.class);
     jobUpdateController = createMock(JobUpdateController.class);
     readOnlyScheduler = createMock(ReadOnlyScheduler.Iface.class);
+    auditMessages = createMock(AuditMessages.class);
 
     thrift = getResponseProxy(
         new SchedulerThriftInterface(
@@ -229,7 +228,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             taskIdGenerator,
             uuidGenerator,
             jobUpdateController,
-            readOnlyScheduler));
+            readOnlyScheduler,
+            auditMessages));
   }
 
   private static AuroraAdmin.Iface getResponseProxy(final AuroraAdmin.Iface realThrift) {
@@ -644,12 +644,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private void expectTransitionsToKilling() {
+    expect(auditMessages.killedBy(USER)).andReturn(Optional.of("test"));
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID,
         Optional.absent(),
         ScheduleStatus.KILLING,
-        killedByMessage(USER))).andReturn(StateChangeResult.SUCCESS);
+        Optional.of("test"))).andReturn(StateChangeResult.SUCCESS);
   }
 
   @Test
@@ -874,12 +875,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testForceTaskState() throws Exception {
     ScheduleStatus status = ScheduleStatus.FAILED;
 
+    expect(auditMessages.transitionedBy(USER)).andReturn(Optional.of("test"));
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID,
         Optional.absent(),
         ScheduleStatus.FAILED,
-        Optional.of(transitionMessage(USER).get()))).andReturn(StateChangeResult.SUCCESS);
+        Optional.of("test"))).andReturn(StateChangeResult.SUCCESS);
 
     expectAuth(ROOT, true);
     expectAuth(ROOT, false);
@@ -972,12 +974,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         Query.instanceScoped(JOB_KEY, shards).active(),
         buildScheduledTask());
 
+    expect(auditMessages.restartedBy(USER))
+        .andReturn(Optional.of("test"));
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID,
         Optional.absent(),
         ScheduleStatus.RESTARTING,
-        restartedByMessage(USER))).andReturn(StateChangeResult.SUCCESS);
+        Optional.of("test"))).andReturn(StateChangeResult.SUCCESS);
 
     control.replay();
 

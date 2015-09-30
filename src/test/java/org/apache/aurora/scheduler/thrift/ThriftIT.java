@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.thrift;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableMap;
@@ -22,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Provides;
 
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.Capability;
@@ -50,6 +52,7 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
+import org.apache.shiro.subject.Subject;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -172,6 +175,11 @@ public class ThriftIT extends EasyMockTest {
             bind(QuotaManager.class).toInstance(quotaManager);
             bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo()));
             bindMock(CronPredictor.class);
+          }
+
+          @Provides
+          Optional<Subject> provideSubject() {
+            return Optional.of(createMock(Subject.class));
           }
         }
     );
