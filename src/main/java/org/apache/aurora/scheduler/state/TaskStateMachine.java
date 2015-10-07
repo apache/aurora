@@ -143,7 +143,7 @@ class TaskStateMachine {
    *
    * @param name Name of the state machine, for logging.
    */
-  public TaskStateMachine(String name) {
+  TaskStateMachine(String name) {
     this(name, Optional.absent());
   }
 
@@ -153,7 +153,7 @@ class TaskStateMachine {
    *.
    * @param task Read-only task that this state machine manages.
    */
-  public TaskStateMachine(IScheduledTask task) {
+  TaskStateMachine(IScheduledTask task) {
     this(Tasks.id(task), Optional.of(task));
   }
 

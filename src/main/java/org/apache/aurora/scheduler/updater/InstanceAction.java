@@ -30,7 +30,7 @@ enum InstanceAction {
 
   private final Optional<InstanceActionHandler> handler;
 
-  private InstanceAction(Optional<InstanceActionHandler> handler) {
+  InstanceAction(Optional<InstanceActionHandler> handler) {
     this.handler = handler;
   }
 

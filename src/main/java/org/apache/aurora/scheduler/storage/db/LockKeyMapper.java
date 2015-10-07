@@ -35,7 +35,7 @@ class LockKeyMapper {
   private final JobKeyMapper jobKeyMapper;
 
   @Inject
-  public LockKeyMapper(JobKeyMapper jobKeyMapper) {
+  LockKeyMapper(JobKeyMapper jobKeyMapper) {
     this.jobKeyMapper = requireNonNull(jobKeyMapper);
   }
 

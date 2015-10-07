@@ -20,7 +20,7 @@ import org.junit.Test;
 
 public class ModuleParserTest {
   static class NoOpModule implements Module {
-    public NoOpModule() {
+    NoOpModule() {
       // No-op.
     }
 

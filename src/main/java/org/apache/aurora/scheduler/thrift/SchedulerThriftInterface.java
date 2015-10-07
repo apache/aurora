@@ -298,7 +298,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   private static class JobExistsException extends Exception {
-    public JobExistsException(String message) {
+    JobExistsException(String message) {
       super(message);
     }
   }
@@ -1040,7 +1040,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   private static class TaskValidationException extends Exception {
-    public TaskValidationException(String message) {
+    TaskValidationException(String message) {
       super(message);
     }
   }

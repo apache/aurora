@@ -170,7 +170,7 @@ public final class Resources {
    * Thrown when there are insufficient resources to satisfy a request.
    */
   static class InsufficientResourcesException extends RuntimeException {
-    public InsufficientResourcesException(String message) {
+    InsufficientResourcesException(String message) {
       super(message);
     }
   }

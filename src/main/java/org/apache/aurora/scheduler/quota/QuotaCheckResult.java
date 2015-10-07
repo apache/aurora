@@ -28,7 +28,7 @@ public class QuotaCheckResult {
   /**
    * Quota check result.
    */
-  public static enum Result {
+  public enum Result {
     /**
      * There is sufficient quota for the requested operation.
      */
@@ -40,13 +40,13 @@ public class QuotaCheckResult {
     INSUFFICIENT_QUOTA
   }
 
-  private static enum Resource {
+  enum Resource {
     CPU("core(s)"),
     RAM("MB"),
     DISK("MB");
 
     private final String unit;
-    private Resource(String unit) {
+    Resource(String unit) {
       this.unit = unit;
     }
 

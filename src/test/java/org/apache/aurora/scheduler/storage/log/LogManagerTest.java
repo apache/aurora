@@ -294,7 +294,7 @@ public class LogManagerTest extends EasyMockTest {
     private final LogEntry header;
     private final ImmutableList<LogEntry> chunks;
 
-    public Message(Amount<Integer, Data> chunkSize, Frame header, Iterable<Frame> chunks) {
+    Message(Amount<Integer, Data> chunkSize, Frame header, Iterable<Frame> chunks) {
       this.chunkSize = chunkSize;
       this.header = LogEntry.frame(header);
       this.chunks = ImmutableList.copyOf(Iterables.transform(chunks,

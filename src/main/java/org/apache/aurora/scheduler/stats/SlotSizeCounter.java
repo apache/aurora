@@ -69,7 +69,7 @@ class SlotSizeCounter implements Runnable {
     private final boolean dedicated;
     private final boolean revocable;
 
-    public MachineResource(IResourceAggregate size, boolean dedicated, boolean revocable) {
+    MachineResource(IResourceAggregate size, boolean dedicated, boolean revocable) {
       this.size = requireNonNull(size);
       this.dedicated = dedicated;
       this.revocable = revocable;

@@ -55,7 +55,7 @@ public final class Permissions {
   /**
    * Domain of a permitted RPC (the first part of a {@link WildcardPermission}).
    */
-  public static enum Domain {
+  public enum Domain {
     /**
      * RPCs on the {@link org.apache.aurora.gen.AuroraSchedulerManager} service.
      */

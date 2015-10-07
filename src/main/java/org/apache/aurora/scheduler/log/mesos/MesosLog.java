@@ -402,7 +402,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
     private static class LogEntry implements org.apache.aurora.scheduler.log.Log.Entry {
       private final Log.Entry underlying;
 
-      public LogEntry(Log.Entry entry) {
+      LogEntry(Log.Entry entry) {
         this.underlying = entry;
       }
 
