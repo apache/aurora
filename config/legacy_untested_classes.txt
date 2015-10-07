@@ -1,6 +1,9 @@
 org/apache/aurora/Protobufs$1
+org/apache/aurora/auth/CapabilityValidator$AuditCheck
+org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$1
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$2
+org/apache/aurora/auth/UnsecureAuthModule$UnsecureSessionValidator
 org/apache/aurora/scheduler/app/SchedulerMain$1
 org/apache/aurora/scheduler/app/SchedulerMain$2
 org/apache/aurora/scheduler/app/SchedulerMain$3
@@ -47,7 +50,8 @@ org/apache/aurora/scheduler/http/Utilization$4
 org/apache/aurora/scheduler/http/Utilization$5
 org/apache/aurora/scheduler/http/Utilization$Display
 org/apache/aurora/scheduler/http/Utilization$DisplayMetric
-org/apache/aurora/scheduler/log/Log$Stream$InvalidPositionException
+org/apache/aurora/scheduler/http/api/security/FieldGetter$IdentityFieldGetter
+org/apache/aurora/scheduler/http/api/security/Kerberos5Realm
 org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule
 org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$3
 org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$4
@@ -56,11 +60,13 @@ org/apache/aurora/scheduler/mesos/DriverFactoryImpl
 org/apache/aurora/scheduler/mesos/LibMesosLoadingModule
 org/apache/aurora/scheduler/stats/AsyncStatsModule$OfferAdapter$1
 org/apache/aurora/scheduler/stats/StatsModule$3
-org/apache/aurora/scheduler/storage/log/LogStorage$RecoveryFailedException
+org/apache/aurora/scheduler/stats/TaskStatCalculator
+org/apache/aurora/scheduler/storage/CallOrderEnforcingStorage$State
+org/apache/aurora/scheduler/storage/backup/BackupModule$LifecycleHook
+org/apache/aurora/scheduler/storage/mem/MemTaskStore$Task
 org/apache/aurora/scheduler/storage/mem/Util
 org/apache/aurora/scheduler/storage/mem/Util$1
 org/apache/aurora/scheduler/testing/FakeStatsProvider$3
-org/apache/aurora/scheduler/updater/UpdateConfigurationException
 org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$LocalClientProvider
 org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$TestServerService
 org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$1

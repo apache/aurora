@@ -76,23 +76,22 @@ class CoverageReportCheck extends DefaultTask {
 
   def checkClassCoverage(coverageReport) {
     def coverageErrors = coverageReport.package.class.collect { cls ->
-      // javac inserts a synthetic constructor for anonymous classes, and jacoco tends to mark
-      // these as covered in some cases, leading to flaky behavior.  We work around that by
-      // collecting the coverage count for each method in each class, omitting the default
-      // constructor for anonymous classes.  Anonymous classes are identified by their name,
-      // which we expect to be of the form 'Something$1'.  Jacoco names default constructors
-      // '<init>', so we filter based on that.
-      def isAnonymous = { c -> c.@name ==~ /.*\$\d+/ }
-      def methodFilter = isAnonymous(cls) ? { m -> m.@name != '<init>' } : { true }
+      def matchedMethods = cls.method
+          // Ignore static code, it should not count as test coverage.
+          .findAll({ m -> m.@name != '<clinit>' })
+          // Ignore classes that only have a constructor. This will avoid tripping for things like
+          // constant-only utility classes, and 'value' classes like TypeLiteral and Clazz.
+          .findAll({ m -> m.@name != '<init>' })
 
-      // Always ignore static code, it should not count as test coverage.
-      def matchedMethods = cls.method.findAll({ m -> m.@name != '<clinit>' }).findAll(methodFilter)
+      // Ignore enums that contain only default methods.
+      if (matchedMethods.collect { m -> m.@name } == ['values', 'valueOf']) {
+        return null
+      }
+
       if (matchedMethods.isEmpty()) {
-        // Ignore anonymous classes that only have a constructor. This will avoid tripping for
-        // things like TypeLiteral and Clazz.
         if (cls.@name in legacyClassesWithoutCoverage) {
           return 'Please remove ' + cls.@name + ' from the legacyClassesWithoutCoverage list' \
-              + ', this check does not apply for constructor-only anonymous classes' \
+              + ', this check does not apply for constructor-only classes' \
               + ' or classes with only static class initialization code.'
         } else {
           return null
