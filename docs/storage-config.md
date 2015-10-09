@@ -99,7 +99,7 @@ accomplished by updating the following scheduler configuration options:
   * Set `-mesos_master_address` to a non-existent zk address. This will prevent scheduler from
     registering with Mesos. E.g.: `-mesos_master_address=zk://localhost:2181`
   * `-max_registration_delay` - set to sufficiently long interval to prevent registration timeout
-    and as a result scheduler suicide. E.g: `-max_registration_delay=360min`
+    and as a result scheduler suicide. E.g: `-max_registration_delay=360mins`
   * Make sure `-reconciliation_initial_delay` option is set high enough (e.g.: `365days`) to
     prevent accidental task GC. This is important as scheduler will attempt to reconcile the cluster
     state and will kill all tasks when restarted with an empty Mesos replicated log.
@@ -112,7 +112,7 @@ Get rid of the corrupted files and re-initialize Mesos replicate log:
 
 * Stop schedulers
 * Delete all files under `-native_log_file_path` on all schedulers
-* Initialize Mesos replica's log file: `mesos-log initialize <-native_log_file_path>`
+* Initialize Mesos replica's log file: `mesos-log initialize --path=<-native_log_file_path>`
 * Restart schedulers
 
 ### Restore from backup
