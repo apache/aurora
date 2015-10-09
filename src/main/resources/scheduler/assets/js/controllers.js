@@ -401,15 +401,15 @@
       ];
 
       var total = _.reduce(response.groups, function (m, n) {
-        return m + n.instanceIds.length;
+        return m + updateUtil.instanceCountFromRanges(n.instances);
       }, 0);
 
       $scope.groupSummary = response.groups.map(function (group, i) {
-        var count = group.instanceIds.length;
+        var count = updateUtil.instanceCountFromRanges(group.instances);
         var percentage = (count / total) * 100;
 
-        var ranges = taskUtil.toRanges(group.instanceIds).map(function (r) {
-          return (r.start === r.end) ? r.start : r.start + '-' + r.end;
+        var ranges = group.instances.map(function (r) {
+          return (r.first === r.last) ? r.first : r.first + '-' + r.last;
         });
 
         return {

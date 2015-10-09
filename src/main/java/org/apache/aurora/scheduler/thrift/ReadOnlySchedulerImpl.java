@@ -91,12 +91,15 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
+import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.thrift.TException;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
+import static org.apache.aurora.scheduler.base.Numbers.toRanges;
 import static org.apache.aurora.scheduler.thrift.Responses.invalidRequest;
 import static org.apache.aurora.scheduler.thrift.Responses.ok;
 
@@ -107,7 +110,8 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
         public ConfigGroup apply(Entry<ITaskConfig, Collection<Integer>> input) {
           return new ConfigGroup(
               input.getKey().newBuilder(),
-              ImmutableSet.copyOf(input.getValue()));
+              ImmutableSet.copyOf(input.getValue()),
+              IRange.toBuildersSet(convertRanges(toRanges(input.getValue()))));
         }
       };
 

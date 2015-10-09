@@ -36,7 +36,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Range;
 
-import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
 import org.apache.aurora.auth.SessionValidator.AuthFailedException;
@@ -119,6 +118,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
+import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -146,6 +146,8 @@ import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.apache.aurora.gen.ResponseCode.WARNING;
+import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
+import static org.apache.aurora.scheduler.base.Numbers.toRanges;
 import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.thrift.Responses.addMessage;
@@ -1069,12 +1071,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     }
   }
 
-  private static Set<org.apache.aurora.gen.Range> convertRanges(Set<Range<Integer>> ranges) {
-    return ranges.stream()
-        .map(range -> new org.apache.aurora.gen.Range(range.lowerEndpoint(), range.upperEndpoint()))
-        .collect(GuavaUtils.toImmutableSet());
-  }
-
   private static Set<InstanceTaskConfig> buildInitialState(Map<Integer, ITaskConfig> tasks) {
     // Translate tasks into instance IDs.
     Multimap<ITaskConfig, Integer> instancesByConfig = HashMultimap.create();
@@ -1088,7 +1084,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     for (Map.Entry<ITaskConfig, Set<Range<Integer>>> entry : rangesByConfig.entrySet()) {
       builder.add(new InstanceTaskConfig()
           .setTask(entry.getKey().newBuilder())
-          .setInstances(convertRanges(entry.getValue())));
+          .setInstances(IRange.toBuildersSet(convertRanges(entry.getValue()))));
     }
 
     return builder.build();
@@ -1185,11 +1181,13 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         JobUpdateInstructions instructions = new JobUpdateInstructions()
             .setSettings(settings.newBuilder())
             .setInitialState(buildInitialState(diff.getReplacedInstances()));
-        if (!diff.getReplacementInstances().isEmpty()) {
+
+        Set<Integer> replacements = diff.getReplacementInstances();
+        if (!replacements.isEmpty()) {
           instructions.setDesiredState(
               new InstanceTaskConfig()
                   .setTask(request.getTaskConfig().newBuilder())
-                  .setInstances(convertRanges(Numbers.toRanges(diff.getReplacementInstances()))));
+                  .setInstances(IRange.toBuildersSet(convertRanges(toRanges(replacements)))));
         }
 
         IJobUpdate update = IJobUpdate.build(new JobUpdate()

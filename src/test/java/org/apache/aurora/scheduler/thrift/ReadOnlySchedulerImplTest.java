@@ -74,6 +74,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
+import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IResponse;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -86,6 +87,8 @@ import static org.apache.aurora.scheduler.ResourceAggregates.LARGE;
 import static org.apache.aurora.scheduler.ResourceAggregates.MEDIUM;
 import static org.apache.aurora.scheduler.ResourceAggregates.SMALL;
 import static org.apache.aurora.scheduler.ResourceAggregates.XLARGE;
+import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
+import static org.apache.aurora.scheduler.base.Numbers.toRanges;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_SCHEDULE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.JOB_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.LOCK;
@@ -520,10 +523,12 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     ConfigGroup group1 = new ConfigGroup()
         .setConfig(firstGroupTask)
-        .setInstanceIds(Sets.newHashSet(0, 1));
+        .setInstanceIds(Sets.newHashSet(0, 1))
+        .setInstances(IRange.toBuildersSet(convertRanges(toRanges(ImmutableSet.of(0, 1)))));
     ConfigGroup group2 = new ConfigGroup()
         .setConfig(secondGroupTask)
-        .setInstanceIds(Sets.newHashSet(2));
+        .setInstanceIds(Sets.newHashSet(2))
+        .setInstances(IRange.toBuildersSet(convertRanges(toRanges(ImmutableSet.of(2)))));
 
     ConfigSummary summary = new ConfigSummary()
         .setKey(key.newBuilder())

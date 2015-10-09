@@ -272,13 +272,6 @@
         JobUpdateAction.INSTANCE_UPDATED
       ]);
 
-      var INSTANCE_TERMINAL = toSet([
-        JobUpdateAction.INSTANCE_UPDATED,
-        JobUpdateAction.INSTANCE_ROLLED_BACK,
-        JobUpdateAction.INSTANCE_UPDATE_FAILED,
-        JobUpdateAction.INSTANCE_ROLLBACK_FAILED
-      ]);
-
       var instanceActionLookup = _.invert(JobUpdateAction);
 
       var updateUtil = {
@@ -290,9 +283,6 @@
         },
         isInstanceSuccessful: function (action) {
           return INSTANCE_SUCCESSFUL.hasOwnProperty(action);
-        },
-        isInstanceTerminal: function (action) {
-          return INSTANCE_TERMINAL.hasOwnProperty(action);
         },
         instanceCountFromRanges: function (ranges) {
           // add the deltas of remaining ranges
@@ -316,18 +306,6 @@
         },
         getInProgressQuery: function () {
           return updateUtil.getStatusQuery(ACTIVE_JOB_UPDATE_STATES);
-        },
-        instanceCountFromConfigs: function (instanceTaskConfigs) {
-          var flattenedRanges = [];
-
-          // get all ranges
-          instanceTaskConfigs.forEach(function (iTaskConfig) {
-            iTaskConfig.instances.forEach(function (range) {
-              flattenedRanges.push(range);
-            });
-          });
-
-          return updateUtil.instanceCountFromRanges(flattenedRanges);
         },
         progressFromEvents: function (instanceEvents) {
           var successful = updateUtil.getLatestInstanceEvents(instanceEvents, function (e) {
@@ -448,39 +426,6 @@
     'taskUtil',
     function () {
       var taskUtil = {
-        // Given a list of tasks, group tasks with identical task configs and belonging to
-        // contiguous instance ids together.
-        summarizeActiveTaskConfigs: function (tasks) {
-          return _.chain(tasks)
-            .filter(taskUtil.isActiveTask)
-            .map(function (task) {
-              return {
-                instanceId: task.assignedTask.instanceId,
-                schedulingDetail: taskUtil.configToDetails(task.assignedTask.task)
-              };
-            })
-            .groupBy(function (task) {
-              return JSON.stringify(task.schedulingDetail);
-            })
-            .map(function (tasks) {
-              // Given a list of tasks with the same task config, group the tasks into ranges where
-              // each range consists of consecutive task ids along with their task config.
-              var schedulingDetail = _.first(tasks).schedulingDetail;
-              var ranges = taskUtil.toRanges(_.pluck(tasks, 'instanceId'));
-              return _.map(ranges, function (range) {
-                return {
-                  range: range,
-                  schedulingDetail: schedulingDetail
-                };
-              });
-            })
-            .flatten(true)
-            .sortBy(function (scheduleDetail) {
-              return scheduleDetail.range.start;
-            })
-            .value();
-        },
-
         configToDetails: function (task) {
           var constraints = _.chain(task.constraints)
             .sortBy(function (constraint) {
@@ -518,24 +463,6 @@
             metadata: metadata,
             container: container
           };
-        },
-
-        // Given a list of instanceIds, group them into contiguous ranges.
-        toRanges: function (instanceIds) {
-          instanceIds = _.sortBy(instanceIds);
-          var ranges = [];
-          var i = 0;
-          var start = instanceIds[i];
-          while (i < instanceIds.length) {
-            if ((i + 1 === instanceIds.length) || (instanceIds[i] + 1 !== instanceIds[i + 1])) {
-              ranges.push({start: start, end: instanceIds[i]});
-              i++;
-              start = instanceIds[i];
-            } else {
-              i++;
-            }
-          }
-          return ranges;
         },
 
         // A function that converts a task constraint into a string

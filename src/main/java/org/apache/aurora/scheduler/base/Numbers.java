@@ -23,6 +23,7 @@ import com.google.common.collect.PeekingIterator;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 
 /**
@@ -92,5 +93,19 @@ public final class Numbers {
     }
 
     return instanceIds.build().asSet(DiscreteDomain.integers());
+  }
+
+  /**
+   * Converts set of instance ranges to a set of {@link IRange}.
+   *
+   * @param ranges Instance ranges to convert.
+   * @return A set of {@link IRange}.
+   */
+  public static Set<IRange> convertRanges(Set<Range<Integer>> ranges) {
+    return ranges.stream()
+        .map(range -> IRange.build(new org.apache.aurora.gen.Range(
+            range.lowerEndpoint(),
+            range.upperEndpoint())))
+        .collect(GuavaUtils.toImmutableSet());
   }
 }
