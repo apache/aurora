@@ -22,7 +22,9 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
@@ -43,6 +45,7 @@ import org.apache.aurora.gen.ConfigGroup;
 import org.apache.aurora.gen.ConfigSummary;
 import org.apache.aurora.gen.ConfigSummaryResult;
 import org.apache.aurora.gen.GetJobUpdateDetailsResult;
+import org.apache.aurora.gen.GetJobUpdateDiffResult;
 import org.apache.aurora.gen.GetJobUpdateSummariesResult;
 import org.apache.aurora.gen.GetJobsResult;
 import org.apache.aurora.gen.GetLocksResult;
@@ -54,6 +57,7 @@ import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateQuery;
+import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.PopulateJobResult;
 import org.apache.aurora.gen.ReadOnlyScheduler;
@@ -89,11 +93,13 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.updater.JobDiff;
 import org.apache.thrift.TException;
 
 import static java.util.Objects.requireNonNull;
@@ -219,14 +225,10 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
     Map<Integer, ITaskConfig> tasksByInstance = Maps.transformValues(
         Maps.uniqueIndex(assignedTasks, IAssignedTask::getInstanceId),
         IAssignedTask::getTask);
-    Multimap<ITaskConfig, Integer> instancesByDetails = Multimaps.invertFrom(
-        Multimaps.forMap(tasksByInstance),
-        HashMultimap.create());
-    Iterable<ConfigGroup> groups = Iterables.transform(
-        instancesByDetails.asMap().entrySet(), TO_GROUP);
+    Set<ConfigGroup> groups = instancesToConfigGroups(tasksByInstance);
 
-    ConfigSummary summary = new ConfigSummary(job, ImmutableSet.copyOf(groups));
-    return ok(Result.configSummaryResult(new ConfigSummaryResult().setSummary(summary)));
+    return ok(Result.configSummaryResult(
+        new ConfigSummaryResult().setSummary(new ConfigSummary(job, groups))));
   }
 
   @Override
@@ -353,6 +355,56 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
     }
   }
 
+  @Override
+  public Response getJobUpdateDiff(JobUpdateRequest mutableRequest) {
+    final IJobUpdateRequest request = IJobUpdateRequest.build(requireNonNull(mutableRequest));
+    final IJobKey job = request.getTaskConfig().getJob();
+
+    return storage.read(new Quiet<Response>() {
+      @Override
+      public Response apply(StoreProvider storeProvider) throws RuntimeException {
+        if (storeProvider.getCronJobStore().fetchJob(job).isPresent()) {
+          return Responses.invalidRequest(NO_CRON);
+        }
+
+        JobDiff diff = JobDiff.compute(
+            storeProvider.getTaskStore(),
+            job,
+            JobDiff.asMap(request.getTaskConfig(), request.getInstanceCount()),
+            request.getSettings().getUpdateOnlyTheseInstances());
+
+        Map<Integer, ITaskConfig> replaced = diff.getReplacedInstances();
+        Map<Integer, ITaskConfig> replacements = Maps.asMap(
+            diff.getReplacementInstances(),
+            Functions.constant(request.getTaskConfig()));
+
+        Map<Integer, ITaskConfig> add = Maps.filterKeys(
+            replacements,
+            Predicates.in(Sets.difference(replacements.keySet(), replaced.keySet())));
+        Map<Integer, ITaskConfig> remove = Maps.filterKeys(
+            replaced,
+            Predicates.in(Sets.difference(replaced.keySet(), replacements.keySet())));
+        Map<Integer, ITaskConfig> update = Maps.filterKeys(
+            replaced,
+            Predicates.in(Sets.intersection(replaced.keySet(), replacements.keySet())));
+
+        return ok(Result.getJobUpdateDiffResult(new GetJobUpdateDiffResult()
+            .setAdd(instancesToConfigGroups(add))
+            .setRemove(instancesToConfigGroups(remove))
+            .setUpdate(instancesToConfigGroups(update))
+            .setUnchanged(instancesToConfigGroups(diff.getUnchangedInstances()))));
+      }
+    });
+  }
+
+  private static Set<ConfigGroup> instancesToConfigGroups(Map<Integer, ITaskConfig> tasks) {
+    Multimap<ITaskConfig, Integer> instancesByDetails = Multimaps.invertFrom(
+        Multimaps.forMap(tasks),
+        HashMultimap.create());
+    return ImmutableSet.copyOf(
+        Iterables.transform(instancesByDetails.asMap().entrySet(), TO_GROUP));
+  }
+
   private List<ScheduledTask> getTasks(TaskQuery query) {
     requireNonNull(query);
 
@@ -418,4 +470,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   private Multimap<IJobKey, IScheduledTask> getTasks(Query.Builder query) {
     return Tasks.byJobKey(Storage.Util.fetchTasks(storage, query));
   }
+
+  @VisibleForTesting
+  static final String NO_CRON = "Cron jobs are not supported.";
 }

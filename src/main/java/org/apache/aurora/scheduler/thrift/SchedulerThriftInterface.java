@@ -479,6 +479,11 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return readOnlyScheduler.getJobs(maybeNullRole);
   }
 
+  @Override
+  public Response getJobUpdateDiff(JobUpdateRequest request) throws TException {
+    return readOnlyScheduler.getJobUpdateDiff(request);
+  }
+
   private void validateLockForTasks(java.util.Optional<ILock> lock, Iterable<IScheduledTask> tasks)
       throws LockException {
 

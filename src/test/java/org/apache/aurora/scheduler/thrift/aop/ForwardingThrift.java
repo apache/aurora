@@ -301,4 +301,9 @@ abstract class ForwardingThrift implements AnnotatedAuroraAdmin {
   public Response getJobUpdateDetails(JobUpdateKey key) throws TException {
     return delegate.getJobUpdateDetails(key);
   }
+
+  @Override
+  public Response getJobUpdateDiff(JobUpdateRequest request) throws TException {
+    return delegate.getJobUpdateDiff(request);
+  }
 }

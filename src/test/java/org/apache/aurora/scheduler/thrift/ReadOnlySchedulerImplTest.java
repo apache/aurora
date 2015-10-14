@@ -33,6 +33,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ConfigGroup;
 import org.apache.aurora.gen.ConfigSummary;
 import org.apache.aurora.gen.ConfigSummaryResult;
+import org.apache.aurora.gen.GetJobUpdateDiffResult;
 import org.apache.aurora.gen.GetQuotaResult;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
@@ -43,11 +44,15 @@ import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateQuery;
+import org.apache.aurora.gen.JobUpdateRequest;
+import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.PopulateJobResult;
+import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.ResponseDetail;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.RoleSummary;
 import org.apache.aurora.gen.RoleSummaryResult;
@@ -88,7 +93,9 @@ import static org.apache.aurora.scheduler.ResourceAggregates.MEDIUM;
 import static org.apache.aurora.scheduler.ResourceAggregates.SMALL;
 import static org.apache.aurora.scheduler.ResourceAggregates.XLARGE;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
+import static org.apache.aurora.scheduler.base.Numbers.rangesToInstanceIds;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
+import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_JOB;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_SCHEDULE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.JOB_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.LOCK;
@@ -104,6 +111,7 @@ import static org.apache.aurora.scheduler.thrift.Fixtures.jobSummaryResponse;
 import static org.apache.aurora.scheduler.thrift.Fixtures.makeDefaultScheduledTasks;
 import static org.apache.aurora.scheduler.thrift.Fixtures.makeJob;
 import static org.apache.aurora.scheduler.thrift.Fixtures.nonProductionTask;
+import static org.apache.aurora.scheduler.thrift.ReadOnlySchedulerImpl.NO_CRON;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -699,5 +707,138 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     control.replay();
 
     assertResponse(INVALID_REQUEST, thrift.getJobUpdateDetails(UPDATE_KEY.newBuilder()));
+  }
+
+  @Test
+  public void testGetJobUpdateDiffWithUpdateAdd() throws Exception {
+    TaskConfig task1 = defaultTask(false).setNumCpus(1.0);
+    TaskConfig task2 = defaultTask(false).setNumCpus(2.0);
+    TaskConfig task3 = defaultTask(false).setNumCpus(3.0);
+    TaskConfig task4 = defaultTask(false).setNumCpus(4.0);
+    TaskConfig task5 = defaultTask(false).setNumCpus(5.0);
+
+    ImmutableSet.Builder<IScheduledTask> tasks = ImmutableSet.builder();
+    makeTasks(0, 10, task1, tasks);
+    makeTasks(10, 20, task2, tasks);
+    makeTasks(20, 30, task3, tasks);
+    makeTasks(30, 40, task4, tasks);
+    makeTasks(40, 50, task5, tasks);
+
+    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andReturn(Optional.absent());
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active(), tasks.build());
+
+    control.replay();
+
+    TaskConfig newTask = defaultTask(false).setNumCpus(6.0);
+    JobUpdateRequest request = new JobUpdateRequest()
+        .setTaskConfig(newTask)
+        .setInstanceCount(60)
+        .setSettings(new JobUpdateSettings()
+            .setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(10, 59))));
+
+    GetJobUpdateDiffResult expected = new GetJobUpdateDiffResult()
+        .setAdd(ImmutableSet.of(group(newTask, new Range(50, 59))))
+        .setUpdate(ImmutableSet.of(
+            group(task2, new Range(10, 19)),
+            group(task3, new Range(20, 29)),
+            group(task4, new Range(30, 39)),
+            group(task5, new Range(40, 49))))
+        .setUnchanged(ImmutableSet.of(group(task1, new Range(0, 9))))
+        .setRemove(ImmutableSet.of());
+
+    Response response = assertOkResponse(thrift.getJobUpdateDiff(request));
+    assertEquals(expected, response.getResult().getGetJobUpdateDiffResult());
+  }
+
+  @Test
+  public void testGetJobUpdateDiffWithUpdateRemove() throws Exception {
+    TaskConfig task1 = defaultTask(false).setNumCpus(1.0);
+    TaskConfig task2 = defaultTask(false).setNumCpus(2.0);
+    TaskConfig task3 = defaultTask(false).setNumCpus(3.0);
+
+    ImmutableSet.Builder<IScheduledTask> tasks = ImmutableSet.builder();
+    makeTasks(0, 10, task1, tasks);
+    makeTasks(10, 20, task2, tasks);
+    makeTasks(20, 30, task3, tasks);
+
+    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andReturn(Optional.absent());
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active(), tasks.build());
+
+    control.replay();
+
+    JobUpdateRequest request = new JobUpdateRequest()
+        .setTaskConfig(defaultTask(false).setNumCpus(6.0))
+        .setInstanceCount(20)
+        .setSettings(new JobUpdateSettings());
+
+    GetJobUpdateDiffResult expected = new GetJobUpdateDiffResult()
+        .setRemove(ImmutableSet.of(group(task3, new Range(20, 29))))
+        .setUpdate(ImmutableSet.of(
+            group(task1, new Range(0, 9)),
+            group(task2, new Range(10, 19))))
+        .setAdd(ImmutableSet.of())
+        .setUnchanged(ImmutableSet.of());
+
+    Response response = assertOkResponse(thrift.getJobUpdateDiff(request));
+    assertEquals(expected, response.getResult().getGetJobUpdateDiffResult());
+  }
+
+  @Test
+  public void testGetJobUpdateDiffWithUnchanged() throws Exception {
+    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andReturn(Optional.absent());
+    storageUtil.expectTaskFetch(
+        Query.jobScoped(JOB_KEY).active(),
+        ImmutableSet.copyOf(makeDefaultScheduledTasks(10)));
+
+    control.replay();
+
+    JobUpdateRequest request = new JobUpdateRequest()
+        .setTaskConfig(defaultTask(true))
+        .setInstanceCount(10)
+        .setSettings(new JobUpdateSettings());
+
+    GetJobUpdateDiffResult expected = new GetJobUpdateDiffResult()
+        .setUnchanged(ImmutableSet.of(group(defaultTask(true), new Range(0, 9))))
+        .setRemove(ImmutableSet.of())
+        .setUpdate(ImmutableSet.of())
+        .setAdd(ImmutableSet.of());
+
+    Response response = assertOkResponse(thrift.getJobUpdateDiff(request));
+    assertEquals(expected, response.getResult().getGetJobUpdateDiffResult());
+  }
+
+  @Test
+  public void testGetJobUpdateDiffNoCron() throws Exception {
+    expect(storageUtil.jobStore.fetchJob(JOB_KEY))
+        .andReturn(Optional.of(IJobConfiguration.build(CRON_JOB)));
+
+    control.replay();
+
+    JobUpdateRequest request = new JobUpdateRequest().setTaskConfig(defaultTask(false));
+
+    Response expected = Responses.empty()
+        .setResponseCode(INVALID_REQUEST)
+        .setDetails(ImmutableList.of(new ResponseDetail(NO_CRON)));
+
+    assertEquals(expected, thrift.getJobUpdateDiff(request));
+  }
+
+  private static void makeTasks(
+      int start,
+      int end,
+      TaskConfig config,
+      ImmutableSet.Builder<IScheduledTask> builder) {
+
+    for (int i = start; i < end; i++) {
+      builder.add(IScheduledTask.build(new ScheduledTask()
+          .setAssignedTask(new AssignedTask().setTask(config).setInstanceId(i))));
+    }
+  }
+
+  private static ConfigGroup group(TaskConfig task, Range range) {
+    return new ConfigGroup()
+        .setConfig(task)
+        .setInstanceIds(rangesToInstanceIds(ImmutableSet.of(IRange.build(range))))
+        .setInstances(ImmutableSet.of(range));
   }
 }

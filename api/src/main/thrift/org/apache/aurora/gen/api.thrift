@@ -908,6 +908,20 @@ struct PulseJobUpdateResult {
   1: JobUpdatePulseStatus status
 }
 
+struct GetJobUpdateDiffResult {
+  /** Instance addition diff details. */
+  1: set<ConfigGroup> add
+
+  /** Instance removal diff details. */
+  2: set<ConfigGroup> remove
+
+  /** Instance update diff details. */
+  3: set<ConfigGroup> update
+
+  /** Instances unchanged by the update. */
+  4: set<ConfigGroup> unchanged
+}
+
 /** Information about the scheduler. */
 struct ServerInfo {
   1: string clusterName
@@ -938,6 +952,7 @@ union Result {
   23: GetJobUpdateSummariesResult getJobUpdateSummariesResult
   24: GetJobUpdateDetailsResult getJobUpdateDetailsResult
   25: PulseJobUpdateResult pulseJobUpdateResult
+  26: GetJobUpdateDiffResult getJobUpdateDiffResult
 }
 
 struct ResponseDetail {
@@ -1002,6 +1017,9 @@ service ReadOnlyScheduler {
 
   /** Gets job update details. */
   Response getJobUpdateDetails(1: JobUpdateKey key)
+
+  /** Gets the diff between client (desired) and server (current) job states. */
+  Response getJobUpdateDiff(1: JobUpdateRequest request)
 }
 
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their

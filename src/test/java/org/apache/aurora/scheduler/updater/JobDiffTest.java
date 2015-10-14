@@ -44,8 +44,6 @@ import static org.junit.Assert.assertNotEquals;
 public class JobDiffTest extends EasyMockTest {
 
   private static final IJobKey JOB = JobKeys.from("role", "env", "job");
-  private static final JobDiff NO_DIFF =
-      new JobDiff(ImmutableMap.of(), ImmutableSet.of(), ImmutableSet.of());
   private static final Set<IRange> NO_SCOPE = ImmutableSet.of();
   private static final Set<IRange> CANARY_SCOPE = ImmutableSet.of(IRange.build(new Range(0, 0)));
 
@@ -65,10 +63,10 @@ public class JobDiffTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        new JobDiff(ImmutableMap.of(), ImmutableSet.of(), ImmutableSet.of(0, 1)),
+        new JobDiff(ImmutableMap.of(), ImmutableSet.of(), ImmutableMap.of(0, task, 1, task)),
         JobDiff.compute(store, JOB, JobDiff.asMap(task, 2), NO_SCOPE));
     assertEquals(
-        new JobDiff(ImmutableMap.of(), ImmutableSet.of(), ImmutableSet.of(0, 1)),
+        new JobDiff(ImmutableMap.of(), ImmutableSet.of(), ImmutableMap.of(0, task, 1, task)),
         JobDiff.compute(store, JOB, JobDiff.asMap(task, 2), CANARY_SCOPE));
   }
 
@@ -81,10 +79,10 @@ public class JobDiffTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        new JobDiff(ImmutableMap.of(), ImmutableSet.of(2, 3, 4), ImmutableSet.of(0, 1)),
+        new JobDiff(ImmutableMap.of(), ImmutableSet.of(2, 3, 4), ImmutableMap.of(0, task, 1, task)),
         JobDiff.compute(store, JOB, JobDiff.asMap(task, 5), NO_SCOPE));
     assertEquals(
-        new JobDiff(ImmutableMap.of(), ImmutableSet.of(), ImmutableSet.of(0, 1)),
+        new JobDiff(ImmutableMap.of(), ImmutableSet.of(), ImmutableMap.of(0, task, 1, task)),
         JobDiff.compute(store, JOB, JobDiff.asMap(task, 5), CANARY_SCOPE));
   }
 
@@ -97,10 +95,13 @@ public class JobDiffTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        new JobDiff(ImmutableMap.of(1, task, 2, task), ImmutableSet.of(), ImmutableSet.of(0)),
+        new JobDiff(ImmutableMap.of(1, task, 2, task), ImmutableSet.of(), ImmutableMap.of(0, task)),
         JobDiff.compute(store, JOB, JobDiff.asMap(task, 1), NO_SCOPE));
     assertEquals(
-        new JobDiff(ImmutableMap.of(), ImmutableSet.of(), ImmutableSet.of(0, 1, 2)),
+        new JobDiff(
+            ImmutableMap.of(),
+            ImmutableSet.of(),
+            ImmutableMap.of(0, task, 1, task, 2, task)),
         JobDiff.compute(store, JOB, JobDiff.asMap(task, 1), CANARY_SCOPE));
   }
 
@@ -117,10 +118,13 @@ public class JobDiffTest extends EasyMockTest {
         new JobDiff(
             ImmutableMap.of(0, oldTask, 1, oldTask, 2, oldTask),
             ImmutableSet.of(0, 1, 2),
-            ImmutableSet.of()),
+            ImmutableMap.of()),
         JobDiff.compute(store, JOB, JobDiff.asMap(newTask, 3), NO_SCOPE));
     assertEquals(
-        new JobDiff(ImmutableMap.of(0, oldTask), ImmutableSet.of(0), ImmutableSet.of(1, 2)),
+        new JobDiff(
+            ImmutableMap.of(0, oldTask),
+            ImmutableSet.of(0),
+            ImmutableMap.of(1, oldTask, 2, oldTask)),
         JobDiff.compute(store, JOB, JobDiff.asMap(newTask, 3), CANARY_SCOPE));
   }
 
@@ -140,10 +144,13 @@ public class JobDiffTest extends EasyMockTest {
         new JobDiff(
             ImmutableMap.of(0, oldTask, 3, oldTask2, 4, oldTask),
             ImmutableSet.of(0, 2, 3, 4),
-            ImmutableSet.of(1)),
+            ImmutableMap.of(1, newTask)),
         JobDiff.compute(store, JOB, JobDiff.asMap(newTask, 5), NO_SCOPE));
     assertEquals(
-        new JobDiff(ImmutableMap.of(0, oldTask), ImmutableSet.of(0), ImmutableSet.of(1, 3, 4)),
+        new JobDiff(
+            ImmutableMap.of(0, oldTask),
+            ImmutableSet.of(0),
+            ImmutableMap.of(1, newTask, 3, oldTask2, 4, oldTask)),
         JobDiff.compute(store, JOB, JobDiff.asMap(newTask, 5), CANARY_SCOPE));
   }
 
@@ -160,13 +167,19 @@ public class JobDiffTest extends EasyMockTest {
         new JobDiff(
             ImmutableMap.of(0, oldTask, 2, oldTask),
             ImmutableSet.of(0, 2),
-            ImmutableSet.of(1)),
+            ImmutableMap.of(1, newTask)),
         JobDiff.compute(store, JOB, JobDiff.asMap(newTask, 3), NO_SCOPE));
     assertEquals(
-        new JobDiff(ImmutableMap.of(0, oldTask), ImmutableSet.of(0), ImmutableSet.of(1, 2)),
+        new JobDiff(
+            ImmutableMap.of(0, oldTask),
+            ImmutableSet.of(0),
+            ImmutableMap.of(1, newTask, 2, oldTask)),
         JobDiff.compute(store, JOB, JobDiff.asMap(newTask, 3), CANARY_SCOPE));
     assertEquals(
-        new JobDiff(ImmutableMap.of(0, oldTask), ImmutableSet.of(0), ImmutableSet.of(1, 2)),
+        new JobDiff(
+            ImmutableMap.of(0, oldTask),
+            ImmutableSet.of(0),
+            ImmutableMap.of(1, newTask, 2, oldTask)),
         JobDiff.compute(store, JOB, JobDiff.asMap(newTask, 4), CANARY_SCOPE));
   }
 
@@ -177,19 +190,19 @@ public class JobDiffTest extends EasyMockTest {
     JobDiff a = new JobDiff(
         ImmutableMap.of(0, makeTask("job", "echo")),
         ImmutableSet.of(0),
-        ImmutableSet.of());
+        ImmutableMap.of());
     JobDiff b = new JobDiff(
         ImmutableMap.of(0, makeTask("job", "echo")),
         ImmutableSet.of(0),
-        ImmutableSet.of());
+        ImmutableMap.of());
     JobDiff c = new JobDiff(
         ImmutableMap.of(0, makeTask("job", "echo1")),
         ImmutableSet.of(0),
-        ImmutableSet.of());
+        ImmutableMap.of());
     JobDiff d = new JobDiff(
         ImmutableMap.of(0, makeTask("job", "echo")),
         ImmutableSet.of(1),
-        ImmutableSet.of());
+        ImmutableMap.of());
     assertEquals(a, b);
     assertEquals(ImmutableSet.of(a), ImmutableSet.of(a, b));
     assertNotEquals(a, c);

@@ -46,7 +46,7 @@ import static java.util.Objects.requireNonNull;
 public final class JobDiff {
   private final Map<Integer, ITaskConfig> replacedInstances;
   private final Set<Integer> replacementInstances;
-  private final Set<Integer> unchangedInstances;
+  private final Map<Integer, ITaskConfig> unchangedInstances;
 
   /**
    * Creates a job diff containing the instances to be replaced (original state), and instances
@@ -55,11 +55,12 @@ public final class JobDiff {
    *
    * @param replacedInstances Instances being replaced.
    * @param replacementInstances Instances to replace {@code replacedInstances}.
+   * @param unchangedInstances Instances unchanged by the update.
    */
   public JobDiff(
       Map<Integer, ITaskConfig> replacedInstances,
       Set<Integer> replacementInstances,
-      Set<Integer> unchangedInstances) {
+      Map<Integer, ITaskConfig> unchangedInstances) {
 
     this.replacedInstances = requireNonNull(replacedInstances);
     this.replacementInstances = requireNonNull(replacementInstances);
@@ -74,7 +75,7 @@ public final class JobDiff {
     return replacementInstances;
   }
 
-  public Set<Integer> getUnchangedInstances() {
+  public Map<Integer, ITaskConfig> getUnchangedInstances() {
     return unchangedInstances;
   }
 
@@ -88,7 +89,7 @@ public final class JobDiff {
     Set<Integer> allValidInstances = ImmutableSet.<Integer>builder()
         .addAll(getReplacedInstances().keySet())
         .addAll(getReplacementInstances())
-        .addAll(getUnchangedInstances())
+        .addAll(getUnchangedInstances().keySet())
         .build();
     return ImmutableSet.copyOf(Sets.difference(scope, allValidInstances));
   }
@@ -160,7 +161,7 @@ public final class JobDiff {
     return new JobDiff(
         removedInstances,
         addedInstances,
-        ImmutableSet.copyOf(diff.entriesInCommon().keySet()));
+        ImmutableMap.copyOf(diff.entriesInCommon()));
   }
 
   /**
@@ -194,10 +195,14 @@ public final class JobDiff {
           ImmutableMap.copyOf(Maps.filterKeys(diff.getReplacedInstances(), Predicates.in(limit)));
       Set<Integer> replacements =
           ImmutableSet.copyOf(Sets.intersection(diff.getReplacementInstances(), limit));
-      Set<Integer> unchanged = ImmutableSet.copyOf(
+
+      Set<Integer> unchangedIds = ImmutableSet.copyOf(
           Sets.difference(
               ImmutableSet.copyOf(Sets.difference(currentState.keySet(), replaced.keySet())),
               replacements));
+      Map<Integer, ITaskConfig> unchanged =
+          ImmutableMap.copyOf(Maps.filterKeys(currentState, Predicates.in(unchangedIds)));
+
       return new JobDiff(replaced, replacements, unchanged);
     }
   }

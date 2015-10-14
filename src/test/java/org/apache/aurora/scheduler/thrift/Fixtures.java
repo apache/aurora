@@ -117,6 +117,8 @@ final class Fixtures {
         .setRequestedPorts(ImmutableSet.of())
         .setTaskLinks(ImmutableMap.of())
         .setMaxTaskFailures(1)
+        .setConstraints(ImmutableSet.of())
+        .setMetadata(ImmutableSet.of())
         .setContainer(Container.mesos(new MesosContainer()));
   }
 

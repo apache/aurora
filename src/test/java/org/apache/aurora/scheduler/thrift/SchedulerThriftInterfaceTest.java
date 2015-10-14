@@ -588,7 +588,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TaskConfig task = nonProductionTask();
-    task.addToConstraints(dedicatedConstraint(ImmutableSet.of("mesos")));
+    task.setConstraints(ImmutableSet.of(dedicatedConstraint(ImmutableSet.of("mesos"))));
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task), null, SESSION));
   }
 
@@ -599,7 +599,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TaskConfig task = nonProductionTask();
-    task.addToConstraints(dedicatedConstraint(1));
+    task.setConstraints(ImmutableSet.of(dedicatedConstraint(1)));
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task), null, SESSION));
   }
 
@@ -610,7 +610,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TaskConfig task = nonProductionTask();
-    task.addToConstraints(dedicatedConstraint(ImmutableSet.of("mesos", "test")));
+    task.setConstraints(ImmutableSet.of(dedicatedConstraint(ImmutableSet.of("mesos", "test"))));
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task), null, SESSION));
   }
 
@@ -1456,7 +1456,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TaskConfig task = nonProductionTask();
-    task.addToConstraints(dedicatedConstraint(ImmutableSet.of("mesos")));
+    task.setConstraints(ImmutableSet.of(dedicatedConstraint(ImmutableSet.of("mesos"))));
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task), null, SESSION));
   }
 
