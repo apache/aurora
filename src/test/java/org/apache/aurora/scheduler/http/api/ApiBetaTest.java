@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.http.api;
 
-import java.nio.charset.StandardCharsets;
-
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
 
@@ -47,7 +45,6 @@ import org.apache.aurora.gen.RoleSummary;
 import org.apache.aurora.gen.RoleSummaryResult;
 import org.apache.aurora.gen.ScheduleStatusResult;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskQuery;
@@ -114,20 +111,17 @@ public class ApiBetaTest extends JettyServerModuleTest {
     Lock lock = new Lock()
         .setKey(LockKey.job(new JobKey("role", "env", "name")))
         .setToken("token");
-    SessionKey session = new SessionKey()
-        .setData("session data".getBytes(StandardCharsets.UTF_8))
-        .setMechanism("fake");
     Response response = new Response()
         .setResponseCode(OK);
 
     JobConfiguration job = JOB_CONFIG.newBuilder();
-    expect(thrift.createJob(anyObject(), eq(lock), eq(session))).andReturn(response);
+    expect(thrift.createJob(anyObject(), eq(lock), eq(null))).andReturn(response);
 
     replayAndStart();
 
     Response actualResponse = getRequestBuilder("/apibeta/createJob")
         .entity(
-            ImmutableMap.of("description", job, "lock", lock, "session", session),
+            ImmutableMap.of("description", job, "lock", lock),
             MediaType.APPLICATION_JSON)
         .post(Response.class);
     assertEquals(IResponse.build(response), IResponse.build(actualResponse));

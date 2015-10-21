@@ -29,6 +29,9 @@ import org.apache.shiro.subject.Subject;
  */
 @VisibleForTesting
 class AuditMessages {
+  @VisibleForTesting
+  static final String DEFAULT_USER = "UNSECURE";
+
   private final Provider<Optional<Subject>> subjectProvider;
 
   @Inject
@@ -36,22 +39,22 @@ class AuditMessages {
     this.subjectProvider = Objects.requireNonNull(subjectProvider);
   }
 
-  private String getShiroUserNameOr(String defaultUser) {
+  String getRemoteUserName() {
     return subjectProvider.get()
         .map(Subject::getPrincipal)
         .map(Object::toString)
-        .orElse(defaultUser);
+        .orElse(DEFAULT_USER);
   }
 
-  com.google.common.base.Optional<String> transitionedBy(String user) {
-    return com.google.common.base.Optional.of("Transition forced by " + getShiroUserNameOr(user));
+  com.google.common.base.Optional<String> transitionedBy() {
+    return com.google.common.base.Optional.of("Transition forced by " + getRemoteUserName());
   }
 
-  com.google.common.base.Optional<String> killedBy(String user) {
-    return com.google.common.base.Optional.of("Killed by " + getShiroUserNameOr(user));
+  com.google.common.base.Optional<String> killedByRemoteUser() {
+    return com.google.common.base.Optional.of("Killed by " + getRemoteUserName());
   }
 
-  com.google.common.base.Optional<String> restartedBy(String user) {
-    return com.google.common.base.Optional.of("Restarted by " + getShiroUserNameOr(user));
+  com.google.common.base.Optional<String> restartedByRemoteUser() {
+    return com.google.common.base.Optional.of("Restarted by " + getRemoteUserName());
   }
 }

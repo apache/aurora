@@ -21,7 +21,6 @@ import com.google.inject.CreationException;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
-import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AuroraAdmin.Iface;
 import org.apache.aurora.gen.JobConfiguration;
@@ -39,18 +38,10 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 
 public class AopModuleTest extends EasyMockTest {
-
-  private static final SessionKey SESSION_KEY = new SessionKey();
-
-  private CapabilityValidator capabilityValidator;
   private AnnotatedAuroraAdmin mockThrift;
 
   @Before
   public void setUp() throws Exception {
-    capabilityValidator = createMock(CapabilityValidator.class);
-    expect(capabilityValidator.toString(SESSION_KEY))
-        .andReturn("user")
-        .anyTimes();
     mockThrift = createMock(AnnotatedAuroraAdmin.class);
   }
 
@@ -59,7 +50,6 @@ public class AopModuleTest extends EasyMockTest {
         new AbstractModule() {
           @Override
           protected void configure() {
-            bind(CapabilityValidator.class).toInstance(capabilityValidator);
             bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo()));
             MockDecoratedThrift.bindForwardedMock(binder(), mockThrift);
           }
@@ -103,12 +93,12 @@ public class AopModuleTest extends EasyMockTest {
   private void assertCreateAllowed(Map<String, Boolean> toggledMethods) throws Exception {
     JobConfiguration job = new JobConfiguration();
     Response response = new Response();
-    expect(mockThrift.createJob(job, null, SESSION_KEY)).andReturn(response);
+    expect(mockThrift.createJob(job, null, null)).andReturn(response);
 
     control.replay();
 
     Iface thrift = getIface(toggledMethods);
-    assertSame(response, thrift.createJob(job, null, SESSION_KEY));
+    assertSame(response, thrift.createJob(job, null, null));
   }
 
   @Test

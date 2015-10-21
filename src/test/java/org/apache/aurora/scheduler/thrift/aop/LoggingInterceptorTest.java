@@ -18,7 +18,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 
 import org.aopalliance.intercept.MethodInvocation;
-import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
@@ -35,8 +34,6 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public class LoggingInterceptorTest extends EasyMockTest {
-  private CapabilityValidator capabilityValidator;
-
   private MethodInvocation methodInvocation;
 
   private LoggingInterceptor loggingInterceptor;
@@ -64,9 +61,7 @@ public class LoggingInterceptorTest extends EasyMockTest {
 
   @Before
   public void setUp() throws Exception {
-    capabilityValidator = createMock(CapabilityValidator.class);
-
-    loggingInterceptor = new LoggingInterceptor(capabilityValidator);
+    loggingInterceptor = new LoggingInterceptor();
 
     methodInvocation = createMock(MethodInvocation.class);
   }
@@ -145,23 +140,6 @@ public class LoggingInterceptorTest extends EasyMockTest {
         .andReturn(InterceptedClass.class.getDeclaredMethod("respond", JobConfiguration.class));
     expect(methodInvocation.getArguments()).andReturn(new Object[] {new JobConfiguration()});
     expect(methodInvocation.proceed()).andReturn(response);
-
-    control.replay();
-
-    assertSame(response, loggingInterceptor.invoke(methodInvocation));
-  }
-
-  @Test
-  public void testInvokePrintsSessionKey() throws Throwable {
-    Response response = new Response();
-    SessionKey sessionKey = new SessionKey();
-
-    expect(methodInvocation.getMethod())
-        .andReturn(InterceptedClass.class.getDeclaredMethod("respond", SessionKey.class));
-    expect(methodInvocation.getArguments()).andReturn(new Object[] {sessionKey});
-    expect(methodInvocation.proceed()).andReturn(response);
-
-    expect(capabilityValidator.toString(sessionKey)).andReturn("session-key");
 
     control.replay();
 

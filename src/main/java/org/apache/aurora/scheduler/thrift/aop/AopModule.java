@@ -37,11 +37,8 @@ import com.google.inject.matcher.Matcher;
 import com.google.inject.matcher.Matchers;
 
 import org.aopalliance.intercept.MethodInterceptor;
-import org.apache.aurora.GuiceUtils;
-import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraSchedulerManager;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
@@ -84,28 +81,14 @@ public class AopModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    requireBinding(CapabilityValidator.class);
-
     // Layer ordering:
-    // APIVersion -> Log -> CapabilityValidator -> FeatureToggle -> StatsExporter ->
-    // SchedulerThriftInterface
+    // APIVersion -> Log -> FeatureToggle -> StatsExporter -> SchedulerThriftInterface
 
     // It's important for this interceptor to be registered first to ensure it's at the 'top' of
     // the stack and the standard message is always applied.
     bindThriftDecorator(new ServerInfoInterceptor());
 
-    // TODO(Sathya): Consider using provider pattern for constructing interceptors to facilitate
-    // unit testing without the creation of Guice injectors.
     bindThriftDecorator(new LoggingInterceptor());
-
-    // Note: it's important that the capability interceptor is only applied to AuroraAdmin.Iface
-    // methods, and does not pick up methods on AuroraSchedulerManager.Iface.
-    MethodInterceptor authInterceptor = new UserCapabilityInterceptor();
-    requestInjection(authInterceptor);
-    bindInterceptor(
-        THRIFT_IFACE_MATCHER,
-        GuiceUtils.interfaceMatcher(AuroraAdmin.Iface.class, true),
-        authInterceptor);
 
     install(new PrivateModule() {
       @Override

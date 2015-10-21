@@ -18,9 +18,6 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.inject.Inject;
-
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
@@ -28,36 +25,19 @@ import com.google.common.collect.Lists;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.ResponseCode;
-import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.shiro.ShiroException;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * A method interceptor that logs all invocations as well as any unchecked exceptions thrown from
  * the underlying call.
  */
 class LoggingInterceptor implements MethodInterceptor {
-
   private static final Logger LOG = Logger.getLogger(LoggingInterceptor.class.getName());
-
-  @Inject
-  private CapabilityValidator validator;
-
-  LoggingInterceptor() {
-    // Guice constructor.
-  }
-
-  @VisibleForTesting
-  LoggingInterceptor(CapabilityValidator validator) {
-    this.validator = requireNonNull(validator);
-  }
 
   private final Map<Class<?>, Function<Object, String>> printFunctions =
       ImmutableMap.of(
@@ -71,14 +51,6 @@ class LoggingInterceptor implements MethodInterceptor {
                     new ExecutorConfig("BLANKED", "BLANKED"));
               }
               return configuration.toString();
-            }
-          },
-          SessionKey.class,
-          new Function<Object, String>() {
-            @Override
-            public String apply(Object input) {
-              SessionKey key = (SessionKey) input;
-              return validator.toString(key);
             }
           }
       );

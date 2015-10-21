@@ -21,7 +21,6 @@ import java.io.OutputStreamWriter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Type;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -40,7 +39,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.io.BaseEncoding;
 import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
@@ -52,9 +50,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
-import com.google.gson.TypeAdapter;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonWriter;
 
 import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.TUnion;
@@ -230,23 +225,6 @@ public class GsonMessageBodyHandler
             }
           } else {
             throw new RuntimeException("Unable to deserialize " + typeOfT);
-          }
-        }
-      })
-      .registerTypeAdapter(ByteBuffer.class, new TypeAdapter<ByteBuffer>() {
-        @Override
-        public void write(JsonWriter out, ByteBuffer value) throws IOException {
-          out.value(BaseEncoding.base64().encode(value.array()));
-        }
-
-        @Override
-        public ByteBuffer read(JsonReader in) throws IOException {
-          try {
-            return ByteBuffer.wrap(BaseEncoding.base64().decode(in.nextString()));
-          } catch (UnsupportedOperationException e) {
-            throw new JsonParseException("Byte array element must be a JSON string.", e);
-          } catch (IllegalArgumentException e) {
-            throw new JsonParseException("Unable to parse base64-encoded string.", e);
           }
         }
       })

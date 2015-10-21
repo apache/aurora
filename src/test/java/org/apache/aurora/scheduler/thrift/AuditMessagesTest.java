@@ -19,6 +19,7 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.shiro.subject.Subject;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.thrift.AuditMessages.DEFAULT_USER;
 import static org.easymock.EasyMock.expect;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertThat;
@@ -30,9 +31,9 @@ public class AuditMessagesTest extends EasyMockTest {
 
     control.replay();
 
-    assertThat(emptyMessages.killedBy("legacy").get(), containsString("legacy"));
-    assertThat(emptyMessages.restartedBy("legacy").get(), containsString("legacy"));
-    assertThat(emptyMessages.transitionedBy("legacy").get(), containsString("legacy"));
+    assertThat(emptyMessages.killedByRemoteUser().get(), containsString(DEFAULT_USER));
+    assertThat(emptyMessages.restartedByRemoteUser().get(), containsString(DEFAULT_USER));
+    assertThat(emptyMessages.transitionedBy().get(), containsString(DEFAULT_USER));
   }
 
   @Test
@@ -44,8 +45,8 @@ public class AuditMessagesTest extends EasyMockTest {
 
     control.replay();
 
-    assertThat(presentMessages.killedBy("legacy").get(), containsString("shiro"));
-    assertThat(presentMessages.restartedBy("legacy").get(), containsString("shiro"));
-    assertThat(presentMessages.transitionedBy("legacy").get(), containsString("shiro"));
+    assertThat(presentMessages.killedByRemoteUser().get(), containsString("shiro"));
+    assertThat(presentMessages.restartedByRemoteUser().get(), containsString("shiro"));
+    assertThat(presentMessages.transitionedBy().get(), containsString("shiro"));
   }
 }

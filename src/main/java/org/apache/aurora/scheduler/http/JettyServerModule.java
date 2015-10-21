@@ -70,7 +70,6 @@ import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.aurora.scheduler.http.api.security.HttpSecurityModule;
 import org.apache.aurora.scheduler.thrift.ThriftModule;
-import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import org.eclipse.jetty.rewrite.handler.RewriteHandler;
 import org.eclipse.jetty.rewrite.handler.RewriteRegexRule;
 import org.eclipse.jetty.server.Connector;
@@ -192,8 +191,7 @@ public class JettyServerModule extends AbstractModule {
               new ApiModule(),
               new H2ConsoleModule(),
               new HttpSecurityModule(),
-              new ThriftModule(),
-              new ThriftAuthModule()));
+              new ThriftModule()));
     }
   };
 
