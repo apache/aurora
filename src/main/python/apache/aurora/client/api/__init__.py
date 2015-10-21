@@ -149,6 +149,18 @@ class AuroraClientAPI(object):
 
     return updater.update(instances)
 
+  def _job_update_request(self, config, instances=None):
+    try:
+      settings = UpdaterConfig(**config.update_config().get()).to_thrift_update_settings(instances)
+    except ValueError as e:
+      raise self.UpdateConfigError(str(e))
+
+    return JobUpdateRequest(
+        instanceCount=config.instances(),
+        settings=settings,
+        taskConfig=config.job().taskConfig
+    )
+
   def start_job_update(self, config, message, instances=None):
     """Requests Scheduler to start job update process.
 
@@ -159,18 +171,8 @@ class AuroraClientAPI(object):
 
     Returns response object with update ID and acquired job lock.
     """
-    try:
-      settings = UpdaterConfig(**config.update_config().get()).to_thrift_update_settings(instances)
-    except ValueError as e:
-      raise self.UpdateConfigError(str(e))
-
+    request = self._job_update_request(config, instances)
     log.info("Starting update for: %s" % config.name())
-    request = JobUpdateRequest(
-        instanceCount=config.instances(),
-        settings=settings,
-        taskConfig=config.job().taskConfig
-    )
-
     return self._scheduler_proxy.startJobUpdate(request, message)
 
   def pause_job_update(self, update_key, message):
@@ -205,6 +207,20 @@ class AuroraClientAPI(object):
     Returns response object.
     """
     return self._scheduler_proxy.abortJobUpdate(update_key, message)
+
+  def get_job_update_diff(self, config, instances=None):
+    """Requests scheduler to calculate difference between scheduler and client job views.
+
+    Arguments:
+    config -- AuroraConfig instance with update details.
+    message -- Audit message to include with the change.
+    instances -- Optional list of instances to restrict update to.
+
+    Returns response object with job update diff results.
+    """
+    request = self._job_update_request(config, instances)
+    log.debug("Requesting job update diff details for: %s" % config.name())
+    return self._scheduler_proxy.getJobUpdateDiff(request)
 
   def query_job_updates(
       self,

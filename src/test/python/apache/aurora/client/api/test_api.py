@@ -135,6 +135,15 @@ class TestJobUpdateApis(unittest.TestCase):
         self.mock_job_config(error=ValueError()),
         None)
 
+  def test_get_job_update_diff(self):
+    """Test getting job update diff."""
+    api, mock_proxy = self.mock_api()
+    task_config = TaskConfig()
+    mock_proxy.getJobUpdateDiff.return_value = self.create_simple_success_response()
+
+    api.get_job_update_diff(self.mock_job_config(), instances=None)
+    mock_proxy.getJobUpdateDiff.assert_called_once_with(self.create_update_request(task_config))
+
   def test_pause_job_update(self):
     """Test successful job update pause."""
     api, mock_proxy = self.mock_api()

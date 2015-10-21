@@ -50,11 +50,21 @@ def mock_verb_options(verb):
   def opt_name(opt):
     return opt.name.lstrip('--').replace('-', '_')
 
-  options = Mock(spec_set=[opt_name(opt) for opt in verb.get_options()])
+  def name_or_dest(opt):
+    """Prefers 'dest' if available otherwise defaults to name."""
+    return opt.kwargs.get('dest') if 'dest' in opt.kwargs else opt_name(opt)
+
+  options = Mock(
+    spec_set=[name_or_dest(opt) for opt in verb.get_options()]
+  )
+
   # Apply default values to options.
   for opt in verb.get_options():
     if 'default' in opt.kwargs:
-      setattr(options, opt_name(opt), opt.kwargs.get('default'))
+      setattr(
+          options,
+          name_or_dest(opt),
+          opt.kwargs.get('default'))
   return options
 
 
@@ -204,6 +214,20 @@ class AuroraClientCommandTest(unittest.TestCase):
     return task
 
   @classmethod
+  def create_task_config(cls, name):
+    return TaskConfig(
+        maxTaskFailures=1,
+        executorConfig=ExecutorConfig(data='fake data'),
+        metadata=[],
+        job=JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name),
+        owner=Identity(role=cls.TEST_ROLE),
+        environment=cls.TEST_ENV,
+        jobName=name,
+        numCpus=2,
+        ramMb=2,
+        diskMb=2)
+
+  @classmethod
   def create_scheduled_tasks(cls):
     tasks = []
     for name in ['foo', 'bar', 'baz']:
@@ -212,17 +236,7 @@ class AuroraClientCommandTest(unittest.TestCase):
           assignedTask=AssignedTask(
               taskId=1287391823,
               slaveHost='slavehost',
-              task=TaskConfig(
-                  maxTaskFailures=1,
-                  executorConfig=ExecutorConfig(data='fake data'),
-                  metadata=[],
-                  job=JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name),
-                  owner=Identity(role=cls.TEST_ROLE),
-                  environment=cls.TEST_ENV,
-                  jobName=name,
-                  numCpus=2,
-                  ramMb=2,
-                  diskMb=2),
+              task=cls.create_task_config(name),
               instanceId=4237894,
               assignedPorts={}),
           status=ScheduleStatus.RUNNING,
