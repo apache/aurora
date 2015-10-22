@@ -34,10 +34,11 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatus,
     ScheduleStatusResult,
     ServerInfo,
+    SessionKey,
     TaskConfig
 )
 
-SESSION_KEY = 'test_session'
+SESSION_KEY = SessionKey()
 CLUSTER = 'east'
 JOB = AuroraJobKey(CLUSTER, 'johndoe', 'test', 'test_job')
 HEALTH_CHECK_INTERVAL_SECONDS = 5

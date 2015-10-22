@@ -67,7 +67,7 @@ def test_coverage():
           'No test defined for RPC %s' % rpc_name)
 
 
-SESSION = SessionKey(mechanism='test', data='test')
+SESSION = SessionKey()
 
 
 class TestSchedulerProxy(scheduler_client.SchedulerProxy):

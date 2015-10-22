@@ -51,14 +51,8 @@ struct Identity {
   2: string user
 }
 
+/** Deprecated, to be removed in 0.11.0 (https://issues.apache.org/jira/browse/AURORA-1229). */
 struct SessionKey {
-  /**
-   * The name of the authentication mechanism, which instructs the server how to interpret the data
-   * field.
-   */
-  4: optional string mechanism
-  /** A blob of data that the server may use for authentication. */
-  5: optional binary data
 }
 
 struct ResourceAggregate {

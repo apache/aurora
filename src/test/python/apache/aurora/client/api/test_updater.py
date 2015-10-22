@@ -53,6 +53,7 @@ from gen.apache.aurora.api.ttypes import (
     ScheduledTask,
     ScheduleStatusResult,
     ServerInfo,
+    SessionKey,
     TaskConfig,
     TaskConstraint,
     TaskQuery,
@@ -148,7 +149,7 @@ class UpdaterTest(TestCase):
     self._name = 'jimbob'
     self._env = 'test'
     self._job_key = JobKey(name=self._name, environment=self._env, role=self._role)
-    self._session_key = 'test_session'
+    self._session_key = SessionKey()
     self._lock = 'test_lock'
     self._instance_watcher = MockObject(InstanceWatcher)
     self._job_monitor = MockObject(JobMonitor)

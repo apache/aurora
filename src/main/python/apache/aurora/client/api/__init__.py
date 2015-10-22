@@ -18,7 +18,6 @@ from twitter.common import log
 
 from apache.aurora.client.base import combine_messages
 from apache.aurora.common.aurora_job_key import AuroraJobKey
-from apache.aurora.common.auth.auth_module_manager import make_session_key
 from apache.aurora.common.cluster import Cluster
 
 from .restarter import Restarter
@@ -52,8 +51,7 @@ class AuroraClientAPI(object):
       self,
       cluster,
       user_agent,
-      verbose=False,
-      session_key_factory=make_session_key):
+      verbose=False):
 
     if not isinstance(cluster, Cluster):
       raise TypeError('AuroraClientAPI expects instance of Cluster for "cluster", got %s' %
@@ -61,7 +59,6 @@ class AuroraClientAPI(object):
     self._scheduler_proxy = SchedulerProxy(
         cluster,
         verbose=verbose,
-        session_key_factory=session_key_factory,
         user_agent=user_agent)
     self._cluster = cluster
 

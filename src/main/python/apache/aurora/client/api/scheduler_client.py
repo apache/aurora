@@ -26,17 +26,13 @@ from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset import ServerSet
 
-from apache.aurora.common.auth.auth_module_manager import (
-    SessionKeyError,
-    get_auth_handler,
-    make_session_key
-)
+from apache.aurora.common.auth.auth_module_manager import get_auth_handler
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.transport import TRequestsTransport
 
 from gen.apache.aurora.api import AuroraAdmin, ReadOnlyScheduler
 from gen.apache.aurora.api.constants import THRIFT_API_VERSION
-from gen.apache.aurora.api.ttypes import ResponseCode
+from gen.apache.aurora.api.ttypes import ResponseCode, SessionKey
 
 try:
   from urlparse import urljoin
@@ -219,12 +215,10 @@ class SchedulerProxy(object):
   class APIVersionError(Error): pass
   class ThriftInternalError(Error): pass
 
-  def __init__(self, cluster, verbose=False, session_key_factory=make_session_key, **kwargs):
-    """A callable session_key_factory should be provided for authentication"""
+  def __init__(self, cluster, verbose=False, **kwargs):
     self.cluster = cluster
     # TODO(Sathya): Make this a part of cluster trait when authentication is pushed to the transport
     # layer.
-    self._session_key_factory = session_key_factory
     self._client = self._scheduler_client = None
     self.verbose = verbose
     self._lock = threading.RLock()
@@ -254,12 +248,6 @@ class SchedulerProxy(object):
   @with_scheduler
   def scheduler_client(self):
     return self._scheduler_client
-
-  def session_key(self):
-    try:
-      return self._session_key_factory(self.cluster.auth_mechanism)
-    except SessionKeyError as e:
-      raise self.AuthError('Unable to create session key %s' % e)
 
   def _construct_scheduler(self):
     """
@@ -300,7 +288,7 @@ class SchedulerProxy(object):
             time.time() - start) < self.RPC_MAXIMUM_WAIT.as_(Time.SECONDS):
 
           # Only automatically append a SessionKey if this is not part of the read-only API.
-          auth_args = () if hasattr(ReadOnlyScheduler.Iface, method_name) else (self.session_key(),)
+          auth_args = () if hasattr(ReadOnlyScheduler.Iface, method_name) else (SessionKey(),)
           try:
             method = getattr(self.client(), method_name)
             if not callable(method):
