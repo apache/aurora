@@ -36,8 +36,6 @@ def register_auth_module(auth_module):
   """
   if not isinstance(auth_module, AuthModule):
     raise TypeError('Given auth module must be a AuthModule subclass, got %s' % type(auth_module))
-  if not callable(auth_module):
-    raise TypeError('auth_module should be callable.')
   _AUTH_MODULES[auth_module.mechanism] = auth_module
 
 
