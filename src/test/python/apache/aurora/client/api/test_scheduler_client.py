@@ -31,7 +31,6 @@ from apache.aurora.common.transport import TRequestsTransport
 
 import gen.apache.aurora.api.AuroraAdmin as AuroraAdmin
 import gen.apache.aurora.api.AuroraSchedulerManager as AuroraSchedulerManager
-from gen.apache.aurora.api.constants import THRIFT_API_VERSION
 from gen.apache.aurora.api.ttypes import (
     Hosts,
     JobConfiguration,
@@ -46,7 +45,6 @@ from gen.apache.aurora.api.ttypes import (
     ResponseDetail,
     RewriteConfigsRequest,
     ScheduleStatus,
-    ServerInfo,
     SessionKey,
     TaskQuery
 )
@@ -55,7 +53,7 @@ ROLE = 'foorole'
 JOB_NAME = 'barjobname'
 JOB_ENV = 'devel'
 JOB_KEY = JobKey(role=ROLE, environment=JOB_ENV, name=JOB_NAME)
-DEFAULT_RESPONSE = Response(serverInfo=ServerInfo(thriftAPIVersion=THRIFT_API_VERSION))
+DEFAULT_RESPONSE = Response()
 
 
 def test_coverage():
@@ -164,13 +162,6 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mock_thrift_client.getQuota(IgnoreArg()).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().getQuota(ROLE)
-
-  def test_api_version_mismatch(self):
-    resp = Response(serverInfo=ServerInfo(thriftAPIVersion=THRIFT_API_VERSION + 1))
-    self.mock_thrift_client.getQuota(IgnoreArg()).AndReturn(resp)
-    self.mox.ReplayAll()
-    with pytest.raises(scheduler_client.SchedulerProxy.ThriftInternalError):
-      self.make_scheduler_proxy().getQuota(ROLE)
 
   def test_addInstances(self):
     self.mock_thrift_client.addInstances(
@@ -434,12 +425,9 @@ def test_transient_error(_, client):
   mock_thrift_client = mock.create_autospec(spec=AuroraAdmin.Client, instance=True)
   mock_thrift_client.killTasks.side_effect = [
       Response(responseCode=ResponseCode.ERROR_TRANSIENT,
-               details=[ResponseDetail(message="message1"), ResponseDetail(message="message2")],
-               serverInfo=DEFAULT_RESPONSE.serverInfo),
-      Response(responseCode=ResponseCode.ERROR_TRANSIENT,
-               serverInfo=DEFAULT_RESPONSE.serverInfo),
-      Response(responseCode=ResponseCode.OK,
-               serverInfo=DEFAULT_RESPONSE.serverInfo)]
+               details=[ResponseDetail(message="message1"), ResponseDetail(message="message2")]),
+      Response(responseCode=ResponseCode.ERROR_TRANSIENT),
+      Response(responseCode=ResponseCode.OK)]
 
   mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
   client.get.return_value = mock_scheduler_client

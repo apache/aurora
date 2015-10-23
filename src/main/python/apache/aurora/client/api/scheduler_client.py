@@ -31,7 +31,6 @@ from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.transport import TRequestsTransport
 
 from gen.apache.aurora.api import AuroraAdmin, ReadOnlyScheduler
-from gen.apache.aurora.api.constants import THRIFT_API_VERSION
 from gen.apache.aurora.api.ttypes import ResponseCode, SessionKey
 
 try:
@@ -298,9 +297,6 @@ class SchedulerProxy(object):
             if resp is not None and resp.responseCode == ResponseCode.ERROR_TRANSIENT:
               raise self.TransientError(", ".join(
                   [m.message for m in resp.details] if resp.details else []))
-            if resp.serverInfo.thriftAPIVersion != THRIFT_API_VERSION:
-              raise self.APIVersionError("Client Version: %s, Server Version: %s" %
-                  (THRIFT_API_VERSION, resp.serverInfo.thriftAPIVersion))
             return resp
           except TRequestsTransport.AuthError as e:
             raise self.AuthError(e)
