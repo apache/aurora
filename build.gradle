@@ -397,6 +397,11 @@ checkstyle {
   toolVersion = '6.11.2'
 }
 
+findbugs {
+  toolVersion = '3.0.1'
+  effort = "max"
+}
+
 tasks.withType(FindBugs) {
   reports {
     xml.enabled = false
