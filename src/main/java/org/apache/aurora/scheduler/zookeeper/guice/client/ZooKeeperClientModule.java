@@ -13,11 +13,13 @@
  */
 package org.apache.aurora.scheduler.zookeeper.guice.client;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
+import com.google.common.io.Files;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
@@ -70,6 +72,17 @@ public class ZooKeeperClientModule extends AbstractModule {
   protected void configure() {
     Key<ZooKeeperClient> clientKey = keyFactory.create(ZooKeeperClient.class);
     if (config.inProcess) {
+      File tempDir = Files.createTempDir();
+      try {
+        bind(ZooKeeperTestServer.class).toInstance(
+            new ZooKeeperTestServer(
+                ZooKeeperTestServer.DEFAULT_SESSION_TIMEOUT,
+                tempDir,
+                tempDir));
+      } catch (IOException e) {
+        throw Throwables.propagate(e);
+      }
+
       install(new PrivateModule() {
         @Override
         protected void configure() {
@@ -80,7 +93,6 @@ public class ZooKeeperClientModule extends AbstractModule {
           expose(clientKey);
         }
       });
-      bind(ZooKeeperTestServer.class).in(Singleton.class);
       SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(TestServerService.class);
     } else {
       bind(clientKey).toInstance(new ZooKeeperClient(

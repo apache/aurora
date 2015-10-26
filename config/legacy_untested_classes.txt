@@ -1,4 +1,3 @@
-org/apache/aurora/GuavaUtils$LifecycleShutdownListener
 org/apache/aurora/Protobufs$1
 org/apache/aurora/auth/CapabilityValidator$AuditCheck
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator
