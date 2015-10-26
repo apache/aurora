@@ -1,3 +1,4 @@
+org/apache/aurora/GuavaUtils$LifecycleShutdownListener
 org/apache/aurora/Protobufs$1
 org/apache/aurora/auth/CapabilityValidator$AuditCheck
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator
@@ -67,7 +68,7 @@ org/apache/aurora/scheduler/storage/mem/MemTaskStore$Task
 org/apache/aurora/scheduler/storage/mem/Util
 org/apache/aurora/scheduler/storage/mem/Util$1
 org/apache/aurora/scheduler/testing/FakeStatsProvider$3
+org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$1
 org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$LocalClientProvider
 org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$TestServerService
-org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$1
 org/apache/aurora/scheduler/zookeeper/guice/client/flagged/FlaggedClientConfig

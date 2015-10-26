@@ -26,6 +26,7 @@ import com.google.inject.binder.LinkedBindingBuilder;
 import com.google.inject.multibindings.Multibinder;
 
 import org.apache.aurora.GuavaUtils;
+import org.apache.aurora.GuavaUtils.LifecycleShutdownListener;
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
 import org.apache.aurora.scheduler.SchedulerLifecycle.SchedulerActive;
 
@@ -68,14 +69,24 @@ public class SchedulerServicesModule extends AbstractModule {
   @Provides
   @Singleton
   @AppStartup
-  ServiceManagerIface provideAppStartupServiceManager(@AppStartup Set<Service> services) {
-    return GuavaUtils.serviceManager(new ServiceManager(services));
+  ServiceManagerIface provideAppStartupServiceManager(
+      @AppStartup Set<Service> services,
+      LifecycleShutdownListener listener) {
+
+    ServiceManager manager = new ServiceManager(services);
+    manager.addListener(listener);
+    return GuavaUtils.serviceManager(manager);
   }
 
   @Provides
   @Singleton
   @SchedulerActive
-  ServiceManagerIface provideSchedulerActiveServiceManager(@SchedulerActive Set<Service> services) {
-    return GuavaUtils.serviceManager(new ServiceManager(services));
+  ServiceManagerIface provideSchedulerActiveServiceManager(
+      @SchedulerActive Set<Service> services,
+      LifecycleShutdownListener listener) {
+
+    ServiceManager manager = new ServiceManager(services);
+    manager.addListener(listener);
+    return GuavaUtils.serviceManager(manager);
   }
 }
