@@ -165,7 +165,9 @@ public class TaskHistoryPruner implements EventSubscriber {
               .limit(tasksToPrune)
               .transform(Tasks::id)
               .toSet();
-          deleteTasks(toPrune);
+          if (!toPrune.isEmpty()) {
+            deleteTasks(toPrune);
+          }
         }
       }
     });

@@ -205,6 +205,19 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
   }
 
   @Test
+  public void testSuppressEmptyDelete() {
+    IScheduledTask running = makeTask("a", RUNNING);
+    IScheduledTask killed = copy(running, KILLED);
+    expectImmediatePrune(
+        ImmutableSet.of(makeTask("b", KILLED), makeTask("c", KILLED), makeTask("d", KILLED)));
+    expectDefaultDelayedPrune();
+
+    control.replay();
+
+    changeState(running, killed);
+  }
+
+  @Test
   public void testJobHistoryExceeded() {
     IScheduledTask a = makeTask("a", RUNNING);
     clock.advance(ONE_MS);
@@ -337,11 +350,11 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
   }
 
   private Capture<Runnable> expectDefaultDelayedPrune() {
-    return expectDelayedPrune(ONE_DAY.as(Time.MILLISECONDS), 1);
+    return expectDelayedPrune(ONE_DAY.as(Time.MILLISECONDS));
   }
 
   private Capture<Runnable> expectOneDelayedPrune(long timestampMillis) {
-    return expectDelayedPrune(timestampMillis, 1);
+    return expectDelayedPrune(timestampMillis);
   }
 
   private void expectNoImmediatePrune(ImmutableSet<IScheduledTask> tasksInJob) {
@@ -373,7 +386,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
     }
   }
 
-  private Capture<Runnable> expectDelayedPrune(long timestampMillis, int count) {
+  private Capture<Runnable> expectDelayedPrune(long timestampMillis) {
     Capture<Runnable> capture = createCapture();
     executor.execute(
         EasyMock.capture(capture),
