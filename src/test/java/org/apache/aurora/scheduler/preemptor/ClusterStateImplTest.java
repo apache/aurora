@@ -13,8 +13,8 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSetMultimap;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.JobKey;
@@ -109,11 +109,11 @@ public class ClusterStateImplTest {
   }
 
   private void assertVictims(IAssignedTask... tasks) {
-    ImmutableMultimap.Builder<String, PreemptionVictim> victims = ImmutableMultimap.builder();
+    ImmutableMultimap.Builder<String, PreemptionVictim> victims = ImmutableSetMultimap.builder();
     for (IAssignedTask task : tasks) {
       victims.put(task.getSlaveId(), PreemptionVictim.fromTask(task));
     }
-    assertEquals(HashMultimap.create(victims.build()), state.getSlavesToActiveTasks());
+    assertEquals(victims.build(), state.getSlavesToActiveTasks());
   }
 
   private IAssignedTask makeTask(String taskId, String slaveId) {

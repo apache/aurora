@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.preemptor;
 
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.eventbus.Subscribe;
 
 import org.apache.aurora.scheduler.base.Tasks;
@@ -27,12 +27,13 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
  */
 public class ClusterStateImpl implements ClusterState, PubsubEvent.EventSubscriber {
 
-  private final Multimap<String, PreemptionVictim> victims =
-      Multimaps.synchronizedMultimap(HashMultimap.create());
+  private final Multimap<String, PreemptionVictim> victims = HashMultimap.create();
 
   @Override
   public Multimap<String, PreemptionVictim> getSlavesToActiveTasks() {
-    return Multimaps.unmodifiableMultimap(victims);
+    synchronized (victims) {
+      return ImmutableSetMultimap.copyOf(victims);
+    }
   }
 
   @Subscribe
