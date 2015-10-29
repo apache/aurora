@@ -144,8 +144,8 @@ You can then configure authorization using a security.ini file as described belo
 To use Kerberos on the client-side you must build Kerberos-enabled client binaries. Do this with
 
 ```
-./pants binary src/main/python/apache/aurora/client/cli:kaurora
-./pants binary src/main/python/apache/aurora/admin:kaurora_admin
+./pants binary src/main/python/apache/aurora/kerberos:kaurora
+./pants binary src/main/python/apache/aurora/kerberos:kaurora_admin
 ```
 
 You must also configure each cluster where you've enabled Kerberos on the scheduler
