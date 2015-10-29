@@ -17,6 +17,7 @@
 - Thrift ConfigGroup.instanceIds field has been deprecated. Use ConfigGroup.instances instead.
 - Deprecated SessionValidator and CapabilityValidator interfaces have been removed. All
   SessionKey-typed arguments are now nullable and ignored by the scheduler Thrift API.
+- Removed the `--root` option from the observer.
 
 0.9.0
 -----

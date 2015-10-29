@@ -22,18 +22,8 @@ from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
 
 from apache.aurora.executor.common.path_detector import MesosPathDetector
-from apache.thermos.common.constants import DEFAULT_CHECKPOINT_ROOT
-from apache.thermos.monitoring.detector import ChainedPathDetector, FixedPathDetector
 from apache.thermos.observer.http.configure import configure_server
 from apache.thermos.observer.task_observer import TaskObserver
-
-app.add_option(
-    '--root',
-    dest='root',
-    type='string',
-    default=DEFAULT_CHECKPOINT_ROOT,
-    help='The thermos checkpoint root directory to search for Thermos tasks [default: %default]')
-
 
 app.add_option(
     '--mesos-root',
@@ -66,10 +56,7 @@ def sleep_forever():
 
 
 def initialize(options):
-  path_detector = ChainedPathDetector(
-      FixedPathDetector(options.root),
-      MesosPathDetector(options.mesos_root),
-  )
+  path_detector = MesosPathDetector(options.mesos_root)
   polling_interval = Amount(options.polling_interval_secs, Time.SECONDS)
   return TaskObserver(path_detector, interval=polling_interval)
 
