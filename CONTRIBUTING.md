@@ -34,6 +34,9 @@ Post a review with `rbt`, fill out the fields in your browser and hit Publish.
 
     ./rbt post -o
 
+If you're unsure about who to add as a reviewer, you can default to adding Bill Farner (wfarner) and
+Joshua Cohen (jcohen). They will take care of finding an appropriate reviewer for the patch.
+
 Once you've done this, you probably want to mark the associated Jira issue as Reviewable.
 
 Updating an Existing Review
