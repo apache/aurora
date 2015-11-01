@@ -236,57 +236,8 @@ above multiple `Process` definitions into just two.
 
     run_task = SequentialTask(processes = [stage, run])
 
-`Process` also has five optional attributes, each with a default value
-if one isn't specified in the configuration:
+`Process` also has optional attributes to customize its behaviour. Details can be found in the [*Aurora+Thermos Configuration Reference*](configuration-reference.md#process-objects).
 
--   `max_failures`: Defaulting to `1`, the maximum number of failures
-    (non-zero exit statuses) before this `Process` is marked permanently
-    failed and not retried. If a `Process` permanently fails, Thermos
-    checks the `Process` object's containing `Task` for the task's
-    failure limit (usually 1) to determine whether or not the `Task`
-    should be failed. Setting `max_failures`to `0` means that this
-    process will keep retrying until a successful (zero) exit status is
-    achieved. Retries happen at most once every `min_duration` seconds
-    to prevent effectively mounting a denial of service attack against
-    the coordinating scheduler.
-
--   `daemon`: Defaulting to `False`, if `daemon` is set to `True`, a
-    successful (zero) exit status does not prevent future process runs.
-    Instead, the `Process` reinvokes after `min_duration` seconds.
-    However, the maximum failure limit (`max_failures`) still
-    applies. A combination of `daemon=True` and `max_failures=0` retries
-    a `Process` indefinitely regardless of exit status. This should
-    generally be avoided for very short-lived processes because of the
-    accumulation of checkpointed state for each process run. When
-    running in Aurora, `max_failures` is capped at
-    100.
-
--   `ephemeral`: Defaulting to `False`, if `ephemeral` is `True`, the
-    `Process`' status is not used to determine if its bound `Task` has
-    completed. For example, consider a `Task` with a
-    non-ephemeral webserver process and an ephemeral logsaver process
-    that periodically checkpoints its log files to a centralized data
-    store. The `Task` is considered finished once the webserver process
-    finishes, regardless of the logsaver's current status.
-
--   `min_duration`: Defaults to `15`. Processes may succeed or fail
-    multiple times during a single Task. Each result is called a
-    *process run* and this value is the minimum number of seconds the
-    scheduler waits before re-running the same process.
-
--   `final`: Defaulting to `False`, this is a finalizing `Process` that
-    should run last. Processes can be grouped into two classes:
-    *ordinary* and *finalizing*. By default, Thermos Processes are
-    ordinary. They run as long as the `Task` is considered
-    healthy (i.e. hasn't reached a failure limit). But once all regular
-    Thermos Processes have either finished or the `Task` has reached a
-    certain failure threshold, Thermos moves into a *finalization* stage
-    and runs all finalizing Processes. These are typically necessary for
-    cleaning up after the `Task`, such as log checkpointers, or perhaps
-    e-mail notifications of a completed Task. Finalizing processes may
-    not depend upon ordinary processes or vice-versa, however finalizing
-    processes may depend upon other finalizing processes and will
-    otherwise run as a typical process schedule.
 
 ## Getting Your Code Into The Sandbox
 
@@ -346,59 +297,8 @@ A basic Task definition looks like:
                             ram = 1*GB,
                             disk = 1*GB))
 
-There are four optional Task attributes:
+A Task has optional attributes to customize its behaviour. Details can be found in the [*Aurora+Thermos Configuration Reference*](configuration-reference.md#task-object)
 
--   `constraints`: A list of `Constraint` objects that constrain the
-    Task's processes. Currently there is only one type, the `order`
-    constraint. For example the following requires that the processes
-    run in the order `foo`, then `bar`.
-
-        constraints = [Constraint(order=['foo', 'bar'])]
-
-    There is an `order()` function that takes `order('foo', 'bar', 'baz')`
-    and converts it into `[Constraint(order=['foo', 'bar', 'baz'])]`.
-    `order()` accepts Process name strings `('foo', 'bar')` or the processes
-    themselves, e.g. `foo=Process(name='foo', ...)`, `bar=Process(name='bar', ...)`,
-    `constraints=order(foo, bar)`
-
-    Note that Thermos rejects tasks with process cycles.
-
--   `max_failures`: Defaulting to `1`, the number of failed processes
-    needed for the `Task` to be marked as failed. Note how this
-    interacts with individual Processes' `max_failures` values. Assume a
-    Task has two Processes and a `max_failures` value of `2`. So both
-    Processes must fail for the Task to fail. Now, assume each of the
-    Task's Processes has its own `max_failures` value of `10`. If
-    Process "A" fails 5 times before succeeding, and Process "B" fails
-    10 times and is then marked as failing, their parent Task succeeds.
-    Even though there were 15 individual failures by its Processes, only
-    1 of its Processes was finally marked as failing. Since 1 is less
-    than the 2 that is the Task's `max_failures` value, the Task does
-    not fail.
-
--   `max_concurrency`: Defaulting to `0`, the maximum number of
-    concurrent processes in the Task. `0` specifies unlimited
-    concurrency. For Tasks with many expensive but otherwise independent
-    processes, you can limit the amount of concurrency Thermos schedules
-    instead of artificially constraining them through `order`
-    constraints. For example, a test framework may generate a Task with
-    100 test run processes, but runs it in a Task with
-    `resources.cpus=4`. Limit the amount of parallelism to 4 by setting
-    `max_concurrency=4`.
-
--   `finalization_wait`: Defaulting to `30`, the number of seconds
-    allocated for finalizing the Task's processes. A Task starts in
-    `ACTIVE` state when Processes run and stays there as long as the Task
-    is healthy and Processes run. When all Processes finish successfully
-    or the Task reaches its maximum process failure limit, it goes into
-    `CLEANING` state. In `CLEANING`, it sends `SIGTERMS` to any still running
-    Processes. When all Processes terminate, the Task goes into
-    `FINALIZING` state and invokes the schedule of all processes whose
-    final attribute has a True value. Everything from the end of `ACTIVE`
-    to the end of `FINALIZING` must happen within `finalization_wait`
-    number of seconds. If not, all still running Processes are sent
-    `SIGKILL`s (or if dependent on yet to be completed Processes, are
-    never invoked).
 
 ### SequentialTask: Running Processes in Parallel or Sequentially
 
@@ -554,77 +454,8 @@ default. For these four parameters, a Job definition might look like:
               task = foo_task)
 
 In addition to the required attributes, there are several optional
-attributes. The first (strongly recommended) optional attribute is:
+attributes. Details can be found in the [Aurora+Thermos Configuration Reference](configuration-reference.md#job-objects).
 
--   `contact`: An email address for the Job's owner. For production
-    jobs, it is usually a team mailing list.
-
-Two more attributes deal with how to handle failure of the Job's Task:
-
--   `max_task_failures`: An integer, defaulting to `1`, of the maximum
-    number of Task failures after which the Job is considered failed.
-    `-1` allows for infinite failures.
-
--   `service`: A boolean, defaulting to `False`, which if `True`
-    restarts tasks regardless of whether they succeeded or failed. In
-    other words, if `True`, after the Job's Task completes, it
-    automatically starts again. This is for Jobs you want to run
-    continuously, rather than doing a single run.
-
-Three attributes deal with configuring the Job's Task:
-
--   `instances`: Defaulting to `1`, the number of
-    instances/replicas/shards of the Job's Task to create.
-
--   `priority`: Defaulting to `0`, the Job's Task's preemption priority,
-    for which higher values may preempt Tasks from Jobs with lower
-    values.
-
--   `production`: a Boolean, defaulting to `False`, specifying that this
-    is a [production](configuration-reference.md#job-objects) job.
-
-The final three Job attributes each take an object as their value.
-
--   `update_config`: An `UpdateConfig`
-    object provides parameters for controlling the rate and policy of
-    rolling updates. The `UpdateConfig` parameters are:
-    -   `batch_size`: An integer, defaulting to `1`, specifying the
-        maximum number of shards to update in one iteration.
-    -   `restart_threshold`: An integer, defaulting to `60`, specifying
-        the maximum number of seconds before a shard must move into the
-        `RUNNING` state before considered a failure.
-    -   `watch_secs`: An integer, defaulting to `45`, specifying the
-        minimum number of seconds a shard must remain in the `RUNNING`
-        state before considered a success.
-    -   `max_per_shard_failures`: An integer, defaulting to `0`,
-        specifying the maximum number of restarts per shard during an
-        update. When the limit is exceeded, it increments the total
-        failure count.
-    -   `max_total_failures`: An integer, defaulting to `0`, specifying
-        the maximum number of shard failures tolerated during an update.
-        Cannot be equal to or greater than the job's total number of
-        tasks.
--   `health_check_config`: A `HealthCheckConfig` object that provides
-    parameters for controlling a Task's health checks via HTTP. Only
-    used if a health port was assigned with a command line wildcard. The
-    `HealthCheckConfig` parameters are:
-    -   `initial_interval_secs`: An integer, defaulting to `15`,
-        specifying the initial delay for doing an HTTP health check.
-    -   `interval_secs`: An integer, defaulting to `10`, specifying the
-        number of seconds in the interval between checking the Task's
-        health.
-    -   `timeout_secs`: An integer, defaulting to `1`, specifying the
-        number of seconds the application must respond to an HTTP health
-        check with `OK` before it is considered a failure.
-    -   `max_consecutive_failures`: An integer, defaulting to `0`,
-        specifying the maximum number of consecutive failures before a
-        task is unhealthy.
--   `constraints`: A `dict` Python object, specifying Task scheduling
-    constraints. Most users will not need to specify constraints, as the
-    scheduler automatically inserts reasonable defaults. Please do not
-    set this field unless you are sure of what you are doing. See the
-    section in the Aurora + Thermos Reference manual on [Specifying
-    Scheduling Constraints](configuration-reference.md) for more information.
 
 ## The jobs List
 
