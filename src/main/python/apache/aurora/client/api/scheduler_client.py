@@ -227,7 +227,7 @@ class SchedulerProxy(object):
   def with_scheduler(method):
     """Decorator magic to make sure a connection is made to the scheduler"""
     def _wrapper(self, *args, **kwargs):
-      if not self._scheduler_client:
+      if not self._client:
         self._construct_scheduler()
       return method(self, *args, **kwargs)
     return _wrapper

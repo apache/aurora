@@ -438,6 +438,23 @@ def test_transient_error(_, client):
   assert mock_thrift_client.killTasks.call_count == 3
 
 
+@mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
+            spec=scheduler_client.SchedulerClient)
+def test_unknown_connection_error(client):
+  mock_scheduler_client = mock.create_autospec(spec=scheduler_client.SchedulerClient, instance=True)
+  client.get.return_value = mock_scheduler_client
+  proxy = TestSchedulerProxy(Cluster(name='local'))
+
+  # unknown, transient connection error
+  mock_scheduler_client.get_thrift_client.side_effect = RuntimeError
+  with pytest.raises(Exception):
+    proxy.client()
+
+  # successful connection on re-attempt
+  mock_scheduler_client.get_thrift_client.side_effect = None
+  assert proxy.client() is not None
+
+
 @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
 def test_connect_direct_scheduler_with_user_agent(mock_transport):
   mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
