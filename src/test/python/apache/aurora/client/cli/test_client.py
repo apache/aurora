@@ -23,6 +23,7 @@ def test_log_plugin_enabled():
   plugin.before_dispatch(["aurora", "version", "--verbose"])
 
   assert logging.getLogger().getEffectiveLevel() == logging.DEBUG
+  assert logging.getLogger('requests_kerberos').getEffectiveLevel() == logging.DEBUG
 
 
 def test_log_plugin_disabled():
@@ -31,3 +32,4 @@ def test_log_plugin_disabled():
   plugin.before_dispatch(["aurora", "version"])
 
   assert logging.getLogger().getEffectiveLevel() == logging.INFO
+  assert logging.getLogger('requests_kerberos').getEffectiveLevel() == logging.CRITICAL

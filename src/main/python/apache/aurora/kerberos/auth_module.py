@@ -21,13 +21,6 @@ class KerberosAuthModule(AuthModule):
   def mechanism(self):
     return 'KERBEROS'
 
-  def payload(self):
-    """NOTE: until AURORA-1229 is addressed, using "Kerberized" client in production in a backwards
-             compatible way will require a new custom module that will override this method to
-             return the currently used payload (security blob used in SessionKey).
-    """
-    return ''
-
   def auth(self):
     # While SPNEGO supports mutual authentication of the response, it does not assert the validity
     # of the response payload, only the identity of the server. Thus the scheduler will not set
@@ -36,3 +29,7 @@ class KerberosAuthModule(AuthModule):
     # constraints the client must connect to the scheduler API via HTTPS. Kerberos is thus only
     # used to authenticate the client to the server.
     return HTTPKerberosAuth(mutual_authentication=DISABLED)
+
+  @property
+  def failed_auth_message(self):
+    return 'Communication with Aurora scheduler is kerberized. Did you forget to run "kinit"?'

@@ -26,6 +26,7 @@ from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset.endpoint import ServiceInstance
 
 import apache.aurora.client.api.scheduler_client as scheduler_client
+from apache.aurora.common.auth.auth_module import AuthModule
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.transport import TRequestsTransport
 
@@ -227,6 +228,7 @@ class TestSchedulerProxyInjection(unittest.TestCase):
   def test_raise_auth_error(self):
     self.mock_thrift_client.killTasks(TaskQuery(), None, None, SESSION).AndRaise(
         TRequestsTransport.AuthError())
+    self.mock_scheduler_client.get_failed_auth_message().AndReturn('failed auth')
     self.mox.ReplayAll()
     with pytest.raises(scheduler_client.SchedulerProxy.AuthError):
       self.make_scheduler_proxy().killTasks(TaskQuery(), None, None)
@@ -328,7 +330,9 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
 
 
 def mock_auth():
-  return mock.create_autospec(spec=AuthBase, instance=True)
+  auth_mock = mock.create_autospec(spec=AuthModule, instance=True)
+  auth_mock.auth.return_value = mock.create_autospec(AuthBase)
+  return auth_mock
 
 
 @pytest.mark.parametrize('scheme', ('http', 'https'))
@@ -411,7 +415,7 @@ def test_connect_scheduler_with_user_agent(mock_transport):
   uri = 'https://scheduler.example.com:1337'
   client._connect_scheduler(uri, mock_time)
 
-  mock_transport.assert_called_once_with(uri, auth=auth, user_agent=user_agent)
+  mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
 
 
 @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
@@ -460,18 +464,19 @@ def test_connect_direct_scheduler_with_user_agent(mock_transport):
   mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
   mock_time = mock.create_autospec(spec=time, instance=True)
 
+  auth = mock_auth()
   user_agent = 'Some-User-Agent'
   uri = 'https://scheduler.example.com:1337'
 
   client = scheduler_client.DirectSchedulerClient(
       uri,
-      auth=None,
+      auth=auth,
       verbose=True,
       user_agent=user_agent)
 
   client._connect_scheduler(uri, mock_time)
 
-  mock_transport.assert_called_once_with(uri, auth=None, user_agent=user_agent)
+  mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
 
 
 @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
@@ -494,7 +499,7 @@ def test_connect_zookeeper_client_with_auth(mock_transport):
 
   client._connect_scheduler(uri, mock_time)
 
-  mock_transport.assert_called_once_with(uri, auth=auth, user_agent=user_agent)
+  mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
 
 
 @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
@@ -517,4 +522,4 @@ def test_connect_direct_client_with_auth(mock_transport):
 
   client._connect_scheduler(uri, mock_time)
 
-  mock_transport.assert_called_once_with(uri, auth=auth, user_agent=user_agent)
+  mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)

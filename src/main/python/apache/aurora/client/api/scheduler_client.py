@@ -73,7 +73,7 @@ class SchedulerClient(object):
 
   def __init__(self, auth, user_agent, verbose=False):
     self._client = None
-    self._auth = auth
+    self._auth_handler = auth
     self._user_agent = user_agent
     self._verbose = verbose
 
@@ -82,13 +82,16 @@ class SchedulerClient(object):
       self._client = self._connect()
     return self._client
 
+  def get_failed_auth_message(self):
+    return self._auth_handler.failed_auth_message
+
   # per-class implementation -- mostly meant to set up a valid host/port
   # pair and then delegate the opening to SchedulerClient._connect_scheduler
   def _connect(self):
     return None
 
   def _connect_scheduler(self, uri, clock=time):
-    transport = TRequestsTransport(uri, auth=self._auth, user_agent=self._user_agent)
+    transport = TRequestsTransport(uri, auth=self._auth_handler.auth(), user_agent=self._user_agent)
     protocol = TJSONProtocol.TJSONProtocol(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
     for _ in range(self.THRIFT_RETRIES):
@@ -299,6 +302,7 @@ class SchedulerProxy(object):
                   [m.message for m in resp.details] if resp.details else []))
             return resp
           except TRequestsTransport.AuthError as e:
+            log.error(self.scheduler_client().get_failed_auth_message())
             raise self.AuthError(e)
           except (TTransport.TTransportException, self.TimeoutError, self.TransientError) as e:
             if not self._terminating.is_set():

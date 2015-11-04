@@ -29,6 +29,12 @@ class AuthModule(Interface):
     :rtype: requests.auth.AuthBase.
     """
 
+  @abstractproperty
+  def failed_auth_message(self):
+    """Default help message to log on failed auth attempt.
+    :rtype: string
+    """
+
 
 class InsecureAuthModule(AuthModule):
   @property
@@ -37,3 +43,7 @@ class InsecureAuthModule(AuthModule):
 
   def auth(self):
     return None
+
+  @property
+  def failed_auth_message(self):
+    return ''

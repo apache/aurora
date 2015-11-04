@@ -46,4 +46,4 @@ def get_auth_handler(auth_mechanism=DEFAULT_AUTH_MECHANISM):
 
   auth_module = _AUTH_MODULES.get(auth_mechanism) or _INSECURE_AUTH_MODULE
   log.debug('Using auth module: %r' % auth_module)
-  return auth_module.auth()
+  return auth_module

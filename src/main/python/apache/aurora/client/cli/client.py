@@ -46,6 +46,7 @@ class AuroraLogConfigurationPlugin(ConfigurationPlugin):
     handler = logging.StreamHandler()
     handler.setFormatter(PlainFormatter())
     logging.getLogger().addHandler(handler)
+    self._configure_lib_logging(loglevel)
     return raw_args
 
   def before_execution(self, context):
@@ -53,6 +54,16 @@ class AuroraLogConfigurationPlugin(ConfigurationPlugin):
 
   def after_execution(self, context, result_code):
     pass
+
+  def _configure_lib_logging(self, loglevel):
+    """Sets logging level for "chatty" third party libs.
+
+    Some dependencies have low default logging threshold thus generating messages that could
+    be confusing to users under normal conditions. To mitigate, we set the default loglevel
+    to CRITICAL to filter out the noise and re-enable logging when verbose output is requested.
+    """
+    lib_loglevel = logging.DEBUG if loglevel == logging.DEBUG else logging.CRITICAL
+    logging.getLogger("requests_kerberos").setLevel(lib_loglevel)
 
 
 class AuroraAuthConfigurationPlugin(ConfigurationPlugin):
