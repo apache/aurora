@@ -13,15 +13,22 @@
 #
 import os
 
+python_library(
+  name = 'kerberos_auth',
+  sources = rglobs('*.py'),
+  dependencies = [
+    '3rdparty/python:requests-kerberos',
+    'src/main/python/apache/aurora/common',
+  ],
+)
 
 python_library(
   name = '_kerberos',
   sources = rglobs('*.py'),
   dependencies = [
-    '3rdparty/python:requests-kerberos',
+    ':kerberos_auth',
     'src/main/python/apache/aurora/admin',
     'src/main/python/apache/aurora/client',
-    'src/main/python/apache/aurora/common',
   ],
 )
 

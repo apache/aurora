@@ -13,7 +13,7 @@
 #
 from requests_kerberos import DISABLED, HTTPKerberosAuth
 
-from apache.aurora.common.auth_module import AuthModule
+from apache.aurora.common.auth.auth_module import AuthModule
 
 
 class KerberosAuthModule(AuthModule):
