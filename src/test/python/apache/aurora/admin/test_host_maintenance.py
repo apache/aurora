@@ -175,9 +175,8 @@ class TestHostMaintenance(unittest.TestCase):
 
   def test_operate_on_hosts(self):
     mock_callback = mock.Mock()
-    test_hosts = Hosts(TEST_HOSTNAMES)
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
-    maintenance._operate_on_hosts(test_hosts, mock_callback)
+    maintenance._operate_on_hosts(TEST_HOSTNAMES, mock_callback)
     assert mock_callback.call_count == 3
 
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._drain_hosts",
@@ -193,6 +192,11 @@ class TestHostMaintenance(unittest.TestCase):
     mock_callback = mock.Mock()
     mock_check_sla.return_value = set()
     mock_start_maintenance.return_value = TEST_HOSTNAMES
+    drain_hosts_results = [set() for _ in TEST_HOSTNAMES]
+    drain_hosts_results[0] = set([TEST_HOSTNAMES[0]])
+    def drain_hosts_result(*args):
+      return drain_hosts_results.pop(0)
+    mock_drain_hosts.side_effect = drain_hosts_result
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
     maintenance.perform_maintenance(TEST_HOSTNAMES, callback=mock_callback)
     mock_start_maintenance.assert_called_once_with(TEST_HOSTNAMES)
@@ -201,8 +205,8 @@ class TestHostMaintenance(unittest.TestCase):
     assert mock_drain_hosts.call_args_list == [
         mock.call(Hosts(set([hostname]))) for hostname in TEST_HOSTNAMES]
     assert mock_operate_on_hosts.call_count == 3
-    assert mock_operate_on_hosts.call_args_list == [
-        mock.call(Hosts(set([hostname])), mock_callback) for hostname in TEST_HOSTNAMES]
+    assert mock_operate_on_hosts.call_args_list == [mock.call(set(), mock_callback)] + [
+        mock.call(set([hostname]), mock_callback) for hostname in TEST_HOSTNAMES[1:]]
 
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._drain_hosts",
               spec=HostMaintenance._drain_hosts)

@@ -161,11 +161,11 @@ class HostMaintenance(object):
     """Perform a given operation on a list of hosts that are ready for maintenance.
 
     :param drained_hosts: Hosts that have been drained (via _drain_hosts)
-    :type drained_hosts: gen.apache.aurora.ttypes.Hosts
+    :type drained_hosts: list of strings
     :param callback: Function to call one hostname at a time
     :type callback: function
     """
-    for hostname in drained_hosts.hostNames:
+    for hostname in drained_hosts:
       callback(hostname)
 
   def perform_maintenance(self, hostnames, grouping_function=DEFAULT_GROUPING,
@@ -215,7 +215,7 @@ class HostMaintenance(object):
       not_drained_hostnames |= self._drain_hosts(hosts)
 
       if callback:
-        self._operate_on_hosts(hosts, callback)
+        self._operate_on_hosts(hosts.hostNames - not_drained_hostnames, callback)
 
     if not_drained_hostnames:
       output = '\n'.join(list(not_drained_hostnames))
