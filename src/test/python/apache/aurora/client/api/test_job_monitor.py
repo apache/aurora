@@ -13,6 +13,7 @@
 #
 import unittest
 
+import mock
 from mock import create_autospec
 
 from apache.aurora.client.api.job_monitor import JobMonitor
@@ -126,3 +127,9 @@ class JobMonitorTest(unittest.TestCase):
     self._event.set()
     monitor = JobMonitor(self._scheduler, self._job_key, terminating_event=self._event)
     assert monitor.wait_until(monitor.terminal)
+
+  def test_terminate(self):
+    mock_event = mock.Mock()
+    monitor = JobMonitor(self._scheduler, self._job_key, terminating_event=mock_event)
+    monitor.terminate()
+    mock_event.set.assert_called_once_with()

@@ -68,16 +68,6 @@ def check_and_log_locked_response(resp):
     log.info(LOCKED_WARNING)
 
 
-def deprecation_warning(text):
-  log.warning('')
-  log.warning('*' * 80)
-  log.warning('* The command you ran is deprecated and will soon break!')
-  for line in text.split('\n'):
-    log.warning('* %s' % line)
-  log.warning('*' * 80)
-  log.warning('')
-
-
 class requires(object):  # noqa
   @classmethod
   def wrap_function(cls, fn, fnargs, comparator):

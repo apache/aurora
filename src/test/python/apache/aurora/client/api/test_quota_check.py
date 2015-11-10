@@ -127,3 +127,16 @@ class QuotaCheckTest(unittest.TestCase):
         call((acquired - released).quota(), 'Requested', self._name),
         call(additional, 'Additional quota required', self._role)
     ]
+
+  def test_op_not_cap_request(self):
+    released = CapacityRequest(ResourceAggregate(numCpus=5.0, ramMb=100, diskMb=100))
+    # Should return self so a noop.
+    out = released._op('not_a_real_op', 'not_a_CapacityRequest_obj')
+    self.assertEqual(out, released)
+
+  def test_right_add(self):
+    released = CapacityRequest(ResourceAggregate(numCpus=5.0, ramMb=100, diskMb=100))
+    # Testing __radd__ which is called when object on the ride side isn't our CapacityRequest
+    # instance.
+    out = 1 + released
+    self.assertEqual(out, released)

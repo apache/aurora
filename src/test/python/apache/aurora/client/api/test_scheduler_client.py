@@ -389,137 +389,151 @@ def test_url_when_not_connected_and_cluster_has_no_proxy_url(scheme):
   client._connect_scheduler.assert_has_calls([])
 
 
-@mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
-def test_connect_scheduler(mock_client):
-  mock_client.return_value.open.side_effect = [TTransport.TTransportException, True]
-  mock_time = mock.create_autospec(spec=time, instance=True)
+class TestSchedulerClient(unittest.TestCase):
 
-  client = scheduler_client.SchedulerClient(mock_auth(), 'Some-User-Agent', verbose=True)
-  client._connect_scheduler('https://scheduler.example.com:1337', mock_time)
+  @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport',
+              spec=TRequestsTransport)
+  def test_connect_scheduler(self, mock_client):
+    mock_client.return_value.open.side_effect = [TTransport.TTransportException, True]
+    mock_time = mock.create_autospec(spec=time, instance=True)
 
-  assert mock_client.return_value.open.has_calls(mock.call(), mock.call())
-  mock_time.sleep.assert_called_once_with(
-      scheduler_client.SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
+    client = scheduler_client.SchedulerClient(mock_auth(), 'Some-User-Agent', verbose=True)
+    client._connect_scheduler('https://scheduler.example.com:1337', mock_time)
 
+    assert mock_client.return_value.open.has_calls(mock.call(), mock.call())
+    mock_time.sleep.assert_called_once_with(
+        scheduler_client.SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
 
-@mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
-def test_connect_scheduler_with_user_agent(mock_transport):
-  mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
-  mock_time = mock.create_autospec(spec=time, instance=True)
+  @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport',
+              spec=TRequestsTransport)
+  def test_connect_scheduler_with_user_agent(self, mock_transport):
+    mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
+    mock_time = mock.create_autospec(spec=time, instance=True)
 
-  auth = mock_auth()
-  user_agent = 'Some-User-Agent'
+    auth = mock_auth()
+    user_agent = 'Some-User-Agent'
 
-  client = scheduler_client.SchedulerClient(auth, user_agent, verbose=True)
+    client = scheduler_client.SchedulerClient(auth, user_agent, verbose=True)
 
-  uri = 'https://scheduler.example.com:1337'
-  client._connect_scheduler(uri, mock_time)
+    uri = 'https://scheduler.example.com:1337'
+    client._connect_scheduler(uri, mock_time)
 
-  mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
+    mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
 
+  @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
+              spec=scheduler_client.SchedulerClient)
+  @mock.patch('threading._Event.wait')
+  def test_transient_error(self, _, client):
+    mock_scheduler_client = mock.create_autospec(
+        spec=scheduler_client.SchedulerClient,
+        spec_set=False,
+        instance=True)
+    mock_thrift_client = mock.create_autospec(spec=AuroraAdmin.Client, instance=True)
+    mock_thrift_client.killTasks.side_effect = [
+        Response(responseCode=ResponseCode.ERROR_TRANSIENT,
+                 details=[ResponseDetail(message="message1"), ResponseDetail(message="message2")]),
+        Response(responseCode=ResponseCode.ERROR_TRANSIENT),
+        Response(responseCode=ResponseCode.OK)]
 
-@mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
-            spec=scheduler_client.SchedulerClient)
-@mock.patch('threading._Event.wait')
-def test_transient_error(_, client):
-  mock_scheduler_client = mock.create_autospec(
-      spec=scheduler_client.SchedulerClient,
-      spec_set=False,
-      instance=True)
-  mock_thrift_client = mock.create_autospec(spec=AuroraAdmin.Client, instance=True)
-  mock_thrift_client.killTasks.side_effect = [
-      Response(responseCode=ResponseCode.ERROR_TRANSIENT,
-               details=[ResponseDetail(message="message1"), ResponseDetail(message="message2")]),
-      Response(responseCode=ResponseCode.ERROR_TRANSIENT),
-      Response(responseCode=ResponseCode.OK)]
+    mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
+    client.get.return_value = mock_scheduler_client
 
-  mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
-  client.get.return_value = mock_scheduler_client
+    proxy = TestSchedulerProxy(Cluster(name='local'))
+    proxy.killTasks(TaskQuery(), None)
 
-  proxy = TestSchedulerProxy(Cluster(name='local'))
-  proxy.killTasks(TaskQuery(), None)
+    assert mock_thrift_client.killTasks.call_count == 3
 
-  assert mock_thrift_client.killTasks.call_count == 3
+  @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
+              spec=scheduler_client.SchedulerClient)
+  def test_unknown_connection_error(self, client):
+    mock_scheduler_client = mock.create_autospec(spec=scheduler_client.SchedulerClient,
+                                                 instance=True)
+    client.get.return_value = mock_scheduler_client
+    proxy = TestSchedulerProxy(Cluster(name='local'))
 
+    # unknown, transient connection error
+    mock_scheduler_client.get_thrift_client.side_effect = RuntimeError
+    with pytest.raises(Exception):
+      proxy.client()
 
-@mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
-            spec=scheduler_client.SchedulerClient)
-def test_unknown_connection_error(client):
-  mock_scheduler_client = mock.create_autospec(spec=scheduler_client.SchedulerClient, instance=True)
-  client.get.return_value = mock_scheduler_client
-  proxy = TestSchedulerProxy(Cluster(name='local'))
+    # successful connection on re-attempt
+    mock_scheduler_client.get_thrift_client.side_effect = None
+    assert proxy.client() is not None
 
-  # unknown, transient connection error
-  mock_scheduler_client.get_thrift_client.side_effect = RuntimeError
-  with pytest.raises(Exception):
-    proxy.client()
+  @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport',
+              spec=TRequestsTransport)
+  def test_connect_direct_scheduler_with_user_agent(self, mock_transport):
+    mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
+    mock_time = mock.create_autospec(spec=time, instance=True)
 
-  # successful connection on re-attempt
-  mock_scheduler_client.get_thrift_client.side_effect = None
-  assert proxy.client() is not None
+    auth = mock_auth()
+    user_agent = 'Some-User-Agent'
+    uri = 'https://scheduler.example.com:1337'
 
+    client = scheduler_client.DirectSchedulerClient(
+        uri,
+        auth=auth,
+        verbose=True,
+        user_agent=user_agent)
 
-@mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
-def test_connect_direct_scheduler_with_user_agent(mock_transport):
-  mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
-  mock_time = mock.create_autospec(spec=time, instance=True)
+    client._connect_scheduler(uri, mock_time)
 
-  auth = mock_auth()
-  user_agent = 'Some-User-Agent'
-  uri = 'https://scheduler.example.com:1337'
+    mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
 
-  client = scheduler_client.DirectSchedulerClient(
-      uri,
-      auth=auth,
-      verbose=True,
-      user_agent=user_agent)
+  @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport',
+              spec=TRequestsTransport)
+  def test_connect_zookeeper_client_with_auth(self, mock_transport):
+    mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
+    mock_time = mock.create_autospec(spec=time, instance=True)
 
-  client._connect_scheduler(uri, mock_time)
+    user_agent = 'Some-User-Agent'
+    uri = 'https://scheduler.example.com:1337'
+    auth = mock_auth()
+    cluster = Cluster(zk='zk', zk_port='2181')
 
-  mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
+    def auth_factory(_):
+      return auth
 
+    client = scheduler_client.SchedulerClient.get(
+        cluster,
+        auth_factory=auth_factory,
+        user_agent=user_agent)
 
-@mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
-def test_connect_zookeeper_client_with_auth(mock_transport):
-  mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
-  mock_time = mock.create_autospec(spec=time, instance=True)
+    client._connect_scheduler(uri, mock_time)
 
-  user_agent = 'Some-User-Agent'
-  uri = 'https://scheduler.example.com:1337'
-  auth = mock_auth()
-  cluster = Cluster(zk='zk', zk_port='2181')
+    mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
 
-  def auth_factory(_):
-    return auth
+  @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport',
+              spec=TRequestsTransport)
+  def test_connect_direct_client_with_auth(self, mock_transport):
+    mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
+    mock_time = mock.create_autospec(spec=time, instance=True)
 
-  client = scheduler_client.SchedulerClient.get(
-      cluster,
-      auth_factory=auth_factory,
-      user_agent=user_agent)
+    user_agent = 'Some-User-Agent'
+    uri = 'https://scheduler.example.com:1337'
+    auth = mock_auth()
+    cluster = Cluster(scheduler_uri='uri')
 
-  client._connect_scheduler(uri, mock_time)
+    def auth_factory(_):
+      return auth
 
-  mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
+    client = scheduler_client.SchedulerClient.get(
+        cluster,
+        auth_factory=auth_factory,
+        user_agent=user_agent)
 
+    client._connect_scheduler(uri, mock_time)
 
-@mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
-def test_connect_direct_client_with_auth(mock_transport):
-  mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
-  mock_time = mock.create_autospec(spec=time, instance=True)
+    mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
 
-  user_agent = 'Some-User-Agent'
-  uri = 'https://scheduler.example.com:1337'
-  auth = mock_auth()
-  cluster = Cluster(scheduler_uri='uri')
+  def test_no_zk_or_scheduler_uri(self):
+    cluster = None
+    with self.assertRaises(TypeError):
+      scheduler_client.SchedulerClient.get(cluster)
+    cluster = Cluster()
+    with self.assertRaises(ValueError):
+      scheduler_client.SchedulerClient.get(cluster)
 
-  def auth_factory(_):
-    return auth
-
-  client = scheduler_client.SchedulerClient.get(
-      cluster,
-      auth_factory=auth_factory,
-      user_agent=user_agent)
-
-  client._connect_scheduler(uri, mock_time)
-
-  mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
+  def test__internal_connect(self):
+    client = scheduler_client.SchedulerClient(mock_auth(), 'Some-User-Agent', verbose=True)
+    self.assertIsNone(client._connect())

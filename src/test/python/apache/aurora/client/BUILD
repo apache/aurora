@@ -37,6 +37,7 @@ python_tests(
 python_tests(name = 'base',
   sources = ['test_base.py'],
   dependencies = [
+    '3rdparty/python:mock',
     'src/main/python/apache/aurora/client',
   ],
 )
