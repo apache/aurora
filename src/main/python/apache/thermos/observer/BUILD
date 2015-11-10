@@ -18,7 +18,7 @@ import os
 python_library(
   name = 'observer',
   sources = rglobs('*.py'),
-  resources = zglobs('**/assets/*') + rglobs('*.tpl'),
+  resources = zglobs('**/assets/*', '**/*.tpl'),
   dependencies = [
     '3rdparty/python:bottle',
     '3rdparty/python:mako',

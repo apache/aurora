@@ -19,7 +19,7 @@ OBSERVER_SOURCE = 'thermos_observer.py'
 
 python_library(
   name = '_tools',
-  sources = rglobs('*.py') - [THERMOS_SOURCE] - [OBSERVER_SOURCE],
+  sources = rglobs('*.py', exclude=[[THERMOS_SOURCE], [OBSERVER_SOURCE]]),
   dependencies = [
     '3rdparty/python:CherryPy',
     '3rdparty/python:twitter.common.app',

@@ -29,10 +29,10 @@ python_library(
     '3rdparty/python:twitter.common.zookeeper',
     'api/src/main/thrift/org/apache/aurora/gen',
     'src/main/python/apache/aurora/common',
+    'src/main/python/apache/aurora/client/cli:auroraversion',
     'src/main/python/apache/aurora/config',
     'src/main/python/apache/thermos/common',
     'src/main/python/apache/thermos/config',
-    'src/main/resources/apache/aurora/client/cli:auroraversion',
   ],
 )
 

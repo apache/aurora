@@ -32,9 +32,7 @@ python -m pip install -d third_party -r <(grep -v mesos.native 3rdparty/python/r
 ./build-support/python/checkstyle-check src
 
 # Run all Python tests
-export JUNIT_XML_BASE="$PWD/dist/test-results"
-mkdir -p "$JUNIT_XML_BASE"
-./pants test.pytest --no-fast --options='-v' src/test/python::
+./pants test.pytest --no-fast --junit-xml-dir="$PWD/dist/test-results" src/test/python:: -- -v
 
 # Ensure we can build python sdists (AURORA-1174)
 ./build-support/release/make-python-sdists

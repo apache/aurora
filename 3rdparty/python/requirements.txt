@@ -5,7 +5,7 @@ mesos.interface==0.23.0
 mesos.native==0.23.0
 mock==1.0.1
 mox==0.5.3
-pex==0.8.2
+pex==1.1.0
 protobuf==2.6.1
 psutil==3.2.2
 pystachio==0.8.0

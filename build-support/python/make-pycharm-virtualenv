@@ -24,10 +24,19 @@ pushd "$BUILDROOT"
   ./pants dependencies --external-only src/test/python:: | sort -u > requirements.txt
   ./pants setup-py api/src/main/thrift/org/apache/aurora/gen
   ./pants setup-py api/src/main/thrift/org/apache/thermos
-  source build-support/pants.venv/bin/activate
+
+  # Here we grab the version of pytest libs used by pants in a fairly awkward way.
+  # TODO(John Sirois): Either get this info from the current pants install itself instead of
+  # using a parallel ephemeral install like we do here (slow), or else invert things and
+  # allow user-control of the pytest lib versions within reason.
+  rm -rf "$VENV_DIR"
+  ./build-support/virtualenv "$VENV_DIR"
+  source $VENV_DIR/bin/activate
+    python -m pip install pantsbuild.pants==$(./pants --version)
     pytest_requirement=$(python -m pip freeze | grep pytest==)
     pytest_cov_requirement=$(python -m pip freeze | grep pytest-cov==)
   deactivate
+
   rm -rf "$VENV_DIR"
   ./build-support/virtualenv "$VENV_DIR"
   source $VENV_DIR/bin/activate
