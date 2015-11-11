@@ -67,7 +67,7 @@ function bootstrap_pants {
   pants_requirement="pantsbuild.pants"
   pants_version=$(
     grep -E "^[[:space:]]*pants_version" pants.ini 2>/dev/null | \
-      sed -E 's|^[[:space:]]*pants_version[:=][[:space:]]*([^[:space:]]+)|\1|'
+      cut -f2 -d: | tr -d ""
   )
   if [[ -n "${pants_version}" ]]
   then
