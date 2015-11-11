@@ -79,6 +79,7 @@ import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
+import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.log.EntrySerializer;
@@ -195,11 +196,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
             Amount.of(0L, Data.MB),
             0);
         bind(ExecutorSettings.class)
-            .toInstance(ExecutorSettings.newBuilder()
-                .setExecutorPath("/executor/thermos")
-                .setThermosObserverRoot("/var/run/thermos")
-                .setExecutorOverhead(executorOverhead)
-                .build());
+            .toInstance(TestExecutorSettings.thermosOnlyWithOverhead(executorOverhead));
         install(new BackupModule(backupDir, SnapshotStoreImpl.class));
 
         bind(IServerInfo.class).toInstance(

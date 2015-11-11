@@ -15,13 +15,13 @@ package org.apache.aurora.scheduler;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -30,16 +30,17 @@ import com.google.common.collect.Range;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
-
 import org.apache.aurora.scheduler.base.Numbers;
-import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.ExecutorInfo;
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.Resource.Builder;
+import org.apache.mesos.Protos.TaskInfo;
 
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.quantity.Data.BYTES;
-
 import static org.apache.aurora.scheduler.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.ResourceType.PORTS;
@@ -72,17 +73,6 @@ public final class ResourceSlot {
     this.disk = requireNonNull(disk);
     this.numPorts = numPorts;
   }
-
-  /**
-   * Minimum resources required to run Thermos. In the wild Thermos needs about 0.01 CPU and
-   * about 170MB (peak usage) of RAM. The RAM requirement has been rounded up to a power of 2.
-   */
-  @VisibleForTesting
-  public static final ResourceSlot MIN_THERMOS_RESOURCES = new ResourceSlot(
-      0.01,
-      Amount.of(256L, Data.MB),
-      Amount.of(1L, Data.MB),
-      0);
 
   /**
    * Extracts the resources required from a task.
@@ -120,6 +110,39 @@ public final class ResourceSlot {
   }
 
   /**
+   * Ensures that the revocable setting on the executor and task CPU resources match.
+   *
+   * @param task Task to check for resource type alignment.
+   * @return A possibly-modified task, with aligned CPU resource types.
+   */
+  public static TaskInfo matchResourceTypes(TaskInfo task) {
+    TaskInfo.Builder taskBuilder = task.toBuilder();
+
+    Optional<Resource> revocableTaskCpu = taskBuilder.getResourcesList().stream()
+        .filter(r -> r.getName().equals(CPUS.getName()))
+        .filter(Resource::hasRevocable)
+        .findFirst();
+    ExecutorInfo.Builder executorBuilder = taskBuilder.getExecutorBuilder();
+
+    Consumer<Builder> matchRevocable = new Consumer<Builder>() {
+      @Override
+      public void accept(Builder builder) {
+        if (revocableTaskCpu.isPresent()) {
+          builder.setRevocable(revocableTaskCpu.get().getRevocable());
+        } else {
+          builder.clearRevocable();
+        }
+      }
+    };
+
+    executorBuilder.getResourcesBuilderList().stream()
+        .filter(r -> r.getName().equals(CPUS.getName()))
+        .forEach(matchRevocable);
+
+    return taskBuilder.build();
+  }
+
+  /**
    * Convenience method for adapting to Mesos resources without applying a port range.
    *
    * @see {@link #toResourceList(java.util.Set, TierInfo)}
@@ -128,20 +151,6 @@ public final class ResourceSlot {
    */
   public List<Protos.Resource> toResourceList(TierInfo tierInfo) {
     return toResourceList(ImmutableSet.of(), tierInfo);
-  }
-
-  /**
-   * Adds executor resource overhead.
-   *
-   * @param executorSettings Executor settings to get executor overhead from.
-   * @return ResourceSlot with overhead applied.
-   */
-  public ResourceSlot withOverhead(ExecutorSettings executorSettings) {
-    // Apply a flat 'tax' of executor overhead resources to the task.
-    ResourceSlot requiredTaskResources = add(executorSettings.getExecutorOverhead());
-
-    // Upsize tasks smaller than the minimum resources required to run the executor.
-    return maxElements(requiredTaskResources, MIN_THERMOS_RESOURCES);
   }
 
   /**
@@ -323,18 +332,17 @@ public final class ResourceSlot {
       int portC = Integer.compare(left.getNumPorts(), right.getNumPorts());
       int cpuC = Double.compare(left.getNumCpus(), right.getNumCpus());
 
-      FluentIterable<Integer> vector =
-          FluentIterable.from(ImmutableList.of(diskC, ramC, portC, cpuC));
+      List<Integer> vector = ImmutableList.of(diskC, ramC, portC, cpuC);
 
-      if (vector.allMatch(IS_ZERO))  {
+      if (vector.stream().allMatch(IS_ZERO))  {
         return 0;
       }
 
-      if (vector.filter(Predicates.not(IS_ZERO)).allMatch(e -> e > 0)) {
+      if (vector.stream().filter(IS_ZERO.negate()).allMatch(e -> e > 0)) {
         return 1;
       }
 
-      if (vector.filter(Predicates.not(IS_ZERO)).allMatch(e -> e < 0)) {
+      if (vector.stream().filter(IS_ZERO.negate()).allMatch(e -> e < 0)) {
         return -1;
       }
 

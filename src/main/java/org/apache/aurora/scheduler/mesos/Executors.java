@@ -13,23 +13,17 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Data;
-import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.mesos.Protos.ExecutorID;
 
 /**
- * Utility class to contain constants related to setting up executor settings.
+ * Utility class for executor-related fields.
  */
-public final class TaskExecutors {
-
-  private TaskExecutors() {
+public final class Executors {
+  private Executors() {
     // Utility class.
   }
 
-  public static final ExecutorSettings NO_OVERHEAD_EXECUTOR =
-      TestExecutorSettings.thermosOnlyWithOverhead(ResourceSlot.NONE);
-
-  public static final ExecutorSettings SOME_OVERHEAD_EXECUTOR =
-      TestExecutorSettings.thermosOnlyWithOverhead(
-          new ResourceSlot(0.01, Amount.of(256L, Data.MB), Amount.of(0L, Data.MB), 0));
+  public static final ExecutorID PLACEHOLDER_EXECUTOR_ID = ExecutorID.newBuilder()
+      .setValue("PLACEHOLDER")
+      .build();
 }

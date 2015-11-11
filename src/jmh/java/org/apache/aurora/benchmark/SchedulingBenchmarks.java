@@ -44,6 +44,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
+import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
@@ -148,12 +149,7 @@ public class SchedulingBenchmarks {
               bind(TaskIdGenerator.class).to(TaskIdGenerator.TaskIdGeneratorImpl.class);
               bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
               bind(SchedulingFilterImpl.class).in(Singleton.class);
-              bind(ExecutorSettings.class)
-                  .toInstance(ExecutorSettings.newBuilder()
-                      .setExecutorPath("/executor/thermos")
-                      .setThermosObserverRoot("/var/run/thermos")
-                      .build());
-
+              bind(ExecutorSettings.class).toInstance(TestExecutorSettings.THERMOS_EXECUTOR);
               bind(Storage.class).toInstance(storage);
               bind(Driver.class).toInstance(new FakeDriver());
               bind(RescheduleCalculator.class).toInstance(new FakeRescheduleCalculator());

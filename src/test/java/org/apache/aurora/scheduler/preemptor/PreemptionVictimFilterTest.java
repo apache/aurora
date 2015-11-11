@@ -268,7 +268,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   @Test
   public void testMinimalSetPreempted() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT).times(9);
+    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT).atLeastOnce();
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(4).setRamMb(4096);
 

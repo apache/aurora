@@ -6,6 +6,7 @@ org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$2
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureSessionValidator
 org/apache/aurora/scheduler/app/SchedulerMain$1
 org/apache/aurora/scheduler/app/SchedulerMain$2
+org/apache/aurora/scheduler/app/SchedulerMain$2$1
 org/apache/aurora/scheduler/app/SchedulerMain$3
 org/apache/aurora/scheduler/app/SchedulerMain$4
 org/apache/aurora/scheduler/async/OfferQueue$OfferQueueImpl$2

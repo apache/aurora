@@ -17,16 +17,18 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -37,6 +39,7 @@ import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
 
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.args.Arg;
@@ -45,6 +48,7 @@ import org.apache.aurora.common.args.ArgScanner.ArgScanException;
 import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.args.constraints.NotNull;
+import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.inject.Bindings;
 import org.apache.aurora.common.logging.RootLogConfig;
 import org.apache.aurora.common.quantity.Amount;
@@ -56,13 +60,15 @@ import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.AppStartup;
-import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.ResourceType;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.http.HttpService;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
+import org.apache.aurora.scheduler.mesos.ExecutorConfig;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
+import org.apache.aurora.scheduler.mesos.Executors;
 import org.apache.aurora.scheduler.mesos.LibMesosLoadingModule;
 import org.apache.aurora.scheduler.stats.StatsModule;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -74,9 +80,18 @@ import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule;
 import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import org.apache.aurora.scheduler.zookeeper.guice.client.flagged.FlaggedClientConfig;
+import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.CommandInfo;
+import org.apache.mesos.Protos.CommandInfo.URI;
+import org.apache.mesos.Protos.ExecutorInfo;
+import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.Protos.Value.Scalar;
+import org.apache.mesos.Protos.Value.Type;
 
 import static org.apache.aurora.common.logging.RootLogConfig.Configuration;
 import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
+import static org.apache.aurora.scheduler.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
 
 /**
  * Launcher for the aurora scheduler.
@@ -201,6 +216,42 @@ public class SchedulerMain {
         new DbModule.GarbageCollectorModule());
   }
 
+  private static Resource makeResource(ResourceType type, double value) {
+    return Resource.newBuilder()
+        .setType(Type.SCALAR)
+        .setName(type.getName())
+        .setScalar(Scalar.newBuilder().setValue(value))
+        .build();
+  }
+
+  private static String uriBasename(String uri) {
+    int lastSlash = uri.lastIndexOf('/');
+    if (lastSlash == -1) {
+      return uri;
+    } else {
+      String basename = uri.substring(lastSlash + 1);
+      MorePreconditions.checkNotBlank(basename, "URI must not end with a slash.");
+
+      return basename;
+    }
+  }
+
+  private static CommandInfo makeExecutorCommand() {
+    Stream<String> resourcesToFetch = Stream.concat(
+        ImmutableList.of(THERMOS_EXECUTOR_PATH.get()).stream(),
+        THERMOS_EXECUTOR_RESOURCES.get().stream());
+
+    return CommandInfo.newBuilder()
+        // Default to the value of $MESOS_SANDBOX if present.  This is necessary for docker tasks,
+        // in which case the mesos agent is responsible for setting $MESOS_SANDBOX.
+        .setValue("${MESOS_SANDBOX=.}/" + uriBasename(THERMOS_EXECUTOR_PATH.get())
+            + " " + Optional.ofNullable(THERMOS_EXECUTOR_FLAGS.get()).orElse(""))
+        .addAllUris(resourcesToFetch
+            .map(r -> URI.newBuilder().setValue(r).setExecutable(true).build())
+            .collect(GuavaUtils.toImmutableList()))
+        .build();
+  }
+
   /**
    * Runs the scheduler by including modules configured from command line arguments in
    * addition to the provided environment-specific module.
@@ -228,21 +279,38 @@ public class SchedulerMain {
         new AbstractModule() {
           @Override
           protected void configure() {
-            ResourceSlot executorOverhead = new ResourceSlot(
-                EXECUTOR_OVERHEAD_CPUS.get(),
-                EXECUTOR_OVERHEAD_RAM.get(),
-                Amount.of(0L, Data.MB),
-                0);
+            List<Protos.Volume> volumeMounts =
+                ImmutableList.<Protos.Volume>builder()
+                    .add(Protos.Volume.newBuilder()
+                        .setHostPath(THERMOS_OBSERVER_ROOT.get())
+                        .setContainerPath(THERMOS_OBSERVER_ROOT.get())
+                        .setMode(Protos.Volume.Mode.RW)
+                        .build())
+                    .addAll(Iterables.transform(
+                        GLOBAL_CONTAINER_MOUNTS.get(),
+                        new Function<Volume, Protos.Volume>() {
+                          @Override
+                          public Protos.Volume apply(Volume v) {
+                            return Protos.Volume.newBuilder()
+                                .setHostPath(v.getHostPath())
+                                .setContainerPath(v.getContainerPath())
+                                .setMode(Protos.Volume.Mode.valueOf(v.getMode().getValue()))
+                                .build();
+                          }
+                        }))
+                .build();
 
-            bind(ExecutorSettings.class)
-                .toInstance(ExecutorSettings.newBuilder()
-                    .setExecutorPath(THERMOS_EXECUTOR_PATH.get())
-                    .setExecutorResources(THERMOS_EXECUTOR_RESOURCES.get())
-                    .setThermosObserverRoot(THERMOS_OBSERVER_ROOT.get())
-                    .setExecutorFlags(Optional.fromNullable(THERMOS_EXECUTOR_FLAGS.get()))
-                    .setExecutorOverhead(executorOverhead)
-                    .setGlobalContainerMounts(GLOBAL_CONTAINER_MOUNTS.get())
-                    .build());
+            bind(ExecutorSettings.class).toInstance(new ExecutorSettings(
+                new ExecutorConfig(
+                    ExecutorInfo.newBuilder()
+                        .setName("aurora.task")
+                        // Necessary as executorId is a required field.
+                        .setExecutorId(Executors.PLACEHOLDER_EXECUTOR_ID)
+                        .setCommand(makeExecutorCommand())
+                        .addResources(makeResource(CPUS, EXECUTOR_OVERHEAD_CPUS.get()))
+                        .addResources(makeResource(RAM_MB, EXECUTOR_OVERHEAD_RAM.get().as(Data.MB)))
+                        .build(),
+                    volumeMounts)));
 
             bind(IServerInfo.class).toInstance(
                 IServerInfo.build(

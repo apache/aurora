@@ -60,6 +60,7 @@ import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.mesos.MesosSchedulerImpl;
+import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
@@ -228,11 +229,7 @@ public class StatusUpdateBenchmark {
                         .build()));
             bind(RescheduleCalculator.class).toInstance(new FakeRescheduleCalculator());
             bind(Clock.class).toInstance(new FakeClock());
-            bind(ExecutorSettings.class)
-                .toInstance(ExecutorSettings.newBuilder()
-                    .setExecutorPath("/executor/thermos")
-                    .setThermosObserverRoot("/var/run/thermos")
-                    .build());
+            bind(ExecutorSettings.class).toInstance(TestExecutorSettings.THERMOS_EXECUTOR);
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(EventSink.class).toInstance(new EventSink() {
               @Override

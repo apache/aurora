@@ -204,6 +204,6 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     // 4. Resource check (lowest score).
     return getResourceVetoes(
         resource.getResourceSlot(),
-        ResourceSlot.from(request.getTask()).withOverhead(executorSettings));
+        ResourceSlot.from(request.getTask()).add(executorSettings.getExecutorOverhead()));
   }
 }

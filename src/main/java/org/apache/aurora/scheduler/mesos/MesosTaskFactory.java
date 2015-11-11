@@ -27,11 +27,8 @@ import com.google.protobuf.ByteString;
 
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.TierManager;
-import org.apache.aurora.scheduler.base.CommandUtil;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -41,7 +38,6 @@ import org.apache.aurora.scheduler.storage.entities.IDockerParameter;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
@@ -49,7 +45,6 @@ import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
-import org.apache.mesos.Protos.Volume;
 
 import static java.util.Objects.requireNonNull;
 
@@ -72,12 +67,6 @@ public interface MesosTaskFactory {
   class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
     private static final String EXECUTOR_PREFIX = "thermos-";
-
-    /**
-     * Name to associate with task executors.
-     */
-    @VisibleForTesting
-    static final String EXECUTOR_NAME = "aurora.task";
 
     private final ExecutorSettings executorSettings;
     private final TierManager tierManager;
@@ -106,18 +95,6 @@ public interface MesosTaskFactory {
       return String.format("%s.%s", getJobSourceName(task), instanceId);
     }
 
-    /**
-     * Resources to 'allocate' to the executor in the ExecutorInfo.  We do this since mesos
-     * disallows an executor with zero resources, but the tasks end up in the same container
-     * anyway.
-     */
-    @VisibleForTesting
-    static final ResourceSlot RESOURCES_EPSILON = new ResourceSlot(
-        0.01,
-        Amount.of(32L, Data.MB),
-        Amount.of(1L, Data.MB),
-        0);
-
     @Override
     public TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException {
       requireNonNull(task);
@@ -132,12 +109,9 @@ public interface MesosTaskFactory {
       }
 
       ITaskConfig config = task.getTask();
-      ResourceSlot resourceSlot = ResourceSlot.from(config)
-          .withOverhead(executorSettings)
-          .subtract(RESOURCES_EPSILON);
 
       // TODO(wfarner): Re-evaluate if/why we need to continue handling unset assignedPorts field.
-      List<Resource> resources = resourceSlot.toResourceList(
+      List<Resource> resources = ResourceSlot.from(config).toResourceList(
           task.isSetAssignedPorts()
               ? ImmutableSet.copyOf(task.getAssignedPorts().values())
               : ImmutableSet.of(),
@@ -163,7 +137,7 @@ public interface MesosTaskFactory {
         throw new SchedulerException("Task had no supported container set.");
       }
 
-      return taskBuilder.build();
+      return ResourceSlot.matchResourceTypes(taskBuilder.build());
     }
 
     private void configureTaskForNoContainer(
@@ -171,14 +145,7 @@ public interface MesosTaskFactory {
         ITaskConfig config,
         TaskInfo.Builder taskBuilder) {
 
-      CommandInfo commandInfo = CommandUtil.create(
-          executorSettings.getExecutorPath(),
-          executorSettings.getExecutorResources(),
-          "./",
-          executorSettings.getExecutorFlags()).build();
-
-      ExecutorInfo.Builder executorBuilder = configureTaskForExecutor(task, config, commandInfo);
-      taskBuilder.setExecutor(executorBuilder.build());
+      taskBuilder.setExecutor(configureTaskForExecutor(task, config).build());
     }
 
     private void configureTaskForDockerContainer(
@@ -203,50 +170,23 @@ public interface MesosTaskFactory {
 
       configureContainerVolumes(containerBuilder);
 
-      // TODO(SteveNiemitz): Allow users to specify an executor per container type.
-      CommandInfo.Builder commandInfoBuilder = CommandUtil.create(
-          executorSettings.getExecutorPath(),
-          executorSettings.getExecutorResources(),
-          "$MESOS_SANDBOX/",
-          executorSettings.getExecutorFlags());
-
-      ExecutorInfo.Builder execBuilder =
-          configureTaskForExecutor(task, taskConfig, commandInfoBuilder.build())
-              .setContainer(containerBuilder.build());
+      ExecutorInfo.Builder execBuilder = configureTaskForExecutor(task, taskConfig)
+          .setContainer(containerBuilder.build());
 
       taskBuilder.setExecutor(execBuilder.build());
     }
 
     private ExecutorInfo.Builder configureTaskForExecutor(
         IAssignedTask task,
-        ITaskConfig config,
-        CommandInfo commandInfo) {
+        ITaskConfig config) {
 
-      return ExecutorInfo.newBuilder()
-          .setCommand(commandInfo)
+      return executorSettings.getExecutorConfig().getExecutor().toBuilder()
           .setExecutorId(getExecutorId(task.getTaskId()))
-          .setName(EXECUTOR_NAME)
-          .setSource(getInstanceSourceName(config, task.getInstanceId()))
-          .addAllResources(RESOURCES_EPSILON.toResourceList(tierManager.getTier(config)));
+          .setSource(getInstanceSourceName(config, task.getInstanceId()));
     }
 
     private void configureContainerVolumes(ContainerInfo.Builder containerBuilder) {
-      containerBuilder.addVolumes(
-          Volume.newBuilder()
-              .setContainerPath(executorSettings.getThermosObserverRoot())
-              .setHostPath(executorSettings.getThermosObserverRoot())
-              .setMode(Volume.Mode.RW)
-              .build());
-
-      for (org.apache.aurora.gen.Volume v : executorSettings.getGlobalContainerMounts()) {
-        // This has already been validated to be correct in ExecutorSettings().
-        containerBuilder.addVolumes(
-            Volume.newBuilder()
-                .setHostPath(v.getHostPath())
-                .setContainerPath(v.getContainerPath())
-                .setMode(Volume.Mode.valueOf(v.getMode().getValue()))
-                .build());
-      }
+      containerBuilder.addAllVolumes(executorSettings.getExecutorConfig().getVolumeMounts());
     }
   }
 }

@@ -23,17 +23,13 @@ import com.google.common.collect.Iterables;
 import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
-
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.ResourceSlot.MIN_THERMOS_RESOURCES;
 import static org.apache.aurora.scheduler.ResourceSlot.makeMesosRangeResource;
 import static org.apache.aurora.scheduler.ResourceSlot.makeMesosResource;
-import static org.apache.aurora.scheduler.ResourceSlot.maxElements;
 import static org.apache.aurora.scheduler.ResourceSlot.sum;
 import static org.apache.aurora.scheduler.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
@@ -90,16 +86,6 @@ public class ResourceSlotTest {
   @Test
   public void testSum() {
     assertEquals(THREE, sum(ImmutableList.of(ONE, ONE, ONE)));
-  }
-
-  @Test
-  public void testWithOverhead() {
-    assertEquals(maxElements(TWO, MIN_THERMOS_RESOURCES), ONE.withOverhead(
-        ExecutorSettings.newBuilder()
-            .setExecutorOverhead(ONE)
-            .setExecutorPath("ignored")
-            .setThermosObserverRoot("ignored")
-            .build()));
   }
 
   @Test

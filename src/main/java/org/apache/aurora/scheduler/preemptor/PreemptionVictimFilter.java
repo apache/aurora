@@ -130,7 +130,7 @@ public interface PreemptionVictimFilter {
               // resource. We can still use RAM, DISK and PORTS as they are not compressible.
               slot = new ResourceSlot(0.0, slot.getRam(), slot.getDisk(), slot.getNumPorts());
             }
-            return slot.withOverhead(executorSettings);
+            return slot.add(executorSettings.getExecutorOverhead());
           }
         };
 
