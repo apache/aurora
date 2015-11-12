@@ -1,3 +1,91 @@
+Aurora 0.10.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1476] - TaskConfig dedupe routine does not handle null fields properly
+    * [AURORA-1479] - Observer chroot browser guesses content-encoding and content-type of files
+    * [AURORA-1406] - End-to-end test stalls at SSH prompt
+    * [AURORA-1282] - twitter.common.stats.Stats warns about exported metric names
+    * [AURORA-1533] - Transient connection errors can leave client in irrecoverable state
+    * [AURORA-1459] - DelayExecutor is flaky within scheduling loop
+    * [AURORA-1435] - Scheduling loop terminates on the first mismatch
+    * [AURORA-1489] - README.md does not include instructions on filing bugs
+    * [AURORA-1529] - Wrong command to `Build a client executable`
+    * [AURORA-1407] - IllegalArgumentException in end-to-end tests
+    * [AURORA-1510] - ConcurrentModificationException in PreemptorService
+    * [AURORA-1511] - PreemptorService failure does not trigger shutdown
+    * [AURORA-1445] - In-progress instances on Update page continue to pulse after update is aborted
+    * [AURORA-1494] - Scheduler fails to start due to thrift/SQL schema data type mismatch
+    * [AURORA-1186] - Remove exclusion block from shiro dependency
+    * [AURORA-1431] - Slave reservation is too restrictive
+    * [AURORA-1342] - shiro.ini with blank users section fails to parse.
+    * [AURORA-1484] - Document Changing Scheduler Quorum Size
+    * [AURORA-1043] - /logconfig does not work when the scheduler is behind SSL
+    * [AURORA-1345] - Update status page for large jobs is killed by Chrome
+    * [AURORA-1537] - post_drain_script called for hosts that fail to drain within timeout
+    * [AURORA-1395] - RescheduleCalculator precondition fails when using DbTaskStore
+    * [AURORA-1409] - End-to-end tests fail with 401 unuthorized
+    * [AURORA-1403] - Aurora UI cannot find task
+    * [AURORA-1524] - register_auth_module still checks for callability
+
+## Epic
+    * [AURORA-1367] - 0.10.0 deprecations
+    * [AURORA-1251] - 0.10.0 backwards incompatible changes
+    * [AURORA-1501] - Add a job update diff RPC 
+    * [AURORA-1457] - Consider removing quota enforcement for dedicated jobs
+
+## Story
+    * [AURORA-1485] - TaskConfig default container value breaks client library generation for GO
+    * [AURORA-1364] - Improve client error messages for Kerberos errors
+    * [AURORA-1317] - Allow an external log rotation process to truncate stdout and stderr
+    * [AURORA-1213] - IP clearance and import of twitter commons java code
+    * [AURORA-1429] - Upgrade Mesos to 0.23
+    * [AURORA-1338] - Remove ChainedPathDetector from thermos
+    * [AURORA-851] - Create nightly builds
+    * [AURORA-1430] - Set up vagrant environment for sudo-less docker commands
+    * [AURORA-1241] - Wrong label on table heading for in progress updates
+    * [AURORA-1474] - Improve discoverability of dashboard link on the Job page
+    * [AURORA-1261] - Expose slave host information using the variable {{mesos.hostname}}
+    * [AURORA-696] - No way to link directly to Completed Tasks
+    * [AURORA-1496] - Re-enable Scheduler Health Endpoint
+    * [AURORA-783] - Remove redundant page header text
+    * [AURORA-829] - Reference documentation should be self-contained
+    * [AURORA-351] - Consider using Apache Shiro for scheduler Authentication and Authorization
+    * [AURORA-586] - Upgrade scheduler to guava 18
+    * [AURORA-1193] - Improve UI task status reporting experience
+    * [AURORA-1405] - Client cluster configuration should specify the correct port to access multiple zookeeper hosts
+    * [AURORA-647] - Don't store serialized thrift objects in the database
+
+## Task
+    * [AURORA-1503] - Determine how best to keep up with Mesos releases
+    * [AURORA-1437] - Implement TierManager to translate tiers to task traits
+    * [AURORA-1491] - Make "aurora task" commands support optional ssh options
+    * [AURORA-1490] - Update website to point towards new mailing lists
+    * [AURORA-1461] - Update RPCs and client/UI to properly identify non-dedicated consumption
+    * [AURORA-1464] - Add e2e integration tests for revocable tasks
+    * [AURORA-1414] - Schema changes to support revocable jobs
+    * [AURORA-1462] - Update quota documentation
+    * [AURORA-1516] - Add update sequence into "aurora job diff" command
+    * [AURORA-1473] - Add build properties into scheduler /var endpoint
+    * [AURORA-1460] - Remove quota enforcement for dedicated jobs
+    * [AURORA-1441] - Document oversubscription in Aurora
+    * [AURORA-1536] - Add test coverage to python/src/apache/*
+    * [AURORA-1502] - Create a design summary for the jobConfigDiff RPC
+    * [AURORA-97] - Provide a web UI page to show history for a specific job instance
+    * [AURORA-1331] - It should be possible to link to an instance from the update page
+    * [AURORA-1442] - Move Twitter Commons into org.apache.aurora namespace and add headers
+    * [AURORA-1419] - FrameworkInfo support for REVOCABLE_RESOURCES capability
+    * [AURORA-1427] - Move build-support/packaging to aurora-packaging repo
+    * [AURORA-1415] - De-generalize resource handling in Scheduler
+    * [AURORA-1515] - Implement getJobUpdateDiff API without TaskConfig diff support
+    * [AURORA-1439] - Modify resource counters to support revocable slot counters
+    * [AURORA-1531] - upgrade psutil to 3.2.2 from 2.1.3
+    * [AURORA-1416] - Centralize offer/task matching implementation in TaskAssigner
+    * [AURORA-1482] - Publish 0.9.0 debs to bintray
+    * [AURORA-904] - 0.8.0 Release Candidate
+    * [AURORA-1418] - Ignore revocable resources in preemptor
+    * [AURORA-1499] - Upgrade Pants to version 0.0.57
+
+
 Aurora 0.9.0
 --------------------------------------------------------------------------------
 ## Bug
