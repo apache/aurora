@@ -317,8 +317,6 @@ class InspectCommand(Verb):
 
   def get_options(self):
     return [BIND_OPTION, JSON_READ_OPTION,
-        CommandOption("--local", dest="local", default=False, action="store_true",
-            help='Inspect the configuration as would be created by the "job create" command.'),
         CommandOption("--raw", dest="raw", default=False, action="store_true",
             help="Show the raw configuration."),
         JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
