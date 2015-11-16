@@ -39,6 +39,7 @@ readonly MESOS_VERSION=0.23.0
 function prepare_extras() {
   pushd aurora
     # Fetch the mesos egg, needed to build python components.
+    # The mesos.native target in 3rdparty/python/BUILD expects to find the native egg in third_party.
     mkdir -p third_party
     pushd third_party
       wget -c https://svn.apache.org/repos/asf/aurora/3rdparty/ubuntu/trusty64/python/mesos.native-${MESOS_VERSION}-py2.7-linux-x86_64.egg
