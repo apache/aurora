@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.mesos;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 
 /**
  * Utility class to contain constants related to setting up executor settings.
