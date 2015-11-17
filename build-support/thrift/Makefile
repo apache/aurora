@@ -13,11 +13,15 @@
 THRIFT_VERSION = 0.9.1
 THRIFT_DISTNAME = thrift-$(THRIFT_VERSION)
 THRIFT_URL = https://archive.apache.org/dist/thrift/$(THRIFT_VERSION)/$(THRIFT_DISTNAME).tar.gz
-#TODO(zmanji): Verify the MD5 of the downloaded file.
+THRIFT_SHA256 = ac175080c8cac567b0331e394f23ac306472c071628396db2850cb00c41b0017
 
-THRIFT = ./thrift-$(THRIFT_VERSION)/compiler/cpp/thrift
+# This patch is documented here: https://issues.apache.org/jira/browse/THRIFT-2386
+THRIFT_PATCH_URL = https://issues.apache.org/jira/secure/attachment/12632477/yylex.patch
+THRIFT_PATCH_SHA256 = 70f20b4e5b2e004b8a0d075b80a52750bce5be02ed83efdc60adbc45ec386a6c
 
-CONFIGURE_FLAGS = --disable-dependency-tracking \
+THRIFT = ./$(THRIFT_DISTNAME)/compiler/cpp/thrift
+THRIFT_CONFIGURE_FLAGS = \
+  --disable-dependency-tracking \
   --disable-shared \
   --without-c_glib \
   --without-cpp \
@@ -38,9 +42,21 @@ CONFIGURE_FLAGS = --disable-dependency-tracking \
 
 all: $(THRIFT)
 
+define calculate_sha256
+	openssl dgst -sha256 | cut -d' ' -f2
+endef
+
 $(THRIFT):
-	curl -s $(THRIFT_URL) | tar zxv
-	(cd $(THRIFT_DISTNAME) && ./configure $(CONFIGURE_FLAGS) && make -j4)
+	sha256=$$(curl -s $(THRIFT_URL) | tee $(THRIFT_DISTNAME).tar.gz | $(calculate_sha256)) && \
+	[ "$${sha256}" = "$(THRIFT_SHA256)" ] && \
+	tar zxvf $(THRIFT_DISTNAME).tar.gz && \
+	cd $(THRIFT_DISTNAME) && \
+	sha256=$$(curl -s $(THRIFT_PATCH_URL) | tee thrift.patch | $(calculate_sha256)) && \
+	[ "$${sha256}" = "$(THRIFT_PATCH_SHA256)" ] && \
+	patch -p1 < thrift.patch && \
+	./configure $(THRIFT_CONFIGURE_FLAGS) && \
+	make clean && \
+	make -j4
 
 clean:
-	rm -fr $(THRIFT_DISTNAME)
+	rm -fr $(THRIFT_DISTNAME)*

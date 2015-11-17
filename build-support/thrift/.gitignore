@@ -1,3 +1,1 @@
-thrift-*
-target
-src/main/gen-java
+/thrift-*
