@@ -37,6 +37,7 @@ public final class TestExecutorSettings {
   }
 
   public static final ExecutorInfo THERMOS_EXECUTOR_INFO = ExecutorInfo.newBuilder()
+      .setName("thermos")
       .setExecutorId(Executors.PLACEHOLDER_EXECUTOR_ID)
       .setCommand(CommandInfo.newBuilder().setValue("thermos_executor.pex")
           .addAllArguments(ImmutableList.of(
