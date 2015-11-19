@@ -15,8 +15,6 @@
 # Wrapper script for self-bootstrapping pex.
 set -e
 
-TWITTER_COMMON_PYTHON_VERSION=0.5.9
-
 if which python2.7 >/dev/null; then
   PY=`which python2.7`
 elif which python2.6 >/dev/null; then
@@ -27,16 +25,17 @@ else
 fi
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+PEX_REQ=$(grep pex $HERE/../3rdparty/python/requirements.txt)
 
 if ! [ -f "$HERE/pex.venv/BOOTSTRAPPED" ] || \
-    [ $(< "$HERE/pex.venv/BOOTSTRAPPED") != $TWITTER_COMMON_PYTHON_VERSION ]; then
+    [ $(< "$HERE/pex.venv/BOOTSTRAPPED") != "$PEX_REQ" ]; then
 
-  echo Bootstrapping twitter.common.python @ $TWITTER_COMMON_PYTHON_VERSION
+  echo Bootstrapping $PEX_REQ
   rm -fr "$HERE/pex.venv"
   "$HERE/virtualenv" "$HERE/pex.venv"
   source "$HERE/pex.venv/bin/activate"
-  python -m pip install "twitter.common.python==$TWITTER_COMMON_PYTHON_VERSION"
-  echo $TWITTER_COMMON_PYTHON_VERSION > "$HERE"/pex.venv/BOOTSTRAPPED
+  python -m pip install $PEX_REQ
+  echo $PEX_REQ > "$HERE"/pex.venv/BOOTSTRAPPED
 fi
 source "$HERE/pex.venv/bin/activate"
 exec pex "$@"
