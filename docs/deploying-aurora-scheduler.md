@@ -121,7 +121,7 @@ See [this document](storage-config.md#scheduler-storage-configuration-flags) for
 log and storage configuration options.
 
 ## Initializing the Replicated Log
-Before you start Aurora you will also need to initialize the log on a majority of the masters.
+Before you start Aurora you will also need to initialize the log on a majority of the schedulers.
 
     mesos-log initialize --path="/path/to/native/log"
 
