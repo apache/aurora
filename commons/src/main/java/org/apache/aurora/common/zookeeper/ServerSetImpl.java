@@ -167,36 +167,10 @@ public class ServerSetImpl implements ServerSet {
     final Group.Membership membership = group.join(serviceInstanceSupplier);
 
     return new EndpointStatus() {
-      @Override public void update(Status status) throws UpdateException {
-        checkNotNull(status);
-        LOG.warning("This method is deprecated. Please use leave() instead.");
-        if (status == Status.DEAD) {
-          leave();
-        } else {
-          LOG.warning("Status update has been ignored");
-        }
-      }
-
       @Override public void leave() throws UpdateException {
         memberStatus.leave(membership);
       }
     };
-  }
-
-  @Override
-  public EndpointStatus join(
-      InetSocketAddress endpoint,
-      Map<String, InetSocketAddress> additionalEndpoints,
-      Status status) throws Group.JoinException, InterruptedException {
-
-    LOG.warning("This method is deprecated. Please do not specify a status field.");
-    if (status != Status.ALIVE) {
-      LOG.severe("**************************************************************************\n"
-          + "WARNING: MUTABLE STATUS FIELDS ARE NO LONGER SUPPORTED.\n"
-          + "JOINING WITH STATUS ALIVE EVEN THOUGH YOU SPECIFIED " + status
-          + "\n**************************************************************************");
-    }
-    return join(endpoint, additionalEndpoints);
   }
 
   @Override
@@ -209,12 +183,6 @@ public class ServerSetImpl implements ServerSet {
     } catch (InterruptedException e) {
       throw new MonitorException("Interrupted while watching ZooKeeper.", e);
     }
-  }
-
-  @Override
-  public void monitor(HostChangeMonitor<ServiceInstance> monitor) throws MonitorException {
-    LOG.warning("This method is deprecated. Please use watch instead.");
-    watch(monitor);
   }
 
   private class MemberStatus {

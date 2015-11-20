@@ -13,18 +13,11 @@
  */
 package org.apache.aurora.common.thrift;
 
-import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.annotation.Nullable;
-
-import com.google.common.base.Function;
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 
@@ -38,72 +31,6 @@ import org.apache.thrift.meta_data.FieldMetaData;
  * @author William Farner
  */
 public class Util {
-
-  /**
-   * Maps a {@link ServiceInstance} to an {@link InetSocketAddress} given the {@code endpointName}.
-   *
-   * @param optionalEndpointName the name of the end-point on the service's additional end-points,
-   *      if not set, maps to the primary service end-point
-   */
-  public static Function<ServiceInstance, InetSocketAddress> getAddress(
-      final Optional<String> optionalEndpointName) {
-    if (!optionalEndpointName.isPresent()) {
-      return GET_ADDRESS;
-    }
-
-    final String endpointName = optionalEndpointName.get();
-    return getAddress(
-        new Function<ServiceInstance, Endpoint>() {
-          @Override public Endpoint apply(@Nullable ServiceInstance serviceInstance) {
-            Map<String, Endpoint> endpoints = serviceInstance.getAdditionalEndpoints();
-            Preconditions.checkArgument(endpoints.containsKey(endpointName),
-                "Did not find end-point %s on %s", endpointName, serviceInstance);
-            return endpoints.get(endpointName);
-          }
-        });
-  }
-
-  private static Function<ServiceInstance, InetSocketAddress> getAddress(
-      final Function<ServiceInstance, Endpoint> serviceToEndpoint) {
-    return new Function<ServiceInstance, InetSocketAddress>() {
-          @Override public InetSocketAddress apply(ServiceInstance serviceInstance) {
-            Endpoint endpoint = serviceToEndpoint.apply(serviceInstance);
-            return InetSocketAddress.createUnresolved(endpoint.getHost(), endpoint.getPort());
-          }
-        };
-  }
-
-  private static Function<ServiceInstance, Endpoint> GET_PRIMARY_ENDPOINT =
-      new Function<ServiceInstance, Endpoint>() {
-        @Override public Endpoint apply(ServiceInstance input) {
-          return input.getServiceEndpoint();
-        }
-      };
-
-  public static Function<ServiceInstance, InetSocketAddress> GET_ADDRESS =
-      getAddress(GET_PRIMARY_ENDPOINT);
-
-  public static final Predicate<ServiceInstance> IS_ALIVE = new Predicate<ServiceInstance>() {
-    @Override public boolean apply(ServiceInstance serviceInstance) {
-      switch (serviceInstance.getStatus()) {
-        case ALIVE:
-          return true;
-
-        // We'll be optimistic here and let MTCP's ranking deal with
-        // unhealthy services in a WARNING state.
-        case WARNING:
-          return true;
-
-        // Services which are just starting up, on the other hand... are much easier to just not
-        // send requests to.  The STARTING state is useful to distinguish from WARNING or ALIVE:
-        // you exist in ZooKeeper, but don't yet serve traffic.
-        case STARTING:
-        default:
-          return false;
-      }
-    }
-  };
-
   /**
    * Pretty-prints a thrift object contents.
    *
@@ -138,8 +65,6 @@ public class Util {
       return o.toString();
     }
   }
-
-  private static final String METADATA_MAP_FIELD_NAME = "metaDataMap";
 
   /**
    * Prints a TBase.

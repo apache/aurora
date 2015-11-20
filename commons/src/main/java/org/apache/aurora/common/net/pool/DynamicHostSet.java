@@ -31,29 +31,16 @@ public interface DynamicHostSet<T> {
    * changed.
    *
    * @param monitor the server set monitor to call back when the host set changes
-   * @throws MonitorException if there is a problem monitoring the host set
-   * @deprecated Deprecated in favor of {@link #watch(HostChangeMonitor)}
-   */
-  @Deprecated
-  public void monitor(final HostChangeMonitor<T> monitor) throws MonitorException;
-
-  /**
-   * Registers a monitor to receive change notices for this server set as long as this jvm process
-   * is alive.  Blocks until the initial server set can be gathered and delivered to the monitor.
-   * The monitor will be notified if the membership set or parameters of existing members have
-   * changed.
-   *
-   * @param monitor the server set monitor to call back when the host set changes
    * @return A command which, when executed, will stop monitoring the host set.
    * @throws MonitorException if there is a problem monitoring the host set
    */
-  public Command watch(final HostChangeMonitor<T> monitor) throws MonitorException;
+  Command watch(final HostChangeMonitor<T> monitor) throws MonitorException;
 
   /**
    * An interface to an object that is interested in receiving notification whenever the host set
    * changes.
    */
-  public static interface HostChangeMonitor<T> {
+  interface HostChangeMonitor<T> {
 
     /**
      * Called when either the available set of services changes (when a service dies or a new
@@ -64,7 +51,7 @@ public interface DynamicHostSet<T> {
     void onChange(ImmutableSet<T> hostSet);
   }
 
-  public static class MonitorException extends Exception {
+  class MonitorException extends Exception {
     public MonitorException(String msg) {
       super(msg);
     }

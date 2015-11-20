@@ -28,24 +28,6 @@ import java.util.Map;
  * TODO(William Farner): Explore decoupling this from thrift.
  */
 public interface ServerSet extends DynamicHostSet<ServiceInstance> {
-
-  /**
-   * Attempts to join a server set for this logical service group.
-   *
-   * @param endpoint the primary service endpoint
-   * @param additionalEndpoints and additional endpoints keyed by their logical name
-   * @param status the current service status
-   * @return an EndpointStatus object that allows the endpoint to adjust its status
-   * @throws JoinException if there was a problem joining the server set
-   * @throws InterruptedException if interrupted while waiting to join the server set
-   * @deprecated The status field is deprecated. Please use {@link #join(InetSocketAddress, Map)}
-   */
-  @Deprecated
-  public EndpointStatus join(
-      InetSocketAddress endpoint,
-      Map<String, InetSocketAddress> additionalEndpoints,
-      Status status) throws JoinException, InterruptedException;
-
   /**
    * Attempts to join a server set for this logical service group.
    *
@@ -55,7 +37,7 @@ public interface ServerSet extends DynamicHostSet<ServiceInstance> {
    * @throws JoinException if there was a problem joining the server set
    * @throws InterruptedException if interrupted while waiting to join the server set
    */
-  public EndpointStatus join(
+  EndpointStatus join(
       InetSocketAddress endpoint,
       Map<String, InetSocketAddress> additionalEndpoints)
       throws JoinException, InterruptedException;
@@ -78,19 +60,7 @@ public interface ServerSet extends DynamicHostSet<ServiceInstance> {
   /**
    * A handle to a service endpoint's status data that allows updating it to track current events.
    */
-  public interface EndpointStatus {
-
-    /**
-     * Attempts to update the status of the service endpoint associated with this endpoint.  If the
-     * {@code status} is {@link Status#DEAD} then the endpoint will be removed from the server set.
-     *
-     * @param status the current status of the endpoint
-     * @throws UpdateException if there was a problem writing the update
-     * @deprecated Support for mutable status is deprecated. Please use {@link #leave()}
-     */
-    @Deprecated
-    void update(Status status) throws UpdateException;
-
+  interface EndpointStatus {
     /**
      * Removes the endpoint from the server set.
      *
@@ -102,7 +72,7 @@ public interface ServerSet extends DynamicHostSet<ServiceInstance> {
   /**
    * Indicates an error updating a service's status information.
    */
-  public static class UpdateException extends Exception {
+  class UpdateException extends Exception {
     public UpdateException(String message, Throwable cause) {
       super(message, cause);
     }

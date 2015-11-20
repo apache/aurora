@@ -35,8 +35,6 @@ import org.apache.zookeeper.data.ACL;
  * the {@link ServerSet} at a time.
  */
 public class SingletonService {
-  private static final Logger LOG = Logger.getLogger(SingletonService.class.getName());
-
   @VisibleForTesting
   static final String LEADER_ELECT_NODE_PREFIX = "singleton_candidate_";
 
@@ -61,32 +59,6 @@ public class SingletonService {
   private final Candidate candidate;
 
   /**
-   * Equivalent to {@link #SingletonService(ZooKeeperClient, String, Iterable)} with a default
-   * wide open {@code acl} ({@link ZooDefs.Ids#OPEN_ACL_UNSAFE}).
-   */
-  public SingletonService(ZooKeeperClient zkClient, String servicePath) {
-    this(zkClient, servicePath, ZooDefs.Ids.OPEN_ACL_UNSAFE);
-  }
-
-  /**
-   * Creates a new singleton service, identified by {@code servicePath}.  All nodes related to the
-   * service (for both leader election and service registration) will live under the path and each
-   * node will be created with the supplied {@code acl}. Internally, two ZooKeeper {@code Group}s
-   * are used to manage a singleton service - one for leader election, and another for the
-   * {@code ServerSet} where the leader's endpoints are registered.  Leadership election should
-   * guarantee that at most one instance will ever exist in the ServerSet at once.
-   *
-   * @param zkClient The ZooKeeper client to use.
-   * @param servicePath The path where service nodes live.
-   * @param acl The acl to apply to newly created candidate nodes and serverset nodes.
-   */
-  public SingletonService(ZooKeeperClient zkClient, String servicePath, Iterable<ACL> acl) {
-    this(
-        new ServerSetImpl(zkClient, new Group(zkClient, acl, servicePath)),
-        createSingletonCandidate(zkClient, servicePath, acl));
-  }
-
-  /**
    * Creates a new singleton service that uses the supplied candidate to vie for leadership and then
    * advertises itself in the given server set once elected.
    *
@@ -96,41 +68,6 @@ public class SingletonService {
   public SingletonService(ServerSet serverSet, Candidate candidate) {
     this.serverSet = Preconditions.checkNotNull(serverSet);
     this.candidate = Preconditions.checkNotNull(candidate);
-  }
-
-  /**
-   * Attempts to lead the singleton service.
-   *
-   * @param endpoint The primary endpoint to register as a leader candidate in the service.
-   * @param additionalEndpoints Additional endpoints that are available on the host.
-   * @param status deprecated, will be ignored entirely
-   * @param listener Handler to call when the candidate is elected or defeated.
-   * @throws Group.WatchException If there was a problem watching the ZooKeeper group.
-   * @throws Group.JoinException If there was a problem joining the ZooKeeper group.
-   * @throws InterruptedException If the thread watching/joining the group was interrupted.
-   * @deprecated The status field is deprecated. Please use
-   *            {@link #lead(InetSocketAddress, Map, LeadershipListener)}
-   */
-  @Deprecated
-  public void lead(final InetSocketAddress endpoint,
-                   final Map<String, InetSocketAddress> additionalEndpoints,
-                   final Status status,
-                   final LeadershipListener listener)
-                   throws Group.WatchException, Group.JoinException, InterruptedException {
-
-    if (status != Status.ALIVE) {
-      LOG.severe("******************************************************************************");
-      LOG.severe("WARNING: MUTABLE STATUS FIELDS ARE NO LONGER SUPPORTED.");
-      LOG.severe("JOINING WITH STATUS ALIVE EVEN THOUGH YOU SPECIFIED " + status);
-      LOG.severe("******************************************************************************");
-    } else {
-      LOG.warning("******************************************************************************");
-      LOG.warning("WARNING: MUTABLE STATUS FIELDS ARE NO LONGER SUPPORTED.");
-      LOG.warning("Please use SingletonService.lead(InetSocketAddress, Map, LeadershipListener)");
-      LOG.warning("******************************************************************************");
-    }
-
-    lead(endpoint, additionalEndpoints, listener);
   }
 
   /**
@@ -194,7 +131,7 @@ public class SingletonService {
      *
      * @param control A controller handle to advertise and/or leave advertised presence.
      */
-    public void onLeading(LeaderControl control);
+    void onLeading(LeaderControl control);
 
     /**
      * Notifies the listener that it is no longer leader.  The leader should take this opportunity
@@ -202,7 +139,7 @@ public class SingletonService {
      *
      * @param status A handle on the endpoint status for the advertised leader.
      */
-    public void onDefeated(@Nullable ServerSet.EndpointStatus status);
+    void onDefeated(@Nullable ServerSet.EndpointStatus status);
   }
 
   /**

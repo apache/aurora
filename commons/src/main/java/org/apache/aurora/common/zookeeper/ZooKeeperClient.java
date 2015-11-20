@@ -298,7 +298,7 @@ public class ZooKeeperClient {
 
     Iterable<String> servers =
         Iterables.transform(ImmutableSet.copyOf(zooKeeperServers),
-            InetSocketAddressHelper.INET_TO_STR);
+            InetSocketAddressHelper::toString);
     this.zooKeeperServers = Joiner.on(',').join(servers).concat(chrootPath.or(""));
   }
 

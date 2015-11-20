@@ -121,7 +121,7 @@ public class MesosLogStreamModule extends PrivateModule {
     }
 
     String zkConnectString = Joiner.on(',').join(
-        Iterables.transform(zkClientConfig.servers, InetSocketAddressHelper.INET_TO_STR));
+        Iterables.transform(zkClientConfig.servers, InetSocketAddressHelper::toString));
 
     PathUtils.validatePath(ZK_LOG_GROUP_PATH.get());
     return new Log(
