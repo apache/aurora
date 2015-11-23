@@ -58,7 +58,7 @@ TASK = MesosTaskInstance(
 
 
 class TestThermosTaskRunnerIntegration(object):
-  PANTS_BUILT = False
+  PEX_PATH = None
   LOG_DIR = None
 
   @classmethod
@@ -67,17 +67,22 @@ class TestThermosTaskRunnerIntegration(object):
     LogOptions.set_log_dir(cls.LOG_DIR)
     LogOptions.set_disk_log_level('DEBUG')
     log.init('executor_logger')
-    if not cls.PANTS_BUILT and 'SKIP_PANTS_BUILD' not in os.environ:
-      assert subprocess.call(["./pants", "binary",
+    if not cls.PEX_PATH:
+      pex_dir = tempfile.mkdtemp()
+      assert subprocess.call(["./pants", "--pants-distdir=%s" % pex_dir, "binary",
           "src/main/python/apache/thermos/runner:thermos_runner"]) == 0
-      cls.PANTS_BUILT = True
+      cls.PEX_PATH = os.path.join(pex_dir, 'thermos_runner.pex')
 
   @classmethod
   def teardown_class(cls):
     if 'THERMOS_DEBUG' not in os.environ:
       safe_rmtree(cls.LOG_DIR)
+      if cls.PEX_PATH:
+        safe_rmtree(os.path.dirname(cls.PEX_PATH))
     else:
       print('Saving executor logs in %s' % cls.LOG_DIR)
+      if cls.PEX_PATH:
+        print('Saved thermos executor at %s' % cls.PEX_PATH)
 
   @contextlib.contextmanager
   def yield_runner(self, runner_class, portmap=None, clock=time, **bindings):
@@ -88,7 +93,7 @@ class TestThermosTaskRunnerIntegration(object):
         portmap = {}
 
       task_runner = runner_class(
-          runner_pex=os.path.join('dist', 'thermos_runner.pex'),
+          runner_pex=self.PEX_PATH,
           task_id='hello_world',
           task=TASK.bind(**bindings).task(),
           role=getpass.getuser(),

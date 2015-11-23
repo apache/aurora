@@ -170,9 +170,21 @@ MESOS_JOB = MesosJob(
 )
 
 
+def thermos_runner_path(build=True):
+  if not build:
+    return getattr(thermos_runner_path, 'value', None)
+
+  if not hasattr(thermos_runner_path, 'value'):
+    pex_dir = safe_mkdtemp()
+    assert subprocess.call(["./pants", "--pants-distdir=%s" % pex_dir, "binary",
+      "src/main/python/apache/thermos/runner:thermos_runner"]) == 0
+    thermos_runner_path.value = os.path.join(pex_dir, 'thermos_runner.pex')
+  return thermos_runner_path.value
+
+
 def make_provider(checkpoint_root, runner_class=ThermosTaskRunner):
   return DefaultThermosTaskRunnerProvider(
-      pex_location=os.path.join('dist', 'thermos_runner.pex'),
+      pex_location=thermos_runner_path(),
       checkpoint_root=checkpoint_root,
       task_runner_class=runner_class,
   )
@@ -266,17 +278,19 @@ class TestThermosExecutor(object):
     LogOptions.set_log_dir(cls.LOG_DIR)
     LogOptions.set_disk_log_level('DEBUG')
     log.init('executor_logger')
-    if not cls.PANTS_BUILT and 'SKIP_PANTS_BUILD' not in os.environ:
-      assert subprocess.call(["./pants", "binary",
-          "src/main/python/apache/thermos/runner:thermos_runner"]) == 0
-      cls.PANTS_BUILT = True
 
   @classmethod
   def teardown_class(cls):
     if 'THERMOS_DEBUG' not in os.environ:
       safe_rmtree(cls.LOG_DIR)
+      thermos_path = thermos_runner_path(build=False)
+      if thermos_path:
+        safe_rmtree(os.path.dirname(thermos_path))
     else:
       print('Saving executor logs in %s' % cls.LOG_DIR)
+      thermos_path = thermos_runner_path(build=False)
+      if thermos_path:
+        print('Saved thermos executor at %s' % thermos_path)
 
   def test_basic(self):
     proxy_driver = ProxyDriver()
