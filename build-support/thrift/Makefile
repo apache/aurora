@@ -55,7 +55,6 @@ $(THRIFT):
 	[ "$${sha256}" = "$(THRIFT_PATCH_SHA256)" ] && \
 	patch -p1 < thrift.patch && \
 	./configure $(THRIFT_CONFIGURE_FLAGS) && \
-	make clean && \
 	make -j4
 
 clean:
