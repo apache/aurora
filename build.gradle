@@ -225,8 +225,6 @@ project(':api') {
 
   idea {
     module {
-      jdkName = '1.8'
-
       [thrift.genJavaDir, thriftEntities.genJavaDir].each {
         sourceDirs += it
         generatedSourceDirs += it
@@ -477,6 +475,8 @@ tasks.withType(Test) {
 idea {
   project {
     vcs = 'Git'
+    jdkName = '1.8'
+    languageLevel = '1.8'
   }
 }
 
