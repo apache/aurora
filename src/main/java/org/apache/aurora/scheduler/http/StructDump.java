@@ -122,6 +122,7 @@ public class StructDump extends JerseyTemplateServlet {
         Optional<? extends TBase<?, ?>> struct = storage.read(work);
         if (struct.isPresent()) {
           template.setAttribute("structPretty", Util.prettyPrint(struct.get()));
+          template.setAttribute("exception", null);
         } else {
           template.setAttribute("exception", "Entity not found");
         }

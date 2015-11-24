@@ -41,8 +41,5 @@
         }$
       </tbody>
     </table>
-    $if(exception)$
-      <font color='red'>Exception: $exception$</font>
-    $endif$
   </body>
 </html>
