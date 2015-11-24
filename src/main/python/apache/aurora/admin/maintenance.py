@@ -32,7 +32,7 @@ from .admin_util import (
 from .host_maintenance import HostMaintenance
 
 
-#TODO(maxim): merge with admin.py commands.
+# TODO(maxim): merge with admin.py commands.
 @app.command
 @app.command_option(FILENAME_OPTION)
 @app.command_option(HOSTS_OPTION)

@@ -130,7 +130,7 @@ class Show(Verb):
     return [JOBSPEC_ARGUMENT]
 
   def execute(self, context):
-    #TODO(mchucarroll): do we want to support wildcards here?
+    # TODO(mchucarroll): do we want to support wildcards here?
     jobkey = context.options.jobspec
     api = context.get_api(jobkey.cluster)
     resp = api.get_jobs(jobkey.role)

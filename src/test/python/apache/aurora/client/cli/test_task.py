@@ -147,8 +147,7 @@ class TestSshCommand(AuroraClientCommandTest):
           jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
           instanceIds=set([1]),
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING
-              ])))
+              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING])))
       mock_subprocess.assert_called_with(['ssh', '-t', '-v', 'bozo@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])

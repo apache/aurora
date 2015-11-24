@@ -61,7 +61,6 @@ class ProcessTreeCollector(object):
         Returns None: result is stored in self.value
     """
     try:
-      last_sample, last_stamp = self._sample, self._stamp
       if self._process is None:
         self._process = Process(self._pid)
       parent = self._process

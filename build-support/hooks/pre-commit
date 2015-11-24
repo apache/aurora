@@ -20,7 +20,6 @@ if [ $SKIP_AURORA_HOOKS ]; then
 fi
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-TARGET=$HERE/../../src
 
 echo "Performing Python import order check."
 if ! $HERE/../../build-support/python/isort-check >&/dev/null; then
@@ -43,7 +42,7 @@ if ! $HERE/../../build-support/python/checkstyle-check $TARGET >&/dev/null; then
   echo ""
   echo "** PYTHON CHECKSTYLE FAILED"
   echo "*"
-  echo "* For more information please run: build-support/python/checkstyle-check $TARGET"
+  echo "* For more information please run: build-support/python/checkstyle-check"
   echo "*"
   echo "**"
   echo ""

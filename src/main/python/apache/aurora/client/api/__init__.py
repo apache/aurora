@@ -280,8 +280,11 @@ class AuroraClientAPI(object):
     """
     self._assert_valid_job_key(job_key)
 
-    return Restarter(job_key, updater_config, health_check_interval_seconds, self._scheduler_proxy
-    ).restart(instances)
+    return Restarter(
+        job_key,
+        updater_config,
+        health_check_interval_seconds,
+        self._scheduler_proxy).restart(instances)
 
   def start_maintenance(self, hosts):
     log.info("Starting maintenance for: %s" % hosts.hostNames)

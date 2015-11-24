@@ -205,13 +205,13 @@ class ProcessBase(object):
     if self._user:
       if user != current_user and os.geteuid() != 0:
         raise self.PermissionError('Must be root to run processes as other users!')
-    uid, gid = user.pw_uid, user.pw_gid
     self._fork_time = self._platform.clock().time()
     self._setup_ckpt()
     self._stdout = safe_open(self._pathspec.with_filename('stdout').getpath('process_logdir'), "a")
     self._stderr = safe_open(self._pathspec.with_filename('stderr').getpath('process_logdir'), "a")
-    os.chown(self._stdout.name, user.pw_uid, user.pw_gid)
-    os.chown(self._stderr.name, user.pw_uid, user.pw_gid)
+    uid, gid = user.pw_uid, user.pw_gid
+    os.chown(self._stdout.name, uid, gid)
+    os.chown(self._stderr.name, uid, gid)
 
   def _finalize_fork(self):
     self._write_initial_update()

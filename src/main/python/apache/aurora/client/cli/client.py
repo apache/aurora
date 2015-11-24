@@ -36,7 +36,7 @@ class AuroraLogConfigurationPlugin(ConfigurationPlugin):
     ]
 
   def before_dispatch(self, raw_args):
-    #TODO(zmanji): Consider raising the default log level to WARN.
+    # TODO(zmanji): Consider raising the default log level to WARN.
     loglevel = logging.INFO
     for arg in raw_args:
       if arg == "--verbose" or arg == "-v":

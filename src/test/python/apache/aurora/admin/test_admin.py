@@ -155,9 +155,9 @@ class TestIncreaseQuotaCommand(AuroraClientCommandTest):
       increase_quota([self.TEST_CLUSTER, role, '4.0', '1MB', '1MB'])
 
       api.set_quota.assert_called_with(role, 24.0, 4001, 6001)
-      assert type(api.set_quota.call_args[0][1]) == type(float())
-      assert type(api.set_quota.call_args[0][2]) == type(int())
-      assert type(api.set_quota.call_args[0][3]) == type(int())
+      assert isinstance(api.set_quota.call_args[0][1], float)
+      assert isinstance(api.set_quota.call_args[0][2], int)
+      assert isinstance(api.set_quota.call_args[0][3], int)
 
 
 class TestSetQuotaCommand(AuroraClientCommandTest):
@@ -187,9 +187,9 @@ class TestSetQuotaCommand(AuroraClientCommandTest):
       set_quota([self.TEST_CLUSTER, role, '4.0', '10MB', '10MB'])
 
       api.set_quota.assert_called_with(role, 4.0, 10, 10)
-      assert type(api.set_quota.call_args[0][1]) == type(float())
-      assert type(api.set_quota.call_args[0][2]) == type(int())
-      assert type(api.set_quota.call_args[0][3]) == type(int())
+      assert isinstance(api.set_quota.call_args[0][1], float)
+      assert isinstance(api.set_quota.call_args[0][2], int)
+      assert isinstance(api.set_quota.call_args[0][3], int)
 
 
 class TestGetLocksCommand(AuroraClientCommandTest):

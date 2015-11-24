@@ -76,7 +76,7 @@ class AuroraClientCommandTest(unittest.TestCase):
     hosts[hostname].append(JobUpTimeDetails(job, predicted, safe, safe_in))
     return [hosts]
 
-  #TODO(wfarner): Remove this, force tests to call out their flags.
+  # TODO(wfarner): Remove this, force tests to call out their flags.
   @classmethod
   def setup_mock_options(cls):
     mock_options = create_autospec(spec=['verbosity'], instance=True)
