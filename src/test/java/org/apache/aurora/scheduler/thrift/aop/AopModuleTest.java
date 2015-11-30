@@ -27,7 +27,6 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.ServerInfo;
-import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.junit.Before;
 import org.junit.Test;
@@ -76,12 +75,11 @@ public class AopModuleTest extends EasyMockTest {
   @Test
   public void testFlaggedMethodDisabled() throws Exception {
     JobConfiguration job = new JobConfiguration();
-    SessionKey session = new SessionKey();
 
     control.replay();
 
     Iface thrift = getIface(ImmutableMap.of("createJob", false));
-    assertEquals(ResponseCode.ERROR, thrift.createJob(job, null, session).getResponseCode());
+    assertEquals(ResponseCode.ERROR, thrift.createJob(job, null).getResponseCode());
   }
 
   @Test(expected = CreationException.class)
@@ -93,12 +91,12 @@ public class AopModuleTest extends EasyMockTest {
   private void assertCreateAllowed(Map<String, Boolean> toggledMethods) throws Exception {
     JobConfiguration job = new JobConfiguration();
     Response response = new Response();
-    expect(mockThrift.createJob(job, null, null)).andReturn(response);
+    expect(mockThrift.createJob(job, null)).andReturn(response);
 
     control.replay();
 
     Iface thrift = getIface(toggledMethods);
-    assertSame(response, thrift.createJob(job, null, null));
+    assertSame(response, thrift.createJob(job, null));
   }
 
   @Test

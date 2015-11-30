@@ -27,7 +27,6 @@ import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.LockValidation;
 import org.apache.aurora.gen.Response;
-import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.http.api.security.AuthorizingParam;
 import org.apache.thrift.TException;
@@ -47,88 +46,73 @@ public interface AnnotatedAuroraAdmin extends AuroraAdmin.Iface {
   @Override
   Response createJob(
       @AuthorizingParam @Nullable JobConfiguration description,
-      @Nullable Lock lock,
-      @Nullable SessionKey session) throws TException;
+      @Nullable Lock lock) throws TException;
 
   @Override
   Response scheduleCronJob(
       @AuthorizingParam @Nullable JobConfiguration description,
-      @Nullable Lock lock,
-      @Nullable SessionKey session) throws TException;
+      @Nullable Lock lock) throws TException;
 
   @Override
   Response descheduleCronJob(
       @AuthorizingParam @Nullable JobKey job,
-      @Nullable Lock lock,
-      @Nullable SessionKey session) throws TException;
+      @Nullable Lock lock) throws TException;
 
   @Override
   Response startCronJob(
-      @AuthorizingParam @Nullable JobKey job,
-      @Nullable SessionKey session) throws TException;
+      @AuthorizingParam @Nullable JobKey job) throws TException;
 
   @Override
   Response restartShards(
       @AuthorizingParam @Nullable JobKey job,
       @Nullable Set<Integer> shardIds,
-      @Nullable Lock lock,
-      @Nullable SessionKey session) throws TException;
+      @Nullable Lock lock) throws TException;
 
   @Override
   Response killTasks(
       @AuthorizingParam @Nullable TaskQuery query,
-      @Nullable Lock lock,
-      @Nullable SessionKey session) throws TException;
+      @Nullable Lock lock) throws TException;
 
   @Override
   Response addInstances(
       @AuthorizingParam @Nullable AddInstancesConfig config,
-      @Nullable Lock lock,
-      @Nullable SessionKey session) throws TException;
+      @Nullable Lock lock) throws TException;
 
   @Override
   Response acquireLock(
-      @AuthorizingParam @Nullable LockKey lockKey,
-      @Nullable SessionKey session) throws TException;
+      @AuthorizingParam @Nullable LockKey lockKey) throws TException;
 
   @Override
   Response releaseLock(
       @AuthorizingParam @Nullable Lock lock,
-      @Nullable LockValidation validation,
-      @Nullable SessionKey session) throws TException;
+      @Nullable LockValidation validation) throws TException;
 
   @Override
   Response replaceCronTemplate(
       @AuthorizingParam @Nullable JobConfiguration config,
-      @Nullable Lock lock,
-      @Nullable SessionKey session) throws TException;
+      @Nullable Lock lock) throws TException;
 
   @Override
   Response startJobUpdate(
       @AuthorizingParam @Nullable JobUpdateRequest request,
-      @Nullable String message,
-      @Nullable SessionKey session) throws TException;
+      @Nullable String message) throws TException;
 
   @Override
   Response pauseJobUpdate(
       @AuthorizingParam @Nullable JobUpdateKey key,
-      @Nullable String message,
-      @Nullable SessionKey session) throws TException;
+      @Nullable String message) throws TException;
 
   @Override
   Response resumeJobUpdate(
       @AuthorizingParam @Nullable JobUpdateKey key,
-      @Nullable String message,
-      @Nullable SessionKey session) throws TException;
+      @Nullable String message) throws TException;
 
   @Override
   Response abortJobUpdate(
       @AuthorizingParam @Nullable JobUpdateKey key,
-      @Nullable String message,
-      @Nullable SessionKey session) throws TException;
+      @Nullable String message) throws TException;
 
   @Override
   Response pulseJobUpdate(
-      @AuthorizingParam @Nullable JobUpdateKey key,
-      @Nullable SessionKey session) throws TException;
+      @AuthorizingParam @Nullable JobUpdateKey key) throws TException;
 }

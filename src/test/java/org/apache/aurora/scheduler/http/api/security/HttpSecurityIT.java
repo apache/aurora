@@ -190,7 +190,7 @@ public class HttpSecurityIT extends JettyServerModuleTest {
 
   private void assertKillTasksFails(AuroraAdmin.Client client) throws TException {
     try {
-      client.killTasks(null, null, null);
+      client.killTasks(null, null);
       fail("killTasks should fail.");
     } catch (TTransportException e) {
       // Expected.
@@ -199,43 +199,43 @@ public class HttpSecurityIT extends JettyServerModuleTest {
 
   @Test
   public void testAuroraSchedulerManager() throws TException, IOException {
-    expect(auroraAdmin.killTasks(null, new Lock().setMessage("1"), null)).andReturn(OK);
-    expect(auroraAdmin.killTasks(null, new Lock().setMessage("2"), null)).andReturn(OK);
+    expect(auroraAdmin.killTasks(null, new Lock().setMessage("1"))).andReturn(OK);
+    expect(auroraAdmin.killTasks(null, new Lock().setMessage("2"))).andReturn(OK);
 
     TaskQuery jobScopedQuery = Query.jobScoped(JobKeys.from("role", "env", "name")).get();
     TaskQuery adsScopedQuery = Query.jobScoped(ADS_STAGING_JOB).get();
-    expect(auroraAdmin.killTasks(adsScopedQuery, null, null)).andReturn(OK);
+    expect(auroraAdmin.killTasks(adsScopedQuery, null)).andReturn(OK);
 
     replayAndStart();
 
     assertEquals(OK,
-        getAuthenticatedClient(WFARNER).killTasks(null, new Lock().setMessage("1"), null));
+        getAuthenticatedClient(WFARNER).killTasks(null, new Lock().setMessage("1")));
     assertEquals(OK,
-        getAuthenticatedClient(ROOT).killTasks(null, new Lock().setMessage("2"), null));
+        getAuthenticatedClient(ROOT).killTasks(null, new Lock().setMessage("2")));
     assertEquals(
         ResponseCode.INVALID_REQUEST,
-        getAuthenticatedClient(UNPRIVILEGED).killTasks(null, null, null).getResponseCode());
+        getAuthenticatedClient(UNPRIVILEGED).killTasks(null, null).getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(UNPRIVILEGED)
-            .killTasks(jobScopedQuery, null, null)
+            .killTasks(jobScopedQuery, null)
             .getResponseCode());
     assertEquals(
         ResponseCode.INVALID_REQUEST,
-        getAuthenticatedClient(BACKUP_SERVICE).killTasks(null, null, null).getResponseCode());
+        getAuthenticatedClient(BACKUP_SERVICE).killTasks(null, null).getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(BACKUP_SERVICE)
-            .killTasks(jobScopedQuery, null, null)
+            .killTasks(jobScopedQuery, null)
             .getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(DEPLOY_SERVICE)
-            .killTasks(jobScopedQuery, null, null)
+            .killTasks(jobScopedQuery, null)
             .getResponseCode());
     assertEquals(
         OK,
-        getAuthenticatedClient(DEPLOY_SERVICE).killTasks(adsScopedQuery, null, null));
+        getAuthenticatedClient(DEPLOY_SERVICE).killTasks(adsScopedQuery, null));
 
     assertKillTasksFails(getUnauthenticatedClient());
     assertKillTasksFails(getAuthenticatedClient(INCORRECT));
@@ -244,7 +244,7 @@ public class HttpSecurityIT extends JettyServerModuleTest {
 
   private void assertSnapshotFails(AuroraAdmin.Client client) throws TException {
     try {
-      client.snapshot(null);
+      client.snapshot();
       fail("snapshot should fail");
     } catch (TTransportException e) {
       // Expected.
@@ -253,12 +253,12 @@ public class HttpSecurityIT extends JettyServerModuleTest {
 
   @Test
   public void testAuroraAdmin() throws TException {
-    expect(auroraAdmin.snapshot(null)).andReturn(OK);
-    expect(auroraAdmin.listBackups(null)).andReturn(OK);
+    expect(auroraAdmin.snapshot()).andReturn(OK);
+    expect(auroraAdmin.listBackups()).andReturn(OK);
 
     replayAndStart();
 
-    assertEquals(OK, getAuthenticatedClient(ROOT).snapshot(null));
+    assertEquals(OK, getAuthenticatedClient(ROOT).snapshot());
 
     for (Credentials credentials : INVALID_CREDENTIALS) {
       assertSnapshotFails(getAuthenticatedClient(credentials));
@@ -267,10 +267,10 @@ public class HttpSecurityIT extends JettyServerModuleTest {
     for (Credentials credentials : Sets.difference(VALID_CREDENTIALS, ImmutableSet.of(ROOT))) {
       assertEquals(
           ResponseCode.AUTH_FAILED,
-          getAuthenticatedClient(credentials).snapshot(null).getResponseCode());
+          getAuthenticatedClient(credentials).snapshot().getResponseCode());
     }
 
-    assertEquals(OK, getAuthenticatedClient(BACKUP_SERVICE).listBackups(null));
+    assertEquals(OK, getAuthenticatedClient(BACKUP_SERVICE).listBackups());
   }
 
   private HttpResponse callH2Console(Credentials credentials) throws Exception {

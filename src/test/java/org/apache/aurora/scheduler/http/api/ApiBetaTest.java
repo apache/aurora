@@ -115,7 +115,7 @@ public class ApiBetaTest extends JettyServerModuleTest {
         .setResponseCode(OK);
 
     JobConfiguration job = JOB_CONFIG.newBuilder();
-    expect(thrift.createJob(anyObject(), eq(lock), eq(null))).andReturn(response);
+    expect(thrift.createJob(anyObject(), eq(lock))).andReturn(response);
 
     replayAndStart();
 

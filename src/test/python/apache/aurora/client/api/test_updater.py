@@ -53,7 +53,6 @@ from gen.apache.aurora.api.ttypes import (
     ScheduledTask,
     ScheduleStatusResult,
     ServerInfo,
-    SessionKey,
     TaskConfig,
     TaskConstraint,
     TaskQuery,
@@ -149,15 +148,12 @@ class UpdaterTest(TestCase):
     self._name = 'jimbob'
     self._env = 'test'
     self._job_key = JobKey(name=self._name, environment=self._env, role=self._role)
-    self._session_key = SessionKey()
     self._lock = 'test_lock'
     self._instance_watcher = MockObject(InstanceWatcher)
     self._job_monitor = MockObject(JobMonitor)
     self._scheduler_mux = FakeSchedulerMux()
     self._scheduler = MockObject(scheduler_client)
-    self._scheduler_proxy = FakeSchedulerProxy(Cluster(name='test-cluster'),
-                                               self._scheduler,
-                                               self._session_key)
+    self._scheduler_proxy = FakeSchedulerProxy(Cluster(name='test-cluster'), self._scheduler)
     self._quota_check = MockObject(QuotaCheck)
     self.init_updater(deepcopy(self.UPDATE_CONFIG))
     self._num_cpus = 1.0
@@ -215,7 +211,7 @@ class UpdaterTest(TestCase):
 
   def expect_cron_replace(self, job_config, response_code=ResponseCode.OK):
     resp = make_response(response_code)
-    self._scheduler.replaceCronTemplate(job_config, self._lock, self._session_key).AndReturn(resp)
+    self._scheduler.replaceCronTemplate(job_config, self._lock).AndReturn(resp)
 
   def expect_restart(self, instance_ids, response_code=None):
     for i in instance_ids:
@@ -224,8 +220,7 @@ class UpdaterTest(TestCase):
       self._scheduler.restartShards(
           self._job_key,
           [i],
-          self._lock,
-          self._session_key).AndReturn(response)
+          self._lock).AndReturn(response)
 
   def expect_kill(self,
       instance_ids,
@@ -238,8 +233,7 @@ class UpdaterTest(TestCase):
                         instanceIds=frozenset([int(i)]))
       self._scheduler.killTasks(
           query,
-          self._lock,
-          self._session_key).InAnyOrder().AndReturn(make_response(response_code))
+          self._lock).InAnyOrder().AndReturn(make_response(response_code))
 
     self.expect_job_monitor(response_code, instance_ids, monitor_result, skip_monitor)
 
@@ -260,8 +254,7 @@ class UpdaterTest(TestCase):
           instanceIds=frozenset([int(i)]))
       self._scheduler.addInstances(
           add_config,
-          self._lock,
-          self._session_key).InAnyOrder().AndReturn(make_response(response_code))
+          self._lock).InAnyOrder().AndReturn(make_response(response_code))
 
   def expect_update_instances(self, instance_ids, task_config):
     for i in instance_ids:
@@ -281,13 +274,12 @@ class UpdaterTest(TestCase):
   def expect_start(self, response_code=ResponseCode.OK):
     response = make_response(response_code)
     response.result = Result(acquireLockResult=AcquireLockResult(lock=self._lock))
-    self._scheduler.acquireLock(LockKey(job=self._job_key), self._session_key).AndReturn(response)
+    self._scheduler.acquireLock(LockKey(job=self._job_key)).AndReturn(response)
 
   def expect_finish(self, response_code=ResponseCode.OK):
     self._scheduler.releaseLock(
         self._lock,
-        LockValidation.CHECKED,
-        self._session_key).AndReturn(make_response(response_code))
+        LockValidation.CHECKED).AndReturn(make_response(response_code))
 
   def expect_quota_check(self,
       num_released,

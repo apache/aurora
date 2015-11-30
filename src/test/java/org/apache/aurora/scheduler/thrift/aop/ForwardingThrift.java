@@ -29,7 +29,6 @@ import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.thrift.TException;
 
@@ -50,60 +49,49 @@ abstract class ForwardingThrift implements AnnotatedAuroraAdmin {
   @Override
   public Response setQuota(
       String ownerRole,
-      ResourceAggregate resourceAggregate,
-      SessionKey session) throws TException {
+      ResourceAggregate resourceAggregate) throws TException {
 
-    return delegate.setQuota(ownerRole, resourceAggregate, session);
+    return delegate.setQuota(ownerRole, resourceAggregate);
   }
 
   @Override
-  public Response forceTaskState(
-      String taskId,
-      ScheduleStatus status,
-      SessionKey session) throws TException {
-
-    return delegate.forceTaskState(taskId, status, session);
+  public Response forceTaskState(String taskId, ScheduleStatus status) throws TException {
+    return delegate.forceTaskState(taskId, status);
   }
 
   @Override
-  public Response performBackup(SessionKey session) throws TException {
-    return delegate.performBackup(session);
+  public Response performBackup() throws TException {
+    return delegate.performBackup();
   }
 
   @Override
-  public Response listBackups(SessionKey session) throws TException {
-    return delegate.listBackups(session);
+  public Response listBackups() throws TException {
+    return delegate.listBackups();
   }
 
   @Override
-  public Response stageRecovery(String backupId, SessionKey session)
-      throws TException {
-
-    return delegate.stageRecovery(backupId, session);
+  public Response stageRecovery(String backupId) throws TException {
+    return delegate.stageRecovery(backupId);
   }
 
   @Override
-  public Response queryRecovery(TaskQuery query, SessionKey session)
-      throws TException {
-
-    return delegate.queryRecovery(query, session);
+  public Response queryRecovery(TaskQuery query) throws TException {
+    return delegate.queryRecovery(query);
   }
 
   @Override
-  public Response deleteRecoveryTasks(TaskQuery query, SessionKey session)
-      throws TException {
-
-    return delegate.deleteRecoveryTasks(query, session);
+  public Response deleteRecoveryTasks(TaskQuery query) throws TException {
+    return delegate.deleteRecoveryTasks(query);
   }
 
   @Override
-  public Response commitRecovery(SessionKey session) throws TException {
-    return delegate.commitRecovery(session);
+  public Response commitRecovery() throws TException {
+    return delegate.commitRecovery();
   }
 
   @Override
-  public Response unloadRecovery(SessionKey session) throws TException {
-    return delegate.unloadRecovery(session);
+  public Response unloadRecovery() throws TException {
+    return delegate.unloadRecovery();
   }
 
   @Override
@@ -122,29 +110,23 @@ abstract class ForwardingThrift implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response createJob(JobConfiguration description, Lock lock, SessionKey session)
-      throws TException {
-
-    return delegate.createJob(description, lock, session);
+  public Response createJob(JobConfiguration description, Lock lock) throws TException {
+    return delegate.createJob(description, lock);
   }
 
   @Override
-  public Response scheduleCronJob(JobConfiguration description, Lock lock, SessionKey session)
-      throws TException {
-
-    return delegate.scheduleCronJob(description, lock, session);
+  public Response scheduleCronJob(JobConfiguration description, Lock lock) throws TException {
+    return delegate.scheduleCronJob(description, lock);
   }
 
   @Override
-  public Response descheduleCronJob(JobKey job, Lock lock, SessionKey session) throws TException {
-    return delegate.descheduleCronJob(job, lock, session);
+  public Response descheduleCronJob(JobKey job, Lock lock) throws TException {
+    return delegate.descheduleCronJob(job, lock);
   }
 
   @Override
-  public Response replaceCronTemplate(JobConfiguration config, Lock lock, SessionKey session)
-      throws TException {
-
-    return delegate.replaceCronTemplate(config, lock, session);
+  public Response replaceCronTemplate(JobConfiguration config, Lock lock) throws TException {
+    return delegate.replaceCronTemplate(config, lock);
   }
 
   @Override
@@ -153,18 +135,13 @@ abstract class ForwardingThrift implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response startCronJob(JobKey job, SessionKey session) throws TException {
-    return delegate.startCronJob(job, session);
+  public Response startCronJob(JobKey job) throws TException {
+    return delegate.startCronJob(job);
   }
 
   @Override
-  public Response restartShards(
-      JobKey job,
-      Set<Integer> shardIds,
-      Lock lock,
-      SessionKey session) throws TException {
-
-    return delegate.restartShards(job, shardIds, lock, session);
+  public Response restartShards(JobKey job, Set<Integer> shardIds, Lock lock) throws TException {
+    return delegate.restartShards(job, shardIds, lock);
   }
 
   @Override
@@ -183,8 +160,8 @@ abstract class ForwardingThrift implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response killTasks(TaskQuery query, Lock lock, SessionKey session) throws TException {
-    return delegate.killTasks(query, lock, session);
+  public Response killTasks(TaskQuery query, Lock lock) throws TException {
+    return delegate.killTasks(query, lock);
   }
 
   @Override
@@ -193,51 +170,43 @@ abstract class ForwardingThrift implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response startMaintenance(Hosts hosts, SessionKey session)
-      throws TException {
-
-    return delegate.startMaintenance(hosts, session);
+  public Response startMaintenance(Hosts hosts) throws TException {
+    return delegate.startMaintenance(hosts);
   }
 
   @Override
-  public Response drainHosts(Hosts hosts, SessionKey session) throws TException {
-    return delegate.drainHosts(hosts, session);
+  public Response drainHosts(Hosts hosts) throws TException {
+    return delegate.drainHosts(hosts);
   }
 
   @Override
-  public Response maintenanceStatus(Hosts hosts, SessionKey session)
-      throws TException {
-
-    return delegate.maintenanceStatus(hosts, session);
+  public Response maintenanceStatus(Hosts hosts) throws TException {
+    return delegate.maintenanceStatus(hosts);
   }
 
   @Override
-  public Response endMaintenance(Hosts hosts, SessionKey session) throws TException {
-    return delegate.endMaintenance(hosts, session);
+  public Response endMaintenance(Hosts hosts) throws TException {
+    return delegate.endMaintenance(hosts);
   }
 
   @Override
-  public Response snapshot(SessionKey session) throws TException {
-    return delegate.snapshot(session);
+  public Response snapshot() throws TException {
+    return delegate.snapshot();
   }
 
   @Override
-  public Response rewriteConfigs(RewriteConfigsRequest request, SessionKey session)
-      throws TException {
-
-    return delegate.rewriteConfigs(request, session);
+  public Response rewriteConfigs(RewriteConfigsRequest request) throws TException {
+    return delegate.rewriteConfigs(request);
   }
 
   @Override
-  public Response acquireLock(LockKey lockKey, SessionKey session) throws TException {
-    return delegate.acquireLock(lockKey, session);
+  public Response acquireLock(LockKey lockKey) throws TException {
+    return delegate.acquireLock(lockKey);
   }
 
   @Override
-  public Response releaseLock(Lock lock, LockValidation validation, SessionKey session)
-      throws TException {
-
-    return delegate.releaseLock(lock, validation, session);
+  public Response releaseLock(Lock lock, LockValidation validation) throws TException {
+    return delegate.releaseLock(lock, validation);
   }
 
   @Override
@@ -246,12 +215,8 @@ abstract class ForwardingThrift implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response addInstances(
-      AddInstancesConfig config,
-      Lock lock,
-      SessionKey session) throws TException {
-
-    return delegate.addInstances(config, lock, session);
+  public Response addInstances(AddInstancesConfig config, Lock lock) throws TException {
+    return delegate.addInstances(config, lock);
   }
 
   @Override
@@ -260,36 +225,28 @@ abstract class ForwardingThrift implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response startJobUpdate(JobUpdateRequest request, String message, SessionKey session)
-      throws TException {
-
-    return delegate.startJobUpdate(request, message, session);
+  public Response startJobUpdate(JobUpdateRequest request, String message) throws TException {
+    return delegate.startJobUpdate(request, message);
   }
 
   @Override
-  public Response pauseJobUpdate(JobUpdateKey key, String message, SessionKey session)
-      throws TException {
-
-    return delegate.pauseJobUpdate(key, message, session);
+  public Response pauseJobUpdate(JobUpdateKey key, String message) throws TException {
+    return delegate.pauseJobUpdate(key, message);
   }
 
   @Override
-  public Response resumeJobUpdate(JobUpdateKey key, String message, SessionKey session)
-      throws TException {
-
-    return delegate.resumeJobUpdate(key, message, session);
+  public Response resumeJobUpdate(JobUpdateKey key, String message) throws TException {
+    return delegate.resumeJobUpdate(key, message);
   }
 
   @Override
-  public Response abortJobUpdate(JobUpdateKey key, String message, SessionKey session)
-      throws TException {
-
-    return delegate.abortJobUpdate(key, message, session);
+  public Response abortJobUpdate(JobUpdateKey key, String message) throws TException {
+    return delegate.abortJobUpdate(key, message);
   }
 
   @Override
-  public Response pulseJobUpdate(JobUpdateKey key, SessionKey session) throws TException {
-    return delegate.pulseJobUpdate(key, session);
+  public Response pulseJobUpdate(JobUpdateKey key) throws TException {
+    return delegate.pulseJobUpdate(key);
   }
 
   @Override

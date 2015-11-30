@@ -116,6 +116,6 @@ public class ThriftIT extends EasyMockTest {
 
     assertEquals(
         OK,
-        thrift.setQuota(USER, QUOTA.newBuilder(), null).getResponseCode());
+        thrift.setQuota(USER, QUOTA.newBuilder()).getResponseCode());
   }
 }

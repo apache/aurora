@@ -18,18 +18,14 @@ from apache.aurora.client.api.scheduler_client import SchedulerProxy
 
 
 class FakeSchedulerProxy(SchedulerProxy):
-  def __init__(self, cluster, scheduler, session_key):
+  def __init__(self, cluster, scheduler):
     SchedulerProxy.__init__(self, cluster, verbose=True)
     self._scheduler = scheduler
-    self._session_key = session_key
     self._lock = RLock()
     self._terminating = Event()
 
   def client(self):
     return self._scheduler
-
-  def session_key(self):
-    return self._session_key
 
   def terminate(self):
     return self._terminating.set()

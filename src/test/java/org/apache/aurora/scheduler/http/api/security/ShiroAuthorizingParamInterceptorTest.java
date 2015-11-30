@@ -111,12 +111,12 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
     expect(subject
         .isPermitted(interceptor.makeTargetPermission("createJob", JOB_KEY)))
         .andReturn(true);
-    expect(thrift.createJob(jobConfiguration, null, null))
+    expect(thrift.createJob(jobConfiguration, null))
         .andReturn(response);
 
     replayAndInitialize();
 
-    assertSame(response, decoratedThrift.createJob(jobConfiguration, null, null));
+    assertSame(response, decoratedThrift.createJob(jobConfiguration, null));
   }
 
   @Test
@@ -126,12 +126,12 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
 
     expect(subject.isPermitted(interceptor.makeWildcardPermission("killTasks")))
         .andReturn(true);
-    expect(thrift.killTasks(taskQuery, null, null))
+    expect(thrift.killTasks(taskQuery, null))
         .andReturn(response);
 
     replayAndInitialize();
 
-    assertSame(response, decoratedThrift.killTasks(taskQuery, null, null));
+    assertSame(response, decoratedThrift.killTasks(taskQuery, null));
   }
 
   @Test
@@ -145,7 +145,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
 
     assertEquals(
         ResponseCode.INVALID_REQUEST,
-        decoratedThrift.killTasks(taskQuery, null, null).getResponseCode());
+        decoratedThrift.killTasks(taskQuery, null).getResponseCode());
   }
 
   @Test

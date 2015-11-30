@@ -22,7 +22,6 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
-import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.storage.Storage.TransientStorageException;
 import org.junit.Before;
@@ -51,10 +50,6 @@ public class LoggingInterceptorTest extends EasyMockTest {
     }
 
     Response respond(JobConfiguration jobConfiguration) {
-      throw new UnsupportedOperationException();
-    }
-
-    Response respond(SessionKey sessionKey) {
       throw new UnsupportedOperationException();
     }
   }

@@ -34,11 +34,9 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatus,
     ScheduleStatusResult,
     ServerInfo,
-    SessionKey,
     TaskConfig
 )
 
-SESSION_KEY = SessionKey()
 CLUSTER = 'east'
 JOB = AuroraJobKey(CLUSTER, 'johndoe', 'test', 'test_job')
 HEALTH_CHECK_INTERVAL_SECONDS = 5
@@ -73,18 +71,14 @@ class TestRestarter(MoxTestBase):
         JOB,
         UPDATER_CONFIG,
         HEALTH_CHECK_INTERVAL_SECONDS,
-        FakeSchedulerProxy(
-            Cluster(name=CLUSTER),
-            self.mock_scheduler,
-            SESSION_KEY),
+        FakeSchedulerProxy(Cluster(name=CLUSTER), self.mock_scheduler),
         self.mock_instance_watcher)
 
   def mock_restart_instances(self, instances, lock=None):
     self.mock_scheduler.restartShards(
         JOB.to_thrift(),
         instances,
-        lock,
-        SESSION_KEY).AndReturn(make_response())
+        lock).AndReturn(make_response())
     self.mock_instance_watcher.watch(instances).AndReturn([])
 
   def test_restart_one_iteration(self):
@@ -142,8 +136,7 @@ class TestRestarter(MoxTestBase):
     self.mock_scheduler.restartShards(
         JOB.to_thrift(),
         IgnoreArg(),
-        self.lock,
-        SESSION_KEY).AndReturn(response)
+        self.lock).AndReturn(response)
 
   def test_restart_instance_fails(self):
     self.mock_status_active_tasks([0, 1])
@@ -157,8 +150,7 @@ class TestRestarter(MoxTestBase):
     self.mock_scheduler.restartShards(
         JOB.to_thrift(),
         instances,
-        self.lock,
-        SESSION_KEY).AndReturn(make_response())
+        self.lock).AndReturn(make_response())
     self.mock_instance_watcher.watch(instances).AndReturn(instances)
 
   def test_restart_instances_watch_fails(self):

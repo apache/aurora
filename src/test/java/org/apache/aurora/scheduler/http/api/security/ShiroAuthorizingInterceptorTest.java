@@ -24,7 +24,6 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
-import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.spi.Permissions;
 import org.apache.aurora.scheduler.spi.Permissions.Domain;
 import org.apache.aurora.scheduler.thrift.Responses;
@@ -55,7 +54,7 @@ public class ShiroAuthorizingInterceptorTest extends EasyMockTest {
     subject = createMock(Subject.class);
     statsProvider = createMock(StatsProvider.class);
     methodInvocation = createMock(MethodInvocation.class);
-    interceptedMethod = AuroraAdmin.Iface.class.getMethod("snapshot", SessionKey.class);
+    interceptedMethod = AuroraAdmin.Iface.class.getMethod("snapshot");
     expect(statsProvider.makeCounter(SHIRO_AUTHORIZATION_FAILURES)).andReturn(new AtomicLong());
   }
 

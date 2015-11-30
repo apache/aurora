@@ -30,8 +30,8 @@ from apache.aurora.common.auth.auth_module_manager import get_auth_handler
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.transport import TRequestsTransport
 
-from gen.apache.aurora.api import AuroraAdmin, ReadOnlyScheduler
-from gen.apache.aurora.api.ttypes import ResponseCode, SessionKey
+from gen.apache.aurora.api import AuroraAdmin
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 try:
   from urlparse import urljoin
@@ -289,14 +289,12 @@ class SchedulerProxy(object):
         while not self._terminating.is_set() and (
             time.time() - start) < self.RPC_MAXIMUM_WAIT.as_(Time.SECONDS):
 
-          # Only automatically append a SessionKey if this is not part of the read-only API.
-          auth_args = () if hasattr(ReadOnlyScheduler.Iface, method_name) else (SessionKey(),)
           try:
             method = getattr(self.client(), method_name)
             if not callable(method):
               return method
 
-            resp = method(*(args + auth_args))
+            resp = method(*args)
             if resp is not None and resp.responseCode == ResponseCode.ERROR_TRANSIENT:
               raise self.TransientError(", ".join(
                   [m.message for m in resp.details] if resp.details else []))
