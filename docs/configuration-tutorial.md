@@ -460,10 +460,13 @@ attributes. Details can be found in the [Aurora+Thermos Configuration Reference]
 ## The jobs List
 
 At the end of your `.aurora` file, you need to specify a list of the
-file's defined Jobs to run in the order listed. For example, the
-following runs first `job1`, then `job2`, then `job3`.
+file's defined Jobs. For example, the following exports the jobs `job1`,
+`job2`, and `job3`.
 
-jobs = [job1, job2, job3]
+    jobs = [job1, job2, job3]
+
+This allows the aurora client to invoke commands on those jobs, such as
+starting, updating, or killing them.
 
 Templating
 ----------
