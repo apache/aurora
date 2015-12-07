@@ -354,7 +354,7 @@ dependencies {
   compile "log4j:log4j:${log4jRev}"
   compile "org.antlr:stringtemplate:${stringTemplateRev}"
   compile 'org.apache.mesos:mesos:0.23.0'
-  compile("org.apache.shiro:shiro-guice:${shiroRev}")
+  compile "org.apache.shiro:shiro-guice:${shiroRev}"
   compile "org.apache.shiro:shiro-web:${shiroRev}"
   compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"
   compile "org.eclipse.jetty:jetty-rewrite:${jettyDep}"
@@ -365,6 +365,7 @@ dependencies {
   compile 'org.mybatis:mybatis-guice:3.6'
   compile 'org.quartz-scheduler:quartz:2.2.1'
   compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
+  compile "uno.perk:forward:1.0.0"
 
   testCompile "com.sun.jersey:jersey-client:${jerseyRev}"
   testCompile "junit:junit:${junitRev}"

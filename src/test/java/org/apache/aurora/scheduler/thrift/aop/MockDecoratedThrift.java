@@ -26,6 +26,8 @@ import com.google.inject.Binder;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 
+import uno.perk.forward.Forward;
+
 /**
  * An injected forwarding thrift implementation that delegates to a bound mock interface.
  * <p>
@@ -33,7 +35,8 @@ import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
  * https://code.google.com/p/google-guice/wiki/AOP#Limitations
  */
 @DecoratedThrift
-public class MockDecoratedThrift extends ForwardingThrift {
+@Forward(AnnotatedAuroraAdmin.class)
+public class MockDecoratedThrift extends MockDecoratedThriftForwarder {
 
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ElementType.PARAMETER, ElementType.METHOD})
