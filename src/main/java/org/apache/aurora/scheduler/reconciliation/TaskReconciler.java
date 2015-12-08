@@ -146,6 +146,8 @@ public class TaskReconciler extends AbstractIdleService {
           // accepting task IDs instead. AURORA-1326 tracks solution on the scheduler side.
           // Setting TASK_RUNNING as a safe dummy value here.
           .setState(Protos.TaskState.TASK_RUNNING)
+          .setSlaveId(
+              Protos.SlaveID.newBuilder().setValue(t.getAssignedTask().getSlaveId()).build())
           .setTaskId(Protos.TaskID.newBuilder().setValue(t.getAssignedTask().getTaskId()).build())
           .build();
 }

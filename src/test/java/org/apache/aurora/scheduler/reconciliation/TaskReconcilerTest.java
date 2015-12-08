@@ -16,17 +16,24 @@ package org.apache.aurora.scheduler.reconciliation;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.junit.Before;
@@ -77,7 +84,7 @@ public class TaskReconcilerTest extends EasyMockTest {
     expect(statsProvider.makeCounter(IMPLICIT_STAT_NAME)).andReturn(implicitRuns);
     clock = FakeScheduledExecutor.scheduleAtFixedRateExecutor(executorService, 2, 5);
 
-    IScheduledTask task = TaskTestUtil.makeTask("id1", TaskTestUtil.JOB);
+    IScheduledTask task = makeTask("id1", TaskTestUtil.makeConfig(TaskTestUtil.JOB));
     storageUtil.expectOperations();
     storageUtil.expectTaskFetch(Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES), task)
         .times(5);
@@ -136,5 +143,25 @@ public class TaskReconcilerTest extends EasyMockTest {
         EXPLICIT_SCHEDULE,
         IMPLICT_SCHEDULE,
         SPREAD);
+  }
+
+  private static IScheduledTask makeTask(String id, ITaskConfig config) {
+    return IScheduledTask.build(new ScheduledTask()
+        .setStatus(ScheduleStatus.ASSIGNED)
+        .setTaskEvents(ImmutableList.of(
+            new TaskEvent(100L, ScheduleStatus.ASSIGNED)
+                .setMessage("message")
+                .setScheduler("scheduler"),
+            new TaskEvent(101L, ScheduleStatus.ASSIGNED)
+                .setMessage("message")
+                .setScheduler("scheduler2")))
+        .setAncestorId("ancestor")
+        .setFailureCount(3)
+        .setAssignedTask(new AssignedTask()
+            .setInstanceId(2)
+            .setTaskId(id)
+            .setSlaveId("slave-id")
+            .setAssignedPorts(ImmutableMap.of("http", 1000))
+            .setTask(config.newBuilder())));
   }
 }
