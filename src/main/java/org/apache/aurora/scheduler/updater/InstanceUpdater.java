@@ -144,10 +144,10 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
       // This is not the configuration that we would like to run.
       if (isKillable(status)) {
         // Task is active, kill it.
-        return StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+        return KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       } else if (Tasks.isTerminated(status) && isPermanentlyKilled(actualState)) {
         // The old task has exited, it is now safe to add the new one.
-        return StateEvaluator.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+        return REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       }
     }
 

@@ -364,7 +364,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
       @Override
       public Response apply(StoreProvider storeProvider) throws RuntimeException {
         if (storeProvider.getCronJobStore().fetchJob(job).isPresent()) {
-          return Responses.invalidRequest(NO_CRON);
+          return invalidRequest(NO_CRON);
         }
 
         JobDiff diff = JobDiff.compute(

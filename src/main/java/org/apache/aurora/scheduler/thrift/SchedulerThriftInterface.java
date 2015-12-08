@@ -650,7 +650,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   @Override
   public Response rewriteConfigs(RewriteConfigsRequest request) {
     if (request.getRewriteCommandsSize() == 0) {
-      return addMessage(Responses.empty(), INVALID_REQUEST, "No rewrite commands provided.");
+      return addMessage(empty(), INVALID_REQUEST, "No rewrite commands provided.");
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {

@@ -525,7 +525,7 @@ class TaskStateMachine {
      * state transition (e.g. storing resource consumption of a running task), we need to find
      * a different way to suppress noop transitions.
      */
-    TaskState taskState = status.transform(STATUS_TO_TASK_STATE).or(TaskState.DELETED);
+    TaskState taskState = status.transform(STATUS_TO_TASK_STATE).or(DELETED);
     if (stateMachine.getState() == taskState) {
       return new TransitionResult(NOOP, ImmutableSet.of());
     }
