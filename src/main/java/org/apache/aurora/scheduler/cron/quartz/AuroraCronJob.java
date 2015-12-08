@@ -25,7 +25,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
 
-import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.util.BackoffHelper;
 import org.apache.aurora.gen.CronCollisionPolicy;
@@ -37,6 +36,8 @@ import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -113,62 +114,59 @@ class AuroraCronJob implements Job {
     final String path = JobKeys.canonicalString(key);
 
     final Optional<DeferredLaunch> deferredLaunch = storage.write(
-        new Storage.MutateWork.Quiet<Optional<DeferredLaunch>>() {
-          @Override
-          public Optional<DeferredLaunch> apply(Storage.MutableStoreProvider storeProvider) {
-            Optional<IJobConfiguration> config = storeProvider.getCronJobStore().fetchJob(key);
-            if (!config.isPresent()) {
-              LOG.warning(String.format(
-                  "Cron was triggered for %s but no job with that key was found in storage.",
-                  path));
-              CRON_JOB_MISFIRES.incrementAndGet();
+        (MutateWork.Quiet<Optional<DeferredLaunch>>) storeProvider -> {
+          Optional<IJobConfiguration> config = storeProvider.getCronJobStore().fetchJob(key);
+          if (!config.isPresent()) {
+            LOG.warning(String.format(
+                "Cron was triggered for %s but no job with that key was found in storage.",
+                path));
+            CRON_JOB_MISFIRES.incrementAndGet();
+            return Optional.absent();
+          }
+
+          SanitizedCronJob cronJob;
+          try {
+            cronJob = SanitizedCronJob.fromUnsanitized(config.get());
+          } catch (ConfigurationManager.TaskDescriptionException | CronException e) {
+            LOG.warning(String.format(
+                "Invalid cron job for %s in storage - failed to parse with %s", key, e));
+            CRON_JOB_PARSE_FAILURES.incrementAndGet();
+            return Optional.absent();
+          }
+
+          CronCollisionPolicy collisionPolicy = cronJob.getCronCollisionPolicy();
+          LOG.info(String.format(
+              "Cron triggered for %s at %s with policy %s", path, new Date(), collisionPolicy));
+          CRON_JOB_TRIGGERS.incrementAndGet();
+
+          final Query.Builder activeQuery = Query.jobScoped(key).active();
+          Set<String> activeTasks =
+              Tasks.ids(storeProvider.getTaskStore().fetchTasks(activeQuery));
+
+          ITaskConfig task = cronJob.getSanitizedConfig().getJobConfig().getTaskConfig();
+          Set<Integer> instanceIds = cronJob.getSanitizedConfig().getInstanceIds();
+          if (activeTasks.isEmpty()) {
+            stateManager.insertPendingTasks(storeProvider, task, instanceIds);
+
+            return Optional.absent();
+          }
+
+          CRON_JOB_COLLISIONS.incrementAndGet();
+          switch (collisionPolicy) {
+            case KILL_EXISTING:
+              return Optional.of(new DeferredLaunch(task, instanceIds, activeTasks));
+
+            case RUN_OVERLAP:
+              LOG.severe(String.format("Ignoring trigger for job %s with deprecated collision"
+                  + "policy RUN_OVERLAP due to unterminated active tasks.", path));
               return Optional.absent();
-            }
 
-            SanitizedCronJob cronJob;
-            try {
-              cronJob = SanitizedCronJob.fromUnsanitized(config.get());
-            } catch (ConfigurationManager.TaskDescriptionException | CronException e) {
-              LOG.warning(String.format(
-                  "Invalid cron job for %s in storage - failed to parse with %s", key, e));
-              CRON_JOB_PARSE_FAILURES.incrementAndGet();
+            case CANCEL_NEW:
               return Optional.absent();
-            }
 
-            CronCollisionPolicy collisionPolicy = cronJob.getCronCollisionPolicy();
-            LOG.info(String.format(
-                "Cron triggered for %s at %s with policy %s", path, new Date(), collisionPolicy));
-            CRON_JOB_TRIGGERS.incrementAndGet();
-
-            final Query.Builder activeQuery = Query.jobScoped(key).active();
-            Set<String> activeTasks =
-                Tasks.ids(storeProvider.getTaskStore().fetchTasks(activeQuery));
-
-            ITaskConfig task = cronJob.getSanitizedConfig().getJobConfig().getTaskConfig();
-            Set<Integer> instanceIds = cronJob.getSanitizedConfig().getInstanceIds();
-            if (activeTasks.isEmpty()) {
-              stateManager.insertPendingTasks(storeProvider, task, instanceIds);
-
+            default:
+              LOG.severe("Unrecognized cron collision policy: " + collisionPolicy);
               return Optional.absent();
-            }
-
-            CRON_JOB_COLLISIONS.incrementAndGet();
-            switch (collisionPolicy) {
-              case KILL_EXISTING:
-                return Optional.of(new DeferredLaunch(task, instanceIds, activeTasks));
-
-              case RUN_OVERLAP:
-                LOG.severe(String.format("Ignoring trigger for job %s with deprecated collision"
-                    + "policy RUN_OVERLAP due to unterminated active tasks.", path));
-                return Optional.absent();
-
-              case CANCEL_NEW:
-                return Optional.absent();
-
-              default:
-                LOG.severe("Unrecognized cron collision policy: " + collisionPolicy);
-                return Optional.absent();
-            }
           }
         }
     );
@@ -177,17 +175,14 @@ class AuroraCronJob implements Job {
       return;
     }
 
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        for (String taskId : deferredLaunch.get().activeTaskIds) {
-          stateManager.changeState(
-              storeProvider,
-              taskId,
-              Optional.absent(),
-              KILLING,
-              KILL_AUDIT_MESSAGE);
-        }
+    storage.write((NoResult.Quiet) (Storage.MutableStoreProvider storeProvider) -> {
+      for (String taskId : deferredLaunch.get().activeTaskIds) {
+        stateManager.changeState(
+            storeProvider,
+            taskId,
+            Optional.absent(),
+            KILLING,
+            KILL_AUDIT_MESSAGE);
       }
     });
 
@@ -197,26 +192,18 @@ class AuroraCronJob implements Job {
     try {
       // NOTE: We block the quartz execution thread here until we've successfully killed our
       // ancestor. We mitigate this by using a cached thread pool for quartz.
-      delayedStartBackoff.doUntilSuccess(new ExceptionalSupplier<Boolean, RuntimeException>() {
-        @Override
-        public Boolean get() {
-          if (Iterables.isEmpty(Storage.Util.fetchTasks(storage, query))) {
-            LOG.info("Initiating delayed launch of cron " + path);
-            storage.write(new Storage.MutateWork.NoResult.Quiet() {
-              @Override
-              public void execute(Storage.MutableStoreProvider storeProvider) {
-                stateManager.insertPendingTasks(
-                    storeProvider,
-                    deferredLaunch.get().task,
-                    deferredLaunch.get().instanceIds);
-              }
-            });
+      delayedStartBackoff.doUntilSuccess(() -> {
+        if (Iterables.isEmpty(Storage.Util.fetchTasks(storage, query))) {
+          LOG.info("Initiating delayed launch of cron " + path);
+          storage.write((NoResult.Quiet) storeProvider -> stateManager.insertPendingTasks(
+              storeProvider,
+              deferredLaunch.get().task,
+              deferredLaunch.get().instanceIds));
 
-            return true;
-          } else {
-            LOG.info("Not yet safe to run cron " + path);
-            return false;
-          }
+          return true;
+        } else {
+          LOG.info("Not yet safe to run cron " + path);
+          return false;
         }
       });
     } catch (InterruptedException e) {

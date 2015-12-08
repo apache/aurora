@@ -61,12 +61,7 @@ public class StatsModule extends AbstractModule {
     bind(TimeSeriesRepositoryImpl.class).in(Singleton.class);
 
     bind(new TypeLiteral<Supplier<Iterable<Stat<?>>>>() { }).toInstance(
-        new Supplier<Iterable<Stat<?>>>() {
-          @Override
-          public Iterable<Stat<?>> get() {
-            return Stats.getVariables();
-          }
-        }
+        Stats::getVariables
     );
 
     SchedulerServicesModule.addAppStartupServiceBinding(binder())

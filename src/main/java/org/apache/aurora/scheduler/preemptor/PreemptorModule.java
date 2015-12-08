@@ -32,10 +32,7 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
-import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.preemptor.BiCache.BiCacheSettings;
-import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 
 import static java.util.Objects.requireNonNull;
 
@@ -154,14 +151,6 @@ public class PreemptorModule extends AbstractModule {
     }
   }
 
-  private static final Preemptor NULL_PREEMPTOR = new Preemptor() {
-    @Override
-    public Optional<String> attemptPreemptionFor(
-        IAssignedTask task,
-        AttributeAggregate jobState,
-        Storage.MutableStoreProvider storeProvider) {
-
-      return Optional.absent();
-    }
-  };
+  private static final Preemptor NULL_PREEMPTOR =
+      (task, jobState, storeProvider) -> Optional.absent();
 }

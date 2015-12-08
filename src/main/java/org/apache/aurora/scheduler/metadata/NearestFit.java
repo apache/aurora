@@ -19,7 +19,6 @@ import java.util.Set;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Ticker;
 import com.google.common.cache.CacheBuilder;
@@ -39,7 +38,6 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Tracks vetoes against scheduling decisions and maintains the closest fit among all the vetoes
@@ -92,12 +90,7 @@ public class NearestFit implements EventSubscriber {
   @Subscribe
   public synchronized void remove(TasksDeleted deletedEvent) {
     fitByGroupKey.invalidateAll(Iterables.transform(deletedEvent.getTasks(), Functions.compose(
-        new Function<ITaskConfig, TaskGroupKey>() {
-          @Override
-          public TaskGroupKey apply(ITaskConfig task) {
-            return TaskGroupKey.from(task);
-          }
-        },
+        TaskGroupKey::from,
         Tasks::getConfig)));
   }
 

@@ -34,8 +34,6 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -61,12 +59,7 @@ public class ResourceCounter {
   }
 
   private static final Function<MetricType, GlobalMetric> TO_GLOBAL_METRIC =
-      new Function<MetricType, GlobalMetric>() {
-        @Override
-        public GlobalMetric apply(MetricType type) {
-          return new GlobalMetric(type);
-        }
-      };
+      GlobalMetric::new;
 
   /**
    * Computes totals for each of the {@link MetricType}s.
@@ -94,15 +87,12 @@ public class ResourceCounter {
    * @throws StorageException if there was a problem fetching quotas from storage.
    */
   public Metric computeQuotaAllocationTotals() throws StorageException {
-    return storage.read(new Work.Quiet<Metric>() {
-      @Override
-      public Metric apply(StoreProvider storeProvider) {
-        Metric allocation = new Metric();
-        for (IResourceAggregate quota : storeProvider.getQuotaStore().fetchQuotas().values()) {
-          allocation.accumulate(quota);
-        }
-        return allocation;
+    return storage.read(storeProvider -> {
+      Metric allocation = new Metric();
+      for (IResourceAggregate quota : storeProvider.getQuotaStore().fetchQuotas().values()) {
+        allocation.accumulate(quota);
       }
+      return allocation;
     });
   }
 

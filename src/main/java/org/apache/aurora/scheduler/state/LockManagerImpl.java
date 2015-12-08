@@ -26,10 +26,7 @@ import org.apache.aurora.gen.LockKey._Fields;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 
@@ -54,54 +51,42 @@ public class LockManagerImpl implements LockManager {
 
   @Override
   public ILock acquireLock(final ILockKey lockKey, final String user) throws LockException {
-    return storage.write(new MutateWork<ILock, LockException>() {
-      @Override
-      public ILock apply(Storage.MutableStoreProvider storeProvider)
-          throws LockException {
+    return storage.write(storeProvider -> {
 
-        LockStore.Mutable lockStore = storeProvider.getLockStore();
-        Optional<ILock> existingLock = lockStore.fetchLock(lockKey);
+      LockStore.Mutable lockStore = storeProvider.getLockStore();
+      Optional<ILock> existingLock = lockStore.fetchLock(lockKey);
 
-        if (existingLock.isPresent()) {
-          throw new LockException(String.format(
-              "Operation for: %s is already in progress. Started at: %s. Current owner: %s.",
-              formatLockKey(lockKey),
-              new Date(existingLock.get().getTimestampMs()).toString(),
-              existingLock.get().getUser()));
-        }
-
-        ILock lock = ILock.build(new Lock()
-            .setKey(lockKey.newBuilder())
-            .setToken(tokenGenerator.createNew().toString())
-            .setTimestampMs(clock.nowMillis())
-            .setUser(user));
-
-        lockStore.saveLock(lock);
-        return lock;
+      if (existingLock.isPresent()) {
+        throw new LockException(String.format(
+            "Operation for: %s is already in progress. Started at: %s. Current owner: %s.",
+            formatLockKey(lockKey),
+            new Date(existingLock.get().getTimestampMs()).toString(),
+            existingLock.get().getUser()));
       }
+
+      ILock lock = ILock.build(new Lock()
+          .setKey(lockKey.newBuilder())
+          .setToken(tokenGenerator.createNew().toString())
+          .setTimestampMs(clock.nowMillis())
+          .setUser(user));
+
+      lockStore.saveLock(lock);
+      return lock;
     });
   }
 
   @Override
   public void releaseLock(final ILock lock) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getLockStore().removeLock(lock.getKey());
-      }
-    });
+    storage.write(
+        (NoResult.Quiet) storeProvider -> storeProvider.getLockStore().removeLock(lock.getKey()));
   }
 
   @Override
   public void validateIfLocked(final ILockKey context, Optional<ILock> heldLock)
       throws LockException {
 
-    Optional<ILock> stored = storage.read(new Work.Quiet<Optional<ILock>>() {
-      @Override
-      public Optional<ILock> apply(StoreProvider storeProvider) {
-        return storeProvider.getLockStore().fetchLock(context);
-      }
-    });
+    Optional<ILock> stored = storage.read(
+        storeProvider -> storeProvider.getLockStore().fetchLock(context));
 
     // The implementation below assumes the following use cases:
     // +-----------+-----------------+----------+
@@ -125,12 +110,7 @@ public class LockManagerImpl implements LockManager {
 
   @Override
   public Iterable<ILock> getLocks() {
-    return storage.read(new Work.Quiet<Iterable<ILock>>() {
-      @Override
-      public Iterable<ILock> apply(StoreProvider storeProvider) {
-        return storeProvider.getLockStore().fetchLocks();
-      }
-    });
+    return storage.read(storeProvider -> storeProvider.getLockStore().fetchLocks());
   }
 
   private static String formatLockKey(ILockKey lockKey) {

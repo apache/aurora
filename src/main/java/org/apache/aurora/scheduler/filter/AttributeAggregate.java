@@ -64,13 +64,8 @@ public final class AttributeAggregate {
       final IJobKey jobKey) {
 
     return create(
-        new Supplier<Iterable<IScheduledTask>>() {
-          @Override
-          public Iterable<IScheduledTask> get() {
-            return storeProvider.getTaskStore()
-                .fetchTasks(Query.jobScoped(jobKey).byStatus(Tasks.SLAVE_ASSIGNED_STATES));
-          }
-        },
+        () -> storeProvider.getTaskStore()
+            .fetchTasks(Query.jobScoped(jobKey).byStatus(Tasks.SLAVE_ASSIGNED_STATES)),
         storeProvider.getAttributeStore());
   }
 
@@ -80,43 +75,32 @@ public final class AttributeAggregate {
       final AttributeStore attributeStore) {
 
     final Function<String, Iterable<IAttribute>> getHostAttributes =
-        new Function<String, Iterable<IAttribute>>() {
-          @Override
-          public Iterable<IAttribute> apply(String host) {
-            // Note: this assumes we have access to attributes for hosts where all active tasks
-            // reside.
-            requireNonNull(host);
-            return attributeStore.getHostAttributes(host).get().getAttributes();
-          }
+        host -> {
+          // Note: this assumes we have access to attributes for hosts where all active tasks
+          // reside.
+          requireNonNull(host);
+          return attributeStore.getHostAttributes(host).get().getAttributes();
         };
 
     return create(Suppliers.compose(
-        new Function<Iterable<IScheduledTask>, Iterable<IAttribute>>() {
-          @Override
-          public Iterable<IAttribute> apply(Iterable<IScheduledTask> tasks) {
-            return FluentIterable.from(tasks)
-                .transform(Tasks::scheduledToSlaveHost)
-                .transformAndConcat(getHostAttributes);
-          }
-        },
+        tasks -> FluentIterable.from(tasks)
+            .transform(Tasks::scheduledToSlaveHost)
+            .transformAndConcat(getHostAttributes),
         taskSupplier));
   }
 
   @VisibleForTesting
   static AttributeAggregate create(Supplier<Iterable<IAttribute>> attributes) {
     Supplier<Multiset<Pair<String, String>>> aggregator = Suppliers.compose(
-        new Function<Iterable<IAttribute>, Multiset<Pair<String, String>>>() {
-          @Override
-          public Multiset<Pair<String, String>> apply(Iterable<IAttribute> attributes) {
-            ImmutableMultiset.Builder<Pair<String, String>> builder = ImmutableMultiset.builder();
-            for (IAttribute attribute : attributes) {
-              for (String value : attribute.getValues()) {
-                builder.add(Pair.of(attribute.getName(), value));
-              }
+        attributes1 -> {
+          ImmutableMultiset.Builder<Pair<String, String>> builder = ImmutableMultiset.builder();
+          for (IAttribute attribute : attributes1) {
+            for (String value : attribute.getValues()) {
+              builder.add(Pair.of(attribute.getName(), value));
             }
-
-            return builder.build();
           }
+
+          return builder.build();
         },
         attributes
     );

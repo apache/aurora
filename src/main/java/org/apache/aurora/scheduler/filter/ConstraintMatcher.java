@@ -37,12 +37,7 @@ final class ConstraintMatcher {
   }
 
   private static final Function<IAttribute, Set<String>> GET_VALUES =
-      new Function<IAttribute, Set<String>>() {
-        @Override
-        public Set<String> apply(IAttribute attribute) {
-          return attribute.getValues();
-        }
-      };
+      IAttribute::getValues;
 
   /**
    * Gets the veto (if any) for a scheduling constraint based on the {@link AttributeAggregate} this

@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.http.api.security;
 
 import java.lang.reflect.Method;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -151,12 +150,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
       ImmutableMap.<Class<?>, Function<?, Optional<JobKey>>>builder()
           .putAll(Maps.uniqueIndex(
               FIELD_GETTERS,
-              new Function<FieldGetter<?, JobKey>, Class<?>>() {
-                @Override
-                public Class<?> apply(FieldGetter<?, JobKey> input) {
-                  return input.getStructClass();
-                }
-              }))
+              (Function<FieldGetter<?, JobKey>, Class<?>>) FieldGetter::getStructClass))
           .build();
 
   @VisibleForTesting
@@ -172,36 +166,31 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
    * @see org.apache.aurora.scheduler.http.api.security.AuthorizingParam
    */
   private static Iterable<Method> getCandidateMethods(final Method method) {
-    return new Iterable<Method>() {
+    return () -> new AbstractSequentialIterator<Method>(method) {
       @Override
-      public Iterator<Method> iterator() {
-        return new AbstractSequentialIterator<Method>(method) {
-          @Override
-          protected Method computeNext(Method previous) {
-            String name = previous.getName();
-            Class<?>[] parameterTypes = previous.getParameterTypes();
-            Class<?> declaringClass = previous.getDeclaringClass();
+      protected Method computeNext(Method previous) {
+        String name = previous.getName();
+        Class<?>[] parameterTypes = previous.getParameterTypes();
+        Class<?> declaringClass = previous.getDeclaringClass();
 
-            if (declaringClass.isInterface()) {
-              return null;
-            }
+        if (declaringClass.isInterface()) {
+          return null;
+        }
 
-            Iterable<Class<?>> searchOrder = ImmutableList.<Class<?>>builder()
-                .addAll(Optional.fromNullable(declaringClass.getSuperclass()).asSet())
-                .addAll(ImmutableList.copyOf(declaringClass.getInterfaces()))
-                .build();
+        Iterable<Class<?>> searchOrder = ImmutableList.<Class<?>>builder()
+            .addAll(Optional.fromNullable(declaringClass.getSuperclass()).asSet())
+            .addAll(ImmutableList.copyOf(declaringClass.getInterfaces()))
+            .build();
 
-            for (Class<?> klazz : searchOrder) {
-              try {
-                return klazz.getMethod(name, parameterTypes);
-              } catch (NoSuchMethodException ignored) {
-                // Expected.
-              }
-            }
-
-            return null;
+        for (Class<?> klazz : searchOrder) {
+          try {
+            return klazz.getMethod(name, parameterTypes);
+          } catch (NoSuchMethodException ignored) {
+            // Expected.
           }
-        };
+        }
+
+        return null;
       }
     };
   }
@@ -271,15 +260,12 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
                     + " field getter was supplied for "
                     + parameterType.getName());
           }
-          return new Function<Object[], Optional<JobKey>>() {
-            @Override
-            public Optional<JobKey> apply(Object[] arguments) {
-              Optional<Object> argument = Optional.fromNullable(arguments[index]);
-              if (argument.isPresent()) {
-                return jobKeyGetter.get().apply(argument.get());
-              } else {
-                return Optional.absent();
-              }
+          return arguments -> {
+            Optional<Object> argument = Optional.fromNullable(arguments[index]);
+            if (argument.isPresent()) {
+              return jobKeyGetter.get().apply(argument.get());
+            } else {
+              return Optional.absent();
             }
           };
         }

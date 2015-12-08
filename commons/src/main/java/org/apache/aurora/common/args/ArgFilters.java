@@ -51,11 +51,7 @@ public final class ArgFilters {
    */
   public static Predicate<Field> selectPackage(final Package pkg) {
     Preconditions.checkNotNull(pkg);
-    return new Predicate<Field>() {
-      @Override public boolean apply(Field field) {
-        return field.getDeclaringClass().getPackage().equals(pkg);
-      }
-    };
+    return field -> field.getDeclaringClass().getPackage().equals(pkg);
   }
 
   /**
@@ -69,10 +65,8 @@ public final class ArgFilters {
   public static Predicate<Field> selectAllPackagesUnderHere(final Package pkg) {
     Preconditions.checkNotNull(pkg);
     final String prefix = pkg.getName() + '.';
-    return Predicates.or(selectPackage(pkg), new Predicate<Field>() {
-      @Override public boolean apply(Field field) {
-        return field.getDeclaringClass().getPackage().getName().startsWith(prefix);
-      }
+    return Predicates.or(selectPackage(pkg), field -> {
+      return field.getDeclaringClass().getPackage().getName().startsWith(prefix);
     });
   }
 
@@ -84,11 +78,7 @@ public final class ArgFilters {
    */
   public static Predicate<Field> selectClass(final Class<?> clazz) {
     Preconditions.checkNotNull(clazz);
-    return new Predicate<Field>() {
-      @Override public boolean apply(Field field) {
-        return field.getDeclaringClass().equals(clazz);
-      }
-    };
+    return field -> field.getDeclaringClass().equals(clazz);
   }
 
   /**
@@ -100,11 +90,7 @@ public final class ArgFilters {
   public static Predicate<Field> selectClasses(final Class<?> ... cls) {
     Preconditions.checkNotNull(cls);
     final Set<Class<?>> listOfClasses = ImmutableSet.copyOf(cls);
-    return new Predicate<Field>() {
-      @Override public boolean apply(Field field) {
-        return listOfClasses.contains(field.getDeclaringClass());
-      }
-    };
+    return field -> listOfClasses.contains(field.getDeclaringClass());
   }
 
   /**
@@ -116,10 +102,8 @@ public final class ArgFilters {
    */
   public static Predicate<Field> selectCmdLineArg(Class<?> clazz, final String name) {
     MorePreconditions.checkNotBlank(name);
-    return Predicates.and(selectClass(clazz), new Predicate<Field>() {
-      @Override public boolean apply(Field field) {
-        return field.getAnnotation(CmdLine.class).name().equals(name);
-      }
+    return Predicates.and(selectClass(clazz), field -> {
+      return field.getAnnotation(CmdLine.class).name().equals(name);
     });
   }
 }

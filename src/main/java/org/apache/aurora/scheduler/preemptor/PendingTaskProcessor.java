@@ -116,69 +116,66 @@ public class PendingTaskProcessor implements Runnable {
   @Override
   public void run() {
     metrics.recordTaskProcessorRun();
-    storage.read(new Storage.Work.Quiet<Void>() {
-      @Override
-      public Void apply(StoreProvider store) {
-        Multimap<String, PreemptionVictim> slavesToActiveTasks =
-            clusterState.getSlavesToActiveTasks();
+    storage.read(store -> {
+      Multimap<String, PreemptionVictim> slavesToActiveTasks =
+          clusterState.getSlavesToActiveTasks();
 
-        if (slavesToActiveTasks.isEmpty()) {
-          // No preemption victims to consider.
-          return null;
-        }
-
-        // Group the offers by slave id so they can be paired with active tasks from the same slave.
-        Map<String, HostOffer> slavesToOffers =
-            Maps.uniqueIndex(offerManager.getOffers(), OFFER_TO_SLAVE_ID);
-
-        Set<String> allSlaves = Sets.newHashSet(Iterables.concat(
-            slavesToOffers.keySet(),
-            slavesToActiveTasks.keySet()));
-
-        // The algorithm below attempts to find a reservation for every task group by matching
-        // it against all available slaves until a preemption slot is found. Groups are evaluated
-        // in a round-robin fashion to ensure fairness (e.g.: G1, G2, G3, G1, G2).
-        // A slave is removed from further matching once a reservation is made. Similarly, all
-        // identical task group instances are removed from further iteration if none of the
-        // available slaves could yield a preemption proposal. A consuming iterator is used for
-        // task groups to ensure iteration order is preserved after a task group is removed.
-        LoadingCache<IJobKey, AttributeAggregate> jobStates = attributeCache(store);
-        List<TaskGroupKey> pendingGroups = fetchIdlePendingGroups(store);
-        Iterator<TaskGroupKey> groups = Iterators.consumingIterator(pendingGroups.iterator());
-        while (!pendingGroups.isEmpty()) {
-          boolean matched = false;
-          TaskGroupKey group = groups.next();
-          ITaskConfig task = group.getTask();
-
-          metrics.recordPreemptionAttemptFor(task);
-          Iterator<String> slaveIterator = allSlaves.iterator();
-          while (slaveIterator.hasNext()) {
-            String slaveId = slaveIterator.next();
-            Optional<ImmutableSet<PreemptionVictim>> candidates =
-                preemptionVictimFilter.filterPreemptionVictims(
-                    task,
-                    slavesToActiveTasks.get(slaveId),
-                    jobStates.getUnchecked(task.getJob()),
-                    Optional.fromNullable(slavesToOffers.get(slaveId)),
-                    store);
-
-            metrics.recordSlotSearchResult(candidates, task);
-            if (candidates.isPresent()) {
-              // Slot found -> remove slave to avoid multiple task reservations.
-              slaveIterator.remove();
-              slotCache.put(new PreemptionProposal(candidates.get(), slaveId), group);
-              matched = true;
-              break;
-            }
-          }
-          if (!matched) {
-            // No slot found for the group -> remove group and reset group iterator.
-            pendingGroups.removeAll(ImmutableSet.of(group));
-            groups = Iterators.consumingIterator(pendingGroups.iterator());
-          }
-        }
+      if (slavesToActiveTasks.isEmpty()) {
+        // No preemption victims to consider.
         return null;
       }
+
+      // Group the offers by slave id so they can be paired with active tasks from the same slave.
+      Map<String, HostOffer> slavesToOffers =
+          Maps.uniqueIndex(offerManager.getOffers(), OFFER_TO_SLAVE_ID);
+
+      Set<String> allSlaves = Sets.newHashSet(Iterables.concat(
+          slavesToOffers.keySet(),
+          slavesToActiveTasks.keySet()));
+
+      // The algorithm below attempts to find a reservation for every task group by matching
+      // it against all available slaves until a preemption slot is found. Groups are evaluated
+      // in a round-robin fashion to ensure fairness (e.g.: G1, G2, G3, G1, G2).
+      // A slave is removed from further matching once a reservation is made. Similarly, all
+      // identical task group instances are removed from further iteration if none of the
+      // available slaves could yield a preemption proposal. A consuming iterator is used for
+      // task groups to ensure iteration order is preserved after a task group is removed.
+      LoadingCache<IJobKey, AttributeAggregate> jobStates = attributeCache(store);
+      List<TaskGroupKey> pendingGroups = fetchIdlePendingGroups(store);
+      Iterator<TaskGroupKey> groups = Iterators.consumingIterator(pendingGroups.iterator());
+      while (!pendingGroups.isEmpty()) {
+        boolean matched = false;
+        TaskGroupKey group = groups.next();
+        ITaskConfig task = group.getTask();
+
+        metrics.recordPreemptionAttemptFor(task);
+        Iterator<String> slaveIterator = allSlaves.iterator();
+        while (slaveIterator.hasNext()) {
+          String slaveId = slaveIterator.next();
+          Optional<ImmutableSet<PreemptionVictim>> candidates =
+              preemptionVictimFilter.filterPreemptionVictims(
+                  task,
+                  slavesToActiveTasks.get(slaveId),
+                  jobStates.getUnchecked(task.getJob()),
+                  Optional.fromNullable(slavesToOffers.get(slaveId)),
+                  store);
+
+          metrics.recordSlotSearchResult(candidates, task);
+          if (candidates.isPresent()) {
+            // Slot found -> remove slave to avoid multiple task reservations.
+            slaveIterator.remove();
+            slotCache.put(new PreemptionProposal(candidates.get(), slaveId), group);
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          // No slot found for the group -> remove group and reset group iterator.
+          pendingGroups.removeAll(ImmutableSet.of(group));
+          groups = Iterators.consumingIterator(pendingGroups.iterator());
+        }
+      }
+      return null;
     });
   }
 
@@ -225,12 +222,7 @@ public class PendingTaskProcessor implements Runnable {
   }
 
   private static final Function<IAssignedTask, TaskGroupKey> ASSIGNED_TO_GROUP_KEY =
-      new Function<IAssignedTask, TaskGroupKey>() {
-        @Override
-        public TaskGroupKey apply(IAssignedTask task) {
-          return TaskGroupKey.from(task.getTask());
-        }
-      };
+      task -> TaskGroupKey.from(task.getTask());
 
   private final Predicate<IScheduledTask> hasCachedSlot = new Predicate<IScheduledTask>() {
     @Override
@@ -248,10 +240,5 @@ public class PendingTaskProcessor implements Runnable {
   };
 
   private static final Function<HostOffer, String> OFFER_TO_SLAVE_ID =
-      new Function<HostOffer, String>() {
-        @Override
-        public String apply(HostOffer offer) {
-          return offer.getOffer().getSlaveId().getValue();
-        }
-      };
+      offer -> offer.getOffer().getSlaveId().getValue();
 }

@@ -103,12 +103,7 @@ class MetricCalculator implements Runnable {
   }
 
   private static final Predicate<ITaskConfig> IS_SERVICE =
-      new Predicate<ITaskConfig>() {
-        @Override
-        public boolean apply(ITaskConfig task) {
-          return task.isIsService();
-        }
-      };
+      ITaskConfig::isIsService;
 
   private final LoadingCache<String, Counter> metricCache;
   private final Storage storage;

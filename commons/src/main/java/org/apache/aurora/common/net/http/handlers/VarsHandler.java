@@ -39,11 +39,7 @@ import org.apache.aurora.common.stats.Stat;
 @Path("/vars")
 public class VarsHandler {
 
-  private static final Function<Stat, String> VAR_PRINTER = new Function<Stat, String>() {
-    @Override public String apply(Stat stat) {
-      return stat.getName() + " " + stat.read();
-    }
-  };
+  private static final Function<Stat, String> VAR_PRINTER = stat -> stat.getName() + " " + stat.read();
 
   private final Supplier<Iterable<Stat<?>>> statSupplier;
 

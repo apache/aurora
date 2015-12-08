@@ -159,18 +159,10 @@ public class ServerSetImpl implements ServerSet {
 
     final MemberStatus memberStatus =
         new MemberStatus(endpoint, additionalEndpoints, shardId);
-    Supplier<byte[]> serviceInstanceSupplier = new Supplier<byte[]>() {
-      @Override public byte[] get() {
-        return memberStatus.serializeServiceInstance();
-      }
-    };
+    Supplier<byte[]> serviceInstanceSupplier = memberStatus::serializeServiceInstance;
     final Group.Membership membership = group.join(serviceInstanceSupplier);
 
-    return new EndpointStatus() {
-      @Override public void leave() throws UpdateException {
-        memberStatus.leave(membership);
-      }
-    };
+    return () -> memberStatus.leave(membership);
   }
 
   @Override
@@ -252,20 +244,10 @@ public class ServerSetImpl implements ServerSet {
     }
 
     public Command watch() throws Group.WatchException, InterruptedException {
-      Watcher onExpirationWatcher = zkClient.registerExpirationHandler(new Command() {
-        @Override public void execute() {
-          // Servers may have changed Status while we were disconnected from ZooKeeper, check and
-          // re-register our node watches.
-          rebuildServerSet();
-        }
-      });
+      Watcher onExpirationWatcher = zkClient.registerExpirationHandler(this::rebuildServerSet);
 
       try {
-        return group.watch(new Group.GroupChangeListener() {
-          @Override public void onGroupChange(Iterable<String> memberIds) {
-            notifyGroupChange(memberIds);
-          }
-        });
+        return group.watch(this::notifyGroupChange);
       } catch (Group.WatchException e) {
         zkClient.unregister(onExpirationWatcher);
         throw e;
@@ -277,35 +259,33 @@ public class ServerSetImpl implements ServerSet {
 
     private ServiceInstance getServiceInstance(final String nodePath) {
       try {
-        return backoffHelper.doUntilResult(new ExceptionalSupplier<ServiceInstance, RuntimeException>() {
-          @Override public ServiceInstance get() {
-            try {
-              byte[] data = zkClient.get().getData(nodePath, false, null);
-              return ServerSets.deserializeServiceInstance(data, codec);
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-              throw new ServiceInstanceFetchException(
-                  "Interrupted updating service data for: " + nodePath, e);
-            } catch (ZooKeeperClient.ZooKeeperConnectionException e) {
+        return backoffHelper.doUntilResult(() -> {
+          try {
+            byte[] data = zkClient.get().getData(nodePath, false, null);
+            return ServerSets.deserializeServiceInstance(data, codec);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ServiceInstanceFetchException(
+                "Interrupted updating service data for: " + nodePath, e);
+          } catch (ZooKeeperClient.ZooKeeperConnectionException e) {
+            LOG.log(Level.WARNING,
+                "Temporary error trying to updating service data for: " + nodePath, e);
+            return null;
+          } catch (NoNodeException e) {
+            invalidateNodePath(nodePath);
+            throw new ServiceInstanceDeletedException(nodePath);
+          } catch (KeeperException e) {
+            if (zkClient.shouldRetry(e)) {
               LOG.log(Level.WARNING,
-                  "Temporary error trying to updating service data for: " + nodePath, e);
+                  "Temporary error trying to update service data for: " + nodePath, e);
               return null;
-            } catch (NoNodeException e) {
-              invalidateNodePath(nodePath);
-              throw new ServiceInstanceDeletedException(nodePath);
-            } catch (KeeperException e) {
-              if (zkClient.shouldRetry(e)) {
-                LOG.log(Level.WARNING,
-                    "Temporary error trying to update service data for: " + nodePath, e);
-                return null;
-              } else {
-                throw new ServiceInstanceFetchException(
-                    "Failed to update service data for: " + nodePath, e);
-              }
-            } catch (IOException e) {
+            } else {
               throw new ServiceInstanceFetchException(
-                  "Failed to deserialize the ServiceInstance data for: " + nodePath, e);
+                  "Failed to update service data for: " + nodePath, e);
             }
+          } catch (IOException e) {
+            throw new ServiceInstanceFetchException(
+                "Failed to deserialize the ServiceInstance data for: " + nodePath, e);
           }
         });
       } catch (InterruptedException e) {
@@ -335,20 +315,18 @@ public class ServerSetImpl implements ServerSet {
     }
 
     private final Function<String, ServiceInstance> MAYBE_FETCH_NODE =
-        new Function<String, ServiceInstance>() {
-          @Override public ServiceInstance apply(String memberId) {
-            // This get will trigger a fetch
-            try {
-              return servicesByMemberId.getUnchecked(memberId);
-            } catch (UncheckedExecutionException e) {
-              Throwable cause = e.getCause();
-              if (!(cause instanceof ServiceInstanceDeletedException)) {
-                Throwables.propagateIfInstanceOf(cause, ServiceInstanceFetchException.class);
-                throw new IllegalStateException(
-                    "Unexpected error fetching member data for: " + memberId, e);
-              }
-              return null;
+        memberId -> {
+          // This get will trigger a fetch
+          try {
+            return servicesByMemberId.getUnchecked(memberId);
+          } catch (UncheckedExecutionException e) {
+            Throwable cause = e.getCause();
+            if (!(cause instanceof ServiceInstanceDeletedException)) {
+              Throwables.propagateIfInstanceOf(cause, ServiceInstanceFetchException.class);
+              throw new IllegalStateException(
+                  "Unexpected error fetching member data for: " + memberId, e);
             }
+            return null;
           }
         };
 
@@ -442,11 +420,7 @@ public class ServerSetImpl implements ServerSet {
       if (instance.getAdditionalEndpoints() != null) {
         this.additionalEndpoints = Maps.transformValues(
             instance.getAdditionalEndpoints(),
-            new Function<Endpoint, EndpointSchema>() {
-              @Override public EndpointSchema apply(Endpoint endpoint) {
-                return new EndpointSchema(endpoint);
-              }
-            }
+            EndpointSchema::new
         );
       } else {
         this.additionalEndpoints = Maps.newHashMap();
@@ -495,11 +469,7 @@ public class ServerSetImpl implements ServerSet {
           output.getServiceEndpoint().getHost(), output.getServiceEndpoint().getPort());
       Map<String, Endpoint> additional = Maps.transformValues(
           output.getAdditionalEndpoints(),
-          new Function<EndpointSchema, Endpoint>() {
-            @Override public Endpoint apply(EndpointSchema endpoint) {
-              return new Endpoint(endpoint.getHost(), endpoint.getPort());
-            }
-          }
+          endpoint -> new Endpoint(endpoint.getHost(), endpoint.getPort())
       );
       ServiceInstance instance =
           new ServiceInstance(primary, ImmutableMap.copyOf(additional), output.getStatus());

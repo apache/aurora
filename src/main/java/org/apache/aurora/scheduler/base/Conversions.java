@@ -72,12 +72,7 @@ public final class Conversions {
   }
 
   private static final Function<Protos.Attribute, String> ATTRIBUTE_NAME =
-      new Function<Protos.Attribute, String>() {
-        @Override
-        public String apply(Protos.Attribute attr) {
-          return attr.getName();
-        }
-      };
+      Protos.Attribute::getName;
 
   /**
    * Typedef to make anonymous implementation more concise.
@@ -87,34 +82,28 @@ public final class Conversions {
   }
 
   private static final Function<Protos.Attribute, String> VALUE_CONVERTER =
-      new Function<Protos.Attribute, String>() {
-        @Override
-        public String apply(Protos.Attribute attribute) {
-          switch (attribute.getType()) {
-            case SCALAR:
-              return String.valueOf(attribute.getScalar().getValue());
+      attribute -> {
+        switch (attribute.getType()) {
+          case SCALAR:
+            return String.valueOf(attribute.getScalar().getValue());
 
-            case TEXT:
-              return attribute.getText().getValue();
+          case TEXT:
+            return attribute.getText().getValue();
 
-            default:
-              LOG.finest("Unrecognized attribute type:" + attribute.getType() + " , ignoring.");
-              return null;
-          }
+          default:
+            LOG.finest("Unrecognized attribute type:" + attribute.getType() + " , ignoring.");
+            return null;
         }
       };
 
-  private static final AttributeConverter ATTRIBUTE_CONVERTER = new AttributeConverter() {
-    @Override
-    public Attribute apply(Entry<String, Collection<Protos.Attribute>> entry) {
-      // Convert values and filter any that were ignored.
-      return new Attribute(
-          entry.getKey(),
-          FluentIterable.from(entry.getValue())
-              .transform(VALUE_CONVERTER)
-              .filter(Predicates.notNull())
-              .toSet());
-    }
+  private static final AttributeConverter ATTRIBUTE_CONVERTER = entry -> {
+    // Convert values and filter any that were ignored.
+    return new Attribute(
+        entry.getKey(),
+        FluentIterable.from(entry.getValue())
+            .transform(VALUE_CONVERTER)
+            .filter(Predicates.notNull())
+            .toSet());
   };
 
   /**

@@ -53,16 +53,8 @@ public class Ratio extends SampledStat<Double> {
     Stats.export(denominator);
 
     return new Ratio(name,
-        new Supplier<Number>() {
-          @Override public Number get() {
-            return numerator.read();
-          }
-        },
-        new Supplier<Number>() {
-          @Override public Number get() {
-            return denominator.read();
-          }
-        });
+        numerator::read,
+        denominator::read);
   }
 
   public static Ratio of(String name, final Number numerator, final Number denominator) {
@@ -70,16 +62,8 @@ public class Ratio extends SampledStat<Double> {
     Preconditions.checkNotNull(denominator);
 
     return new Ratio(name,
-        new Supplier<Number>() {
-          @Override public Number get() {
-            return numerator;
-          }
-        },
-        new Supplier<Number>() {
-          @Override public Number get() {
-            return denominator;
-          }
-        });
+        () -> numerator,
+        () -> denominator);
   }
 
   @Override

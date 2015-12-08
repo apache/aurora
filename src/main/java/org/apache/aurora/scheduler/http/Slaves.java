@@ -26,8 +26,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 
-import org.antlr.stringtemplate.StringTemplate;
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
@@ -37,9 +35,6 @@ import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
-
-import static org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import static org.apache.aurora.scheduler.storage.Storage.Work;
 
 /**
  * HTTP interface to serve as a HUD for the mesos slaves tracked in the scheduler.
@@ -63,21 +58,11 @@ public class Slaves extends JerseyTemplateServlet {
   }
 
   private Iterable<IHostAttributes> getHostAttributes() {
-    return storage.read(new Work.Quiet<Iterable<IHostAttributes>>() {
-      @Override
-      public Iterable<IHostAttributes> apply(StoreProvider storeProvider) {
-        return storeProvider.getAttributeStore().getHostAttributes();
-      }
-    });
+    return storage.read(storeProvider -> storeProvider.getAttributeStore().getHostAttributes());
   }
 
   private static final Function<IHostAttributes, Slave> TO_SLAVE =
-      new Function<IHostAttributes, Slave>() {
-        @Override
-        public Slave apply(IHostAttributes attributes) {
-          return new Slave(attributes);
-        }
-      };
+      Slave::new;
 
   /**
    * Fetches the listing of known slaves.
@@ -87,14 +72,11 @@ public class Slaves extends JerseyTemplateServlet {
   @GET
   @Produces(MediaType.TEXT_HTML)
   public Response get() {
-    return fillTemplate(new Closure<StringTemplate>() {
-      @Override
-      public void execute(StringTemplate template) {
-        template.setAttribute("cluster_name", clusterName);
+    return fillTemplate(template -> {
+      template.setAttribute("cluster_name", clusterName);
 
-        template.setAttribute("slaves",
-            FluentIterable.from(getHostAttributes()).transform(TO_SLAVE).toList());
-      }
+      template.setAttribute("slaves",
+          FluentIterable.from(getHostAttributes()).transform(TO_SLAVE).toList());
     });
   }
 
@@ -129,12 +111,7 @@ public class Slaves extends JerseyTemplateServlet {
     }
 
     private static final Function<IAttribute, String> ATTR_TO_STRING =
-        new Function<IAttribute, String>() {
-          @Override
-          public String apply(IAttribute attr) {
-            return attr.getName() + "=[" + Joiner.on(",").join(attr.getValues()) + "]";
-          }
-        };
+        attr -> attr.getName() + "=[" + Joiner.on(",").join(attr.getValues()) + "]";
 
     public String getAttributes() {
       return Joiner.on(", ").join(

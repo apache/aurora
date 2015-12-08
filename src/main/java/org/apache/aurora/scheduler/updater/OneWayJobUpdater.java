@@ -26,7 +26,6 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Maps.EntryTransformer;
 
 import org.apache.aurora.common.util.StateMachine;
 import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
@@ -82,21 +81,11 @@ class OneWayJobUpdater<K, T> {
 
     this.instances = ImmutableMap.copyOf(Maps.transformEntries(
         instanceEvaluators,
-        new EntryTransformer<K, StateEvaluator<T>, InstanceUpdate<T>>() {
-          @Override
-          public InstanceUpdate<T> transformEntry(K key, StateEvaluator<T> value) {
-            return new InstanceUpdate<>("Instance " + key, value);
-          }
-        }));
+        (key, value) -> new InstanceUpdate<>("Instance " + key, value)));
   }
 
   private static final Function<InstanceUpdate<?>, SideEffect.InstanceUpdateStatus> GET_STATE =
-      new Function<InstanceUpdate<?>, SideEffect.InstanceUpdateStatus>() {
-        @Override
-        public SideEffect.InstanceUpdateStatus apply(InstanceUpdate<?> manager) {
-          return manager.getState();
-        }
-      };
+      InstanceUpdate::getState;
 
   private static <K, T> Set<K> filterByStatus(
       Map<K, InstanceUpdate<T>> instances,

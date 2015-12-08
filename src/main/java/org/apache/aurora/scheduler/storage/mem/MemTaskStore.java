@@ -73,19 +73,9 @@ class MemTaskStore implements TaskStore.Mutable {
   private final long slowQueryThresholdNanos = SLOW_QUERY_LOG_THRESHOLD.get().as(Time.NANOSECONDS);
 
   private static final Function<Query.Builder, Optional<Set<IJobKey>>> QUERY_TO_JOB_KEY =
-      new Function<Query.Builder, Optional<Set<IJobKey>>>() {
-        @Override
-        public Optional<Set<IJobKey>> apply(Query.Builder query) {
-          return JobKeys.from(query);
-        }
-      };
+      JobKeys::from;
   private static final Function<Query.Builder, Optional<Set<String>>> QUERY_TO_SLAVE_HOST =
-      new Function<Query.Builder, Optional<Set<String>>>() {
-        @Override
-        public Optional<Set<String>> apply(Query.Builder query) {
-          return Optional.fromNullable(query.get().getSlaveHosts());
-        }
-      };
+      query -> Optional.fromNullable(query.get().getSlaveHosts());
 
   // Since this class operates under the API and umbrella of {@link Storage}, it is expected to be
   // thread-safe but not necessarily strongly-consistent unless the externally-controlled storage
@@ -149,13 +139,7 @@ class MemTaskStore implements TaskStore.Mutable {
         .toSet();
   }
 
-  private final Function<IScheduledTask, Task> toTask =
-      new Function<IScheduledTask, Task>() {
-        @Override
-        public Task apply(IScheduledTask task) {
-          return new Task(task, configInterner);
-        }
-      };
+  private final Function<IScheduledTask, Task> toTask = task -> new Task(task, configInterner);
 
   @Timed("mem_storage_save_tasks")
   @Override
@@ -290,13 +274,7 @@ class MemTaskStore implements TaskStore.Mutable {
     return FluentIterable.from(from.get()).filter(queryFilter(query));
   }
 
-  private static final Function<Task, IScheduledTask> TO_SCHEDULED =
-      new Function<Task, IScheduledTask>() {
-        @Override
-        public IScheduledTask apply(Task task) {
-          return task.storedTask;
-        }
-      };
+  private static final Function<Task, IScheduledTask> TO_SCHEDULED = task -> task.storedTask;
 
   private static final Function<Task, String> TO_ID =
       Functions.compose(Tasks::id, TO_SCHEDULED);

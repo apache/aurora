@@ -38,9 +38,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -153,24 +151,21 @@ public interface MaintenanceController {
     public void taskChangedState(final TaskStateChange change) {
       if (Tasks.isTerminated(change.getNewState())) {
         final String host = change.getTask().getAssignedTask().getSlaveHost();
-        storage.write(new MutateWork.NoResult.Quiet() {
-          @Override
-          public void execute(MutableStoreProvider store) {
-            // If the task _was_ associated with a draining host, and it was the last task on the
-            // host.
-            Optional<IHostAttributes> attributes =
-                store.getAttributeStore().getHostAttributes(host);
-            if (attributes.isPresent() && attributes.get().getMode() == DRAINING) {
-              Query.Builder builder = Query.slaveScoped(host).active();
-              Iterable<IScheduledTask> activeTasks = store.getTaskStore().fetchTasks(builder);
-              if (Iterables.isEmpty(activeTasks)) {
-                LOG.info(String.format("Moving host %s into DRAINED", host));
-                setMaintenanceMode(store, ImmutableSet.of(host), DRAINED);
-              } else {
-                LOG.info(String.format("Host %s is DRAINING with active tasks: %s",
-                    host,
-                    Tasks.ids(activeTasks)));
-              }
+        storage.write((NoResult.Quiet) (MutableStoreProvider store) -> {
+          // If the task _was_ associated with a draining host, and it was the last task on the
+          // host.
+          Optional<IHostAttributes> attributes =
+              store.getAttributeStore().getHostAttributes(host);
+          if (attributes.isPresent() && attributes.get().getMode() == DRAINING) {
+            Query.Builder builder = Query.slaveScoped(host).active();
+            Iterable<IScheduledTask> activeTasks = store.getTaskStore().fetchTasks(builder);
+            if (Iterables.isEmpty(activeTasks)) {
+              LOG.info(String.format("Moving host %s into DRAINED", host));
+              setMaintenanceMode(store, ImmutableSet.of(host), DRAINED);
+            } else {
+              LOG.info(String.format("Host %s is DRAINING with active tasks: %s",
+                  host,
+                  Tasks.ids(activeTasks)));
             }
           }
         });
@@ -179,12 +174,8 @@ public interface MaintenanceController {
 
     @Override
     public Set<HostStatus> startMaintenance(final Set<String> hosts) {
-      return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
-        @Override
-        public Set<HostStatus> apply(MutableStoreProvider storeProvider) {
-          return setMaintenanceMode(storeProvider, hosts, MaintenanceMode.SCHEDULED);
-        }
-      });
+      return storage.write(
+          storeProvider -> setMaintenanceMode(storeProvider, hosts, MaintenanceMode.SCHEDULED));
     }
 
     @VisibleForTesting
@@ -193,73 +184,41 @@ public interface MaintenanceController {
 
     @Override
     public Set<HostStatus> drain(final Set<String> hosts) {
-      return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
-        @Override
-        public Set<HostStatus> apply(MutableStoreProvider store) {
-          return watchDrainingTasks(store, hosts);
-        }
-      });
+      return storage.write(store -> watchDrainingTasks(store, hosts));
     }
 
     private static final Function<IHostAttributes, String> HOST_NAME =
-        new Function<IHostAttributes, String>() {
-          @Override
-          public String apply(IHostAttributes attributes) {
-            return attributes.getHost();
-          }
-        };
+        IHostAttributes::getHost;
 
     private static final Function<IHostAttributes, HostStatus> ATTRS_TO_STATUS =
-        new Function<IHostAttributes, HostStatus>() {
-          @Override
-          public HostStatus apply(IHostAttributes attributes) {
-            return new HostStatus().setHost(attributes.getHost()).setMode(attributes.getMode());
-          }
-        };
+        attributes -> new HostStatus().setHost(attributes.getHost()).setMode(attributes.getMode());
 
     private static final Function<HostStatus, MaintenanceMode> GET_MODE =
-        new Function<HostStatus, MaintenanceMode>() {
-          @Override
-          public MaintenanceMode apply(HostStatus status) {
-            return status.getMode();
-          }
-        };
+        HostStatus::getMode;
 
     @Override
     public MaintenanceMode getMode(final String host) {
-      return storage.read(new Work.Quiet<MaintenanceMode>() {
-        @Override
-        public MaintenanceMode apply(StoreProvider storeProvider) {
-          return storeProvider.getAttributeStore().getHostAttributes(host)
-              .transform(ATTRS_TO_STATUS)
-              .transform(GET_MODE)
-              .or(MaintenanceMode.NONE);
-        }
-      });
+      return storage.read(storeProvider -> storeProvider.getAttributeStore().getHostAttributes(host)
+          .transform(ATTRS_TO_STATUS)
+          .transform(GET_MODE)
+          .or(MaintenanceMode.NONE));
     }
 
     @Override
     public Set<HostStatus> getStatus(final Set<String> hosts) {
-      return storage.read(new Work.Quiet<Set<HostStatus>>() {
-        @Override
-        public Set<HostStatus> apply(StoreProvider storeProvider) {
-          // Warning - this is filtering _all_ host attributes.  If using this to frequently query
-          // for a small set of hosts, a getHostAttributes variant should be added.
-          return FluentIterable.from(storeProvider.getAttributeStore().getHostAttributes())
-              .filter(Predicates.compose(Predicates.in(hosts), HOST_NAME))
-              .transform(ATTRS_TO_STATUS).toSet();
-        }
+      return storage.read(storeProvider -> {
+        // Warning - this is filtering _all_ host attributes.  If using this to frequently query
+        // for a small set of hosts, a getHostAttributes variant should be added.
+        return FluentIterable.from(storeProvider.getAttributeStore().getHostAttributes())
+            .filter(Predicates.compose(Predicates.in(hosts), HOST_NAME))
+            .transform(ATTRS_TO_STATUS).toSet();
       });
     }
 
     @Override
     public Set<HostStatus> endMaintenance(final Set<String> hosts) {
-      return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
-        @Override
-        public Set<HostStatus> apply(MutableStoreProvider storeProvider) {
-          return setMaintenanceMode(storeProvider, hosts, MaintenanceMode.NONE);
-        }
-      });
+      return storage.write(
+          storeProvider -> setMaintenanceMode(storeProvider, hosts, MaintenanceMode.NONE));
     }
 
     private Set<HostStatus> setMaintenanceMode(

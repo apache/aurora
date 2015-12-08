@@ -65,9 +65,7 @@ public final class Iterables2 {
       if (iterators == null) {
         // Iterables -> Iterators.
         iterators = ImmutableList.copyOf(Iterables.transform(iterables,
-            new Function<Iterable<T>, Iterator<T>>() {
-              @Override public Iterator<T> apply(Iterable<T> it) { return it.iterator(); }
-            }));
+            Iterable::iterator));
       }
     }
 
@@ -127,11 +125,7 @@ public final class Iterables2 {
   public static <T> Iterable<List<T>> zip(final Iterable<Iterable<T>> iterables,
       final T defaultValue) {
 
-    return new Iterable<List<T>>() {
-      @Override public Iterator<List<T>> iterator() {
-        return new ZippingIterator<T>(iterables, defaultValue);
-      }
-    };
+    return () -> new ZippingIterator<T>(iterables, defaultValue);
   }
 
   /**

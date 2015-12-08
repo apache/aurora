@@ -43,10 +43,6 @@ public class ListParser extends TypeParameterizedParser<List<?>> {
     final Type listType = typeParams.get(0);
     final Parser<?> parser = parserOracle.get(TypeToken.of(listType));
     return ImmutableList.copyOf(Iterables.transform(Parsers.MULTI_VALUE_SPLITTER.split(raw),
-        new Function<String, Object>() {
-          @Override public Object apply(String raw) {
-            return parser.parse(parserOracle, listType, raw);
-          }
-        }));
+        raw1 -> parser.parse(parserOracle, listType, raw1)));
   }
 }

@@ -126,12 +126,8 @@ class SlotSizeCounter implements Runnable {
   }
 
   private int countSlots(Iterable<IResourceAggregate> slots, final IResourceAggregate slotSize) {
-    Function<IResourceAggregate, Integer> counter = new Function<IResourceAggregate, Integer>() {
-      @Override
-      public Integer apply(IResourceAggregate machineSlack) {
-        return ResourceAggregates.divide(machineSlack, slotSize);
-      }
-    };
+    Function<IResourceAggregate, Integer> counter =
+        machineSlack -> ResourceAggregates.divide(machineSlack, slotSize);
 
     int sum = 0;
     for (int slotCount : FluentIterable.from(slots).transform(counter)) {

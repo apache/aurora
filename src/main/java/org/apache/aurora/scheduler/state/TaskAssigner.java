@@ -23,14 +23,12 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.stats.Stats;
-
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.TierInfo;
@@ -117,12 +115,7 @@ public interface TaskAssigner {
 
       final Iterator<String> names = requestedPorts.iterator();
       Map<String, Integer> portsByName = FluentIterable.from(selectedPorts)
-          .uniqueIndex(new Function<Object, String>() {
-            @Override
-            public String apply(Object input) {
-              return names.next();
-            }
-          });
+          .uniqueIndex(input -> names.next());
 
       IAssignedTask assigned = stateManager.assignTask(
           storeProvider,

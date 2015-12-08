@@ -351,25 +351,23 @@ public class ZooKeeperClient {
 
     if (zooKeeper == null) {
       final CountDownLatch connected = new CountDownLatch(1);
-      Watcher watcher = new Watcher() {
-        @Override public void process(WatchedEvent event) {
-          switch (event.getType()) {
-            // Guard the None type since this watch may be used as the default watch on calls by
-            // the client outside our control.
-            case None:
-              switch (event.getState()) {
-                case Expired:
-                  LOG.info("Zookeeper session expired. Event: " + event);
-                  close();
-                  break;
-                case SyncConnected:
-                  connected.countDown();
-                  break;
-              }
-          }
-
-          eventQueue.offer(event);
+      Watcher watcher = event -> {
+        switch (event.getType()) {
+          // Guard the None type since this watch may be used as the default watch on calls by
+          // the client outside our control.
+          case None:
+            switch (event.getState()) {
+              case Expired:
+                LOG.info("Zookeeper session expired. Event: " + event);
+                close();
+                break;
+              case SyncConnected:
+                connected.countDown();
+                break;
+            }
         }
+
+        eventQueue.offer(event);
       };
 
       try {
@@ -413,11 +411,9 @@ public class ZooKeeperClient {
    *     removal.
    */
   public Watcher registerExpirationHandler(final Command onExpired) {
-    Watcher watcher = new Watcher() {
-      @Override public void process(WatchedEvent event) {
-        if (event.getType() == EventType.None && event.getState() == KeeperState.Expired) {
-          onExpired.execute();
-        }
+    Watcher watcher = event -> {
+      if (event.getType() == EventType.None && event.getState() == KeeperState.Expired) {
+        onExpired.execute();
       }
     };
     register(watcher);

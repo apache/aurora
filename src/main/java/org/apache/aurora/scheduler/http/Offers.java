@@ -61,63 +61,47 @@ public class Offers {
         FluentIterable.from(offerManager.getOffers()).transform(TO_BEAN).toList()).build();
   }
 
-  private static final Function<ExecutorID, String> EXECUTOR_ID_TOSTRING =
-      new Function<ExecutorID, String>() {
-        @Override
-        public String apply(ExecutorID id) {
-          return id.getValue();
-        }
-      };
+  private static final Function<ExecutorID, String> EXECUTOR_ID_TOSTRING = ExecutorID::getValue;
 
-  private static final Function<Range, Object> RANGE_TO_BEAN = new Function<Range, Object>() {
-    @Override
-    public Object apply(Range range) {
-      return range.getBegin() + "-" + range.getEnd();
-    }
-  };
+  private static final Function<Range, Object> RANGE_TO_BEAN =
+      range -> range.getBegin() + "-" + range.getEnd();
 
   private static final Function<Attribute, Object> ATTRIBUTE_TO_BEAN =
-      new Function<Attribute, Object>() {
-        @Override
-        public Object apply(Attribute attr) {
-          ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
-          builder.put("name", attr.getName());
-          if (attr.hasScalar()) {
-            builder.put("scalar", attr.getScalar().getValue());
-          }
-          if (attr.hasRanges()) {
-            builder.put("ranges", immutable(attr.getRanges().getRangeList(), RANGE_TO_BEAN));
-          }
-          if (attr.hasSet()) {
-            builder.put("set", attr.getSet().getItemList());
-          }
-          if (attr.hasText()) {
-            builder.put("text", attr.getText().getValue());
-          }
-          return builder.build();
+      attr -> {
+        ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+        builder.put("name", attr.getName());
+        if (attr.hasScalar()) {
+          builder.put("scalar", attr.getScalar().getValue());
         }
+        if (attr.hasRanges()) {
+          builder.put("ranges", immutable(attr.getRanges().getRangeList(), RANGE_TO_BEAN));
+        }
+        if (attr.hasSet()) {
+          builder.put("set", attr.getSet().getItemList());
+        }
+        if (attr.hasText()) {
+          builder.put("text", attr.getText().getValue());
+        }
+        return builder.build();
       };
 
   private static final Function<Resource, Object> RESOURCE_TO_BEAN =
-      new Function<Resource, Object>() {
-        @Override
-        public Object apply(Resource resource) {
-          ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
-          builder.put("name", resource.getName());
-          if (resource.hasScalar()) {
-            builder.put("scalar", resource.getScalar().getValue());
-          }
-          if (resource.hasRanges()) {
-            builder.put("ranges", immutable(resource.getRanges().getRangeList(), RANGE_TO_BEAN));
-          }
-          if (resource.hasSet()) {
-            builder.put("set", resource.getSet().getItemList());
-          }
-          if (resource.hasRevocable()) {
-            builder.put("revocable", "true");
-          }
-          return builder.build();
+      resource -> {
+        ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+        builder.put("name", resource.getName());
+        if (resource.hasScalar()) {
+          builder.put("scalar", resource.getScalar().getValue());
         }
+        if (resource.hasRanges()) {
+          builder.put("ranges", immutable(resource.getRanges().getRangeList(), RANGE_TO_BEAN));
+        }
+        if (resource.hasSet()) {
+          builder.put("set", resource.getSet().getItemList());
+        }
+        if (resource.hasRevocable()) {
+          builder.put("revocable", "true");
+        }
+        return builder.build();
       };
 
   private static <A, B> Iterable<B> immutable(Iterable<A> iterable, Function<A, B> transform) {
@@ -125,19 +109,16 @@ public class Offers {
   }
 
   private static final Function<HostOffer, Map<String, ?>> TO_BEAN =
-      new Function<HostOffer, Map<String, ?>>() {
-        @Override
-        public Map<String, ?> apply(HostOffer hostOffer) {
-          Offer offer = hostOffer.getOffer();
-          return ImmutableMap.<String, Object>builder()
-              .put("id", offer.getId().getValue())
-              .put("framework_id", offer.getFrameworkId().getValue())
-              .put("slave_id", offer.getSlaveId().getValue())
-              .put("hostname", offer.getHostname())
-              .put("resources", immutable(offer.getResourcesList(), RESOURCE_TO_BEAN))
-              .put("attributes", immutable(offer.getAttributesList(), ATTRIBUTE_TO_BEAN))
-              .put("executor_ids", immutable(offer.getExecutorIdsList(), EXECUTOR_ID_TOSTRING))
-              .build();
-        }
+      hostOffer -> {
+        Offer offer = hostOffer.getOffer();
+        return ImmutableMap.<String, Object>builder()
+            .put("id", offer.getId().getValue())
+            .put("framework_id", offer.getFrameworkId().getValue())
+            .put("slave_id", offer.getSlaveId().getValue())
+            .put("hostname", offer.getHostname())
+            .put("resources", immutable(offer.getResourcesList(), RESOURCE_TO_BEAN))
+            .put("attributes", immutable(offer.getAttributesList(), ATTRIBUTE_TO_BEAN))
+            .put("executor_ids", immutable(offer.getExecutorIdsList(), EXECUTOR_ID_TOSTRING))
+            .build();
       };
 }

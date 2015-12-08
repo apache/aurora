@@ -26,9 +26,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
@@ -82,25 +80,17 @@ interface TemporaryStorage {
       return new TemporaryStorage() {
         @Override
         public void deleteTasks(final Query.Builder query) {
-          storage.write(new MutateWork.NoResult.Quiet() {
-            @Override
-            public void execute(MutableStoreProvider storeProvider) {
-              Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
-                  .transform(Tasks::id)
-                  .toSet();
-              storeProvider.getUnsafeTaskStore().deleteTasks(ids);
-            }
+          storage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+            Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
+                .transform(Tasks::id)
+                .toSet();
+            storeProvider.getUnsafeTaskStore().deleteTasks(ids);
           });
         }
 
         @Override
         public Iterable<IScheduledTask> fetchTasks(final Query.Builder query) {
-          return storage.read(new Work.Quiet<Iterable<IScheduledTask>>() {
-            @Override
-            public Iterable<IScheduledTask> apply(StoreProvider storeProvider) {
-              return storeProvider.getTaskStore().fetchTasks(query);
-            }
-          });
+          return storage.read(storeProvider -> storeProvider.getTaskStore().fetchTasks(query));
         }
 
         @Override

@@ -25,15 +25,10 @@ import javax.ws.rs.core.Response.Status;
 import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
 
-import org.antlr.stringtemplate.StringTemplate;
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.thrift.Util;
-import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -78,15 +73,12 @@ public class StructDump extends JerseyTemplateServlet {
   public Response dumpJob(
       @PathParam("task") final String taskId) {
 
-    return dumpEntity("Task " + taskId, new Work.Quiet<Optional<? extends TBase<?, ?>>>() {
-      @Override
-      public Optional<? extends TBase<?, ?>> apply(StoreProvider storeProvider) {
-        // Deep copy the struct to sidestep any subclass trickery inside the storage system.
-        return Optional.fromNullable(Iterables.getOnlyElement(
-                storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskId)),
-                null)
-            .newBuilder());
-      }
+    return dumpEntity("Task " + taskId, storeProvider -> {
+      // Deep copy the struct to sidestep any subclass trickery inside the storage system.
+      return Optional.fromNullable(Iterables.getOnlyElement(
+              storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskId)),
+              null)
+          .newBuilder());
     });
   }
 
@@ -105,27 +97,19 @@ public class StructDump extends JerseyTemplateServlet {
 
     final IJobKey jobKey = JobKeys.from(role, environment, job);
     return dumpEntity("Cron job " + JobKeys.canonicalString(jobKey),
-        new Work.Quiet<Optional<? extends TBase<?, ?>>>() {
-          @Override
-          public Optional<JobConfiguration> apply(StoreProvider storeProvider) {
-            return storeProvider.getCronJobStore().fetchJob(jobKey)
-                .transform(IJobConfiguration::newBuilder);
-          }
-        });
+        storeProvider -> storeProvider.getCronJobStore().fetchJob(jobKey)
+            .transform(IJobConfiguration::newBuilder));
   }
 
   private Response dumpEntity(final String id, final Quiet<Optional<? extends TBase<?, ?>>> work) {
-    return fillTemplate(new Closure<StringTemplate>() {
-      @Override
-      public void execute(StringTemplate template) {
-        template.setAttribute("id", id);
-        Optional<? extends TBase<?, ?>> struct = storage.read(work);
-        if (struct.isPresent()) {
-          template.setAttribute("structPretty", Util.prettyPrint(struct.get()));
-          template.setAttribute("exception", null);
-        } else {
-          template.setAttribute("exception", "Entity not found");
-        }
+    return fillTemplate(template -> {
+      template.setAttribute("id", id);
+      Optional<? extends TBase<?, ?>> struct = storage.read(work);
+      if (struct.isPresent()) {
+        template.setAttribute("structPretty", Util.prettyPrint(struct.get()));
+        template.setAttribute("exception", null);
+      } else {
+        template.setAttribute("exception", "Entity not found");
       }
     });
   }

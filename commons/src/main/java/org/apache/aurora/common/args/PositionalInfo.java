@@ -106,11 +106,7 @@ public final class PositionalInfo<T> extends ArgumentInfo<List<T>> {
   void load(final ParserOracle parserOracle, List<String> positionalArgs) {
     final Parser<? extends T> parser = parserOracle.get(elementType);
     List<T> assignmentValue = Lists.newArrayList(Iterables.transform(positionalArgs,
-      new Function<String, T>() {
-        @Override public T apply(String argValue) {
-          return parser.parse(parserOracle, elementType.getType(), argValue);
-        }
-      }));
+        argValue -> parser.parse(parserOracle, elementType.getType(), argValue)));
     setValue(assignmentValue);
   }
 }

@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.storage.mem;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 
 import org.apache.thrift.TBase;
@@ -36,17 +34,14 @@ final class Util {
    * @return A copier for the provided type of thrift structs.
    */
   static <T extends TBase<T, ?>> Function<T, T> deepCopier() {
-    return new Function<T, T>() {
-      @Override
-      public T apply(@Nullable T input) {
-        if (input == null) {
-          return null;
-        }
-
-        @SuppressWarnings("unchecked")
-        T t = (T) input.deepCopy();
-        return t;
+    return input -> {
+      if (input == null) {
+        return null;
       }
+
+      @SuppressWarnings("unchecked")
+      T t = (T) input.deepCopy();
+      return t;
     };
   }
 }

@@ -74,22 +74,17 @@ class TaskThrottler implements EventSubscriber {
       long delayMs = Math.max(0, readyAtMs - clock.nowMillis());
       throttleStats.accumulate(delayMs);
       executor.execute(
-          new Runnable() {
+          () -> storage.write(new Storage.MutateWork.NoResult.Quiet() {
             @Override
-            public void run() {
-              storage.write(new Storage.MutateWork.NoResult.Quiet() {
-                @Override
-                public void execute(Storage.MutableStoreProvider storeProvider) {
-                  stateManager.changeState(
-                      storeProvider,
-                      stateChange.getTaskId(),
-                      Optional.of(THROTTLED),
-                      PENDING,
-                      Optional.absent());
-                }
-              });
+            public void execute(Storage.MutableStoreProvider storeProvider) {
+              stateManager.changeState(
+                  storeProvider,
+                  stateChange.getTaskId(),
+                  Optional.of(THROTTLED),
+                  PENDING,
+                  Optional.absent());
             }
-          },
+          }),
           Amount.of(delayMs, Time.MILLISECONDS));
     }
   }

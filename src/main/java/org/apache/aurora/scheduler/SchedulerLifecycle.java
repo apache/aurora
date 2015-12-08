@@ -103,12 +103,7 @@ public class SchedulerLifecycle implements EventSubscriber {
     DEAD
   }
 
-  private static final Predicate<Transition<State>> IS_DEAD = new Predicate<Transition<State>>() {
-    @Override
-    public boolean apply(Transition<State> state) {
-      return state.getTo() == State.DEAD;
-    }
-  };
+  private static final Predicate<Transition<State>> IS_DEAD = state -> state.getTo() == State.DEAD;
 
   private static final Predicate<Transition<State>> NOT_DEAD = Predicates.not(IS_DEAD);
 
@@ -252,24 +247,18 @@ public class SchedulerLifecycle implements EventSubscriber {
         driver.startAsync().awaitRunning();
 
         delayedActions.onRegistrationTimeout(
-            new Runnable() {
-              @Override
-              public void run() {
-                if (!registrationAcked.get()) {
-                  LOG.severe(
-                      "Framework has not been registered within the tolerated delay.");
-                  stateMachine.transition(State.DEAD);
-                }
+            () -> {
+              if (!registrationAcked.get()) {
+                LOG.severe(
+                    "Framework has not been registered within the tolerated delay.");
+                stateMachine.transition(State.DEAD);
               }
             });
 
         delayedActions.onAutoFailover(
-            new Runnable() {
-              @Override
-              public void run() {
-                LOG.info("Triggering automatic failover.");
-                stateMachine.transition(State.DEAD);
-              }
+            () -> {
+              LOG.info("Triggering automatic failover.");
+              stateMachine.transition(State.DEAD);
             });
       }
     };
@@ -278,13 +267,10 @@ public class SchedulerLifecycle implements EventSubscriber {
       @Override
       public void execute(Transition<State> transition) {
         registrationAcked.set(true);
-        delayedActions.blockingDriverJoin(new Runnable() {
-          @Override
-          public void run() {
-            driver.blockUntilStopped();
-            LOG.info("Driver exited, terminating lifecycle.");
-            stateMachine.transition(State.DEAD);
-          }
+        delayedActions.blockingDriverJoin(() -> {
+          driver.blockUntilStopped();
+          LOG.info("Driver exited, terminating lifecycle.");
+          stateMachine.transition(State.DEAD);
         });
 
         // TODO(ksweeney): Extract leader advertisement to its own service.
@@ -365,16 +351,13 @@ public class SchedulerLifecycle implements EventSubscriber {
   }
 
   private Closure<Transition<State>> dieOnError(final Closure<Transition<State>> closure) {
-    return new Closure<Transition<State>>() {
-      @Override
-      public void execute(Transition<State> transition) {
-        try {
-          closure.execute(transition);
-        } catch (RuntimeException e) {
-          LOG.log(Level.SEVERE, "Caught unchecked exception: " + e, e);
-          stateMachine.transition(State.DEAD);
-          throw e;
-        }
+    return transition -> {
+      try {
+        closure.execute(transition);
+      } catch (RuntimeException e) {
+        LOG.log(Level.SEVERE, "Caught unchecked exception: " + e, e);
+        stateMachine.transition(State.DEAD);
+        throw e;
       }
     };
   }

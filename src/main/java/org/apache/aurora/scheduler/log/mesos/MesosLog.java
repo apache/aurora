@@ -164,12 +164,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
     }
 
     private static final Function<Log.Entry, LogEntry> MESOS_ENTRY_TO_ENTRY =
-        new Function<Log.Entry, LogEntry>() {
-          @Override
-          public LogEntry apply(Log.Entry entry) {
-            return new LogEntry(entry);
-          }
-        };
+        LogEntry::new;
 
     private final OpStats readStats = new OpStats("read");
     private final OpStats appendStats = new OpStats("append");
@@ -312,13 +307,9 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
     public LogPosition append(final byte[] contents) throws StreamAccessException {
       requireNonNull(contents);
 
-      Log.Position position = mutate(appendStats, new Mutation<Log.Position>() {
-        @Override
-        public Log.Position apply(WriterInterface logWriter)
-            throws TimeoutException, Log.WriterFailedException {
-          return logWriter.append(contents, writeTimeout, writeTimeUnit);
-        }
-      });
+      Log.Position position = mutate(
+          appendStats,
+          logWriter -> logWriter.append(contents, writeTimeout, writeTimeUnit));
       return LogPosition.wrap(position);
     }
 
@@ -330,13 +321,9 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       Preconditions.checkArgument(position instanceof LogPosition);
 
       final Log.Position before = ((LogPosition) position).unwrap();
-      mutate(truncateStats, new Mutation<Void>() {
-        @Override
-        public Void apply(WriterInterface logWriter)
-            throws TimeoutException, Log.WriterFailedException {
-          logWriter.truncate(before, writeTimeout, writeTimeUnit);
-          return null;
-        }
+      mutate(truncateStats, logWriter -> {
+        logWriter.truncate(before, writeTimeout, writeTimeUnit);
+        return null;
       });
     }
 

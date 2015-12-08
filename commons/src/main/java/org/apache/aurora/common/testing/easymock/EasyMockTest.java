@@ -45,11 +45,7 @@ public abstract class EasyMockTest extends TearDownTestCase {
   @Before
   public final void setupEasyMock() {
     control = createControl();
-    addTearDown(new TearDown() {
-      @Override public void tearDown() {
-        control.verify();
-      }
-    });
+    addTearDown(() -> control.verify());
   }
 
   /**

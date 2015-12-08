@@ -43,12 +43,10 @@ import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
-import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 
 import org.apache.thrift.TFieldIdEnum;
@@ -177,56 +175,44 @@ public class GsonMessageBodyHandler
 
   public static final Gson GSON = new GsonBuilder()
       .addSerializationExclusionStrategy(EXCLUDE_THRIFT_FIELDS)
-      .registerTypeHierarchyAdapter(TUnion.class, new JsonSerializer<TUnion<?, ?>>() {
-        @Override
-        public JsonElement serialize(
-            TUnion<?, ?> src,
-            Type typeOfSrc,
-            JsonSerializationContext context) {
-
-          return context.serialize(
-              ImmutableMap.of(src.getSetField().getFieldName(), src.getFieldValue()));
-        }
-      })
-      .registerTypeHierarchyAdapter(TUnion.class, new JsonDeserializer<TUnion<?, ?>>() {
-        @Override
-        public TUnion<?, ?> deserialize(
-            JsonElement json,
-            Type typeOfT,
-            JsonDeserializationContext context) throws JsonParseException {
-
-          JsonObject jsonObject = json.getAsJsonObject();
-          if (jsonObject.entrySet().size() != 1) {
-            throw new JsonParseException(
-                typeOfT.getClass().getName() + " must have exactly one element");
-          }
-
-          if (typeOfT instanceof Class) {
-            Class<?> clazz = (Class<?>) typeOfT;
-            Entry<String, JsonElement> item = Iterables.getOnlyElement(jsonObject.entrySet());
-
-            try {
-              Field metaDataMapField = clazz.getField("metaDataMap");
-              @SuppressWarnings("unchecked")
-              Map<TFieldIdEnum, FieldMetaData> metaDataMap =
-                  (Map<TFieldIdEnum, FieldMetaData>) metaDataMapField.get(null);
-
-              for (Map.Entry<TFieldIdEnum, FieldMetaData> entry : metaDataMap.entrySet()) {
-                if (entry.getKey().getFieldName().equals(item.getKey())) {
-                  StructMetaData valueMetaData = (StructMetaData) entry.getValue().valueMetaData;
-                  Object result = context.deserialize(item.getValue(), valueMetaData.structClass);
-                  return createUnion(clazz, entry.getKey(), result);
-                }
-              }
-
-              throw new RuntimeException("Failed to deserialize " + typeOfT);
-            } catch (NoSuchFieldException | IllegalAccessException | InstantiationException e) {
-              throw Throwables.propagate(e);
+      .registerTypeHierarchyAdapter(
+          TUnion.class,
+          (JsonSerializer<TUnion<?, ?>>) (src, typeOfSrc, context) -> context.serialize(
+              ImmutableMap.of(src.getSetField().getFieldName(), src.getFieldValue())))
+      .registerTypeHierarchyAdapter(
+          TUnion.class,
+          (JsonDeserializer<TUnion<?, ?>>) (json, typeOfT, context) -> {
+            JsonObject jsonObject = json.getAsJsonObject();
+            if (jsonObject.entrySet().size() != 1) {
+              throw new JsonParseException(
+                  typeOfT.getClass().getName() + " must have exactly one element");
             }
-          } else {
-            throw new RuntimeException("Unable to deserialize " + typeOfT);
-          }
-        }
-      })
+
+            if (typeOfT instanceof Class) {
+              Class<?> clazz = (Class<?>) typeOfT;
+              Entry<String, JsonElement> item = Iterables.getOnlyElement(jsonObject.entrySet());
+
+              try {
+                Field metaDataMapField = clazz.getField("metaDataMap");
+                @SuppressWarnings("unchecked")
+                Map<TFieldIdEnum, FieldMetaData> metaDataMap =
+                    (Map<TFieldIdEnum, FieldMetaData>) metaDataMapField.get(null);
+
+                for (Entry<TFieldIdEnum, FieldMetaData> entry : metaDataMap.entrySet()) {
+                  if (entry.getKey().getFieldName().equals(item.getKey())) {
+                    StructMetaData valueMetaData = (StructMetaData) entry.getValue().valueMetaData;
+                    Object result = context.deserialize(item.getValue(), valueMetaData.structClass);
+                    return createUnion(clazz, entry.getKey(), result);
+                  }
+                }
+
+                throw new RuntimeException("Failed to deserialize " + typeOfT);
+              } catch (NoSuchFieldException | IllegalAccessException | InstantiationException e) {
+                throw Throwables.propagate(e);
+              }
+            } else {
+              throw new RuntimeException("Unable to deserialize " + typeOfT);
+            }
+          })
       .create();
 }

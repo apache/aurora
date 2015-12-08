@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractScheduledService;
 
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -72,18 +73,15 @@ class RowGarbageCollector extends AbstractScheduledService {
 
     final AtomicLong deletedCount = new AtomicLong();
     for (Class<? extends GarbageCollectedTableMapper> tableClass : TABLES) {
-      storage.write(new Storage.MutateWork.NoResult.Quiet() {
-        @Override
-        public void execute(Storage.MutableStoreProvider storeProvider) {
-          try (SqlSession session = sessionFactory.openSession(true)) {
-            GarbageCollectedTableMapper table = session.getMapper(tableClass);
-            for (long rowId : table.selectAllRowIds()) {
-              try {
-                table.deleteRow(rowId);
-                deletedCount.incrementAndGet();
-              } catch (PersistenceException e) {
-                // Expected for rows that are still referenced.
-              }
+      storage.write((NoResult.Quiet) (Storage.MutableStoreProvider storeProvider) -> {
+        try (SqlSession session = sessionFactory.openSession(true)) {
+          GarbageCollectedTableMapper table = session.getMapper(tableClass);
+          for (long rowId : table.selectAllRowIds()) {
+            try {
+              table.deleteRow(rowId);
+              deletedCount.incrementAndGet();
+            } catch (PersistenceException e) {
+              // Expected for rows that are still referenced.
             }
           }
         }

@@ -40,7 +40,6 @@ import org.apache.aurora.scheduler.preemptor.Preemptor;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -111,12 +110,7 @@ public interface TaskScheduler extends EventSubscriber {
     public boolean schedule(final String taskId) {
       attemptsFired.incrementAndGet();
       try {
-        return storage.write(new MutateWork.Quiet<Boolean>() {
-          @Override
-          public Boolean apply(MutableStoreProvider store) {
-            return scheduleTask(store, taskId);
-          }
-        });
+        return storage.write(store -> scheduleTask(store, taskId));
       } catch (RuntimeException e) {
         // We catch the generic unchecked exception here to ensure tasks are not abandoned
         // if there is a transient issue resulting in an unchecked exception.

@@ -35,6 +35,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -122,12 +123,8 @@ public class TaskHistoryPruner implements EventSubscriber {
 
   private void deleteTasks(final Set<String> taskIds) {
     LOG.info("Pruning inactive tasks " + taskIds);
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        stateManager.deleteTasks(storeProvider, taskIds);
-      }
-    });
+    storage.write(
+        (NoResult.Quiet) storeProvider -> stateManager.deleteTasks(storeProvider, taskIds));
   }
 
   @VisibleForTesting
@@ -142,32 +139,26 @@ public class TaskHistoryPruner implements EventSubscriber {
 
     LOG.fine("Prune task " + taskId + " in " + timeRemaining + " ms.");
     executor.execute(
-        new Runnable() {
-          @Override
-          public void run() {
-            LOG.info("Pruning expired inactive task " + taskId);
-            deleteTasks(ImmutableSet.of(taskId));
-          }
+        () -> {
+          LOG.info("Pruning expired inactive task " + taskId);
+          deleteTasks(ImmutableSet.of(taskId));
         },
         Amount.of(timeRemaining, Time.MILLISECONDS));
 
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        Iterable<IScheduledTask> inactiveTasks =
-            Storage.Util.fetchTasks(storage, jobHistoryQuery(jobKey));
-        int numInactiveTasks = Iterables.size(inactiveTasks);
-        int tasksToPrune = numInactiveTasks - settings.perJobHistoryGoal;
-        if (tasksToPrune > 0 && numInactiveTasks > settings.perJobHistoryGoal) {
-          Set<String> toPrune = FluentIterable
-              .from(Tasks.LATEST_ACTIVITY.sortedCopy(inactiveTasks))
-              .filter(safeToDelete)
-              .limit(tasksToPrune)
-              .transform(Tasks::id)
-              .toSet();
-          if (!toPrune.isEmpty()) {
-            deleteTasks(toPrune);
-          }
+    executor.execute(() -> {
+      Iterable<IScheduledTask> inactiveTasks =
+          Storage.Util.fetchTasks(storage, jobHistoryQuery(jobKey));
+      int numInactiveTasks = Iterables.size(inactiveTasks);
+      int tasksToPrune = numInactiveTasks - settings.perJobHistoryGoal;
+      if (tasksToPrune > 0 && numInactiveTasks > settings.perJobHistoryGoal) {
+        Set<String> toPrune = FluentIterable
+            .from(Tasks.LATEST_ACTIVITY.sortedCopy(inactiveTasks))
+            .filter(safeToDelete)
+            .limit(tasksToPrune)
+            .transform(Tasks::id)
+            .toSet();
+        if (!toPrune.isEmpty()) {
+          deleteTasks(toPrune);
         }
       }
     });

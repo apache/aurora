@@ -70,12 +70,7 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
   @Override
   protected void startUp() {
     Optional<String> frameworkId = storage.read(
-        new Storage.Work.Quiet<Optional<String>>() {
-          @Override
-          public Optional<String> apply(Storage.StoreProvider storeProvider) {
-            return storeProvider.getSchedulerStore().fetchFrameworkId();
-          }
-        });
+        storeProvider -> storeProvider.getSchedulerStore().fetchFrameworkId());
 
     LOG.info("Connecting to mesos master: " + driverSettings.getMasterUri());
     if (!driverSettings.getCredentials().isPresent()) {

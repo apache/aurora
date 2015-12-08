@@ -30,8 +30,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.codehaus.jackson.annotate.JsonProperty;
 
@@ -56,33 +54,25 @@ public class Quotas {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   public Response getQuotas(@QueryParam("role") final String role) {
-    return storage.read(new Work.Quiet<Response>() {
-      @Override
-      public Response apply(StoreProvider storeProvider) {
-        Map<String, IResourceAggregate> quotas;
-        if (role == null) {
-          quotas = storeProvider.getQuotaStore().fetchQuotas();
+    return storage.read(storeProvider -> {
+      Map<String, IResourceAggregate> quotas;
+      if (role == null) {
+        quotas = storeProvider.getQuotaStore().fetchQuotas();
+      } else {
+        Optional<IResourceAggregate> quota = storeProvider.getQuotaStore().fetchQuota(role);
+        if (quota.isPresent()) {
+          quotas = ImmutableMap.of(role, quota.get());
         } else {
-          Optional<IResourceAggregate> quota = storeProvider.getQuotaStore().fetchQuota(role);
-          if (quota.isPresent()) {
-            quotas = ImmutableMap.of(role, quota.get());
-          } else {
-            quotas = ImmutableMap.of();
-          }
+          quotas = ImmutableMap.of();
         }
-
-        return Response.ok(Maps.transformValues(quotas, TO_BEAN)).build();
       }
+
+      return Response.ok(Maps.transformValues(quotas, TO_BEAN)).build();
     });
   }
 
   private static final Function<IResourceAggregate, ResourceAggregateBean> TO_BEAN =
-      new Function<IResourceAggregate, ResourceAggregateBean>() {
-        @Override
-        public ResourceAggregateBean apply(IResourceAggregate quota) {
-          return new ResourceAggregateBean(quota.getNumCpus(), quota.getRamMb(), quota.getDiskMb());
-        }
-      };
+      quota -> new ResourceAggregateBean(quota.getNumCpus(), quota.getRamMb(), quota.getDiskMb());
 
   private static final class ResourceAggregateBean {
     private final double cpu;

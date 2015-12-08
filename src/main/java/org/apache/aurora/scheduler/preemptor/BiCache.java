@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -85,12 +84,7 @@ public class BiCache<K, V> {
 
     statsProvider.makeGauge(
         settings.cacheSizeStatName,
-        new Supplier<Long>() {
-          @Override
-          public Long get() {
-            return cache.size();
-          }
-        });
+        cache::size);
   }
 
   /**

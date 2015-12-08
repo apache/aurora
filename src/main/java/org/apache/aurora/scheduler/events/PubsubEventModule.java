@@ -27,8 +27,6 @@ import com.google.common.eventbus.AsyncEventBus;
 import com.google.common.eventbus.DeadEvent;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
-import com.google.common.eventbus.SubscriberExceptionContext;
-import com.google.common.eventbus.SubscriberExceptionHandler;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
@@ -81,15 +79,12 @@ public final class PubsubEventModule extends AbstractModule {
     final AtomicLong subscriberExceptions = statsProvider.makeCounter(EXCEPTIONS_STAT);
     EventBus eventBus = new AsyncEventBus(
         executor,
-        new SubscriberExceptionHandler() {
-          @Override
-          public void handleException(Throwable exception, SubscriberExceptionContext context) {
-            subscriberExceptions.incrementAndGet();
-            log.log(
-                Level.SEVERE,
-                "Failed to dispatch event to " + context.getSubscriberMethod() + ": " + exception,
-                exception);
-          }
+        (exception, context) -> {
+          subscriberExceptions.incrementAndGet();
+          log.log(
+              Level.SEVERE,
+              "Failed to dispatch event to " + context.getSubscriberMethod() + ": " + exception,
+              exception);
         }
     );
 
@@ -100,12 +95,7 @@ public final class PubsubEventModule extends AbstractModule {
   @Provides
   @Singleton
   EventSink provideEventSink(EventBus eventBus) {
-    return new EventSink() {
-      @Override
-      public void post(PubsubEvent event) {
-        eventBus.post(event);
-      }
-    };
+    return eventBus::post;
   }
 
   private class DeadEventHandler {

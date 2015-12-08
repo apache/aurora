@@ -45,10 +45,6 @@ public class SetParser extends TypeParameterizedParser<Set<?>> {
     final Parser<?> parser = parserOracle.get(TypeToken.of(setType));
 
     return ImmutableSet.copyOf(Iterables.transform(Parsers.MULTI_VALUE_SPLITTER.split(raw),
-        new Function<String, Object>() {
-          @Override public Object apply(String raw) {
-            return parser.parse(parserOracle, setType, raw);
-          }
-        }));
+        raw1 -> parser.parse(parserOracle, setType, raw1)));
   }
 }

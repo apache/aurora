@@ -149,12 +149,7 @@ public class MesosLogStreamModule extends PrivateModule {
 
   @Provides
   LogInterface provideLogInterface(final Log log) {
-    return new LogInterface() {
-      @Override
-      public Log.Position position(byte[] identity) {
-        return log.position(identity);
-      }
-    };
+    return log::position;
   }
 
   @Provides

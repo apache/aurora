@@ -34,7 +34,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.util.Objects.requireNonNull;
@@ -190,15 +190,12 @@ public interface Recovery {
       }
 
       void commit() {
-        primaryStorage.write(new MutateWork.NoResult.Quiet() {
-          @Override
-          public void execute(MutableStoreProvider storeProvider) {
-            try {
-              distributedStore.persist(tempStorage.toSnapshot());
-              shutDownNow.execute();
-            } catch (CodingException e) {
-              throw new IllegalStateException("Failed to encode snapshot.", e);
-            }
+        primaryStorage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+          try {
+            distributedStore.persist(tempStorage.toSnapshot());
+            shutDownNow.execute();
+          } catch (CodingException e) {
+            throw new IllegalStateException("Failed to encode snapshot.", e);
           }
         });
       }

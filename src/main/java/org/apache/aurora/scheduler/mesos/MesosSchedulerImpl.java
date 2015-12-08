@@ -44,6 +44,7 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
@@ -130,12 +131,9 @@ public class MesosSchedulerImpl implements Scheduler {
 
     log.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
 
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getSchedulerStore().saveFrameworkId(frameworkId.getValue());
-      }
-    });
+    storage.write(
+        (NoResult.Quiet) storeProvider ->
+            storeProvider.getSchedulerStore().saveFrameworkId(frameworkId.getValue()));
     isRegistered = true;
     eventSink.post(new DriverRegistered());
   }
@@ -158,27 +156,24 @@ public class MesosSchedulerImpl implements Scheduler {
   public void resourceOffers(SchedulerDriver driver, final List<Offer> offers) {
     Preconditions.checkState(isRegistered, "Must be registered before receiving offers.");
 
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        // TODO(wfarner): Reconsider the requirements here, augment the task scheduler to skip over
-        //                offers when the host attributes cannot be found. (AURORA-137)
-        storage.write(new MutateWork.NoResult.Quiet() {
-          @Override
-          public void execute(MutableStoreProvider storeProvider) {
-            for (Offer offer : offers) {
-              IHostAttributes attributes =
-                  AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);
-              storeProvider.getAttributeStore().saveHostAttributes(attributes);
-              if (log.isLoggable(Level.FINE)) {
-                log.log(Level.FINE, String.format("Received offer: %s", offer));
-              }
-              counters.get("scheduler_resource_offers").incrementAndGet();
-              offerManager.addOffer(new HostOffer(offer, attributes));
+    executor.execute(() -> {
+      // TODO(wfarner): Reconsider the requirements here, augment the task scheduler to skip over
+      //                offers when the host attributes cannot be found. (AURORA-137)
+      storage.write(new MutateWork.NoResult.Quiet() {
+        @Override
+        public void execute(MutableStoreProvider storeProvider) {
+          for (Offer offer : offers) {
+            IHostAttributes attributes =
+                AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);
+            storeProvider.getAttributeStore().saveHostAttributes(attributes);
+            if (log.isLoggable(Level.FINE)) {
+              log.log(Level.FINE, String.format("Received offer: %s", offer));
             }
+            counters.get("scheduler_resource_offers").incrementAndGet();
+            offerManager.addOffer(new HostOffer(offer, attributes));
           }
-        });
-      }
+        }
+      });
     });
   }
 
@@ -211,12 +206,7 @@ public class MesosSchedulerImpl implements Scheduler {
     logger.log(level, message.toString());
   }
 
-  private static final Function<Double, Long> SECONDS_TO_MICROS = new Function<Double, Long>() {
-    @Override
-    public Long apply(Double seconds) {
-      return (long) (seconds * 1E6);
-    }
-  };
+  private static final Function<Double, Long> SECONDS_TO_MICROS = seconds -> (long) (seconds * 1E6);
 
   @AllowUnchecked
   @Timed("scheduler_status_update")

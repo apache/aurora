@@ -24,7 +24,6 @@ import java.util.logging.Logger;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.io.Files;
@@ -131,15 +130,12 @@ public class SchedulerModule extends AbstractModule {
 
   @VisibleForTesting
   static TierConfig parseTierConfig(Optional<String> config) {
-    Optional<TierConfig> map = config.transform(new Function<String, TierConfig>() {
-      @Override
-      public TierConfig apply(String input) {
-        try {
-          return new ObjectMapper().readValue(input, TierConfig.class);
-        } catch (IOException e) {
-          LOG.severe("Error parsing tier configuration file.");
-          throw Throwables.propagate(e);
-        }
+    Optional<TierConfig> map = config.transform(input -> {
+      try {
+        return new ObjectMapper().readValue(input, TierConfig.class);
+      } catch (IOException e) {
+        LOG.severe("Error parsing tier configuration file.");
+        throw Throwables.propagate(e);
       }
     });
     return map.or(TierConfig.EMPTY);

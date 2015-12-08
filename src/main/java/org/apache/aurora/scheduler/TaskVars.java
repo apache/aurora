@@ -46,8 +46,6 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -112,20 +110,10 @@ class TaskVars extends AbstractIdleService implements EventSubscriber {
         JobKeys.canonicalString(task.getAssignedTask().getTask().getJob()));
   }
 
-  private static final Predicate<IAttribute> IS_RACK = new Predicate<IAttribute>() {
-    @Override
-    public boolean apply(IAttribute attr) {
-      return "rack".equals(attr.getName());
-    }
-  };
+  private static final Predicate<IAttribute> IS_RACK = attr -> "rack".equals(attr.getName());
 
   private static final Function<IAttribute, String> ATTR_VALUE =
-      new Function<IAttribute, String>() {
-        @Override
-        public String apply(IAttribute attr) {
-          return Iterables.getOnlyElement(attr.getValues());
-        }
-      };
+      attr -> Iterables.getOnlyElement(attr.getValues());
 
   private Counter getCounter(ScheduleStatus status) {
     return counters.getUnchecked(getVarName(status));
@@ -145,14 +133,11 @@ class TaskVars extends AbstractIdleService implements EventSubscriber {
     if (Strings.isNullOrEmpty(task.getAssignedTask().getSlaveHost())) {
       rack = Optional.absent();
     } else {
-      rack = storage.read(new Work.Quiet<Optional<String>>() {
-        @Override
-        public Optional<String> apply(StoreProvider storeProvider) {
-          Optional<IAttribute> rack = FluentIterable
-              .from(AttributeStore.Util.attributesOrNone(storeProvider, host))
-              .firstMatch(IS_RACK);
-          return rack.transform(ATTR_VALUE);
-        }
+      rack = storage.read(storeProvider -> {
+        Optional<IAttribute> rack1 = FluentIterable
+            .from(AttributeStore.Util.attributesOrNone(storeProvider, host))
+            .firstMatch(IS_RACK);
+        return rack1.transform(ATTR_VALUE);
       });
     }
 

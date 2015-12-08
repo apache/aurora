@@ -292,21 +292,11 @@ public interface Storage {
      * @return Tasks returned from the query.
      */
     public static Iterable<IScheduledTask> fetchTasks(Storage storage, final Builder query) {
-      return storage.read(new Work.Quiet<Iterable<IScheduledTask>>() {
-        @Override
-        public Iterable<IScheduledTask> apply(StoreProvider storeProvider) {
-          return storeProvider.getTaskStore().fetchTasks(query);
-        }
-      });
+      return storage.read(storeProvider -> storeProvider.getTaskStore().fetchTasks(query));
     }
 
     public static Iterable<IJobConfiguration> fetchCronJobs(Storage storage) {
-      return storage.read(new Work.Quiet<Iterable<IJobConfiguration>>() {
-        @Override
-        public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
-          return storeProvider.getCronJobStore().fetchJobs();
-        }
-      });
+      return storage.read(storeProvider -> storeProvider.getCronJobStore().fetchJobs());
     }
   }
 }

@@ -72,12 +72,7 @@ public class AopModule extends AbstractModule {
     this.toggledMethods = ImmutableMap.copyOf(toggledMethods);
   }
 
-  private static final Function<Method, String> GET_NAME = new Function<Method, String>() {
-    @Override
-    public String apply(Method method) {
-      return method.getName();
-    }
-  };
+  private static final Function<Method, String> GET_NAME = Method::getName;
 
   @Override
   protected void configure() {

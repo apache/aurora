@@ -79,28 +79,14 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public final class ArgScanner {
 
-  private static final Function<OptionInfo<?>, String> GET_OPTION_INFO_NAME =
-      new Function<OptionInfo<?>, String>() {
-        @Override public String apply(OptionInfo<?> optionInfo) {
-          return optionInfo.getName();
-        }
-      };
+  private static final Function<OptionInfo<?>, String> GET_OPTION_INFO_NAME = ArgumentInfo::getName;
 
   public static final Ordering<OptionInfo<?>> ORDER_BY_NAME =
       Ordering.natural().onResultOf(GET_OPTION_INFO_NAME);
 
-  private static final Function<String, String> ARG_NAME_TO_FLAG = new Function<String, String>() {
-    @Override public String apply(String argName) {
-      return "-" + argName;
-    }
-  };
+  private static final Function<String, String> ARG_NAME_TO_FLAG = argName -> "-" + argName;
 
-  private static final Predicate<OptionInfo<?>> IS_BOOLEAN =
-      new Predicate<OptionInfo<?>>() {
-        @Override public boolean apply(OptionInfo<?> optionInfo) {
-          return optionInfo.isBoolean();
-        }
-      };
+  private static final Predicate<OptionInfo<?>> IS_BOOLEAN = OptionInfo::isBoolean;
 
   // Regular expression to identify a possible dangling assignment.
   // A dangling assignment occurs in two cases:
@@ -122,31 +108,19 @@ public final class ArgScanner {
    * Extracts the name from an @OptionInfo.
    */
   private static final Function<OptionInfo<?>, String> GET_OPTION_INFO_NEGATED_NAME =
-      new Function<OptionInfo<?>, String>() {
-        @Override public String apply(OptionInfo<?> optionInfo) {
-          return optionInfo.getNegatedName();
-        }
-      };
+      OptionInfo::getNegatedName;
 
   /**
    * Gets the canonical name for an @Arg, based on the class containing the field it annotates.
    */
   private static final Function<OptionInfo<?>, String> GET_CANONICAL_ARG_NAME =
-      new Function<OptionInfo<?>, String>() {
-        @Override public String apply(OptionInfo<?> optionInfo) {
-          return optionInfo.getCanonicalName();
-        }
-      };
+      ArgumentInfo::getCanonicalName;
 
   /**
    * Gets the canonical negated name for an @Arg.
    */
   private static final Function<OptionInfo<?>, String> GET_CANONICAL_NEGATED_ARG_NAME =
-      new Function<OptionInfo<?>, String>() {
-        @Override public String apply(OptionInfo<?> optionInfo) {
-          return optionInfo.getCanonicalNegatedName();
-        }
-      };
+      OptionInfo::getCanonicalNegatedName;
 
   private static final Logger LOG = Logger.getLogger(ArgScanner.class.getName());
 

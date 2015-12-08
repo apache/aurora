@@ -43,36 +43,32 @@ public final class Parsers implements ParserOracle {
       Splitter.on(",").trimResults().omitEmptyStrings();
 
   private static final Function<ParserInfo, Class<?>> INFO_TO_PARSED_TYPE =
-      new Function<ParserInfo, Class<?>>() {
-        @Override public Class<?> apply(ParserInfo parserInfo) {
-          try {
-            return Class.forName(parserInfo.parsedType);
-          } catch (ClassNotFoundException e) {
-            throw new ConfigurationException(e);
-          }
+      parserInfo -> {
+        try {
+          return Class.forName(parserInfo.parsedType);
+        } catch (ClassNotFoundException e) {
+          throw new ConfigurationException(e);
         }
       };
 
   @VisibleForTesting
   static final Function<ParserInfo, Parser<?>> INFO_TO_PARSER =
-      new Function<ParserInfo, Parser<?>>() {
-        @Override public Parser<?> apply(ParserInfo parserInfo) {
-          try {
-            Class<?> parserClass = Class.forName(parserInfo.parserClass);
-            Constructor<?> constructor = parserClass.getDeclaredConstructor();
-            constructor.setAccessible(true);
-            return (Parser<?>) constructor.newInstance();
-          } catch (ClassNotFoundException e) {
-            throw new ConfigurationException(e);
-          } catch (InstantiationException e) {
-            throw new ConfigurationException(e);
-          } catch (IllegalAccessException e) {
-            throw new ConfigurationException(e);
-          } catch (NoSuchMethodException e) {
-            throw new ConfigurationException(e);
-          } catch (InvocationTargetException e) {
-            throw new ConfigurationException(e);
-          }
+      parserInfo -> {
+        try {
+          Class<?> parserClass = Class.forName(parserInfo.parserClass);
+          Constructor<?> constructor = parserClass.getDeclaredConstructor();
+          constructor.setAccessible(true);
+          return (Parser<?>) constructor.newInstance();
+        } catch (ClassNotFoundException e) {
+          throw new ConfigurationException(e);
+        } catch (InstantiationException e) {
+          throw new ConfigurationException(e);
+        } catch (IllegalAccessException e) {
+          throw new ConfigurationException(e);
+        } catch (NoSuchMethodException e) {
+          throw new ConfigurationException(e);
+        } catch (InvocationTargetException e) {
+          throw new ConfigurationException(e);
         }
       };
 

@@ -120,7 +120,7 @@ public class AsyncModule extends AbstractModule {
       statsProvider.makeGauge(ASYNC_TASKS_GAUGE, executor::getCompletedTaskCount);
       // Using a lambda rather than method ref to sidestep a bug in PMD that makes it think
       // delayExecutor is unused.
-      statsProvider.makeGauge(DELAY_QUEUE_GAUGE, () -> delayExecutor.getQueueSize());
+      statsProvider.makeGauge(DELAY_QUEUE_GAUGE, delayExecutor::getQueueSize);
     }
 
     @Override

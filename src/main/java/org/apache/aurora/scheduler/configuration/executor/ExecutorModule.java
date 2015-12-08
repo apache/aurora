@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
@@ -110,16 +109,11 @@ public class ExecutorModule extends AbstractModule {
                 .build())
             .addAll(Iterables.transform(
                 GLOBAL_CONTAINER_MOUNTS.get(),
-                new Function<Volume, Protos.Volume>() {
-                  @Override
-                  public Protos.Volume apply(Volume v) {
-                    return Protos.Volume.newBuilder()
-                        .setHostPath(v.getHostPath())
-                        .setContainerPath(v.getContainerPath())
-                        .setMode(Protos.Volume.Mode.valueOf(v.getMode().getValue()))
-                        .build();
-                  }
-                }))
+                v -> Protos.Volume.newBuilder()
+                    .setHostPath(v.getHostPath())
+                    .setContainerPath(v.getContainerPath())
+                    .setMode(Protos.Volume.Mode.valueOf(v.getMode().getValue()))
+                    .build()))
             .build();
 
     bind(ExecutorSettings.class).toInstance(new ExecutorSettings(

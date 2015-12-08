@@ -86,11 +86,7 @@ public class TimeSeriesDataSource {
     }
 
     final long since = Long.parseLong(Optional.fromNullable(sinceQuery).or("0"));
-    Predicate<List<Number>> sinceFilter = new Predicate<List<Number>>() {
-      @Override public boolean apply(List<Number> next) {
-        return next.get(0).longValue() > since;
-      }
-    };
+    Predicate<List<Number>> sinceFilter = next -> next.get(0).longValue() > since;
 
     ResponseStruct response = new ResponseStruct(
         ImmutableList.<String>builder().add(TIME_METRIC).addAll(names).build(),

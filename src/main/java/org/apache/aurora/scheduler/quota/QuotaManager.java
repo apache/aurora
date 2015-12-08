@@ -358,37 +358,29 @@ public interface QuotaManager {
       final Multimap<IJobKey, ITaskConfig> taskConfigsByKey = tasks.index(ITaskConfig::getJob);
       return addAll(Iterables.transform(
           cronTemplates,
-          new Function<IJobConfiguration, IResourceAggregate>() {
-            @Override
-            public IResourceAggregate apply(IJobConfiguration config) {
-              return max(
-                  scale(config.getTaskConfig(), config.getInstanceCount()),
-                  fromTasks(taskConfigsByKey.get(config.getKey())));
-            }
-          }));
+          config -> max(
+              scale(config.getTaskConfig(), config.getInstanceCount()),
+              fromTasks(taskConfigsByKey.get(config.getKey())))));
     }
 
     private static Predicate<IAssignedTask> buildNonUpdatingTasksFilter(
         final Map<IJobKey, IJobUpdateInstructions> roleJobUpdates) {
 
-      return new Predicate<IAssignedTask>() {
-        @Override
-        public boolean apply(IAssignedTask task) {
-          Optional<IJobUpdateInstructions> update = Optional.fromNullable(
-              roleJobUpdates.get(task.getTask().getJob()));
+      return task -> {
+        Optional<IJobUpdateInstructions> update = Optional.fromNullable(
+            roleJobUpdates.get(task.getTask().getJob()));
 
-          if (update.isPresent()) {
-            IJobUpdateInstructions instructions = update.get();
-            RangeSet<Integer> initialInstances = getInstanceIds(instructions.getInitialState());
-            RangeSet<Integer> desiredInstances = getInstanceIds(instructions.isSetDesiredState()
-                ? ImmutableSet.of(instructions.getDesiredState())
-                : ImmutableSet.of());
+        if (update.isPresent()) {
+          IJobUpdateInstructions instructions = update.get();
+          RangeSet<Integer> initialInstances = getInstanceIds(instructions.getInitialState());
+          RangeSet<Integer> desiredInstances = getInstanceIds(instructions.isSetDesiredState()
+              ? ImmutableSet.of(instructions.getDesiredState())
+              : ImmutableSet.of());
 
-            int instanceId = task.getInstanceId();
-            return !initialInstances.contains(instanceId) && !desiredInstances.contains(instanceId);
-          }
-          return true;
+          int instanceId = task.getInstanceId();
+          return !initialInstances.contains(instanceId) && !desiredInstances.contains(instanceId);
         }
+        return true;
       };
     }
 
@@ -397,12 +389,7 @@ public interface QuotaManager {
         String role) {
 
       Function<IJobUpdateSummary, IJobUpdate> fetchUpdate =
-          new Function<IJobUpdateSummary, IJobUpdate>() {
-            @Override
-            public IJobUpdate apply(IJobUpdateSummary summary) {
-              return jobUpdateStore.fetchJobUpdate(summary.getKey()).get();
-            }
-          };
+          summary -> jobUpdateStore.fetchJobUpdate(summary.getKey()).get();
 
       return Maps.transformValues(
           FluentIterable.from(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(role)))
@@ -419,23 +406,13 @@ public interface QuotaManager {
     }
 
     private static final Function<ITaskConfig, IResourceAggregate> CONFIG_RESOURCES =
-        new Function<ITaskConfig, IResourceAggregate>() {
-          @Override
-          public IResourceAggregate apply(ITaskConfig config) {
-            return IResourceAggregate.build(new ResourceAggregate()
-                .setNumCpus(config.getNumCpus())
-                .setRamMb(config.getRamMb())
-                .setDiskMb(config.getDiskMb()));
-          }
-        };
+        config -> IResourceAggregate.build(new ResourceAggregate()
+            .setNumCpus(config.getNumCpus())
+            .setRamMb(config.getRamMb())
+            .setDiskMb(config.getDiskMb()));
 
     private static final Function<IInstanceTaskConfig, IResourceAggregate> INSTANCE_RESOURCES =
-        new Function<IInstanceTaskConfig, IResourceAggregate>() {
-          @Override
-          public IResourceAggregate apply(IInstanceTaskConfig config) {
-            return scale(config.getTask(), getUpdateInstanceCount(config.getInstances()));
-          }
-        };
+        config -> scale(config.getTask(), getUpdateInstanceCount(config.getInstances()));
 
     private static IResourceAggregate instructionsToResources(
         Iterable<IInstanceTaskConfig> instructions) {
@@ -459,20 +436,17 @@ public interface QuotaManager {
     private static Function<IJobUpdateInstructions, IResourceAggregate> updateResources(
         final Predicate<IInstanceTaskConfig> instanceFilter) {
 
-      return new Function<IJobUpdateInstructions, IResourceAggregate>() {
-        @Override
-        public IResourceAggregate apply(IJobUpdateInstructions instructions) {
-          Iterable<IInstanceTaskConfig> initialState =
-              Iterables.filter(instructions.getInitialState(), instanceFilter);
-          Iterable<IInstanceTaskConfig> desiredState = Iterables.filter(
-              Optional.fromNullable(instructions.getDesiredState()).asSet(),
-              instanceFilter);
+      return instructions -> {
+        Iterable<IInstanceTaskConfig> initialState =
+            Iterables.filter(instructions.getInitialState(), instanceFilter);
+        Iterable<IInstanceTaskConfig> desiredState = Iterables.filter(
+            Optional.fromNullable(instructions.getDesiredState()).asSet(),
+            instanceFilter);
 
-          // Calculate result as max(existing, desired) per resource type.
-          return max(
-              instructionsToResources(initialState),
-              instructionsToResources(desiredState));
-        }
+        // Calculate result as max(existing, desired) per resource type.
+        return max(
+            instructionsToResources(initialState),
+            instructionsToResources(desiredState));
       };
     }
 
@@ -518,12 +492,7 @@ public interface QuotaManager {
     }
 
     private static final Function<IJobUpdate, IJobKey> UPDATE_TO_JOB_KEY =
-        new Function<IJobUpdate, IJobKey>() {
-          @Override
-          public IJobKey apply(IJobUpdate input) {
-            return input.getSummary().getKey().getJob();
-          }
-        };
+        input -> input.getSummary().getKey().getJob();
 
     private static int getUpdateInstanceCount(Set<IRange> ranges) {
       int instanceCount = 0;

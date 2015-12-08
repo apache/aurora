@@ -176,12 +176,7 @@ public final class Resources {
   }
 
   private static final Function<Range, Set<Integer>> RANGE_TO_MEMBERS =
-      new Function<Range, Set<Integer>>() {
-        @Override
-        public Set<Integer> apply(Range range) {
-          return ContiguousSet.create(
-              com.google.common.collect.Range.closed((int) range.getBegin(), (int) range.getEnd()),
-              DiscreteDomain.integers());
-        }
-      };
+      range -> ContiguousSet.create(
+          com.google.common.collect.Range.closed((int) range.getBegin(), (int) range.getEnd()),
+          DiscreteDomain.integers());
 }

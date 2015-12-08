@@ -214,14 +214,12 @@ public abstract class ArgumentInfo<T> {
 
   private Iterable<ValueVerifier<T>> getVerifiers(final Verifiers verifierOracle) {
     Function<Annotation, Optional<ValueVerifier<T>>> toVerifier =
-        new Function<Annotation, Optional<ValueVerifier<T>>>() {
-          @Override public Optional<ValueVerifier<T>> apply(Annotation annotation) {
-            @Nullable Verifier<? super T> verifier = verifierOracle.get(type, annotation);
-            if (verifier != null) {
-              return Optional.of(new ValueVerifier<T>(verifier, annotation));
-            } else {
-              return Optional.absent();
-            }
+        annotation -> {
+          @Nullable Verifier<? super T> verifier = verifierOracle.get(type, annotation);
+          if (verifier != null) {
+            return Optional.of(new ValueVerifier<T>(verifier, annotation));
+          } else {
+            return Optional.absent();
           }
         };
     return Optional.presentInstances(Iterables.transform(verifierAnnotations, toVerifier));
@@ -238,10 +236,6 @@ public abstract class ArgumentInfo<T> {
     @SuppressWarnings("unchecked") // type.getType() is T
     final Class<? extends T> rawType = (Class<? extends T>) type.getRawType();
     return FluentIterable.from(getVerifiers(verifierOracle)).transform(
-        new Function<ValueVerifier<T>, String>() {
-          @Override public String apply(ValueVerifier<T> verifier) {
-            return verifier.toString(rawType);
-          }
-        }).toList();
+        verifier -> verifier.toString(rawType)).toList();
   }
 }

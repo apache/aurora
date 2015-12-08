@@ -107,19 +107,16 @@ public class TaskReconciler extends AbstractIdleService {
   protected void startUp() {
     // Schedule explicit reconciliation.
     executor.scheduleAtFixedRate(
-        new Runnable() {
-          @Override
-          public void run() {
-            ImmutableSet<Protos.TaskStatus> active = FluentIterable
-                .from(Storage.Util.fetchTasks(
-                    storage,
-                    Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES)))
-                .transform(TASK_TO_PROTO)
-                .toSet();
+        () -> {
+          ImmutableSet<Protos.TaskStatus> active = FluentIterable
+              .from(Storage.Util.fetchTasks(
+                  storage,
+                  Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES)))
+              .transform(TASK_TO_PROTO)
+              .toSet();
 
-            driver.reconcileTasks(active);
-            explicitRuns.incrementAndGet();
-          }
+          driver.reconcileTasks(active);
+          explicitRuns.incrementAndGet();
         },
         settings.explicitDelayMinutes,
         settings.explicitInterval.as(MINUTES),
@@ -127,12 +124,9 @@ public class TaskReconciler extends AbstractIdleService {
 
     // Schedule implicit reconciliation.
     executor.scheduleAtFixedRate(
-        new Runnable() {
-          @Override
-          public void run() {
-            driver.reconcileTasks(ImmutableSet.of());
-            implicitRuns.incrementAndGet();
-          }
+        () -> {
+          driver.reconcileTasks(ImmutableSet.of());
+          implicitRuns.incrementAndGet();
         },
         settings.implicitDelayMinutes,
         settings.implicitInterval.as(MINUTES),

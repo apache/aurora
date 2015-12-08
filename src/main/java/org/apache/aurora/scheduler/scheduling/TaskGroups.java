@@ -100,12 +100,9 @@ public class TaskGroups implements EventSubscriber {
     this.backoff = requireNonNull(settings.taskGroupBackoff);
     this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
 
-    this.taskScheduler = new TaskScheduler() {
-      @Override
-      public boolean schedule(String taskId) {
-        settings.rateLimiter.acquire();
-        return taskScheduler.schedule(taskId);
-      }
+    this.taskScheduler = taskId -> {
+      settings.rateLimiter.acquire();
+      return taskScheduler.schedule(taskId);
     };
   }
 

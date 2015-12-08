@@ -23,10 +23,8 @@ public final class Commands {
   /**
    * A command that does nothing when executed.
    */
-  public static final Command NOOP = new Command() {
-    @Override public void execute() {
-      // noop
-    }
+  public static final Command NOOP = () -> {
+    // noop
   };
 
   private Commands() {

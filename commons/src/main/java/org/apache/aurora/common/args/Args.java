@@ -40,49 +40,43 @@ import static org.apache.aurora.common.args.apt.Configuration.ConfigurationExcep
  * a configuration database or from explicitly listed containing classes or objects.
  */
 public final class Args {
+  private static final Logger LOG = Logger.getLogger(Args.class.getName());
+
   @VisibleForTesting
   static final Function<ArgInfo, Optional<Field>> TO_FIELD =
-      new Function<ArgInfo, Optional<Field>>() {
-        @Override public Optional<Field> apply(ArgInfo info) {
-          try {
-            return Optional.of(Class.forName(info.className).getDeclaredField(info.fieldName));
-          } catch (NoSuchFieldException e) {
-            throw new ConfigurationException(e);
-          } catch (ClassNotFoundException e) {
-            throw new ConfigurationException(e);
-          } catch (NoClassDefFoundError e) {
-            // A compilation had this class available at the time the ArgInfo was deposited, but
-            // the classes have been re-bundled with some subset including the class this ArgInfo
-            // points to no longer available.  If the re-bundling is correct, then the arg truly is
-            // not needed.
-            LOG.fine(String.format("Not on current classpath, skipping %s", info));
-            return Optional.absent();
-          }
+      info -> {
+        try {
+          return Optional.of(Class.forName(info.className).getDeclaredField(info.fieldName));
+        } catch (NoSuchFieldException e) {
+          throw new ConfigurationException(e);
+        } catch (ClassNotFoundException e) {
+          throw new ConfigurationException(e);
+        } catch (NoClassDefFoundError e) {
+          // A compilation had this class available at the time the ArgInfo was deposited, but
+          // the classes have been re-bundled with some subset including the class this ArgInfo
+          // points to no longer available.  If the re-bundling is correct, then the arg truly is
+          // not needed.
+          LOG.fine(String.format("Not on current classpath, skipping %s", info));
+          return Optional.absent();
         }
       };
 
-  private static final Logger LOG = Logger.getLogger(Args.class.getName());
-
   private static final Function<Field, OptionInfo<?>> TO_OPTION_INFO =
-      new Function<Field, OptionInfo<?>>() {
-        @Override public OptionInfo<?> apply(Field field) {
-          @Nullable CmdLine cmdLine = field.getAnnotation(CmdLine.class);
-          if (cmdLine == null) {
-            throw new ConfigurationException("No @CmdLine Arg annotation for field " + field);
-          }
-          return OptionInfo.createFromField(field);
+      field -> {
+        @Nullable CmdLine cmdLine = field.getAnnotation(CmdLine.class);
+        if (cmdLine == null) {
+          throw new ConfigurationException("No @CmdLine Arg annotation for field " + field);
         }
+        return OptionInfo.createFromField(field);
       };
 
   private static final Function<Field, PositionalInfo<?>> TO_POSITIONAL_INFO =
-      new Function<Field, PositionalInfo<?>>() {
-        @Override public PositionalInfo<?> apply(Field field) {
-          @Nullable Positional positional = field.getAnnotation(Positional.class);
-          if (positional == null) {
-            throw new ConfigurationException("No @Positional Arg annotation for field " + field);
-          }
-          return PositionalInfo.createFromField(field);
+      field -> {
+        @Nullable Positional positional = field.getAnnotation(Positional.class);
+        if (positional == null) {
+          throw new ConfigurationException("No @Positional Arg annotation for field " + field);
         }
+        return PositionalInfo.createFromField(field);
       };
 
   /**

@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.testing;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -48,12 +47,7 @@ public class FakeStatsProvider implements StatsProvider {
   public Map<String, ? extends Number> getAllValues() {
     return ImmutableMap.copyOf(Maps.transformValues(
         stats,
-        new Function<Supplier<? extends Number>, Number>() {
-        @Override
-        public Number apply(Supplier<? extends Number> supplier) {
-          return supplier.get();
-        }
-      }));
+        Supplier::get));
   }
 
   /**
@@ -69,12 +63,7 @@ public class FakeStatsProvider implements StatsProvider {
   @Override
   public AtomicLong makeCounter(String name) {
     final AtomicLong counter = new AtomicLong();
-    stats.put(name, new Supplier<Long>() {
-      @Override
-      public Long get() {
-        return counter.get();
-      }
-    });
+    stats.put(name, counter::get);
     return counter;
   }
 

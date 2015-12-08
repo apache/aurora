@@ -160,18 +160,15 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
       loginContext.login();
       serverCredential = Subject.doAs(
           loginContext.getSubject(),
-          new PrivilegedAction<GSSCredential>() {
-            @Override
-            public GSSCredential run() {
-              try {
-                return gssManager.createCredential(
-                    null /* Use the service principal name defined in jaas.conf */,
-                    GSSCredential.INDEFINITE_LIFETIME,
-                    new Oid[] {new Oid(GSS_SPNEGO_MECH_OID), new Oid(GSS_KRB5_MECH_OID)},
-                    GSSCredential.ACCEPT_ONLY);
-              } catch (GSSException e) {
-                throw Throwables.propagate(e);
-              }
+          (PrivilegedAction<GSSCredential>) () -> {
+            try {
+              return gssManager.createCredential(
+                  null /* Use the service principal name defined in jaas.conf */,
+                  GSSCredential.INDEFINITE_LIFETIME,
+                  new Oid[] {new Oid(GSS_SPNEGO_MECH_OID), new Oid(GSS_KRB5_MECH_OID)},
+                  GSSCredential.ACCEPT_ONLY);
+            } catch (GSSException e) {
+              throw Throwables.propagate(e);
             }
           });
     } catch (LoginException e) {

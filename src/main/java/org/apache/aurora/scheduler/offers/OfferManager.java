@@ -190,12 +190,7 @@ public interface OfferManager extends EventSubscriber {
       } else {
         hostOffers.add(offer);
         executor.execute(
-            new Runnable() {
-              @Override
-              public void run() {
-                removeAndDecline(offer.getOffer().getId());
-              }
-            },
+            () -> removeAndDecline(offer.getOffer().getId()),
             returnDelay.get());
       }
     }

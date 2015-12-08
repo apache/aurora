@@ -89,22 +89,20 @@ public class LogConfig {
   protected String displayPage(Optional<String> configChange) throws TemplateException {
     StringWriter writer = new StringWriter();
 
-    template.writeTemplate(writer, new Closure<StringTemplate>() {
-      @Override public void execute(StringTemplate stringTemplate) {
-        LoggingMXBean logBean = LogManager.getLoggingMXBean();
+    template.writeTemplate(writer, stringTemplate -> {
+      LoggingMXBean logBean = LogManager.getLoggingMXBean();
 
-        if (configChange.isPresent()) {
-          stringTemplate.setAttribute("configChange", configChange.get());
-        }
-
-        List<LoggerConfig> loggerConfigs = Lists.newArrayList();
-        for (String logger : Ordering.natural().immutableSortedCopy(logBean.getLoggerNames())) {
-          loggerConfigs.add(new LoggerConfig(logger, logBean.getLoggerLevel(logger)));
-        }
-
-        stringTemplate.setAttribute("loggers", loggerConfigs);
-        stringTemplate.setAttribute("levels", LOG_LEVELS);
+      if (configChange.isPresent()) {
+        stringTemplate.setAttribute("configChange", configChange.get());
       }
+
+      List<LoggerConfig> loggerConfigs = Lists.newArrayList();
+      for (String logger : Ordering.natural().immutableSortedCopy(logBean.getLoggerNames())) {
+        loggerConfigs.add(new LoggerConfig(logger, logBean.getLoggerLevel(logger)));
+      }
+
+      stringTemplate.setAttribute("loggers", loggerConfigs);
+      stringTemplate.setAttribute("levels", LOG_LEVELS);
     });
 
     return writer.toString();

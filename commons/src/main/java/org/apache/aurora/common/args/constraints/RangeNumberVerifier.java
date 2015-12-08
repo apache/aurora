@@ -54,11 +54,7 @@ public class RangeNumberVerifier implements Verifier<Number> {
 
       converter = Functions.identity();
     } else {
-      converter = new Function<Number, Number>() {
-        @Override public Number apply(Number item) {
-          return item.longValue();
-        }
-      };
+      converter = Number::longValue;
     }
 
     return String.format("must be >= %s and <= %s",

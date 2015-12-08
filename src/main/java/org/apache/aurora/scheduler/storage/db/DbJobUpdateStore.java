@@ -158,12 +158,7 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
   }
 
   private static final Function<PruneVictim, IJobUpdateKey> GET_UPDATE_KEY =
-      new Function<PruneVictim, IJobUpdateKey>() {
-        @Override
-        public IJobUpdateKey apply(PruneVictim victim) {
-          return IJobUpdateKey.build(victim.getUpdate());
-        }
-      };
+      victim -> IJobUpdateKey.build(victim.getUpdate());
 
   @Timed("job_update_store_prune_history")
   @Override

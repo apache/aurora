@@ -56,21 +56,12 @@ public class Locks {
         Maps.uniqueIndex(lockManager.getLocks(), TO_LOCK_KEY), TO_BEAN)).build();
   }
 
-  private static final Function<ILock, String> TO_LOCK_KEY = new Function<ILock, String>() {
-    @Override
-    public String apply(ILock lock) {
-      return lock.getKey().getSetField() == LockKey._Fields.JOB
+  private static final Function<ILock, String> TO_LOCK_KEY =
+      lock -> lock.getKey().getSetField() == LockKey._Fields.JOB
           ? JobKeys.canonicalString(lock.getKey().getJob())
           : "Unknown lock key type: " + lock.getKey().getSetField();
-    }
-  };
 
-  private static final Function<ILock, LockBean> TO_BEAN = new Function<ILock, LockBean>() {
-    @Override
-    public LockBean apply(ILock lock) {
-      return new LockBean(lock);
-    }
-  };
+  private static final Function<ILock, LockBean> TO_BEAN = LockBean::new;
 
   private static final class LockBean {
     private final ILock lock;

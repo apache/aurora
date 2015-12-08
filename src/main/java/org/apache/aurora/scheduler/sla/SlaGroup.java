@@ -17,7 +17,6 @@ import java.util.Map;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -62,12 +61,7 @@ interface SlaGroup {
             "sla_cpu_large_", Range.openClosed(MEDIUM.getNumCpus(), LARGE.getNumCpus()),
             "sla_cpu_xlarge_", Range.openClosed(LARGE.getNumCpus(), XLARGE.getNumCpus()),
             "sla_cpu_xxlarge_", Range.greaterThan(XLARGE.getNumCpus())),
-        new Function<IScheduledTask, Double>() {
-          @Override
-          public Double apply(IScheduledTask task) {
-            return task.getAssignedTask().getTask().getNumCpus();
-          }
-        }
+        task -> task.getAssignedTask().getTask().getNumCpus()
     )),
     RESOURCE_RAM(new Resource<>(
         ImmutableMap.of(
@@ -76,12 +70,7 @@ interface SlaGroup {
             "sla_ram_large_", Range.openClosed(MEDIUM.getRamMb(), LARGE.getRamMb()),
             "sla_ram_xlarge_", Range.openClosed(LARGE.getRamMb(), XLARGE.getRamMb()),
             "sla_ram_xxlarge_", Range.greaterThan(XLARGE.getRamMb())),
-        new Function<IScheduledTask, Long>() {
-          @Override
-          public Long apply(IScheduledTask task) {
-            return task.getAssignedTask().getTask().getRamMb();
-          }
-        }
+        task -> task.getAssignedTask().getTask().getRamMb()
     )),
     RESOURCE_DISK(new Resource<>(
         ImmutableMap.of(
@@ -90,12 +79,7 @@ interface SlaGroup {
             "sla_disk_large_", Range.openClosed(MEDIUM.getDiskMb(), LARGE.getDiskMb()),
             "sla_disk_xlarge_", Range.openClosed(LARGE.getDiskMb(), XLARGE.getDiskMb()),
             "sla_disk_xxlarge_", Range.greaterThan(XLARGE.getDiskMb())),
-        new Function<IScheduledTask, Long>() {
-          @Override
-          public Long apply(IScheduledTask task) {
-            return task.getAssignedTask().getTask().getDiskMb();
-          }
-        }
+        task -> task.getAssignedTask().getTask().getDiskMb()
     ));
 
     private SlaGroup group;
@@ -129,12 +113,7 @@ interface SlaGroup {
   class Cluster implements SlaGroup {
     @Override
     public Multimap<String, IScheduledTask> createNamedGroups(Iterable<IScheduledTask> tasks) {
-      return Multimaps.index(tasks, new Function<IScheduledTask, String>() {
-        @Override
-        public String apply(IScheduledTask task) {
-          return "sla_cluster_";
-        }
-      });
+      return Multimaps.index(tasks, task -> "sla_cluster_");
     }
   }
 
@@ -159,11 +138,8 @@ interface SlaGroup {
           ImmutableListMultimap.builder();
 
       for (final Map.Entry<String, Range<T>> entry : map.entrySet()) {
-        result.putAll(entry.getKey(), Iterables.filter(tasks, new Predicate<IScheduledTask>() {
-          @Override
-          public boolean apply(IScheduledTask task) {
-            return entry.getValue().contains(function.apply(task));
-          }
+        result.putAll(entry.getKey(), Iterables.filter(tasks, task -> {
+          return entry.getValue().contains(function.apply(task));
         }));
       }
       return result.build();

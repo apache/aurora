@@ -80,12 +80,7 @@ public interface EntrySerializer {
       final byte[] header = encode(
           Frame.header(new FrameHeader(chunks, ByteBuffer.wrap(checksum(entry)))));
 
-      return new Iterable<byte[]>() {
-        @Override
-        public Iterator<byte[]> iterator() {
-          return streamFrames(header, chunks, entry);
-        }
-      };
+      return () -> streamFrames(header, chunks, entry);
     }
 
     Iterator<byte[]> streamFrames(final byte[] header, final int chunks, final byte[] entry) {

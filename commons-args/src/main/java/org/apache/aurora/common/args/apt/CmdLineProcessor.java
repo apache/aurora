@@ -96,11 +96,7 @@ public class CmdLineProcessor extends AbstractProcessor {
   static final String CHECK_LINKAGE_OPTION =
       "com.twitter.common.args.apt.CmdLineProcessor.check_linkage";
 
-  private static final Function<Class<?>, String> GET_NAME = new Function<Class<?>, String>() {
-    @Override public String apply(Class<?> type) {
-      return type.getName();
-    }
-  };
+  private static final Function<Class<?>, String> GET_NAME = Class::getName;
 
   private final Supplier<Configuration> configSupplier =
       Suppliers.memoize(new Supplier<Configuration>() {
@@ -273,17 +269,9 @@ public class CmdLineProcessor extends AbstractProcessor {
   }
 
   private static final Function<Element, Element> EXTRACT_ENCLOSING_CLASS =
-      new Function<Element, Element>() {
-        @Override public Element apply(Element element) {
-          return element.getEnclosingElement();
-        }
-      };
+      Element::getEnclosingElement;
 
-  private final Function<Element, String> extractClassName = new Function<Element, String>() {
-    @Override public String apply(Element element) {
-      return getBinaryName((TypeElement) element);
-    }
-  };
+  private final Function<Element, String> extractClassName = element -> getBinaryName((TypeElement) element);
 
   private final Function<Element, String> extractEnclosingClassName =
       Functions.compose(extractClassName, EXTRACT_ENCLOSING_CLASS);
@@ -325,16 +313,14 @@ public class CmdLineProcessor extends AbstractProcessor {
     }
 
     Iterable<String> parsersFor = Optional.presentInstances(Iterables.transform(parsers,
-        new Function<Element, Optional<String>>() {
-          @Override public Optional<String> apply(Element parser) {
-            TypeMirror parsedType = getTypeArgument(parser.asType(), typeElement(Parser.class));
-            if (parsedType == null) {
-              error("failed to find a type argument for Parser: %s", parser);
-              return Optional.absent();
-            }
-            // Equals on TypeMirrors doesn't work - so we compare string representations :/
-            return Optional.of(typeUtils.erasure(parsedType).toString());
+        parser -> {
+          TypeMirror parsedType = getTypeArgument(parser.asType(), typeElement(Parser.class));
+          if (parsedType == null) {
+            error("failed to find a type argument for Parser: %s", parser);
+            return Optional.absent();
           }
+          // Equals on TypeMirrors doesn't work - so we compare string representations :/
+          return Optional.of(typeUtils.erasure(parsedType).toString());
         }));
     if (configuration != null) {
       parsersFor = Iterables.concat(parsersFor, Iterables.filter(
@@ -358,17 +344,15 @@ public class CmdLineProcessor extends AbstractProcessor {
       final Class<? extends Annotation> argAnnotation) {
 
     return Optional.presentInstances(Iterables.transform(args,
-        new Function<Element, Optional<ArgInfo>>() {
-          @Override public Optional<ArgInfo> apply(Element arg) {
-            @Nullable TypeElement containingType = processArg(parsedTypes, arg, argAnnotation);
-              if (containingType == null) {
-                return Optional.absent();
-              } else {
-                return Optional.of(new ArgInfo(getBinaryName(containingType),
-                    arg.getSimpleName().toString()));
-              }
+        arg -> {
+          @Nullable TypeElement containingType = processArg(parsedTypes, arg, argAnnotation);
+            if (containingType == null) {
+              return Optional.absent();
+            } else {
+              return Optional.of(new ArgInfo(getBinaryName(containingType),
+                  arg.getSimpleName().toString()));
             }
-        }));
+          }));
   }
 
   private Set<? extends Element> getAnnotatedElements(RoundEnvironment roundEnv,

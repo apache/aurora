@@ -90,11 +90,7 @@ public class Pair<A, B> {
    * @return A function that will extract the 1st item in a pair.
    */
   public static <S, T> Function<Pair<S, T>, S> first() {
-    return new Function<Pair<S, T>, S>() {
-      @Override public S apply(Pair<S, T> pair) {
-        return pair.first;
-      }
-    };
+    return pair -> pair.first;
   }
 
   /**
@@ -105,11 +101,7 @@ public class Pair<A, B> {
    * @return A function that will extract the 2nd item in a pair.
    */
   public static <S, T> Function<Pair<S, T>, T> second() {
-    return new Function<Pair<S, T>, T>() {
-      @Override public T apply(Pair<S, T> pair) {
-        return pair.second;
-      }
-    };
+    return pair -> pair.second;
   }
 
   /**

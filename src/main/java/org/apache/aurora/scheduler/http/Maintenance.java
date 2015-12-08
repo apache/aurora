@@ -34,7 +34,6 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -57,22 +56,19 @@ public class Maintenance {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   public Response getHosts() {
-    return storage.read(new Work.Quiet<Response>() {
-      @Override
-      public Response apply(StoreProvider storeProvider) {
-        Multimap<MaintenanceMode, String> hostsByMode =
-            Multimaps.transformValues(
-              Multimaps.index(
-                  storeProvider.getAttributeStore().getHostAttributes(),
-                  IHostAttributes::getMode),
-              HOST_NAME);
+    return storage.read(storeProvider -> {
+      Multimap<MaintenanceMode, String> hostsByMode =
+          Multimaps.transformValues(
+            Multimaps.index(
+                storeProvider.getAttributeStore().getHostAttributes(),
+                IHostAttributes::getMode),
+            HOST_NAME);
 
-        Map<MaintenanceMode, Object> hosts = Maps.newHashMap();
-        hosts.put(DRAINED, ImmutableSet.copyOf(hostsByMode.get(DRAINED)));
-        hosts.put(SCHEDULED, ImmutableSet.copyOf(hostsByMode.get(SCHEDULED)));
-        hosts.put(DRAINING, getTasksByHosts(storeProvider, hostsByMode.get(DRAINING)).asMap());
-        return Response.ok(hosts).build();
-      }
+      Map<MaintenanceMode, Object> hosts = Maps.newHashMap();
+      hosts.put(DRAINED, ImmutableSet.copyOf(hostsByMode.get(DRAINED)));
+      hosts.put(SCHEDULED, ImmutableSet.copyOf(hostsByMode.get(SCHEDULED)));
+      hosts.put(DRAINING, getTasksByHosts(storeProvider, hostsByMode.get(DRAINING)).asMap());
+      return Response.ok(hosts).build();
     });
   }
 
@@ -85,10 +81,5 @@ public class Maintenance {
   }
 
   private static final Function<IHostAttributes, String> HOST_NAME =
-      new Function<IHostAttributes, String>() {
-        @Override
-        public String apply(IHostAttributes attributes) {
-          return attributes.getHost();
-        }
-      };
+      IHostAttributes::getHost;
 }

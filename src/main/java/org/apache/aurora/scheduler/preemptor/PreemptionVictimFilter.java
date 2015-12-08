@@ -97,28 +97,13 @@ public interface PreemptionVictimFilter {
     }
 
     private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
-        new Function<HostOffer, ResourceSlot>() {
-          @Override
-          public ResourceSlot apply(HostOffer offer) {
-            return Resources.from(offer.getOffer()).filter(Resources.NON_REVOCABLE).slot();
-          }
-        };
+        offer -> Resources.from(offer.getOffer()).filter(Resources.NON_REVOCABLE).slot();
 
     private static final Function<HostOffer, String> OFFER_TO_HOST =
-        new Function<HostOffer, String>() {
-          @Override
-          public String apply(HostOffer offer) {
-            return offer.getOffer().getHostname();
-          }
-        };
+        offer -> offer.getOffer().getHostname();
 
     private static final Function<PreemptionVictim, String> VICTIM_TO_HOST =
-        new Function<PreemptionVictim, String>() {
-          @Override
-          public String apply(PreemptionVictim victim) {
-            return victim.getSlaveHost();
-          }
-        };
+        PreemptionVictim::getSlaveHost;
 
     private final Function<PreemptionVictim, ResourceSlot> victimToResources =
         new Function<PreemptionVictim, ResourceSlot>() {
@@ -200,24 +185,21 @@ public interface PreemptionVictimFilter {
      *     with {@code preemptableTask}.
      */
     private static Predicate<PreemptionVictim> preemptionFilter(final ITaskConfig pendingTask) {
-      return new Predicate<PreemptionVictim>() {
-        @Override
-        public boolean apply(PreemptionVictim possibleVictim) {
-          boolean pendingIsProduction = pendingTask.isProduction();
-          boolean victimIsProduction = possibleVictim.isProduction();
+      return possibleVictim -> {
+        boolean pendingIsProduction = pendingTask.isProduction();
+        boolean victimIsProduction = possibleVictim.isProduction();
 
-          if (pendingIsProduction && !victimIsProduction) {
-            return true;
-          } else if (pendingIsProduction == victimIsProduction) {
-            // If production flags are equal, preemption is based on priority within the same role.
-            if (pendingTask.getJob().getRole().equals(possibleVictim.getRole())) {
-              return pendingTask.getPriority() > possibleVictim.getPriority();
-            } else {
-              return false;
-            }
+        if (pendingIsProduction && !victimIsProduction) {
+          return true;
+        } else if (pendingIsProduction == victimIsProduction) {
+          // If production flags are equal, preemption is based on priority within the same role.
+          if (pendingTask.getJob().getRole().equals(possibleVictim.getRole())) {
+            return pendingTask.getPriority() > possibleVictim.getPriority();
           } else {
             return false;
           }
+        } else {
+          return false;
         }
       };
     }

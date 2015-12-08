@@ -38,6 +38,7 @@ import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.mesos.Protos.TaskStatus;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -147,22 +148,19 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
       pendingUpdates.drainTo(updates, maxBatchSize - updates.size());
 
       try {
-        storage.write(new Storage.MutateWork.NoResult.Quiet() {
-          @Override
-          public void execute(Storage.MutableStoreProvider storeProvider) {
-            for (TaskStatus status : updates) {
-              ScheduleStatus translatedState = Conversions.convertProtoState(status.getState());
+        storage.write((NoResult.Quiet) (Storage.MutableStoreProvider storeProvider) -> {
+          for (TaskStatus status : updates) {
+            ScheduleStatus translatedState = Conversions.convertProtoState(status.getState());
 
-              StateChangeResult result = stateManager.changeState(
-                  storeProvider,
-                  status.getTaskId().getValue(),
-                  Optional.absent(),
-                  translatedState,
-                  formatMessage(status));
+            StateChangeResult result = stateManager.changeState(
+                storeProvider,
+                status.getTaskId().getValue(),
+                Optional.absent(),
+                translatedState,
+                formatMessage(status));
 
-              if (status.hasReason()) {
-                counters.get(statName(status, result)).incrementAndGet();
-              }
+            if (status.hasReason()) {
+              counters.get(statName(status, result)).incrementAndGet();
             }
           }
         });

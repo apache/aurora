@@ -33,8 +33,6 @@ import javax.ws.rs.core.Response.Status;
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 
-import org.antlr.stringtemplate.StringTemplate;
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.util.templating.StringTemplateHelper;
 import org.apache.aurora.common.util.templating.StringTemplateHelper.TemplateException;
@@ -65,24 +63,16 @@ public class Utilization {
 
   private String fillTemplate(Map<Display, Metric> metrics) {
     Function<Entry<Display, Metric>, DisplayMetric> transform =
-        new Function<Entry<Display, Metric>, DisplayMetric>() {
-          @Override
-          public DisplayMetric apply(Entry<Display, Metric> entry) {
-            return new DisplayMetric(entry.getKey(), entry.getValue());
-          }
-        };
+        entry -> new DisplayMetric(entry.getKey(), entry.getValue());
     return fillTemplate(FluentIterable.from(metrics.entrySet()).transform(transform).toList());
   }
 
   private String fillTemplate(final Iterable<DisplayMetric> metrics) {
     StringWriter output = new StringWriter();
     try {
-      templateHelper.writeTemplate(output, new Closure<StringTemplate>() {
-        @Override
-        public void execute(StringTemplate template) {
-          template.setAttribute("cluster_name", clusterName);
-          template.setAttribute("metrics", metrics);
-        }
+      templateHelper.writeTemplate(output, template -> {
+        template.setAttribute("cluster_name", clusterName);
+        template.setAttribute("metrics", metrics);
       });
     } catch (TemplateException e) {
       throw new WebApplicationException(e);
@@ -152,16 +142,11 @@ public class Utilization {
   }
 
   private static final Function<GlobalMetric, DisplayMetric> TO_DISPLAY =
-      new Function<GlobalMetric, DisplayMetric>() {
-        @Override
-        public DisplayMetric apply(GlobalMetric count) {
-          return new DisplayMetric(
-              new Display(
-                  count.type.name().replace('_', ' ').toLowerCase(),
-                  count.type.name().toLowerCase()),
-              count);
-        }
-      };
+      count -> new DisplayMetric(
+          new Display(
+              count.type.name().replace('_', ' ').toLowerCase(),
+              count.type.name().toLowerCase()),
+          count);
 
   /**
    * Displays the aggregate utilization for the entire cluster.
@@ -197,12 +182,9 @@ public class Utilization {
   public Response aggregateRoles(@PathParam("metric") final String metric) {
     final MetricType type = getTypeByName(metric);
 
-    Function<ITaskConfig, Display> toKey = new Function<ITaskConfig, Display>() {
-      @Override
-      public Display apply(ITaskConfig task) {
-        String role = task.getJob().getRole();
-        return new Display(role, metric + "/" + role);
-      }
+    Function<ITaskConfig, Display> toKey = task -> {
+      String role = task.getJob().getRole();
+      return new Display(role, metric + "/" + role);
     };
     Map<Display, Metric> byRole =
         counter.computeAggregates(Query.unscoped().active(), type.filter, toKey);
@@ -224,12 +206,7 @@ public class Utilization {
       @PathParam("role") String role) {
 
     MetricType type = getTypeByName(metric);
-    Function<ITaskConfig, Display> toKey = new Function<ITaskConfig, Display>() {
-      @Override
-      public Display apply(ITaskConfig task) {
-        return new Display(task.getJobName(), null);
-      }
-    };
+    Function<ITaskConfig, Display> toKey = task -> new Display(task.getJobName(), null);
     Map<Display, Metric> byJob =
         counter.computeAggregates(Query.roleScoped(role).active(), type.filter, toKey);
     return Response.ok(fillTemplate(byJob)).build();

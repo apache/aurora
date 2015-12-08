@@ -82,11 +82,7 @@ public final class Configuration {
   private static final CharMatcher IDENTIFIER_REST =
       CharMatcher.forPredicate(Character::isJavaIdentifierPart);
 
-  private static final Function<URL, CharSource> URL_TO_SOURCE = new Function<URL, CharSource>() {
-    @Override public CharSource apply(URL input) {
-      return Resources.asCharSource(input, StandardCharsets.UTF_8);
-    }
-  };
+  private static final Function<URL, CharSource> URL_TO_SOURCE = input -> Resources.asCharSource(input, StandardCharsets.UTF_8);
 
   private static final String DEFAULT_RESOURCE_NAME = "cmdline.arg.info.txt";
 

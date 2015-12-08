@@ -91,12 +91,7 @@ class TaskStateMachine {
   private final Set<SideEffect> sideEffects = Sets.newHashSet();
 
   private static final Function<ScheduleStatus, TaskState> STATUS_TO_TASK_STATE =
-      new Function<ScheduleStatus, TaskState>() {
-        @Override
-        public TaskState apply(ScheduleStatus input) {
-          return TaskState.valueOf(input.name());
-        }
-      };
+      input -> TaskState.valueOf(input.name());
 
   private static final Function<IScheduledTask, TaskState> SCHEDULED_TO_TASK_STATE =
       Functions.compose(STATUS_TO_TASK_STATE, IScheduledTask::getStatus);
@@ -183,52 +178,46 @@ class TaskStateMachine {
             .build());
 
     final Closure<Transition<TaskState>> manageRestartingTask =
-        new Closure<Transition<TaskState>>() {
-          @Override
-          public void execute(Transition<TaskState> transition) {
-            switch (transition.getTo()) {
-              case ASSIGNED:
-                addFollowup(KILL);
-                break;
+        transition -> {
+          switch (transition.getTo()) {
+            case ASSIGNED:
+              addFollowup(KILL);
+              break;
 
-              case STARTING:
-                addFollowup(KILL);
-                break;
+            case STARTING:
+              addFollowup(KILL);
+              break;
 
-              case RUNNING:
-                addFollowup(KILL);
-                break;
+            case RUNNING:
+              addFollowup(KILL);
+              break;
 
-              case LOST:
-                addFollowup(KILL);
-                addFollowup(RESCHEDULE);
-                break;
+            case LOST:
+              addFollowup(KILL);
+              addFollowup(RESCHEDULE);
+              break;
 
-              case FINISHED:
-                addFollowup(RESCHEDULE);
-                break;
+            case FINISHED:
+              addFollowup(RESCHEDULE);
+              break;
 
-              case FAILED:
-                addFollowup(RESCHEDULE);
-                break;
+            case FAILED:
+              addFollowup(RESCHEDULE);
+              break;
 
-              case KILLED:
-                addFollowup(RESCHEDULE);
-                break;
+            case KILLED:
+              addFollowup(RESCHEDULE);
+              break;
 
-              default:
-                // No-op.
-            }
+            default:
+              // No-op.
           }
         };
 
     // To be called on a task transitioning into the FINISHED state.
-    final Command rescheduleIfService = new Command() {
-      @Override
-      public void execute() {
-        if (task.get().getAssignedTask().getTask().isIsService()) {
-          addFollowup(RESCHEDULE);
-        }
+    final Command rescheduleIfService = () -> {
+      if (task.get().getAssignedTask().getTask().isIsService()) {
+        addFollowup(RESCHEDULE);
       }
     };
 
@@ -275,46 +264,43 @@ class TaskStateMachine {
                 .to(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, DRAINING,
                     KILLED, KILLING, LOST, PREEMPTING)
                 .withCallback(
-                    new Closure<Transition<TaskState>>() {
-                      @Override
-                      public void execute(Transition<TaskState> transition) {
-                        switch (transition.getTo()) {
-                          case FINISHED:
-                            rescheduleIfService.execute();
-                            break;
+                    transition -> {
+                      switch (transition.getTo()) {
+                        case FINISHED:
+                          rescheduleIfService.execute();
+                          break;
 
-                          case PREEMPTING:
-                            addFollowup(KILL);
-                            break;
+                        case PREEMPTING:
+                          addFollowup(KILL);
+                          break;
 
-                          case FAILED:
-                            incrementFailuresMaybeReschedule.execute();
-                            break;
+                        case FAILED:
+                          incrementFailuresMaybeReschedule.execute();
+                          break;
 
-                          case RESTARTING:
-                            addFollowup(KILL);
-                            break;
+                        case RESTARTING:
+                          addFollowup(KILL);
+                          break;
 
-                          case DRAINING:
-                            addFollowup(KILL);
-                            break;
+                        case DRAINING:
+                          addFollowup(KILL);
+                          break;
 
-                          case KILLED:
-                            addFollowup(RESCHEDULE);
-                            break;
+                        case KILLED:
+                          addFollowup(RESCHEDULE);
+                          break;
 
-                          case LOST:
-                            addFollowup(RESCHEDULE);
-                            addFollowup(KILL);
-                            break;
+                        case LOST:
+                          addFollowup(RESCHEDULE);
+                          addFollowup(KILL);
+                          break;
 
-                          case KILLING:
-                            addFollowup(KILL);
-                            break;
+                        case KILLING:
+                          addFollowup(KILL);
+                          break;
 
-                          default:
-                            // No-op.
-                        }
+                        default:
+                          // No-op.
                       }
                     }
                 ))
@@ -323,45 +309,42 @@ class TaskStateMachine {
                 .to(RUNNING, FINISHED, FAILED, RESTARTING, DRAINING, KILLING,
                     KILLED, LOST, PREEMPTING)
                 .withCallback(
-                    new Closure<Transition<TaskState>>() {
-                      @Override
-                      public void execute(Transition<TaskState> transition) {
-                        switch (transition.getTo()) {
-                          case FINISHED:
-                            rescheduleIfService.execute();
-                            break;
+                    transition -> {
+                      switch (transition.getTo()) {
+                        case FINISHED:
+                          rescheduleIfService.execute();
+                          break;
 
-                          case RESTARTING:
-                            addFollowup(KILL);
-                            break;
+                        case RESTARTING:
+                          addFollowup(KILL);
+                          break;
 
-                          case DRAINING:
-                            addFollowup(KILL);
-                            break;
+                        case DRAINING:
+                          addFollowup(KILL);
+                          break;
 
-                          case PREEMPTING:
-                            addFollowup(KILL);
-                            break;
+                        case PREEMPTING:
+                          addFollowup(KILL);
+                          break;
 
-                          case FAILED:
-                            incrementFailuresMaybeReschedule.execute();
-                            break;
+                        case FAILED:
+                          incrementFailuresMaybeReschedule.execute();
+                          break;
 
-                          case KILLED:
-                            addFollowup(RESCHEDULE);
-                            break;
+                        case KILLED:
+                          addFollowup(RESCHEDULE);
+                          break;
 
-                          case KILLING:
-                            addFollowup(KILL);
-                            break;
+                        case KILLING:
+                          addFollowup(KILL);
+                          break;
 
-                          case LOST:
-                            addFollowup(RESCHEDULE);
-                            break;
+                        case LOST:
+                          addFollowup(RESCHEDULE);
+                          break;
 
-                          default:
-                            // No-op.
-                        }
+                        default:
+                          // No-op.
                       }
                     }
                 ))
@@ -369,45 +352,42 @@ class TaskStateMachine {
             Rule.from(RUNNING)
                 .to(FINISHED, RESTARTING, DRAINING, FAILED, KILLING, KILLED, LOST, PREEMPTING)
                 .withCallback(
-                    new Closure<Transition<TaskState>>() {
-                      @Override
-                      public void execute(Transition<TaskState> transition) {
-                        switch (transition.getTo()) {
-                          case FINISHED:
-                            rescheduleIfService.execute();
-                            break;
+                    transition -> {
+                      switch (transition.getTo()) {
+                        case FINISHED:
+                          rescheduleIfService.execute();
+                          break;
 
-                          case PREEMPTING:
-                            addFollowup(KILL);
-                            break;
+                        case PREEMPTING:
+                          addFollowup(KILL);
+                          break;
 
-                          case RESTARTING:
-                            addFollowup(KILL);
-                            break;
+                        case RESTARTING:
+                          addFollowup(KILL);
+                          break;
 
-                          case DRAINING:
-                            addFollowup(KILL);
-                            break;
+                        case DRAINING:
+                          addFollowup(KILL);
+                          break;
 
-                          case FAILED:
-                            incrementFailuresMaybeReschedule.execute();
-                            break;
+                        case FAILED:
+                          incrementFailuresMaybeReschedule.execute();
+                          break;
 
-                          case KILLED:
-                            addFollowup(RESCHEDULE);
-                            break;
+                        case KILLED:
+                          addFollowup(RESCHEDULE);
+                          break;
 
-                          case KILLING:
-                            addFollowup(KILL);
-                            break;
+                        case KILLING:
+                          addFollowup(KILL);
+                          break;
 
-                          case LOST:
-                            addFollowup(RESCHEDULE);
-                            break;
+                        case LOST:
+                          addFollowup(RESCHEDULE);
+                          break;
 
-                          default:
-                            // No-op.
-                        }
+                        default:
+                          // No-op.
                       }
                     }
                 ))
@@ -495,12 +475,7 @@ class TaskStateMachine {
   }
 
   private Closure<Transition<TaskState>> addFollowupClosure(final Action action) {
-    return new Closure<Transition<TaskState>>() {
-      @Override
-      public void execute(Transition<TaskState> item) {
-        addFollowup(action);
-      }
-    };
+    return item -> addFollowup(action);
   }
 
   /**
@@ -549,12 +524,7 @@ class TaskStateMachine {
    */
   @Nullable
   ScheduleStatus getPreviousState() {
-    return previousState.transform(new Function<TaskState, ScheduleStatus>() {
-      @Override
-      public ScheduleStatus apply(TaskState item) {
-        return item.getStatus().orNull();
-      }
-    }).orNull();
+    return previousState.transform(item -> item.getStatus().orNull()).orNull();
   }
 
   @Override

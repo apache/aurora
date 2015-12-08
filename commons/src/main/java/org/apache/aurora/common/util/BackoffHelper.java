@@ -83,11 +83,9 @@ public class BackoffHelper {
    */
   public <E extends Exception> void doUntilSuccess(final ExceptionalSupplier<Boolean, E> task)
       throws InterruptedException, BackoffStoppedException, E {
-    doUntilResult(new ExceptionalSupplier<Boolean, E>() {
-      @Override public Boolean get() throws E {
-        Boolean result = task.get();
-        return Boolean.TRUE.equals(result) ? result : null;
-      }
+    doUntilResult(() -> {
+      Boolean result = task.get();
+      return Boolean.TRUE.equals(result) ? result : null;
     });
   }
 

@@ -28,10 +28,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public final class Closures {
 
-  private static final Closure<?> NOOP = new Closure<Object>() {
-    @Override public void execute(Object item) {
-      // noop
-    }
+  private static final Closure<?> NOOP = item -> {
+    // noop
   };
 
   private Closures() {
@@ -55,11 +53,9 @@ public final class Closures {
 
     final Iterable<Closure<T>> closuresCopy = ImmutableList.copyOf(closures);
 
-    return new Closure<T>() {
-      @Override public void execute(T item) {
-        for (Closure<T> closure : closuresCopy) {
-          closure.execute(item);
-        }
+    return item -> {
+      for (Closure<T> closure : closuresCopy) {
+        closure.execute(item);
       }
     };
   }
@@ -77,11 +73,9 @@ public final class Closures {
     checkNotNull(filter);
     checkNotNull(closure);
 
-    return new Closure<T>() {
-      @Override public void execute(T item) {
-        if (filter.apply(item)) {
-          closure.execute(item);
-        }
+    return item -> {
+      if (filter.apply(item)) {
+        closure.execute(item);
       }
     };
   }

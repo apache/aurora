@@ -39,8 +39,6 @@ import org.apache.aurora.scheduler.storage.Storage;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.storage.Storage.MutateWork;
-
 /**
  * Observes task transitions and identifies tasks that are 'stuck' in a transient state.  Stuck
  * tasks will be transitioned to the LOST state.
@@ -118,17 +116,12 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
         // canceled, but in the event of a state transition race, including transientState
         // prevents an unintended task timeout.
         // Note: This requires LOST transitions trigger Driver.killTask.
-        StateChangeResult result = storage.write(new MutateWork.Quiet<StateChangeResult>() {
-          @Override
-          public StateChangeResult apply(Storage.MutableStoreProvider storeProvider) {
-            return stateManager.changeState(
-                storeProvider,
-                taskId,
-                Optional.of(newState),
-                ScheduleStatus.LOST,
-                TIMEOUT_MESSAGE);
-          }
-        });
+        StateChangeResult result = storage.write(storeProvider -> stateManager.changeState(
+            storeProvider,
+            taskId,
+            Optional.of(newState),
+            ScheduleStatus.LOST,
+            TIMEOUT_MESSAGE));
 
         if (result == StateChangeResult.SUCCESS) {
           LOG.info("Timeout reached for task " + taskId + ":" + taskId);

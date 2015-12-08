@@ -160,12 +160,7 @@ interface SlaAlgorithm {
             IScheduledTask::getStatus);
 
     private static final Function<IScheduledTask, ITaskEvent> TASK_TO_EVENT =
-        new Function<IScheduledTask, ITaskEvent>() {
-          @Override
-          public ITaskEvent apply(IScheduledTask task) {
-            return Tasks.getLatestEvent(task);
-          }
-        };
+        Tasks::getLatestEvent;
 
     private JobUptime(float percentile) {
       this.percentile = percentile;
@@ -176,12 +171,7 @@ interface SlaAlgorithm {
       List<Long> uptimes = FluentIterable.from(tasks)
           .filter(IS_RUNNING)
           .transform(Functions.compose(
-              new Function<ITaskEvent, Long>() {
-                @Override
-                public Long apply(ITaskEvent event) {
-                  return timeFrame.upperEndpoint() - event.getTimestamp();
-                }
-              },
+              event -> timeFrame.upperEndpoint() - event.getTimestamp(),
               TASK_TO_EVENT)).toList();
 
       return (int) Math.floor((double) SlaUtil.percentile(uptimes, percentile) / 1000);
@@ -278,102 +268,86 @@ interface SlaAlgorithm {
     }
 
     private static final Function<IScheduledTask, InstanceId> TO_ID =
-        new Function<IScheduledTask, InstanceId>() {
-          @Override
-          public InstanceId apply(IScheduledTask task) {
-            return new InstanceId(
-                task.getAssignedTask().getTask().getJob(),
-                task.getAssignedTask().getInstanceId());
-          }
-        };
+        task -> new InstanceId(
+            task.getAssignedTask().getTask().getJob(),
+            task.getAssignedTask().getInstanceId());
 
     private static final Function<ITaskEvent, Long> TASK_EVENT_TO_TIMESTAMP =
-        new Function<ITaskEvent, Long>() {
-          @Override
-          public Long apply(ITaskEvent taskEvent) {
-            return taskEvent.getTimestamp();
-          }
-        };
+        ITaskEvent::getTimestamp;
 
     /**
      * Combine all task events per given instance into the unified sorted instance history view.
      */
     private static final Function<Collection<IScheduledTask>, List<ITaskEvent>> TO_SORTED_EVENTS =
-        new Function<Collection<IScheduledTask>, List<ITaskEvent>>() {
-          @Override
-          public List<ITaskEvent> apply(Collection<IScheduledTask> tasks) {
-            List<ITaskEvent> result = Lists.newLinkedList();
-            for (IScheduledTask task : tasks) {
-              result.addAll(task.getTaskEvents());
-            }
-
-            return Ordering.natural()
-                .onResultOf(TASK_EVENT_TO_TIMESTAMP).immutableSortedCopy(result);
+        tasks -> {
+          List<ITaskEvent> result = Lists.newLinkedList();
+          for (IScheduledTask task : tasks) {
+            result.addAll(task.getTaskEvents());
           }
+
+          return Ordering.natural()
+              .onResultOf(TASK_EVENT_TO_TIMESTAMP).immutableSortedCopy(result);
         };
 
     /**
      * Convert instance history into the {@link SlaState} based {@link Interval} list.
      */
     private static final Function<List<ITaskEvent>, List<Interval>> TASK_EVENTS_TO_INTERVALS =
-        new Function<List<ITaskEvent>, List<Interval>>() {
-          @Override
-          public List<Interval> apply(List<ITaskEvent> events) {
+        events -> {
 
-            ImmutableList.Builder<Interval> intervals = ImmutableList.builder();
-            Pair<SlaState, Long> current = Pair.of(SlaState.REMOVED, 0L);
+          ImmutableList.Builder<Interval> intervals = ImmutableList.builder();
+          Pair<SlaState, Long> current = Pair.of(SlaState.REMOVED, 0L);
 
-            for (ITaskEvent event : events) {
-              long timestamp = event.getTimestamp();
+          for (ITaskEvent event : events) {
+            long timestamp = event.getTimestamp();
 
-              // Event status in the instance timeline signifies either of the following:
-              // - termination of the existing SlaState interval AND start of a new one;
-              // - continuation of the existing matching SlaState interval.
-              switch (event.getStatus()) {
-                case LOST:
-                case DRAINING:
-                case PREEMPTING:
-                  current = updateIntervals(timestamp, SlaState.DOWN, current, intervals);
-                  break;
+            // Event status in the instance timeline signifies either of the following:
+            // - termination of the existing SlaState interval AND start of a new one;
+            // - continuation of the existing matching SlaState interval.
+            switch (event.getStatus()) {
+              case LOST:
+              case DRAINING:
+              case PREEMPTING:
+                current = updateIntervals(timestamp, SlaState.DOWN, current, intervals);
+                break;
 
-                case PENDING:
-                case ASSIGNED:
-                case STARTING:
-                  if (current.getFirst() != SlaState.DOWN) {
-                    current = updateIntervals(timestamp, SlaState.REMOVED, current, intervals);
-                  }
-                  break;
-
-                case THROTTLED:
-                case FINISHED:
-                case RESTARTING:
-                case FAILED:
-                case KILLING:
+              case PENDING:
+              case ASSIGNED:
+              case STARTING:
+                if (current.getFirst() != SlaState.DOWN) {
                   current = updateIntervals(timestamp, SlaState.REMOVED, current, intervals);
-                  break;
+                }
+                break;
 
-                case RUNNING:
-                  current = updateIntervals(timestamp, SlaState.UP, current, intervals);
-                  break;
+              case THROTTLED:
+              case FINISHED:
+              case RESTARTING:
+              case FAILED:
+              case KILLING:
+                current = updateIntervals(timestamp, SlaState.REMOVED, current, intervals);
+                break;
 
-                case KILLED:
-                  if (current.getFirst() == SlaState.UP) {
-                    current = updateIntervals(timestamp, SlaState.DOWN, current, intervals);
-                  }
-                  break;
+              case RUNNING:
+                current = updateIntervals(timestamp, SlaState.UP, current, intervals);
+                break;
 
-                case INIT:
-                  // Ignore.
-                  break;
+              case KILLED:
+                if (current.getFirst() == SlaState.UP) {
+                  current = updateIntervals(timestamp, SlaState.DOWN, current, intervals);
+                }
+                break;
 
-                default:
-                  throw new IllegalArgumentException("Unsupported status:" + event.getStatus());
-              }
+              case INIT:
+                // Ignore.
+                break;
+
+              default:
+                throw new IllegalArgumentException("Unsupported status:" + event.getStatus());
             }
-            // Add the last event interval.
-            intervals.add(new Interval(current.getFirst(), current.getSecond(), Long.MAX_VALUE));
-            return intervals.build();
           }
+          // Add the last event interval.
+          intervals.add(new Interval(current.getFirst(), current.getSecond(), Long.MAX_VALUE));
+          return intervals.build();
         };
 
     private static Pair<SlaState, Long> updateIntervals(

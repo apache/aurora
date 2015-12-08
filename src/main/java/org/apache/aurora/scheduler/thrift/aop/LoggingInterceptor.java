@@ -42,16 +42,13 @@ class LoggingInterceptor implements MethodInterceptor {
   private final Map<Class<?>, Function<Object, String>> printFunctions =
       ImmutableMap.of(
           JobConfiguration.class,
-          new Function<Object, String>() {
-            @Override
-            public String apply(Object input) {
-              JobConfiguration configuration = ((JobConfiguration) input).deepCopy();
-              if (configuration.isSetTaskConfig()) {
-                configuration.getTaskConfig().setExecutorConfig(
-                    new ExecutorConfig("BLANKED", "BLANKED"));
-              }
-              return configuration.toString();
+          input -> {
+            JobConfiguration configuration = ((JobConfiguration) input).deepCopy();
+            if (configuration.isSetTaskConfig()) {
+              configuration.getTaskConfig().setExecutorConfig(
+                  new ExecutorConfig("BLANKED", "BLANKED"));
             }
+            return configuration.toString();
           }
       );
 

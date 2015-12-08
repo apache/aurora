@@ -128,12 +128,7 @@ final class JobUpdateStateMachine {
           .build();
 
   static final Function<JobUpdateStatus, JobUpdateStatus> GET_PAUSE_STATE =
-      new Function<JobUpdateStatus, JobUpdateStatus>() {
-        @Override
-        public JobUpdateStatus apply(JobUpdateStatus status) {
-          return PAUSE_BEHAVIOR.get(status);
-        }
-      };
+      PAUSE_BEHAVIOR::get;
 
   private static final Map<JobUpdateStatus, JobUpdateStatus> RESUME_ACTIVE_BEHAVIOR =
       ImmutableMap.<JobUpdateStatus, JobUpdateStatus>builder()
@@ -150,28 +145,13 @@ final class JobUpdateStateMachine {
           .build();
 
   static final Function<JobUpdateStatus, JobUpdateStatus> GET_ACTIVE_RESUME_STATE =
-      new Function<JobUpdateStatus, JobUpdateStatus>() {
-        @Override
-        public JobUpdateStatus apply(JobUpdateStatus status) {
-          return RESUME_ACTIVE_BEHAVIOR.get(status);
-        }
-      };
+      RESUME_ACTIVE_BEHAVIOR::get;
 
   static final Function<JobUpdateStatus, JobUpdateStatus> GET_BLOCKED_RESUME_STATE =
-      new Function<JobUpdateStatus, JobUpdateStatus>() {
-        @Override
-        public JobUpdateStatus apply(JobUpdateStatus status) {
-          return RESUME_BLOCKED_BEHAVIOR.get(status);
-        }
-      };
+      RESUME_BLOCKED_BEHAVIOR::get;
 
   static final Function<JobUpdateStatus, JobUpdateStatus> GET_UNBLOCKED_STATE =
-      new Function<JobUpdateStatus, JobUpdateStatus>() {
-        @Override
-        public JobUpdateStatus apply(JobUpdateStatus status) {
-          return UNBLOCK_BEHAVIOR.get(status);
-        }
-      };
+      UNBLOCK_BEHAVIOR::get;
 
   static JobUpdateStatus getBlockedState(JobUpdateStatus status) {
     return BLOCK_BEHAVIOR.get(status);

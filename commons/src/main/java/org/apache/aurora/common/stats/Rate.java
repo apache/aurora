@@ -112,9 +112,7 @@ public class Rate<T extends Number> extends SampledStat<Double> {
     Builder(final Stat<T> input) {
       Stats.export(input);
       this.name = input.getName() + "_per_sec";
-      inputAccessor = new Supplier<T>() {
-        @Override public T get() { return input.read(); }
-      };
+      inputAccessor = input::read;
     }
 
     public Builder<T> withName(String name) {

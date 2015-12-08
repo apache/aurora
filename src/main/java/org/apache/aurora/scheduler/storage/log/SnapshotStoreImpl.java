@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.storage.log;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.logging.Logger;
+
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
@@ -39,7 +40,7 @@ import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -246,28 +247,25 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   public Snapshot createSnapshot() {
     // It's important to perform snapshot creation in a write lock to ensure all upstream callers
     // are correctly synchronized (e.g. during backup creation).
-    return storage.write(new MutateWork.Quiet<Snapshot>() {
-      @Override
-      public Snapshot apply(MutableStoreProvider storeProvider) {
-        Snapshot snapshot = new Snapshot();
+    return storage.write(storeProvider -> {
+      Snapshot snapshot = new Snapshot();
 
-        // Capture timestamp to signify the beginning of a snapshot operation, apply after in case
-        // one of the field closures is mean and tries to apply a timestamp.
-        long timestamp = clock.nowMillis();
-        for (SnapshotField field : SNAPSHOT_FIELDS) {
-          field.saveToSnapshot(storeProvider, snapshot);
-        }
-
-        SchedulerMetadata metadata = new SchedulerMetadata()
-            .setFrameworkId(storeProvider.getSchedulerStore().fetchFrameworkId().orNull())
-            .setVersion(CURRENT_API_VERSION);
-
-        metadata.setDetails(buildInfo.getProperties());
-
-        snapshot.setSchedulerMetadata(metadata);
-        snapshot.setTimestamp(timestamp);
-        return snapshot;
+      // Capture timestamp to signify the beginning of a snapshot operation, apply after in case
+      // one of the field closures is mean and tries to apply a timestamp.
+      long timestamp = clock.nowMillis();
+      for (SnapshotField field : SNAPSHOT_FIELDS) {
+        field.saveToSnapshot(storeProvider, snapshot);
       }
+
+      SchedulerMetadata metadata = new SchedulerMetadata()
+          .setFrameworkId(storeProvider.getSchedulerStore().fetchFrameworkId().orNull())
+          .setVersion(CURRENT_API_VERSION);
+
+      metadata.setDetails(buildInfo.getProperties());
+
+      snapshot.setSchedulerMetadata(metadata);
+      snapshot.setTimestamp(timestamp);
+      return snapshot;
     });
   }
 
@@ -276,14 +274,11 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   public void applySnapshot(final Snapshot snapshot) {
     requireNonNull(snapshot);
 
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        LOG.info("Restoring snapshot.");
+    storage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+      LOG.info("Restoring snapshot.");
 
-        for (SnapshotField field : SNAPSHOT_FIELDS) {
-          field.restoreFromSnapshot(storeProvider, snapshot);
-        }
+      for (SnapshotField field : SNAPSHOT_FIELDS) {
+        field.restoreFromSnapshot(storeProvider, snapshot);
       }
     });
   }

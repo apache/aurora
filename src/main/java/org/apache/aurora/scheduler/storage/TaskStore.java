@@ -118,47 +118,44 @@ public interface TaskStore {
     }
 
     public static Predicate<IScheduledTask> queryFilter(final Query.Builder queryBuilder) {
-      return new Predicate<IScheduledTask>() {
-        @Override
-        public boolean apply(IScheduledTask task) {
-          TaskQuery query = queryBuilder.get();
-          ITaskConfig config = task.getAssignedTask().getTask();
-          // TODO(wfarner): Investigate why blank inputs are treated specially for the role field.
-          if (query.getRole() != null
-              && !WHITESPACE.matchesAllOf(query.getRole())
-              && !query.getRole().equals(config.getJob().getRole())) {
-            return false;
-          }
-          if (query.getEnvironment() != null
-              && !query.getEnvironment().equals(config.getEnvironment())) {
-            return false;
-          }
-          if (query.getJobName() != null && !query.getJobName().equals(config.getJobName())) {
-            return false;
-          }
-
-          if (query.getJobKeysSize() > 0
-              && !query.getJobKeys().contains(config.getJob().newBuilder())) {
-            return false;
-          }
-          if (query.getTaskIds() != null && !query.getTaskIds().contains(Tasks.id(task))) {
-            return false;
-          }
-
-          if (query.getStatusesSize() > 0 && !query.getStatuses().contains(task.getStatus())) {
-            return false;
-          }
-          if (query.getSlaveHostsSize() > 0
-              && !query.getSlaveHosts().contains(task.getAssignedTask().getSlaveHost())) {
-            return false;
-          }
-          if (query.getInstanceIdsSize() > 0
-              && !query.getInstanceIds().contains(task.getAssignedTask().getInstanceId())) {
-            return false;
-          }
-
-          return true;
+      return task -> {
+        TaskQuery query = queryBuilder.get();
+        ITaskConfig config = task.getAssignedTask().getTask();
+        // TODO(wfarner): Investigate why blank inputs are treated specially for the role field.
+        if (query.getRole() != null
+            && !WHITESPACE.matchesAllOf(query.getRole())
+            && !query.getRole().equals(config.getJob().getRole())) {
+          return false;
         }
+        if (query.getEnvironment() != null
+            && !query.getEnvironment().equals(config.getEnvironment())) {
+          return false;
+        }
+        if (query.getJobName() != null && !query.getJobName().equals(config.getJobName())) {
+          return false;
+        }
+
+        if (query.getJobKeysSize() > 0
+            && !query.getJobKeys().contains(config.getJob().newBuilder())) {
+          return false;
+        }
+        if (query.getTaskIds() != null && !query.getTaskIds().contains(Tasks.id(task))) {
+          return false;
+        }
+
+        if (query.getStatusesSize() > 0 && !query.getStatuses().contains(task.getStatus())) {
+          return false;
+        }
+        if (query.getSlaveHostsSize() > 0
+            && !query.getSlaveHosts().contains(task.getAssignedTask().getSlaveHost())) {
+          return false;
+        }
+        if (query.getInstanceIdsSize() > 0
+            && !query.getInstanceIds().contains(task.getAssignedTask().getInstanceId())) {
+          return false;
+        }
+
+        return true;
       };
     }
   }

@@ -30,6 +30,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -91,14 +92,11 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
     checkInState(State.PREPARED);
     wrapped.start(initializationLogic);
     stateMachine.transition(State.READY);
-    wrapped.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        Iterable<IScheduledTask> tasks = Tasks.LATEST_ACTIVITY.sortedCopy(
-            storeProvider.getTaskStore().fetchTasks(Query.unscoped()));
-        for (IScheduledTask task : tasks) {
-          eventSink.post(TaskStateChange.initialized(task));
-        }
+    wrapped.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+      Iterable<IScheduledTask> tasks = Tasks.LATEST_ACTIVITY.sortedCopy(
+          storeProvider.getTaskStore().fetchTasks(Query.unscoped()));
+      for (IScheduledTask task : tasks) {
+        eventSink.post(TaskStateChange.initialized(task));
       }
     });
   }

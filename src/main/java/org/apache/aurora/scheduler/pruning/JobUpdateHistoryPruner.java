@@ -28,7 +28,7 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 
 import static java.util.Objects.requireNonNull;
@@ -76,23 +76,15 @@ class JobUpdateHistoryPruner extends AbstractIdleService {
   @Override
   protected void startUp() {
     executor.scheduleAtFixedRate(
-        new Runnable() {
-          @Override
-          public void run() {
-            storage.write(new MutateWork.NoResult.Quiet() {
-              @Override
-              public void execute(MutableStoreProvider storeProvider) {
-                Set<IJobUpdateKey> prunedUpdates = storeProvider.getJobUpdateStore().pruneHistory(
-                    settings.maxUpdatesPerJob,
-                    clock.nowMillis() - settings.maxHistorySize.as(Time.MILLISECONDS));
+        () -> storage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+          Set<IJobUpdateKey> prunedUpdates = storeProvider.getJobUpdateStore().pruneHistory(
+              settings.maxUpdatesPerJob,
+              clock.nowMillis() - settings.maxHistorySize.as(Time.MILLISECONDS));
 
-                LOG.info(prunedUpdates.isEmpty()
-                    ? "No job update history to prune."
-                    : "Pruned job update history: " + Joiner.on(",").join(prunedUpdates));
-              }
-            });
-          }
-        },
+          LOG.info(prunedUpdates.isEmpty()
+              ? "No job update history to prune."
+              : "Pruned job update history: " + Joiner.on(",").join(prunedUpdates));
+        }),
         settings.pruneInterval.as(Time.MILLISECONDS),
         settings.pruneInterval.as(Time.MILLISECONDS),
         TimeUnit.MILLISECONDS);

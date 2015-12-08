@@ -33,8 +33,7 @@ import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.quartz.CronTrigger;
@@ -69,13 +68,10 @@ class CronJobManagerImpl implements CronJobManager {
   public void startJobNow(final IJobKey jobKey) throws CronException {
     requireNonNull(jobKey);
 
-    storage.read(new Work<Void, CronException>() {
-      @Override
-      public Void apply(Storage.StoreProvider storeProvider) throws CronException {
-        checkCronExists(jobKey, storeProvider.getCronJobStore());
-        triggerJob(jobKey);
-        return null;
-      }
+    storage.read(storeProvider -> {
+      checkCronExists(jobKey, storeProvider.getCronJobStore());
+      triggerJob(jobKey);
+      return null;
     });
   }
 
@@ -103,16 +99,13 @@ class CronJobManagerImpl implements CronJobManager {
     checkNoRunOverlap(config);
 
     final IJobKey jobKey = config.getSanitizedConfig().getJobConfig().getKey();
-    storage.write(new MutateWork.NoResult<CronException>() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) throws CronException {
-        checkCronExists(jobKey, storeProvider.getCronJobStore());
+    storage.write((NoResult<CronException>) (Storage.MutableStoreProvider storeProvider) -> {
+      checkCronExists(jobKey, storeProvider.getCronJobStore());
 
-        removeJob(jobKey, storeProvider.getCronJobStore());
-        descheduleJob(jobKey);
-        saveJob(config, storeProvider.getCronJobStore());
-        scheduleJob(config.getCrontabEntry(), jobKey);
-      }
+      removeJob(jobKey, storeProvider.getCronJobStore());
+      descheduleJob(jobKey);
+      saveJob(config, storeProvider.getCronJobStore());
+      scheduleJob(config.getCrontabEntry(), jobKey);
     });
   }
 
@@ -122,14 +115,11 @@ class CronJobManagerImpl implements CronJobManager {
     checkNoRunOverlap(cronJob);
 
     final IJobKey jobKey = cronJob.getSanitizedConfig().getJobConfig().getKey();
-    storage.write(new MutateWork.NoResult<CronException>() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) throws CronException {
-        checkNotExists(jobKey, storeProvider.getCronJobStore());
+    storage.write((NoResult<CronException>) (Storage.MutableStoreProvider storeProvider) -> {
+      checkNotExists(jobKey, storeProvider.getCronJobStore());
 
-        saveJob(cronJob, storeProvider.getCronJobStore());
-        scheduleJob(cronJob.getCrontabEntry(), jobKey);
-      }
+      saveJob(cronJob, storeProvider.getCronJobStore());
+      scheduleJob(cronJob.getCrontabEntry(), jobKey);
     });
   }
 
@@ -173,17 +163,14 @@ class CronJobManagerImpl implements CronJobManager {
   public boolean deleteJob(final IJobKey jobKey) {
     requireNonNull(jobKey);
 
-    return storage.write(new MutateWork.Quiet<Boolean>() {
-      @Override
-      public Boolean apply(Storage.MutableStoreProvider storeProvider) {
-        if (!storeProvider.getCronJobStore().fetchJob(jobKey).isPresent()) {
-          return false;
-        }
-
-        removeJob(jobKey, storeProvider.getCronJobStore());
-        descheduleJob(jobKey);
-        return true;
+    return storage.write(storeProvider -> {
+      if (!storeProvider.getCronJobStore().fetchJob(jobKey).isPresent()) {
+        return false;
       }
+
+      removeJob(jobKey, storeProvider.getCronJobStore());
+      descheduleJob(jobKey);
+      return true;
     });
   }
 

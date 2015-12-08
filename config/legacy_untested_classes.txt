@@ -10,7 +10,6 @@ org/apache/aurora/scheduler/app/SchedulerMain$2$1
 org/apache/aurora/scheduler/app/SchedulerMain$3
 org/apache/aurora/scheduler/app/SchedulerMain$4
 org/apache/aurora/scheduler/async/OfferQueue$OfferQueueImpl$2
-org/apache/aurora/scheduler/base/Conversions$1
 org/apache/aurora/scheduler/base/Conversions$2
 org/apache/aurora/scheduler/base/Conversions$3
 org/apache/aurora/scheduler/configuration/executor/ExecutorModule
@@ -62,13 +61,13 @@ org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$5
 org/apache/aurora/scheduler/mesos/DriverFactoryImpl
 org/apache/aurora/scheduler/mesos/LibMesosLoadingModule
 org/apache/aurora/scheduler/stats/AsyncStatsModule$OfferAdapter$1
-org/apache/aurora/scheduler/stats/StatsModule$3
 org/apache/aurora/scheduler/stats/TaskStatCalculator
 org/apache/aurora/scheduler/storage/CallOrderEnforcingStorage$State
 org/apache/aurora/scheduler/storage/backup/BackupModule$LifecycleHook
 org/apache/aurora/scheduler/storage/mem/MemTaskStore$Task
 org/apache/aurora/scheduler/storage/mem/Util
 org/apache/aurora/scheduler/storage/mem/Util$1
+org/apache/aurora/scheduler/testing/FakeStatsProvider$1
 org/apache/aurora/scheduler/testing/FakeStatsProvider$3
 org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$1
 org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$LocalClientProvider

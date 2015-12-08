@@ -385,11 +385,7 @@ public class StateMachine<T> {
      * @return A reference to the builder.
      */
     public Builder<T> logTransitions() {
-      return onAnyTransition(new Closure<Transition<T>>() {
-        @Override public void execute(Transition<T> transition) {
-          LOG.info(name + " state machine transition " + transition);
-        }
-      });
+      return onAnyTransition(transition -> LOG.info(name + " state machine transition " + transition));
     }
 
     /**
@@ -438,19 +434,11 @@ public class StateMachine<T> {
     }
 
     private static <T> Function<Transition<T>, T> from() {
-      return new Function<Transition<T>, T>() {
-        @Override public T apply(Transition<T> transition) {
-          return transition.from;
-        }
-      };
+      return transition -> transition.from;
     }
 
     private static <T> Function<Transition<T>, T> to() {
-      return new Function<Transition<T>, T>() {
-        @Override public T apply(Transition<T> transition) {
-          return transition.to;
-        }
-      };
+      return transition -> transition.to;
     }
 
     private static <T> Predicate<Transition<T>> oneSideFilter(

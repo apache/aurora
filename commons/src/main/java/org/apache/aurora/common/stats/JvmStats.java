@@ -188,29 +188,19 @@ public class JvmStats {
     // This is based on code in Bridcage: https://cgit.twitter.biz/birdcage/tree/ \
     // ostrich/src/main/scala/com/twitter/ostrich/stats/StatsCollection.scala
     Stats.exportAll(Iterables.transform(ManagementFactory.getGarbageCollectorMXBeans(),
-        new Function<GarbageCollectorMXBean, Stat<? extends Number>>(){
-          @Override
-          public Stat<? extends Number> apply(final GarbageCollectorMXBean gcMXBean) {
-            return new StatImpl<Long>(
-                "jvm_gc_" + Stats.normalizeName(gcMXBean.getName()) + "_collection_count") {
-              @Override public Long read() {
-                return gcMXBean.getCollectionCount();
-              }
-            };
+        gcMXBean -> new StatImpl<Long>(
+            "jvm_gc_" + Stats.normalizeName(gcMXBean.getName()) + "_collection_count") {
+          @Override public Long read() {
+            return gcMXBean.getCollectionCount();
           }
         }
     ));
 
     Stats.exportAll(Iterables.transform(ManagementFactory.getGarbageCollectorMXBeans(),
-        new Function<GarbageCollectorMXBean, Stat<? extends Number>>(){
-          @Override
-          public Stat<? extends Number> apply(final GarbageCollectorMXBean gcMXBean) {
-            return new StatImpl<Long>(
-                "jvm_gc_" + Stats.normalizeName(gcMXBean.getName()) + "_collection_time_ms") {
-              @Override public Long read() {
-                return gcMXBean.getCollectionTime();
-              }
-            };
+        gcMXBean -> new StatImpl<Long>(
+            "jvm_gc_" + Stats.normalizeName(gcMXBean.getName()) + "_collection_time_ms") {
+          @Override public Long read() {
+            return gcMXBean.getCollectionTime();
           }
         }
     ));

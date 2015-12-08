@@ -79,12 +79,8 @@ class DbAttributeStore implements AttributeStore.Mutable {
     return true;
   }
 
-  private static final Predicate<IAttribute> EMPTY_VALUES = new Predicate<IAttribute>() {
-    @Override
-    public boolean apply(IAttribute attribute) {
-      return attribute.getValues().isEmpty();
-    }
-  };
+  private static final Predicate<IAttribute> EMPTY_VALUES =
+      attribute -> attribute.getValues().isEmpty();
 
   @Timed("attribute_store_fetch_one")
   @Override

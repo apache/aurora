@@ -81,11 +81,7 @@ public final class OptionInfo<T> extends ArgumentInfo<T> {
         String.format("Argument name '%s' does not match required pattern %s",
             name, ARG_NAME_RE));
 
-    Function<String, String> canonicalizer = new Function<String, String>() {
-      @Override public String apply(String name) {
-        return field.getDeclaringClass().getCanonicalName() + "." + name;
-      }
-    };
+    Function<String, String> canonicalizer = name1 -> field.getDeclaringClass().getCanonicalName() + "." + name1;
 
     @SuppressWarnings({"unchecked", "rawtypes"}) // we have no way to know the type here
     OptionInfo<?> optionInfo = new OptionInfo(

@@ -87,11 +87,7 @@ public class Group {
     this.path = ZooKeeperUtils.normalizePath(Preconditions.checkNotNull(path));
 
     this.nodeScheme = Preconditions.checkNotNull(nodeScheme);
-    nodeNameFilter = new Predicate<String>() {
-      @Override public boolean apply(String nodeName) {
-        return Group.this.nodeScheme.isMember(nodeName);
-      }
-    };
+    nodeNameFilter = Group.this.nodeScheme::isMember;
 
     backoffHelper = new BackoffHelper();
   }
@@ -264,47 +260,43 @@ public class Group {
     ensurePersistentGroupPath();
 
     final ActiveMembership groupJoiner = new ActiveMembership(memberData, onLoseMembership);
-    return backoffHelper.doUntilResult(new ExceptionalSupplier<Membership, JoinException>() {
-      @Override public Membership get() throws JoinException {
-        try {
-          return groupJoiner.join();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new JoinException("Interrupted trying to join group at path: " + path, e);
-        } catch (ZooKeeperConnectionException e) {
+    return backoffHelper.doUntilResult(() -> {
+      try {
+        return groupJoiner.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new JoinException("Interrupted trying to join group at path: " + path, e);
+      } catch (ZooKeeperConnectionException e) {
+        LOG.log(Level.WARNING, "Temporary error trying to join group at path: " + path, e);
+        return null;
+      } catch (KeeperException e) {
+        if (zkClient.shouldRetry(e)) {
           LOG.log(Level.WARNING, "Temporary error trying to join group at path: " + path, e);
           return null;
-        } catch (KeeperException e) {
-          if (zkClient.shouldRetry(e)) {
-            LOG.log(Level.WARNING, "Temporary error trying to join group at path: " + path, e);
-            return null;
-          } else {
-            throw new JoinException("Problem joining partition group at path: " + path, e);
-          }
+        } else {
+          throw new JoinException("Problem joining partition group at path: " + path, e);
         }
       }
     });
   }
 
   private void ensurePersistentGroupPath() throws JoinException, InterruptedException {
-    backoffHelper.doUntilSuccess(new ExceptionalSupplier<Boolean, JoinException>() {
-      @Override public Boolean get() throws JoinException {
-        try {
-          ZooKeeperUtils.ensurePath(zkClient, acl, path);
-          return true;
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new JoinException("Interrupted trying to ensure group at path: " + path, e);
-        } catch (ZooKeeperConnectionException e) {
-          LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+    backoffHelper.doUntilSuccess(() -> {
+      try {
+        ZooKeeperUtils.ensurePath(zkClient, acl, path);
+        return true;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new JoinException("Interrupted trying to ensure group at path: " + path, e);
+      } catch (ZooKeeperConnectionException e) {
+        LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+        return false;
+      } catch (KeeperException e) {
+        if (zkClient.shouldRetry(e)) {
+          LOG.log(Level.WARNING, "Temporary error ensuring path: " + path, e);
           return false;
-        } catch (KeeperException e) {
-          if (zkClient.shouldRetry(e)) {
-            LOG.log(Level.WARNING, "Temporary error ensuring path: " + path, e);
-            return false;
-          } else {
-            throw new JoinException("Problem ensuring group at path: " + path, e);
-          }
+        } else {
+          throw new JoinException("Problem ensuring group at path: " + path, e);
         }
       }
     });
@@ -361,28 +353,26 @@ public class Group {
     public synchronized void cancel() throws JoinException {
       if (!cancelled) {
         try {
-          backoffHelper.doUntilSuccess(new ExceptionalSupplier<Boolean, JoinException>() {
-            @Override public Boolean get() throws JoinException {
-              try {
-                zkClient.get().delete(nodePath, ZooKeeperUtils.ANY_VERSION);
-                return true;
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new JoinException("Interrupted trying to cancel membership: " + nodePath, e);
-              } catch (ZooKeeperConnectionException e) {
-                LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+          backoffHelper.doUntilSuccess(() -> {
+            try {
+              zkClient.get().delete(nodePath, ZooKeeperUtils.ANY_VERSION);
+              return true;
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new JoinException("Interrupted trying to cancel membership: " + nodePath, e);
+            } catch (ZooKeeperConnectionException e) {
+              LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+              return false;
+            } catch (NoNodeException e) {
+              LOG.info("Membership already cancelled, node at path: " + nodePath +
+                       " has been deleted");
+              return true;
+            } catch (KeeperException e) {
+              if (zkClient.shouldRetry(e)) {
+                LOG.log(Level.WARNING, "Temporary error cancelling membership: " + nodePath, e);
                 return false;
-              } catch (NoNodeException e) {
-                LOG.info("Membership already cancelled, node at path: " + nodePath +
-                         " has been deleted");
-                return true;
-              } catch (KeeperException e) {
-                if (zkClient.shouldRetry(e)) {
-                  LOG.log(Level.WARNING, "Temporary error cancelling membership: " + nodePath, e);
-                  return false;
-                } else {
-                  throw new JoinException("Problem cancelling membership: " + nodePath, e);
-                }
+              } else {
+                throw new JoinException("Problem cancelling membership: " + nodePath, e);
               }
             }
           });
@@ -406,11 +396,7 @@ public class Group {
       if (nodePath == null) {
         // Re-join if our ephemeral node goes away due to session expiry - only needs to be
         // registered once.
-        zkClient.registerExpirationHandler(new Command() {
-          @Override public void execute() {
-            tryJoin();
-          }
-        });
+        zkClient.registerExpirationHandler(this::tryJoin);
       }
 
       byte[] membershipData = memberData.get();
@@ -424,11 +410,9 @@ public class Group {
       this.membershipData = membershipData;
 
       // Re-join if our ephemeral node goes away due to maliciousness.
-      zkClient.get().exists(nodePath, new Watcher() {
-        @Override public void process(WatchedEvent event) {
-          if (event.getType() == EventType.NodeDeleted) {
-            tryJoin();
-          }
+      zkClient.get().exists(nodePath, event -> {
+        if (event.getType() == EventType.NodeDeleted) {
+          tryJoin();
         }
       });
 
@@ -436,24 +420,22 @@ public class Group {
     }
 
     private final ExceptionalSupplier<Boolean, InterruptedException> tryJoin =
-        new ExceptionalSupplier<Boolean, InterruptedException>() {
-          @Override public Boolean get() throws InterruptedException {
-            try {
-              join();
-              return true;
-            } catch (CancelledException e) {
-              // Lost a cancel race - that's ok.
-              return true;
-            } catch (ZooKeeperConnectionException e) {
-              LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+        () -> {
+          try {
+            join();
+            return true;
+          } catch (CancelledException e) {
+            // Lost a cancel race - that's ok.
+            return true;
+          } catch (ZooKeeperConnectionException e) {
+            LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+            return false;
+          } catch (KeeperException e) {
+            if (zkClient.shouldRetry(e)) {
+              LOG.log(Level.WARNING, "Temporary error re-joining group: " + path, e);
               return false;
-            } catch (KeeperException e) {
-              if (zkClient.shouldRetry(e)) {
-                LOG.log(Level.WARNING, "Temporary error re-joining group: " + path, e);
-                return false;
-              } else {
-                throw new IllegalStateException("Permanent problem re-joining group: " + path, e);
-              }
+            } else {
+              throw new IllegalStateException("Permanent problem re-joining group: " + path, e);
             }
           }
         };
@@ -542,32 +524,26 @@ public class Group {
     }
 
     final GroupMonitor groupMonitor = new GroupMonitor(groupChangeListener);
-    backoffHelper.doUntilSuccess(new ExceptionalSupplier<Boolean, WatchException>() {
-      @Override public Boolean get() throws WatchException {
-        try {
-          groupMonitor.watchGroup();
-          return true;
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new WatchException("Interrupted trying to watch group at path: " + path, e);
-        } catch (ZooKeeperConnectionException e) {
+    backoffHelper.doUntilSuccess(() -> {
+      try {
+        groupMonitor.watchGroup();
+        return true;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new WatchException("Interrupted trying to watch group at path: " + path, e);
+      } catch (ZooKeeperConnectionException e) {
+        LOG.log(Level.WARNING, "Temporary error trying to watch group at path: " + path, e);
+        return null;
+      } catch (KeeperException e) {
+        if (zkClient.shouldRetry(e)) {
           LOG.log(Level.WARNING, "Temporary error trying to watch group at path: " + path, e);
           return null;
-        } catch (KeeperException e) {
-          if (zkClient.shouldRetry(e)) {
-            LOG.log(Level.WARNING, "Temporary error trying to watch group at path: " + path, e);
-            return null;
-          } else {
-            throw new WatchException("Problem trying to watch group at path: " + path, e);
-          }
+        } else {
+          throw new WatchException("Problem trying to watch group at path: " + path, e);
         }
       }
     });
-    return new Command() {
-      @Override public void execute() {
-        groupMonitor.stopWatching();
-      }
-    };
+    return groupMonitor::stopWatching;
   }
 
   /**
@@ -582,30 +558,26 @@ public class Group {
       this.groupChangeListener = groupChangeListener;
     }
 
-    private final Watcher groupWatcher = new Watcher() {
-      @Override public final void process(WatchedEvent event) {
-        if (event.getType() == EventType.NodeChildrenChanged) {
-          tryWatchGroup();
-        }
+    private final Watcher groupWatcher = event -> {
+      if (event.getType() == EventType.NodeChildrenChanged) {
+        tryWatchGroup();
       }
     };
 
     private final ExceptionalSupplier<Boolean, InterruptedException> tryWatchGroup =
-        new ExceptionalSupplier<Boolean, InterruptedException>() {
-          @Override public Boolean get() throws InterruptedException {
-            try {
-              watchGroup();
-              return true;
-            } catch (ZooKeeperConnectionException e) {
-              LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+        () -> {
+          try {
+            watchGroup();
+            return true;
+          } catch (ZooKeeperConnectionException e) {
+            LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+            return false;
+          } catch (KeeperException e) {
+            if (zkClient.shouldRetry(e)) {
+              LOG.log(Level.WARNING, "Temporary error re-watching group: " + path, e);
               return false;
-            } catch (KeeperException e) {
-              if (zkClient.shouldRetry(e)) {
-                LOG.log(Level.WARNING, "Temporary error re-watching group: " + path, e);
-                return false;
-              } else {
-                throw new IllegalStateException("Permanent problem re-watching group: " + path, e);
-              }
+            } else {
+              throw new IllegalStateException("Permanent problem re-watching group: " + path, e);
             }
           }
         };
@@ -650,11 +622,7 @@ public class Group {
 
       if (this.members == null) {
         // Reset our watch on the group if session expires - only needs to be registered once.
-        zkClient.registerExpirationHandler(new Command() {
-          @Override public void execute() {
-            tryWatchGroup();
-          }
-        });
+        zkClient.registerExpirationHandler(this::tryWatchGroup);
       }
 
       Set<String> membership = ImmutableSet.copyOf(members);

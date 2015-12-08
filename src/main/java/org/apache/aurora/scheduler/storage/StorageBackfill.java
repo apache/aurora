@@ -24,7 +24,6 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -75,13 +74,10 @@ public final class StorageBackfill {
     // Backfilling job keys has to be done in a separate transaction to ensure follow up scoped
     // Query calls work against upgraded MemTaskStore, which does not support deprecated fields.
     LOG.info("Backfilling task config job keys.");
-    storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
-      @Override
-      public IScheduledTask apply(final IScheduledTask task) {
-        ScheduledTask builder = task.newBuilder();
-        populateJobKey(builder.getAssignedTask().getTask(), BACKFILLED_TASK_CONFIG_KEYS);
-        return IScheduledTask.build(builder);
-      }
+    storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), task -> {
+      ScheduledTask builder = task.newBuilder();
+      populateJobKey(builder.getAssignedTask().getTask(), BACKFILLED_TASK_CONFIG_KEYS);
+      return IScheduledTask.build(builder);
     });
   }
 }

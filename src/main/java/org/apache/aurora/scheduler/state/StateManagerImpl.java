@@ -54,7 +54,6 @@ import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.state.SideEffect.Action;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -63,7 +62,6 @@ import org.apache.mesos.Protos.SlaveID;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
-
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
@@ -121,12 +119,7 @@ public class StateManagerImpl implements StateManager {
 
     // Done outside the write transaction to minimize the work done inside a transaction.
     Set<IScheduledTask> scheduledTasks = FluentIterable.from(instanceIds)
-        .transform(new Function<Integer, IScheduledTask>() {
-          @Override
-          public IScheduledTask apply(Integer instanceId) {
-            return createTask(instanceId, task);
-          }
-        }).toSet();
+        .transform(instanceId -> createTask(instanceId, task)).toSet();
 
     Iterable<IScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
         Query.jobScoped(task.getJob()).active());
@@ -182,16 +175,13 @@ public class StateManagerImpl implements StateManager {
     Query.Builder query = Query.taskScoped(taskId);
 
     storeProvider.getUnsafeTaskStore().mutateTasks(query,
-        new Function<IScheduledTask, IScheduledTask>() {
-          @Override
-          public IScheduledTask apply(IScheduledTask task) {
-            ScheduledTask builder = task.newBuilder();
-            builder.getAssignedTask()
-                .setAssignedPorts(assignedPorts)
-                .setSlaveHost(slaveHost)
-                .setSlaveId(slaveId.getValue());
-            return IScheduledTask.build(builder);
-          }
+        task -> {
+          ScheduledTask builder = task.newBuilder();
+          builder.getAssignedTask()
+              .setAssignedPorts(assignedPorts)
+              .setSlaveHost(slaveHost)
+              .setSlaveId(slaveId.getValue());
+          return IScheduledTask.build(builder);
         });
 
     StateChangeResult changeResult = updateTaskAndExternalState(
@@ -213,15 +203,12 @@ public class StateManagerImpl implements StateManager {
 
   @VisibleForTesting
   static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(
-      new Supplier<String>() {
-        @Override
-        public String get() {
-          try {
-            return InetAddress.getLocalHost().getHostName();
-          } catch (UnknownHostException e) {
-            LOG.log(Level.SEVERE, "Failed to get self hostname.");
-            throw Throwables.propagate(e);
-          }
+      () -> {
+        try {
+          return InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+          LOG.log(Level.SEVERE, "Failed to get self hostname.");
+          throw Throwables.propagate(e);
         }
       });
 
@@ -252,12 +239,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   private static final Function<SideEffect, Action> GET_ACTION =
-      new Function<SideEffect, Action>() {
-        @Override
-        public Action apply(SideEffect sideEffect) {
-          return sideEffect.getAction();
-        }
-      };
+      SideEffect::getAction;
 
   private static final List<Action> ACTIONS_IN_ORDER = ImmutableList.of(
       Action.INCREMENT_FAILURES,
@@ -309,13 +291,8 @@ public class StateManagerImpl implements StateManager {
 
       switch (sideEffect.getAction()) {
         case INCREMENT_FAILURES:
-          taskStore.mutateTasks(query, new TaskMutation() {
-            @Override
-            public IScheduledTask apply(IScheduledTask task) {
-              return IScheduledTask.build(
-                  task.newBuilder().setFailureCount(task.getFailureCount() + 1));
-            }
-          });
+          taskStore.mutateTasks(query, task1 -> IScheduledTask.build(
+              task1.newBuilder().setFailureCount(task1.getFailureCount() + 1)));
           break;
 
         case SAVE_STATE:
@@ -323,18 +300,15 @@ public class StateManagerImpl implements StateManager {
               upToDateTask.isPresent(),
               "Operation expected task " + taskId + " to be present.");
 
-          taskStore.mutateTasks(query, new TaskMutation() {
-            @Override
-            public IScheduledTask apply(IScheduledTask task) {
-              ScheduledTask mutableTask = task.newBuilder();
-              mutableTask.setStatus(targetState.get());
-              mutableTask.addToTaskEvents(new TaskEvent()
-                  .setTimestamp(clock.nowMillis())
-                  .setStatus(targetState.get())
-                  .setMessage(transitionMessage.orNull())
-                  .setScheduler(LOCAL_HOST_SUPPLIER.get()));
-              return IScheduledTask.build(mutableTask);
-            }
+          taskStore.mutateTasks(query, task1 -> {
+            ScheduledTask mutableTask = task1.newBuilder();
+            mutableTask.setStatus(targetState.get());
+            mutableTask.addToTaskEvents(new TaskEvent()
+                .setTimestamp(clock.nowMillis())
+                .setStatus(targetState.get())
+                .setMessage(transitionMessage.orNull())
+                .setScheduler(LOCAL_HOST_SUPPLIER.get()));
+            return IScheduledTask.build(mutableTask);
           });
           events.add(
               PubsubEvent.TaskStateChange.transition(

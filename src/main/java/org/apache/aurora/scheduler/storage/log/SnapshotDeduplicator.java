@@ -62,12 +62,7 @@ public interface SnapshotDeduplicator {
     private static final Logger LOG = Logger.getLogger(SnapshotDeduplicatorImpl.class.getName());
 
     private static final Function<ScheduledTask, TaskConfig> SCHEDULED_TO_CONFIG =
-        new Function<ScheduledTask, TaskConfig>() {
-          @Override
-          public TaskConfig apply(ScheduledTask task) {
-            return task.getAssignedTask().getTask();
-          }
-        };
+        task -> task.getAssignedTask().getTask();
 
     private static ScheduledTask deepCopyWithoutTaskConfig(ScheduledTask scheduledTask) {
       ScheduledTask scheduledTaskCopy = new ScheduledTask();

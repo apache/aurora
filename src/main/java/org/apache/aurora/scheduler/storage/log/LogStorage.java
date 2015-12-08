@@ -32,7 +32,6 @@ import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.base.Closure;
-import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -61,6 +60,7 @@ import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -158,16 +158,10 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     ScheduledExecutorSchedulingService(ShutdownRegistry shutdownRegistry,
         Amount<Long, Time> shutdownGracePeriod) {
       scheduledExecutor = AsyncUtil.singleThreadLoggingScheduledExecutor("LogStorage-%d", LOG);
-      shutdownRegistry.addAction(new Command() {
-
-        @Override
-        public void execute() throws RuntimeException {
-          MoreExecutors.shutdownAndAwaitTermination(
-              scheduledExecutor,
-              shutdownGracePeriod.getValue(),
-              shutdownGracePeriod.getUnit().getTimeUnit());
-        }
-      });
+      shutdownRegistry.addAction(() -> MoreExecutors.shutdownAndAwaitTermination(
+          scheduledExecutor,
+          shutdownGracePeriod.getValue(),
+          shutdownGracePeriod.getUnit().getTimeUnit()));
     }
 
     @Override
@@ -311,32 +305,21 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   @VisibleForTesting
   final Map<LogEntry._Fields, Closure<LogEntry>> buildLogEntryReplayActions() {
     return ImmutableMap.<LogEntry._Fields, Closure<LogEntry>>builder()
-        .put(LogEntry._Fields.SNAPSHOT, new Closure<LogEntry>() {
-          @Override
-          public void execute(LogEntry logEntry) {
-            Snapshot snapshot = logEntry.getSnapshot();
-            LOG.info("Applying snapshot taken on " + new Date(snapshot.getTimestamp()));
-            snapshotStore.applySnapshot(snapshot);
-          }
+        .put(LogEntry._Fields.SNAPSHOT, logEntry -> {
+          Snapshot snapshot = logEntry.getSnapshot();
+          LOG.info("Applying snapshot taken on " + new Date(snapshot.getTimestamp()));
+          snapshotStore.applySnapshot(snapshot);
         })
-        .put(LogEntry._Fields.TRANSACTION, new Closure<LogEntry>() {
+        .put(LogEntry._Fields.TRANSACTION, logEntry -> write(new MutateWork.NoResult.Quiet() {
           @Override
-          public void execute(final LogEntry logEntry) {
-            write(new MutateWork.NoResult.Quiet() {
-              @Override
-              public void execute(MutableStoreProvider unused) {
-                for (Op op : logEntry.getTransaction().getOps()) {
-                  replayOp(op);
-                }
-              }
-            });
+          public void execute(MutableStoreProvider unused) {
+            for (Op op : logEntry.getTransaction().getOps()) {
+              replayOp(op);
+            }
           }
-        })
-        .put(LogEntry._Fields.NOOP, new Closure<LogEntry>() {
-          @Override
-          public void execute(LogEntry item) {
-            // Nothing to do here
-          }
+        }))
+        .put(LogEntry._Fields.NOOP, item -> {
+          // Nothing to do here
         })
         .build();
   }
@@ -344,124 +327,77 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   @VisibleForTesting
   final Map<Op._Fields, Closure<Op>> buildTransactionReplayActions() {
     return ImmutableMap.<Op._Fields, Closure<Op>>builder()
-        .put(Op._Fields.SAVE_FRAMEWORK_ID, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            writeBehindSchedulerStore.saveFrameworkId(op.getSaveFrameworkId().getId());
+        .put(
+            Op._Fields.SAVE_FRAMEWORK_ID,
+            op -> writeBehindSchedulerStore.saveFrameworkId(op.getSaveFrameworkId().getId()))
+        .put(Op._Fields.SAVE_CRON_JOB, op -> {
+          SaveCronJob cronJob = op.getSaveCronJob();
+          writeBehindJobStore.saveAcceptedJob(
+              IJobConfiguration.build(cronJob.getJobConfig()));
+        })
+        .put(
+            Op._Fields.REMOVE_JOB,
+            op -> writeBehindJobStore.removeJob(IJobKey.build(op.getRemoveJob().getJobKey())))
+        .put(
+            Op._Fields.SAVE_TASKS,
+            op -> writeBehindTaskStore.saveTasks(
+            IScheduledTask.setFromBuilders(op.getSaveTasks().getTasks())))
+        .put(Op._Fields.REWRITE_TASK, op -> {
+          RewriteTask rewriteTask = op.getRewriteTask();
+          writeBehindTaskStore.unsafeModifyInPlace(
+              rewriteTask.getTaskId(),
+              ITaskConfig.build(rewriteTask.getTask()));
+        })
+        .put(
+            Op._Fields.REMOVE_TASKS,
+            op -> writeBehindTaskStore.deleteTasks(op.getRemoveTasks().getTaskIds()))
+        .put(Op._Fields.SAVE_QUOTA, op -> {
+          SaveQuota saveQuota = op.getSaveQuota();
+          writeBehindQuotaStore.saveQuota(
+              saveQuota.getRole(),
+              IResourceAggregate.build(saveQuota.getQuota()));
+        })
+        .put(
+            Op._Fields.REMOVE_QUOTA,
+            op -> writeBehindQuotaStore.removeQuota(op.getRemoveQuota().getRole()))
+        .put(Op._Fields.SAVE_HOST_ATTRIBUTES, op -> {
+          HostAttributes attributes = op.getSaveHostAttributes().getHostAttributes();
+          // Prior to commit 5cf760b, the store would persist maintenance mode changes for
+          // unknown hosts.  5cf760b began rejecting these, but the replicated log may still
+          // contain entries with a null slave ID.
+          if (attributes.isSetSlaveId()) {
+            writeBehindAttributeStore.saveHostAttributes(IHostAttributes.build(attributes));
+          } else {
+            LOG.info("Dropping host attributes with no slave ID: " + attributes);
           }
         })
-        .put(Op._Fields.SAVE_CRON_JOB, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            SaveCronJob cronJob = op.getSaveCronJob();
-            writeBehindJobStore.saveAcceptedJob(
-                IJobConfiguration.build(cronJob.getJobConfig()));
-          }
+        .put(
+            Op._Fields.SAVE_LOCK,
+            op -> writeBehindLockStore.saveLock(ILock.build(op.getSaveLock().getLock())))
+        .put(
+            Op._Fields.REMOVE_LOCK,
+            op -> writeBehindLockStore.removeLock(ILockKey.build(op.getRemoveLock().getLockKey())))
+        .put(Op._Fields.SAVE_JOB_UPDATE, op -> {
+          JobUpdate update = op.getSaveJobUpdate().getJobUpdate();
+          writeBehindJobUpdateStore.saveJobUpdate(
+              IJobUpdate.build(update),
+              Optional.fromNullable(op.getSaveJobUpdate().getLockToken()));
         })
-        .put(Op._Fields.REMOVE_JOB, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            writeBehindJobStore.removeJob(IJobKey.build(op.getRemoveJob().getJobKey()));
-          }
+        .put(Op._Fields.SAVE_JOB_UPDATE_EVENT, op -> {
+          SaveJobUpdateEvent event = op.getSaveJobUpdateEvent();
+          writeBehindJobUpdateStore.saveJobUpdateEvent(
+              IJobUpdateKey.build(event.getKey()),
+              IJobUpdateEvent.build(op.getSaveJobUpdateEvent().getEvent()));
         })
-        .put(Op._Fields.SAVE_TASKS, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            writeBehindTaskStore.saveTasks(
-                IScheduledTask.setFromBuilders(op.getSaveTasks().getTasks()));
-          }
+        .put(Op._Fields.SAVE_JOB_INSTANCE_UPDATE_EVENT, op -> {
+          SaveJobInstanceUpdateEvent event = op.getSaveJobInstanceUpdateEvent();
+          writeBehindJobUpdateStore.saveJobInstanceUpdateEvent(
+              IJobUpdateKey.build(event.getKey()),
+              IJobInstanceUpdateEvent.build(op.getSaveJobInstanceUpdateEvent().getEvent()));
         })
-        .put(Op._Fields.REWRITE_TASK, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            RewriteTask rewriteTask = op.getRewriteTask();
-            writeBehindTaskStore.unsafeModifyInPlace(
-                rewriteTask.getTaskId(),
-                ITaskConfig.build(rewriteTask.getTask()));
-          }
-        })
-        .put(Op._Fields.REMOVE_TASKS, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            writeBehindTaskStore.deleteTasks(op.getRemoveTasks().getTaskIds());
-          }
-        })
-        .put(Op._Fields.SAVE_QUOTA, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            SaveQuota saveQuota = op.getSaveQuota();
-            writeBehindQuotaStore.saveQuota(
-                saveQuota.getRole(),
-                IResourceAggregate.build(saveQuota.getQuota()));
-          }
-        })
-        .put(Op._Fields.REMOVE_QUOTA, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            writeBehindQuotaStore.removeQuota(op.getRemoveQuota().getRole());
-          }
-        })
-        .put(Op._Fields.SAVE_HOST_ATTRIBUTES, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            HostAttributes attributes = op.getSaveHostAttributes().getHostAttributes();
-            // Prior to commit 5cf760b, the store would persist maintenance mode changes for
-            // unknown hosts.  5cf760b began rejecting these, but the replicated log may still
-            // contain entries with a null slave ID.
-            if (attributes.isSetSlaveId()) {
-              writeBehindAttributeStore.saveHostAttributes(IHostAttributes.build(attributes));
-            } else {
-              LOG.info("Dropping host attributes with no slave ID: " + attributes);
-            }
-          }
-        })
-        .put(Op._Fields.SAVE_LOCK, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            writeBehindLockStore.saveLock(ILock.build(op.getSaveLock().getLock()));
-          }
-        })
-        .put(Op._Fields.REMOVE_LOCK, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            writeBehindLockStore.removeLock(ILockKey.build(op.getRemoveLock().getLockKey()));
-          }
-        })
-        .put(Op._Fields.SAVE_JOB_UPDATE, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            JobUpdate update = op.getSaveJobUpdate().getJobUpdate();
-            writeBehindJobUpdateStore.saveJobUpdate(
-                IJobUpdate.build(update),
-                Optional.fromNullable(op.getSaveJobUpdate().getLockToken()));
-          }
-        })
-        .put(Op._Fields.SAVE_JOB_UPDATE_EVENT, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            SaveJobUpdateEvent event = op.getSaveJobUpdateEvent();
-            writeBehindJobUpdateStore.saveJobUpdateEvent(
-                IJobUpdateKey.build(event.getKey()),
-                IJobUpdateEvent.build(op.getSaveJobUpdateEvent().getEvent()));
-          }
-        })
-        .put(Op._Fields.SAVE_JOB_INSTANCE_UPDATE_EVENT, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            SaveJobInstanceUpdateEvent event = op.getSaveJobInstanceUpdateEvent();
-            writeBehindJobUpdateStore.saveJobInstanceUpdateEvent(
-                IJobUpdateKey.build(event.getKey()),
-                IJobInstanceUpdateEvent.build(op.getSaveJobInstanceUpdateEvent().getEvent()));
-          }
-        })
-        .put(Op._Fields.PRUNE_JOB_UPDATE_HISTORY, new Closure<Op>() {
-          @Override
-          public void execute(Op op) {
-            writeBehindJobUpdateStore.pruneHistory(
-                op.getPruneJobUpdateHistory().getPerJobRetainCount(),
-                op.getPruneJobUpdateHistory().getHistoryPruneThresholdMs());
-          }
-        }).build();
+        .put(Op._Fields.PRUNE_JOB_UPDATE_HISTORY, op -> writeBehindJobUpdateStore.pruneHistory(
+            op.getPruneJobUpdateHistory().getPerJobRetainCount(),
+            op.getPruneJobUpdateHistory().getHistoryPruneThresholdMs())).build();
   }
 
   @Override
@@ -477,19 +413,16 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
   @Override
   public synchronized void start(final MutateWork.NoResult.Quiet initializationLogic) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider unused) {
-        // Must have the underlying storage started so we can query it for the last checkpoint.
-        // We replay these entries in the forwarded storage system's transactions but not ours - we
-        // do not want to re-record these ops to the log.
-        recover();
-        recovered = true;
+    write((NoResult.Quiet) (MutableStoreProvider unused) -> {
+      // Must have the underlying storage started so we can query it for the last checkpoint.
+      // We replay these entries in the forwarded storage system's transactions but not ours - we
+      // do not want to re-record these ops to the log.
+      recover();
+      recovered = true;
 
-        // Now that we're recovered we should let any mutations done in initializationLogic append
-        // to the log, so run it in one of our transactions.
-        write(initializationLogic);
-      }
+      // Now that we're recovered we should let any mutations done in initializationLogic append
+      // to the log, so run it in one of our transactions.
+      write(initializationLogic);
     });
 
     scheduleSnapshots();
@@ -502,19 +435,11 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
   @Timed("scheduler_log_recover")
   void recover() throws RecoveryFailedException {
-    writeBehindStorage.bulkLoad(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        try {
-          streamManager.readFromBeginning(new Closure<LogEntry>() {
-            @Override
-            public void execute(LogEntry logEntry) {
-              replay(logEntry);
-            }
-          });
-        } catch (CodingException | InvalidPositionException | StreamAccessException e) {
-          throw new RecoveryFailedException(e);
-        }
+    writeBehindStorage.bulkLoad(storeProvider -> {
+      try {
+        streamManager.readFromBeginning(LogStorage.this::replay);
+      } catch (CodingException | InvalidPositionException | StreamAccessException e) {
+        throw new RecoveryFailedException(e);
       }
     });
   }
@@ -545,17 +470,14 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
   private void scheduleSnapshots() {
     if (snapshotInterval.getValue() > 0) {
-      schedulingService.doEvery(snapshotInterval, new Runnable() {
-        @Override
-        public void run() {
-          try {
-            snapshot();
-          } catch (StorageException e) {
-            if (e.getCause() == null) {
-              LOG.log(Level.WARNING, "StorageException when attempting to snapshot.", e);
-            } else {
-              LOG.log(Level.WARNING, e.getMessage(), e.getCause());
-            }
+      schedulingService.doEvery(snapshotInterval, () -> {
+        try {
+          snapshot();
+        } catch (StorageException e) {
+          if (e.getCause() == null) {
+            LOG.log(Level.WARNING, "StorageException when attempting to snapshot.", e);
+          } else {
+            LOG.log(Level.WARNING, e.getMessage(), e.getCause());
           }
         }
       });
@@ -571,21 +493,16 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
    */
   @Timed("scheduler_log_snapshot")
   void doSnapshot() throws CodingException, InvalidPositionException, StreamAccessException {
-    write(new MutateWork.NoResult<CodingException>() {
-      @Override
-      public void execute(MutableStoreProvider unused)
-          throws CodingException, InvalidPositionException, StreamAccessException {
-
-        LOG.info("Creating snapshot.");
-        Snapshot snapshot = snapshotStore.createSnapshot();
-        persist(snapshot);
-        LOG.info("Snapshot complete."
-            + " host attrs: " + snapshot.getHostAttributesSize()
-            + ", cron jobs: " + snapshot.getCronJobsSize()
-            + ", locks: " + snapshot.getLocksSize()
-            + ", quota confs: " + snapshot.getQuotaConfigurationsSize()
-            + ", tasks: " + snapshot.getTasksSize());
-      }
+    write((NoResult<CodingException>) (MutableStoreProvider unused) -> {
+      LOG.info("Creating snapshot.");
+      Snapshot snapshot = snapshotStore.createSnapshot();
+      persist(snapshot);
+      LOG.info("Snapshot complete."
+          + " host attrs: " + snapshot.getHostAttributesSize()
+          + ", cron jobs: " + snapshot.getCronJobsSize()
+          + ", locks: " + snapshot.getLocksSize()
+          + ", quota confs: " + snapshot.getQuotaConfigurationsSize()
+          + ", tasks: " + snapshot.getTasksSize());
     });
   }
 
@@ -608,21 +525,18 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
     transaction = streamManager.startTransaction();
     try {
-      return writeBehindStorage.write(new MutateWork<T, E>() {
-        @Override
-        public T apply(MutableStoreProvider unused) throws E {
-          T result = work.apply(writeAheadStorage);
-          try {
-            transaction.commit();
-          } catch (CodingException e) {
-            throw new IllegalStateException(
-                "Problem encoding transaction operations to the log stream", e);
-          } catch (StreamAccessException e) {
-            throw new StorageException(
-                "There was a problem committing the transaction to the log.", e);
-          }
-          return result;
+      return writeBehindStorage.write(unused -> {
+        T result = work.apply(writeAheadStorage);
+        try {
+          transaction.commit();
+        } catch (CodingException e) {
+          throw new IllegalStateException(
+              "Problem encoding transaction operations to the log stream", e);
+        } catch (StreamAccessException e) {
+          throw new StorageException(
+              "There was a problem committing the transaction to the log.", e);
         }
+        return result;
       });
     } finally {
       transaction = null;

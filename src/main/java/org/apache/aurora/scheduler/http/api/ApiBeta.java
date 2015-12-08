@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.http.api;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -150,17 +148,14 @@ public class ApiBeta {
 
     final Method method = getApiMethod(methodName, methodMetadata);
     final Object[] params = readParams(parameters, methodMetadata);
-    return Response.ok(new StreamingOutput() {
-      @Override
-      public void write(OutputStream output) throws IOException {
-        try {
-          Object response = method.invoke(api, params);
-          try (OutputStreamWriter out = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
-            GSON.toJson(response, out);
-          }
-        } catch (IllegalAccessException | InvocationTargetException e) {
-          throw Throwables.propagate(e);
+    return Response.ok((StreamingOutput) output -> {
+      try {
+        Object response = method.invoke(api, params);
+        try (OutputStreamWriter out = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
+          GSON.toJson(response, out);
         }
+      } catch (IllegalAccessException | InvocationTargetException e) {
+        throw Throwables.propagate(e);
       }
     }).build();
   }

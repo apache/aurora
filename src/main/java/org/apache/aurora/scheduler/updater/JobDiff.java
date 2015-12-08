@@ -26,6 +26,7 @@ import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.MapDifference;
+import com.google.common.collect.MapDifference.ValueDifference;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
@@ -130,12 +131,7 @@ public final class JobDiff {
   }
 
   private static <V> Function<MapDifference.ValueDifference<V>, V> leftValue() {
-    return new Function<MapDifference.ValueDifference<V>, V>() {
-      @Override
-      public V apply(MapDifference.ValueDifference<V> diff) {
-        return diff.leftValue();
-      }
-    };
+    return ValueDifference::leftValue;
   }
 
   private static JobDiff computeUnscoped(

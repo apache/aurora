@@ -124,14 +124,11 @@ public final class ResourceSlot {
         .findFirst();
     ExecutorInfo.Builder executorBuilder = taskBuilder.getExecutorBuilder();
 
-    Consumer<Builder> matchRevocable = new Consumer<Builder>() {
-      @Override
-      public void accept(Builder builder) {
-        if (revocableTaskCpu.isPresent()) {
-          builder.setRevocable(revocableTaskCpu.get().getRevocable());
-        } else {
-          builder.clearRevocable();
-        }
+    Consumer<Builder> matchRevocable = builder -> {
+      if (revocableTaskCpu.isPresent()) {
+        builder.setRevocable(revocableTaskCpu.get().getRevocable());
+      } else {
+        builder.clearRevocable();
       }
     };
 
@@ -353,13 +350,8 @@ public final class ResourceSlot {
   private static final Predicate<Integer> IS_ZERO = e -> e == 0;
 
   private static final Function<Range<Integer>, Protos.Value.Range> RANGE_TRANSFORM =
-      new Function<Range<Integer>, Protos.Value.Range>() {
-        @Override
-        public Protos.Value.Range apply(Range<Integer> input) {
-          return Protos.Value.Range.newBuilder()
-              .setBegin(input.lowerEndpoint())
-              .setEnd(input.upperEndpoint())
-              .build();
-        }
-      };
+      input -> Protos.Value.Range.newBuilder()
+          .setBegin(input.lowerEndpoint())
+          .setEnd(input.upperEndpoint())
+          .build();
 }

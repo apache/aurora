@@ -18,7 +18,6 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
@@ -53,12 +52,7 @@ class CronSchedulerImpl implements CronScheduler {
       return Optional.of(Iterables.getOnlyElement(
           FluentIterable.from(scheduler.getTriggersOfJob(jobKey(jobKey)))
               .filter(CronTrigger.class)
-              .transform(new Function<CronTrigger, CrontabEntry>() {
-                @Override
-                public CrontabEntry apply(CronTrigger trigger) {
-                  return Quartz.crontabEntry(trigger);
-                }
-              })));
+              .transform(Quartz::crontabEntry)));
     } catch (SchedulerException e) {
       LOG.log(Level.SEVERE,
           "Error reading job " + JobKeys.canonicalString(jobKey) + " cronExpression Quartz: " + e,

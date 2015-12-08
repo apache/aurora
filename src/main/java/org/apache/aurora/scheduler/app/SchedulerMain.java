@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.app;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
@@ -167,12 +166,9 @@ public class SchedulerMain {
   @VisibleForTesting
   public static void flagConfiguredMain(Module appEnvironmentModule) {
     AtomicLong uncaughtExceptions = Stats.exportLong("uncaught_exceptions");
-    Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-      @Override
-      public void uncaughtException(Thread t, Throwable e) {
-        uncaughtExceptions.incrementAndGet();
-        LOG.log(Level.SEVERE, "Uncaught exception from " + t + ":" + e, e);
-      }
+    Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+      uncaughtExceptions.incrementAndGet();
+      LOG.log(Level.SEVERE, "Uncaught exception from " + t + ":" + e, e);
     });
 
     ClientConfig zkClientConfig = FlaggedClientConfig.create();

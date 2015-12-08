@@ -62,12 +62,7 @@ public final class GuiceUtils {
   }
 
   private static final Function<Method, Pair<String, Class<?>[]>> CANONICALIZE =
-      new Function<Method, Pair<String, Class<?>[]>>() {
-        @Override
-        public Pair<String, Class<?>[]> apply(Method method) {
-          return Pair.of(method.getName(), method.getParameterTypes());
-        }
-      };
+      method -> Pair.of(method.getName(), method.getParameterTypes());
 
   /**
    * Creates a matcher that will match methods of an interface, optionally excluding inherited
@@ -125,12 +120,8 @@ public final class GuiceUtils {
         });
   }
 
-  private static final Predicate<Method> IS_WHITELISTED = new Predicate<Method>() {
-    @Override
-    public boolean apply(Method method) {
-      return method.getAnnotation(AllowUnchecked.class) != null;
-    }
-  };
+  private static final Predicate<Method> IS_WHITELISTED =
+      method -> method.getAnnotation(AllowUnchecked.class) != null;
 
   private static final Matcher<Method> WHITELIST_MATCHER = new AbstractMatcher<Method>() {
     @Override
@@ -139,12 +130,8 @@ public final class GuiceUtils {
     }
   };
 
-  private static final Predicate<Method> VOID_METHOD = new Predicate<Method>() {
-    @Override
-    public boolean apply(Method method) {
-      return method.getReturnType() == Void.TYPE;
-    }
-  };
+  private static final Predicate<Method> VOID_METHOD =
+      method -> method.getReturnType() == Void.TYPE;
 
   /**
    * Binds an exception trap on all interface methods of all classes bound against an interface.

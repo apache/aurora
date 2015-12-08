@@ -155,14 +155,11 @@ class DbStorage extends AbstractIdleService implements Storage {
     // introduction of DbStorage, but should be revisited.
     // TODO(wfarner): Consider revisiting to execute async work only when the transaction is
     // successful.
-    return gatedWorkQueue.closeDuring(new GatedOperation<T, E>() {
-      @Override
-      public T doWithGateClosed() throws E {
-        try {
-          return transactionedWrite(work);
-        } catch (PersistenceException e) {
-          throw new StorageException(e.getMessage(), e);
-        }
+    return gatedWorkQueue.closeDuring((GatedOperation<T, E>) () -> {
+      try {
+        return transactionedWrite(work);
+      } catch (PersistenceException e) {
+        throw new StorageException(e.getMessage(), e);
       }
     });
   }
@@ -179,23 +176,20 @@ class DbStorage extends AbstractIdleService implements Storage {
   public <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work)
       throws StorageException, E {
 
-    gatedWorkQueue.closeDuring(new GatedOperation<Void, E>() {
-      @Override
-      public Void doWithGateClosed() throws E {
-        // Disabling the undo log disables transaction rollback, but dramatically speeds up a bulk
-        // insert.
-        try (SqlSession session = sessionFactory.openSession(false)) {
-          try {
-            session.update(DISABLE_UNDO_LOG);
-            work.apply(storeProvider);
-          } catch (PersistenceException e) {
-            throw new StorageException(e.getMessage(), e);
-          } finally {
-            session.update(ENABLE_UNDO_LOG);
-          }
+    gatedWorkQueue.closeDuring(() -> {
+      // Disabling the undo log disables transaction rollback, but dramatically speeds up a bulk
+      // insert.
+      try (SqlSession session = sessionFactory.openSession(false)) {
+        try {
+          session.update(DISABLE_UNDO_LOG);
+          work.apply(storeProvider);
+        } catch (PersistenceException e) {
+          throw new StorageException(e.getMessage(), e);
+        } finally {
+          session.update(ENABLE_UNDO_LOG);
         }
-        return null;
       }
+      return null;
     });
   }
 
