@@ -46,6 +46,7 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
+import org.apache.aurora.scheduler.storage.ForwardingStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
@@ -65,8 +66,6 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
-import uno.perk.forward.Forward;
-
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.storage.log.LogStorage.TransactionManager;
@@ -76,15 +75,7 @@ import static org.apache.aurora.scheduler.storage.log.LogStorage.TransactionMana
  * to a provided {@link TransactionManager}) before forwarding the operations to delegate mutable
  * stores.
  */
-@Forward({
-    SchedulerStore.class,
-    CronJobStore.class,
-    TaskStore.class,
-    LockStore.class,
-    QuotaStore.class,
-    AttributeStore.class,
-    JobUpdateStore.class})
-class WriteAheadStorage extends WriteAheadStorageForwarder implements
+class WriteAheadStorage extends ForwardingStore implements
     MutableStoreProvider,
     SchedulerStore.Mutable,
     CronJobStore.Mutable,
