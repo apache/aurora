@@ -30,18 +30,14 @@ import static org.junit.Assert.assertEquals;
 
 /**
  * This test can't exercise much functionality of the output from the factory without duplicating
- * test behavior in the job updater integration test.  So instead, we test only some basic behavior.
+ * test behavior in the job updater integration test. So instead, we test only some basic behavior.
  */
 public class UpdateFactoryImplTest {
 
   private static final IJobUpdateInstructions INSTRUCTIONS = IJobUpdateInstructions.build(
       new JobUpdateInstructions()
-          .setDesiredState(new InstanceTaskConfig()
-              .setTask(new TaskConfig())
-              .setInstances(ImmutableSet.of(new Range(0, 2))))
-          .setInitialState(ImmutableSet.of(new InstanceTaskConfig()
-              .setTask(new TaskConfig())
-              .setInstances(ImmutableSet.of(new Range(1, 2)))))
+          .setDesiredState(instanceConfig(new Range(0, 2)))
+          .setInitialState(ImmutableSet.of(instanceConfig(new Range(1, 2))))
           .setSettings(new JobUpdateSettings()
               .setMaxFailedInstances(1)
               .setMaxPerInstanceFailures(1)
@@ -72,19 +68,23 @@ public class UpdateFactoryImplTest {
   @Test
   public void testRollForwardSpecificInstances() throws Exception {
     JobUpdateInstructions config = INSTRUCTIONS.newBuilder();
-    config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(1, 2)));
+    config.setInitialState(ImmutableSet.of());
+    config.setDesiredState(instanceConfig(new Range(1, 1)));
+    config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(0, 1)));
 
     Update update = factory.newUpdate(IJobUpdateInstructions.build(config), true);
-    assertEquals(ImmutableSet.of(1, 2), update.getUpdater().getInstances());
+    assertEquals(ImmutableSet.of(1), update.getUpdater().getInstances());
   }
 
   @Test
   public void testRollBackSpecificInstances() throws Exception {
     JobUpdateInstructions config = INSTRUCTIONS.newBuilder();
-    config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(1, 2)));
+    config.setInitialState(ImmutableSet.of());
+    config.setDesiredState(instanceConfig(new Range(1, 1)));
+    config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(0, 1)));
 
     Update update = factory.newUpdate(IJobUpdateInstructions.build(config), false);
-    assertEquals(ImmutableSet.of(1, 2), update.getUpdater().getInstances());
+    assertEquals(ImmutableSet.of(1), update.getUpdater().getInstances());
   }
 
   @Test
@@ -94,5 +94,11 @@ public class UpdateFactoryImplTest {
 
     Update update = factory.newUpdate(IJobUpdateInstructions.build(config), true);
     assertEquals(ImmutableSet.of(0, 1, 2), update.getUpdater().getInstances());
+  }
+
+  private static InstanceTaskConfig instanceConfig(Range instances) {
+    return new InstanceTaskConfig()
+        .setTask(new TaskConfig())
+        .setInstances(ImmutableSet.of(instances));
   }
 }

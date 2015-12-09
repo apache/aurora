@@ -767,11 +767,11 @@ public class JobUpdaterIT extends EasyMockTest {
     control.replay();
 
     JobUpdate builder =
-        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 1).newBuilder();
+        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 0, OLD_CONFIG)), 1).newBuilder();
     builder.getInstructions().getSettings().setUpdateOnlyTheseInstances(
         ImmutableSet.of(new Range(0, 0)));
     IJobUpdate update = IJobUpdate.build(builder);
-    insertInitialTasks(update);
+    insertPendingTasks(OLD_CONFIG, ImmutableSet.of(0, 1));
 
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
@@ -789,6 +789,37 @@ public class JobUpdaterIT extends EasyMockTest {
     assertJobState(
         JOB,
         ImmutableMap.of(0, NEW_CONFIG, 1, OLD_CONFIG));
+  }
+
+  @Test
+  public void testUpdateSpecificInstancesSkipUnchanged() throws Exception {
+    control.replay();
+
+    JobUpdate builder = makeJobUpdate().newBuilder();
+
+    builder.getInstructions().getDesiredState().setInstances(ImmutableSet.of(new Range(1, 1)));
+    builder.getInstructions().getSettings().setUpdateOnlyTheseInstances(
+        ImmutableSet.of(new Range(0, 1)));
+    IJobUpdate update = IJobUpdate.build(builder);
+    insertPendingTasks(NEW_CONFIG, ImmutableSet.of(0));
+    insertPendingTasks(OLD_CONFIG, ImmutableSet.of(2));
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    // Instance 1 is added, while instance 0 is skipped
+    updater.start(update, AUDIT);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+    assertState(
+        ROLLED_FORWARD,
+        actions.putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED).build());
+    assertJobState(
+        JOB,
+        ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, OLD_CONFIG));
   }
 
   @Test

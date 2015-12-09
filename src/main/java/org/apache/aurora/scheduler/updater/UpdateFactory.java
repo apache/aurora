@@ -28,7 +28,6 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.JobUpdateStatus;
-import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
@@ -87,18 +86,12 @@ interface UpdateFactory {
           settings.getUpdateGroupSize() > 0,
           "Update group size must be positive.");
 
-      Set<Integer> instances;
       Set<Integer> desiredInstances = instructions.isSetDesiredState()
           ? expandInstanceIds(ImmutableSet.of(instructions.getDesiredState()))
           : ImmutableSet.of();
 
-      if (settings.getUpdateOnlyTheseInstances().isEmpty()) {
-        // In a full job update, the working set is the union of instance IDs before and after.
-        instances =  ImmutableSet.copyOf(
-            Sets.union(expandInstanceIds(instructions.getInitialState()), desiredInstances));
-      } else {
-        instances = Numbers.rangesToInstanceIds(settings.getUpdateOnlyTheseInstances());
-      }
+      Set<Integer> instances = ImmutableSet.copyOf(
+          Sets.union(expandInstanceIds(instructions.getInitialState()), desiredInstances));
 
       ImmutableMap.Builder<Integer, StateEvaluator<Optional<IScheduledTask>>> evaluators =
           ImmutableMap.builder();
