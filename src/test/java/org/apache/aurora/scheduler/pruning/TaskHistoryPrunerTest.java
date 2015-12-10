@@ -13,10 +13,7 @@
  */
 package org.apache.aurora.scheduler.pruning;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -59,7 +56,6 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -267,12 +263,8 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
             .setDaemon(true)
             .setNameFormat("testThreadSafeEvents-executor")
             .build());
-    closer.register(new Closeable() {
-      @Override
-      public void close() throws IOException {
-        MoreExecutors.shutdownAndAwaitTermination(realExecutor, 1L, TimeUnit.SECONDS);
-      }
-    });
+    closer.register(
+        () -> MoreExecutors.shutdownAndAwaitTermination(realExecutor, 1L, TimeUnit.SECONDS));
 
     Injector injector = Guice.createInjector(
         new AsyncModule(realExecutor),
@@ -305,9 +297,9 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
         storageUtil.storage);
   }
 
-  private CountDownLatch expectTaskDeleted(final Command onDelete, String taskId) {
-    final CountDownLatch deleteCalled = new CountDownLatch(1);
-    final CountDownLatch eventDelivered = new CountDownLatch(1);
+  private CountDownLatch expectTaskDeleted(Command onDelete, String taskId) {
+    CountDownLatch deleteCalled = new CountDownLatch(1);
+    CountDownLatch eventDelivered = new CountDownLatch(1);
 
     Thread eventDispatch = new Thread() {
       @Override
@@ -328,18 +320,15 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
     eventDispatch.start();
 
     stateManager.deleteTasks(storageUtil.mutableStoreProvider, ImmutableSet.of(taskId));
-    expectLastCall().andAnswer(new IAnswer<Void>() {
-      @Override
-      public Void answer() {
-        deleteCalled.countDown();
-        try {
-          eventDelivered.await();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          fail("Interrupted while awaiting for event delivery.");
-        }
-        return null;
+    expectLastCall().andAnswer(() -> {
+      deleteCalled.countDown();
+      try {
+        eventDelivered.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        fail("Interrupted while awaiting for event delivery.");
       }
+      return null;
     });
 
     return eventDelivered;
@@ -368,13 +357,10 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
     // Expect a deferred prune operation when a new task is being watched.
     executor.execute(EasyMock.<Runnable>anyObject());
     expectLastCall().andAnswer(
-        new IAnswer<Future<?>>() {
-          @Override
-          public Future<?> answer() {
-            Runnable work = (Runnable) EasyMock.getCurrentArguments()[0];
-            work.run();
-            return null;
-          }
+        () -> {
+          Runnable work = (Runnable) EasyMock.getCurrentArguments()[0];
+          work.run();
+          return null;
         }
     );
 

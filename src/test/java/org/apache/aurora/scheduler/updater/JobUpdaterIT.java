@@ -76,8 +76,6 @@ import org.apache.aurora.scheduler.state.UUIDGenerator;
 import org.apache.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -163,7 +161,7 @@ public class JobUpdaterIT extends EasyMockTest {
   public void setUp() {
     // Avoid console spam due to stats registered multiple times.
     Stats.flush();
-    final ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
+    ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
     clock = FakeScheduledExecutor.scheduleExecutor(executor);
     driver = createMock(Driver.class);
     eventBus = new EventBus();
@@ -186,12 +184,7 @@ public class JobUpdaterIT extends EasyMockTest {
                         Amount.of(1L, Time.SECONDS), Amount.of(1L, Time.MINUTES)),
                     FLAPPING_THRESHOLD,
                     Amount.of(1, Time.MINUTES)));
-            bind(EventSink.class).toInstance(new EventSink() {
-              @Override
-              public void post(PubsubEvent event) {
-                eventBus.post(event);
-              }
-            });
+            bind(EventSink.class).toInstance(eventBus::post);
             bind(LockManager.class).to(LockManagerImpl.class);
             bind(UUIDGenerator.class).to(UUIDGeneratorImpl.class);
           }
@@ -231,25 +224,23 @@ public class JobUpdaterIT extends EasyMockTest {
   }
 
   private void changeState(
-      final IJobKey job,
-      final int instanceId,
+      IJobKey job,
+      int instanceId,
       ScheduleStatus status,
       ScheduleStatus... statuses) {
 
-    for (final ScheduleStatus s
+    for (ScheduleStatus s
         : ImmutableList.<ScheduleStatus>builder().add(status).add(statuses).build()) {
 
-      storage.write(new NoResult.Quiet() {
-        @Override
-        public void execute(Storage.MutableStoreProvider storeProvider) {
-          assertEquals(StateChangeResult.SUCCESS, stateManager.changeState(
-              storeProvider,
-              getTaskId(job, instanceId),
-              Optional.absent(),
-              s,
-              Optional.absent()));
-        }
-      });
+      storage.write((NoResult.Quiet) storeProvider ->
+          assertEquals(
+              StateChangeResult.SUCCESS,
+              stateManager.changeState(
+                  storeProvider,
+                  getTaskId(job, instanceId),
+                  Optional.absent(),
+                  s,
+                  Optional.absent())));
     }
   }
 
@@ -261,20 +252,11 @@ public class JobUpdaterIT extends EasyMockTest {
         }
       });
   private static final Function<IJobInstanceUpdateEvent, Integer> EVENT_TO_INSTANCE =
-      new Function<IJobInstanceUpdateEvent, Integer>() {
-        @Override
-        public Integer apply(IJobInstanceUpdateEvent event) {
-          return event.getInstanceId();
-        }
-      };
+      IJobInstanceUpdateEvent::getInstanceId;
 
   private IJobUpdateDetails getDetails() {
-    return storage.read(new Work.Quiet<IJobUpdateDetails>() {
-      @Override
-      public IJobUpdateDetails apply(StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(UPDATE_ID).get();
-      }
-    });
+    return storage.read(
+        storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdateDetails(UPDATE_ID).get());
   }
 
   private void assertLatestUpdateMessage(String expected) {
@@ -302,22 +284,15 @@ public class JobUpdaterIT extends EasyMockTest {
     return expectLastCall();
   }
 
-  private void insertPendingTasks(final ITaskConfig task, final Set<Integer> instanceIds) {
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        stateManager.insertPendingTasks(storeProvider, task, instanceIds);
-      }
-    });
+  private void insertPendingTasks(ITaskConfig task, Set<Integer> instanceIds) {
+    storage.write((NoResult.Quiet) storeProvider ->
+        stateManager.insertPendingTasks(storeProvider, task, instanceIds));
   }
 
-  private void insertInitialTasks(final IJobUpdate update) {
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        for (IInstanceTaskConfig config : update.getInstructions().getInitialState()) {
-          insertPendingTasks(config.getTask(), expandInstanceIds(ImmutableSet.of(config)));
-        }
+  private void insertInitialTasks(IJobUpdate update) {
+    storage.write((NoResult.Quiet) storeProvider -> {
+      for (IInstanceTaskConfig config : update.getInstructions().getInitialState()) {
+        insertPendingTasks(config.getTask(), expandInstanceIds(ImmutableSet.of(config)));
       }
     });
   }
@@ -454,18 +429,14 @@ public class JobUpdaterIT extends EasyMockTest {
     JobUpdate builder =
         setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2).newBuilder();
     builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
-    final IJobUpdate update = IJobUpdate.build(builder);
+    IJobUpdate update = IJobUpdate.build(builder);
     insertInitialTasks(update);
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
     clock.advance(ONE_DAY);
 
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD);
-      }
-    });
+    storage.write(
+        storeProvider -> saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD));
 
     subscriber.startAsync().awaitRunning();
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
@@ -499,17 +470,13 @@ public class JobUpdaterIT extends EasyMockTest {
     JobUpdate builder =
         setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 0, OLD_CONFIG)), 1).newBuilder();
     builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
-    final IJobUpdate update = IJobUpdate.build(builder);
+    IJobUpdate update = IJobUpdate.build(builder);
     insertInitialTasks(update);
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
     clock.advance(ONE_DAY);
 
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLL_FORWARD_AWAITING_PULSE);
-      }
-    });
+    storage.write(storeProvider ->
+        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLL_FORWARD_AWAITING_PULSE));
 
     subscriber.startAsync().awaitRunning();
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
@@ -534,17 +501,13 @@ public class JobUpdaterIT extends EasyMockTest {
     JobUpdate builder =
         setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 0, OLD_CONFIG)), 1).newBuilder();
     builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
-    final IJobUpdate update = IJobUpdate.build(builder);
+    IJobUpdate update = IJobUpdate.build(builder);
     insertInitialTasks(update);
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
     clock.advance(ONE_DAY);
 
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLL_FORWARD_PAUSED);
-      }
-    });
+    storage.write(storeProvider ->
+        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLL_FORWARD_PAUSED));
 
     subscriber.startAsync().awaitRunning();
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
@@ -571,7 +534,7 @@ public class JobUpdaterIT extends EasyMockTest {
     JobUpdate builder =
         setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2).newBuilder();
     builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
-    final IJobUpdate update = IJobUpdate.build(builder);
+    IJobUpdate update = IJobUpdate.build(builder);
     insertInitialTasks(update);
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
@@ -672,18 +635,14 @@ public class JobUpdaterIT extends EasyMockTest {
     JobUpdate builder =
         setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2).newBuilder();
     builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
-    final IJobUpdate update = IJobUpdate.build(builder);
+    IJobUpdate update = IJobUpdate.build(builder);
     insertInitialTasks(update);
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
     clock.advance(ONE_DAY);
 
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD);
-      }
-    });
+    storage.write(
+        storeProvider -> saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD));
 
     subscriber.startAsync().awaitRunning();
 
@@ -691,12 +650,9 @@ public class JobUpdaterIT extends EasyMockTest {
     // The update is blocked initially waiting for a pulse.
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
 
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
-        releaseAllLocks();
-      }
+    storage.write((NoResult.Quiet) storeProvider -> {
+      storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+      releaseAllLocks();
     });
 
     // The pulse still returns OK but the error is handled.
@@ -1069,8 +1025,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     control.replay();
 
-    final IJobUpdate update =
-        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2);
+    IJobUpdate update = setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2);
     insertInitialTasks(update);
 
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
@@ -1084,19 +1039,16 @@ public class JobUpdaterIT extends EasyMockTest {
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
 
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        JobUpdateStore.Mutable store = storeProvider.getJobUpdateStore();
-        store.deleteAllUpdatesAndEvents();
+    storage.write((NoResult.Quiet) storeProvider -> {
+      JobUpdateStore.Mutable store = storeProvider.getJobUpdateStore();
+      store.deleteAllUpdatesAndEvents();
 
-        JobUpdate builder = update.newBuilder();
-        builder.getInstructions().getSettings().setUpdateGroupSize(0);
-        for (ILock lock : lockManager.getLocks()) {
-          lockManager.releaseLock(lock);
-        }
-        saveJobUpdate(store, IJobUpdate.build(builder), ROLLING_FORWARD);
+      JobUpdate builder = update.newBuilder();
+      builder.getInstructions().getSettings().setUpdateGroupSize(0);
+      for (ILock lock : lockManager.getLocks()) {
+        lockManager.releaseLock(lock);
       }
+      saveJobUpdate(store, IJobUpdate.build(builder), ROLLING_FORWARD);
     });
 
     changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
@@ -1142,19 +1094,14 @@ public class JobUpdaterIT extends EasyMockTest {
 
     control.replay();
 
-    final IJobUpdate update =
-        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2);
+    IJobUpdate update = setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 2);
     insertInitialTasks(update);
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
     clock.advance(ONE_DAY);
 
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD);
-      }
-    });
+    storage.write(
+        storeProvider -> saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD));
 
     subscriber.startAsync().awaitRunning();
 
@@ -1177,15 +1124,11 @@ public class JobUpdaterIT extends EasyMockTest {
   public void testSystemResumeNoLock() throws Exception {
     control.replay();
 
-    final IJobUpdate update =
-        setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 0);
+    IJobUpdate update = setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 0);
 
-    storage.write(new NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        ILock lock = saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD);
-        lockManager.releaseLock(lock);
-      }
+    storage.write((NoResult.Quiet) storeProvider -> {
+      ILock lock = saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD);
+      lockManager.releaseLock(lock);
     });
 
     subscriber.startAsync().awaitRunning();
@@ -1196,7 +1139,7 @@ public class JobUpdaterIT extends EasyMockTest {
   public void testImmediatelySuccessfulUpdate() throws Exception {
     control.replay();
 
-    final IJobUpdate update = makeJobUpdate(makeInstanceConfig(0, 2, NEW_CONFIG));
+    IJobUpdate update = makeJobUpdate(makeInstanceConfig(0, 2, NEW_CONFIG));
     insertInitialTasks(update);
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
@@ -1209,7 +1152,7 @@ public class JobUpdaterIT extends EasyMockTest {
   public void testNoopUpdateEmptyDiff() throws Exception {
     control.replay();
 
-    final IJobUpdate update = makeJobUpdate();
+    IJobUpdate update = makeJobUpdate();
     JobUpdate builder = update.newBuilder();
     builder.getInstructions().unsetDesiredState();
 

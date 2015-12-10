@@ -274,7 +274,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   public void applySnapshot(final Snapshot snapshot) {
     requireNonNull(snapshot);
 
-    storage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+    storage.write((NoResult.Quiet) storeProvider -> {
       LOG.info("Restoring snapshot.");
 
       for (SnapshotField field : SNAPSHOT_FIELDS) {

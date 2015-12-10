@@ -175,7 +175,7 @@ class AuroraCronJob implements Job {
       return;
     }
 
-    storage.write((NoResult.Quiet) (Storage.MutableStoreProvider storeProvider) -> {
+    storage.write((NoResult.Quiet) storeProvider -> {
       for (String taskId : deferredLaunch.get().activeTaskIds) {
         stateManager.changeState(
             storeProvider,

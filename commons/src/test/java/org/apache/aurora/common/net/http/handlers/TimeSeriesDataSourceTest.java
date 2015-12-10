@@ -114,11 +114,7 @@ public class TimeSeriesDataSourceTest extends EasyMockTest {
 
     Iterable<List<Number>> expectedData = Iterables2.zip(0,
         TIMESTAMPS, getSamples(TIME_SERIES_1), getSamples(TIME_SERIES_2));
-    expectedData = Iterables.filter(expectedData, new Predicate<List<Number>>() {
-        @Override public boolean apply(List<Number> row) {
-          return row.get(0).intValue() >= 3;
-        }
-      });
+    expectedData = Iterables.filter(expectedData, row -> row.get(0).intValue() >= 3);
 
     checkRows(expectedData, response.data);
   }

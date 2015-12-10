@@ -48,11 +48,8 @@ public class FakeStatsProvider implements StatsProvider {
 
   @Override
   public RequestTimer makeRequestTimer(String name) {
-    return new RequestTimer() {
-      @Override
-      public void requestComplete(long latencyMicros) {
-        // no-op
-      }
+    return latencyMicros -> {
+      // no-op
     };
   }
 }

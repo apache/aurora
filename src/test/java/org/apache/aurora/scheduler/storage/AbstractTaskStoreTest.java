@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,6 +47,7 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -95,75 +95,47 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     storage = injector.getInstance(Storage.class);
     storage.prepare();
 
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        AttributeStore.Mutable attributeStore = storeProvider.getAttributeStore();
-        attributeStore.saveHostAttributes(HOST_A);
-        attributeStore.saveHostAttributes(HOST_B);
-      }
+    storage.write((NoResult.Quiet) storeProvider -> {
+      AttributeStore.Mutable attributeStore = storeProvider.getAttributeStore();
+      attributeStore.saveHostAttributes(HOST_A);
+      attributeStore.saveHostAttributes(HOST_B);
     });
   }
 
-  private Iterable<IScheduledTask> fetchTasks(final Query.Builder query) {
-    return storage.read(new Storage.Work.Quiet<Iterable<IScheduledTask>>() {
-      @Override
-      public Iterable<IScheduledTask> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getTaskStore().fetchTasks(query);
-      }
-    });
+  private Iterable<IScheduledTask> fetchTasks(Query.Builder query) {
+    return storage.read(storeProvider -> storeProvider.getTaskStore().fetchTasks(query));
   }
 
-  protected void saveTasks(final IScheduledTask... tasks) {
+  protected void saveTasks(IScheduledTask... tasks) {
     saveTasks(ImmutableSet.copyOf(tasks));
   }
 
-  private void saveTasks(final Set<IScheduledTask> tasks) {
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.copyOf(tasks));
-      }
-    });
+  private void saveTasks(Set<IScheduledTask> tasks) {
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.copyOf(tasks)));
   }
 
   private ImmutableSet<IScheduledTask> mutateTasks(
       final Query.Builder query,
       final TaskMutation mutation) {
 
-    return storage.write(new Storage.MutateWork.Quiet<ImmutableSet<IScheduledTask>>() {
-      @Override
-      public ImmutableSet<IScheduledTask> apply(Storage.MutableStoreProvider storeProvider) {
-        return storeProvider.getUnsafeTaskStore().mutateTasks(query, mutation);
-      }
-    });
+    return storage.write(
+        storeProvider -> storeProvider.getUnsafeTaskStore().mutateTasks(query, mutation));
   }
 
-  private boolean unsafeModifyInPlace(final String taskId, final ITaskConfig taskConfiguration) {
-    return storage.write(new Storage.MutateWork.Quiet<Boolean>() {
-      @Override
-      public Boolean apply(Storage.MutableStoreProvider storeProvider) {
-        return storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(taskId, taskConfiguration);
-      }
-    });
+  private boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration) {
+    return storage.write(storeProvider ->
+        storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(taskId, taskConfiguration));
   }
 
-  protected void deleteTasks(final String... taskIds) {
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().deleteTasks(ImmutableSet.copyOf(taskIds));
-      }
-    });
+  protected void deleteTasks(String... taskIds) {
+    storage.write((NoResult.Quiet) storeProvider ->
+        storeProvider.getUnsafeTaskStore().deleteTasks(ImmutableSet.copyOf(taskIds)));
   }
 
   protected void deleteAllTasks() {
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().deleteAllTasks();
-      }
-    });
+    storage.write(
+        (NoResult.Quiet) storeProvider -> storeProvider.getUnsafeTaskStore().deleteAllTasks());
   }
 
   @Test
@@ -290,23 +262,17 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     saveTasks(TASK_A, TASK_B, TASK_C, TASK_D);
     assertQueryResults(Query.statusScoped(RUNNING));
 
-    mutateTasks(Query.taskScoped("a"), new TaskMutation() {
-      @Override
-      public IScheduledTask apply(IScheduledTask task) {
-        return IScheduledTask.build(task.newBuilder().setStatus(RUNNING));
-      }
-    });
+    mutateTasks(
+        Query.taskScoped("a"),
+        task -> IScheduledTask.build(task.newBuilder().setStatus(RUNNING)));
 
     assertQueryResults(
         Query.statusScoped(RUNNING),
         IScheduledTask.build(TASK_A.newBuilder().setStatus(RUNNING)));
 
-    mutateTasks(Query.unscoped(), new TaskMutation() {
-      @Override
-      public IScheduledTask apply(IScheduledTask task) {
-        return IScheduledTask.build(task.newBuilder().setStatus(ScheduleStatus.ASSIGNED));
-      }
-    });
+    mutateTasks(
+        Query.unscoped(),
+        task -> IScheduledTask.build(task.newBuilder().setStatus(ScheduleStatus.ASSIGNED)));
 
     assertStoreContents(
         IScheduledTask.build(TASK_A.newBuilder().setStatus(ScheduleStatus.ASSIGNED)),
@@ -376,12 +342,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob, d);
 
-    mutateTasks(jimsJob, new TaskMutation() {
-      @Override
-      public IScheduledTask apply(IScheduledTask task) {
-        return IScheduledTask.build(task.newBuilder().setStatus(RUNNING));
-      }
-    });
+    mutateTasks(jimsJob, task -> IScheduledTask.build(task.newBuilder().setStatus(RUNNING)));
     IScheduledTask aRunning = IScheduledTask.build(a.newBuilder().setStatus(RUNNING));
     assertQueryResults(jimsJob, aRunning);
     assertQueryResults(jimsJob2, c);
@@ -454,12 +415,9 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
 
     final IScheduledTask b = setHost(a, HOST_A);
     Set<IScheduledTask> result = mutateTasks(Query.taskScoped(Tasks.id(a)),
-        new TaskMutation() {
-          @Override
-          public IScheduledTask apply(IScheduledTask task) {
-            assertEquals(a, task);
-            return b;
-          }
+        task -> {
+          assertEquals(a, task);
+          return b;
         });
     assertEquals(ImmutableSet.of(b), result);
     assertQueryResults(Query.slaveScoped(HOST_A.getHost()), b);
@@ -467,12 +425,9 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     // Unrealistic behavior, but proving that the secondary index can handle key mutations.
     final IScheduledTask c = setHost(b, HOST_B);
     Set<IScheduledTask> result2 = mutateTasks(Query.taskScoped(Tasks.id(a)),
-        new TaskMutation() {
-          @Override
-          public IScheduledTask apply(IScheduledTask task) {
-            assertEquals(b, task);
-            return c;
-          }
+        task -> {
+          assertEquals(b, task);
+          return c;
         });
     assertEquals(ImmutableSet.of(c), result2);
     assertQueryResults(Query.slaveScoped(HOST_B.getHost()), c);
@@ -491,12 +446,9 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
 
     final IScheduledTask b = unsetHost(a);
     Set<IScheduledTask> result = mutateTasks(Query.taskScoped(Tasks.id(a)),
-        new TaskMutation() {
-          @Override
-          public IScheduledTask apply(IScheduledTask task) {
-            assertEquals(a, task);
-            return b;
-          }
+        task -> {
+          assertEquals(a, task);
+          return b;
         });
     assertEquals(ImmutableSet.of(b), result);
     assertQueryResults(Query.slaveScoped(HOST_A.getHost()));
@@ -526,12 +478,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   }
 
   private Set<IJobKey> getJobKeys() {
-    return storage.read(new Storage.Work.Quiet<Set<IJobKey>>() {
-      @Override
-      public Set<IJobKey> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getTaskStore().getJobKeys();
-      }
-    });
+    return storage.read(storeProvider -> storeProvider.getTaskStore().getJobKeys());
   }
 
   private Set<IJobKey> toJobKeys(IScheduledTask... tasks) {
@@ -579,19 +526,11 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
       final CountDownLatch read = new CountDownLatch(numJobs);
       for (int j = 0; j < numJobs; j++) {
         final int id = j;
-        executor.submit(new Runnable() {
-          @Override
-          public void run() {
-            assertNotNull(fetchTasks(Query.jobScoped(JobKeys.from("role", "env", "name" + id))));
-            read.countDown();
-          }
+        executor.submit(() -> {
+          assertNotNull(fetchTasks(Query.jobScoped(JobKeys.from("role", "env", "name" + id))));
+          read.countDown();
         });
-        executor.submit(new Runnable() {
-          @Override
-          public void run() {
-            saveTasks(createTask("TaskNew1" + id));
-          }
-        });
+        executor.submit(() -> saveTasks(createTask("TaskNew1" + id)));
       }
 
       read.await();
@@ -614,21 +553,14 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     addTearDown(() -> MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS));
 
     saveTasks(TASK_A);
-    storage.write(new Storage.MutateWork.NoResult<Exception>() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) throws Exception {
-        IScheduledTask taskARunning = TaskTestUtil.addStateTransition(TASK_A, RUNNING, 1000L);
-        saveTasks(taskARunning);
+    storage.write((NoResult<Exception>) storeProvider -> {
+      IScheduledTask taskARunning = TaskTestUtil.addStateTransition(TASK_A, RUNNING, 1000L);
+      saveTasks(taskARunning);
 
-        Future<ScheduleStatus> asyncReadState = executor.submit(new Callable<ScheduleStatus>() {
-          @Override
-          public ScheduleStatus call() {
-            return Iterables.getOnlyElement(fetchTasks(Query.taskScoped(Tasks.id(TASK_A))))
-                .getStatus();
-          }
-        });
-        assertEquals(RUNNING, asyncReadState.get());
-      }
+      Future<ScheduleStatus> asyncReadState = executor.submit(
+          () -> Iterables.getOnlyElement(fetchTasks(Query.taskScoped(Tasks.id(TASK_A))))
+              .getStatus());
+      assertEquals(RUNNING, asyncReadState.get());
     });
   }
 

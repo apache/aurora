@@ -124,23 +124,20 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
     eventBus.post(new Started());
 
     executor.scheduleAtFixedRate(
-        new Runnable() {
-          @Override
-          public void run() {
-            List<Offer> allOffers;
-            synchronized (sentOffers) {
-              synchronized (idleOffers) {
-                sentOffers.putAll(idleOffers);
-                allOffers = ImmutableList.copyOf(idleOffers.values());
-                idleOffers.clear();
-              }
+        () -> {
+          List<Offer> allOffers;
+          synchronized (sentOffers) {
+            synchronized (idleOffers) {
+              sentOffers.putAll(idleOffers);
+              allOffers = ImmutableList.copyOf(idleOffers.values());
+              idleOffers.clear();
             }
+          }
 
-            if (allOffers.isEmpty()) {
-              LOG.info("All offers consumed, suppressing offer cycle.");
-            } else {
-              Futures.getUnchecked(schedulerFuture).resourceOffers(FakeMaster.this, allOffers);
-            }
+          if (allOffers.isEmpty()) {
+            LOG.info("All offers consumed, suppressing offer cycle.");
+          } else {
+            Futures.getUnchecked(schedulerFuture).resourceOffers(FakeMaster.this, allOffers);
           }
         },
         1,
@@ -226,17 +223,12 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
     }
 
     executor.schedule(
-        new Runnable() {
-          @Override
-          public void run() {
-            Futures.getUnchecked(schedulerFuture).statusUpdate(
-                FakeMaster.this,
-                TaskStatus.newBuilder()
-                    .setTaskId(task.getTaskId())
-                    .setState(TaskState.TASK_RUNNING)
-                    .build());
-          }
-        },
+        () -> Futures.getUnchecked(schedulerFuture).statusUpdate(
+            FakeMaster.this,
+            TaskStatus.newBuilder()
+                .setTaskId(task.getTaskId())
+                .setState(TaskState.TASK_RUNNING)
+                .build()),
         1,
         TimeUnit.SECONDS);
 

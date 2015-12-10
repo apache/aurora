@@ -42,8 +42,6 @@ import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos.ExecutorID;
@@ -159,19 +157,16 @@ public class MesosSchedulerImpl implements Scheduler {
     executor.execute(() -> {
       // TODO(wfarner): Reconsider the requirements here, augment the task scheduler to skip over
       //                offers when the host attributes cannot be found. (AURORA-137)
-      storage.write(new MutateWork.NoResult.Quiet() {
-        @Override
-        public void execute(MutableStoreProvider storeProvider) {
-          for (Offer offer : offers) {
-            IHostAttributes attributes =
-                AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);
-            storeProvider.getAttributeStore().saveHostAttributes(attributes);
-            if (log.isLoggable(Level.FINE)) {
-              log.log(Level.FINE, String.format("Received offer: %s", offer));
-            }
-            counters.get("scheduler_resource_offers").incrementAndGet();
-            offerManager.addOffer(new HostOffer(offer, attributes));
+      storage.write((NoResult.Quiet) storeProvider -> {
+        for (Offer offer : offers) {
+          IHostAttributes attributes =
+              AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);
+          storeProvider.getAttributeStore().saveHostAttributes(attributes);
+          if (log.isLoggable(Level.FINE)) {
+            log.log(Level.FINE, String.format("Received offer: %s", offer));
           }
+          counters.get("scheduler_resource_offers").incrementAndGet();
+          offerManager.addOffer(new HostOffer(offer, attributes));
         }
       });
     });

@@ -23,9 +23,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -50,11 +48,8 @@ public class AsyncUtilTest extends EasyMockTest {
 
     control.replay();
 
-    scheduledExecutor().schedule(new Runnable() {
-      @Override
-      public void run() {
-        throw new IllegalArgumentException("Expected exception.");
-      }
+    scheduledExecutor().schedule(() -> {
+      throw new IllegalArgumentException("Expected exception.");
     }, 0, TimeUnit.MILLISECONDS);
 
     latch.await();
@@ -83,12 +78,9 @@ public class AsyncUtilTest extends EasyMockTest {
     control.replay();
 
     ThreadPoolExecutor executor =
-        AsyncUtil.loggingExecutor(1, 1, new LinkedBlockingQueue<Runnable>(), NAME_FORMAT, logger);
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        throw new IllegalArgumentException("Expected exception.");
-      }
+        AsyncUtil.loggingExecutor(1, 1, new LinkedBlockingQueue<>(), NAME_FORMAT, logger);
+    executor.execute(() -> {
+      throw new IllegalArgumentException("Expected exception.");
     });
 
     latch.await();
@@ -100,12 +92,9 @@ public class AsyncUtilTest extends EasyMockTest {
         contains("Expected exception."),
         EasyMock.<ExecutionException>anyObject());
 
-    expectLastCall().andAnswer(new IAnswer<Object>() {
-      @Override
-      public Object answer() throws Throwable {
-        latch.countDown();
-        return null;
-      }
+    expectLastCall().andAnswer(() -> {
+      latch.countDown();
+      return null;
     }).once();
   }
 

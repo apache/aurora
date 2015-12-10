@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.updater;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-
 import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateSettings;

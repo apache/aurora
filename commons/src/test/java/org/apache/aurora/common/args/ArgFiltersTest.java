@@ -89,11 +89,7 @@ public class ArgFiltersTest {
   private void testFilter(final Predicate<Field> filter, Configuration.ArgInfo... expected)
       throws IOException {
 
-    Predicate<Optional<Field>> fieldFilter = new Predicate<Optional<Field>>() {
-      @Override public boolean apply(Optional<Field> maybeField) {
-        return maybeField.isPresent() && filter.apply(maybeField.get());
-      }
-    };
+    Predicate<Optional<Field>> fieldFilter = maybeField -> maybeField.isPresent() && filter.apply(maybeField.get());
 
     assertEquals(ImmutableSet.copyOf(expected),
         ImmutableSet.copyOf(Iterables.filter(Configuration.load().optionInfo(),

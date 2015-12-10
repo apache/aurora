@@ -26,10 +26,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
@@ -148,12 +145,8 @@ public class DbAttributeStoreTest {
         .setSlaveId(HOST_A_ATTRS.getSlaveId());
     final IScheduledTask taskA = IScheduledTask.build(builder);
 
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(taskA));
-      }
-    });
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(taskA)));
 
     HostAttributes attributeBuilder = HOST_A_ATTRS.newBuilder()
         .setMode(MaintenanceMode.DRAINED);
@@ -163,39 +156,21 @@ public class DbAttributeStoreTest {
     assertEquals(Optional.of(hostAUpdated), read(HOST_A));
   }
 
-  private void insert(final IHostAttributes attributes) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getAttributeStore().saveHostAttributes(attributes);
-      }
-    });
+  private void insert(IHostAttributes attributes) {
+    storage.write(
+        storeProvider -> storeProvider.getAttributeStore().saveHostAttributes(attributes));
   }
 
-  private Optional<IHostAttributes> read(final String host) {
-    return storage.read(new Work.Quiet<Optional<IHostAttributes>>() {
-      @Override
-      public Optional<IHostAttributes> apply(StoreProvider storeProvider) {
-        return storeProvider.getAttributeStore().getHostAttributes(host);
-      }
-    });
+  private Optional<IHostAttributes> read(String host) {
+    return storage.read(storeProvider -> storeProvider.getAttributeStore().getHostAttributes(host));
   }
 
   private Set<IHostAttributes> readAll() {
-    return storage.read(new Work.Quiet<Set<IHostAttributes>>() {
-      @Override
-      public Set<IHostAttributes> apply(StoreProvider storeProvider) {
-        return storeProvider.getAttributeStore().getHostAttributes();
-      }
-    });
+    return storage.read(storeProvider -> storeProvider.getAttributeStore().getHostAttributes());
   }
 
   private void truncate() {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getAttributeStore().deleteHostAttributes();
-      }
-    });
+    storage.write(
+        (NoResult.Quiet) storeProvider -> storeProvider.getAttributeStore().deleteHostAttributes());
   }
 }

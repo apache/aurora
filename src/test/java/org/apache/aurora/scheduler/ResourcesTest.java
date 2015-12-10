@@ -28,7 +28,6 @@ import org.apache.mesos.Protos.Value.Ranges;
 import org.junit.Test;
 
 import static org.apache.aurora.common.quantity.Data.MB;
-
 import static org.apache.aurora.scheduler.ResourceSlot.makeMesosResource;
 import static org.apache.aurora.scheduler.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.ResourceType.DISK_MB;

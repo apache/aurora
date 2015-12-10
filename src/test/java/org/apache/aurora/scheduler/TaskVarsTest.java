@@ -21,7 +21,6 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
-import org.apache.aurora.common.stats.Stat;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
@@ -43,7 +42,6 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
@@ -100,16 +98,12 @@ public class TaskVarsTest extends EasyMockTest {
     expectStatExport(name, trackedProvider);
   }
 
-  private void expectStatExport(final String name, StatsProvider provider) {
+  private void expectStatExport(String name, StatsProvider provider) {
     expect(provider.makeGauge(EasyMock.eq(name), EasyMock.<Supplier<Long>>anyObject()))
-        .andAnswer(new IAnswer<Stat<Long>>() {
-          @SuppressWarnings("unchecked")
-          @Override
-          public Stat<Long> answer() {
-            assertFalse(globalCounters.containsKey(name));
-            globalCounters.put(name, (Supplier<Long>) EasyMock.getCurrentArguments()[1]);
-            return null;
-          }
+        .andAnswer(() -> {
+          assertFalse(globalCounters.containsKey(name));
+          globalCounters.put(name, (Supplier<Long>) EasyMock.getCurrentArguments()[1]);
+          return null;
         });
   }
 

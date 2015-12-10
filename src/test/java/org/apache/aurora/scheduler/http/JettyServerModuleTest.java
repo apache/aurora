@@ -24,7 +24,6 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
-import com.google.inject.Provider;
 import com.google.inject.TypeLiteral;
 import com.google.inject.util.Modules;
 import com.sun.jersey.api.client.Client;
@@ -128,11 +127,8 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
             bindMock(TaskScheduler.class);
             bindMock(Thread.UncaughtExceptionHandler.class);
 
-            bind(ServletContextListener.class).toProvider(new Provider<ServletContextListener>() {
-              @Override
-              public ServletContextListener get() {
-                return makeServletContextListener(injector, getChildServletModule());
-              }
+            bind(ServletContextListener.class).toProvider(() -> {
+              return makeServletContextListener(injector, getChildServletModule());
             });
           }
         },

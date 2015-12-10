@@ -117,11 +117,7 @@ public class GroupTest extends BaseZooKeeperTest {
   @Test
   public void testSessionExpirationTriggersOnLoseMembership() throws Exception {
     final CountDownLatch lostMembership = new CountDownLatch(1);
-    Command onLoseMembership = new Command() {
-      @Override public void execute() throws RuntimeException {
-        lostMembership.countDown();
-      }
-    };
+    Command onLoseMembership = lostMembership::countDown;
     assertEmptyMembershipObserved();
 
     Membership membership = joinGroup.join(onLoseMembership);
@@ -134,11 +130,7 @@ public class GroupTest extends BaseZooKeeperTest {
   @Test
   public void testNodeDeleteTriggersOnLoseMembership() throws Exception {
     final CountDownLatch lostMembership = new CountDownLatch(1);
-    Command onLoseMembership = new Command() {
-      @Override public void execute() throws RuntimeException {
-        lostMembership.countDown();
-      }
-    };
+    Command onLoseMembership = lostMembership::countDown;
     assertEmptyMembershipObserved();
 
     Membership membership = joinGroup.join(onLoseMembership);

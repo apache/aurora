@@ -46,8 +46,7 @@ import org.apache.aurora.scheduler.scheduling.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -95,7 +94,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     eventSink = PubsubTestUtil.startPubsub(injector);
   }
 
-  private Injector getInjector(final Storage storageImpl) {
+  private Injector getInjector(Storage storageImpl) {
     return Guice.createInjector(
         new PubsubEventModule(),
         new AbstractModule() {
@@ -252,16 +251,12 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     eventSink = PubsubTestUtil.startPubsub(injector);
 
     ScheduledTask builder = TASK_A.newBuilder();
-    final IScheduledTask taskA = IScheduledTask.build(builder.setStatus(PENDING));
+    IScheduledTask taskA = IScheduledTask.build(builder.setStatus(PENDING));
     builder.getAssignedTask().setTaskId("b");
-    final IScheduledTask taskB = IScheduledTask.build(builder.setStatus(THROTTLED));
+    IScheduledTask taskB = IScheduledTask.build(builder.setStatus(THROTTLED));
 
-    memStorage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider store) {
-        store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(taskA, taskB));
-      }
-    });
+    memStorage.write((NoResult.Quiet)
+        store -> store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(taskA, taskB)));
 
     expectAsMap(NO_RESERVATION);
     expect(assigner.maybeAssign(

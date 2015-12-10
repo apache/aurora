@@ -29,10 +29,7 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -110,28 +107,16 @@ public abstract class AbstractCronJobStoreTest {
   public void testTaskConfigDedupe() {
     // Test for regression of AURORA-1392.
 
-    final IScheduledTask instance = TaskTestUtil.makeTask("a", JOB_A.getTaskConfig());
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(instance));
-      }
-    });
+    IScheduledTask instance = TaskTestUtil.makeTask("a", JOB_A.getTaskConfig());
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(instance)));
 
     saveAcceptedJob(JOB_A);
 
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().mutateTasks(Query.taskScoped(Tasks.id(instance)),
-            new TaskStore.Mutable.TaskMutation() {
-              @Override
-              public IScheduledTask apply(IScheduledTask task) {
-                return IScheduledTask.build(task.newBuilder().setStatus(ScheduleStatus.RUNNING));
-              }
-            });
-      }
-    });
+    storage.write(storeProvider ->
+        storeProvider.getUnsafeTaskStore().mutateTasks(
+            Query.taskScoped(Tasks.id(instance)),
+            task -> IScheduledTask.build(task.newBuilder().setStatus(ScheduleStatus.RUNNING))));
   }
 
   @Test
@@ -162,47 +147,25 @@ public abstract class AbstractCronJobStoreTest {
   }
 
   private Set<IJobConfiguration> fetchJobs() {
-    return storage.read(new Work.Quiet<Set<IJobConfiguration>>() {
-      @Override
-      public Set<IJobConfiguration> apply(StoreProvider storeProvider) {
-        return ImmutableSet.copyOf(storeProvider.getCronJobStore().fetchJobs());
-      }
-    });
+    return storage.read(
+        storeProvider -> ImmutableSet.copyOf(storeProvider.getCronJobStore().fetchJobs()));
   }
 
-  private Optional<IJobConfiguration> fetchJob(final IJobKey jobKey) {
-    return storage.read(new Work.Quiet<Optional<IJobConfiguration>>() {
-      @Override
-      public Optional<IJobConfiguration> apply(StoreProvider storeProvider) {
-        return storeProvider.getCronJobStore().fetchJob(jobKey);
-      }
-    });
+  private Optional<IJobConfiguration> fetchJob(IJobKey jobKey) {
+    return storage.read(storeProvider -> storeProvider.getCronJobStore().fetchJob(jobKey));
   }
 
-  private void saveAcceptedJob(final IJobConfiguration jobConfig) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getCronJobStore().saveAcceptedJob(jobConfig);
-      }
-    });
+  private void saveAcceptedJob(IJobConfiguration jobConfig) {
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getCronJobStore().saveAcceptedJob(jobConfig));
   }
 
-  private void removeJob(final IJobKey jobKey) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getCronJobStore().removeJob(jobKey);
-      }
-    });
+  private void removeJob(IJobKey jobKey) {
+    storage.write(
+        (NoResult.Quiet) storeProvider -> storeProvider.getCronJobStore().removeJob(jobKey));
   }
 
   private void deleteJobs() {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getCronJobStore().deleteJobs();
-      }
-    });
+    storage.write((NoResult.Quiet) storeProvider -> storeProvider.getCronJobStore().deleteJobs());
   }
 }

@@ -18,10 +18,7 @@ import java.io.IOException;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -45,21 +42,12 @@ public class DbSchedulerStoreTest {
     assertEquals(Optional.of("b"), select());
   }
 
-  private void save(final String id) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getSchedulerStore().saveFrameworkId(id);
-      }
-    });
+  private void save(String id) {
+    storage.write(
+        (NoResult.Quiet) storeProvider -> storeProvider.getSchedulerStore().saveFrameworkId(id));
   }
 
   private Optional<String> select() {
-    return storage.read(new Work.Quiet<Optional<String>>() {
-      @Override
-      public Optional<String> apply(StoreProvider storeProvider) {
-        return storeProvider.getSchedulerStore().fetchFrameworkId();
-      }
-    });
+    return storage.read(storeProvider -> storeProvider.getSchedulerStore().fetchFrameworkId());
   }
 }

@@ -99,7 +99,7 @@ class CronJobManagerImpl implements CronJobManager {
     checkNoRunOverlap(config);
 
     final IJobKey jobKey = config.getSanitizedConfig().getJobConfig().getKey();
-    storage.write((NoResult<CronException>) (Storage.MutableStoreProvider storeProvider) -> {
+    storage.write((NoResult<CronException>) storeProvider -> {
       checkCronExists(jobKey, storeProvider.getCronJobStore());
 
       removeJob(jobKey, storeProvider.getCronJobStore());
@@ -115,7 +115,7 @@ class CronJobManagerImpl implements CronJobManager {
     checkNoRunOverlap(cronJob);
 
     final IJobKey jobKey = cronJob.getSanitizedConfig().getJobConfig().getKey();
-    storage.write((NoResult<CronException>) (Storage.MutableStoreProvider storeProvider) -> {
+    storage.write((NoResult<CronException>) storeProvider -> {
       checkNotExists(jobKey, storeProvider.getCronJobStore());
 
       saveJob(cronJob, storeProvider.getCronJobStore());

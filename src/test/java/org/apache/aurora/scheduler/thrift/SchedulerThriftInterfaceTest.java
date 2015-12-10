@@ -13,9 +13,7 @@
  */
 package org.apache.aurora.scheduler.thrift;
 
-import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Map;
 import java.util.Set;
@@ -215,26 +213,23 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             auditMessages));
   }
 
-  private static AuroraAdmin.Iface getResponseProxy(final AuroraAdmin.Iface realThrift) {
+  private static AuroraAdmin.Iface getResponseProxy(AuroraAdmin.Iface realThrift) {
     // Capture all API method calls to validate response objects.
     Class<AuroraAdmin.Iface> thriftClass = AuroraAdmin.Iface.class;
     return (AuroraAdmin.Iface) Proxy.newProxyInstance(
         thriftClass.getClassLoader(),
         new Class<?>[] {thriftClass},
-        new InvocationHandler() {
-          @Override
-          public Object invoke(Object o, Method method, Object[] args) throws Throwable {
-            Response response;
-            try {
-              response = (Response) method.invoke(realThrift, args);
-            } catch (InvocationTargetException e) {
-              Throwables.propagateIfPossible(e.getTargetException(), TException.class);
-              throw e;
-            }
-            assertTrue(response.isSetResponseCode());
-            assertNotNull(response.getDetails());
-            return response;
+        (o, method, args) -> {
+          Response response;
+          try {
+            response = (Response) method.invoke(realThrift, args);
+          } catch (InvocationTargetException e) {
+            Throwables.propagateIfPossible(e.getTargetException(), TException.class);
+            throw e;
           }
+          assertTrue(response.isSetResponseCode());
+          assertNotNull(response.getDetails());
+          return response;
         });
   }
 
@@ -393,7 +388,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertResponse(INVALID_REQUEST, thrift.createJob(job.newBuilder(), null));
   }
 
-  private void assertMessageMatches(Response response, final String string) {
+  private void assertMessageMatches(Response response, String string) {
     // TODO(wfarner): This test coverage could be much better.  Circle back to apply more thorough
     // response contents testing throughout.
     assertTrue(Iterables.any(response.getDetails(), detail -> detail.getMessage().equals(string)));

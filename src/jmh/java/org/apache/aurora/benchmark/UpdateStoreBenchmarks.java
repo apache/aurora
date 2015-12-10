@@ -25,6 +25,7 @@ import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
@@ -69,56 +70,45 @@ public class UpdateStoreBenchmarks {
 
     @Setup(Level.Iteration)
     public void setUpIteration() {
-      storage.write(new Storage.MutateWork.NoResult.Quiet() {
-        @Override
-        public void execute(Storage.MutableStoreProvider storeProvider) {
-          JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
-          Set<IJobUpdateDetails> updates =
-              new JobUpdates.Builder().setNumInstanceEvents(instances).build(1);
+      storage.write((NoResult.Quiet) storeProvider -> {
+        JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
+        Set<IJobUpdateDetails> updates =
+            new JobUpdates.Builder().setNumInstanceEvents(instances).build(1);
 
-          ImmutableSet.Builder<IJobUpdateKey> keyBuilder = ImmutableSet.builder();
-          for (IJobUpdateDetails details : updates) {
-            IJobUpdateKey key = details.getUpdate().getSummary().getKey();
-            keyBuilder.add(key);
-            String lockToken = UUID.randomUUID().toString();
-            storeProvider.getLockStore().saveLock(
-                ILock.build(new Lock(LockKey.job(key.getJob().newBuilder()), lockToken, USER, 0L)));
+        ImmutableSet.Builder<IJobUpdateKey> keyBuilder = ImmutableSet.builder();
+        for (IJobUpdateDetails details : updates) {
+          IJobUpdateKey key = details.getUpdate().getSummary().getKey();
+          keyBuilder.add(key);
+          String lockToken = UUID.randomUUID().toString();
+          storeProvider.getLockStore().saveLock(
+              ILock.build(new Lock(LockKey.job(key.getJob().newBuilder()), lockToken, USER, 0L)));
 
-            updateStore.saveJobUpdate(details.getUpdate(), Optional.of(lockToken));
+          updateStore.saveJobUpdate(details.getUpdate(), Optional.of(lockToken));
 
-            for (IJobUpdateEvent updateEvent : details.getUpdateEvents()) {
-              updateStore.saveJobUpdateEvent(key, updateEvent);
-            }
-
-            for (IJobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
-              updateStore.saveJobInstanceUpdateEvent(key, instanceEvent);
-            }
+          for (IJobUpdateEvent updateEvent : details.getUpdateEvents()) {
+            updateStore.saveJobUpdateEvent(key, updateEvent);
           }
-          keys = keyBuilder.build();
+
+          for (IJobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
+            updateStore.saveJobInstanceUpdateEvent(key, instanceEvent);
+          }
         }
+        keys = keyBuilder.build();
       });
     }
 
     @TearDown(Level.Iteration)
     public void tearDownIteration() {
-      storage.write(new Storage.MutateWork.NoResult.Quiet() {
-        @Override
-        public void execute(Storage.MutableStoreProvider storeProvider) {
-          storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
-          storeProvider.getLockStore().deleteLocks();
-        }
+      storage.write((NoResult.Quiet) storeProvider -> {
+        storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+        storeProvider.getLockStore().deleteLocks();
       });
     }
 
     @Benchmark
     public IJobUpdateDetails run() throws TException {
-      return storage.read(new Storage.Work.Quiet<IJobUpdateDetails>() {
-        @Override
-        public IJobUpdateDetails apply(Storage.StoreProvider store) {
-          return store.getJobUpdateStore().fetchJobUpdateDetails(
-              Iterables.getOnlyElement(keys)).get();
-        }
-      });
+      return storage.read(store -> store.getJobUpdateStore().fetchJobUpdateDetails(
+          Iterables.getOnlyElement(keys)).get());
     }
   }
 }

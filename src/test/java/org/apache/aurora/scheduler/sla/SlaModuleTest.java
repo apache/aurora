@@ -28,7 +28,6 @@ import com.google.inject.Module;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.stats.Stat;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.Clock;
@@ -39,7 +38,6 @@ import org.apache.aurora.scheduler.sla.SlaModule.SlaUpdater;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -105,12 +103,9 @@ public class SlaModuleTest extends EasyMockTest {
     expect(statsProvider.untracked()).andReturn(untracked).anyTimes();
     expect(untracked.makeGauge(EasyMock.anyString(), EasyMock.anyObject()))
         .andReturn(EasyMock.anyObject())
-        .andAnswer(new IAnswer<Stat<Number>>() {
-          @Override
-          public Stat<Number> answer() throws Throwable {
-            latch.countDown();
-            return null;
-          }
+        .andAnswer(() -> {
+          latch.countDown();
+          return null;
         }).anyTimes();
 
     storageUtil.expectTaskFetch(

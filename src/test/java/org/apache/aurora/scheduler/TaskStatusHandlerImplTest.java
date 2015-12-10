@@ -32,7 +32,6 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -125,12 +124,9 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
         Optional.absent(),
         RUNNING,
         Optional.of("fake message")))
-        .andAnswer(new IAnswer<StateChangeResult>() {
-          @Override
-          public StateChangeResult answer() throws Throwable {
-            latch.countDown();
-            throw new StorageException("Injected error");
-          }
+        .andAnswer(() -> {
+          latch.countDown();
+          throw new StorageException("Injected error");
         });
 
     control.replay();
@@ -229,11 +225,8 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
 
     expect(queue.add(EasyMock.anyObject())).andReturn(true);
 
-    expect(queue.take()).andAnswer(new IAnswer<TaskStatus>() {
-      @Override
-      public TaskStatus answer() throws Throwable {
-        throw new RuntimeException();
-      }
+    expect(queue.take()).andAnswer(() -> {
+      throw new RuntimeException();
     });
 
     final CountDownLatch latch = new CountDownLatch(1);
@@ -257,12 +250,9 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
   }
 
   private static void waitAndAnswer(CountDownLatch latch) {
-    expectLastCall().andAnswer(new IAnswer<StateChangeResult>() {
-      @Override
-      public StateChangeResult answer() {
-        latch.countDown();
-        return null;
-      }
+    expectLastCall().andAnswer(() -> {
+      latch.countDown();
+      return null;
     });
   }
 }

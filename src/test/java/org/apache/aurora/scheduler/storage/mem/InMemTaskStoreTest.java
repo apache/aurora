@@ -22,14 +22,13 @@ import com.google.inject.util.Modules;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
-import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
 import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
-
 import static org.junit.Assert.assertEquals;
 
 public class InMemTaskStoreTest extends AbstractTaskStoreTest {
@@ -52,14 +51,11 @@ public class InMemTaskStoreTest extends AbstractTaskStoreTest {
   @Test
   public void testSecondaryIndexConsistency() {
     // Test for regression of AURORA-1305.
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
-        taskStore.saveTasks(ImmutableSet.of(TASK_A));
-        taskStore.deleteTasks(Tasks.ids(TASK_A));
-        assertEquals(0L, statsProvider.getLongValue(MemTaskStore.getIndexSizeStatName("job")));
-      }
+    storage.write((NoResult.Quiet) storeProvider -> {
+      TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
+      taskStore.saveTasks(ImmutableSet.of(TASK_A));
+      taskStore.deleteTasks(Tasks.ids(TASK_A));
+      assertEquals(0L, statsProvider.getLongValue(MemTaskStore.getIndexSizeStatName("job")));
     });
   }
 }

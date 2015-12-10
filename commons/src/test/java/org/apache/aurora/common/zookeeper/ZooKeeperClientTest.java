@@ -63,17 +63,15 @@ public class ZooKeeperClientTest extends BaseZooKeeperTest {
 
     final CountDownLatch blockingGetComplete = new CountDownLatch(1);
     final AtomicReference<ZooKeeper> client = new AtomicReference<ZooKeeper>();
-    new Thread(new Runnable() {
-      @Override public void run() {
-        try {
-          client.set(zkClient.get());
-        } catch (ZooKeeperConnectionException e) {
-          throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
-        } finally {
-          blockingGetComplete.countDown();
-        }
+    new Thread(() -> {
+      try {
+        client.set(zkClient.get());
+      } catch (ZooKeeperConnectionException e) {
+        throw new RuntimeException(e);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      } finally {
+        blockingGetComplete.countDown();
       }
     }).start();
 
@@ -116,18 +114,16 @@ public class ZooKeeperClientTest extends BaseZooKeeperTest {
     final CountDownLatch blockingGetComplete = new CountDownLatch(1);
     final AtomicBoolean interrupted = new AtomicBoolean();
     final AtomicReference<ZooKeeper> client = new AtomicReference<ZooKeeper>();
-    Thread getThread = new Thread(new Runnable() {
-      @Override public void run() {
-        try {
-          client.set(zkClient.get());
-        } catch (ZooKeeperConnectionException e) {
-          throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-          interrupted.set(true);
-          throw new RuntimeException(e);
-        } finally {
-          blockingGetComplete.countDown();
-        }
+    Thread getThread = new Thread(() -> {
+      try {
+        client.set(zkClient.get());
+      } catch (ZooKeeperConnectionException e) {
+        throw new RuntimeException(e);
+      } catch (InterruptedException e) {
+        interrupted.set(true);
+        throw new RuntimeException(e);
+      } finally {
+        blockingGetComplete.countDown();
       }
     });
     getThread.start();

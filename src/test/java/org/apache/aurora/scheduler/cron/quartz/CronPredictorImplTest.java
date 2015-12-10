@@ -17,7 +17,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
-import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -73,12 +72,7 @@ public class CronPredictorImplTest {
           "Cron schedule " + expectedPrediction.getSchedule() + " made unexpected predictions.",
           Lists.transform(
               expectedPrediction.getTriggerTimes(),
-              new Function<Long, Date>() {
-                @Override
-                public Date apply(Long time) {
-                  return new Date(time);
-                }
-              }
+              Date::new
           ),
           results);
     }

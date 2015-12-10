@@ -73,13 +73,9 @@ import static org.junit.Assert.fail;
 public class ArgScannerTest {
 
   private static final Function<Class<?>, Predicate<Field>> TO_SCOPE_PREDICATE =
-      new Function<Class<?>, Predicate<Field>>() {
-        @Override public Predicate<Field> apply(final Class<?> cls) {
-          return new Predicate<Field>() {
-            @Override public boolean apply(Field field) {
-              return field.getDeclaringClass() == cls;
-            }
-          };
+      cls -> new Predicate<Field>() {
+        @Override public boolean apply(Field field) {
+          return field.getDeclaringClass() == cls;
         }
       };
 
@@ -130,104 +126,54 @@ public class ArgScannerTest {
   @Test
   public void testStandardArgs() {
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(StandardArgs.ENUM_VAL.get(), CoreMatchers.is(Optimizations.ALL));
-          }
-        }, "enum", "ALL");
+        () -> assertThat(StandardArgs.ENUM_VAL.get(), CoreMatchers.is(Optimizations.ALL)), "enum", "ALL");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(StandardArgs.STRING_VAL.get(), is("newstring"));
-          }
-        },
+        () -> assertThat(StandardArgs.STRING_VAL.get(), is("newstring")),
         "string", "newstring");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() { assertThat(StandardArgs.CHAR_VAL.get(), is('x')); }
-        },
+        () -> assertThat(StandardArgs.CHAR_VAL.get(), is('x')),
         "char", "x");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(StandardArgs.BYTE_VAL.get(), is((byte) 10));
-          }
-        },
+        () -> assertThat(StandardArgs.BYTE_VAL.get(), is((byte) 10)),
         "byte", "10");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(StandardArgs.SHORT_VAL.get(), is((short) 10));
-          }
-        },
+        () -> assertThat(StandardArgs.SHORT_VAL.get(), is((short) 10)),
         "short", "10");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() { assertThat(StandardArgs.INT_VAL.get(), is(10)); }
-        },
+        () -> assertThat(StandardArgs.INT_VAL.get(), is(10)),
         "int", "10");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() { assertThat(StandardArgs.LONG_VAL.get(), is(10L)); }
-        },
+        () -> assertThat(StandardArgs.LONG_VAL.get(), is(10L)),
         "long", "10");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() { assertThat(StandardArgs.FLOAT_VAL.get(), is(10f)); }
-        },
+        () -> assertThat(StandardArgs.FLOAT_VAL.get(), is(10f)),
         "float", "10.0");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() { assertThat(StandardArgs.DOUBLE_VAL.get(), is(10d)); }
-        },
+        () -> assertThat(StandardArgs.DOUBLE_VAL.get(), is(10d)),
         "double", "10.0");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() { assertThat(StandardArgs.BOOL.get(), is(true)); }
-        },
+        () -> assertThat(StandardArgs.BOOL.get(), is(true)),
         "bool", "true");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() { assertThat(StandardArgs.BOOL.get(), is(true)); }
-        },
+        () -> assertThat(StandardArgs.BOOL.get(), is(true)),
         "bool", "");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(StandardArgs.REGEX.get().matcher("jack").matches(), is(true));
-          }
-        },
+        () -> assertThat(StandardArgs.REGEX.get().matcher("jack").matches(), is(true)),
         "regex", ".*ack$");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() { assertThat(StandardArgs.BOOL.get(), is(false)); }
-        },
+        () -> assertThat(StandardArgs.BOOL.get(), is(false)),
         "no_bool", "");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() { assertThat(StandardArgs.BOOL.get(), is(true)); }
-        },
+        () -> assertThat(StandardArgs.BOOL.get(), is(true)),
         "no_bool", "false");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(StandardArgs.TIME_AMOUNT.get(), is(Amount.of(100L, Time.SECONDS)));
-          }
-        },
+        () -> assertThat(StandardArgs.TIME_AMOUNT.get(), is(Amount.of(100L, Time.SECONDS))),
         "time_amount", "100secs");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(StandardArgs.DATA_AMOUNT.get(), is(Amount.of(1L, Data.Gb)));
-          }
-        },
+        () -> assertThat(StandardArgs.DATA_AMOUNT.get(), is(Amount.of(1L, Data.Gb))),
         "data_amount", "1Gb");
     test(StandardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(StandardArgs.RANGE.get(), is(com.google.common.collect.Range.closed(1, 5)));
-          }
-        },
+        () -> assertThat(StandardArgs.RANGE.get(), is(com.google.common.collect.Range.closed(1, 5))),
         "range", "1-5");
 
     resetArgs(StandardArgs.class);
@@ -301,17 +247,9 @@ public class ArgScannerTest {
   @Test
   public void testCustomArgs() {
     test(CustomArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(CustomArgs.NAME_VAL.get(), is(new Name("jane")));
-          }
-        }, "custom1", "jane");
+        () -> assertThat(CustomArgs.NAME_VAL.get(), is(new Name("jane"))), "custom1", "jane");
     test(CustomArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(CustomArgs.MEANING_VAL.get(), is(new MeaningOfLife(42L)));
-          }
-        }, "custom2", "jim");
+        () -> assertThat(CustomArgs.MEANING_VAL.get(), is(new MeaningOfLife(42L))), "custom2", "jim");
   }
 
   @Test
@@ -364,95 +302,59 @@ public class ArgScannerTest {
   @Test
   public void testCollectionArgs() {
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(CollectionArgs.STRING_LIST.get(), is(Arrays.asList("a", "b", "c", "d")));
-          }
-        },
+        () -> assertThat(CollectionArgs.STRING_LIST.get(), is(Arrays.asList("a", "b", "c", "d"))),
         "stringList", "a,b,c,d");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(CollectionArgs.INT_LIST.get(), is(Arrays.asList(1, 2, 3, 4)));
-          }
-        },
+        () -> assertThat(CollectionArgs.INT_LIST.get(), is(Arrays.asList(1, 2, 3, 4))),
         "intList", "1, 2, 3, 4");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            Set<String> expected = ImmutableSet.of("a", "b", "c", "d");
-            assertThat(CollectionArgs.STRING_SET.get(), is(expected));
-          }
+        () -> {
+          Set<String> expected = ImmutableSet.of("a", "b", "c", "d");
+          assertThat(CollectionArgs.STRING_SET.get(), is(expected));
         },
         "stringSet", "a,b,c,d");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            Set<Integer> expected = ImmutableSet.of(1, 2, 3, 4);
-            assertThat(CollectionArgs.INT_SET.get(), is(expected));
-          }
+        () -> {
+          Set<Integer> expected = ImmutableSet.of(1, 2, 3, 4);
+          assertThat(CollectionArgs.INT_SET.get(), is(expected));
         },
         "intSet", "1, 2, 3, 4");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            Map<String, String> expected = ImmutableMap.of("a", "b", "c", "d", "e", "f", "g", "h");
-            assertThat(CollectionArgs.STRING_STRING_MAP.get(), is(expected));
-          }
+        () -> {
+          Map<String, String> expected = ImmutableMap.of("a", "b", "c", "d", "e", "f", "g", "h");
+          assertThat(CollectionArgs.STRING_STRING_MAP.get(), is(expected));
         },
         "stringStringMap", "a=b, c=d, e=f, g=h");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            Map<Integer, Integer> expected = ImmutableMap.of(1, 2, 3, 4, 5, 6, 7, 8);
-            assertThat(CollectionArgs.INT_INT_MAP.get(), is(expected));
-          }
+        () -> {
+          Map<Integer, Integer> expected = ImmutableMap.of(1, 2, 3, 4, 5, 6, 7, 8);
+          assertThat(CollectionArgs.INT_INT_MAP.get(), is(expected));
         },
         "intIntMap", "1 = 2,3=4, 5=6 ,7=8");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            Map<String, Integer> expected = ImmutableMap.of("a", 1, "b", 2, "c", 3, "d", 4);
-            assertThat(CollectionArgs.STRING_INT_MAP.get(), is(expected));
-          }
+        () -> {
+          Map<String, Integer> expected = ImmutableMap.of("a", 1, "b", 2, "c", 3, "d", 4);
+          assertThat(CollectionArgs.STRING_INT_MAP.get(), is(expected));
         },
         "stringIntMap", "a=1  , b=2, c=3   ,d=4");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            Map<Integer, String> expected = ImmutableMap.of(1, "1", 2, "2", 3, "3", 4, "4");
-            assertThat(CollectionArgs.INT_STRING_MAP.get(), is(expected));
-          }
+        () -> {
+          Map<Integer, String> expected = ImmutableMap.of(1, "1", 2, "2", 3, "3", 4, "4");
+          assertThat(CollectionArgs.INT_STRING_MAP.get(), is(expected));
         },
         "intStringMap", "  1=1  , 2=2, 3=3,4=4");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(CollectionArgs.STRING_STRING_PAIR.get(), is(Pair.of("foo", "bar")));
-          }
-        },
+        () -> assertThat(CollectionArgs.STRING_STRING_PAIR.get(), is(Pair.of("foo", "bar"))),
         "stringStringPair", "foo , bar");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(CollectionArgs.INT_INT_PAIR.get(), is(Pair.of(10, 20)));
-          }
-        },
+        () -> assertThat(CollectionArgs.INT_INT_PAIR.get(), is(Pair.of(10, 20))),
         "intIntPair", "10    ,20");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(CollectionArgs.STRING_TIME_AMOUNT_PAIR.get(),
-                       is(Pair.of("fred", Amount.of(42L, Time.MINUTES))));
-          }
-        },
+        () -> assertThat(CollectionArgs.STRING_TIME_AMOUNT_PAIR.get(),
+                   is(Pair.of("fred", Amount.of(42L, Time.MINUTES)))),
         "stringTimeAmountPair", "fred    ,42mins");
     test(CollectionArgs.class,
-        new Command() {
-          @Override public void execute() {
-            CollectionArgs.STRING_TIME_AMOUNT_PAIR.get();
-          }
-        },
+        CollectionArgs.STRING_TIME_AMOUNT_PAIR::get,
         true, "stringTimeAmountPair", "george,1MB");
 
   }
@@ -473,44 +375,24 @@ public class ArgScannerTest {
   @Test
   public void testWildcardArgs() {
     test(WildcardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertSame(Serializable2.class, WildcardArgs.CLAZZ.get());
-          }
-        },
+        () -> assertSame(Serializable2.class, WildcardArgs.CLAZZ.get()),
         "class", Serializable2.class.getName());
 
     test(WildcardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            WildcardArgs.CLAZZ.get();
-          }
-        },
+        WildcardArgs.CLAZZ::get,
         true, "class", Runnable.class.getName());
 
     test(WildcardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertEquals(ImmutableList.of(Serializable1.class, Serializable2.class),
-                         WildcardArgs.CLASS_LIST_1.get());
-          }
-        },
+        () -> assertEquals(ImmutableList.of(Serializable1.class, Serializable2.class),
+                     WildcardArgs.CLASS_LIST_1.get()),
         "classList1", Serializable1.class.getName() + "," + Serializable2.class.getName());
 
     test(WildcardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertEquals(ImmutableList.of(Serializable2.class), WildcardArgs.CLASS_LIST_2.get());
-          }
-        },
+        () -> assertEquals(ImmutableList.of(Serializable2.class), WildcardArgs.CLASS_LIST_2.get()),
         "classList2", Serializable2.class.getName());
 
     test(WildcardArgs.class,
-        new Command() {
-          @Override public void execute() {
-            WildcardArgs.CLASS_LIST_2.get();
-          }
-        },
+        WildcardArgs.CLASS_LIST_2::get,
         true, "classList2", Serializable1.class.getName() + "," + Runnable.class.getName());
   }
 
@@ -563,11 +445,9 @@ public class ArgScannerTest {
   @Test
   public void testEnforcesConstraints() {
     test(VerifyArgs.class,
-        new Command() {
-          @Override public void execute() {
-            assertThat(VerifyArgs.STRING_VAL.get(), is("newstring"));
-            assertThat(VerifyArgs.OPTIONAL_STRING_VAL.get(), nullValue(String.class));
-          }
+        () -> {
+          assertThat(VerifyArgs.STRING_VAL.get(), is("newstring"));
+          assertThat(VerifyArgs.OPTIONAL_STRING_VAL.get(), nullValue(String.class));
         },
         "string", "newstring");
 
@@ -578,11 +458,7 @@ public class ArgScannerTest {
     testFails(VerifyArgs.class, "long", "-1");
 
     test(VerifyArgs.class,
-        new Command() {
-          @Override public void execute() {
-           assertThat(VerifyArgs.FLOAT_VAL.get(), is(10.5f));
-          }
-        },
+        () -> assertThat(VerifyArgs.FLOAT_VAL.get(), is(10.5f)),
         "float", "10.5");
     testFails(VerifyArgs.class, "float", "9");
   }

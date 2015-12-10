@@ -59,17 +59,14 @@ public final class FakeScheduledExecutor extends FakeClock {
     return executor;
   }
 
-  private static IAnswer<Object> answerExecuteWithDelay(final FakeScheduledExecutor executor) {
-    return new IAnswer<Object>() {
-      @Override
-      public Object answer() {
-        Object[] args = EasyMock.getCurrentArguments();
-        Runnable work = (Runnable) args[0];
-        @SuppressWarnings("unchecked")
-        Amount<Long, Time> delay = (Amount<Long, Time>) args[1];
-        addDelayedWork(executor, delay.as(Time.MILLISECONDS), work);
-        return null;
-      }
+  private static IAnswer<Object> answerExecuteWithDelay(FakeScheduledExecutor executor) {
+    return () -> {
+      Object[] args = EasyMock.getCurrentArguments();
+      Runnable work = (Runnable) args[0];
+      @SuppressWarnings("unchecked")
+      Amount<Long, Time> delay = (Amount<Long, Time>) args[1];
+      addDelayedWork(executor, delay.as(Time.MILLISECONDS), work);
+      return null;
     };
   }
 
@@ -87,28 +84,22 @@ public final class FakeScheduledExecutor extends FakeClock {
   }
 
   private static IAnswer<Void> answerExecute() {
-    return new IAnswer<Void>() {
-      @Override
-      public Void answer() throws Throwable {
-        Object[] args = EasyMock.getCurrentArguments();
-        Runnable work = (Runnable) args[0];
-        work.run();
-        return null;
-      }
+    return () -> {
+      Object[] args = EasyMock.getCurrentArguments();
+      Runnable work = (Runnable) args[0];
+      work.run();
+      return null;
     };
   }
 
-  private static IAnswer<Object> answerSchedule(final FakeScheduledExecutor executor) {
-    return new IAnswer<Object>() {
-      @Override
-      public Object answer() {
-        Object[] args = EasyMock.getCurrentArguments();
-        Runnable work = (Runnable) args[0];
-        long value = (Long) args[1];
-        TimeUnit unit = (TimeUnit) args[2];
-        addDelayedWork(executor, toMillis(value, unit), work);
-        return null;
-      }
+  private static IAnswer<Object> answerSchedule(FakeScheduledExecutor executor) {
+    return () -> {
+      Object[] args = EasyMock.getCurrentArguments();
+      Runnable work = (Runnable) args[0];
+      long value = (Long) args[1];
+      TimeUnit unit = (TimeUnit) args[2];
+      addDelayedWork(executor, toMillis(value, unit), work);
+      return null;
     };
   }
 
@@ -142,22 +133,19 @@ public final class FakeScheduledExecutor extends FakeClock {
   }
 
   private static IAnswer<ScheduledFuture<?>> answerScheduleAtFixedRate(
-      final FakeScheduledExecutor executor,
-      final int workCount) {
+      FakeScheduledExecutor executor,
+      int workCount) {
 
-    return new IAnswer<ScheduledFuture<?>>() {
-      @Override
-      public ScheduledFuture<?> answer() {
-        Object[] args = EasyMock.getCurrentArguments();
-        Runnable work = (Runnable) args[0];
-        long initialDelay = (Long) args[1];
-        long period = (Long) args[2];
-        TimeUnit unit = (TimeUnit) args[3];
-        for (int i = 0; i <= workCount; i++) {
-          addDelayedWork(executor, toMillis(initialDelay, unit) + i * toMillis(period, unit), work);
-        }
-        return null;
+    return () -> {
+      Object[] args = EasyMock.getCurrentArguments();
+      Runnable work = (Runnable) args[0];
+      long initialDelay = (Long) args[1];
+      long period = (Long) args[2];
+      TimeUnit unit = (TimeUnit) args[3];
+      for (int i = 0; i <= workCount; i++) {
+        addDelayedWork(executor, toMillis(initialDelay, unit) + i * toMillis(period, unit), work);
       }
+      return null;
     };
   }
 

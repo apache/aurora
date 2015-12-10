@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.app;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -45,11 +43,9 @@ import com.google.inject.Module;
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.Lifecycle;
-import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.stats.Stats;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.zookeeper.ServerSet;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
@@ -96,7 +92,6 @@ import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.Before;
 import org.junit.Rule;
@@ -154,16 +149,13 @@ public class SchedulerIT extends BaseZooKeeperTest {
   @Before
   public void mySetUp() throws Exception {
     control = createControl();
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() {
-        if (mainException.get().isPresent()) {
-          RuntimeException e = mainException.get().get();
-          LOG.log(Level.SEVERE, "Scheduler main exited with an exception", e);
-          fail(e.getMessage());
-        }
-        control.verify();
+    addTearDown(() -> {
+      if (mainException.get().isPresent()) {
+        RuntimeException e = mainException.get().get();
+        LOG.log(Level.SEVERE, "Scheduler main exited with an exception", e);
+        fail(e.getMessage());
       }
+      control.verify();
     });
     backupDir = temporaryFolder.newFolder();
     driver = control.createMock(SchedulerDriver.class);
@@ -224,47 +216,35 @@ public class SchedulerIT extends BaseZooKeeperTest {
     injector.injectMembers(main);
     lifecycle = injector.getInstance(Lifecycle.class);
 
-    executor.submit(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          main.run();
-        } catch (RuntimeException e) {
-          mainException.set(Optional.of(e));
-          executor.shutdownNow();
-        }
+    executor.submit(() -> {
+      try {
+        main.run();
+      } catch (RuntimeException e) {
+        mainException.set(Optional.of(e));
+        executor.shutdownNow();
       }
     });
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() throws Exception {
-        lifecycle.shutdown();
-        MoreExecutors.shutdownAndAwaitTermination(executor, 10, TimeUnit.SECONDS);
-      }
+    addTearDown(() -> {
+      lifecycle.shutdown();
+      MoreExecutors.shutdownAndAwaitTermination(executor, 10, TimeUnit.SECONDS);
     });
     injector.getInstance(Key.get(GuavaUtils.ServiceManagerIface.class, AppStartup.class))
         .awaitHealthy();
   }
 
   private void awaitSchedulerReady() throws Exception {
-    executor.submit(new Callable<Void>() {
-      @Override
-      public Void call() throws Exception {
-        ServerSet schedulerService = new ServerSetImpl(zkClient, SERVERSET_PATH);
-        final CountDownLatch schedulerReady = new CountDownLatch(1);
-        schedulerService.watch(new HostChangeMonitor<ServiceInstance>() {
-          @Override
-          public void onChange(ImmutableSet<ServiceInstance> hostSet) {
-            if (!hostSet.isEmpty()) {
-              schedulerReady.countDown();
-            }
-          }
-        });
-        // A timeout is used because certain types of assertion errors (mocks) will not surface
-        // until the main test thread exits this body of code.
-        assertTrue(schedulerReady.await(5L, TimeUnit.MINUTES));
-        return null;
-      }
+    executor.submit(() -> {
+      ServerSet schedulerService = new ServerSetImpl(zkClient, SERVERSET_PATH);
+      final CountDownLatch schedulerReady = new CountDownLatch(1);
+      schedulerService.watch(hostSet -> {
+        if (!hostSet.isEmpty()) {
+          schedulerReady.countDown();
+        }
+      });
+      // A timeout is used because certain types of assertion errors (mocks) will not surface
+      // until the main test thread exits this body of code.
+      assertTrue(schedulerReady.await(5L, TimeUnit.MINUTES));
+      return null;
     }).get();
   }
 
@@ -287,19 +267,11 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
   private Iterable<Entry> toEntries(LogEntry... entries) {
     return Iterables.transform(Arrays.asList(entries),
-        new Function<LogEntry, Entry>() {
-          @Override
-          public Entry apply(final LogEntry entry) {
-            return new Entry() {
-              @Override
-              public byte[] contents() {
-                try {
-                  return Iterables.getFirst(entrySerializer.serialize(entry), null);
-                } catch (CodingException e) {
-                  throw Throwables.propagate(e);
-                }
-              }
-            };
+        entry -> () -> {
+          try {
+            return Iterables.getFirst(entrySerializer.serialize(entry), null);
+          } catch (CodingException e) {
+            throw Throwables.propagate(e);
           }
         });
   }
@@ -347,29 +319,18 @@ public class SchedulerIT extends BaseZooKeeperTest {
         .andReturn(nextPosition());
 
     final CountDownLatch driverStarted = new CountDownLatch(1);
-    expect(driver.start()).andAnswer(new IAnswer<Status>() {
-      @Override
-      public Status answer() {
-        driverStarted.countDown();
-        return Status.DRIVER_RUNNING;
-      }
+    expect(driver.start()).andAnswer(() -> {
+      driverStarted.countDown();
+      return Status.DRIVER_RUNNING;
     });
 
     // Try to be a good test suite citizen by releasing the blocked thread when the test case exits.
     final CountDownLatch testCompleted = new CountDownLatch(1);
-    expect(driver.join()).andAnswer(new IAnswer<Status>() {
-      @Override
-      public Status answer() throws Throwable {
-        testCompleted.await();
-        return Status.DRIVER_STOPPED;
-      }
+    expect(driver.join()).andAnswer(() -> {
+      testCompleted.await();
+      return Status.DRIVER_STOPPED;
     });
-    addTearDown(new TearDown() {
-      @Override
-      public void tearDown() {
-        testCompleted.countDown();
-      }
-    });
+    addTearDown(testCompleted::countDown);
     expect(driver.stop(true)).andReturn(Status.DRIVER_STOPPED).anyTimes();
 
     control.replay();

@@ -40,7 +40,6 @@ import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.events.EventSink;
-import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -55,6 +54,7 @@ import org.apache.aurora.scheduler.scheduling.TaskScheduler;
 import org.apache.aurora.scheduler.scheduling.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -155,12 +155,7 @@ public class SchedulingBenchmarks {
               bind(RescheduleCalculator.class).toInstance(new FakeRescheduleCalculator());
               bind(Clock.class).toInstance(clock);
               bind(StatsProvider.class).toInstance(new FakeStatsProvider());
-              bind(EventSink.class).toInstance(new EventSink() {
-                @Override
-                public void post(PubsubEvent event) {
-                  eventBus.post(event);
-                }
-              });
+              bind(EventSink.class).toInstance(eventBus::post);
             }
           }
       );
@@ -197,21 +192,14 @@ public class SchedulingBenchmarks {
     }
 
     private void saveTasks(final Set<IScheduledTask> tasks) {
-      storage.write(new Storage.MutateWork.NoResult.Quiet() {
-        @Override
-        public void execute(Storage.MutableStoreProvider storeProvider) {
-          storeProvider.getUnsafeTaskStore().saveTasks(tasks);
-        }
-      });
+      storage.write(
+          (NoResult.Quiet) storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(tasks));
     }
 
     private void saveHostAttributes(final Set<IHostAttributes> hostAttributesToSave) {
-      storage.write(new Storage.MutateWork.NoResult.Quiet() {
-        @Override
-        public void execute(Storage.MutableStoreProvider storeProvider) {
-          for (IHostAttributes attributes : hostAttributesToSave) {
-            storeProvider.getAttributeStore().saveHostAttributes(attributes);
-          }
+      storage.write((NoResult.Quiet) storeProvider -> {
+        for (IHostAttributes attributes : hostAttributesToSave) {
+          storeProvider.getAttributeStore().saveHostAttributes(attributes);
         }
       });
     }

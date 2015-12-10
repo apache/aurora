@@ -45,14 +45,9 @@ public class LeaderRedirectTest extends EasyMockTest {
   private static final int HTTP_PORT = 500;
 
   private static final Function<HostAndPort, ServiceInstance> CREATE_INSTANCE =
-      new Function<HostAndPort, ServiceInstance>() {
-        @Override
-        public ServiceInstance apply(HostAndPort endpoint) {
-          return new ServiceInstance()
-              .setAdditionalEndpoints(ImmutableMap.of(HTTP_PORT_NAME,
-                  new Endpoint(endpoint.getHostText(), endpoint.getPort())));
-        }
-      };
+      endpoint -> new ServiceInstance()
+          .setAdditionalEndpoints(ImmutableMap.of(HTTP_PORT_NAME,
+              new Endpoint(endpoint.getHostText(), endpoint.getPort())));
 
   private Capture<HostChangeMonitor<ServiceInstance>> monitorCapture;
 

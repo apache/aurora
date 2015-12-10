@@ -14,7 +14,6 @@
 package org.apache.aurora.benchmark;
 
 import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.concurrent.TimeUnit;
 
@@ -160,31 +159,28 @@ public class ThriftApiBenchmarks {
   private static void bulkLoadTasks(Storage storage, final TestConfiguration config) {
     // Ideally we would use the API to populate the storage, but wiring in the writable thrift
     // interface requires considerably more binding setup.
-    storage.bulkLoad(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        for (int roleId = 0; roleId < config.roles; roleId++) {
-          String role = "role" + roleId;
-          for (int envId = 0; envId < config.envs; envId++) {
-            String env = "env" + envId;
-            for (int jobId = 0; jobId < config.jobs; jobId++) {
-              String job = "job" + jobId;
-              ImmutableSet.Builder<IScheduledTask> tasks = ImmutableSet.builder();
-              tasks.addAll(new Tasks.Builder()
-                  .setRole(role)
-                  .setEnv(env)
-                  .setJob(job)
-                  .setScheduleStatus(ScheduleStatus.RUNNING)
-                  .build(config.instances));
-              tasks.addAll(new Tasks.Builder()
-                  .setRole(role)
-                  .setEnv(env)
-                  .setJob(job)
-                  .setScheduleStatus(ScheduleStatus.FINISHED)
-                  .setUuidStart(1)
-                  .build(config.deadTasks));
-              storeProvider.getUnsafeTaskStore().saveTasks(tasks.build());
-            }
+    storage.bulkLoad(storeProvider -> {
+      for (int roleId = 0; roleId < config.roles; roleId++) {
+        String role = "role" + roleId;
+        for (int envId = 0; envId < config.envs; envId++) {
+          String env = "env" + envId;
+          for (int jobId = 0; jobId < config.jobs; jobId++) {
+            String job = "job" + jobId;
+            ImmutableSet.Builder<IScheduledTask> tasks = ImmutableSet.builder();
+            tasks.addAll(new Tasks.Builder()
+                .setRole(role)
+                .setEnv(env)
+                .setJob(job)
+                .setScheduleStatus(ScheduleStatus.RUNNING)
+                .build(config.instances));
+            tasks.addAll(new Tasks.Builder()
+                .setRole(role)
+                .setEnv(env)
+                .setJob(job)
+                .setScheduleStatus(ScheduleStatus.FINISHED)
+                .setUuidStart(1)
+                .build(config.deadTasks));
+            storeProvider.getUnsafeTaskStore().saveTasks(tasks.build());
           }
         }
       }
@@ -192,11 +188,8 @@ public class ThriftApiBenchmarks {
   }
 
   private static <T> T createThrowingFake(Class<T> clazz) {
-    InvocationHandler handler = new InvocationHandler() {
-      @Override
-      public Object invoke(Object o, Method method, Object[] objects) throws Throwable {
-        throw new UnsupportedOperationException("This fake has no behavior.");
-      }
+    InvocationHandler handler = (o, method, objects) -> {
+      throw new UnsupportedOperationException("This fake has no behavior.");
     };
 
     @SuppressWarnings("unchecked")

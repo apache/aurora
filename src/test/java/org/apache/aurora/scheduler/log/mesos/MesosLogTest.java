@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.TimeoutException;
 
-import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
@@ -33,6 +32,7 @@ import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
@@ -182,20 +182,10 @@ public class MesosLogTest extends EasyMockTest {
 
   private List<String> readAll() {
     List<byte[]> entryBytes = FluentIterable.from(ImmutableList.copyOf(logStream.readAll()))
-        .transform(new Function<org.apache.aurora.scheduler.log.Log.Entry, byte[]>() {
-          @Override
-          public byte[] apply(org.apache.aurora.scheduler.log.Log.Entry entry) {
-            return entry.contents();
-          }
-        })
+        .transform(Entry::contents)
         .toList();
     return FluentIterable.from(entryBytes)
-        .transform(new Function<byte[], String>() {
-          @Override
-          public String apply(byte[] data) {
-            return new String(data, StandardCharsets.UTF_8);
-          }
-        })
+        .transform(data -> new String(data, StandardCharsets.UTF_8))
         .toList();
   }
 

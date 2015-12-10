@@ -276,12 +276,7 @@ public class TaskStateMachineTest {
   }
 
   private static final Function<Action, SideEffect> TO_SIDE_EFFECT =
-      new Function<Action, SideEffect>() {
-        @Override
-        public SideEffect apply(Action action) {
-          return new SideEffect(action, Optional.absent());
-        }
-      };
+      action -> new SideEffect(action, Optional.absent());
 
   private void legalTransition(TaskState state, SideEffect.Action... expectedActions) {
     legalTransition(state, ImmutableSet.copyOf(expectedActions));

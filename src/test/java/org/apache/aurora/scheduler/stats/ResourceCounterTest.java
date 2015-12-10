@@ -33,6 +33,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -117,14 +118,11 @@ public class ResourceCounterTest {
 
   @Test
   public void testComputeQuotaAllocationTotals() {
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getQuotaStore()
-            .saveQuota("a", IResourceAggregate.build(new ResourceAggregate(1, 1, 1)));
-        storeProvider.getQuotaStore()
-            .saveQuota("b", IResourceAggregate.build(new ResourceAggregate(2, 3, 4)));
-      }
+    storage.write((NoResult.Quiet) storeProvider -> {
+      storeProvider.getQuotaStore()
+          .saveQuota("a", IResourceAggregate.build(new ResourceAggregate(1, 1, 1)));
+      storeProvider.getQuotaStore()
+          .saveQuota("b", IResourceAggregate.build(new ResourceAggregate(2, 3, 4)));
     });
 
     assertEquals(new Metric(3, 4, 5), resourceCounter.computeQuotaAllocationTotals());
@@ -184,11 +182,7 @@ public class ResourceCounterTest {
   }
 
   private void insertTasks(final IScheduledTask... tasks) {
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-          storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.copyOf(tasks));
-      }
-    });
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.copyOf(tasks)));
   }
 }

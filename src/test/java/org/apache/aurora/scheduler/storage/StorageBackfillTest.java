@@ -22,6 +22,8 @@ import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
@@ -48,12 +50,8 @@ public class StorageBackfillTest {
   @Test
   public void testBackfillTask() {
     final Set<IScheduledTask> backfilledTasks = ImmutableSet.of(TASK);
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(backfilledTasks);
-      }
-    });
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(backfilledTasks));
 
     backfill();
 
@@ -63,12 +61,7 @@ public class StorageBackfillTest {
   }
 
   private void backfill() {
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        StorageBackfill.backfill(storeProvider);
-      }
-    });
+    storage.write((Quiet) StorageBackfill::backfill);
   }
 
   private static IScheduledTask setMesosContainer(IScheduledTask task) {

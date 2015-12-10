@@ -16,8 +16,6 @@ package org.apache.aurora.scheduler.thrift.aop;
 import java.lang.reflect.Method;
 import java.util.Collection;
 
-import com.google.common.base.Function;
-import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.FluentIterable;
 import com.google.common.reflect.Invokable;
@@ -32,30 +30,20 @@ import static org.junit.Assert.assertEquals;
 public class AnnotatedAuroraAdminTest {
   @Test
   public void testAllAuroraSchedulerManagerIfaceMethodsHaveAuthorizingParam() throws Exception {
-    for (final Method declaredMethod : AuroraSchedulerManager.Iface.class.getDeclaredMethods()) {
+    for (Method declaredMethod : AuroraSchedulerManager.Iface.class.getDeclaredMethods()) {
       Invokable<?, ?> invokable = Invokable.from(declaredMethod);
       Collection<Parameter> parameters = invokable.getParameters();
       Invokable<?, ?> annotatedInvokable = Invokable.from(
           AnnotatedAuroraAdmin.class.getDeclaredMethod(
               invokable.getName(),
               FluentIterable.from(parameters)
-                  .transform(new Function<Parameter, Class<?>>() {
-                    @Override
-                    public Class<?> apply(Parameter input) {
-                      return input.getType().getRawType();
-                    }
-                  })
+                  .transform(input -> input.getType().getRawType())
                   .toList()
                   .toArray(new Class<?>[0])));
 
       Collection<Parameter> annotatedParameters = Collections2.filter(
           annotatedInvokable.getParameters(),
-          new Predicate<Parameter>() {
-            @Override
-            public boolean apply(Parameter input) {
-              return input.getAnnotation(AuthorizingParam.class) != null;
-            }
-          });
+          input -> input.getAnnotation(AuthorizingParam.class) != null);
 
       assertEquals(
           "Method " + invokable + " should have 1 " + AuthorizingParam.class.getName()

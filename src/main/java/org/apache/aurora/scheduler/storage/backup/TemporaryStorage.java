@@ -25,7 +25,6 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -80,7 +79,7 @@ interface TemporaryStorage {
       return new TemporaryStorage() {
         @Override
         public void deleteTasks(final Query.Builder query) {
-          storage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+          storage.write((NoResult.Quiet) storeProvider -> {
             Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
                 .transform(Tasks::id)
                 .toSet();

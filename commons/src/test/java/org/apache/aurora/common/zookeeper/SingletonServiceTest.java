@@ -60,11 +60,7 @@ public class SingletonServiceTest extends BaseZooKeeperTest {
   @SuppressWarnings("unchecked")
   public void mySetUp() throws IOException {
     control = createControl();
-    addTearDown(new TearDown() {
-      @Override public void tearDown() {
-        control.verify();
-      }
-    });
+    addTearDown(control::verify);
     listener = control.createMock(SingletonService.LeadershipListener.class);
     serverSet = control.createMock(ServerSet.class);
     candidate = control.createMock(Candidate.class);

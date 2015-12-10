@@ -72,11 +72,7 @@ public class Iterables2Test {
         list(9));
 
     // Attempt to trim all rows that have the default value.
-    Iterables.removeIf(meta, new Predicate<List<Integer>>() {
-      @Override public boolean apply(List<Integer> input) {
-        return Iterables.contains(input, DEFAULT);
-      }
-    });
+    Iterables.removeIf(meta, input -> Iterables.contains(input, DEFAULT));
 
     assertValues(meta, list(1, 5, 9));
   }

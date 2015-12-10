@@ -37,11 +37,9 @@ public class EasyMockTestTest extends EasyMockTest {
 
     Runnable runnable = createMock(new Clazz<Runnable>() { });
     runnable.run();
-    expectLastCall().andAnswer(new IAnswer<Void>() {
-      @Override public Void answer() {
-        ran.set(true);
-        return null;
-      }
+    expectLastCall().andAnswer(() -> {
+      ran.set(true);
+      return null;
     });
     control.replay();
 

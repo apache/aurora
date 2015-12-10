@@ -35,10 +35,10 @@ import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
-import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 import org.quartz.JobExecutionContext;
@@ -136,12 +136,8 @@ public class CronIT extends EasyMockTest {
     control.replay();
     final Scheduler scheduler = injector.getInstance(Scheduler.class);
 
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getCronJobStore().saveAcceptedJob(CRON_JOB);
-      }
-    });
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getCronJobStore().saveAcceptedJob(CRON_JOB));
 
     final CountDownLatch cronRan = new CountDownLatch(1);
     scheduler.getListenerManager().addTriggerListener(new CountDownWhenComplete(cronRan));
@@ -163,22 +159,16 @@ public class CronIT extends EasyMockTest {
     final CountDownLatch secondExecutionCompleted = new CountDownLatch(1);
 
     auroraCronJob.execute(isA(JobExecutionContext.class));
-    expectLastCall().andAnswer(new IAnswer<Void>() {
-      @Override
-      public Void answer() throws Throwable {
-        firstExecutionTriggered.countDown();
-        firstExecutionCompleted.await();
-        return null;
-      }
+    expectLastCall().andAnswer(() -> {
+      firstExecutionTriggered.countDown();
+      firstExecutionCompleted.await();
+      return null;
     });
     auroraCronJob.execute(isA(JobExecutionContext.class));
-    expectLastCall().andAnswer(new IAnswer<Object>() {
-      @Override
-      public Void answer() throws Throwable {
-        secondExecutionTriggered.countDown();
-        secondExecutionCompleted.await();
-        return null;
-      }
+    expectLastCall().andAnswer(() -> {
+      secondExecutionTriggered.countDown();
+      secondExecutionCompleted.await();
+      return null;
     });
 
     control.replay();

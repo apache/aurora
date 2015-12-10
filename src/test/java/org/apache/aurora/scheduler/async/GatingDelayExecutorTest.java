@@ -22,9 +22,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.scheduler.async.GatedWorkQueue.GatedOperation;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
@@ -58,12 +56,9 @@ public class GatingDelayExecutorTest extends EasyMockTest {
   }
 
   private IExpectationSetters<?> invokeWorkWhenSubmitted() {
-    return expectLastCall().andAnswer(new IAnswer<Object>() {
-      @Override
-      public Object answer() {
-        ((Runnable) EasyMock.getCurrentArguments()[0]).run();
-        return null;
-      }
+    return expectLastCall().andAnswer(() -> {
+      ((Runnable) EasyMock.getCurrentArguments()[0]).run();
+      return null;
     });
   }
 
@@ -75,23 +70,15 @@ public class GatingDelayExecutorTest extends EasyMockTest {
 
     CountDownLatch gateClosed = new CountDownLatch(1);
     CountDownLatch unblock = new CountDownLatch(1);
-    Runnable closer = new Runnable() {
-      @Override
-      public void run() {
-        gatingExecutor.closeDuring(new GatedOperation<String, RuntimeException>() {
-          @Override
-          public String doWithGateClosed() {
-            gateClosed.countDown();
-            try {
-              unblock.await();
-            } catch (InterruptedException e) {
-              throw Throwables.propagate(e);
-            }
-            return "hi";
-          }
-        });
+    Runnable closer = () -> gatingExecutor.closeDuring(() -> {
+      gateClosed.countDown();
+      try {
+        unblock.await();
+      } catch (InterruptedException e) {
+        throw Throwables.propagate(e);
       }
-    };
+      return "hi";
+    });
     new ThreadFactoryBuilder()
         .setDaemon(true)
         .setNameFormat("GateTest")
@@ -119,24 +106,18 @@ public class GatingDelayExecutorTest extends EasyMockTest {
     gatingExecutor.execute(runnable);
     assertQueueSize(0);
 
-    String result = gatingExecutor.closeDuring(new GatedOperation<String, RuntimeException>() {
-      @Override
-      public String doWithGateClosed() {
+    String result = gatingExecutor.closeDuring(() -> {
+      gatingExecutor.execute(runnable);
+      assertQueueSize(1);
+
+      String result1 = gatingExecutor.closeDuring(() -> {
         gatingExecutor.execute(runnable);
-        assertQueueSize(1);
+        assertQueueSize(2);
+        return "hello";
+      });
+      assertEquals("hello", result1);
 
-        String result = gatingExecutor.closeDuring(new GatedOperation<String, RuntimeException>() {
-          @Override
-          public String doWithGateClosed() {
-            gatingExecutor.execute(runnable);
-            assertQueueSize(2);
-            return "hello";
-          }
-        });
-        assertEquals("hello", result);
-
-        return "hi";
-      }
+      return "hi";
     });
     assertEquals("hi", result);
     assertQueueSize(0);

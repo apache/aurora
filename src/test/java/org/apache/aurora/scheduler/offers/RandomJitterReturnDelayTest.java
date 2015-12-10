@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.offers;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.Random;
-
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;

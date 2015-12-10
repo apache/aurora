@@ -33,7 +33,6 @@ import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -190,7 +189,7 @@ public interface Recovery {
       }
 
       void commit() {
-        primaryStorage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+        primaryStorage.write((NoResult.Quiet) storeProvider -> {
           try {
             distributedStore.persist(tempStorage.toSnapshot());
             shutDownNow.execute();

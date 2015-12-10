@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.scheduling;
 
 import java.util.Map;
-import java.util.Map.Entry;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
@@ -174,12 +173,7 @@ public class RescheduleCalculatorImplTest extends EasyMockTest {
   }
 
   private static final Function<Map.Entry<ScheduleStatus, Long>, TaskEvent> TO_EVENT =
-      new Function<Entry<ScheduleStatus, Long>, TaskEvent>() {
-        @Override
-        public TaskEvent apply(Entry<ScheduleStatus, Long> input) {
-          return new TaskEvent().setStatus(input.getKey()).setTimestamp(input.getValue());
-        }
-      };
+      input -> new TaskEvent().setStatus(input.getKey()).setTimestamp(input.getValue());
 
   private IScheduledTask setEvents(IScheduledTask task, Map<ScheduleStatus, Long> events) {
     return IScheduledTask.build(task.newBuilder().setTaskEvents(

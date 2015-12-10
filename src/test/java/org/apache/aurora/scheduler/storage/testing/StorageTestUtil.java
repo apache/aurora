@@ -31,7 +31,6 @@ import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.easymock.Capture;
-import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 
 import static org.easymock.EasyMock.capture;
@@ -74,24 +73,15 @@ public class StorageTestUtil {
   }
 
   public <T> IExpectationSetters<T> expectRead() {
-    final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
+    Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
     return expect(storage.<T, RuntimeException>read(capture(work)))
-        .andAnswer(new IAnswer<T>() {
-          @Override
-          public T answer() {
-            return work.getValue().apply(storeProvider);
-          }
-        });
+        .andAnswer(() -> work.getValue().apply(storeProvider));
   }
 
   public <T> IExpectationSetters<T> expectWrite() {
-    final Capture<MutateWork<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.<T, RuntimeException>write(capture(work))).andAnswer(new IAnswer<T>() {
-      @Override
-      public T answer() {
-        return work.getValue().apply(mutableStoreProvider);
-      }
-    });
+    Capture<MutateWork<T, RuntimeException>> work = EasyMockTest.createCapture();
+    return expect(storage.<T, RuntimeException>write(capture(work)))
+        .andAnswer(() -> work.getValue().apply(mutableStoreProvider));
   }
 
   /**

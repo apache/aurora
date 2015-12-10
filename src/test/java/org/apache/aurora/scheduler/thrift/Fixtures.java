@@ -74,12 +74,7 @@ final class Fixtures {
       IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), UPDATE_ID));
   static final UUID UU_ID = UUID.fromString(UPDATE_ID);
   private static final Function<String, ResponseDetail> MESSAGE_TO_DETAIL =
-      new Function<String, ResponseDetail>() {
-        @Override
-        public ResponseDetail apply(String message) {
-          return new ResponseDetail().setMessage(message);
-        }
-      };
+      message -> new ResponseDetail().setMessage(message);
   static final String CRON_SCHEDULE = "0 * * * *";
   static final IResourceAggregate QUOTA =
       IResourceAggregate.build(new ResourceAggregate(10.0, 1024, 2048));

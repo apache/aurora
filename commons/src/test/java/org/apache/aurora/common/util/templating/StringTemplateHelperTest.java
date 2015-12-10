@@ -54,16 +54,14 @@ public class StringTemplateHelperTest {
   @Test
   public void testFillTemplate() throws Exception {
     StringWriter output = new StringWriter();
-    templateHelper.writeTemplate(output, new Closure<StringTemplate>() {
-      @Override public void execute(StringTemplate template) {
-        template.setAttribute("header", "Prices");
-        template.setAttribute("items", Arrays.asList(
-            new Item("banana", 50),
-            new Item("car", 2),
-            new Item("jupiter", 200)
-        ));
-        template.setAttribute("footer", "The End");
-      }
+    templateHelper.writeTemplate(output, template -> {
+      template.setAttribute("header", "Prices");
+      template.setAttribute("items", Arrays.asList(
+          new Item("banana", 50),
+          new Item("car", 2),
+          new Item("jupiter", 200)
+      ));
+      template.setAttribute("footer", "The End");
     });
     String expected = "Prices\n"
         + "\n  The banana costs $50."
@@ -83,10 +81,8 @@ public class StringTemplateHelperTest {
 
   @Test(expected = CustomException.class)
   public void testClosureError() throws Exception {
-    templateHelper.writeTemplate(new StringWriter(), new Closure<StringTemplate>() {
-      @Override public void execute(StringTemplate template) {
-        throw new CustomException();
-      }
+    templateHelper.writeTemplate(new StringWriter(), template -> {
+      throw new CustomException();
     });
   }
 }

@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.base;
 
 import java.util.EnumSet;
 
-import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 
@@ -35,12 +34,8 @@ public class JobsTest {
     ImmutableList<IScheduledTask> tasks =
         FluentIterable
             .from(EnumSet.allOf(ScheduleStatus.class))
-            .transform(new Function<ScheduleStatus, IScheduledTask>() {
-              @Override
-              public IScheduledTask apply(ScheduleStatus status) {
-                return addStateTransition(makeTask("id", TaskTestUtil.JOB), status, 100L);
-              }
-            }).toList();
+            .transform(status ->
+                addStateTransition(makeTask("id", TaskTestUtil.JOB), status, 100L)).toList();
 
     IJobStats expectedStats = IJobStats.build(new JobStats()
         .setActiveTaskCount(7)

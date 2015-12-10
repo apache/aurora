@@ -33,7 +33,6 @@ import org.apache.aurora.scheduler.scheduling.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
-import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -84,16 +83,13 @@ public class TaskGroupsTest extends EasyMockTest {
   public void testTaskDeletedBeforeEvaluating() {
     final IScheduledTask task = makeTask(TASK_A_ID);
     expect(rateLimiter.acquire()).andReturn(0D);
-    expect(taskScheduler.schedule(Tasks.id(task))).andAnswer(new IAnswer<Boolean>() {
-      @Override
-      public Boolean answer() {
-        // Test a corner case where a task is deleted while it is being evaluated by the task
-        // scheduler.  If not handled carefully, this could result in the scheduler trying again
-        // later to satisfy the deleted task.
-        taskGroups.tasksDeleted(new TasksDeleted(ImmutableSet.of(task)));
+    expect(taskScheduler.schedule(Tasks.id(task))).andAnswer(() -> {
+      // Test a corner case where a task is deleted while it is being evaluated by the task
+      // scheduler.  If not handled carefully, this could result in the scheduler trying again
+      // later to satisfy the deleted task.
+      taskGroups.tasksDeleted(new TasksDeleted(ImmutableSet.of(task)));
 
-        return false;
-      }
+      return false;
     });
     expect(backoffStrategy.calculateBackoffMs(FIRST_SCHEDULE_DELAY.as(Time.MILLISECONDS)))
         .andReturn(0L);

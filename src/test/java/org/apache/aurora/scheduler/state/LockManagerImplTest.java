@@ -36,7 +36,6 @@ import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -174,16 +173,13 @@ public class LockManagerImplTest extends EasyMockTest {
     final CountDownLatch reads = new CountDownLatch(2);
     EasyMock.makeThreadSafe(storageUtil.storage, false);
     expect(storageUtil.storage.read(EasyMock.anyObject()))
-        .andAnswer(new IAnswer<Object>() {
-          @Override
-          public Object answer() throws Throwable {
-            @SuppressWarnings("unchecked")
-            Work<?, ?> work = (Work<?, ?>) EasyMock.getCurrentArguments()[0];
-            Object result = work.apply(storageUtil.storeProvider);
-            reads.countDown();
-            reads.await();
-            return result;
-          }
+        .andAnswer(() -> {
+          @SuppressWarnings("unchecked")
+          Work<?, ?> work = (Work<?, ?>) EasyMock.getCurrentArguments()[0];
+          Object result = work.apply(storageUtil.storeProvider);
+          reads.countDown();
+          reads.await();
+          return result;
         }).atLeastOnce();
 
     lockManager = new LockManagerImpl(storageUtil.storage, clock, tokenGenerator);
@@ -194,14 +190,11 @@ public class LockManagerImplTest extends EasyMockTest {
         .setDaemon(true)
         .setNameFormat("LockRead-%s")
         .build()
-        .newThread(new Runnable() {
-          @Override
-          public void run() {
-            try {
-              lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
-            } catch (LockException e) {
-              throw Throwables.propagate(e);
-            }
+        .newThread(() -> {
+          try {
+            lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
+          } catch (LockException e) {
+            throw Throwables.propagate(e);
           }
         })
         .start();

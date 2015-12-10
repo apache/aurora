@@ -66,11 +66,11 @@ import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Scheduler;
-import org.apache.mesos.SchedulerDriver;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -190,33 +190,18 @@ public class StatusUpdateBenchmark {
                 .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor(
                     "SchedulerImpl-%d",
                     Logger.getLogger(StatusUpdateBenchmark.class.getName())));
-            bind(DriverFactory.class).toInstance(new DriverFactory() {
-              @Override
-              public SchedulerDriver create(
-                  Scheduler s,
-                  Optional<Protos.Credential> credentials,
-                  Protos.FrameworkInfo frameworkInfo,
-                  String master) {
-
-                return new FakeSchedulerDriver();
-              }
-            });
+            bind(DriverFactory.class)
+                .toInstance((s, credentials, frameworkInfo, master) -> new FakeSchedulerDriver());
             bind(OfferManager.class).toInstance(new FakeOfferManager());
             bind(TaskIdGenerator.class).to(TaskIdGenerator.TaskIdGeneratorImpl.class);
             bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
             bind(Command.class).annotatedWith(ShutdownStage.class).toInstance(
-                new Command() {
-                  @Override
-                  public void execute() throws RuntimeException {
-                    // no-op
-                  }
+                () -> {
+                  // no-op
                 });
             bind(Thread.UncaughtExceptionHandler.class).toInstance(
-                new Thread.UncaughtExceptionHandler() {
-                  @Override
-                  public void uncaughtException(Thread t, Throwable e) {
-                    // no-op
-                  }
+                (t, e) -> {
+                  // no-op
                 });
             bind(Storage.class).toInstance(storage);
             bind(DriverSettings.class).toInstance(
@@ -231,15 +216,10 @@ public class StatusUpdateBenchmark {
             bind(Clock.class).toInstance(new FakeClock());
             bind(ExecutorSettings.class).toInstance(TestExecutorSettings.THERMOS_EXECUTOR);
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
-            bind(EventSink.class).toInstance(new EventSink() {
-              @Override
-              public void post(PubsubEvent event) {
-                eventBus.post(event);
-              }
-            });
+            bind(EventSink.class).toInstance(eventBus::post);
             bind(new TypeLiteral<BlockingQueue<Protos.TaskStatus>>() { })
                 .annotatedWith(TaskStatusHandlerImpl.StatusUpdateQueue.class)
-                .toInstance(new LinkedBlockingQueue<Protos.TaskStatus>());
+                .toInstance(new LinkedBlockingQueue<>());
             bind(new TypeLiteral<Integer>() { })
                 .annotatedWith(TaskStatusHandlerImpl.MaxBatchSize.class)
                 .toInstance(1000);
@@ -283,12 +263,8 @@ public class StatusUpdateBenchmark {
         .setScheduleStatus(ScheduleStatus.STARTING)
         .build(NUM_TASKS);
 
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(tasks);
-      }
-    });
+    storage.write(
+        (NoResult.Quiet) storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(tasks));
 
     countDownLatch = new CountDownLatch(tasks.size());
   }

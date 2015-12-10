@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage.db;
 
 import java.io.IOException;
 import java.util.Optional;
-import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
 
@@ -24,11 +23,7 @@ import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
@@ -42,47 +37,31 @@ public class DbLockStoreTest {
 
   private Storage storage;
 
-  private void assertLocks(final ILock... expected) {
+  private void assertLocks(ILock... expected) {
     assertEquals(
         ImmutableSet.<ILock>builder().add(expected).build(),
-        storage.read(new Quiet<Set<ILock>>() {
-          @Override
-          public Set<ILock> apply(Storage.StoreProvider storeProvider) {
-            return storeProvider.getLockStore().fetchLocks();
-          }
-        }));
+        storage.read(storeProvider -> storeProvider.getLockStore().fetchLocks()));
   }
 
-  private Optional<ILock> getLock(final ILockKey key) {
-    return storage.read(new Quiet<Optional<ILock>>() {
-      @Override
-      public Optional<ILock> apply(StoreProvider storeProvider) {
-        return storeProvider.getLockStore().fetchLock(key);
+  private Optional<ILock> getLock(ILockKey key) {
+    return storage.read(storeProvider -> storeProvider.getLockStore().fetchLock(key));
+  }
+
+  private void saveLocks(ILock... locks) {
+    storage.write(storeProvider -> {
+      for (ILock lock : locks) {
+        storeProvider.getLockStore().saveLock(lock);
       }
+      return null;
     });
   }
 
-  private void saveLocks(final ILock... locks) {
-    storage.write(new MutateWork.Quiet<Void>() {
-      @Override
-      public Void apply(MutableStoreProvider storeProvider) {
-        for (ILock lock : locks) {
-          storeProvider.getLockStore().saveLock(lock);
-        }
-        return null;
+  private void removeLocks(ILock... locks) {
+    storage.write(storeProvider -> {
+      for (ILock lock : locks) {
+        storeProvider.getLockStore().removeLock(lock.getKey());
       }
-    });
-  }
-
-  private void removeLocks(final ILock... locks) {
-    storage.write(new MutateWork.Quiet<Void>() {
-      @Override
-      public Void apply(MutableStoreProvider storeProvider) {
-        for (ILock lock : locks) {
-          storeProvider.getLockStore().removeLock(lock.getKey());
-        }
-        return null;
-      }
+      return null;
     });
   }
 
@@ -196,12 +175,9 @@ public class DbLockStoreTest {
     saveLocks(lock1, lock2);
     assertLocks(lock1, lock2);
 
-    storage.write(new MutateWork.Quiet<Void>() {
-      @Override
-      public Void apply(MutableStoreProvider storeProvider) {
-        storeProvider.getLockStore().deleteLocks();
-        return null;
-      }
+    storage.write(storeProvider -> {
+      storeProvider.getLockStore().deleteLocks();
+      return null;
     });
 
     assertLocks();

@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler;
 
 import java.util.Set;
 
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -169,12 +168,7 @@ public class ResourceSlotTest {
 
     Set<Pair<Long, Long>> actual = ImmutableSet.copyOf(Iterables.transform(
         resource.getRanges().getRangeList(),
-        new Function<Protos.Value.Range, Pair<Long, Long>>() {
-          @Override
-          public Pair<Long, Long> apply(Protos.Value.Range range) {
-            return Pair.of(range.getBegin(), range.getEnd());
-          }
-        }));
+        range -> Pair.of(range.getBegin(), range.getEnd())));
     assertEquals(expected, actual);
   }
 }

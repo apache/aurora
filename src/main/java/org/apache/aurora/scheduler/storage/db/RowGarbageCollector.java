@@ -73,7 +73,7 @@ class RowGarbageCollector extends AbstractScheduledService {
 
     final AtomicLong deletedCount = new AtomicLong();
     for (Class<? extends GarbageCollectedTableMapper> tableClass : TABLES) {
-      storage.write((NoResult.Quiet) (Storage.MutableStoreProvider storeProvider) -> {
+      storage.write((NoResult.Quiet) storeProvider -> {
         try (SqlSession session = sessionFactory.openSession(true)) {
           GarbageCollectedTableMapper table = session.getMapper(tableClass);
           for (long rowId : table.selectAllRowIds()) {

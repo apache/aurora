@@ -29,6 +29,7 @@ import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -245,21 +246,12 @@ public class CronJobManagerImplTest extends EasyMockTest {
   }
 
   private void populateStorage() throws Exception {
-    storage.write(new Storage.MutateWork.NoResult<Exception>() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) throws Exception {
-        storeProvider.getCronJobStore().saveAcceptedJob(
-            QuartzTestUtil.makeSanitizedCronJob().getSanitizedConfig().getJobConfig());
-      }
-    });
+    storage.write((NoResult.Quiet) storeProvider -> storeProvider.getCronJobStore().saveAcceptedJob(
+        QuartzTestUtil.makeSanitizedCronJob().getSanitizedConfig().getJobConfig()));
   }
 
   private Optional<IJobConfiguration> fetchFromStorage() {
-    return storage.read(new Storage.Work.Quiet<Optional<IJobConfiguration>>() {
-      @Override
-      public Optional<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getCronJobStore().fetchJob(QuartzTestUtil.AURORA_JOB_KEY);
-      }
-    });
+    return storage.read(
+        storeProvider -> storeProvider.getCronJobStore().fetchJob(QuartzTestUtil.AURORA_JOB_KEY));
   }
 }

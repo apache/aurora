@@ -21,10 +21,7 @@ import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
 import org.junit.Before;
@@ -88,51 +85,28 @@ public class DbQuotaStoreTest {
     assertQuotas(ImmutableMap.of(ROLE_A, QUOTA_B));
   }
 
-  private void save(final String role, final IResourceAggregate quota) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getQuotaStore().saveQuota(role, quota);
-      }
-    });
+  private void save(String role, IResourceAggregate quota) {
+    storage.write(
+        (NoResult.Quiet) storeProvider -> storeProvider.getQuotaStore().saveQuota(role, quota));
   }
 
-  private Optional<IResourceAggregate> select(final String role) {
-    return storage.read(new Work.Quiet<Optional<IResourceAggregate>>() {
-      @Override
-      public Optional<IResourceAggregate> apply(StoreProvider storeProvider) {
-        return storeProvider.getQuotaStore().fetchQuota(role);
-      }
-    });
+  private Optional<IResourceAggregate> select(String role) {
+    return storage.read(storeProvider -> storeProvider.getQuotaStore().fetchQuota(role));
   }
 
   private void assertQuotas(Map<String, IResourceAggregate> quotas) {
     assertEquals(
         quotas,
-        storage.read(new Work.Quiet<Map<String, IResourceAggregate>>() {
-          @Override
-          public Map<String, IResourceAggregate> apply(StoreProvider storeProvider) {
-            return storeProvider.getQuotaStore().fetchQuotas();
-          }
-        })
+        storage.read(storeProvider -> storeProvider.getQuotaStore().fetchQuotas())
     );
   }
 
-  private void delete(final String role) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getQuotaStore().removeQuota(role);
-      }
-    });
+  private void delete(String role) {
+    storage.write(
+        (NoResult.Quiet) storeProvider -> storeProvider.getQuotaStore().removeQuota(role));
   }
 
   private void deleteAll() {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getQuotaStore().deleteQuotas();
-      }
-    });
+    storage.write((NoResult.Quiet) storeProvider -> storeProvider.getQuotaStore().deleteQuotas());
   }
 }

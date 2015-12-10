@@ -17,7 +17,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -51,7 +50,6 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.Protos;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
@@ -476,12 +474,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   private static ImmutableSet<PreemptionVictim> preemptionVictims(ScheduledTask... tasks) {
     return FluentIterable.from(ImmutableSet.copyOf(tasks))
         .transform(
-            new Function<ScheduledTask, PreemptionVictim>() {
-              @Override
-              public PreemptionVictim apply(ScheduledTask task) {
-                return PreemptionVictim.fromTask(IAssignedTask.build(task.getAssignedTask()));
-              }
-            }).toSet();
+            task -> PreemptionVictim.fromTask(IAssignedTask.build(task.getAssignedTask()))).toSet();
   }
 
   private static void assertVictims(
@@ -541,12 +534,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
         EasyMock.anyObject(),
         EasyMock.anyObject()))
         .andAnswer(
-            new IAnswer<Set<SchedulingFilter.Veto>>() {
-              @Override
-              public Set<SchedulingFilter.Veto> answer() {
-                return veto.asSet();
-              }
-            });
+            veto::asSet);
   }
 
   static ScheduledTask makeTask(

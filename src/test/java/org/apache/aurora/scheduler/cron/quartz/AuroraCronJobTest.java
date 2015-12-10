@@ -26,6 +26,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.easymock.Capture;
@@ -34,7 +35,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.quartz.JobExecutionException;
 
-import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -120,37 +120,22 @@ public class AuroraCronJobTest extends EasyMockTest {
     auroraCronJob.doExecute(QuartzTestUtil.AURORA_JOB_KEY);
     assertFalse(capture.getValue().get());
     storage.write(
-        new Storage.MutateWork.NoResult.Quiet() {
-          @Override
-          public void execute(MutableStoreProvider storeProvider) {
-            storeProvider.getUnsafeTaskStore().deleteAllTasks();
-          }
-        });
+        (NoResult.Quiet) storeProvider -> storeProvider.getUnsafeTaskStore().deleteAllTasks());
     assertTrue(capture.getValue().get());
   }
 
   private void populateTaskStore() {
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
             IScheduledTask.build(new ScheduledTask()
                 .setStatus(ScheduleStatus.RUNNING)
                 .setAssignedTask(new AssignedTask()
                     .setTaskId(TASK_ID)
-                    .setTask(QuartzTestUtil.JOB.getTaskConfig().newBuilder())))
-        ));
-      }
-    });
+                    .setTask(QuartzTestUtil.JOB.getTaskConfig().newBuilder()))))));
   }
 
-  private void populateStorage(final CronCollisionPolicy policy) {
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getCronJobStore().saveAcceptedJob(
-            QuartzTestUtil.makeSanitizedCronJob(policy).getSanitizedConfig().getJobConfig());
-      }
-    });
+  private void populateStorage(CronCollisionPolicy policy) {
+    storage.write((NoResult.Quiet) storeProvider -> storeProvider.getCronJobStore().saveAcceptedJob(
+        QuartzTestUtil.makeSanitizedCronJob(policy).getSanitizedConfig().getJobConfig()));
   }
 }

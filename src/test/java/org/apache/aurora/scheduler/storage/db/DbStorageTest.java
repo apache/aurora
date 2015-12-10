@@ -22,8 +22,8 @@ import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.TaskStore;
@@ -31,7 +31,6 @@ import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
@@ -93,12 +92,9 @@ public class DbStorageTest extends EasyMockTest {
 
   private IExpectationSetters<?> expectGateClosed() throws Exception {
     return expect(gatedWorkQueue.closeDuring(EasyMock.anyObject()))
-        .andAnswer(new IAnswer<Object>() {
-          @Override
-          public Object answer() throws Throwable {
-            GatedOperation<?, ?> op = (GatedOperation<?, ?>) EasyMock.getCurrentArguments()[0];
-            return op.doWithGateClosed();
-          }
+        .andAnswer(() -> {
+          GatedOperation<?, ?> op = (GatedOperation<?, ?>) EasyMock.getCurrentArguments()[0];
+          return op.doWithGateClosed();
         });
   }
 
@@ -134,20 +130,12 @@ public class DbStorageTest extends EasyMockTest {
 
     control.replay();
 
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        noopWrite();
-      }
-    });
+    storage.write((NoResult.Quiet) storeProvider -> noopWrite());
   }
 
   private void noopWrite() {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        // No-op.
-      }
+    storage.write((NoResult.Quiet) storeProvider -> {
+      // No-op.
     });
   }
 

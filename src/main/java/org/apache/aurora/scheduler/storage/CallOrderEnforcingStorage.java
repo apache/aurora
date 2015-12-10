@@ -92,7 +92,7 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
     checkInState(State.PREPARED);
     wrapped.start(initializationLogic);
     stateMachine.transition(State.READY);
-    wrapped.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+    wrapped.write((NoResult.Quiet) storeProvider -> {
       Iterable<IScheduledTask> tasks = Tasks.LATEST_ACTIVITY.sortedCopy(
           storeProvider.getTaskStore().fetchTasks(Query.unscoped()));
       for (IScheduledTask task : tasks) {

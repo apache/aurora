@@ -310,12 +310,9 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
           LOG.info("Applying snapshot taken on " + new Date(snapshot.getTimestamp()));
           snapshotStore.applySnapshot(snapshot);
         })
-        .put(LogEntry._Fields.TRANSACTION, logEntry -> write(new MutateWork.NoResult.Quiet() {
-          @Override
-          public void execute(MutableStoreProvider unused) {
-            for (Op op : logEntry.getTransaction().getOps()) {
-              replayOp(op);
-            }
+        .put(LogEntry._Fields.TRANSACTION, logEntry -> write((NoResult.Quiet) unused -> {
+          for (Op op : logEntry.getTransaction().getOps()) {
+            replayOp(op);
           }
         }))
         .put(LogEntry._Fields.NOOP, item -> {

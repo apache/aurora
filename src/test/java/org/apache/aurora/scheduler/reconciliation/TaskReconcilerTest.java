@@ -40,7 +40,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.common.quantity.Time.MINUTES;
-
 import static org.apache.aurora.scheduler.reconciliation.TaskReconciler.EXPLICIT_STAT_NAME;
 import static org.apache.aurora.scheduler.reconciliation.TaskReconciler.IMPLICIT_STAT_NAME;
 import static org.apache.aurora.scheduler.reconciliation.TaskReconciler.TASK_TO_PROTO;

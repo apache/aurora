@@ -65,11 +65,7 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
   @Before
   public void mySetUp() throws IOException {
     serverSetBuffer = new LinkedBlockingQueue<ImmutableSet<ServiceInstance>>();
-    serverSetMonitor = new DynamicHostSet.HostChangeMonitor<ServiceInstance>() {
-      @Override public void onChange(ImmutableSet<ServiceInstance> serverSet) {
-        serverSetBuffer.offer(serverSet);
-      }
-    };
+    serverSetMonitor = serverSetBuffer::offer;
   }
 
   private ServerSetImpl createServerSet() throws IOException {
@@ -273,10 +269,7 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
     ServerSetImpl serverset = new ServerSetImpl(zkClient, group);
 
     try {
-      serverset.watch(new DynamicHostSet.HostChangeMonitor<ServiceInstance>() {
-        @Override
-        public void onChange(ImmutableSet<ServiceInstance> hostSet) {}
-      });
+      serverset.watch(hostSet -> {});
       fail("Expected MonitorException");
     } catch (DynamicHostSet.MonitorException e) {
       // expected
@@ -298,24 +291,16 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
       throws InterruptedException {
     assertChangeFired(
         ImmutableSet.copyOf(Iterables.transform(ImmutableSet.copyOf(hostsStatuses.entrySet()),
-        new Function<Map.Entry<InetSocketAddress, Status>, ServiceInstance>() {
-          @Override public ServiceInstance apply(Map.Entry<InetSocketAddress, Status> e) {
-            return new ServiceInstance(new Endpoint(e.getKey().getHostName(), e.getKey().getPort()),
-                ImmutableMap.<String, Endpoint>of(), e.getValue());
-          }
-        })));
+            e -> new ServiceInstance(new Endpoint(e.getKey().getHostName(), e.getKey().getPort()),
+                ImmutableMap.<String, Endpoint>of(), e.getValue()))));
   }
 
   private void assertChangeFired(String... serviceHosts)
       throws InterruptedException {
 
     assertChangeFired(ImmutableSet.copyOf(Iterables.transform(ImmutableSet.copyOf(serviceHosts),
-        new Function<String, ServiceInstance>() {
-          @Override public ServiceInstance apply(String serviceHost) {
-            return new ServiceInstance(new Endpoint(serviceHost, 42),
-                ImmutableMap.<String, Endpoint>of(), Status.ALIVE);
-          }
-        })));
+        serviceHost -> new ServiceInstance(new Endpoint(serviceHost, 42),
+            ImmutableMap.<String, Endpoint>of(), Status.ALIVE))));
   }
 
   protected void assertChangeFiredEmpty() throws InterruptedException {

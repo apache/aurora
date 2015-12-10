@@ -146,8 +146,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     requireNonNull(update);
     requireNonNull(auditData);
 
-    storage.write((NoResult<UpdateStateException>) (MutableStoreProvider storeProvider) -> {
-
+    storage.write((NoResult<UpdateStateException>) storeProvider -> {
       IJobUpdateSummary summary = update.getSummary();
       IJobUpdateInstructions instructions = update.getInstructions();
       IJobKey job = summary.getKey().getJob();
@@ -210,7 +209,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     requireNonNull(key);
     requireNonNull(auditData);
     LOG.info("Attempting to resume update " + key);
-    storage.write((NoResult<UpdateStateException>) (MutableStoreProvider storeProvider) -> {
+    storage.write((NoResult<UpdateStateException>) storeProvider -> {
       IJobUpdateDetails details = Iterables.getOnlyElement(
           storeProvider.getJobUpdateStore().fetchJobUpdateDetails(queryByUpdate(key)), null);
 
@@ -248,7 +247,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
   @Override
   public void systemResume() {
-    storage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+    storage.write((NoResult.Quiet) storeProvider -> {
       for (IJobUpdateDetails details
           : storeProvider.getJobUpdateStore().fetchJobUpdateDetails(ACTIVE_QUERY)) {
 
@@ -321,7 +320,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   private void instanceChanged(final IInstanceKey instance, final Optional<IScheduledTask> state) {
-    storage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+    storage.write((NoResult.Quiet) storeProvider -> {
       IJobKey job = instance.getJobKey();
       UpdateFactory.Update update = updates.get(job);
       if (update != null) {
@@ -370,7 +369,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       final Function<? super JobUpdateStatus, JobUpdateEvent> stateChange)
       throws UpdateStateException {
 
-    storage.write((NoResult<UpdateStateException>) (MutableStoreProvider storeProvider) -> {
+    storage.write((NoResult<UpdateStateException>) storeProvider -> {
 
       IJobUpdateSummary update = Iterables.getOnlyElement(
           storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(queryByUpdate(key)), null);
@@ -695,7 +694,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   private Runnable getDeferredEvaluator(final IInstanceKey instance, final IJobUpdateKey key) {
-    return () -> storage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+    return () -> storage.write((NoResult.Quiet) storeProvider -> {
       IJobUpdateSummary summary =
           getOnlyMatch(storeProvider.getJobUpdateStore(), queryByUpdate(key));
       JobUpdateStatus status = summary.getState().getStatus();

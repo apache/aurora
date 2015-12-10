@@ -47,6 +47,7 @@ import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -54,7 +55,6 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.SlaveID;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IArgumentMatcher;
 import org.junit.Before;
 import org.junit.Test;
@@ -112,12 +112,9 @@ public class StateManagerImplTest extends EasyMockTest {
         taskIdGenerator,
         eventSink,
         rescheduleCalculator);
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        AttributeStore.Mutable attributeStore = storeProvider.getAttributeStore();
-        attributeStore.saveHostAttributes(HOST_A);
-      }
+    storage.write((NoResult.Quiet) storeProvider -> {
+      AttributeStore.Mutable attributeStore = storeProvider.getAttributeStore();
+      attributeStore.saveHostAttributes(HOST_A);
     });
   }
 
@@ -264,12 +261,9 @@ public class StateManagerImplTest extends EasyMockTest {
 
     // Trigger an event that produces a side-effect and a PubSub event .
     eventSink.post(matchStateChange(id, INIT, PENDING));
-    expectLastCall().andAnswer(new IAnswer<Void>() {
-      @Override
-      public Void answer() throws Throwable {
-        changeState(id, ASSIGNED);
-        return null;
-      }
+    expectLastCall().andAnswer(() -> {
+      changeState(id, ASSIGNED);
+      return null;
     });
 
     // Final event sink execution that adds no side effect or event.
@@ -406,12 +400,8 @@ public class StateManagerImplTest extends EasyMockTest {
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
     changeState(taskId, FINISHED);
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        stateManager.deleteTasks(storeProvider, ImmutableSet.of(taskId));
-      }
-    });
+    storage.write((NoResult.Quiet)
+        storeProvider -> stateManager.deleteTasks(storeProvider, ImmutableSet.of(taskId)));
   }
 
   private static ITaskConfig setRequestedPorts(ITaskConfig config, Set<String> portNames) {
@@ -472,15 +462,10 @@ public class StateManagerImplTest extends EasyMockTest {
   @Test(expected = IllegalArgumentException.class)
   public void insertEmptyPendingInstancesFails() {
     control.replay();
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        stateManager.insertPendingTasks(
-            storeProvider,
-            NON_SERVICE_CONFIG,
-            ImmutableSet.of());
-      }
-    });
+    storage.write((NoResult.Quiet) storeProvider -> stateManager.insertPendingTasks(
+        storeProvider,
+        NON_SERVICE_CONFIG,
+        ImmutableSet.of()));
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -542,35 +527,26 @@ public class StateManagerImplTest extends EasyMockTest {
     }
   }
 
-  private void insertTask(final ITaskConfig task, final int instanceId) {
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        stateManager.insertPendingTasks(storeProvider, task, ImmutableSet.of(instanceId));
-      }
-    });
+  private void insertTask(ITaskConfig task, int instanceId) {
+    storage.write((NoResult.Quiet) storeProvider ->
+        stateManager.insertPendingTasks(storeProvider, task, ImmutableSet.of(instanceId)));
   }
 
   private StateChangeResult changeState(
-      final String taskId,
-      final Optional<ScheduleStatus> casState,
-      final ScheduleStatus newState,
-      final Optional<String> auditMessage) {
+      String taskId,
+      Optional<ScheduleStatus> casState,
+      ScheduleStatus newState,
+      Optional<String> auditMessage) {
 
-    return storage.write(new Storage.MutateWork.Quiet<StateChangeResult>() {
-      @Override
-      public StateChangeResult apply(Storage.MutableStoreProvider storeProvider) {
-        return stateManager.changeState(
-            storeProvider,
-            taskId,
-            casState,
-            newState,
-            auditMessage);
-      }
-    });
+    return storage.write(storeProvider -> stateManager.changeState(
+        storeProvider,
+        taskId,
+        casState,
+        newState,
+        auditMessage));
   }
 
-  private StateChangeResult changeState(final String taskId, final ScheduleStatus status) {
+  private StateChangeResult changeState(String taskId, ScheduleStatus status) {
     return changeState(
         taskId,
         Optional.absent(),
@@ -582,21 +558,12 @@ public class StateManagerImplTest extends EasyMockTest {
     assignTask(taskId, host, ImmutableMap.of());
   }
 
-  private void assignTask(
-      final String taskId,
-      final IHostAttributes host,
-      final Map<String, Integer> ports) {
-
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
-        stateManager.assignTask(
-            storeProvider,
-            taskId,
-            host.getHost(),
-            SlaveID.newBuilder().setValue(host.getSlaveId()).build(),
-            ports);
-      }
-    });
+  private void assignTask(String taskId, IHostAttributes host, Map<String, Integer> ports) {
+    storage.write(storeProvider -> stateManager.assignTask(
+        storeProvider,
+        taskId,
+        host.getHost(),
+        SlaveID.newBuilder().setValue(host.getSlaveId()).build(),
+        ports));
   }
 }

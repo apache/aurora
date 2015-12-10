@@ -27,7 +27,6 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 
@@ -76,7 +75,7 @@ class JobUpdateHistoryPruner extends AbstractIdleService {
   @Override
   protected void startUp() {
     executor.scheduleAtFixedRate(
-        () -> storage.write((NoResult.Quiet) (MutableStoreProvider storeProvider) -> {
+        () -> storage.write((NoResult.Quiet) storeProvider -> {
           Set<IJobUpdateKey> prunedUpdates = storeProvider.getJobUpdateStore().pruneHistory(
               settings.maxUpdatesPerJob,
               clock.nowMillis() - settings.maxHistorySize.as(Time.MILLISECONDS));

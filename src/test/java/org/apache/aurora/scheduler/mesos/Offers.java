@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.mesos;
 
 import org.apache.aurora.common.collections.Pair;
-
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;

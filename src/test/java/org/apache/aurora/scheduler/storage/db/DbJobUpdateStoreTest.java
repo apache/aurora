@@ -17,7 +17,6 @@ package org.apache.aurora.scheduler.storage.db;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -49,10 +48,8 @@ import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
-import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
@@ -122,15 +119,12 @@ public class DbJobUpdateStoreTest {
         instructions.getDesiredState().getInstances(),
         instructions.getSettings().getUpdateOnlyTheseInstances())
         .flatMap(Set::stream)
-        .forEach(new Consumer<Range>() {
-          @Override
-          public void accept(Range range) {
-            if (range.getFirst() == 0) {
-              range.setFirst(1);
-            }
-            if (range.getLast() == 0) {
-              range.setLast(1);
-            }
+        .forEach(range -> {
+          if (range.getFirst() == 0) {
+            range.setFirst(1);
+          }
+          if (range.getLast() == 0) {
+            range.setLast(1);
           }
         });
     return IJobUpdate.build(builder);
@@ -384,14 +378,11 @@ public class DbJobUpdateStoreTest {
 
   @Test
   public void testSaveJobUpdateWithoutEventFailsSelect() {
-    final IJobUpdateKey updateId = makeKey("u3");
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        IJobUpdate update = makeJobUpdate(updateId);
-        storeProvider.getLockStore().saveLock(makeLock(update, "lock1"));
-        storeProvider.getJobUpdateStore().saveJobUpdate(update, Optional.of("lock1"));
-      }
+    IJobUpdateKey updateId = makeKey("u3");
+    storage.write((NoResult.Quiet) storeProvider -> {
+      IJobUpdate update = makeJobUpdate(updateId);
+      storeProvider.getLockStore().saveLock(makeLock(update, "lock1"));
+      storeProvider.getJobUpdateStore().saveJobUpdate(update, Optional.of("lock1"));
     });
     assertEquals(Optional.absent(), getUpdateDetails(updateId));
   }
@@ -591,33 +582,29 @@ public class DbJobUpdateStoreTest {
 
   @Test(expected = StorageException.class)
   public void testSaveUpdateWithoutLock() {
-    final IJobUpdate update = makeJobUpdate(makeKey("updateId"));
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().saveJobUpdate(update, Optional.of("lock"));
-      }
-    });
+    IJobUpdate update = makeJobUpdate(makeKey("updateId"));
+    storage.write((NoResult.Quiet) storeProvider ->
+        storeProvider.getJobUpdateStore().saveJobUpdate(update, Optional.of("lock")));
   }
 
   @Test(expected = StorageException.class)
   public void testSaveTwoUpdatesForOneJob() {
-    final IJobUpdate update = makeJobUpdate(makeKey("updateId"));
+    IJobUpdate update = makeJobUpdate(makeKey("updateId"));
     saveUpdate(update, Optional.of("lock1"));
     saveUpdate(update, Optional.of("lock2"));
   }
 
   @Test(expected = StorageException.class)
   public void testSaveTwoUpdatesSameJobKey() {
-    final IJobUpdate update1 = makeJobUpdate(makeKey("update1"));
-    final IJobUpdate update2 = makeJobUpdate(makeKey("update2"));
+    IJobUpdate update1 = makeJobUpdate(makeKey("update1"));
+    IJobUpdate update2 = makeJobUpdate(makeKey("update2"));
     saveUpdate(update1, Optional.of("lock1"));
     saveUpdate(update2, Optional.of("lock1"));
   }
 
   @Test
   public void testLockCleared() {
-    final IJobUpdate update = makeJobUpdate(makeKey("update1"));
+    IJobUpdate update = makeJobUpdate(makeKey("update1"));
     saveUpdate(update, Optional.of("lock1"));
 
     removeLock(update, "lock1");
@@ -644,35 +631,32 @@ public class DbJobUpdateStoreTest {
 
   @Test
   public void testGetLockToken() {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        final IJobUpdate update1 = makeJobUpdate(UPDATE1);
-        final IJobUpdate update2 = makeJobUpdate(UPDATE2);
-        saveUpdate(update1, Optional.of("lock1"));
-        assertEquals(
-            Optional.of("lock1"),
-            storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
-        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
+    storage.write((NoResult.Quiet) storeProvider -> {
+      IJobUpdate update1 = makeJobUpdate(UPDATE1);
+      IJobUpdate update2 = makeJobUpdate(UPDATE2);
+      saveUpdate(update1, Optional.of("lock1"));
+      assertEquals(
+          Optional.of("lock1"),
+          storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
+      assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
 
-        saveUpdate(update2, Optional.of("lock2"));
-        assertEquals(
-            Optional.of("lock1"),
-            storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
-        assertEquals(
-            Optional.of("lock2"),
-            storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
+      saveUpdate(update2, Optional.of("lock2"));
+      assertEquals(
+          Optional.of("lock1"),
+          storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
+      assertEquals(
+          Optional.of("lock2"),
+          storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
 
-        storeProvider.getLockStore().removeLock(makeLock(update1, "lock1").getKey());
-        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
-        assertEquals(
-            Optional.of("lock2"),
-            storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
+      storeProvider.getLockStore().removeLock(makeLock(update1, "lock1").getKey());
+      assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
+      assertEquals(
+          Optional.of("lock2"),
+          storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
 
-        storeProvider.getLockStore().removeLock(makeLock(update2, "lock2").getKey());
-        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
-        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
-      }
+      storeProvider.getLockStore().removeLock(makeLock(update2, "lock2").getKey());
+      assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
+      assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
     });
   }
 
@@ -848,69 +832,38 @@ public class DbJobUpdateStoreTest {
     assertEquals(getUpdateInstructions(key).get(), expected.getInstructions());
   }
 
-  private Optional<IJobUpdate> getUpdate(final IJobUpdateKey key) {
-    return storage.read(new Quiet<Optional<IJobUpdate>>() {
-      @Override
-      public Optional<IJobUpdate> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdate(key);
-      }
-    });
+  private Optional<IJobUpdate> getUpdate(IJobUpdateKey key) {
+    return storage.read(storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdate(key));
   }
 
-  private List<IJobInstanceUpdateEvent> getInstanceEvents(final IJobUpdateKey key, final int id) {
-    return storage.read(new Quiet<List<IJobInstanceUpdateEvent>>() {
-      @Override
-      public List<IJobInstanceUpdateEvent> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchInstanceEvents(key, id);
-      }
-    });
+  private List<IJobInstanceUpdateEvent> getInstanceEvents(IJobUpdateKey key, int id) {
+    return storage.read(
+        storeProvider -> storeProvider.getJobUpdateStore().fetchInstanceEvents(key, id));
   }
 
-  private Optional<IJobUpdateInstructions> getUpdateInstructions(final IJobUpdateKey key) {
-    return storage.read(new Quiet<Optional<IJobUpdateInstructions>>() {
-      @Override
-      public Optional<IJobUpdateInstructions> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdateInstructions(key);
-      }
-    });
+  private Optional<IJobUpdateInstructions> getUpdateInstructions(IJobUpdateKey key) {
+    return storage.read(
+        storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdateInstructions(key));
   }
 
-  private Optional<IJobUpdateDetails> getUpdateDetails(final IJobUpdateKey key) {
-    return storage.read(new Quiet<Optional<IJobUpdateDetails>>() {
-      @Override
-      public Optional<IJobUpdateDetails> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(key);
-      }
-    });
+  private Optional<IJobUpdateDetails> getUpdateDetails(IJobUpdateKey key) {
+    return storage.read(
+        storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdateDetails(key));
   }
 
   private Set<StoredJobUpdateDetails> getAllUpdateDetails() {
-    return storage.read(new Quiet<Set<StoredJobUpdateDetails>>() {
-      @Override
-      public Set<StoredJobUpdateDetails> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchAllJobUpdateDetails();
-      }
-    });
+    return storage.read(
+        storeProvider -> storeProvider.getJobUpdateStore().fetchAllJobUpdateDetails());
   }
 
-  private List<IJobUpdateDetails> queryDetails(final JobUpdateQuery query) {
-    return storage.read(new Quiet<List<IJobUpdateDetails>>() {
-      @Override
-      public List<IJobUpdateDetails> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(
-            IJobUpdateQuery.build(query));
-      }
-    });
+  private List<IJobUpdateDetails> queryDetails(JobUpdateQuery query) {
+    return storage.read(storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdateDetails(
+        IJobUpdateQuery.build(query)));
   }
 
-  private List<IJobUpdateSummary> getSummaries(final JobUpdateQuery query) {
-    return storage.read(new Quiet<List<IJobUpdateSummary>>() {
-      @Override
-      public List<IJobUpdateSummary> apply(Storage.StoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(
-            IJobUpdateQuery.build(query));
-      }
-    });
+  private List<IJobUpdateSummary> getSummaries(JobUpdateQuery query) {
+    return storage.read(storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(
+        IJobUpdateQuery.build(query)));
   }
 
   private static ILock makeLock(IJobUpdate update, String lockToken) {
@@ -921,80 +874,54 @@ public class DbJobUpdateStoreTest {
         .setUser("fake user"));
   }
 
-  private IJobUpdate saveUpdate(final IJobUpdate update, final Optional<String> lockToken) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        if (lockToken.isPresent()) {
-          storeProvider.getLockStore().saveLock(makeLock(update, lockToken.get()));
-        }
-        storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
-        storeProvider.getJobUpdateStore().saveJobUpdateEvent(
-            update.getSummary().getKey(),
-            FIRST_EVENT);
+  private IJobUpdate saveUpdate(IJobUpdate update, Optional<String> lockToken) {
+    storage.write((NoResult.Quiet) storeProvider -> {
+      if (lockToken.isPresent()) {
+        storeProvider.getLockStore().saveLock(makeLock(update, lockToken.get()));
       }
+      storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
+      storeProvider.getJobUpdateStore().saveJobUpdateEvent(
+          update.getSummary().getKey(),
+          FIRST_EVENT);
     });
 
     return update;
   }
 
-  private IJobUpdate saveUpdateNoEvent(final IJobUpdate update, final Optional<String> lockToken) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        if (lockToken.isPresent()) {
-          storeProvider.getLockStore().saveLock(makeLock(update, lockToken.get()));
-        }
-        storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
+  private IJobUpdate saveUpdateNoEvent(IJobUpdate update, Optional<String> lockToken) {
+    storage.write((NoResult.Quiet) storeProvider -> {
+      if (lockToken.isPresent()) {
+        storeProvider.getLockStore().saveLock(makeLock(update, lockToken.get()));
       }
+      storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
     });
 
     return update;
   }
 
-  private void saveJobEvent(final IJobUpdateEvent event, final IJobUpdateKey key) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().saveJobUpdateEvent(key, event);
-      }
-    });
+  private void saveJobEvent(IJobUpdateEvent event, IJobUpdateKey key) {
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getJobUpdateStore().saveJobUpdateEvent(key, event));
   }
 
-  private void saveJobInstanceEvent(final IJobInstanceUpdateEvent event, final IJobUpdateKey key) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().saveJobInstanceUpdateEvent(key, event);
-      }
-    });
+  private void saveJobInstanceEvent(IJobInstanceUpdateEvent event, IJobUpdateKey key) {
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getJobUpdateStore().saveJobInstanceUpdateEvent(key, event));
   }
 
   private void truncateUpdates() {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
-      }
-    });
+    storage.write((NoResult.Quiet)
+        storeProvider -> storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents());
   }
 
-  private Set<IJobUpdateKey> pruneHistory(final int retainCount, final long pruningThresholdMs) {
-    return storage.write(new MutateWork.Quiet<Set<IJobUpdateKey>>() {
-      @Override
-      public Set<IJobUpdateKey> apply(MutableStoreProvider storeProvider) {
-        return storeProvider.getJobUpdateStore().pruneHistory(retainCount, pruningThresholdMs);
-      }
-    });
+  private Set<IJobUpdateKey> pruneHistory(int retainCount, long pruningThresholdMs) {
+    return storage.write(storeProvider ->
+        storeProvider.getJobUpdateStore().pruneHistory(retainCount, pruningThresholdMs));
   }
 
-  private void removeLock(final IJobUpdate update, final String lockToken) {
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getLockStore().removeLock(makeLock(update, lockToken).getKey());
-      }
-    });
+  private void removeLock(IJobUpdate update, String lockToken) {
+    storage.write((NoResult.Quiet) storeProvider ->
+        storeProvider.getLockStore().removeLock(makeLock(update, lockToken).getKey()));
   }
 
   private IJobUpdate populateExpected(IJobUpdate update) {

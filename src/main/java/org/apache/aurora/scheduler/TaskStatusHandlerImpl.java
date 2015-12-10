@@ -148,7 +148,7 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
       pendingUpdates.drainTo(updates, maxBatchSize - updates.size());
 
       try {
-        storage.write((NoResult.Quiet) (Storage.MutableStoreProvider storeProvider) -> {
+        storage.write((NoResult.Quiet) storeProvider -> {
           for (TaskStatus status : updates) {
             ScheduleStatus translatedState = Conversions.convertProtoState(status.getState());
 

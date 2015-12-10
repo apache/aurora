@@ -54,24 +54,16 @@ class FakeSlaves {
   }
 
   @Subscribe
-  public void offerAccepted(final OfferAccepted accepted) {
+  public void offerAccepted(OfferAccepted accepted) {
     // Move the task to starting after a delay.
     executor.schedule(
-        new Runnable() {
-          @Override
-          public void run() {
-            master.changeState(accepted.task.getTaskId(), TaskState.TASK_STARTING);
+        () -> {
+          master.changeState(accepted.task.getTaskId(), TaskState.TASK_STARTING);
 
-            executor.schedule(
-                new Runnable() {
-                  @Override
-                  public void run() {
-                    master.changeState(accepted.task.getTaskId(), TaskState.TASK_RUNNING);
-                  }
-                },
-                1,
-                TimeUnit.SECONDS);
-          }
+          executor.schedule(
+              () -> master.changeState(accepted.task.getTaskId(), TaskState.TASK_RUNNING),
+              1,
+              TimeUnit.SECONDS);
         },
         1,
         TimeUnit.SECONDS);
