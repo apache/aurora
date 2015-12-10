@@ -10,6 +10,7 @@
 /.pants.*
 /.vagrant/*
 /api/dist/*
+/api/out/*
 /atlassian-ide-plugin.xml
 /build-support/*.pex
 /build-support/*.venv
@@ -19,7 +20,9 @@
 /buildSrc/build/*
 /buildSrc/dist/*
 /commons-args/dist/*
+/commons-args/out/*
 /commons/dist/*
+/commons/out/*
 /dist/*
 /gradle-app.setting
 /out/*

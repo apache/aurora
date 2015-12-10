@@ -230,8 +230,6 @@ project(':api') {
         generatedSourceDirs += it
       }
 
-      scopes.COMPILE.plus += [parent.configurations.jmh]
-
       // These directories must exist, else the plugin omits them from the
       // generated project. Since this is executed during the configuration
       // lifecycle phase, dependency tasks have not yet run and created
@@ -335,6 +333,7 @@ dependencies {
 
   compile project(':api')
   compile project(':commons')
+  compile project(':commons-args')
 
   compile 'aopalliance:aopalliance:1.0'
   compile 'com.google.code.findbugs:jsr305:2.0.1'
@@ -354,7 +353,7 @@ dependencies {
   compile "log4j:log4j:${log4jRev}"
   compile "org.antlr:stringtemplate:${stringTemplateRev}"
   compile 'org.apache.mesos:mesos:0.23.0'
-  compile("org.apache.shiro:shiro-guice:${shiroRev}")
+  compile "org.apache.shiro:shiro-guice:${shiroRev}"
   compile "org.apache.shiro:shiro-web:${shiroRev}"
   compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"
   compile "org.eclipse.jetty:jetty-rewrite:${jettyDep}"
@@ -365,12 +364,10 @@ dependencies {
   compile 'org.mybatis:mybatis-guice:3.6'
   compile 'org.quartz-scheduler:quartz:2.2.1'
   compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
+  compile "uno.perk:forward:1.0.0"
 
   testCompile "com.sun.jersey:jersey-client:${jerseyRev}"
   testCompile "junit:junit:${junitRev}"
-
-  configurations.compile {
-  }
 }
 
 // For normal developer builds, avoid running the often-time-consuming code quality checks.
@@ -470,11 +467,90 @@ tasks.withType(Test) {
   maxParallelForks = Runtime.runtime.availableProcessors()
 }
 
+// Turn on annotation processors for commons (uses commons-args) and aurora
+// (uses commons-args, forward, ...).  The crux here is _not_ turning annotation processing on
+// for commons-args (this leads to an attempt at self-processing before its processor is
+// compiled); so the strategy taken is to white-list modules.
+//
+// NB: Unfortunately, most of the ipr/iml modeling we need is not exposed by the idea plugin DSL so
+// we drop to xml manipulation here only out of necessity.
+def apt_projects = ['commons', 'aurora']
+
 idea {
   project {
     vcs = 'Git'
     jdkName = '1.8'
     languageLevel = '1.8'
+
+    ipr {
+      withXml {
+        def projectNode = it.asNode()
+        def compilerConfiguration = projectNode.find {
+          it.name() == 'component' && it.@name == 'CompilerConfiguration'
+        }
+        def apt = compilerConfiguration.find { it.name() == 'annotationProcessing' }
+        // Turn on annotation processing only for the whitelisted modules.
+        apt.replaceNode {
+          annotationProcessing {
+            profile(default: 'true', name: 'Default', enabled: 'false')
+            profile(default: 'false', name: 'apt', enabled: 'true') {
+              sourceOutputDir(name: 'generated')
+              sourceTestOutputDir(name: 'generated')
+              processorPath(useClasspath: 'true')
+              apt_projects.each {
+                module(name: it)
+              }
+            }
+          }
+        }
+        def projectRoot = projectNode.find {
+          it.name() == 'component' && it.@name == 'ProjectRootManager'
+        }
+        projectRoot.remove(projectRoot.output)
+      }
+    }
+  }
+}
+
+// Map output dirs explicitly per-module with the end goal of mapping the annotation processor
+// generated code output dirs as source (and test) dirs.  The key difficulty being worked around
+// here is the fact that excludes higher in a directory tree override includes deeper in the tree.
+allprojects {
+  def isApt = it.name in apt_projects
+  def generatedSourceDir = file("${it.projectDir}/out/production/generated")
+  def generatedTestDir = file("${it.projectDir}/out/test/generated")
+
+  idea {
+    module {
+      if (isApt) {
+        generatedSourceDir.exists() || generatedSourceDir.mkdirs()
+        sourceDirs += generatedSourceDir
+        generatedSourceDirs += generatedSourceDir
+
+        generatedTestDir.exists() || generatedTestDir.mkdirs()
+        testSourceDirs += generatedTestDir
+        generatedSourceDirs += generatedTestDir
+      }
+
+      iml {
+        withXml {
+          def moduleNode = it.asNode()
+          def moduleConfiguration = moduleNode.find {
+            it.name() == 'component' && it.@name == 'NewModuleRootManager'
+          }
+          moduleConfiguration.attributes().remove('inherit-compiler-output')
+          moduleConfiguration.appendNode('output', [url: 'file://$MODULE_DIR$/out/production'])
+          moduleConfiguration.appendNode('output-test', [url: 'file://$MODULE_DIR$/out/test'])
+
+          if (isApt) {
+            def excludeOutput = moduleConfiguration.find { it.name() == 'exclude-output' }
+            if (excludeOutput) {
+              moduleConfiguration.remove(excludeOutput)
+            }
+          }
+        }
+      }
+    }
   }
 }
 
