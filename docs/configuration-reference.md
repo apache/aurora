@@ -491,13 +491,6 @@ does not shut down on its own after this, it will be forcefully killed
 Specifying Scheduling Constraints
 =================================
 
-Most users will not need to specify constraints explicitly, as the
-scheduler automatically inserts reasonable defaults that attempt to
-ensure reliability without impacting schedulability. For example, the
-scheduler inserts a `host: limit:1` constraint, ensuring
-that your shards run on different physical machines. Please do not
-set this field unless you are sure of what you are doing.
-
 In the `Job` object there is a map `constraints` from String to String
 allowing the user to tailor the schedulability of tasks within the job.
 
