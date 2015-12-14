@@ -536,12 +536,14 @@ Aurora client or Aurora-provided services.
 
 ### mesos Namespace
 
-The `mesos` namespace contains the `instance` variable that can be used
+The `mesos` namespace contains variables which relate to the `mesos` slave
+which launched the task. The `instance` variable can be used
 to distinguish between Task replicas.
 
 | variable name     | type       | description
 | --------------- | :--------: | -------------
 | ```instance```    | Integer    | The instance number of the created task. A job with 5 replicas has instance numbers 0, 1, 2, 3, and 4.
+| ```hostname``` | String | The instance hostname that the task was launched on.
 
 ### thermos Namespace
 
