@@ -107,7 +107,7 @@ build_centos6() {
   mkdir -pv centos6
   pushd centos6
     VAGRANTDIR=$PWD
-    init_vagrant_box chef/centos-6.5
+    init_vagrant_box bento/centos-6.7
     vagrant up
     vagrant ssh <<EOF
     set -e -u
@@ -146,7 +146,7 @@ build_centos7() {
   local python_outdir=$output_basedir/centos/7/python
   mkdir -pv "$python_outdir"
   pushd $TMPDIR
-    init_vagrant_box chef/centos-7.0
+    init_vagrant_box bento/centos-7.1
     vagrant up
     vagrant ssh <<EOF
     set -e -u

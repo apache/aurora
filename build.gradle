@@ -352,7 +352,7 @@ dependencies {
   compile "javax.servlet:servlet-api:${servletRev}"
   compile "log4j:log4j:${log4jRev}"
   compile "org.antlr:stringtemplate:${stringTemplateRev}"
-  compile 'org.apache.mesos:mesos:0.23.0'
+  compile 'org.apache.mesos:mesos:0.24.1'
   compile "org.apache.shiro:shiro-guice:${shiroRev}"
   compile "org.apache.shiro:shiro-web:${shiroRev}"
   compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"
