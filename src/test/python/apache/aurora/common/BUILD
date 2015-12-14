@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-python_test_suite(
+target(
   name = 'all',
   dependencies = [
     ':test_aurora_job_key',

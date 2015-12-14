@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-python_test_suite(
+target(
   name = 'all',
   dependencies = [
     ':thermos_executor_entry_point',

@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-python_test_suite(name = 'all',
+target(name = 'all',
   dependencies = [
     ':small',
     ':medium',
@@ -20,13 +20,13 @@ python_test_suite(name = 'all',
   ]
 )
 
-python_test_suite(name = 'small',
+target(name = 'small',
   dependencies = [
     ':test_process',
   ]
 )
 
-python_test_suite(name = 'medium',
+target(name = 'medium',
   dependencies = [
     ':test_ephemerals',
     ':test_failing_runner',
@@ -37,7 +37,7 @@ python_test_suite(name = 'medium',
  ]
 )
 
-python_test_suite(name = 'large',
+target(name = 'large',
   dependencies = [
     ':test_angry',
     ':test_staged_kill'

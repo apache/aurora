@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-python_test_suite(
+target(
   name = 'all',
   dependencies = [
     'src/test/python/apache/thermos/common:all',

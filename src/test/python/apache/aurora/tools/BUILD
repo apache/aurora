@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-python_test_suite(name = 'all',
+target(name = 'all',
   dependencies = [
     ':thermos_observer_entry_point',
   ]

@@ -13,7 +13,7 @@
 #
 
 
-python_test_suite(
+target(
   name = 'all',
   dependencies = [
     ':test_file_browser',

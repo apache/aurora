@@ -18,7 +18,7 @@ CherryPy==3.6.0
 mako==0.4.0
 mock==1.0.1
 mox==0.5.3
-pex==1.1.0
+pex==1.1.1
 protobuf==2.6.1
 psutil==3.2.2
 pystachio==0.8.0

@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-python_test_suite(name = 'all',
+target(name = 'all',
   dependencies = [
     ':executor-small',
     ':executor-large',
@@ -20,7 +20,7 @@ python_test_suite(name = 'all',
 )
 
 
-python_test_suite(
+target(
   name = 'executor-small',
   dependencies = [
     ':executor_base',
@@ -33,7 +33,7 @@ python_test_suite(
 )
 
 
-python_test_suite(
+target(
   name = 'executor-large',
   dependencies = [
     ':thermos_executor',

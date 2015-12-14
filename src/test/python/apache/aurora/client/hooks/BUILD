@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-python_test_suite(name = 'all',
+target(name = 'all',
   dependencies = [
     ':hooked_api',
     ':non_hooked_api',
