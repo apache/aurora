@@ -304,7 +304,7 @@ publishing {
 task generateBuildProperties (type:Exec) {
   def outputDir = file("${buildDir}/build-properties")
   def outputFile = file("${outputDir}/build.properties")
-  inputs.dir rootDir
+  outputs.upToDateWhen { false }
   outputs.dir outputDir
   doFirst {
     outputDir.exists() || outputDir.mkdirs()
