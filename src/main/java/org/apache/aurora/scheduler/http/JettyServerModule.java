@@ -24,7 +24,9 @@ import java.util.logging.Logger;
 import javax.annotation.Nonnegative;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.servlet.DispatcherType;
 import javax.servlet.ServletContextListener;
+import javax.ws.rs.HttpMethod;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -72,15 +74,16 @@ import org.apache.aurora.scheduler.http.api.security.HttpSecurityModule;
 import org.apache.aurora.scheduler.thrift.ThriftModule;
 import org.eclipse.jetty.rewrite.handler.RewriteHandler;
 import org.eclipse.jetty.rewrite.handler.RewriteRegexRule;
-import org.eclipse.jetty.server.Connector;
-import org.eclipse.jetty.server.DispatcherType;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.Slf4jRequestLog;
 import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.RequestLogHandler;
-import org.eclipse.jetty.server.nio.SelectChannelConnector;
+import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlets.GzipFilter;
 import org.eclipse.jetty.util.resource.Resource;
 
 import static java.util.Objects.requireNonNull;
@@ -263,7 +266,6 @@ public class JettyServerModule extends AbstractModule {
                 filterRegex(allOf(ImmutableSet.copyOf(JAX_RS_ENDPOINTS.values())))
                     .through(GuiceContainer.class, GUICE_CONTAINER_PARAMS);
 
-                filterRegex("/assets/.*").through(new GzipFilter());
                 filterRegex("/assets/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
 
                 serve("/assets", "/assets/*")
@@ -303,6 +305,7 @@ public class JettyServerModule extends AbstractModule {
     private final ServletContextListener servletContextListener;
     private final Optional<String> advertisedHostOverride;
     private volatile Server server;
+    private volatile HostAndPort serverAddress = null;
 
     @Inject
     HttpServerLauncher(
@@ -321,7 +324,7 @@ public class JettyServerModule extends AbstractModule {
             .put("/(?:scheduler|updates)(?:/.*)?", "/assets/scheduler/index.html")
             .build();
 
-    private RewriteHandler getRewriteHandler(HandlerCollection rootHandler) {
+    private static Handler getRewriteHandler(Handler wrapped) {
       RewriteHandler rewrites = new RewriteHandler();
       rewrites.setOriginalPathAttribute(ORIGINAL_PATH_ATTRIBUTE_NAME);
       rewrites.setRewriteRequestURI(true);
@@ -334,32 +337,24 @@ public class JettyServerModule extends AbstractModule {
         rewrites.addRule(rule);
       }
 
-      rewrites.setHandler(rootHandler);
+      rewrites.setHandler(wrapped);
 
       return rewrites;
+    }
+
+    private static Handler getGzipHandler(Handler wrapped) {
+      GzipHandler gzip = new GzipHandler();
+      gzip.addIncludedMethods(HttpMethod.POST);
+      gzip.setHandler(wrapped);
+      return gzip;
     }
 
     @Override
     public HostAndPort getAddress() {
       Preconditions.checkState(state() == State.RUNNING);
-      Connector connector = server.getConnectors()[0];
-
-      String host;
-      if (advertisedHostOverride.isPresent()) {
-        host = advertisedHostOverride.get();
-      } else if (connector.getHost() == null) {
-        // Resolve the local host name.
-        try {
-          host = InetAddress.getLocalHost().getHostAddress();
-        } catch (UnknownHostException e) {
-          throw new RuntimeException("Failed to resolve local host address: " + e, e);
-        }
-      } else {
-        // If jetty was configured with a specific host to bind to, use that.
-        host = connector.getHost();
-      }
-
-      return HostAndPort.fromParts(host, connector.getLocalPort());
+      return HostAndPort.fromParts(
+          advertisedHostOverride.or(serverAddress.getHostText()),
+          serverAddress.getPort());
     }
 
     @Override
@@ -376,18 +371,18 @@ public class JettyServerModule extends AbstractModule {
       servletHandler.addFilter(GuiceFilter.class, "/*", EnumSet.allOf(DispatcherType.class));
       servletHandler.addEventListener(servletContextListener);
 
-      HandlerCollection rootHandler = new HandlerCollection();
+      HandlerCollection rootHandler = new HandlerList();
 
       RequestLogHandler logHandler = new RequestLogHandler();
-      logHandler.setRequestLog(new RequestLogger());
+      logHandler.setRequestLog(new Slf4jRequestLog());
 
       rootHandler.addHandler(logHandler);
       rootHandler.addHandler(servletHandler);
 
-      Connector connector = new SelectChannelConnector();
+      ServerConnector connector = new ServerConnector(server);
       connector.setPort(HTTP_PORT.get());
       server.addConnector(connector);
-      server.setHandler(getRewriteHandler(rootHandler));
+      server.setHandler(getGzipHandler(getRewriteHandler(rootHandler)));
 
       try {
         connector.open();
@@ -395,6 +390,20 @@ public class JettyServerModule extends AbstractModule {
       } catch (Exception e) {
         throw Throwables.propagate(e);
       }
+
+      String host;
+      if (connector.getHost() == null) {
+        // Resolve the local host name.
+        try {
+          host = InetAddress.getLocalHost().getHostAddress();
+        } catch (UnknownHostException e) {
+          throw new RuntimeException("Failed to resolve local host address: " + e, e);
+        }
+      } else {
+        // If jetty was configured with a specific host to bind to, use that.
+        host = connector.getHost();
+      }
+      serverAddress = HostAndPort.fromParts(host, connector.getLocalPort());
     }
 
     @Override

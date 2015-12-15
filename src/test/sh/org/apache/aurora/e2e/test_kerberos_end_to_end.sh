@@ -116,9 +116,9 @@ function test_snapshot {
 
 function test_h2console {
   h2console_as vagrant
-  grep -q 'Error 401 Unauthorized' h2console-response.vagrant.json
+  grep -q 'Error 401' h2console-response.vagrant.json
   h2console_as unpriv
-  grep -q 'Error 401 Unauthorized' h2console-response.unpriv.json
+  grep -q 'Error 401' h2console-response.unpriv.json
   h2console_as root
   grep -q 'Welcome to H2' h2console-response.root.json
 }

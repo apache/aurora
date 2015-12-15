@@ -14,9 +14,7 @@
 package org.apache.aurora.scheduler.http.api;
 
 import javax.inject.Singleton;
-import javax.ws.rs.HttpMethod;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Provides;
 import com.google.inject.servlet.ServletModule;
@@ -32,7 +30,6 @@ import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.thrift.protocol.TJSONProtocol;
 import org.apache.thrift.server.TServlet;
 import org.eclipse.jetty.servlet.DefaultServlet;
-import org.eclipse.jetty.servlets.GzipFilter;
 import org.eclipse.jetty.util.resource.Resource;
 
 public class ApiModule extends ServletModule {
@@ -58,12 +55,6 @@ public class ApiModule extends ServletModule {
     if (ENABLE_CORS_SUPPORT.get()) {
       filter(API_PATH).through(new CorsFilter(ENABLE_CORS_FOR.get()));
     }
-    // NOTE: GzipFilter is applied only to /api instead of globally because the
-    // Jersey-managed servlets have a conflicting filter applied to them.
-    filter(API_PATH)
-        .through(
-            new GzipFilter(),
-            ImmutableMap.of("methods", Joiner.on(',').join(HttpMethod.GET, HttpMethod.POST)));
     serve(API_PATH).with(TServlet.class);
 
     filter(ApiBeta.PATH, ApiBeta.PATH + "/*").through(LeaderRedirectFilter.class);

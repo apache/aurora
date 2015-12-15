@@ -51,10 +51,6 @@ public class ServletFilterTest extends JettyServerModuleTest {
     assertContentEncoding(get(path), Optional.of("gzip"));
   }
 
-  private void assertGzipEncodedPost(String path, String body) {
-    assertContentEncoding(post(path, body), Optional.of("gzip"));
-  }
-
   @Test
   public void testGzipEncoding() throws Exception {
     replayAndStart();

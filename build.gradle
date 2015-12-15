@@ -86,7 +86,7 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.slf4jRev = '1.7.12'
   ext.thriftRev = '0.9.1'
   ext.guiceRev = '3.0'
-  ext.servletRev = '2.5'
+  ext.servletRev = '3.1.0'
   ext.stringTemplateRev = '3.2.1'
   ext.zookeeperRev = '3.3.4'
   ext.jerseyRev = '1.18.1'
@@ -156,9 +156,9 @@ project(':commons') {
     compile "com.google.guava:guava:${guavaRev}"
     compile "com.google.inject.extensions:guice-multibindings:${guiceRev}"
     compile "com.google.inject:guice:${guiceRev}"
+    compile "com.sun.jersey:jersey-core:${jerseyRev}"
     compile "commons-lang:commons-lang:${commonsLangRev}"
-    compile "javax.servlet:servlet-api:${servletRev}"
-    compile "javax.ws.rs:javax.ws.rs-api:2.0.1"
+    compile "javax.servlet:javax.servlet-api:${servletRev}"
     compile "joda-time:joda-time:2.3"
     compile "log4j:log4j:${log4jRev}"
     compile "org.antlr:stringtemplate:${stringTemplateRev}"
@@ -324,12 +324,7 @@ sourceSets {
 
 dependencies {
   def shiroRev = '1.2.4'
-
-  def gsonDep = "com.google.code.gson:gson:${gsonRev}"
-  def guavaDep = "com.google.guava:guava:${guavaRev}"
-  // NOTE: We are using the jetty 7.x series due to a large number of dependencies impacted
-  // by 8.x and later resulting from using newer javax.servlet servlet-api.
-  def jettyDep = '7.6.15.v20140411'
+  def jettyDep = '9.3.6.v20151106'
 
   compile project(':api')
   compile project(':commons')
@@ -349,7 +344,7 @@ dependencies {
   compile "com.sun.jersey:jersey-servlet:${jerseyRev}"
   compile "com.sun.jersey.contribs:jersey-guice:${jerseyRev}"
   compile 'javax.inject:javax.inject:1'
-  compile "javax.servlet:servlet-api:${servletRev}"
+  compile "javax.servlet:javax.servlet-api:${servletRev}"
   compile "log4j:log4j:${log4jRev}"
   compile "org.antlr:stringtemplate:${stringTemplateRev}"
   compile 'org.apache.mesos:mesos:0.24.1'

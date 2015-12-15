@@ -54,6 +54,7 @@ public class HttpStatsFilter extends AbstractFilter {
       wrappedStatus = sc;
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public void setStatus(int sc, String sm) {
       super.setStatus(sc, sm);
