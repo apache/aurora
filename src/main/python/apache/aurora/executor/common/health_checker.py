@@ -22,10 +22,14 @@ from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import LambdaGauge
 
-from apache.aurora.common.http_signaler import HttpSignaler
+from apache.aurora.common.health_check.http_signaler import HttpSignaler
+from apache.aurora.common.health_check.shell import ShellHealthCheck
 
 from .status_checker import StatusChecker, StatusCheckerProvider, StatusResult
 from .task_info import mesos_task_instance_from_assigned_task, resolve_ports
+
+HTTP_HEALTH_CHECK = 'http'
+SHELL_HEALTH_CHECK = 'shell'
 
 
 class ThreadedHealthChecker(ExceptionalThread):
@@ -200,23 +204,44 @@ class HealthChecker(StatusChecker):
 
 class HealthCheckerProvider(StatusCheckerProvider):
   def from_assigned_task(self, assigned_task, sandbox):
+    """
+    :param assigned_task:
+    :param sandbox:
+    :return: Instance of a HealthChecker.
+    """
     mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
     portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)
 
-    if 'health' not in portmap:
-      return None
-
     health_check_config = mesos_task.health_check_config().get()
-    http_signaler = HttpSignaler(
+    health_check_type = health_check_config.get('type')
+
+    # We don't need a port if we are running a shell command.
+    if health_check_type == HTTP_HEALTH_CHECK and 'health' not in portmap:
+      return None
+    timeout_secs = health_check_config.get('timeout_secs')
+
+    if health_check_type == SHELL_HEALTH_CHECK:
+      shell_command = health_check_config.get('shell_command')
+      shell_signaler = ShellHealthCheck(
+        cmd=shell_command,
+        timeout_secs=timeout_secs
+      )
+      a_health_checker = lambda: shell_signaler()
+    else:
+      http_signaler = HttpSignaler(
         portmap['health'],
-        timeout_secs=health_check_config.get('timeout_secs'))
+        timeout_secs=timeout_secs)
+      a_health_checker = lambda: http_signaler(
+        endpoint=health_check_config.get('endpoint'),
+        expected_response=health_check_config.get('expected_response'),
+        expected_response_code=health_check_config.get('expected_response_code')
+      )
+
     health_checker = HealthChecker(
-        lambda: http_signaler(
-            endpoint=health_check_config.get('endpoint'),
-            expected_response=health_check_config.get('expected_response'),
-            expected_response_code=health_check_config.get('expected_response_code')),
-        sandbox,
-        interval_secs=health_check_config.get('interval_secs'),
-        initial_interval_secs=health_check_config.get('initial_interval_secs'),
-        max_consecutive_failures=health_check_config.get('max_consecutive_failures'))
+      a_health_checker,
+      sandbox,
+      interval_secs=health_check_config.get('interval_secs'),
+      initial_interval_secs=health_check_config.get('initial_interval_secs'),
+      max_consecutive_failures=health_check_config.get('max_consecutive_failures'))
+
     return health_checker

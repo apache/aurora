@@ -180,6 +180,71 @@ def test_dedicated_portmap():
                               constraints={'foo': 'bar'})))
 
 
+def test_health_check_config_http_ok():
+  base_job = Job(
+    name='hello_bond', role='james', cluster='marine-cluster',
+    health_check_config=HealthCheckConfig(
+      max_consecutive_failures=1,
+      type='http',
+    ),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+  config._validate_health_check_config(AuroraConfig(base_job))
+
+
+def test_health_check_config_shell_ok():
+  base_job = Job(
+    name='hello_bond', role='james', cluster='marine-cluster',
+    health_check_config=HealthCheckConfig(
+      max_consecutive_failures=1,
+      type='shell',
+      shell_command='foo bar'
+    ),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+  config._validate_health_check_config(AuroraConfig(base_job))
+
+
+def test_health_check_config_invalid_type():
+  base_job = Job(
+    name='hello_bond', role='james', cluster='marine-cluster',
+    health_check_config=HealthCheckConfig(
+      max_consecutive_failures=1,
+      type='foo',
+    ),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+  with pytest.raises(SystemExit):
+    config._validate_health_check_config(AuroraConfig(base_job))
+
+
+def test_health_check_config_http_and_shell_defined():
+  base_job = Job(
+    name='hello_bond', role='james', cluster='marine-cluster',
+    health_check_config=HealthCheckConfig(
+      max_consecutive_failures=1,
+      type='http',
+      shell_command='foo bar'
+    ),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+  with pytest.raises(SystemExit):
+    config._validate_health_check_config(AuroraConfig(base_job))
+
+
+def test_health_check_config_shell_no_command():
+  base_job = Job(
+    name='hello_bond', role='james', cluster='marine-cluster',
+    health_check_config=HealthCheckConfig(
+      max_consecutive_failures=1,
+      type='shell',
+    ),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+  with pytest.raises(SystemExit):
+    config._validate_health_check_config(AuroraConfig(base_job))
+
+
 def test_update_config_passes_with_default_values():
   base_job = Job(
     name='hello_world', role='john_doe', cluster='test-cluster',

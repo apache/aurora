@@ -21,6 +21,7 @@ python_library(
     '3rdparty/python:pex',
     '3rdparty/python:pystachio',
     '3rdparty/python:requests',
+    '3rdparty/python:subprocess32',
     '3rdparty/python:thrift',
     '3rdparty/python:twitter.common.collections',
     '3rdparty/python:twitter.common.lang',

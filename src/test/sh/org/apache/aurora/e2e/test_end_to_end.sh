@@ -45,7 +45,7 @@ collect_result() {
   then
     echo "OK (all tests passed)"
   else
-    echo "!!! FAIL (something returned non-zero)"
+    echo "!!! FAIL (something returned non-zero) for $BASH_COMMAND"
     # Attempt to clean up any state we left behind.
     tear_down
   fi
@@ -173,6 +173,30 @@ test_update() {
   fi
 }
 
+test_update_fail() {
+  local _jobkey=$1 _config=$2 _cluster=$3  _bad_healthcheck_config=$4
+  # Make sure our updates works.
+  aurora update start $_jobkey $_config
+  assert_update_state $_jobkey 'ROLLING_FORWARD'
+  local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
+      | tail -n +2 | awk '{print $2}')
+  # Need to wait until udpate finishes before we can start one that we want to fail.
+  aurora update wait $_jobkey $_update_id
+
+  # Starting update with a health check that is meant to fail. Expected behavior is roll back.
+  aurora update start $_jobkey $_bad_healthcheck_config
+  local _update_id=$(aurora update list $_jobkey --status active \
+      | tail -n +2 | awk '{print $2}')
+  # || is so that we don't return an EXIT so that `trap collect_result` doesn't get triggered.
+  aurora update wait $_jobkey $_update_id || echo $?
+  # MAKING SURE WE ROLLED BACK.
+  local status=$(aurora update info $_jobkey $_update_id | grep 'Current status' | awk '{print $NF}')
+  if [[ $status != "ROLLED_BACK" ]]; then
+    echo "Update should have completed in ROLLED_BACK state due to failed healthcheck."
+    exit 1
+  fi
+}
+
 test_announce() {
   local _role=$1 _env=$2 _job=$3
 
@@ -231,7 +255,8 @@ test_quota() {
 test_http_example() {
   local _cluster=$1 _role=$2 _env=$3
   local _base_config=$4 _updated_config=$5
-  local _job=$6
+  local _bad_healthcheck_config=$6
+  local _job=$7
   local _jobkey="$_cluster/$_role/$_env/$_job"
 
   test_config $_base_config $_jobkey
@@ -241,6 +266,9 @@ test_http_example() {
   test_scheduler_ui $_role $_env $_job
   test_observer_ui $_cluster $_role $_job
   test_restart $_jobkey
+  test_update $_jobkey $_updated_config $_cluster
+  test_update_fail $_jobkey $_base_config  $_cluster $_bad_healthcheck_config
+  # Running test_update second time to change state to success.
   test_update $_jobkey $_updated_config $_cluster
   test_announce $_role $_env $_job
   test_run $_jobkey
@@ -252,7 +280,7 @@ test_http_example() {
 test_http_revocable_example() {
   local _cluster=$1 _role=$2 _env=$3
   local _base_config=$4
-  local _job=$6
+  local _job=$7
   local _jobkey="$_cluster/$_role/$_env/$_job"
 
   test_create $_jobkey $_base_config
@@ -274,7 +302,7 @@ restore_netrc() {
 test_basic_auth_unauthenticated() {
   local _cluster=$1 _role=$2 _env=$3
   local _config=$4
-  local _job=$6
+  local _job=$7
   local _jobkey="$_cluster/$_role/$_env/$_job"
 
   mv ~/.netrc ~/.netrc.bak
@@ -301,6 +329,7 @@ TEST_JOB_REVOCABLE=http_example_revocable
 TEST_JOB_DOCKER=http_example_docker
 TEST_CONFIG_FILE=$EXAMPLE_DIR/http_example.aurora
 TEST_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_updated.aurora
+TEST_BAD_HEALTHCHECK_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_bad_healthcheck.aurora
 
 BASE_ARGS=(
   $TEST_CLUSTER
@@ -308,6 +337,7 @@ BASE_ARGS=(
   $TEST_ENV
   $TEST_CONFIG_FILE
   $TEST_CONFIG_UPDATED_FILE
+  $TEST_BAD_HEALTHCHECK_CONFIG_UPDATED_FILE
 )
 
 TEST_JOB_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB")

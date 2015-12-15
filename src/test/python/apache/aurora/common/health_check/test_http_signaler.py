@@ -18,7 +18,7 @@ from socket import timeout as SocketTimeout
 import mox
 from twitter.common.lang import Compatibility
 
-from apache.aurora.common.http_signaler import HttpSignaler
+from apache.aurora.common.health_check.http_signaler import HttpSignaler
 
 if Compatibility.PY3:
   import urllib.request as urllib_request

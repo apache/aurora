@@ -84,7 +84,14 @@ class HttpSignaler(object):
 
   def __call__(self, endpoint, use_post_method=False, expected_response=None,
       expected_response_code=None):
-    """Returns a (boolean, string|None) tuple of (call success, failure reason)"""
+    """
+    Returns a (boolean, string|None) tuple of (call success, failure reason)
+    :type endpoint: str
+    :type use_post_method: bool
+    :type expected_response: str
+    :type expected_response_code: int
+    :rtype (bool, str):
+    """
     try:
       response, response_code = self.query(endpoint, '' if use_post_method else None)
       response = response.strip().lower()

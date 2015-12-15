@@ -22,6 +22,8 @@ import math
 import re
 import sys
 
+from pystachio.composite import Empty
+
 from apache.aurora.client import binding_helper
 from apache.aurora.client.base import die
 from apache.aurora.config import AuroraConfig
@@ -66,6 +68,47 @@ def __validate_env(name, config_name):
 def _validate_environment_name(config):
   env_name = str(config.raw().environment())
   __validate_env(env_name, 'Environment')
+
+
+CANNOT_HAVE_HTTP_ARGS_WITH_SHELL_ERROR = '''
+shell_command does not support supplied http arguments.
+'''
+
+CANNOT_HAVE_SHELL_ARGS_WITH_HTTP_ERROR = '''
+Cannot define shell_commmand for HTTP health check.
+'''
+
+INVALID_HEALTH_CHECK_TYPE = '''
+Invalid health check type {health_check_type}.
+'''
+
+MUST_PROVIDE_SHELL_COMMAND_ERROR = '''
+Must provide a shell command for shell type.
+'''
+
+
+HTTP_HEALTH_CHECK = 'http'
+SHELL_HEALTH_CHECK = 'shell'
+
+
+# TODO (AURORA-1552): Add config validation to the executor
+def _validate_health_check_config(config):
+  health_check_config = config.health_check_config()
+  health_check_type = health_check_config.type().get()
+
+  # Make sure we either have HTTP or SHELL.
+  if health_check_type not in {HTTP_HEALTH_CHECK, SHELL_HEALTH_CHECK}:
+    die(INVALID_HEALTH_CHECK_TYPE.format(health_check_type=health_check_type))
+  if health_check_type == SHELL_HEALTH_CHECK:
+    # SHELL options
+    shell_command = health_check_config.shell_command()
+    if shell_command == Empty:
+      # Must define a command.
+      die(MUST_PROVIDE_SHELL_COMMAND_ERROR)
+  elif health_check_type == HTTP_HEALTH_CHECK:
+    if health_check_config.shell_command() != Empty:
+      # No shell_command for HTTP.
+      die(CANNOT_HAVE_SHELL_ARGS_WITH_HTTP_ERROR)
 
 
 UPDATE_CONFIG_MAX_FAILURES_ERROR = '''
@@ -118,6 +161,7 @@ def validate_config(config, env=None):
   _validate_update_config(config)
   _validate_announce_configuration(config)
   _validate_environment_name(config)
+  _validate_health_check_config(config)
 
 
 class GlobalHookRegistry(object):

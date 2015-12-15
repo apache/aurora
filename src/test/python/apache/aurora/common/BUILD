@@ -19,7 +19,6 @@ target(
     ':test_cluster',
     ':test_clusters',
     ':test_cluster_option',
-    ':test_http_signaler',
     ':test_pex_version',
     ':test_shellify',
     ':test_transport',
@@ -64,15 +63,6 @@ python_tests(
   sources = ['test_cluster_option.py'],
   dependencies = [
     '3rdparty/python:twitter.common.options',
-    'src/main/python/apache/aurora/common',
-  ]
-)
-
-python_tests(
-  name = 'test_http_signaler',
-  sources = ['test_http_signaler.py'],
-  dependencies = [
-    '3rdparty/python:mox',
     'src/main/python/apache/aurora/common',
   ]
 )

@@ -46,6 +46,7 @@ python_tests(name = 'config',
   sources = ['test_config.py'],
   dependencies = [
     '3rdparty/python:mox',
+    '3rdparty/python:pystachio',
     'src/main/python/apache/aurora/client',
   ],
 )

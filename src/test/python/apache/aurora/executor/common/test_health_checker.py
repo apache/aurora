@@ -22,7 +22,7 @@ from mesos.interface.mesos_pb2 import TaskState
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.testing.clock import ThreadedClock
 
-from apache.aurora.common.http_signaler import HttpSignaler
+from apache.aurora.common.health_check.http_signaler import HttpSignaler
 from apache.aurora.config.schema.base import HealthCheckConfig
 from apache.aurora.executor.common.health_checker import (
     HealthChecker,
@@ -181,7 +181,7 @@ class TestHealthChecker(unittest.TestCase):
 
 
 class TestHealthCheckerProvider(unittest.TestCase):
-  def test_from_assigned_task(self):
+  def test_from_assigned_task_http(self):
     interval_secs = 17
     initial_interval_secs = 3
     max_consecutive_failures = 2
@@ -205,6 +205,58 @@ class TestHealthCheckerProvider(unittest.TestCase):
     assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs
     hct_max_fail = health_checker.threaded_health_checker.max_consecutive_failures
     assert hct_max_fail == max_consecutive_failures
+
+  def test_from_assigned_task_generic(self):
+    interval_secs = 17
+    initial_interval_secs = 3
+    max_consecutive_failures = 2
+    timeout_secs = 5
+    task_config = TaskConfig(
+        executorConfig=ExecutorConfig(
+            name='thermos-generic',
+            data=MESOS_JOB(
+                task=HELLO_WORLD,
+                health_check_config=HealthCheckConfig(
+                    interval_secs=interval_secs,
+                    initial_interval_secs=initial_interval_secs,
+                    max_consecutive_failures=max_consecutive_failures,
+                    timeout_secs=timeout_secs,
+                    type='shell',
+                    shell_command='failed command'
+                )
+            ).json_dumps()
+        )
+    )
+    assigned_task = AssignedTask(task=task_config, instanceId=1, assignedPorts={'health': 9001})
+    health_checker = HealthCheckerProvider().from_assigned_task(assigned_task, None)
+    assert health_checker.threaded_health_checker.interval == interval_secs
+    assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs
+    hct_max_fail = health_checker.threaded_health_checker.max_consecutive_failures
+    assert hct_max_fail == max_consecutive_failures
+
+  def test_from_assigned_task_no_health_port(self):
+    interval_secs = 17
+    initial_interval_secs = 3
+    max_consecutive_failures = 2
+    timeout_secs = 5
+    task_config = TaskConfig(
+        executorConfig=ExecutorConfig(
+            name='thermos-generic',
+            data=MESOS_JOB(
+                task=HELLO_WORLD,
+                health_check_config=HealthCheckConfig(
+                    interval_secs=interval_secs,
+                    initial_interval_secs=initial_interval_secs,
+                    max_consecutive_failures=max_consecutive_failures,
+                    timeout_secs=timeout_secs,
+                )
+            ).json_dumps()
+        )
+    )
+    # No health port and we don't have a shell_command.
+    assigned_task = AssignedTask(task=task_config, instanceId=1, assignedPorts={'http': 9001})
+    health_checker = HealthCheckerProvider().from_assigned_task(assigned_task, None)
+    self.assertIsNone(health_checker)
 
 
 class TestThreadedHealthChecker(unittest.TestCase):

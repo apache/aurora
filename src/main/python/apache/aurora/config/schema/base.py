@@ -37,13 +37,15 @@ class UpdateConfig(Struct):
 
 
 class HealthCheckConfig(Struct):
-  initial_interval_secs    = Default(Float, 15.0)
-  interval_secs            = Default(Float, 10.0)
-  timeout_secs             = Default(Float, 1.0)
-  max_consecutive_failures = Default(Integer, 0)
   endpoint                 = Default(String, '/health')
   expected_response        = Default(String, 'ok')
   expected_response_code   = Default(Integer, 0)
+  initial_interval_secs    = Default(Float, 15.0)
+  interval_secs            = Default(Float, 10.0)
+  max_consecutive_failures = Default(Integer, 0)
+  shell_command            = String
+  type                     = Default(String, 'http')
+  timeout_secs             = Default(Float, 1.0)
 
 
 class HttpLifecycleConfig(Struct):

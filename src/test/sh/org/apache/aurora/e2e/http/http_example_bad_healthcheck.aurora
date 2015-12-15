@@ -25,17 +25,24 @@ stage_server = Process(
   cmdline = '{{cmd}}'
 )
 
-test_task = SequentialTask(
+test_task = Task(
   name = 'http_example',
-  resources = Resources(cpu=0.4, ram=34*MB, disk=64*MB),
-  processes = [stage_server, run_server])
+  resources = Resources(cpu=0.5, ram=32*MB, disk=64*MB),
+  processes = [stage_server, run_server],
+  constraints = order(stage_server, run_server))
 
-update_config = UpdateConfig(watch_secs=10, batch_size=3)
-health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)
+update_config = UpdateConfig(watch_secs=10, batch_size=2)
+# "I am going to fail" config.
+health_check_config = HealthCheckConfig(
+    initial_interval_secs=5,
+    interval_secs=1,
+    type='shell',
+    shell_command='grep foo'
+    )
 
 job = Service(
   cluster = 'devcluster',
-  instances = 3,
+  instances = 2,
   update_config = update_config,
   health_check_config = health_check_config,
   task = test_task,

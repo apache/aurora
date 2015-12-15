@@ -17,7 +17,7 @@ import time
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
 
-from apache.aurora.common.http_signaler import HttpSignaler
+from apache.aurora.common.health_check.http_signaler import HttpSignaler
 
 from .common.task_runner import TaskError, TaskRunner
 
