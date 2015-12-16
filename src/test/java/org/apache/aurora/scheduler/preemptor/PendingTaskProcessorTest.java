@@ -46,7 +46,6 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.Protos;
-import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -248,9 +247,9 @@ public class PendingTaskProcessorTest extends EasyMockTest {
   private void expectSlotSearch(ITaskConfig config, IScheduledTask... victims) {
     expect(preemptionVictimFilter.filterPreemptionVictims(
         eq(config),
-        EasyMock.anyObject(),
+        anyObject(),
         anyObject(AttributeAggregate.class),
-        EasyMock.anyObject(),
+        anyObject(),
         eq(storageUtil.storeProvider)));
     expectLastCall().andReturn(
         victims.length == 0

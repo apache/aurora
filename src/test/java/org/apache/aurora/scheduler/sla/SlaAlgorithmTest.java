@@ -48,7 +48,7 @@ import static org.junit.Assert.assertEquals;
 public class SlaAlgorithmTest {
 
   @Test
-  public void MedianTimeToAssignedEvenTest() {
+  public void testMedianTimeToAssignedEven() {
     Number actual = MEDIAN_TIME_TO_ASSIGNED.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING, 200L, ASSIGNED, 250L, KILLED)),
@@ -59,7 +59,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void MedianTimeToAssignedOddTest() {
+  public void testMedianTimeToAssignedOdd() {
     Number actual = MEDIAN_TIME_TO_ASSIGNED.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING, 200L, ASSIGNED, 250L, RUNNING)),
@@ -70,7 +70,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void MedianTimeToAssignedZeroTest() {
+  public void testMedianTimeToAssignedZero() {
     Number actual = MEDIAN_TIME_TO_ASSIGNED.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING)),
@@ -80,7 +80,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void MedianTimeToAssignedOneTest() {
+  public void testMedianTimeToAssignedOne() {
     Number actual = MEDIAN_TIME_TO_ASSIGNED.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING)),
@@ -90,7 +90,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test(expected = IllegalArgumentException.class)
-  public void MedianTimeToAssignedNoPendingTest() {
+  public void testMedianTimeToAssignedNoPending() {
     MEDIAN_TIME_TO_ASSIGNED.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, ASSIGNED))),
@@ -98,7 +98,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void MedianTimeToRunningEvenTest() {
+  public void testMedianTimeToRunningEven() {
     Number actual = MEDIAN_TIME_TO_RUNNING.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING)), // Ignored as not RUNNING
@@ -115,7 +115,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void MedianTimeToRunningOddTest() {
+  public void testMedianTimeToRunningOdd() {
     Number actual = MEDIAN_TIME_TO_RUNNING.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING)), // Ignored as not RUNNING
@@ -127,7 +127,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void MedianTimeToRunningZeroTest() {
+  public void testMedianTimeToRunningZero() {
     Number actual = MEDIAN_TIME_TO_RUNNING.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING)),
@@ -137,7 +137,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void MedianTimeEventsOutsideTimeRangeIgnored() {
+  public void testMedianTimeEventsOutsideTimeRangeIgnored() {
     Number actual = MEDIAN_TIME_TO_ASSIGNED.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING)),
@@ -151,7 +151,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void JobUptime50Test() {
+  public void testJobUptime50() {
     long now = System.currentTimeMillis();
     Number actual = JOB_UPTIME_50.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
@@ -160,7 +160,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void JobUptime75Test() {
+  public void testJobUptime75() {
     long now = System.currentTimeMillis();
     Number actual = JOB_UPTIME_75.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
@@ -169,7 +169,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void JobUptime90Test() {
+  public void testJobUptime90() {
     long now = System.currentTimeMillis();
     Number actual = JOB_UPTIME_90.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
@@ -178,7 +178,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void JobUptime95Test() {
+  public void testJobUptime95() {
     long now = System.currentTimeMillis();
     Number actual = JOB_UPTIME_95.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
@@ -187,7 +187,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void JobUptime99Test() {
+  public void testJobUptime99() {
     long now = System.currentTimeMillis();
     Number actual = JOB_UPTIME_99.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
@@ -196,7 +196,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void JobUptimeEmptyTest() {
+  public void testJobUptimeEmpty() {
     long now = System.currentTimeMillis();
     Number actual = JOB_UPTIME_99.getAlgorithm().calculate(
         new LinkedList<IScheduledTask>(),
@@ -205,7 +205,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void JobUptimeNonTerminalIgnoredTest() {
+  public void testJobUptimeNonTerminalIgnored() {
     long now = System.currentTimeMillis();
     Set<IScheduledTask> instances = makeUptimeTasks(100, now);
     instances.add(makeTask(ImmutableMap.of(now - 5000, RUNNING, now - 3000, KILLED)));
@@ -214,7 +214,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void JobUptimeLiveNonTerminalIgnoredTest() {
+  public void testJobUptimeLiveNonTerminalIgnored() {
     long now = System.currentTimeMillis();
     Set<IScheduledTask> instances = makeUptimeTasks(100, now);
     instances.add(makeTask(ImmutableMap.of(now - 5000, RUNNING, now - 3000, RESTARTING)));
@@ -223,7 +223,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void AggregatePlatformUptimeTest() {
+  public void testAggregatePlatformUptime() {
     Number actual = AGGREGATE_PLATFORM_UPTIME.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(100L, PENDING), 0), // Ignored.
@@ -245,7 +245,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void AggregatePlatformUptimeRecoveredFromDownTest() {
+  public void testAggregatePlatformUptimeRecoveredFromDown() {
     Number actual = AGGREGATE_PLATFORM_UPTIME.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, RUNNING, 300L, LOST, 310L, KILLED), 0), // DOWN mid range.
@@ -259,7 +259,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void AggregatePlatformUptimeKilledByPlatformTest() {
+  public void testAggregatePlatformUptimeKilledByPlatform() {
     Number actual = AGGREGATE_PLATFORM_UPTIME.getAlgorithm().calculate(
         ImmutableSet.of(makeTask(ImmutableMap.of(50L, RUNNING, 300L, KILLED), 0)),
         Range.closedOpen(100L, 500L));
@@ -267,7 +267,7 @@ public class SlaAlgorithmTest {
   }
 
   @Test
-  public void AggregatePlatformUptimeEmptyTest() {
+  public void testAggregatePlatformUptimeEmpty() {
     Number actual = AGGREGATE_PLATFORM_UPTIME.getAlgorithm().calculate(
         ImmutableSet.of(makeTask(ImmutableMap.of(50L, PENDING), 0)),
         Range.closedOpen(100L, 500L));

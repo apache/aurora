@@ -42,7 +42,6 @@ public class DbStorageTest extends EasyMockTest {
 
   private SqlSessionFactory sessionFactory;
   private SqlSession session;
-  private EnumValueMapper enumMapper;
   private GatedWorkQueue gatedWorkQueue;
   private Work.Quiet<String> readWork;
   private MutateWork.NoResult.Quiet writeWork;
@@ -53,14 +52,13 @@ public class DbStorageTest extends EasyMockTest {
   public void setUp() {
     sessionFactory = createMock(SqlSessionFactory.class);
     session = createMock(SqlSession.class);
-    enumMapper = createMock(EnumValueMapper.class);
     gatedWorkQueue = createMock(GatedWorkQueue.class);
     readWork = createMock(new Clazz<Work.Quiet<String>>() { });
     writeWork = createMock(new Clazz<MutateWork.NoResult.Quiet>() { });
 
     storage = new DbStorage(
         sessionFactory,
-        enumMapper,
+        createMock(EnumValueMapper.class),
         gatedWorkQueue,
         createMock(CronJobStore.Mutable.class),
         createMock(TaskStore.Mutable.class),

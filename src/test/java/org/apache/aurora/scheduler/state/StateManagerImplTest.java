@@ -137,8 +137,8 @@ public class StateManagerImplTest extends EasyMockTest {
 
       TaskStateChange change = (TaskStateChange) argument;
       return taskId.equals(Tasks.id(change.getTask()))
-          && (from == change.getOldState().get())
-          && (to == change.getNewState());
+          && from == change.getOldState().get()
+          && to == change.getNewState();
     }
 
     @Override

@@ -41,7 +41,6 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.Protos;
-import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -155,7 +154,7 @@ public class PreemptorImplTest extends EasyMockTest {
         eq(Tasks.id(preempted)),
         eq(Optional.absent()),
         eq(ScheduleStatus.PREEMPTING),
-        EasyMock.anyObject()))
+        anyObject()))
         .andReturn(StateChangeResult.SUCCESS);
   }
 

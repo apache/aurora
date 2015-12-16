@@ -24,8 +24,8 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.apache.aurora.scheduler.app.local.FakeMaster;
-import org.apache.aurora.scheduler.app.local.simulator.Events.OfferAccepted;
-import org.apache.aurora.scheduler.app.local.simulator.Events.Started;
+import org.apache.aurora.scheduler.app.local.simulator.events.OfferAccepted;
+import org.apache.aurora.scheduler.app.local.simulator.events.Started;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskState;
 

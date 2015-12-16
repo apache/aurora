@@ -26,7 +26,7 @@ import com.google.inject.servlet.ServletModule;
 import com.google.inject.util.Providers;
 import com.sun.jersey.api.client.ClientResponse;
 
-import org.apache.aurora.scheduler.http.JettyServerModuleTest;
+import org.apache.aurora.scheduler.http.AbstractJettyTest;
 import org.apache.shiro.authz.UnauthenticatedException;
 import org.apache.shiro.subject.Subject;
 import org.junit.Before;
@@ -36,20 +36,19 @@ import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 
-public class ShiroKerberosPermissiveAuthenticationFilterTest extends JettyServerModuleTest {
+public class ShiroKerberosPermissiveAuthenticationFilterTest extends AbstractJettyTest {
   private static final String PATH = "/test";
 
-  private Subject subject;
   private HttpServlet mockServlet;
 
   private ShiroKerberosPermissiveAuthenticationFilter filter;
 
   @Before
   public void setUp() {
-    subject = createMock(Subject.class);
     mockServlet = createMock(HttpServlet.class);
 
-    filter = new ShiroKerberosPermissiveAuthenticationFilter(Providers.of(subject));
+    filter =
+        new ShiroKerberosPermissiveAuthenticationFilter(Providers.of(createMock(Subject.class)));
   }
 
   @Override

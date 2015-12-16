@@ -63,7 +63,6 @@ public class TaskReconcilerTest extends EasyMockTest {
   private StatsProvider statsProvider;
   private Driver driver;
   private ScheduledExecutorService executorService;
-  private FakeScheduledExecutor clock;
   private AtomicLong explicitRuns;
   private AtomicLong implicitRuns;
 
@@ -81,7 +80,8 @@ public class TaskReconcilerTest extends EasyMockTest {
   public void testExecution() {
     expect(statsProvider.makeCounter(EXPLICIT_STAT_NAME)).andReturn(explicitRuns);
     expect(statsProvider.makeCounter(IMPLICIT_STAT_NAME)).andReturn(implicitRuns);
-    clock = FakeScheduledExecutor.scheduleAtFixedRateExecutor(executorService, 2, 5);
+    FakeScheduledExecutor clock =
+        FakeScheduledExecutor.scheduleAtFixedRateExecutor(executorService, 2, 5);
 
     IScheduledTask task = makeTask("id1", TaskTestUtil.makeConfig(TaskTestUtil.JOB));
     storageUtil.expectOperations();

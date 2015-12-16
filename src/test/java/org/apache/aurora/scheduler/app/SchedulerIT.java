@@ -126,13 +126,12 @@ public class SchedulerIT extends BaseZooKeeperTest {
           .setName("test framework")
           .build());
 
-  private ExecutorService executor = Executors.newCachedThreadPool(
+  private final ExecutorService executor = Executors.newCachedThreadPool(
       new ThreadFactoryBuilder().setNameFormat("SchedulerIT-%d").setDaemon(true).build());
-  private AtomicReference<Optional<RuntimeException>> mainException =
+  private final AtomicReference<Optional<RuntimeException>> mainException =
       Atomics.newReference(Optional.absent());
 
   private IMocksControl control;
-  private Injector injector;
 
   private SchedulerDriver driver;
   private DriverFactory driverFactory;
@@ -142,7 +141,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private EntrySerializer entrySerializer;
   private ZooKeeperClient zkClient;
   private File backupDir;
-  private Lifecycle lifecycle;
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
@@ -204,7 +202,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         .create(ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
         .withCredentials(credentials);
     SchedulerMain main = SchedulerMain.class.newInstance();
-    injector = Guice.createInjector(
+    Injector injector = Guice.createInjector(
         ImmutableList.<Module>builder()
             .add(SchedulerMain.getUniversalModule())
             .add(new LogStorageModule())
@@ -214,7 +212,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
             .build()
     );
     injector.injectMembers(main);
-    lifecycle = injector.getInstance(Lifecycle.class);
+    Lifecycle lifecycle = injector.getInstance(Lifecycle.class);
 
     executor.submit(() -> {
       try {
@@ -248,7 +246,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
     }).get();
   }
 
-  private AtomicInteger curPosition = new AtomicInteger();
+  private final AtomicInteger curPosition = new AtomicInteger();
   private static class IntPosition implements Position {
     private final int pos;
 

@@ -208,7 +208,7 @@ public class CronJobManagerImplTest extends EasyMockTest {
   @Test
   public void testGetScheduledJobs() throws Exception {
     CronTrigger cronTrigger = createMock(CronTrigger.class);
-    expect(scheduler.getJobKeys(EasyMock.anyObject()))
+    expect(scheduler.getJobKeys(anyObject()))
         .andReturn(ImmutableSet.of(QuartzTestUtil.QUARTZ_JOB_KEY));
     EasyMock.
         <List<? extends Trigger>>expect(scheduler.getTriggersOfJob(QuartzTestUtil.QUARTZ_JOB_KEY))
@@ -223,7 +223,7 @@ public class CronJobManagerImplTest extends EasyMockTest {
 
   @Test
   public void testGetScheduledJobsEmpty() throws Exception {
-    expect(scheduler.getJobKeys(EasyMock.anyObject()))
+    expect(scheduler.getJobKeys(anyObject()))
         .andReturn(ImmutableSet.of(QuartzTestUtil.QUARTZ_JOB_KEY));
     EasyMock.
         <List<? extends Trigger>>expect(scheduler.getTriggersOfJob(QuartzTestUtil.QUARTZ_JOB_KEY))
@@ -235,7 +235,7 @@ public class CronJobManagerImplTest extends EasyMockTest {
 
   @Test(expected = RuntimeException.class)
   public void testGetScheduledJobsFails() throws Exception {
-    expect(scheduler.getJobKeys(EasyMock.anyObject()))
+    expect(scheduler.getJobKeys(anyObject()))
         .andReturn(ImmutableSet.of(QuartzTestUtil.QUARTZ_JOB_KEY));
     EasyMock.
         <List<? extends Trigger>>expect(scheduler.getTriggersOfJob(QuartzTestUtil.QUARTZ_JOB_KEY))

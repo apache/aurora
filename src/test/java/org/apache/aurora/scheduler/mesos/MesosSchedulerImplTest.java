@@ -27,7 +27,6 @@ import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskStatusHandler;
 import org.apache.aurora.scheduler.base.Conversions;
@@ -132,7 +131,6 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       Optional.of(1000000L)
   );
 
-  private Logger log;
   private StorageTestUtil storageUtil;
   private Command shutdownCommand;
   private TaskStatusHandler statusHandler;
@@ -144,7 +142,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    log = Logger.getAnonymousLogger();
+    Logger log = Logger.getAnonymousLogger();
     log.setLevel(Level.INFO);
     initializeScheduler(log);
   }
@@ -178,7 +176,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testNoOffers() {
-    new RegisteredFixture() {
+    new AbstractRegisteredTest() {
       @Override
       void test() {
         scheduler.resourceOffers(driver, ImmutableList.of());
@@ -188,7 +186,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testAcceptOffer() {
-    new OfferFixture() {
+    new AbstractOfferTest() {
       @Override
       void respondToOffer() {
         expectOfferAttributesSaved(OFFER);
@@ -205,7 +203,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     mockLogger.log(eq(Level.FINE), anyString());
     initializeScheduler(mockLogger);
 
-    new OfferFixture() {
+    new AbstractOfferTest() {
       @Override
       void respondToOffer() {
         expectOfferAttributesSaved(OFFER);
@@ -216,7 +214,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testAttributesModePreserved() {
-    new OfferFixture() {
+    new AbstractOfferTest() {
       @Override
       void respondToOffer() {
         IHostAttributes draining =
@@ -250,7 +248,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Test(expected = SchedulerException.class)
   public void testStatusUpdateFails() {
-    new StatusFixture() {
+    new AbstractStatusTest() {
       @Override
       void expectations() {
         eventSink.post(new TaskStatusReceived(
@@ -267,7 +265,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testMultipleOffers() {
-    new RegisteredFixture() {
+    new AbstractRegisteredTest() {
       @Override
       void expectations() {
         expectOfferAttributesSaved(OFFER);
@@ -285,7 +283,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testDisconnected() {
-    new RegisteredFixture() {
+    new AbstractRegisteredTest() {
       @Override
       void expectations() {
         eventSink.post(new DriverDisconnected());
@@ -355,7 +353,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     mockLogger.log(eq(Level.FINE), anyString());
     initializeScheduler(mockLogger);
 
-    new StatusReconciliationFixture() {
+    new AbstractStatusReconciliationTest() {
       @Override
       void expectations() {
         eventSink.post(PUBSUB_RECONCILIATION_EVENT);
@@ -364,7 +362,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     }.run();
   }
 
-  private class StatusUpdater extends StatusFixture {
+  private class StatusUpdater extends AbstractStatusTest {
     StatusUpdater(TaskStatus status) {
       super(status);
     }
@@ -385,14 +383,14 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     expect(storageUtil.attributeStore.getHostAttributes(offer.getOffer().getHostname()))
         .andReturn(Optional.absent());
     IHostAttributes defaultMode = IHostAttributes.build(
-        Conversions.getAttributes(offer.getOffer()).newBuilder().setMode(MaintenanceMode.NONE));
+        Conversions.getAttributes(offer.getOffer()).newBuilder().setMode(NONE));
     expect(storageUtil.attributeStore.saveHostAttributes(defaultMode)).andReturn(true);
   }
 
-  private abstract class RegisteredFixture {
+  private abstract class AbstractRegisteredTest {
     private final AtomicBoolean runCalled = new AtomicBoolean(false);
 
-    RegisteredFixture() {
+    AbstractRegisteredTest() {
       // Prevent otherwise silent noop tests that forget to call run().
       addTearDown(new TearDown() {
         @Override
@@ -422,8 +420,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     abstract void test();
   }
 
-  private abstract class OfferFixture extends RegisteredFixture {
-    OfferFixture() {
+  private abstract class AbstractOfferTest extends AbstractRegisteredTest {
+    AbstractOfferTest() {
       super();
     }
 
@@ -440,14 +438,14 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     }
   }
 
-  private abstract class StatusFixture extends RegisteredFixture {
+  private abstract class AbstractStatusTest extends AbstractRegisteredTest {
     protected final TaskStatus status;
 
-    StatusFixture() {
+    AbstractStatusTest() {
       this(STATUS);
     }
 
-    StatusFixture(TaskStatus status) {
+    AbstractStatusTest(TaskStatus status) {
       super();
       this.status = status;
     }
@@ -458,8 +456,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     }
   }
 
-  private abstract class StatusReconciliationFixture extends StatusFixture {
-    StatusReconciliationFixture() {
+  private abstract class AbstractStatusReconciliationTest extends AbstractStatusTest {
+    AbstractStatusReconciliationTest() {
       super(STATUS_RECONCILIATION);
     }
   }

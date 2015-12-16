@@ -26,7 +26,7 @@ import com.google.inject.servlet.ServletModule;
 import com.google.inject.util.Providers;
 import com.sun.jersey.api.client.ClientResponse;
 
-import org.apache.aurora.scheduler.http.JettyServerModuleTest;
+import org.apache.aurora.scheduler.http.AbstractJettyTest;
 import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.AuthenticationToken;
 import org.apache.shiro.subject.Subject;
@@ -38,7 +38,7 @@ import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.isA;
 import static org.junit.Assert.assertEquals;
 
-public class ShiroKerberosAuthenticationFilterTest extends JettyServerModuleTest {
+public class ShiroKerberosAuthenticationFilterTest extends AbstractJettyTest {
   private static final String PATH = "/test";
 
   private Subject subject;

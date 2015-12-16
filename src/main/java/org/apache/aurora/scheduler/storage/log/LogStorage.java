@@ -410,7 +410,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
   @Override
   public synchronized void start(final MutateWork.NoResult.Quiet initializationLogic) {
-    write((NoResult.Quiet) (MutableStoreProvider unused) -> {
+    write((NoResult.Quiet) unused -> {
       // Must have the underlying storage started so we can query it for the last checkpoint.
       // We replay these entries in the forwarded storage system's transactions but not ours - we
       // do not want to re-record these ops to the log.

@@ -45,13 +45,11 @@ import static org.junit.Assert.assertEquals;
 public class AsyncModuleTest extends EasyMockTest {
 
   private FakeStatsProvider statsProvider;
-  private StorageTestUtil storageUtil;
 
   @Before
   public void setUp() {
     statsProvider = new FakeStatsProvider();
-    storageUtil = new StorageTestUtil(this);
-    storageUtil.expectOperations();
+    new StorageTestUtil(this).expectOperations();
   }
 
   private Injector createInjector(Module module) {

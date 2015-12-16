@@ -37,7 +37,6 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
-import org.apache.aurora.scheduler.ResourceAggregates;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
@@ -724,7 +723,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     expectNoTasks();
     expectQuota(IResourceAggregate.build(new ResourceAggregate(1, 1, 1)));
 
-    storageUtil.quotaStore.saveQuota(ROLE, ResourceAggregates.EMPTY);
+    storageUtil.quotaStore.saveQuota(ROLE, EMPTY);
 
     control.replay();
     quotaManager.saveQuota(
@@ -902,8 +901,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
   }
 
   private IExpectationSetters<?> expectNoJobUpdates() {
-    return expect(jobUpdateStore.fetchJobUpdateSummaries(
-        QuotaManagerImpl.updateQuery(ROLE))).andReturn(ImmutableList.of());
+    return expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(ROLE)))
+        .andReturn(ImmutableList.of());
   }
 
   private IExpectationSetters<?> expectNoTasks() {

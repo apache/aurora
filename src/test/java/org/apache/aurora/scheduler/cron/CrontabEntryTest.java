@@ -14,10 +14,9 @@
 package org.apache.aurora.scheduler.cron;
 
 import java.util.List;
-import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Sets;
+import com.google.common.collect.ImmutableSet;
 
 import org.junit.Test;
 
@@ -43,8 +42,7 @@ public class CrontabEntryTest {
       }
     }
 
-    Set<CrontabEntry> equivalentEntries = Sets.newHashSet(entries);
-    assertTrue(equivalentEntries.size() == 1);
+    assertEquals(1, ImmutableSet.copyOf(entries).size());
   }
 
   @Test

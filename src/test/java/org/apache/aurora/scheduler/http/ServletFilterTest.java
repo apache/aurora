@@ -28,7 +28,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class ServletFilterTest extends JettyServerModuleTest {
+public class ServletFilterTest extends AbstractJettyTest {
 
   protected ClientResponse get(String path) {
     return getRequestBuilder(path)

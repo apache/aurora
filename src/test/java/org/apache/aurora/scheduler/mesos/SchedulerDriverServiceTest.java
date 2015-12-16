@@ -145,6 +145,6 @@ public class SchedulerDriverServiceTest extends EasyMockTest {
         builder.build(),
         SETTINGS.getMasterUri()))
         .andReturn(schedulerDriver);
-    expect(schedulerDriver.start()).andReturn(Protos.Status.DRIVER_RUNNING);
+    expect(schedulerDriver.start()).andReturn(DRIVER_RUNNING);
   }
 }

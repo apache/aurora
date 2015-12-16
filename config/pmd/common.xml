@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!--
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this work except in compliance with the License.
+You may obtain a copy of the License in the LICENSE file, or at:
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<ruleset name="Aurora"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+
+  <description>
+    Aurora PMD ruleset for all sources.
+  </description>
+
+  <rule ref="rulesets/java/basic.xml"/>
+  <rule ref="rulesets/java/braces.xml"/>
+  <rule ref="rulesets/java/unnecessary.xml"/>
+  <rule ref="rulesets/java/unusedcode.xml"/>
+
+  <rule ref="rulesets/java/naming.xml">
+    <!-- Requiring longer variable names can be cumbersome when applied globally. -->
+    <exclude name="ShortVariable"/>
+    <!-- Requiring shorter variable names can be cumbersome when applied globally. -->
+    <exclude name="LongVariable"/>
+    <!-- Short method names are useful on occasion, such as with factory methods: Rate.of(...). -->
+    <exclude name="ShortMethodName"/>
+    <!-- TODO(wfarner): Enable this if/when we have automatic transaction management, rather than
+         the classes in org.apache.aurora.scheduler.storage.Storage (e.g. Work). -->
+    <exclude name="AbstractNaming"/>
+    <!-- There are rare, but valid, cases where short class names are useful. -->
+    <exclude name="ShortClassName"/>
+  </rule>
+
+  <rule ref="rulesets/java/empty.xml">
+    <!-- Configured below -->
+    <exclude name="EmptyCatchBlock"/>
+  </rule>
+
+  <rule ref="rulesets/java/empty.xml/EmptyCatchBlock">
+    <properties>
+      <!-- Some APIs, like the Java Reflection API, use exceptions to indicate the absence of
+           a value and we legitimately want to ignore them. -->
+      <property name="allowCommentedBlocks" value="true"/>
+    </properties>
+  </rule>
+
+  <rule ref="rulesets/java/imports.xml">
+    <!-- We frequently use static imports for enum fields (making other code more concise), but
+         those trip this rule. -->
+    <exclude name="TooManyStaticImports"/>
+  </rule>
+
+  <rule ref="rulesets/java/logging-java.xml">
+    <!-- It's valid to inject the logger, and in some cases preferable. -->
+    <exclude name="LoggerIsNotStaticFinal"/>
+    <!-- In practice, we don't have high enough log volume for this rule to be useful. -->
+    <exclude name="GuardLogStatementJavaUtil"/>
+    <exclude name="MoreThanOneLogger"/>
+  </rule>
+</ruleset>

@@ -76,7 +76,7 @@ public class LogManagerTest extends EasyMockTest {
   private static final Amount<Integer, Data> NO_FRAMES_EVER_SIZE =
       Amount.of(Integer.MAX_VALUE, Data.GB);
 
-  private static final Function<LogEntry, byte[]> ENCODE = entry -> {
+  private static final Function<LogEntry, byte[]> ENCODER = entry -> {
     try {
       return encode(entry);
     } catch (CodingException e) {
@@ -211,7 +211,7 @@ public class LogManagerTest extends EasyMockTest {
 
   private static byte[] entryEq(LogEntry expected) {
     EasyMock.reportMatcher(new LogEntryMatcher(expected));
-    return null;
+    return new byte[] {};
   }
 
   @Test
@@ -356,9 +356,9 @@ public class LogManagerTest extends EasyMockTest {
     List<byte[]> expectedAppends =
         ImmutableList.<byte[]>builder()
             .add(encode(message1.header))
-            .addAll(Iterables.transform(message1.chunks, ENCODE))
+            .addAll(Iterables.transform(message1.chunks, ENCODER))
             .add(encode(message2.header))
-            .addAll(Iterables.transform(message2.chunks, ENCODE))
+            .addAll(Iterables.transform(message2.chunks, ENCODER))
             .build();
 
     final Deque<byte[]> actualAppends = new LinkedBlockingDeque<>();

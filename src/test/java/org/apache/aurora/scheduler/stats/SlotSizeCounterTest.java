@@ -46,14 +46,14 @@ public class SlotSizeCounterTest extends EasyMockTest {
   private StatsProvider statsProvider;
   private Runnable slotCounter;
 
-  private AtomicLong smallCounter = new AtomicLong();
-  private AtomicLong smallDedicatedCounter = new AtomicLong();
-  private AtomicLong smallRevocableCounter = new AtomicLong();
-  private AtomicLong smallDedicatedRevocableCounter = new AtomicLong();
-  private AtomicLong largeCounter = new AtomicLong();
-  private AtomicLong largeDedicatedCounter = new AtomicLong();
-  private AtomicLong largeRevocableCounter = new AtomicLong();
-  private AtomicLong largeDedicatedRevocableCounter = new AtomicLong();
+  private final AtomicLong smallCounter = new AtomicLong();
+  private final AtomicLong smallDedicatedCounter = new AtomicLong();
+  private final AtomicLong smallRevocableCounter = new AtomicLong();
+  private final AtomicLong smallDedicatedRevocableCounter = new AtomicLong();
+  private final AtomicLong largeCounter = new AtomicLong();
+  private final AtomicLong largeDedicatedCounter = new AtomicLong();
+  private final AtomicLong largeRevocableCounter = new AtomicLong();
+  private final AtomicLong largeDedicatedRevocableCounter = new AtomicLong();
 
   @Before
   public void setUp() {

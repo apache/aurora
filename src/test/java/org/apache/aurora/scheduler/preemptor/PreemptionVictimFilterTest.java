@@ -30,7 +30,6 @@ import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobKey;
-import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -77,9 +76,9 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   private static final String TASK_ID_B = "task_b";
   private static final String TASK_ID_C = "task_c";
   private static final String TASK_ID_D = "task_d";
-  private static final String HOST = "host";
-  private static final String RACK = "rack";
-  private static final String SLAVE_ID = HOST + "_id";
+  private static final String HOST_A = "hostA";
+  private static final String RACK_A = "rackA";
+  private static final String SLAVE_ID = HOST_A + "_id";
   private static final String RACK_ATTRIBUTE = "rack";
   private static final String HOST_ATTRIBUTE = "host";
   private static final String OFFER = "offer";
@@ -444,7 +443,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a1);
 
-    expect(storageUtil.attributeStore.getHostAttributes(HOST)).andReturn(Optional.absent());
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.absent());
 
     control.replay();
 
@@ -515,12 +514,12 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     builder.getIdBuilder().setValue(offerId);
     builder.getFrameworkIdBuilder().setValue("framework-id");
     builder.getSlaveIdBuilder().setValue(SLAVE_ID);
-    builder.setHostname(HOST);
+    builder.setHostname(HOST_A);
     builder.addAllResources(resources);
 
     return Optional.of(new HostOffer(
         builder.build(),
-        IHostAttributes.build(new HostAttributes().setMode(MaintenanceMode.NONE))));
+        IHostAttributes.build(new HostAttributes().setMode(NONE))));
   }
 
   private IExpectationSetters<Set<SchedulingFilter.Veto>> expectFiltering() {
@@ -580,7 +579,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   private void assignToHost(ScheduledTask task) {
     task.setStatus(RUNNING);
     addEvent(task, RUNNING);
-    task.getAssignedTask().setSlaveHost(HOST);
+    task.getAssignedTask().setSlaveHost(HOST_A);
     task.getAssignedTask().setSlaveId(SLAVE_ID);
   }
 
@@ -595,10 +594,10 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   // Sets up a normal host, no dedicated hosts and no maintenance.
   private void setUpHost() {
     IHostAttributes hostAttrs = IHostAttributes.build(
-        new HostAttributes().setHost(HOST).setSlaveId(HOST + "_id")
-            .setMode(NONE).setAttributes(ImmutableSet.of(rack(RACK), host(RACK))));
+        new HostAttributes().setHost(HOST_A).setSlaveId(HOST_A + "_id")
+            .setMode(NONE).setAttributes(ImmutableSet.of(rack(RACK_A), host(RACK_A))));
 
-    expect(storageUtil.attributeStore.getHostAttributes(HOST))
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
         .andReturn(Optional.of(hostAttrs)).anyTimes();
   }
 }

@@ -73,7 +73,7 @@ import static org.junit.Assert.assertNotNull;
  * HTTP server for each test case.
  *
  */
-public abstract class JettyServerModuleTest extends EasyMockTest {
+public abstract class AbstractJettyTest extends EasyMockTest {
   private Injector injector;
   protected StorageTestUtil storage;
   protected HostAndPort httpServer;

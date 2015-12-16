@@ -571,9 +571,9 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     ITaskConfig nullMetadata =
         ITaskConfig.build(TaskTestUtil.makeConfig(TaskTestUtil.JOB).newBuilder().setMetadata(null));
 
-    IScheduledTask a = TaskTestUtil.makeTask("a", nullMetadata);
-    IScheduledTask b = TaskTestUtil.makeTask("a", nullMetadata);
-    IScheduledTask c = TaskTestUtil.makeTask("a", nullMetadata);
+    IScheduledTask a = makeTask("a", nullMetadata);
+    IScheduledTask b = makeTask("a", nullMetadata);
+    IScheduledTask c = makeTask("a", nullMetadata);
     saveTasks(a);
     saveTasks(b);
     saveTasks(c);

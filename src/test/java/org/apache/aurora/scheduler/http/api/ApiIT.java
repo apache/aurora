@@ -21,7 +21,7 @@ import com.google.inject.util.Modules;
 import com.sun.jersey.api.client.ClientResponse;
 
 import org.apache.aurora.gen.Response;
-import org.apache.aurora.scheduler.http.JettyServerModuleTest;
+import org.apache.aurora.scheduler.http.AbstractJettyTest;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.junit.Before;
 import org.junit.Test;
@@ -29,7 +29,7 @@ import org.junit.Test;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
-public class ApiIT extends JettyServerModuleTest {
+public class ApiIT extends AbstractJettyTest {
   private AnnotatedAuroraAdmin thrift;
 
   @Before

@@ -22,8 +22,6 @@ limitations under the License.
     Aurora PMD ruleset.
   </description>
 
-  <rule ref="rulesets/java/basic.xml">
-  </rule>
   <rule ref="rulesets/java/design.xml">
     <!-- This rule suffers from false positivies in cases where we are implementing a third-party
          interface. -->
@@ -45,41 +43,6 @@ limitations under the License.
 
     <!-- Classes that are only meant to be managed by mybatis with reflection trip this rule. -->
     <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
-  </rule>
-  <rule ref="rulesets/java/empty.xml">
-    <!-- Configured below -->
-    <exclude name="EmptyCatchBlock"/>
-  </rule>
-  <rule ref="rulesets/java/empty.xml/EmptyCatchBlock">
-    <properties>
-          <!-- Some APIs, like the Java Reflection API, use exceptions to indicate the absence of
-               a value and we legitimately want to ignore them. -->
-          <property name="allowCommentedBlocks" value="true"/>
-        </properties>
-      </rule>
-      <rule ref="rulesets/java/imports.xml">
-        <!-- We frequently use static imports for enum fields (making other code more concise), but
-             those trip this rule. -->
-    <exclude name="TooManyStaticImports"/>
-  </rule>
-  <rule ref="rulesets/java/logging-java.xml">
-    <!-- It's valid to inject the logger, and in some cases preferable. -->
-    <exclude name="LoggerIsNotStaticFinal"/>
-    <!-- In practice, we don't have high enough log volume for this rule to be useful. -->
-    <exclude name="GuardLogStatementJavaUtil"/>
-  </rule>
-  <rule ref="rulesets/java/naming.xml">
-    <!-- Requiring longer variable names can be cumbersome when applied globally. -->
-    <exclude name="ShortVariable"/>
-    <!-- Requiring shorter variable names can be cumbersome when applied globally. -->
-    <exclude name="LongVariable"/>
-    <!-- Short method names are useful on occasion, such as with factory methods: Rate.of(...). -->
-    <exclude name="ShortMethodName"/>
-    <!-- TODO(wfarner): Enable this if/when we have automatic transaction management, rather than
-         the classes in org.apache.aurora.scheduler.storage.Storage (e.g. Work). -->
-    <exclude name="AbstractNaming"/>
-    <!-- There are rare, but valid, cases where short class names are useful. -->
-    <exclude name="ShortClassName"/>
   </rule>
 
   <!-- Custom rules -->

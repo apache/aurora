@@ -62,32 +62,41 @@ public final class StorageEntityUtil {
     } else if (!(object instanceof String) && !(object instanceof Enum)) {
       for (Field field : object.getClass().getDeclaredFields()) {
         if (!Modifier.isStatic(field.getModifiers())) {
-          try {
-            field.setAccessible(true);
-            String fullName = name + "." + field.getName();
-            Object fieldValue = field.get(object);
-            boolean mustBeSet = !ignoredFields.contains(field);
-            if (mustBeSet) {
-              assertNotNull(fullName + " is null", fieldValue);
-            }
-            if (fieldValue != null) {
-              if (Primitives.isWrapperType(fieldValue.getClass())) {
-                // Special-case the mutable hash code field.
-                if (mustBeSet && !fullName.endsWith("cachedHashCode")) {
-                  assertNotEquals(
-                      "Primitive value must not be default: " + fullName,
-                      Defaults.defaultValue(Primitives.unwrap(fieldValue.getClass())),
-                      fieldValue);
-                }
-              } else {
-                assertFullyPopulated(fullName, fieldValue, ignoredFields);
-              }
-            }
-          } catch (IllegalAccessException e) {
-            throw Throwables.propagate(e);
-          }
+          validateField(name, object, field, ignoredFields);
         }
       }
+    }
+  }
+
+  private static void validateField(
+      String name,
+      Object object,
+      Field field,
+      Set<Field> ignoredFields) {
+
+    try {
+      field.setAccessible(true);
+      String fullName = name + "." + field.getName();
+      Object fieldValue = field.get(object);
+      boolean mustBeSet = !ignoredFields.contains(field);
+      if (mustBeSet) {
+        assertNotNull(fullName + " is null", fieldValue);
+      }
+      if (fieldValue != null) {
+        if (Primitives.isWrapperType(fieldValue.getClass())) {
+          // Special-case the mutable hash code field.
+          if (mustBeSet && !fullName.endsWith("cachedHashCode")) {
+            assertNotEquals(
+                "Primitive value must not be default: " + fullName,
+                Defaults.defaultValue(Primitives.unwrap(fieldValue.getClass())),
+                fieldValue);
+          }
+        } else {
+          assertFullyPopulated(fullName, fieldValue, ignoredFields);
+        }
+      }
+    } catch (IllegalAccessException e) {
+      throw Throwables.propagate(e);
     }
   }
 

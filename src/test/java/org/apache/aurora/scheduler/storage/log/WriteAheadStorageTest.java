@@ -57,11 +57,7 @@ import static org.junit.Assert.assertTrue;
 public class WriteAheadStorageTest extends EasyMockTest {
 
   private LogStorage.TransactionManager transactionManager;
-  private SchedulerStore.Mutable schedulerStore;
-  private CronJobStore.Mutable jobStore;
   private TaskStore.Mutable taskStore;
-  private LockStore.Mutable lockStore;
-  private QuotaStore.Mutable quotaStore;
   private AttributeStore.Mutable attributeStore;
   private JobUpdateStore.Mutable jobUpdateStore;
   private Logger log;
@@ -71,11 +67,7 @@ public class WriteAheadStorageTest extends EasyMockTest {
   @Before
   public void setUp() {
     transactionManager = createMock(LogStorage.TransactionManager.class);
-    schedulerStore = createMock(SchedulerStore.Mutable.class);
-    jobStore = createMock(CronJobStore.Mutable.class);
     taskStore = createMock(TaskStore.Mutable.class);
-    lockStore = createMock(LockStore.Mutable.class);
-    quotaStore = createMock(QuotaStore.Mutable.class);
     attributeStore = createMock(AttributeStore.Mutable.class);
     jobUpdateStore = createMock(JobUpdateStore.Mutable.class);
     log = createMock(Logger.class);
@@ -83,11 +75,11 @@ public class WriteAheadStorageTest extends EasyMockTest {
 
     storage = new WriteAheadStorage(
         transactionManager,
-        schedulerStore,
-        jobStore,
+        createMock(SchedulerStore.Mutable.class),
+        createMock(CronJobStore.Mutable.class),
         taskStore,
-        lockStore,
-        quotaStore,
+        createMock(LockStore.Mutable.class),
+        createMock(QuotaStore.Mutable.class),
         attributeStore,
         jobUpdateStore,
         log,

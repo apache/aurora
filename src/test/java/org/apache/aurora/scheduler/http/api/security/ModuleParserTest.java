@@ -31,7 +31,7 @@ public class ModuleParserTest {
   }
 
   static class NoNullaryConstructorModule implements Module {
-    private String name;
+    private final String name;
 
     NoNullaryConstructorModule(String name) {
       this.name = name;

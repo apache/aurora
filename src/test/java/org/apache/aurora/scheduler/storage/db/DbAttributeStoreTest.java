@@ -148,8 +148,7 @@ public class DbAttributeStoreTest {
     storage.write((NoResult.Quiet)
         storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(taskA)));
 
-    HostAttributes attributeBuilder = HOST_A_ATTRS.newBuilder()
-        .setMode(MaintenanceMode.DRAINED);
+    HostAttributes attributeBuilder = HOST_A_ATTRS.newBuilder().setMode(DRAINED);
     attributeBuilder.addToAttributes(new Attribute("newAttr", ImmutableSet.of("a", "b")));
     IHostAttributes hostAUpdated = IHostAttributes.build(attributeBuilder);
     insert(hostAUpdated);

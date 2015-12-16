@@ -23,7 +23,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class H2ConsoleModuleIT extends JettyServerModuleTest {
+public class H2ConsoleModuleIT extends AbstractJettyTest {
   @Override
   protected Module getChildServletModule() {
     return new H2ConsoleModule(true);

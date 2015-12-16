@@ -49,6 +49,7 @@ import org.quartz.TriggerListener;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.isA;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class CronIT extends EasyMockTest {
@@ -116,7 +117,7 @@ public class CronIT extends EasyMockTest {
     control.replay();
 
     Scheduler scheduler = injector.getInstance(Scheduler.class);
-    assertTrue(!scheduler.isStarted());
+    assertFalse(scheduler.isStarted());
 
     Service cronLifecycle = boot();
 
@@ -125,7 +126,7 @@ public class CronIT extends EasyMockTest {
 
     cronLifecycle.stopAsync().awaitTerminated();
 
-    assertTrue(!cronLifecycle.isRunning());
+    assertFalse(cronLifecycle.isRunning());
     assertTrue(scheduler.isShutdown());
   }
 
@@ -199,6 +200,7 @@ public class CronIT extends EasyMockTest {
 
     @Override
     public void triggerFired(Trigger trigger, JobExecutionContext context) {
+      // No-op.
     }
 
     @Override

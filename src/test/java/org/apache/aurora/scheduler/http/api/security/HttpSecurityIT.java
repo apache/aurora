@@ -31,8 +31,8 @@ import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.http.AbstractJettyTest;
 import org.apache.aurora.scheduler.http.H2ConsoleModule;
-import org.apache.aurora.scheduler.http.JettyServerModuleTest;
 import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
@@ -63,7 +63,7 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class HttpSecurityIT extends JettyServerModuleTest {
+public class HttpSecurityIT extends AbstractJettyTest {
   private static final Response OK = new Response().setResponseCode(ResponseCode.OK);
 
   private static final UsernamePasswordCredentials ROOT =

@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.app.local.simulator;
+package org.apache.aurora.scheduler.app.local.simulator.events;
 
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskInfo;
@@ -19,20 +19,14 @@ import org.apache.mesos.Protos.TaskInfo;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Pubsub events used to signal fake cluster activity.
+ * Event indicating that an offer has been accepted.
  */
-public interface Events {
+public class OfferAccepted {
+  public final OfferID offer;
+  public final TaskInfo task;
 
-  class Started {
-  }
-
-  class OfferAccepted {
-    public final OfferID offer;
-    public final TaskInfo task;
-
-    public OfferAccepted(OfferID offer, TaskInfo task) {
-      this.offer = requireNonNull(offer);
-      this.task = requireNonNull(task);
-    }
+  public OfferAccepted(OfferID offer, TaskInfo task) {
+    this.offer = requireNonNull(offer);
+    this.task = requireNonNull(task);
   }
 }

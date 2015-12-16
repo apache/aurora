@@ -48,7 +48,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskQuery;
-import org.apache.aurora.scheduler.http.JettyServerModuleTest;
+import org.apache.aurora.scheduler.http.AbstractJettyTest;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IResponse;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -63,7 +63,7 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
-public class ApiBetaTest extends JettyServerModuleTest {
+public class ApiBetaTest extends AbstractJettyTest {
   private AnnotatedAuroraAdmin thrift;
 
   @Before

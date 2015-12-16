@@ -35,7 +35,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 
-import org.apache.aurora.scheduler.app.local.simulator.Events.Started;
+import org.apache.aurora.scheduler.app.local.simulator.events.Started;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ExecutorID;
@@ -137,7 +137,7 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
           if (allOffers.isEmpty()) {
             LOG.info("All offers consumed, suppressing offer cycle.");
           } else {
-            Futures.getUnchecked(schedulerFuture).resourceOffers(FakeMaster.this, allOffers);
+            Futures.getUnchecked(schedulerFuture).resourceOffers(this, allOffers);
           }
         },
         1,
@@ -224,7 +224,7 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
 
     executor.schedule(
         () -> Futures.getUnchecked(schedulerFuture).statusUpdate(
-            FakeMaster.this,
+            this,
             TaskStatus.newBuilder()
                 .setTaskId(task.getTaskId())
                 .setState(TaskState.TASK_RUNNING)
@@ -306,11 +306,11 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
 
   private static final class Task {
     private final Offer offer;
-    private final TaskInfo task;
+    private final TaskInfo taskInfo;
 
-    private Task(Offer offer, TaskInfo task) {
+    private Task(Offer offer, TaskInfo taskInfo) {
       this.offer = offer;
-      this.task = task;
+      this.taskInfo = taskInfo;
     }
 
     Offer getOffer() {
@@ -318,7 +318,7 @@ public class FakeMaster implements SchedulerDriver, DriverFactory {
     }
 
     TaskInfo getTask() {
-      return task;
+      return taskInfo;
     }
   }
 }

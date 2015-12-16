@@ -113,13 +113,14 @@ public class TaskStateMachineTest {
 
         default:
           fail("Unknown state " + endState);
+          break;
       }
 
       expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
       legalTransition(TaskState.valueOf(endState.name()), finalActions);
 
       for (ScheduleStatus badTransition : Tasks.TERMINAL_STATES) {
-        if (endState == badTransition) {
+        if (endState.equals(badTransition)) {
           assertEquals(NOOP, stateMachine.updateState(Optional.of(badTransition)).getResult());
         } else {
           illegalTransition(TaskState.valueOf(badTransition.name()));
@@ -153,6 +154,7 @@ public class TaskStateMachineTest {
 
         default:
           fail("Unknown state " + endState);
+          break;
       }
 
       expectUpdateStateOnTransitionTo(
@@ -379,9 +381,9 @@ public class TaskStateMachineTest {
       }
 
       TestCase other = (TestCase) o;
-      return (taskPresent == other.taskPresent)
-          && (from == other.from)
-          && (to == other.to);
+      return taskPresent == other.taskPresent
+          && from == other.from
+          && to == other.to;
     }
 
     @Override
@@ -533,7 +535,7 @@ public class TaskStateMachineTest {
 
           TransitionResult expectation = EXPECTATIONS.get(testCase);
           if (expectation == null) {
-            if (taskPresent && from == to || !taskPresent && to == DELETED) {
+            if (taskPresent && from.equals(to) || !taskPresent && to.equals(DELETED)) {
               expectation = new TransitionResult(NOOP, ImmutableSet.of());
             } else {
               expectation = new TransitionResult(ILLEGAL, ImmutableSet.of());
@@ -543,7 +545,7 @@ public class TaskStateMachineTest {
           TaskStateMachine machine;
           if (taskPresent) {
             // Cannot create a state machine for an DELETED task that is in the store.
-            boolean expectException = from == DELETED;
+            boolean expectException = from.equals(DELETED);
             try {
               machine = new TaskStateMachine(
                   IScheduledTask.build(makeTask(false).setStatus(from.getStatus().get())));
@@ -551,10 +553,11 @@ public class TaskStateMachineTest {
                 fail();
               }
             } catch (IllegalStateException e) {
-              if (!expectException) {
-                throw e;
-              } else {
+              if (expectException) {
                 continue;
+              } else {
+                throw e;
+
               }
             }
           } else {

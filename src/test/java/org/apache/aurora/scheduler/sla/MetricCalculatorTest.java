@@ -64,7 +64,7 @@ public class MetricCalculatorTest extends EasyMockTest {
           .build();
 
   @Test
-  public void runTest() {
+  public void testRun() {
     FakeClock clock = new FakeClock();
     StatsProvider statsProvider = createMock(StatsProvider.class);
     StatsProvider untracked = createMock(StatsProvider.class);

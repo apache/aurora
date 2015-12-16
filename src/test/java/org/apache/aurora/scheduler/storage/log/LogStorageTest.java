@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,7 +24,6 @@ import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
@@ -137,13 +137,12 @@ public class LogStorageTest extends EasyMockTest {
   private SchedulingService schedulingService;
   private SnapshotStore<Snapshot> snapshotStore;
   private StorageTestUtil storageUtil;
-  private SnapshotDeduplicator snapshotDeduplicator;
   private EventSink eventSink;
 
   @Before
   public void setUp() {
     log = createMock(Log.class);
-    snapshotDeduplicator = createMock(SnapshotDeduplicator.class);
+    SnapshotDeduplicator snapshotDeduplicator = createMock(SnapshotDeduplicator.class);
 
     StreamManagerFactory streamManagerFactory = logStream -> {
       HashFunction md5 = Hashing.md5();
@@ -194,28 +193,28 @@ public class LogStorageTest extends EasyMockTest {
 
     // Our start should recover the log and then forward to the underlying storage start of the
     // supplied initialization logic.
-    final AtomicBoolean initialized = new AtomicBoolean(false);
+    AtomicBoolean initialized = new AtomicBoolean(false);
     MutateWork.NoResult.Quiet initializationLogic = provider -> {
       // Creating a mock and expecting apply(storeProvider) does not work here for whatever
       // reason.
       initialized.set(true);
     };
 
-    final Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
+    Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
     storageUtil.storage.write(capture(recoverAndInitializeWork));
     expectLastCall().andAnswer(() -> {
       recoverAndInitializeWork.getValue().apply(storageUtil.mutableStoreProvider);
       return null;
     });
 
-    final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
+    Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
     expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
         () -> {
           recoveryWork.getValue().apply(storageUtil.mutableStoreProvider);
           return null;
         });
 
-    final Capture<MutateWork<Void, RuntimeException>> initializationWork = createCapture();
+    Capture<MutateWork<Void, RuntimeException>> initializationWork = createCapture();
     expect(storageUtil.storage.write(capture(initializationWork))).andAnswer(
         () -> {
           initializationWork.getValue().apply(storageUtil.mutableStoreProvider);
@@ -234,7 +233,7 @@ public class LogStorageTest extends EasyMockTest {
     expect(snapshotStore.createSnapshot()).andReturn(snapshotContents);
     streamMatcher.expectSnapshot(snapshotContents).andReturn(position);
     stream.truncateBefore(position);
-    final Capture<MutateWork<Void, RuntimeException>> snapshotWork = createCapture();
+    Capture<MutateWork<Void, RuntimeException>> snapshotWork = createCapture();
     expect(storageUtil.storage.write(capture(snapshotWork))).andAnswer(
         () -> {
           snapshotWork.getValue().apply(storageUtil.mutableStoreProvider);
@@ -379,10 +378,10 @@ public class LogStorageTest extends EasyMockTest {
     expect(stream.readAll()).andReturn(entryBuilder.build().iterator());
   }
 
-  abstract class StorageTestFixture {
+  abstract class AbstractStorageFixture {
     private final AtomicBoolean runCalled = new AtomicBoolean(false);
 
-    StorageTestFixture() {
+    AbstractStorageFixture() {
       // Prevent otherwise silent noop tests that forget to call run().
       addTearDown(new TearDown() {
         @Override
@@ -408,7 +407,7 @@ public class LogStorageTest extends EasyMockTest {
         // No-op.
       };
 
-      final Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
+      Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
       storageUtil.storage.write(capture(recoverAndInitializeWork));
       expectLastCall().andAnswer(() -> {
         recoverAndInitializeWork.getValue().apply(storageUtil.mutableStoreProvider);
@@ -421,8 +420,8 @@ public class LogStorageTest extends EasyMockTest {
         work.apply(storageUtil.mutableStoreProvider);
         return null;
       });
-      expect(stream.readAll()).andReturn(Iterators.emptyIterator());
-      final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
+      expect(stream.readAll()).andReturn(Collections.emptyIterator());
+      Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
       expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
           () -> {
             recoveryWork.getValue().apply(storageUtil.mutableStoreProvider);
@@ -452,10 +451,10 @@ public class LogStorageTest extends EasyMockTest {
     protected abstract void runTest();
   }
 
-  abstract class MutationFixture extends StorageTestFixture {
+  abstract class AbstractMutationFixture extends AbstractStorageFixture {
     @Override
     protected void runTest() {
-      logStorage.write((Quiet) MutationFixture.this::performMutations);
+      logStorage.write((Quiet) AbstractMutationFixture.this::performMutations);
     }
 
     protected abstract void performMutations(MutableStoreProvider storeProvider);
@@ -463,8 +462,8 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testSaveFrameworkId() throws Exception {
-    final String frameworkId = "bob";
-    new MutationFixture() {
+    String frameworkId = "bob";
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws CodingException {
         storageUtil.expectWrite();
@@ -482,9 +481,9 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testSaveAcceptedJob() throws Exception {
-    final IJobConfiguration jobConfig =
+    IJobConfiguration jobConfig =
         IJobConfiguration.build(new JobConfiguration().setKey(JOB_KEY.newBuilder()));
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -503,7 +502,7 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testRemoveJob() throws Exception {
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -522,8 +521,8 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testSaveTasks() throws Exception {
-    final Set<IScheduledTask> tasks = ImmutableSet.of(task("a", ScheduleStatus.INIT));
-    new MutationFixture() {
+    Set<IScheduledTask> tasks = ImmutableSet.of(task("a", ScheduleStatus.INIT));
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -542,11 +541,10 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testMutateTasks() throws Exception {
-    final Query.Builder query = Query.taskScoped("fred");
-    final Function<IScheduledTask, IScheduledTask> mutation = Functions.identity();
-    final ImmutableSet<IScheduledTask> mutated =
-        ImmutableSet.of(task("a", ScheduleStatus.STARTING));
-    new MutationFixture() {
+    Query.Builder query = Query.taskScoped("fred");
+    Function<IScheduledTask, IScheduledTask> mutation = Functions.identity();
+    ImmutableSet<IScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.STARTING));
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -565,11 +563,10 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testUnsafeModifyInPlace() throws Exception {
-    final String taskId = "wilma";
-    final String taskId2 = "barney";
-    final ITaskConfig updatedConfig =
-        task(taskId, ScheduleStatus.RUNNING).getAssignedTask().getTask();
-    new MutationFixture() {
+    String taskId = "wilma";
+    String taskId2 = "barney";
+    ITaskConfig updatedConfig = task(taskId, ScheduleStatus.RUNNING).getAssignedTask().getTask();
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -590,13 +587,12 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testNestedTransactions() throws Exception {
-    final Query.Builder query = Query.taskScoped("fred");
-    final Function<IScheduledTask, IScheduledTask> mutation = Functions.identity();
-    final ImmutableSet<IScheduledTask> mutated =
-        ImmutableSet.of(task("a", ScheduleStatus.STARTING));
-    final ImmutableSet<String> tasksToRemove = ImmutableSet.of("b");
+    Query.Builder query = Query.taskScoped("fred");
+    Function<IScheduledTask, IScheduledTask> mutation = Functions.identity();
+    ImmutableSet<IScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.STARTING));
+    ImmutableSet<String> tasksToRemove = ImmutableSet.of("b");
 
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -627,7 +623,7 @@ public class LogStorageTest extends EasyMockTest {
     Set<IScheduledTask> saved = ImmutableSet.of(task("a", ScheduleStatus.INIT));
     ImmutableSet<IScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
 
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -657,7 +653,7 @@ public class LogStorageTest extends EasyMockTest {
     Set<IScheduledTask> saved = ImmutableSet.of(task("b", ScheduleStatus.INIT));
     ImmutableSet<IScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
 
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -688,7 +684,7 @@ public class LogStorageTest extends EasyMockTest {
   public void testRemoveTasksQuery() throws Exception {
     IScheduledTask task = task("a", ScheduleStatus.FINISHED);
     Set<String> taskIds = Tasks.ids(task);
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -707,7 +703,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testRemoveTasksIds() throws Exception {
     Set<String> taskIds = ImmutableSet.of("42");
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -728,7 +724,7 @@ public class LogStorageTest extends EasyMockTest {
     String role = "role";
     IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate(1.0, 128L, 1024L));
 
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -747,7 +743,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testRemoveQuota() throws Exception {
     String role = "role";
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -769,7 +765,7 @@ public class LogStorageTest extends EasyMockTest {
         .setToken("testLockId")
         .setUser("testUser")
         .setTimestampMs(12345L));
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -788,7 +784,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testRemoveLock() throws Exception {
     ILockKey lockKey = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -814,7 +810,7 @@ public class LogStorageTest extends EasyMockTest {
             .setHost(host)
             .setAttributes(attributes)));
 
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -875,7 +871,7 @@ public class LogStorageTest extends EasyMockTest {
                 .setInstances(ImmutableSet.of(new Range(0, 3)))))
             .setSettings(new JobUpdateSettings())));
 
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -898,7 +894,7 @@ public class LogStorageTest extends EasyMockTest {
         .setStatus(JobUpdateStatus.ROLLING_BACK)
         .setTimestampMs(12345L));
 
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -922,7 +918,7 @@ public class LogStorageTest extends EasyMockTest {
         .setTimestampMs(12345L)
         .setInstanceId(0));
 
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
@@ -947,7 +943,7 @@ public class LogStorageTest extends EasyMockTest {
         .setHistoryPruneThresholdMs(1L)
         .setPerJobRetainCount(1);
 
-    new MutationFixture() {
+    new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
