@@ -45,7 +45,7 @@ request 1 core of cpu, 1 GB of RAM, and 1 GB of disk space as specified
 in the configuration file `hello_world.aurora`. I want to
 update it so it requests 2 GB of RAM instead of 1. I create a new
 configuration file to do that called `new_hello_world.aurora` and
-issue a `aurora job update <job_key_value>/0-1 new_hello_world.aurora`
+issue a `aurora update start <job_key_value>/0-1 new_hello_world.aurora`
 command.
 
 This results in instances 0 and 1 having 1 cpu, 2 GB of RAM, and 1 GB of disk space,

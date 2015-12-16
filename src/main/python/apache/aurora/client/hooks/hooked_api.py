@@ -49,9 +49,6 @@ class NonHookedAuroraClientAPI(AuroraClientAPI):
     * is thus available to API methods in subclasses
   """
 
-  def cancel_update(self, job_key, config=None):
-    return super(NonHookedAuroraClientAPI, self).cancel_update(job_key)
-
   def kill_job(self, job_key, instances=None, lock=None, config=None):
     return super(NonHookedAuroraClientAPI, self).kill_job(job_key, instances=instances, lock=lock)
 
@@ -158,11 +155,6 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
     return self._hooked_call(config, None,
         _partial(super(HookedAuroraClientAPI, self).create_job, config, lock))
 
-  def cancel_update(self, job_key, config=None):
-    return self._hooked_call(config, job_key,
-        _partial(super(HookedAuroraClientAPI, self).cancel_update,
-            job_key, config=config))
-
   def kill_job(self, job_key, instances=None, lock=None, config=None):
     return self._hooked_call(config, job_key,
         _partial(super(HookedAuroraClientAPI, self).kill_job,
@@ -177,12 +169,6 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
     return self._hooked_call(config, job_key,
         _partial(super(HookedAuroraClientAPI, self).start_cronjob,
             job_key, config=config))
-
-  def update_job(self, config, health_check_interval_seconds=3, instances=None):
-    return self._hooked_call(config, None,
-        _partial(super(HookedAuroraClientAPI, self).update_job,
-            config, health_check_interval_seconds=health_check_interval_seconds,
-            instances=instances))
 
   def start_job_update(self, config, message, instances=None):
     return self._hooked_call(config, None,

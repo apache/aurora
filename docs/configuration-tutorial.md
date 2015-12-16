@@ -4,7 +4,7 @@ Aurora Configuration Tutorial
 How to write Aurora configuration files, including feature descriptions
 and best practices. When writing a configuration file, make use of
 `aurora job inspect`. It takes the same job key and configuration file
-arguments as `aurora job create` or `aurora job update`. It first ensures the
+arguments as `aurora job create` or `aurora update start`. It first ensures the
 configuration parses, then outputs it in human-readable form.
 
 You should read this after going through the general [Aurora Tutorial](tutorial.md).

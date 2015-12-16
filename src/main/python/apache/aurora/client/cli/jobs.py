@@ -20,7 +20,6 @@ import os
 import pprint
 import subprocess
 import textwrap
-import time
 import webbrowser
 from collections import namedtuple
 from copy import deepcopy
@@ -752,118 +751,6 @@ class StatusCommand(Verb):
       return self._print_jobs_not_found(context)
 
 
-CLIENT_UPDATER_DEPRECATION = """\
-WARNING: The command you are using is deprecated, and will be removed in
-Aurora 0.9.0.
-Please see the new commands at 'aurora update -h'."""
-
-
-class CancelUpdateCommand(Verb):
-  @property
-  def name(self):
-    return "cancel-update"
-
-  @property
-  def help(self):
-    return ("%s\n\nCancel an in-progress update operation, releasing the update lock"
-        % CLIENT_UPDATER_DEPRECATION)
-
-  def get_options(self):
-    return [JSON_READ_OPTION,
-        BIND_OPTION,
-        CONFIG_OPTION,
-        JOBSPEC_ARGUMENT]
-
-  def execute(self, context):
-    context.print_err(CLIENT_UPDATER_DEPRECATION)
-    api = context.get_api(context.options.jobspec.cluster)
-    config = context.get_job_config_optional(context.options.jobspec, context.options.config)
-    resp = api.cancel_update(context.options.jobspec, config=config)
-    context.log_response_and_raise(resp)
-    return EXIT_OK
-
-
-class UpdateCommand(Verb):
-  @property
-  def name(self):
-    return "update"
-
-  def get_options(self):
-    return [FORCE_OPTION, BIND_OPTION, JSON_READ_OPTION, HEALTHCHECK_OPTION,
-        INSTANCES_SPEC_ARGUMENT, STRICT_OPTION, CONFIG_ARGUMENT]
-
-  @property
-  def help(self):
-    return textwrap.dedent("""\
-        %s
-
-        Perform a rolling upgrade on a running job, using the update configuration
-        within the config file as a control for update velocity and failure tolerance.
-
-        Updates are fully controlled client-side, so aborting an update halts the
-        update and leaves the job in a 'locked' state on the scheduler.
-        Subsequent update attempts will fail until the update is 'unlocked' using the
-        'cancel_update' command.
-
-        The updater only takes action on instances in a job that have changed, meaning
-        that changing a single instance will only induce a restart on the changed task instance.
-
-        You may want to consider using the 'diff' subcommand before updating,
-        to preview what changes will take effect.
-        """ % CLIENT_UPDATER_DEPRECATION)
-
-  def warn_if_dangerous_change(self, context, api, job_spec, config):
-    # Get the current job status, so that we can check if there's anything
-    # dangerous about this update.
-    resp = api.query_no_configs(api.build_query(config.role(), config.name(),
-        env=config.environment(), statuses=ACTIVE_STATES))
-    context.log_response_and_raise(resp, err_msg="Server could not find running job to update")
-    remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
-    # for determining if an update is dangerous, we estimate the scope of the change
-    # by comparing number of instances to be updated, with the number of
-    # instances running in the cluster.
-    # If the user passed an instance count, then we select the *smaller* of the
-    # number of instances being updated, and the total number running on the server.
-    # So updating 20 instances out of 500 isn't a large change: even though 20 < 500/4;
-    # but updating 20 instances when there are only 4 running is a large change.
-    if context.options.instance_spec.instance == ALL_INSTANCES:
-      local_task_count = config.instances()
-      remote_task_count = len(remote_tasks)
-    else:
-      local_task_count = len(context.options.instance_spec.instance)
-      remote_task_count = min(len(remote_tasks), local_task_count)
-
-    # Dangerous if it's more than a factor-of-four change in number of instances.
-    if (local_task_count >= 4 * remote_task_count or
-        4 * local_task_count <= remote_task_count or
-        local_task_count == 0):
-      context.print_out("Warning: this update is a large change. ")
-      context.print_out("Press ^c within five seconds to abort.")
-      time.sleep(5)
-
-  def execute(self, context):
-    context.print_err(CLIENT_UPDATER_DEPRECATION)
-    job = context.options.instance_spec.jobkey
-    instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
-        context.options.instance_spec.instance)
-    config = context.get_job_config(job, context.options.config_file)
-
-    if not config.job().taskConfig.isService and not config.job().cronSchedule:
-      raise context.CommandError(
-          EXIT_COMMAND_FAILURE,
-          "Only service and cron jobs may be updated this way, "
-          "please kill and re-create your job instead.")
-
-    api = context.get_api(config.cluster())
-    if not context.options.force:
-      self.warn_if_dangerous_change(context, api, job, config)
-    resp = api.update_job(config, context.options.healthcheck_interval_seconds, instances)
-    context.log_response_and_raise(resp, err_code=EXIT_COMMAND_FAILURE,
-        err_msg="Update failed due to error:")
-    context.print_out("Update completed successfully")
-    return EXIT_OK
-
-
 class Job(Noun):
   @property
   def name(self):
@@ -879,7 +766,6 @@ class Job(Noun):
 
   def __init__(self):
     super(Job, self).__init__()
-    self.register_verb(CancelUpdateCommand())
     self.register_verb(CreateJobCommand())
     self.register_verb(DiffCommand())
     self.register_verb(InspectCommand())
@@ -889,4 +775,3 @@ class Job(Noun):
     self.register_verb(OpenCommand())
     self.register_verb(RestartCommand())
     self.register_verb(StatusCommand())
-    self.register_verb(UpdateCommand())

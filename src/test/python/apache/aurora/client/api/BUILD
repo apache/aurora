@@ -23,7 +23,6 @@ target(name = 'all',
     ':scheduler_client',
     ':sla',
     ':task_util',
-    ':updater',
     ':updater_util'
   ],
 )
@@ -108,17 +107,6 @@ python_tests(name = 'task_util',
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/client',
     'api/src/main/thrift/org/apache/aurora/gen',
-  ]
-)
-
-python_tests(name = 'updater',
-  sources = ['test_updater.py'],
-  dependencies = [
-    '3rdparty/python:mox',
-    'src/main/python/apache/aurora/common',
-    'src/main/python/apache/aurora/client',
-    'api/src/main/thrift/org/apache/aurora/gen',
-    'src/test/python/apache/aurora/client:fake_scheduler_proxy',
   ]
 )
 

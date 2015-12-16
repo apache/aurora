@@ -29,7 +29,6 @@ target(
     ':sla',
     ':task',
     ':supdate',
-    ':update',
     ':version',
   ]
 )
@@ -101,20 +100,8 @@ python_tests(
 )
 
 python_tests(
-  name='update',
-  sources=['test_update.py'],
-  dependencies = [
-    ':util',
-    '3rdparty/python:mock',
-    '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client',
-  ]
-)
-
-python_tests(
   name = 'job',
   sources = [
-    'test_cancel_update.py',
     'test_create.py',
     'test_diff.py',
     'test_kill.py',

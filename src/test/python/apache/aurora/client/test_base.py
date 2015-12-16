@@ -128,15 +128,7 @@ class TestBase(unittest.TestCase):
     out = base.check_and_log_response(resp)
     self.assertIsNone(out)
     mock_sys_exit.assert_called_once_with(1)
-    mock_log.assert_any_call(base.LOCKED_WARNING)
     mock_log.assert_any_call('Response from scheduler: LOCK_ERROR (message: )')
-
-  @mock.patch('apache.aurora.client.base.log.info')
-  def test_check_and_log_locked_response(self, mock_log):
-    resp = Response(responseCode=ResponseCode.LOCK_ERROR)
-    out = base.check_and_log_locked_response(resp)
-    self.assertIsNone(out)
-    mock_log.assert_called_once_with(base.LOCKED_WARNING)
 
   @mock.patch('apache.aurora.client.base.sys.exit')
   @mock.patch('apache.aurora.client.base.log.fatal')

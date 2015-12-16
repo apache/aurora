@@ -86,10 +86,8 @@ You can associate `pre_`, `post_`, and `err_` hooks with the following methods. 
 
   Aurora Client API Method | Client API Method Argument Signature | Aurora Command Line Command
   -------------------------| ------------------------------------- | ---------------------------
-  ```cancel_update``` | ```self```, ```job_key``` | ```job cancel-update```
   ```create_job``` | ```self```, ```config``` | ```job create```, <code>runtask
   ```restart``` | ```self```, ```job_key```, ```shards```, ```update_config```, ```health_check_interval_seconds``` | ```job restart```
-  ```update_job``` | ```self```, ```config```, ```health_check_interval_seconds=3```, ```shards=None``` | ```job update```
   ```kill_job``` | ```self```, ```job_key```, ```shards=None``` |  ```job kill```
   ```start_cronjob``` | ```self```, ```job_key``` | ```cron start```
   ```start_job_update``` | ```self```, ```config```, ```instances=None``` | ```update start```

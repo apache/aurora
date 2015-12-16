@@ -226,7 +226,7 @@ It looks like we made a typo in our Python script. We wanted `xrange`,
 not `xrang`. Edit the `hello_world.py` script to use the correct function and
 we will try again.
 
-    aurora job update devcluster/www-data/devel/hello_world /vagrant/hello_world.aurora
+    aurora update start devcluster/www-data/devel/hello_world /vagrant/hello_world.aurora
 
 This time, the task comes up, we inspect the page, and see that the
 `hello_world` process is running.

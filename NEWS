@@ -1,6 +1,10 @@
 0.11.0
 ------
 - Upgraded Mesos to 0.24.1.
+- The client-side updater has been removed, along with the CLI commands that used it:
+  'aurora job update' and 'aurora job cancel-update'.  Users are encouraged to take
+  advantage of scheduler-driven updates (see 'aurora update -h' for usage), which has been a
+  stable feature for several releases.
 
 0.10.0
 ------

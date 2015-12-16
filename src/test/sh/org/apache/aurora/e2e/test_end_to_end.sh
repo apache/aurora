@@ -34,7 +34,6 @@ tear_down() {
   set +x  # Disable command echo, as this makes it more difficult see which command failed.
 
   for job in http_example http_example_revocable http_example_docker; do
-    aurora job cancel-update devcluster/vagrant/test/$job >/dev/null 2>&1
     aurora update abort devcluster/vagrant/test/$job || true >/dev/null 2>&1
     aurora job killall --no-batching devcluster/vagrant/test/$job >/dev/null 2>&1
   done
@@ -132,12 +131,6 @@ test_restart() {
   local _jobkey=$1
 
   aurora job restart --batch-size=2 $_jobkey
-}
-
-test_legacy_update() {
-  local _jobkey=$1 _config=$2
-
-  aurora job update $_jobkey $_config
 }
 
 assert_update_state() {
@@ -272,7 +265,6 @@ test_http_example() {
   test_update $_jobkey $_updated_config $_cluster
   test_announce $_role $_env $_job
   test_run $_jobkey
-  test_legacy_update $_jobkey $_base_config
   test_kill $_jobkey
   test_quota $_cluster $_role
 }

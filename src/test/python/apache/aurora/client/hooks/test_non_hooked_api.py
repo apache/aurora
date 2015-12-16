@@ -18,8 +18,8 @@ import unittest
 from apache.aurora.client.hooks.hooked_api import NonHookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-API_METHODS = ('cancel_update', 'create_job', 'kill_job', 'restart', 'start_cronjob', 'update_job')
-API_METHODS_WITH_CONFIG_PARAM_ADDED = ('cancel_update', 'kill_job', 'restart', 'start_cronjob')
+API_METHODS = ('create_job', 'kill_job', 'restart', 'start_cronjob')
+API_METHODS_WITH_CONFIG_PARAM_ADDED = ('kill_job', 'restart', 'start_cronjob')
 
 
 class TestNonHookedAuroraClientAPI(unittest.TestCase):
@@ -28,6 +28,9 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
     This is necessary so that the callsite can use either this or HookedAuroraClientAPI
     in a consistent fashion, while AuroraClientAPI does not receive that param
   """
+
+  # Field used as a capture for the last call made to the API.
+  API_CALL = None
 
   def __init__(self, *args, **kw):
     super(TestNonHookedAuroraClientAPI, self).__init__(*args, **kw)
@@ -38,10 +41,6 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
     test_obj = self
 
     class FakeAuroraClientAPI(object):
-
-      def cancel_update(self, job_key):
-        test_obj.API_CALL = functools.partial(self.cancel_update, job_key)
-        return test_obj.RETURN_VALUE
 
       def kill_job(self, job_key, instances=None, lock=None):
         test_obj.API_CALL = functools.partial(self.kill_job, job_key, instances, lock)
@@ -81,10 +80,6 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
     assert args == self.API_CALL.args
     assert kwargs == (self.API_CALL.keywords or {})
     assert return_value == self.RETURN_VALUE
-
-  def test_cancel_update_discards_config(self):
-    return_value = self.api.cancel_update(self.test_job_key, config=self.test_config)
-    self._verify_api_call(return_value, self.test_job_key)
 
   def test_kill_job_discards_config(self):
     return_value = self.api.kill_job(

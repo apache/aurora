@@ -16,14 +16,12 @@ from __future__ import print_function
 
 from twitter.common import log
 
-from apache.aurora.client.base import combine_messages
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 
 from .restarter import Restarter
 from .scheduler_client import SchedulerProxy
 from .sla import Sla
-from .updater import Updater
 from .updater_util import UpdaterConfig
 
 from gen.apache.aurora.api.constants import LIVE_STATES
@@ -34,7 +32,6 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateRequest,
     Lock,
     ResourceAggregate,
-    ResponseCode,
     TaskQuery
 )
 
@@ -135,16 +132,6 @@ class AuroraClientAPI(object):
       return self._scheduler_proxy.getTasksWithoutConfigs(query)
     except SchedulerProxy.ThriftInternalError as e:
       raise self.ThriftInternalError(e.args[0])
-
-  def update_job(self, config, health_check_interval_seconds=3, instances=None):
-    """Run a job update for a given config, for the specified instances.  If
-       instances is left unspecified, update all instances.  Returns whether or not
-       the update was successful."""
-
-    log.info("Updating job: %s" % config.name())
-    updater = Updater(config, health_check_interval_seconds, self._scheduler_proxy)
-
-    return updater.update(instances)
 
   def _job_update_request(self, config, instances=None):
     try:
@@ -258,17 +245,6 @@ class AuroraClientAPI(object):
       raise self.TypeError('Invalid key %r: expected %s but got %s'
                            % (key, JobUpdateKey.__name__, key.__class__.__name__))
     return self._scheduler_proxy.getJobUpdateDetails(key)
-
-  def cancel_update(self, job_key):
-    """Cancel the update represented by job_key. Returns whether or not the cancellation was
-       successful."""
-    self._assert_valid_job_key(job_key)
-
-    log.info("Canceling update on job %s" % job_key)
-    resp = Updater.cancel_update(self._scheduler_proxy, job_key)
-    if resp.responseCode != ResponseCode.OK:
-      log.error('Error cancelling the update: %s' % combine_messages(resp))
-    return resp
 
   def restart(self, job_key, instances, updater_config, health_check_interval_seconds):
     """Perform a rolling restart of the job.

@@ -11,7 +11,6 @@ Aurora Client Commands
     - [Killing a Job](#killing-a-job)
     - [Updating a Job](#updating-a-job)
         - [Coordinated job updates](#user-content-coordinated-job-updates)
-        - [Client-orchestrated updates (deprecated)](#user-content-client-orchestrated-updates-deprecated)
     - [Renaming a Job](#renaming-a-job)
     - [Restarting Jobs](#restarting-jobs)
 - [Cron Jobs](#cron-jobs)
@@ -123,11 +122,9 @@ the machine executing Aurora commands.
 
 Hooks can be associated with these Aurora Client commands.
 
-  - `job cancel-update`
   - `job create`
   - `job kill`
   - `job restart`
-  - `job update`
 
 The process for writing and activating them is complex enough
 that we explain it in a devoted document, [Hooks for Aurora Client API](hooks.md).
@@ -212,35 +209,6 @@ NOTE: A coordinated update starts in `ROLL_FORWARD_AWAITING_PULSE` state and wil
 progress until the first pulse arrives. However, a paused update (`ROLL_FORWARD_PAUSED` or
 `ROLL_BACK_PAUSED`) is still considered active and upon resuming will immediately make progress
 provided the pulse interval has not expired.
-
-#### Client-orchestrated updates (deprecated)
-
-*Note: This feature is deprecated and will be removed in 0.9.0.
-Please use aurora update instead.*
-
-    aurora job update CLUSTER/ROLE/ENV/NAME[/INSTANCES] <configuration file>
-    aurora job cancel-update CLUSTER/ROLE/ENV/NAME
-
-Given a running job, does a rolling update to reflect a new
-configuration version. Only updates Tasks in the Job with a changed
-configuration. You can further restrict the operated on Tasks by specifying
-specific instances that should be updated.
-
-You may want to run `aurora job diff` beforehand to validate which Tasks
-have different configurations.
-
-Updating jobs are locked to be sure the update finishes without
-disruption. If the update abnormally terminates, the lock may stay
-around and cause failure of subsequent update attempts.
- `aurora job cancel-update `unlocks the Job specified by
-its `job_key` argument. Be sure you don't issue `job cancel-update` when
-another user is working with the specified Job.
-
-The `<configuration file>` argument for `job cancel-update` is optional. Use
-it only if it contains hook definitions and activations that affect the
-`cancel_update` command. The `<configuration file>` argument for
-`update` is required, but in addition to a new configuration it can be
-used to define and activate hooks for `job update`.
 
 ### Renaming a Job
 
