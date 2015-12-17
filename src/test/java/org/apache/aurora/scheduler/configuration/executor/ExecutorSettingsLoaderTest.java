@@ -19,7 +19,6 @@ import java.io.StringReader;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 
-import org.apache.aurora.scheduler.configuration.executor.ExecutorSettingsLoader.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettingsLoader.ExecutorConfigException;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.mesos.Protos.Volume;

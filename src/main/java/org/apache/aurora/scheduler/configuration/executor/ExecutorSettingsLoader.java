@@ -16,10 +16,8 @@ package org.apache.aurora.scheduler.configuration.executor;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Objects;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
@@ -29,8 +27,6 @@ import com.hubspot.jackson.datatype.protobuf.ProtobufModule;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Volume;
-
-import static java.util.Objects.requireNonNull;
 
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES;
 
@@ -117,48 +113,6 @@ public final class ExecutorSettingsLoader {
 
     void setVolumeMounts(List<Volume> volumeMounts) {
       this.volumeMounts = volumeMounts;
-    }
-  }
-
-  public static class ExecutorConfig {
-    private final ExecutorInfo executor;
-    private final List<Volume> volumeMounts;
-
-    public ExecutorConfig(ExecutorInfo executor, List<Volume> volumeMounts) {
-      this.executor = requireNonNull(executor);
-      this.volumeMounts = requireNonNull(volumeMounts);
-    }
-
-    public ExecutorInfo getExecutor() {
-      return executor;
-    }
-
-    public List<Volume> getVolumeMounts() {
-      return volumeMounts;
-    }
-
-    @Override
-    public String toString() {
-      return MoreObjects.toStringHelper(this)
-          .add("executor", executor)
-          .add("volumeMounts", volumeMounts)
-          .toString();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (!(obj instanceof ExecutorConfig)) {
-        return false;
-      }
-
-      ExecutorConfig other = (ExecutorConfig) obj;
-      return Objects.equals(executor, other.executor)
-          && Objects.equals(volumeMounts, other.volumeMounts);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(executor, volumeMounts);
     }
   }
 }
