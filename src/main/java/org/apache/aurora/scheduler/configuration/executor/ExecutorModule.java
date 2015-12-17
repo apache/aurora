@@ -13,6 +13,10 @@
  */
 package org.apache.aurora.scheduler.configuration.executor;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -24,6 +28,8 @@ import com.google.inject.AbstractModule;
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.common.args.constraints.CanRead;
+import org.apache.aurora.common.args.constraints.Exists;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
@@ -44,6 +50,14 @@ import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
  * Binding module for {@link ExecutorSettings}.
  */
 public class ExecutorModule extends AbstractModule {
+
+  @CmdLine(
+      name = "custom_executor_config",
+      help = "Path to custom executor settings configuration file.")
+  @Exists
+  @CanRead
+  private static final Arg<File> CUSTOM_EXECUTOR_CONFIG = Arg.create(null);
+
   @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor entry point.")
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
@@ -98,8 +112,7 @@ public class ExecutorModule extends AbstractModule {
         .build();
   }
 
-  @Override
-  protected void configure() {
+  private static ExecutorSettings makeThermosExecutorSettings()  {
     List<Protos.Volume> volumeMounts =
         ImmutableList.<Protos.Volume>builder()
             .add(Protos.Volume.newBuilder()
@@ -116,7 +129,7 @@ public class ExecutorModule extends AbstractModule {
                     .build()))
             .build();
 
-    bind(ExecutorSettings.class).toInstance(new ExecutorSettings(
+    return new ExecutorSettings(
         new ExecutorConfig(
             ExecutorInfo.newBuilder()
                 .setName("aurora.task")
@@ -126,7 +139,27 @@ public class ExecutorModule extends AbstractModule {
                 .addResources(makeResource(CPUS, EXECUTOR_OVERHEAD_CPUS.get()))
                 .addResources(makeResource(RAM_MB, EXECUTOR_OVERHEAD_RAM.get().as(Data.MB)))
                 .build(),
-            volumeMounts)));
+            volumeMounts));
+  }
+
+  private static ExecutorSettings makeCustomExecutorSettings() {
+    try {
+      return
+          new ExecutorSettings(
+              ExecutorSettingsLoader.read(
+                  Files.newBufferedReader(
+                      CUSTOM_EXECUTOR_CONFIG.get().toPath(),
+                      StandardCharsets.UTF_8)));
+    } catch (ExecutorSettingsLoader.ExecutorConfigException | IOException e) {
+      throw new IllegalArgumentException("Failed to read executor settings: " + e, e);
+    }
+  }
+
+  @Override
+  protected void configure() {
+    bind(ExecutorSettings.class).toInstance(CUSTOM_EXECUTOR_CONFIG.hasAppliedValue()
+        ? makeCustomExecutorSettings()
+        : makeThermosExecutorSettings());
   }
 
   private static Resource makeResource(ResourceType type, double value) {

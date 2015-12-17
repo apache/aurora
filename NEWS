@@ -13,6 +13,9 @@
   varied health checkers. The following fields from `HealthCheckConfig` are now deprecated:
   `endpoint`, `expected_response`, `expected_response_code` in favor of setting them as part of an
   `HttpHealthChecker.`
+ - Added support for taking in an executor configuration in JSON via a command line argument
+   `--custom_executor_config` which will override all other the command line arguments and default
+   values pertaining to the executor.
 
 0.10.0
 ------
