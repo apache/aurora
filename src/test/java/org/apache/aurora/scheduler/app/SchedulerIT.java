@@ -99,7 +99,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import static org.apache.aurora.common.testing.easymock.EasyMockTest.createCapture;
-import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
@@ -193,7 +192,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
             IServerInfo.build(
                 new ServerInfo()
                     .setClusterName(CLUSTER_NAME)
-                    .setThriftAPIVersion(THRIFT_API_VERSION)
                     .setStatsUrlPrefix(STATS_URL_PREFIX)));
       }
     };

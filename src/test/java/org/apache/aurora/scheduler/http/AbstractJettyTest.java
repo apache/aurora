@@ -114,7 +114,6 @@ public abstract class AbstractJettyTest extends EasyMockTest {
             bind(Storage.class).toInstance(storage.storage);
             bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo()
                 .setClusterName("unittest")
-                .setThriftAPIVersion(100)
                 .setStatsUrlPrefix("none")));
             bind(TaskGroupsSettings.class).toInstance(
                 new TaskGroupsSettings(

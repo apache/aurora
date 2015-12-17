@@ -70,7 +70,6 @@ import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.
 import org.apache.aurora.scheduler.zookeeper.guice.client.flagged.FlaggedClientConfig;
 
 import static org.apache.aurora.common.logging.RootLogConfig.Configuration;
-import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 
 /**
  * Launcher for the aurora scheduler.
@@ -186,7 +185,6 @@ public class SchedulerMain {
                 IServerInfo.build(
                     new ServerInfo()
                         .setClusterName(CLUSTER_NAME.get())
-                        .setThriftAPIVersion(THRIFT_API_VERSION)
                         .setStatsUrlPrefix(STATS_URL_PREFIX.get())));
           }
         });

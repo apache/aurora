@@ -25,7 +25,7 @@ from apache.aurora.common.clusters import CLUSTERS, Clusters
 
 from ...api_util import SchedulerProxyApiSpec, SchedulerThriftApiSpec
 
-from gen.apache.aurora.api.constants import ACTIVE_STATES, CURRENT_API_VERSION
+from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     ExecutorConfig,
@@ -38,7 +38,6 @@ from gen.apache.aurora.api.ttypes import (
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
-    ServerInfo,
     TaskConfig,
     TaskEvent,
     TaskQuery
@@ -151,10 +150,7 @@ class AuroraClientCommandTest(unittest.TestCase):
 
   @classmethod
   def create_blank_response(cls, code, msg):
-    return Response(
-        responseCode=code,
-        details=[ResponseDetail(message=msg)],
-        serverInfo=ServerInfo(thriftAPIVersion=CURRENT_API_VERSION.major))
+    return Response(responseCode=code, details=[ResponseDetail(message=msg)])
 
   @classmethod
   def create_simple_success_response(cls):

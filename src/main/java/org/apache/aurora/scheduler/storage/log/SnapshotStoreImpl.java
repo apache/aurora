@@ -55,8 +55,6 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
-
 /**
  * Snapshot store implementation that delegates to underlying snapshot stores by
  * extracting/applying fields in a snapshot thrift struct.
@@ -259,9 +257,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
       SchedulerMetadata metadata = new SchedulerMetadata()
           .setFrameworkId(storeProvider.getSchedulerStore().fetchFrameworkId().orNull())
-          .setVersion(CURRENT_API_VERSION);
-
-      metadata.setDetails(buildInfo.getProperties());
+          .setDetails(buildInfo.getProperties());
 
       snapshot.setSchedulerMetadata(metadata);
       snapshot.setTimestamp(timestamp);

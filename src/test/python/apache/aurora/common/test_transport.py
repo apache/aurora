@@ -31,7 +31,7 @@ from gen.apache.aurora.api.ttypes import Response, ResponseCode, ServerInfo
 
 class ReadOnlySchedulerHandler(object):
   def getRoleSummary(self):  # noqa
-    server_info = ServerInfo(clusterName='west', thriftAPIVersion=3)
+    server_info = ServerInfo(clusterName='west')
     return Response(responseCode=ResponseCode.OK, serverInfo=server_info)
 
 
@@ -55,7 +55,6 @@ def test_request_transport_integration():
   assert response is not None
   assert response.responseCode == ResponseCode.OK
   assert response.serverInfo.clusterName == 'west'
-  assert response.serverInfo.thriftAPIVersion == 3
 
   transport.close()
 

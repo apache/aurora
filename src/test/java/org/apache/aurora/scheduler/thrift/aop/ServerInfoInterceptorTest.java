@@ -43,7 +43,6 @@ public class ServerInfoInterceptorTest extends EasyMockTest {
   private static final IServerInfo SERVER_INFO = IServerInfo.build(
       new ServerInfo()
           .setClusterName("test")
-          .setThriftAPIVersion(1)
           .setStatsUrlPrefix("fake_url"));
 
   private ServerInfoInterceptor interceptor;
@@ -68,9 +67,7 @@ public class ServerInfoInterceptorTest extends EasyMockTest {
 
   @Test
   public void testServerInfoIsSet() throws Exception {
-    ServerInfo previousServerInfo =
-        new ServerInfo().setClusterName("FAKECLUSTER").setThriftAPIVersion(100000);
-
+    ServerInfo previousServerInfo = new ServerInfo().setClusterName("FAKECLUSTER");
     Response response = okResponse(
         Result.getJobsResult(new GetJobsResult().setConfigs(ImmutableSet.of())))
         .setServerInfo(previousServerInfo);

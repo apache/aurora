@@ -22,7 +22,6 @@ from apache.aurora.common.cluster import Cluster
 from ..fake_scheduler_proxy import FakeSchedulerProxy
 
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
-from gen.apache.aurora.api.constants import THRIFT_API_VERSION
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Response,
@@ -52,7 +51,7 @@ def make_response(code=ResponseCode.OK, message='test', result=None):
     responseCode=code,
     details=[ResponseDetail(message=message)],
     result=result,
-    serverInfo=ServerInfo(clusterName='test', thriftAPIVersion=THRIFT_API_VERSION))
+    serverInfo=ServerInfo(clusterName='test'))
 
 
 class TestRestarter(MoxTestBase):

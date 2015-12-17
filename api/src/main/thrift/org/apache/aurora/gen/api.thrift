@@ -33,15 +33,6 @@ enum ResponseCode {
   ERROR_TRANSIENT = 6
 }
 
-const i32 THRIFT_API_VERSION = 3
-
-struct APIVersion {
-  1: required i32 major
-}
-
-// Scheduler Thrift API Version. Increment this when breaking backwards compatibility.
-const APIVersion CURRENT_API_VERSION = {'major': THRIFT_API_VERSION}
-
 // Aurora executor framework name.
 const string AURORA_EXECUTOR_NAME = 'AuroraExecutor'
 
@@ -915,7 +906,6 @@ struct GetJobUpdateDiffResult {
 /** Information about the scheduler. */
 struct ServerInfo {
   1: string clusterName
-  2: i32 thriftAPIVersion
   /** A url prefix for job container stats. */
   3: string statsUrlPrefix
 }
@@ -931,7 +921,6 @@ union Result {
   9: QueryRecoveryResult queryRecoveryResult
   10: MaintenanceStatusResult maintenanceStatusResult
   11: EndMaintenanceResult endMaintenanceResult
-  15: APIVersion getVersionResult
   16: AcquireLockResult acquireLockResult
   17: RoleSummaryResult roleSummaryResult
   18: JobSummaryResult jobSummaryResult

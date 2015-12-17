@@ -61,7 +61,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.common.util.testing.FakeBuildInfo.generateBuildInfo;
-import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
@@ -110,9 +109,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setToken("lockId")
         .setUser("testUser")
         .setTimestampMs(12345L));
-    SchedulerMetadata metadata = new SchedulerMetadata()
-        .setFrameworkId(frameworkId)
-        .setVersion(CURRENT_API_VERSION);
+    SchedulerMetadata metadata = new SchedulerMetadata().setFrameworkId(frameworkId);
     metadata.setDetails(Maps.newHashMap());
     metadata.getDetails().put(FakeBuildInfo.DATE, FakeBuildInfo.DATE);
     metadata.getDetails().put(FakeBuildInfo.GIT_REVISION, FakeBuildInfo.GIT_REVISION);

@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.base.Command;
@@ -48,7 +49,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -156,11 +156,10 @@ public class RecoveryTest extends EasyMockTest {
 
   private static Snapshot makeSnapshot(IScheduledTask... tasks) {
     SchedulerMetadata metadata = new SchedulerMetadata()
-        .setVersion(CURRENT_API_VERSION);
-    metadata.setDetails(com.google.common.collect.Maps.newHashMap());
-    metadata.getDetails().put(FakeBuildInfo.DATE, FakeBuildInfo.DATE);
-    metadata.getDetails().put(FakeBuildInfo.GIT_REVISION, FakeBuildInfo.GIT_REVISION);
-    metadata.getDetails().put(FakeBuildInfo.GIT_TAG, FakeBuildInfo.GIT_TAG);
+        .setDetails(ImmutableMap.of(
+            FakeBuildInfo.DATE, FakeBuildInfo.DATE,
+            FakeBuildInfo.GIT_REVISION, FakeBuildInfo.GIT_REVISION,
+            FakeBuildInfo.GIT_TAG, FakeBuildInfo.GIT_TAG));
 
     return new Snapshot()
         .setHostAttributes(ImmutableSet.of())
