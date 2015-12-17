@@ -32,8 +32,8 @@ from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
 
 from apache.aurora.client.api.job_monitor import JobMonitor
+from apache.aurora.client.api.restarter import RestartSettings
 from apache.aurora.client.api.scheduler_client import SchedulerProxy
-from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.base import get_job_page, synthesize_url
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
@@ -584,14 +584,14 @@ class RestartCommand(Verb):
       context.verify_instances_option_validity(job, instances)
     api = context.get_api(job.cluster)
     config = context.get_job_config_optional(job, context.options.config)
-    updater_config = UpdaterConfig(
-        context.options.batch_size,
-        context.options.restart_threshold,
-        context.options.watch_secs,
-        context.options.max_per_instance_failures,
-        context.options.max_total_failures)
-    resp = api.restart(job, instances, updater_config,
-        context.options.healthcheck_interval_seconds, config=config)
+    restart_settings = RestartSettings(
+        batch_size=context.options.batch_size,
+        restart_threshold=context.options.restart_threshold,
+        watch_secs=context.options.watch_secs,
+        max_per_instance_failures=context.options.max_per_instance_failures,
+        max_total_failures=context.options.max_total_failures,
+        health_check_interval_seconds=context.options.healthcheck_interval_seconds)
+    resp = api.restart(job, instances, restart_settings, config=config)
 
     context.log_response_and_raise(resp,
                                    err_msg="Error restarting job %s:" % str(job))

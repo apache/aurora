@@ -52,9 +52,8 @@ class NonHookedAuroraClientAPI(AuroraClientAPI):
   def kill_job(self, job_key, instances=None, lock=None, config=None):
     return super(NonHookedAuroraClientAPI, self).kill_job(job_key, instances=instances, lock=lock)
 
-  def restart(self, job_key, shards, updater_config, health_check_interval_seconds, config=None):
-    return super(NonHookedAuroraClientAPI, self).restart(job_key, shards, updater_config,
-        health_check_interval_seconds)
+  def restart(self, job_key, shards, restart_settings, config=None):
+    return super(NonHookedAuroraClientAPI, self).restart(job_key, shards, restart_settings)
 
   def start_cronjob(self, job_key, config=None):
     return super(NonHookedAuroraClientAPI, self).start_cronjob(job_key)
@@ -160,10 +159,14 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
         _partial(super(HookedAuroraClientAPI, self).kill_job,
             job_key, instances=instances, lock=lock, config=config))
 
-  def restart(self, job_key, shards, updater_config, health_check_interval_seconds, config=None):
+  def restart(self, job_key, shards, restart_settings, config=None):
     return self._hooked_call(config, job_key,
-        _partial(super(HookedAuroraClientAPI, self).restart,
-            job_key, shards, updater_config, health_check_interval_seconds, config=config))
+        _partial(
+            super(HookedAuroraClientAPI, self).restart,
+            job_key,
+            shards,
+            restart_settings,
+            config=config))
 
   def start_cronjob(self, job_key, config=None):
     return self._hooked_call(config, job_key,

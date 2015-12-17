@@ -18,8 +18,8 @@ import pytest
 from mock import call, create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.api import UpdaterConfig
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
+from apache.aurora.client.api.restarter import RestartSettings
 from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER, Context
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.jobs import RestartCommand
@@ -50,15 +50,19 @@ class TestRestartJobCommand(AuroraClientCommandTest):
     with pytest.raises(Context.CommandError):
       command.execute(fake_context)
 
-    updater_config = UpdaterConfig(
-      mock_options.batch_size,
-      mock_options.restart_threshold,
-      mock_options.watch_secs,
-      mock_options.max_per_instance_failures,
-      mock_options.max_total_failures)
+    restart_settings = RestartSettings(
+        batch_size=mock_options.batch_size,
+        restart_threshold=mock_options.restart_threshold,
+        max_per_instance_failures=mock_options.max_per_instance_failures,
+        max_total_failures=mock_options.max_total_failures,
+        watch_secs=mock_options.watch_secs,
+        health_check_interval_seconds=mock_options.healthcheck_interval_seconds)
 
-    mock_api.restart.assert_called_once_with(jobkey, mock_options.instance_spec.instance,
-      updater_config, mock_options.healthcheck_interval_seconds, config=None)
+    mock_api.restart.assert_called_once_with(
+        jobkey,
+        mock_options.instance_spec.instance,
+        restart_settings,
+        config=None)
     self.assert_lock_message(fake_context)
 
   def test_restart_inactive_instance_spec(self):

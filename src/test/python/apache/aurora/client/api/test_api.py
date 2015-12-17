@@ -84,7 +84,6 @@ class TestJobUpdateApis(unittest.TestCase):
         updateGroupSize=1,
         maxPerInstanceFailures=2,
         maxFailedInstances=1,
-        maxWaitToInstanceRunningMs=50 * 1000,
         minWaitInInstanceRunningMs=50 * 1000,
         rollbackOnFailure=True,
         waitForBatchCompletion=False)

@@ -629,16 +629,18 @@ class JobUpdateControllerImpl implements JobUpdateController {
         if (action.isPresent()) {
           Optional<InstanceActionHandler> handler = action.get().getHandler();
           if (handler.isPresent()) {
-            Amount<Long, Time> reevaluateDelay = handler.get().getReevaluationDelay(
+            Optional<Amount<Long, Time>> reevaluateDelay = handler.get().getReevaluationDelay(
                 instance,
                 instructions,
                 storeProvider,
                 stateManager,
                 updaterStatus);
-            executor.schedule(
-                getDeferredEvaluator(instance, key),
-                reevaluateDelay.getValue(),
-                reevaluateDelay.getUnit().getTimeUnit());
+            if (reevaluateDelay.isPresent()) {
+              executor.schedule(
+                  getDeferredEvaluator(instance, key),
+                  reevaluateDelay.get().getValue(),
+                  reevaluateDelay.get().getUnit().getTimeUnit());
+            }
           }
         }
       }

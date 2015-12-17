@@ -967,6 +967,14 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
               .setKey(new JobUpdateKey(job.newBuilder(), updateId))
               .setUser(remoteUserName))
           .setInstructions(instructions));
+
+      Response response = empty();
+      if (update.getInstructions().getSettings().getMaxWaitToInstanceRunningMs() > 0) {
+        addMessage(
+            response,
+            "The maxWaitToInstanceRunningMs (restart_threshold) field is deprecated.");
+      }
+
       try {
         validateTaskLimits(
             request.getTaskConfig(),
@@ -976,8 +984,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         jobUpdateController.start(
             update,
             new AuditData(remoteUserName, Optional.fromNullable(message)));
-        return ok(Result.startJobUpdateResult(
-            new StartJobUpdateResult(update.getSummary().getKey().newBuilder())));
+        return response.setResponseCode(OK)
+            .setResult(Result.startJobUpdateResult(
+                new StartJobUpdateResult(update.getSummary().getKey().newBuilder())));
       } catch (UpdateStateException | TaskValidationException e) {
         return error(INVALID_REQUEST, e);
       }

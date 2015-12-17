@@ -406,12 +406,13 @@ public class JobUpdaterIT extends EasyMockTest {
     // The update is blocked due to expired pulse timeout.
     clock.advance(Amount.of(PULSE_TIMEOUT_MS, Time.MILLISECONDS));
     actions.put(2, INSTANCE_UPDATING);
+    changeState(JOB, 2, KILLED);
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
     assertLatestUpdateMessage(JobUpdateControllerImpl.PULSE_TIMEOUT_MESSAGE);
 
     // Pulse arrives and instance 2 is updated.
     assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
-    changeState(JOB, 2, KILLED, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
     actions.put(2, INSTANCE_UPDATED);
 
@@ -982,7 +983,7 @@ public class JobUpdaterIT extends EasyMockTest {
     // Instance 0 is updated.
     updater.start(update, AUDIT);
     releaseAllLocks();
-    clock.advance(RUNNING_TIMEOUT);
+    changeState(JOB, 0, KILLED);
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
     actions.putAll(0, INSTANCE_UPDATING);
     assertState(ERROR, actions.build());
@@ -1006,10 +1007,6 @@ public class JobUpdaterIT extends EasyMockTest {
 
     JobUpdate update = makeJobUpdate().newBuilder();
     update.getInstructions().getSettings().setUpdateGroupSize(-1);
-    expectInvalid(update);
-
-    update = makeJobUpdate().newBuilder();
-    update.getInstructions().getSettings().setMaxWaitToInstanceRunningMs(0);
     expectInvalid(update);
 
     update = makeJobUpdate().newBuilder();

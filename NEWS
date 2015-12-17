@@ -5,6 +5,9 @@
   'aurora job update' and 'aurora job cancel-update'.  Users are encouraged to take
   advantage of scheduler-driven updates (see 'aurora update -h' for usage), which has been a
   stable feature for several releases.
+- The field 'JobUpdateSettings.maxWaitToInstanceRunningMs' (UpdateConfig.restart_threshold in
+  client-side configuration) is now deprecated.  This setting was brittle in practice, and is
+  ignored by the 0.11.0 scheduler.
 
 0.10.0
 ------

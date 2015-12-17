@@ -77,9 +77,6 @@ interface UpdateFactory {
       requireNonNull(instructions);
       IJobUpdateSettings settings = instructions.getSettings();
       checkArgument(
-          settings.getMaxWaitToInstanceRunningMs() > 0,
-          "Max wait to running must be positive.");
-      checkArgument(
           settings.getMinWaitInInstanceRunningMs() > 0,
           "Min wait in running must be positive.");
       checkArgument(

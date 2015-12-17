@@ -24,19 +24,6 @@ from gen.apache.aurora.api.ttypes import JobUpdateSettings, Range
 class UpdaterConfig(object):
   MIN_PULSE_INTERVAL_SECONDS = 60
 
-  """
-  For updates involving a health check,
-
-  UPDATE INSTANCE                         HEALTHY              REMAIN HEALTHY
-  ----------------------------------------|-----------------------|
-  \--------------------------------------/ \----------------------/
-            restart_thresold                      watch_secs
-
-  When an update is initiated, an instance is expected to be "healthy" before restart_threshold.
-  An instance is also expected to remain healthy for at least watch_secs. If these conditions are
-  not satisfied, the instance is deemed unhealthy.
-  """
-
   def __init__(self,
                batch_size,
                restart_threshold,
@@ -49,15 +36,15 @@ class UpdaterConfig(object):
 
     if batch_size <= 0:
       raise ValueError('Batch size should be greater than 0')
-    if restart_threshold <= 0:
-      raise ValueError('Restart Threshold should be greater than 0')
     if watch_secs <= 0:
       raise ValueError('Watch seconds should be greater than 0')
     if pulse_interval_secs is not None and pulse_interval_secs < self.MIN_PULSE_INTERVAL_SECONDS:
       raise ValueError('Pulse interval seconds must be at least %s seconds.'
                        % self.MIN_PULSE_INTERVAL_SECONDS)
+    if restart_threshold:
+      log.warn('restart_threshold has been deprecated and will be removed in a future release')
+
     self.batch_size = batch_size
-    self.restart_threshold = restart_threshold
     self.watch_secs = watch_secs
     self.max_total_failures = max_total_failures
     self.max_per_instance_failures = max_per_shard_failures
@@ -98,7 +85,6 @@ class UpdaterConfig(object):
         updateGroupSize=self.batch_size,
         maxPerInstanceFailures=self.max_per_instance_failures,
         maxFailedInstances=self.max_total_failures,
-        maxWaitToInstanceRunningMs=self.restart_threshold * 1000,
         minWaitInInstanceRunningMs=self.watch_secs * 1000,
         rollbackOnFailure=self.rollback_on_failure,
         waitForBatchCompletion=self.wait_for_batch_completion,

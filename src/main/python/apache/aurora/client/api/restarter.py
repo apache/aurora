@@ -23,25 +23,43 @@ from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import ResponseCode
 
 
+class RestartSettings(object):
+  def __init__(self,
+               batch_size,
+               restart_threshold,
+               max_per_instance_failures,
+               max_total_failures,
+               watch_secs,
+               health_check_interval_seconds):
+
+    self.batch_size = batch_size
+    self.restart_threshold = restart_threshold
+    self.max_per_instance_failures = max_per_instance_failures
+    self.max_total_failures = max_total_failures
+    self.watch_secs = watch_secs
+    self.health_check_interval_seconds = health_check_interval_seconds
+
+  def __eq__(self, other):
+    return self.__dict__ == other.__dict__
+
+
 class Restarter(object):
   def __init__(self,
                job_key,
-               update_config,
-               health_check_interval_seconds,
+               restart_settings,
                scheduler,
                instance_watcher=None,
                lock=None):
     self._job_key = job_key
-    self._update_config = update_config
-    self.health_check_interval_seconds = health_check_interval_seconds
+    self._restart_settings = restart_settings
     self._scheduler = scheduler
     self._lock = lock
     self._instance_watcher = instance_watcher or InstanceWatcher(
         scheduler,
         job_key.to_thrift(),
-        update_config.restart_threshold,
-        update_config.watch_secs,
-        health_check_interval_seconds)
+        restart_settings.restart_threshold,
+        restart_settings.watch_secs,
+        restart_settings.health_check_interval_seconds)
 
   def restart(self, instances):
     # Verify that this operates on a valid job.
@@ -52,8 +70,8 @@ class Restarter(object):
       return status
 
     failure_threshold = FailureThreshold(
-        self._update_config.max_per_instance_failures,
-        self._update_config.max_total_failures)
+        self._restart_settings.max_per_instance_failures,
+        self._restart_settings.max_total_failures)
 
     if not instances:
       tasks = status.result.scheduleStatusResult.tasks
@@ -67,8 +85,8 @@ class Restarter(object):
     log.info("Performing rolling restart of job %s (instances: %s)" % (self._job_key, instances))
 
     while instances and not failure_threshold.is_failed_update():
-      batch = instances[:self._update_config.batch_size]
-      instances = instances[self._update_config.batch_size:]
+      batch = instances[:self._restart_settings.batch_size]
+      instances = instances[self._restart_settings.batch_size:]
 
       log.info("Restarting instances: %s", batch)
 

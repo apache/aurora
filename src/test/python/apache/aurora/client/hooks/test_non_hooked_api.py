@@ -46,9 +46,8 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
         test_obj.API_CALL = functools.partial(self.kill_job, job_key, instances, lock)
         return test_obj.RETURN_VALUE
 
-      def restart(self, job_key, shards, updater_config, health_check_interval_seconds):
-        test_obj.API_CALL = functools.partial(self.restart, job_key, shards,
-            updater_config, health_check_interval_seconds)
+      def restart(self, job_key, shards, restart_settings):
+        test_obj.API_CALL = functools.partial(self.restart, job_key, shards, restart_settings)
         return test_obj.RETURN_VALUE
 
       def start_cronjob(self, job_key):
@@ -63,7 +62,6 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
     self.test_config = 'bar'
     self.test_shards = 'baz'
     self.test_lock = 'lock'
-    self.test_updater_config = 'blah'
     self.health_check_interval_seconds = 'baa'
 
   def tearDown(self):
@@ -90,10 +88,12 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
     self._verify_api_call(return_value, self.test_job_key, self.test_shards, self.test_lock)
 
   def test_restart_discards_config(self):
-    return_value = self.api.restart(self.test_job_key, self.test_shards,
-        self.test_updater_config, self.health_check_interval_seconds, config=self.test_config)
-    self._verify_api_call(return_value, self.test_job_key, self.test_shards,
-        self.test_updater_config, self.health_check_interval_seconds)
+    return_value = self.api.restart(
+        self.test_job_key,
+        self.test_shards,
+        'fake',
+        config=self.test_config)
+    self._verify_api_call(return_value, self.test_job_key, self.test_shards, 'fake')
 
   def test_start_cronjob_discards_config(self):
     return_value = self.api.start_cronjob(self.test_job_key, config=self.test_config)

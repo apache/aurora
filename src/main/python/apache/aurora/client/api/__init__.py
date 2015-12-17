@@ -246,7 +246,7 @@ class AuroraClientAPI(object):
                            % (key, JobUpdateKey.__name__, key.__class__.__name__))
     return self._scheduler_proxy.getJobUpdateDetails(key)
 
-  def restart(self, job_key, instances, updater_config, health_check_interval_seconds):
+  def restart(self, job_key, instances, restart_settings):
     """Perform a rolling restart of the job.
 
        If instances is None or [], restart all instances.  Returns the
@@ -256,11 +256,7 @@ class AuroraClientAPI(object):
     """
     self._assert_valid_job_key(job_key)
 
-    return Restarter(
-        job_key,
-        updater_config,
-        health_check_interval_seconds,
-        self._scheduler_proxy).restart(instances)
+    return Restarter(job_key, restart_settings, self._scheduler_proxy).restart(instances)
 
   def start_maintenance(self, hosts):
     log.info("Starting maintenance for: %s" % hosts.hostNames)

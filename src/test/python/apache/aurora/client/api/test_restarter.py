@@ -15,8 +15,7 @@
 from mox import IgnoreArg, MoxTestBase
 
 from apache.aurora.client.api.instance_watcher import InstanceWatcher
-from apache.aurora.client.api.restarter import Restarter
-from apache.aurora.client.api.updater_util import UpdaterConfig
+from apache.aurora.client.api.restarter import Restarter, RestartSettings
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 
@@ -39,15 +38,13 @@ from gen.apache.aurora.api.ttypes import (
 
 CLUSTER = 'east'
 JOB = AuroraJobKey(CLUSTER, 'johndoe', 'test', 'test_job')
-HEALTH_CHECK_INTERVAL_SECONDS = 5
-UPDATER_CONFIG = UpdaterConfig(
+RESTART_SETTINGS = RestartSettings(
     batch_size=2,
     restart_threshold=23,
     watch_secs=45,
-    max_per_shard_failures=0,
+    max_per_instance_failures=0,
     max_total_failures=0,
-    rollback_on_failure=True,
-)
+    health_check_interval_seconds=5)
 
 
 def make_response(code=ResponseCode.OK, message='test', result=None):
@@ -69,8 +66,7 @@ class TestRestarter(MoxTestBase):
 
     self.restarter = Restarter(
         JOB,
-        UPDATER_CONFIG,
-        HEALTH_CHECK_INTERVAL_SECONDS,
+        RESTART_SETTINGS,
         FakeSchedulerProxy(Cluster(name=CLUSTER), self.mock_scheduler),
         self.mock_instance_watcher)
 

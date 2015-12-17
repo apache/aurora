@@ -39,7 +39,7 @@ import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 
 interface InstanceActionHandler {
 
-  Amount<Long, Time> getReevaluationDelay(
+  Optional<Amount<Long, Time>> getReevaluationDelay(
       IInstanceKey instance,
       IJobUpdateInstructions instructions,
       MutableStoreProvider storeProvider,
@@ -79,7 +79,7 @@ interface InstanceActionHandler {
     }
 
     @Override
-    public Amount<Long, Time> getReevaluationDelay(
+    public Optional<Amount<Long, Time>> getReevaluationDelay(
         IInstanceKey instance,
         IJobUpdateInstructions instructions,
         MutableStoreProvider storeProvider,
@@ -102,15 +102,14 @@ interface InstanceActionHandler {
             replacement,
             ImmutableSet.of(instance.getInstanceId()));
       }
-      return Amount.of(
-          (long) instructions.getSettings().getMaxWaitToInstanceRunningMs(),
-          Time.MILLISECONDS);
+      // A task state transition will trigger re-evaluation in this case, rather than a timer.
+      return Optional.absent();
     }
   }
 
   class KillTask implements InstanceActionHandler {
     @Override
-    public Amount<Long, Time> getReevaluationDelay(
+    public Optional<Amount<Long, Time>> getReevaluationDelay(
         IInstanceKey instance,
         IJobUpdateInstructions instructions,
         MutableStoreProvider storeProvider,
@@ -131,24 +130,23 @@ interface InstanceActionHandler {
         // and it's deletion from the store. This is a perfectly valid case.
         LOG.info("No active instance " + instance + " to kill while " + status);
       }
-      return Amount.of(
-          (long) instructions.getSettings().getMaxWaitToInstanceRunningMs(),
-          Time.MILLISECONDS);
+      // A task state transition will trigger re-evaluation in this case, rather than a timer.
+      return Optional.absent();
     }
   }
 
   class WatchRunningTask implements InstanceActionHandler {
     @Override
-    public Amount<Long, Time> getReevaluationDelay(
+    public Optional<Amount<Long, Time>> getReevaluationDelay(
         IInstanceKey instance,
         IJobUpdateInstructions instructions,
         MutableStoreProvider storeProvider,
         StateManager stateManager,
         JobUpdateStatus status) {
 
-      return Amount.of(
+      return Optional.of(Amount.of(
           (long) instructions.getSettings().getMinWaitInInstanceRunningMs(),
-          Time.MILLISECONDS);
+          Time.MILLISECONDS));
     }
   }
 }
