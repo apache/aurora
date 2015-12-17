@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import json
 import os.path
 import threading
 import time
@@ -23,7 +24,12 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.testing.clock import ThreadedClock
 
 from apache.aurora.common.health_check.http_signaler import HttpSignaler
-from apache.aurora.config.schema.base import HealthCheckConfig
+from apache.aurora.config.schema.base import (
+    HealthCheckConfig,
+    HealthCheckerConfig,
+    HttpHealthChecker,
+    ShellHealthChecker
+)
 from apache.aurora.executor.common.health_checker import (
     HealthChecker,
     HealthCheckerProvider,
@@ -206,28 +212,65 @@ class TestHealthCheckerProvider(unittest.TestCase):
     hct_max_fail = health_checker.threaded_health_checker.max_consecutive_failures
     assert hct_max_fail == max_consecutive_failures
 
-  def test_from_assigned_task_generic(self):
+  def test_from_assigned_task_http_endpoint_style_config(self):
+    interval_secs = 17
+    initial_interval_secs = 3
+    max_consecutive_failures = 2
+    http_config = HttpHealthChecker(
+      endpoint='/foo',
+      expected_response='bar',
+      expected_response_code=201
+    )
+    task_config = TaskConfig(
+        executorConfig=ExecutorConfig(
+            name='thermos',
+            data=MESOS_JOB(
+                task=HELLO_WORLD,
+                health_check_config=HealthCheckConfig(
+                    health_checker=HealthCheckerConfig(http=http_config),
+                    interval_secs=interval_secs,
+                    initial_interval_secs=initial_interval_secs,
+                    max_consecutive_failures=max_consecutive_failures,
+                    timeout_secs=7
+                )
+            ).json_dumps()
+        )
+    )
+    assigned_task = AssignedTask(task=task_config, instanceId=1, assignedPorts={'health': 9001})
+    execconfig_data = json.loads(assigned_task.task.executorConfig.data)
+    http_exec_config = execconfig_data['health_check_config']['health_checker']['http']
+    assert http_exec_config['endpoint'] == '/foo'
+    assert http_exec_config['expected_response'] == 'bar'
+    assert http_exec_config['expected_response_code'] == 201
+    health_checker = HealthCheckerProvider().from_assigned_task(assigned_task, None)
+    assert health_checker.threaded_health_checker.interval == interval_secs
+    assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs
+
+  def test_from_assigned_task_shell(self):
     interval_secs = 17
     initial_interval_secs = 3
     max_consecutive_failures = 2
     timeout_secs = 5
+    shell_config = ShellHealthChecker(shell_command='failed command')
     task_config = TaskConfig(
         executorConfig=ExecutorConfig(
             name='thermos-generic',
             data=MESOS_JOB(
                 task=HELLO_WORLD,
                 health_check_config=HealthCheckConfig(
+                    health_checker=HealthCheckerConfig(shell=shell_config),
                     interval_secs=interval_secs,
                     initial_interval_secs=initial_interval_secs,
                     max_consecutive_failures=max_consecutive_failures,
                     timeout_secs=timeout_secs,
-                    type='shell',
-                    shell_command='failed command'
                 )
             ).json_dumps()
         )
     )
-    assigned_task = AssignedTask(task=task_config, instanceId=1, assignedPorts={'health': 9001})
+    assigned_task = AssignedTask(task=task_config, instanceId=1)
+    execconfig_data = json.loads(assigned_task.task.executorConfig.data)
+    assert execconfig_data[
+             'health_check_config']['health_checker']['shell']['shell_command'] == 'failed command'
     health_checker = HealthCheckerProvider().from_assigned_task(assigned_task, None)
     assert health_checker.threaded_health_checker.interval == interval_secs
     assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs

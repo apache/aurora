@@ -33,11 +33,13 @@ test_task = Task(
 
 update_config = UpdateConfig(watch_secs=10, batch_size=2)
 # "I am going to fail" config.
+shell_config = ShellHealthChecker(
+    shell_command='grep foo'
+    )
 health_check_config = HealthCheckConfig(
+    health_checker=HealthCheckerConfig(shell=shell_config),
     initial_interval_secs=5,
     interval_secs=1,
-    type='shell',
-    shell_command='grep foo'
     )
 
 job = Service(

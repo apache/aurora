@@ -36,15 +36,32 @@ class UpdateConfig(Struct):
   pulse_interval_secs         = Integer
 
 
+class HttpHealthChecker(Struct):
+  endpoint                 = Default(String, '/health')
+  expected_response        = Default(String, 'ok')
+  expected_response_code   = Default(Integer, 0)
+
+
+class ShellHealthChecker(Struct):
+  shell_command            = String
+
+
+class HealthCheckerConfig(Struct):
+  http                     = HttpHealthChecker
+  shell                    = ShellHealthChecker
+
+
+DefaultHealthChecker      = HealthCheckerConfig(http=HttpHealthChecker())
+
+
 class HealthCheckConfig(Struct):
   endpoint                 = Default(String, '/health')
   expected_response        = Default(String, 'ok')
   expected_response_code   = Default(Integer, 0)
+  health_checker           = Default(HealthCheckerConfig, DefaultHealthChecker)
   initial_interval_secs    = Default(Float, 15.0)
   interval_secs            = Default(Float, 10.0)
   max_consecutive_failures = Default(Integer, 0)
-  shell_command            = String
-  type                     = Default(String, 'http')
   timeout_secs             = Default(Float, 1.0)
 
 

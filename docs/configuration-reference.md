@@ -333,7 +333,7 @@ Job Schema
   ```max_task_failures``` | Integer | Maximum number of failures after which the task is considered to have failed (Default: 1) Set to -1 to allow for infinite failures
   ```priority``` | Integer | Preemption priority to give the task (Default 0). Tasks with higher priorities may preempt tasks at lower priorities.
   ```production``` | Boolean |  Whether or not this is a production task that may [preempt](resources.md#task-preemption) other tasks (Default: False). Production job role must have the appropriate [quota](resources.md#resource-quota).
-  ```health_check_config``` | ```HealthCheckConfig``` object | Parameters for controlling a task's health checks via HTTP. Only used if a  health port was assigned with a command line wildcard.
+  ```health_check_config``` | ```HealthCheckConfig``` object | Parameters for controlling a task's health checks. HTTP health check is only used if a  health port was assigned with a command line wildcard.
   ```container``` | ```Container``` object | An optional container to run all processes inside of.
   ```lifecycle``` | ```LifecycleConfig``` object | An optional task lifecycle configuration that dictates commands to be executed on startup/teardown.  HTTP lifecycle is enabled by default if the "health" port is requested.  See [LifecycleConfig Objects](#lifecycleconfig-objects) for more information.
   ```tier``` | String | Task tier type. When set to `revocable` requires the task to run with Mesos revocable resources. This is work [in progress](https://issues.apache.org/jira/browse/AURORA-1343) and is currently only supported for the revocable tasks. The ultimate goal is to simplify task configuration by hiding various configuration knobs behind a task tier definition. See AURORA-1343 and AURORA-1443 for more details.
@@ -380,19 +380,40 @@ Parameters for controlling the rate and policy of rolling updates.
 
 ### HealthCheckConfig Objects
 
+*Note: ```endpoint```, ```expected_response``` and ```expected_response_code``` are deprecated from ```HealthCheckConfig``` and must be definied in ```HttpHealthChecker```.*
+
 Parameters for controlling a task's health checks via HTTP or a shell command.
 
-| object                         | type      | description
+| param                          | type      | description
+| -------                        | :-------: | --------
+| *```endpoint```*               | String    | HTTP endpoint to check (Default: /health) **Deprecated.**
+| *```expected_response```*      | String    | If not empty, fail the HTTP health check if the response differs. Case insensitive. (Default: ok) **Deprecated.**
+| *```expected_response_code```* | Integer   | If not zero, fail the HTTP health check if the response code differs. (Default: 0) **Deprecated.**
+| ```health_checker```           | HealthCheckerConfig | Configure what kind of health check to use.
+| ```initial_interval_secs```    | Integer   | Initial delay for performing a health check. (Default: 15)
+| ```interval_secs```            | Integer   | Interval on which to check the task's health. (Default: 10)
+| ```max_consecutive_failures``` | Integer   | Maximum number of consecutive failures that will be tolerated before considering a task unhealthy (Default: 0)
+| ```timeout_secs```             | Integer   | HTTP request timeout. (Default: 1)
+
+### HealthCheckerConfig Objects
+| param                          | type                | description
+| -------                        | :-------:           | --------
+| ```http```                     | HttpHealthChecker  | Configure health check to use HTTP. (Default)
+| ```shell```                    | ShellHealthChecker | Configure health check via a shell command.
+
+
+### HttpHealthChecker Objects
+| param                          | type      | description
 | -------                        | :-------: | --------
 | ```endpoint```                 | String    | HTTP endpoint to check (Default: /health)
 | ```expected_response```        | String    | If not empty, fail the HTTP health check if the response differs. Case insensitive. (Default: ok)
 | ```expected_response_code```   | Integer   | If not zero, fail the HTTP health check if the response code differs. (Default: 0)
-| ```initial_interval_secs```    | Integer   | Initial delay for performing a health check. (Default: 15)
-| ```interval_secs```            | Integer   | Interval on which to check the task's health. (Default: 10)
-| ```max_consecutive_failures``` | Integer   | Maximum number of consecutive failures that will be tolerated before considering a task unhealthy (Default: 0)
+
+### ShellHealthChecker Objects
+| param                          | type      | description
+| -------                        | :-------: | --------
 | ```shell_command```            | String    | An alternative to HTTP health checking. Specifies a shell command that will be executed. Any non-zero exit status will be interpreted as a health check failure.
-| ```type```                     | String    | 'http' or 'shell'. (Default: 'http')
-| ```timeout_secs```             | Integer   | HTTP request timeout. (Default: 1)
+
 
 ### Announcer Objects
 

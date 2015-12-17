@@ -22,7 +22,7 @@ import math
 import re
 import sys
 
-from pystachio.composite import Empty
+from twitter.common import log
 
 from apache.aurora.client import binding_helper
 from apache.aurora.client.base import die
@@ -70,22 +70,18 @@ def _validate_environment_name(config):
   __validate_env(env_name, 'Environment')
 
 
-CANNOT_HAVE_HTTP_ARGS_WITH_SHELL_ERROR = '''
-shell_command does not support supplied http arguments.
-'''
-
-CANNOT_HAVE_SHELL_ARGS_WITH_HTTP_ERROR = '''
-Cannot define shell_commmand for HTTP health check.
-'''
-
-INVALID_HEALTH_CHECK_TYPE = '''
-Invalid health check type {health_check_type}.
+INVALID_HEALTH_CHECKER = '''
+Invalid health endpoint config.
 '''
 
 MUST_PROVIDE_SHELL_COMMAND_ERROR = '''
-Must provide a shell command for shell type.
+Must provide a shell command if using ShellHealthChecker.
 '''
 
+HTTP_DEPRECATION_WARNING = '''
+WARNING: endpoint, expected_response, and expected_response_code are deprecated and will be removed
+in the next release. Please consult updated documentation.
+'''
 
 HTTP_HEALTH_CHECK = 'http'
 SHELL_HEALTH_CHECK = 'shell'
@@ -93,22 +89,22 @@ SHELL_HEALTH_CHECK = 'shell'
 
 # TODO (AURORA-1552): Add config validation to the executor
 def _validate_health_check_config(config):
-  health_check_config = config.health_check_config()
-  health_check_type = health_check_config.type().get()
-
-  # Make sure we either have HTTP or SHELL.
-  if health_check_type not in {HTTP_HEALTH_CHECK, SHELL_HEALTH_CHECK}:
-    die(INVALID_HEALTH_CHECK_TYPE.format(health_check_type=health_check_type))
-  if health_check_type == SHELL_HEALTH_CHECK:
-    # SHELL options
-    shell_command = health_check_config.shell_command()
-    if shell_command == Empty:
+  health_check_config = config.health_check_config().get()
+  health_checker = health_check_config.get('health_checker', {})
+  # If we have old-style of configuring.
+  # TODO (AURORA-1563): Remove this code after we drop support for defining these directly in
+  # HealthCheckConfig.
+  for deprecated in {'endpoint', 'expected_response', 'expected_response_code'}:
+    if deprecated in health_check_config:
+      log.warn(HTTP_DEPRECATION_WARNING)
+      break
+  if SHELL_HEALTH_CHECK in health_checker:
+    # Make sure we specified a shell_command if we chose a shell config.
+    shell_health_checker = health_checker.get(SHELL_HEALTH_CHECK, {})
+    shell_command = shell_health_checker.get('shell_command')
+    if not shell_command:
       # Must define a command.
       die(MUST_PROVIDE_SHELL_COMMAND_ERROR)
-  elif health_check_type == HTTP_HEALTH_CHECK:
-    if health_check_config.shell_command() != Empty:
-      # No shell_command for HTTP.
-      die(CANNOT_HAVE_SHELL_ARGS_WITH_HTTP_ERROR)
 
 
 UPDATE_CONFIG_MAX_FAILURES_ERROR = '''

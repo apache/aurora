@@ -210,31 +210,39 @@ class HealthCheckerProvider(StatusCheckerProvider):
     :return: Instance of a HealthChecker.
     """
     mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
-    portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)
-
     health_check_config = mesos_task.health_check_config().get()
-    health_check_type = health_check_config.get('type')
-
-    # We don't need a port if we are running a shell command.
-    if health_check_type == HTTP_HEALTH_CHECK and 'health' not in portmap:
-      return None
+    health_checker = health_check_config.get('health_checker', {})
     timeout_secs = health_check_config.get('timeout_secs')
-
-    if health_check_type == SHELL_HEALTH_CHECK:
-      shell_command = health_check_config.get('shell_command')
+    if SHELL_HEALTH_CHECK in health_checker:
+      shell_command = health_checker.get(SHELL_HEALTH_CHECK, {}).get('shell_command')
       shell_signaler = ShellHealthCheck(
         cmd=shell_command,
         timeout_secs=timeout_secs
       )
       a_health_checker = lambda: shell_signaler()
     else:
+      portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)
+      if 'health' not in portmap:
+        return None
+      if HTTP_HEALTH_CHECK in health_checker:
+        # Assume user has already switched over to the new config since we found the key.
+        http_config = health_checker.get(HTTP_HEALTH_CHECK, {})
+        http_endpoint = http_config.get('endpoint')
+        http_expected_response = http_config.get('expected_response')
+        http_expected_response_code = http_config.get('expected_response_code')
+      else:
+        # TODO (AURORA-1563): Remove this clause after we deprecate support for following keys
+        # directly in HealthCheckConfig
+        http_endpoint = health_check_config.get('endpoint')
+        http_expected_response = health_check_config.get('expected_response')
+        http_expected_response_code = health_check_config.get('expected_response_code')
       http_signaler = HttpSignaler(
         portmap['health'],
         timeout_secs=timeout_secs)
       a_health_checker = lambda: http_signaler(
-        endpoint=health_check_config.get('endpoint'),
-        expected_response=health_check_config.get('expected_response'),
-        expected_response_code=health_check_config.get('expected_response_code')
+        endpoint=http_endpoint,
+        expected_response=http_expected_response,
+        expected_response_code=http_expected_response_code
       )
 
     health_checker = HealthChecker(
