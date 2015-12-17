@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import java.util.concurrent.TimeUnit;
+
 import javax.servlet.ServletContextListener;
 import javax.ws.rs.core.MediaType;
 
@@ -91,7 +93,7 @@ public abstract class AbstractJettyTest extends EasyMockTest {
   @Before
   public void setUpBase() throws Exception {
     storage = new StorageTestUtil(this);
-    final DynamicHostSet<ServiceInstance> schedulers =
+    DynamicHostSet<ServiceInstance> schedulers =
         createMock(new Clazz<DynamicHostSet<ServiceInstance>>() { });
 
     injector = Guice.createInjector(
@@ -140,8 +142,12 @@ public abstract class AbstractJettyTest extends EasyMockTest {
   protected void replayAndStart() {
     control.replay();
     try {
-      injector.getInstance(Key.get(ServiceManagerIface.class, AppStartup.class))
-          .startAsync().awaitHealthy();
+      ServiceManagerIface service =
+          injector.getInstance(Key.get(ServiceManagerIface.class, AppStartup.class));
+      service.startAsync().awaitHealthy();
+      addTearDown(() -> {
+        service.stopAsync().awaitStopped(5L, TimeUnit.SECONDS);
+      });
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }

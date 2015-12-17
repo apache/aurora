@@ -359,10 +359,6 @@ public class JettyServerModule extends AbstractModule {
 
     @Override
     protected void startUp() {
-      // N.B. we explicitly disable the resource cache here due to a bug serving content out of the
-      // jar under the vagrant image. C.f. https://bugs.eclipse.org/bugs/show_bug.cgi?id=364936
-      Resource.setDefaultUseCaches(false);
-
       server = new Server();
       ServletContextHandler servletHandler =
           new ServletContextHandler(server, "/", ServletContextHandler.NO_SESSIONS);
