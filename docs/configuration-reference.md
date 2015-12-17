@@ -393,7 +393,7 @@ Parameters for controlling a task's health checks via HTTP or a shell command.
 | ```initial_interval_secs```    | Integer   | Initial delay for performing a health check. (Default: 15)
 | ```interval_secs```            | Integer   | Interval on which to check the task's health. (Default: 10)
 | ```max_consecutive_failures``` | Integer   | Maximum number of consecutive failures that will be tolerated before considering a task unhealthy (Default: 0)
-| ```timeout_secs```             | Integer   | HTTP request timeout. (Default: 1)
+| ```timeout_secs```             | Integer   | Health check timeout. (Default: 1)
 
 ### HealthCheckerConfig Objects
 | param                          | type                | description

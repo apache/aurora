@@ -8,6 +8,11 @@
 - The field 'JobUpdateSettings.maxWaitToInstanceRunningMs' (UpdateConfig.restart_threshold in
   client-side configuration) is now deprecated.  This setting was brittle in practice, and is
   ignored by the 0.11.0 scheduler.
+- Added support for shell-based health checkers in addition to HTTP health checkers. In concert with
+  this change the `HealthCheckConfig` schema has been restructured to more cleanly allow configuring
+  varied health checkers. The following fields from `HealthCheckConfig` are now deprecated:
+  `endpoint`, `expected_response`, `expected_response_code` in favor of setting them as part of an
+  `HttpHealthChecker.`
 
 0.10.0
 ------
