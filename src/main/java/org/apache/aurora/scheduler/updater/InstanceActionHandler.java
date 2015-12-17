@@ -31,6 +31,7 @@ import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IRange;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
@@ -46,6 +47,14 @@ interface InstanceActionHandler {
       JobUpdateStatus status);
 
   Logger LOG = Logger.getLogger(InstanceActionHandler.class.getName());
+
+  static Optional<IScheduledTask> getExistingTask(
+      MutableStoreProvider storeProvider,
+      IInstanceKey instance) {
+
+    return Optional.fromNullable(Iterables.getOnlyElement(
+        storeProvider.getTaskStore().fetchTasks(Query.instanceScoped(instance).active()), null));
+  }
 
   class AddTask implements InstanceActionHandler {
     private static ITaskConfig getTargetConfig(
@@ -77,16 +86,23 @@ interface InstanceActionHandler {
         StateManager stateManager,
         JobUpdateStatus status) {
 
-      LOG.info("Adding instance " + instance + " while " + status);
-      ITaskConfig replacement = getTargetConfig(
-          instructions,
-          status == ROLLING_FORWARD,
-          instance.getInstanceId());
-      stateManager.insertPendingTasks(
-          storeProvider,
-          replacement,
-          ImmutableSet.of(instance.getInstanceId()));
-      return  Amount.of(
+      Optional<IScheduledTask> task = getExistingTask(storeProvider, instance);
+      if (task.isPresent()) {
+        // Due to async event processing it's possible to have a race between task event
+        // and instance addition. This is a perfectly valid case.
+        LOG.info("Instance " + instance + " already exists while " + status);
+      } else {
+        LOG.info("Adding instance " + instance + " while " + status);
+        ITaskConfig replacement = getTargetConfig(
+            instructions,
+            status == ROLLING_FORWARD,
+            instance.getInstanceId());
+        stateManager.insertPendingTasks(
+            storeProvider,
+            replacement,
+            ImmutableSet.of(instance.getInstanceId()));
+      }
+      return Amount.of(
           (long) instructions.getSettings().getMaxWaitToInstanceRunningMs(),
           Time.MILLISECONDS);
     }
@@ -101,15 +117,20 @@ interface InstanceActionHandler {
         StateManager stateManager,
         JobUpdateStatus status) {
 
-      String taskId = Tasks.id(Iterables.getOnlyElement(
-          storeProvider.getTaskStore().fetchTasks(Query.instanceScoped(instance).active())));
-      LOG.info("Killing " + instance + " while " + status);
-      stateManager.changeState(
-          storeProvider,
-          taskId,
-          Optional.absent(),
-          ScheduleStatus.KILLING,
-          Optional.of("Killed for job update."));
+      Optional<IScheduledTask> task = getExistingTask(storeProvider, instance);
+      if (task.isPresent()) {
+        LOG.info("Killing " + instance + " while " + status);
+        stateManager.changeState(
+            storeProvider,
+            Tasks.id(task.get()),
+            Optional.absent(),
+            ScheduleStatus.KILLING,
+            Optional.of("Killed for job update."));
+      } else {
+        // Due to async event processing it's possible to have a race between task event
+        // and it's deletion from the store. This is a perfectly valid case.
+        LOG.info("No active instance " + instance + " to kill while " + status);
+      }
       return Amount.of(
           (long) instructions.getSettings().getMaxWaitToInstanceRunningMs(),
           Time.MILLISECONDS);

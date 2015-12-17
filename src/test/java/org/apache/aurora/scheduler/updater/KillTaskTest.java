@@ -13,19 +13,18 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.base.Optional;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.InstanceKey;
-import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
-import org.apache.aurora.gen.Range;
-import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
@@ -33,12 +32,11 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.junit.Before;
 import org.junit.Test;
 
-public class AddTaskTest extends EasyMockTest {
+import static org.easymock.EasyMock.expect;
+
+public class KillTaskTest extends EasyMockTest {
   private static final IJobUpdateInstructions INSTRUCTIONS = IJobUpdateInstructions.build(
       new JobUpdateInstructions()
-          .setDesiredState(new InstanceTaskConfig()
-              .setTask(new TaskConfig())
-              .setInstances(ImmutableSet.of(new Range(0, 0))))
           .setSettings(
               new JobUpdateSettings()
                   .setMinWaitInInstanceRunningMs(1000)));
@@ -54,33 +52,22 @@ public class AddTaskTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
-    handler = new InstanceActionHandler.AddTask();
+    handler = new InstanceActionHandler.KillTask();
   }
 
   @Test
-  public void testAddInstance() throws Exception {
-    storageUtil.expectTaskFetch(Query.instanceScoped(INSTANCE).active());
-
-    stateManager.insertPendingTasks(
-        storageUtil.mutableStoreProvider,
-        INSTRUCTIONS.getDesiredState().getTask(),
-        ImmutableSet.of(0));
-
-    control.replay();
-
-    handler.getReevaluationDelay(
-        INSTANCE,
-        INSTRUCTIONS,
-        storageUtil.mutableStoreProvider,
-        stateManager,
-        JobUpdateStatus.ROLLING_FORWARD);
-  }
-
-  @Test
-  public void testAddInstanceCollisionDoesNotThrow() throws Exception {
+  public void testInstanceKill() throws Exception {
+    String id = "task_id";
     storageUtil.expectTaskFetch(
         Query.instanceScoped(INSTANCE).active(),
-        TaskTestUtil.makeTask("id", INSTANCE.getJobKey()));
+        TaskTestUtil.makeTask(id, INSTANCE.getJobKey()));
+
+    expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
+        id,
+        Optional.absent(),
+        ScheduleStatus.KILLING,
+        Optional.of("Killed for job update."))).andReturn(StateChangeResult.SUCCESS);
 
     control.replay();
 
@@ -89,11 +76,11 @@ public class AddTaskTest extends EasyMockTest {
         INSTRUCTIONS,
         storageUtil.mutableStoreProvider,
         stateManager,
-        JobUpdateStatus.ROLLING_FORWARD);
+        JobUpdateStatus.ROLLING_BACK);
   }
 
-  @Test(expected = IllegalStateException.class)
-  public void testInstanceNotFound() throws Exception {
+  @Test
+  public void testInstanceNotFoundDoesNotThrow() throws Exception {
     storageUtil.expectTaskFetch(Query.instanceScoped(INSTANCE).active());
 
     control.replay();
