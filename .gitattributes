@@ -1,3 +1,5 @@
+* text eol=lf
+
 /gradlew export-ignore
 /gradle export-ignore
 
