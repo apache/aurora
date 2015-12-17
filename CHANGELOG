@@ -1,3 +1,51 @@
+Aurora 0.11.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1535] - Dead links in documentation
+    * [AURORA-1478] - Mirror redirector on website doesn't point to correct file
+    * [AURORA-1304] - vagrant devcluster should only start one instance of aurora
+    * [AURORA-1549] - Updater kills instances with scoped update
+    * [AURORA-1272] - Link on "Deploying Aurora Scheduler" page is 404
+    * [AURORA-870] - Documentation can't link to code
+    * [AURORA-1539] - Package build script leaves root-owned files
+    * [AURORA-1544] - Packaging scripts broken for 0.10.0
+    * [AURORA-1507] - Instance collision stack trace in updater
+    * [AURORA-1545] - rpm build fails compiling thrift
+    * [AURORA-1550] - Unable to run tests from Intellij
+    * [AURORA-954] - Change pants.ini to look in somewhere more descriptive than third_party
+    * [AURORA-1506] - Job updater does not handle DELETED tasks properly
+    * [AURORA-547] - Python tests produce a pex?
+    * [AURORA-1381] - Remove duplicate thermos_observer
+    * [AURORA-1538] - Vagrant build is broken on master
+    * [AURORA-1512] - Aurora rpm missing std output switch 
+    * [AURORA-1530] - client tests fails when run via Test client code: ./pants test src/test/python/apache/aurora/client/cli:all
+
+## Story
+    * [AURORA-1532] - Python check style should use the built-in pants checkstyle
+    * [AURORA-1551] - Add support for non-HTTP based health checks
+    * [AURORA-1562] - Create separate HttpEndpointConfig and ShellEndpointConfig structs
+    * [AURORA-849] - modify release script to publish versioned docs to apache website 
+
+## Task
+    * [AURORA-814] - Migrate client off of deprecated SessionKey APIs
+    * [AURORA-785] - Remove client-side update code
+    * [AURORA-850] - Ability to tag project documentation as they appear on website
+    * [AURORA-726] - Table of contents anchors do not work in docs
+    * [AURORA-95] - Executor should auto-roll stderr/stdout files
+    * [AURORA-1253] - Warn when JobUpdateSettings.maxWaitToInstanceRunningMs is set
+    * [AURORA-1553] - Deprecate and remove ServerInfo.thriftAPIVersion
+    * [AURORA-1252] - Deprecate UpdateConfig restart_threshold setting
+    * [AURORA-1557] - Document mesos.hostname in Thermos reference
+    * [AURORA-1547] - TaskReconciler should set TaskStatus.slave_id field
+    * [AURORA-687] - Aurora should set FrameworkInfo.principal
+    * [AURORA-1554] - Update pants to 0.0.63
+    * [AURORA-1527] - 0.11.0 backwards incompatible changes
+    * [AURORA-879] - Improve ordering of elements in "job status" output
+    * [AURORA-1410] - Publish RPM and deb for 0.9.0
+    * [AURORA-1543] - Upgrade to Mesos 0.24
+    * [AURORA-1526] - 0.11.0 deprecations
+
+
 Aurora 0.10.0
 --------------------------------------------------------------------------------
 ## Bug
