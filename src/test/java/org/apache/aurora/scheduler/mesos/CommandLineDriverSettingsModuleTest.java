@@ -18,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Properties;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -69,8 +70,10 @@ public class CommandLineDriverSettingsModuleTest {
   public void testFrameworkInfoNoRevocable() {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
         "user",
+        Optional.absent(),
         Amount.of(1L, Time.MINUTES),
         false);
+    assertEquals("", info.getPrincipal());
     assertEquals(0, info.getCapabilitiesCount());
   }
 
@@ -78,8 +81,33 @@ public class CommandLineDriverSettingsModuleTest {
   public void testFrameworkInfoRevocable() {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
         "user",
+        Optional.absent(),
         Amount.of(1L, Time.MINUTES),
         true);
+    assertEquals("", info.getPrincipal());
+    assertEquals(1, info.getCapabilitiesCount());
+    assertEquals(REVOCABLE_RESOURCES, info.getCapabilities(0).getType());
+  }
+
+  @Test
+  public void testFrameworkInfoNoRevocableWithAnnouncedPrincipal() {
+    Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "user",
+        Optional.of("auroraprincipal"),
+        Amount.of(1L, Time.MINUTES),
+        false);
+    assertEquals("auroraprincipal", info.getPrincipal());
+    assertEquals(0, info.getCapabilitiesCount());
+  }
+
+  @Test
+  public void testFrameworkInfoRevocableWithAnnouncedPrincipal() {
+    Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "user",
+            Optional.of("auroraprincipal"),
+        Amount.of(1L, Time.MINUTES),
+        true);
+    assertEquals("auroraprincipal", info.getPrincipal());
     assertEquals(1, info.getCapabilitiesCount());
     assertEquals(REVOCABLE_RESOURCES, info.getCapabilities(0).getType());
   }

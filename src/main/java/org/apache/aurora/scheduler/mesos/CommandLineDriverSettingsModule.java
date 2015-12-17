@@ -68,6 +68,13 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> FRAMEWORK_FAILOVER_TIMEOUT =
       Arg.create(Amount.of(21L, Time.DAYS));
 
+  @CmdLine(name = "framework_announce_principal",
+      help = "When 'framework_authentication_file' flag is set, the FrameworkInfo "
+          + "registered with the mesos master will also contain the principal. This is "
+          + "necessary if you intend to use mesos authorization via mesos ACLs. "
+          + "The default will change in a future release.")
+  private static final Arg<Boolean> FRAMEWORK_ANNOUNCE_PRINCIPAL = Arg.create(false);
+
   @CmdLine(name = "executor_user",
       help = "User to start the executor. Defaults to \"root\". "
           + "Set this to an unprivileged user if the mesos master was started with "
@@ -86,11 +93,17 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
 
   @Override
   protected void configure() {
+    Optional<Protos.Credential> credentials = getCredentials();
+    Optional<String> principal = Optional.absent();
+    if (FRAMEWORK_ANNOUNCE_PRINCIPAL.get() && credentials.isPresent()) {
+      principal = Optional.of(credentials.get().getPrincipal());
+    }
     DriverSettings settings = new DriverSettings(
         MESOS_MASTER_ADDRESS.get(),
-        getCredentials(),
+        credentials,
         buildFrameworkInfo(
             EXECUTOR_USER.get(),
+            principal,
             FRAMEWORK_FAILOVER_TIMEOUT.get(),
             RECEIVE_REVOCABLE_RESOURCES.get()));
     bind(DriverSettings.class).toInstance(settings);
@@ -121,6 +134,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
   @VisibleForTesting
   static FrameworkInfo buildFrameworkInfo(
       String executorUser,
+      Optional<String> principal,
       Amount<Long, Time> failoverTimeout,
       boolean revocable) {
 
@@ -130,6 +144,9 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
             // Require slave checkpointing.  Assumes slaves have '--checkpoint=true' arg set.
         .setCheckpoint(true)
         .setFailoverTimeout(failoverTimeout.as(Time.SECONDS));
+    if (principal.isPresent()) {
+      infoBuilder.setPrincipal(principal.get());
+    }
 
     if (revocable) {
       infoBuilder.addCapabilities(Capability.newBuilder().setType(REVOCABLE_RESOURCES));

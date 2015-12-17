@@ -19,6 +19,8 @@
 - Log rotation has been added to the thermos runner. See the configuration reference for details
   on how configure rotation per-process. Command line options may also be passed through the
   scheduler in order to configure the global default behavior.
+- Added a new scheduler flag 'framework_announce_principal' to support use of authorization and
+  rate limiting in Mesos.
 
 0.10.0
 ------
