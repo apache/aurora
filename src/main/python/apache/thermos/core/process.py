@@ -20,9 +20,11 @@ commandline in a subprocess of its own.
 
 """
 
+import errno
 import grp
 import os
 import pwd
+import select
 import signal
 import subprocess
 import sys
@@ -30,9 +32,9 @@ import time
 from abc import abstractmethod
 
 from twitter.common import log
-from twitter.common.dirutil import lock_file, safe_mkdir, safe_open
+from twitter.common.dirutil import lock_file, safe_delete, safe_mkdir, safe_open
 from twitter.common.lang import Interface
-from twitter.common.quantity import Amount, Time
+from twitter.common.quantity import Amount, Data, Time
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
 from gen.apache.thermos.ttypes import ProcessState, ProcessStatus, RunnerCkpt
@@ -54,6 +56,17 @@ class Platform(Interface):
     pass
 
 
+class LoggerMode(object):
+  STANDARD = 'standard'
+  ROTATE = 'rotate'
+
+  _ALL_MODES = [STANDARD, ROTATE]
+
+  @staticmethod
+  def is_valid(mode):
+    return mode in LoggerMode._ALL_MODES
+
+
 class ProcessBase(object):
   """
     Encapsulate a running process for a task.
@@ -67,7 +80,8 @@ class ProcessBase(object):
   CONTROL_WAIT_CHECK_INTERVAL = Amount(100, Time.MILLISECONDS)
   MAXIMUM_CONTROL_WAIT = Amount(1, Time.MINUTES)
 
-  def __init__(self, name, cmdline, sequence, pathspec, sandbox_dir, user=None, platform=None):
+  def __init__(self, name, cmdline, sequence, pathspec, sandbox_dir, user=None, platform=None,
+               logger_mode=LoggerMode.STANDARD, rotate_log_size=None, rotate_log_backups=None):
     """
       required:
         name        = name of the process
@@ -78,8 +92,12 @@ class ProcessBase(object):
         platform    = Platform providing fork, clock, getpid
 
       optional:
-        user        = the user to run as (if unspecified, will default to current user.)
-                      if specified to a user that is not the current user, you must have root access
+        user               = the user to run as (if unspecified, will default to current user.)
+                             if specified to a user that is not the current user, you must have root
+                             access
+        logger_mode        = The type of logger to use for the process.
+        rotate_log_size    = The maximum size of the rotated stdout/stderr logs.
+        rotate_log_backups = The maximum number of rotated stdout/stderr log backups.
     """
     self._name = name
     self._cmdline = cmdline
@@ -90,14 +108,24 @@ class ProcessBase(object):
       safe_mkdir(self._sandbox)
     self._pid = None
     self._fork_time = None
-    self._stdout = None
-    self._stderr = None
     self._user = user
     self._ckpt = None
     self._ckpt_head = -1
     if platform is None:
       raise ValueError("Platform must be specified")
     self._platform = platform
+    self._logger_mode = logger_mode
+    self._rotate_log_size = rotate_log_size
+    self._rotate_log_backups = rotate_log_backups
+
+    if not LoggerMode.is_valid(self._logger_mode):
+      raise ValueError("Logger mode %s is invalid." % self._logger_mode)
+
+    if self._logger_mode == LoggerMode.ROTATE:
+      if self._rotate_log_size.as_(Data.BYTES) <= 0:
+        raise ValueError('Log size cannot be less than one byte.')
+      if self._rotate_log_backups <= 0:
+        raise ValueError('Log backups cannot be less than one.')
 
   def _log(self, msg):
     log.debug('[process:%5s=%s]: %s' % (self._pid, self.name(), msg))
@@ -150,6 +178,9 @@ class ProcessBase(object):
 
   def ckpt_file(self):
     return self._pathspec.getpath('process_checkpoint')
+
+  def process_logdir(self):
+    return self._pathspec.getpath('process_logdir')
 
   def _setup_ckpt(self):
     """Set up the checkpoint: must be run on the parent."""
@@ -207,11 +238,9 @@ class ProcessBase(object):
         raise self.PermissionError('Must be root to run processes as other users!')
     self._fork_time = self._platform.clock().time()
     self._setup_ckpt()
-    self._stdout = safe_open(self._pathspec.with_filename('stdout').getpath('process_logdir'), "a")
-    self._stderr = safe_open(self._pathspec.with_filename('stderr').getpath('process_logdir'), "a")
-    uid, gid = user.pw_uid, user.pw_gid
-    os.chown(self._stdout.name, uid, gid)
-    os.chown(self._stderr.name, uid, gid)
+    # Since the forked process is responsible for creating log files, it needs to own the log dir.
+    safe_mkdir(self.process_logdir())
+    os.chown(self.process_logdir(), user.pw_uid, user.pw_gid)
 
   def _finalize_fork(self):
     self._write_initial_update()
@@ -315,10 +344,6 @@ class Process(ProcessBase):
 
   def execute(self):
     """Perform final initialization and launch target process commandline in a subprocess."""
-    if not self._stderr:
-      raise RuntimeError('self._stderr not set up!')
-    if not self._stdout:
-      raise RuntimeError('self._stdout not set up!')
 
     user, _ = self._getpwuid()
     username, homedir = user.pw_name, user.pw_dir
@@ -348,19 +373,32 @@ class Process(ProcessBase):
     if os.path.exists(thermos_profile):
       env.update(BASH_ENV=thermos_profile)
 
-    self._popen = subprocess.Popen(["/bin/bash", "-c", self.cmdline()],
-                                   stderr=self._stderr,
-                                   stdout=self._stdout,
-                                   close_fds=self.FD_CLOEXEC,
-                                   cwd=sandbox,
-                                   env=env)
+    subprocess_args = {
+      'args': ["/bin/bash", "-c", self.cmdline()],
+      'close_fds': self.FD_CLOEXEC,
+      'cwd': sandbox,
+      'env': env,
+      'pathspec': self._pathspec
+    }
+
+    if self._logger_mode == LoggerMode.ROTATE:
+      log_size = int(self._rotate_log_size.as_(Data.BYTES))
+      self._log('Starting subprocess with log rotation. Size: %s, Backups: %s' % (
+        log_size, self._rotate_log_backups))
+      executor = LogRotatingSubprocessExecutor(max_bytes=log_size,
+                                               max_backups=self._rotate_log_backups,
+                                               **subprocess_args)
+    else:
+      self._log('Starting subprocess with no log rotation.')
+      executor = SubprocessExecutor(**subprocess_args)
+
+    pid = executor.start()
 
     self._write_process_update(state=ProcessState.RUNNING,
-                               pid=self._popen.pid,
+                               pid=pid,
                                start_time=start_time)
 
-    # wait for job to finish
-    rc = self._popen.wait()
+    rc = executor.wait()
 
     # indicate that we have finished/failed
     if rc < 0:
@@ -378,3 +416,215 @@ class Process(ProcessBase):
   def finish(self):
     self._log('Coordinator exiting.')
     sys.exit(0)
+
+
+class SubprocessExecutorBase(object):
+  """
+  Encapsulate execution of a subprocess.
+  """
+
+  def __init__(self, args, close_fds, cwd, env, pathspec):
+    """
+      required:
+        args        = The arguments to pass to the subprocess.
+        close_fds   = Close file descriptors argument to Popen.
+        cwd         = The current working directory.
+        env         = Environment variables to be passed to the subprocess.
+        pathspec    = TaskPath object for synthesizing path names.
+    """
+    self._args = args
+    self._close_fds = close_fds
+    self._cwd = cwd
+    self._env = env
+    self._pathspec = pathspec
+    self._popen = None
+
+  def _get_log_path(self, log_name):
+    return self._pathspec.with_filename(log_name).getpath('process_logdir')
+
+  def _start_subprocess(self, stderr, stdout):
+    return subprocess.Popen(self._args,
+                            stderr=stderr,
+                            stdout=stdout,
+                            close_fds=self._close_fds,
+                            cwd=self._cwd,
+                            env=self._env)
+
+  def start(self):
+    """Start the subprocess and immediately return the resulting pid."""
+    raise NotImplementedError()
+
+  def wait(self):
+    """Wait for the subprocess to finish executing and return the return code."""
+    raise NotImplementedError()
+
+
+class SubprocessExecutor(SubprocessExecutorBase):
+  """
+  Basic implementation of a SubprocessExecutor that writes stderr/stdout unconstrained log files.
+  """
+
+  def __init__(self, args, close_fds, cwd, env, pathspec):
+    """See SubprocessExecutorBase.__init__"""
+    self._stderr = None
+    self._stdout = None
+    super(SubprocessExecutor, self).__init__(args, close_fds, cwd, env, pathspec)
+
+  def start(self):
+    self._stderr = safe_open(self._get_log_path('stderr'), 'a')
+    self._stdout = safe_open(self._get_log_path('stdout'), 'a')
+
+    self._popen = self._start_subprocess(self._stderr, self._stdout)
+    return self._popen.pid
+
+  def wait(self):
+    return self._popen.wait()
+
+
+class LogRotatingSubprocessExecutor(SubprocessExecutorBase):
+  """
+  Implementation of a SubprocessExecutor that implements log rotation for stderr/stdout.
+  """
+
+  READ_BUFFER_SIZE = 2 ** 16
+
+  def __init__(self, args, close_fds, cwd, env, pathspec, max_bytes, max_backups):
+    """
+    See SubprocessExecutorBase.__init__
+
+    Takes additional arguments:
+      max_bytes   = The maximum size of an individual log file.
+      max_backups = The maximum number of log file backups to create.
+    """
+    self._max_bytes = max_bytes
+    self._max_backups = max_backups
+    self._stderr = None
+    self._stdout = None
+    super(LogRotatingSubprocessExecutor, self).__init__(args, close_fds, cwd, env, pathspec)
+
+  def start(self):
+    self._stderr = RotatingFileHandler(self._get_log_path('stderr'),
+                                       self._max_bytes,
+                                       self._max_backups)
+    self._stdout = RotatingFileHandler(self._get_log_path('stdout'),
+                                       self._max_bytes,
+                                       self._max_backups)
+
+    self._popen = self._start_subprocess(subprocess.PIPE, subprocess.PIPE)
+    return self._popen.pid
+
+  def wait(self):
+    stdout = self._popen.stdout.fileno()
+    stderr = self._popen.stderr.fileno()
+    pipes = {
+      stderr: self._stderr,
+      stdout: self._stdout
+    }
+
+    rc = None
+    # Read until there is a return code AND both of the pipes have reached EOF.
+    while rc is None or pipes:
+      rc = self._popen.poll()
+
+      read_results, _, _ = select.select(pipes.keys(), [], [], 1)
+      for fd in read_results:
+        handler = pipes[fd]
+        buf = os.read(fd, self.READ_BUFFER_SIZE)
+
+        if len(buf) == 0:
+          del pipes[fd]
+        else:
+          handler.write(buf)
+
+    return rc
+
+
+class FileHandler(object):
+  """
+  Base file handler.
+  """
+
+  def __init__(self, filename, mode='w'):
+    """
+      required:
+        filename = The file name.
+
+      optional:
+        mode = Mode to open the file in.
+    """
+    self.file = safe_open(filename, mode=mode)
+    self.filename = filename
+    self.mode = mode
+    self.closed = False
+
+  def close(self):
+    if not self.closed:
+      self.file.close()
+      self.closed = True
+
+  def write(self, b):
+    self.file.write(b)
+    self.file.flush()
+
+
+class RotatingFileHandler(FileHandler):
+  """
+  File handler that implements max size/rotation.
+  """
+
+  def __init__(self, filename, max_bytes, max_backups, mode='w'):
+    """
+      required:
+        filename    = The file name.
+        max_bytes   = The maximum size of an individual log file.
+        max_backups = The maximum number of log file backups to create.
+
+      optional:
+        mode = Mode to open the file in.
+    """
+    if max_bytes > 0 and max_backups <= 0:
+      raise ValueError('A positive value for max_backups must be specified if max_bytes > 0.')
+    self._max_bytes = max_bytes
+    self._max_backups = max_backups
+    super(RotatingFileHandler, self).__init__(filename, mode)
+
+  def write(self, b):
+    super(RotatingFileHandler, self).write(b)
+    if self.should_rollover():
+      self.rollover()
+
+  def swap_files(self, src, tgt):
+    if os.path.exists(tgt):
+      safe_delete(tgt)
+
+    try:
+      os.rename(src, tgt)
+    except OSError as e:
+      if e.errno != errno.ENOENT:
+        raise
+
+  def make_indexed_filename(self, index):
+    return '%s.%d' % (self.filename, index)
+
+  def should_rollover(self):
+    if self._max_bytes <= 0 or self._max_backups <= 0:
+      return False
+
+    if self.file.tell() >= self._max_bytes:
+      return True
+
+    return False
+
+  def rollover(self):
+    """
+    Perform the rollover of the log.
+    """
+    self.file.close()
+    for i in range(self._max_backups - 1, 0, -1):
+      src = self.make_indexed_filename(i)
+      tgt = self.make_indexed_filename(i + 1)
+      if os.path.exists(src):
+        self.swap_files(src, tgt)
+
+    self.swap_files(self.filename, self.make_indexed_filename(1))
+    self.file = safe_open(self.filename, mode='w')

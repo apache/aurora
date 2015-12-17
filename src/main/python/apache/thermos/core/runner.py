@@ -47,10 +47,10 @@ import time
 import traceback
 from contextlib import contextmanager
 
-from pystachio import Environment
+from pystachio import Empty, Environment
 from twitter.common import log
 from twitter.common.dirutil import safe_mkdir
-from twitter.common.quantity import Amount, Time
+from twitter.common.quantity import Amount, Data, Time
 from twitter.common.recordio import ThriftRecordReader
 
 from apache.thermos.common.ckpt import (
@@ -70,7 +70,7 @@ from apache.thermos.config.schema import ThermosContext
 
 from .helper import TaskRunnerHelper
 from .muxer import ProcessMuxer
-from .process import Process
+from .process import LoggerMode, Process
 
 from gen.apache.thermos.ttypes import (
     ProcessState,
@@ -418,7 +418,8 @@ class TaskRunner(object):
 
   def __init__(self, task, checkpoint_root, sandbox, log_dir=None,
                task_id=None, portmap=None, user=None, chroot=False, clock=time,
-               universal_handler=None, planner_class=TaskPlanner, hostname=None):
+               universal_handler=None, planner_class=TaskPlanner, hostname=None,
+               process_logger_mode=None, rotate_log_size_mb=None, rotate_log_backups=None):
     """
       required:
         task (config.Task) = the task to run
@@ -440,6 +441,9 @@ class TaskRunner(object):
         universal_handler = checkpoint record handler (only used for testing)
         planner_class (TaskPlanner class) = TaskPlanner class to use for constructing the task
                             planning policy.
+        process_logger_mode (string) = The type of logger to use for all processes.
+        rotate_log_size_mb (integer) = The maximum size of the rotated stdout/stderr logs in MiB.
+        rotate_log_backups (integer) = The maximum number of rotated stdout/stderr log backups.
     """
     if not issubclass(planner_class, TaskPlanner):
       raise TypeError('planner_class must be a TaskPlanner.')
@@ -462,6 +466,9 @@ class TaskRunner(object):
     self._portmap = portmap or {}
     self._launch_time = launch_time
     self._log_dir = log_dir or os.path.join(sandbox, '.logs')
+    self._process_logger_mode = process_logger_mode
+    self._rotate_log_size_mb = rotate_log_size_mb
+    self._rotate_log_backups = rotate_log_backups
     self._pathspec = TaskPath(root=checkpoint_root, task_id=self._task_id, log_dir=self._log_dir)
     self._hostname = hostname or socket.gethostname()
     try:
@@ -687,6 +694,9 @@ class TaskRunner(object):
       if pid == 0 and self._ckpt is not None:
         self._ckpt.close()
       return pid
+
+    logger_mode, rotate_log_size, rotate_log_backups = self._build_process_logger_args(process)
+
     return Process(
       process.name().get(),
       process.cmdline().get(),
@@ -695,7 +705,36 @@ class TaskRunner(object):
       self._sandbox,
       self._user,
       chroot=self._chroot,
-      fork=close_ckpt_and_fork)
+      fork=close_ckpt_and_fork,
+      logger_mode=logger_mode,
+      rotate_log_size=rotate_log_size,
+      rotate_log_backups=rotate_log_backups)
+
+  def _build_process_logger_args(self, process):
+    """
+      Build the appropriate logging configuration based on flags + process
+      configuration settings.
+
+      If no configuration (neither flags nor process config), default to
+      "standard" mode.
+    """
+    logger = process.logger()
+    if logger is Empty:
+      if self._process_logger_mode:
+        return (
+          self._process_logger_mode,
+          Amount(self._rotate_log_size_mb, Data.MB),
+          self._rotate_log_backups
+        )
+      else:
+        return LoggerMode.STANDARD, None, None
+    else:
+      mode = logger.mode().get()
+      if mode == LoggerMode.ROTATE:
+        rotate = logger.rotate()
+        return mode, Amount(rotate.log_size().get(), Data.BYTES), rotate.backups().get()
+      else:
+        return mode, None, None
 
   def deadlocked(self, plan=None):
     """Check whether a plan is deadlocked, i.e. there are no running/runnable processes, and the

@@ -15,6 +15,7 @@ machines.  This guide helps you get the scheduler set up and troubleshoot some c
   - [Considerations for running jobs in docker](#considerations-for-running-jobs-in-docker)
   - [Security Considerations](#security-considerations)
   - [Configuring Resource Oversubscription](#configuring-resource-oversubscription)
+  - [Process Log Rotation](#process-log-rotation)
 - [Running Aurora](#running-aurora)
   - [Maintaining an Aurora Installation](#maintaining-an-aurora-installation)
   - [Monitoring](#monitoring)
@@ -166,12 +167,27 @@ script does not access resources outside of the sandbox, as when the script is r
 docker container those resources will not exist.
 
 A scheduler flag, `-global_container_mounts` allows mounting paths from the host (i.e., the slave)
-into all containers on that host. The format is a comma seperated list of host_path:container_path[:mode]
+into all containers on that host. The format is a comma separated list of host_path:container_path[:mode]
 tuples. For example `-global_container_mounts=/opt/secret_keys_dir:/mnt/secret_keys_dir:ro` mounts
 `/opt/secret_keys_dir` from the slaves into all launched containers. Valid modes are `ro` and `rw`.
 
 In order to correctly execute processes inside a job, the docker container must have python 2.7
 installed.
+
+### Process Log Rotation
+By default, Thermos will not rotate the stdout/stderr logs from child processes and they will grow
+without bound. An individual user may change this behavior via configuration on the Process object,
+but it may also be desirable to change the default configuration for the entire cluster.
+In order to enable rotation by default, the following flags can be applied to Thermos (through the
+-thermos_executor_flags argument to the Aurora scheduler):
+
+    --runner-logger-mode=rotate
+    --runner-rotate-log-size-mb=100
+    --runner-rotate-log-backups=10
+
+In the above example, each instance of the Thermos runner will rotate stderr/stdout logs once they
+reach 100 MiB in size and keep a maximum of 10 backups. If a user has provided a custom setting for
+their process, it will override these default settings.
 
 ## Running Aurora
 Configure a supervisor like [Monit](http://mmonit.com/monit/) or

@@ -102,6 +102,30 @@ app.add_option(
          "the locally-resolved hostname.")
 
 
+app.add_option(
+    '--process_logger_mode',
+    dest='process_logger_mode',
+    type=str,
+    default=None,
+    help='The type of logger to use for all processes run by thermos.')
+
+
+app.add_option(
+    '--rotate_log_size_mb',
+    dest='rotate_log_size_mb',
+    type=int,
+    default=None,
+    help='Maximum size of the rotated stdout/stderr logs emitted by the thermos runner in MiB.')
+
+
+app.add_option(
+    '--rotate_log_backups',
+    dest='rotate_log_backups',
+    type=int,
+    default=None,
+    help='Maximum number of rotated stdout/stderr logs emitted by the thermos runner.')
+
+
 def get_task_from_options(opts):
   tasks = ThermosConfigLoader.load_json(opts.thermos_json)
   if len(tasks.tasks()) == 0:
@@ -167,6 +191,9 @@ def proxy_main(args, opts):
       chroot=opts.chroot,
       planner_class=CappedTaskPlanner,
       hostname=opts.hostname,
+      process_logger_mode=opts.process_logger_mode,
+      rotate_log_size_mb=opts.rotate_log_size_mb,
+      rotate_log_backups=opts.rotate_log_backups
   )
 
   for sig in (signal.SIGUSR1, signal.SIGUSR2):

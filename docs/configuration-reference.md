@@ -12,6 +12,7 @@ Aurora + Thermos Configuration Reference
       - [ephemeral](#ephemeral)
       - [min_duration](#min_duration)
       - [final](#final)
+      - [logger](#logger)
 - [Task Schema](#task-schema)
     - [Task Object](#task-object)
       - [name](#name-1)
@@ -72,6 +73,7 @@ behavior with its optional attributes. Remember, Processes are handled by Thermo
    **ephemeral**      | Boolean     | When True, this is an ephemeral process. (Default: False)
    **min_duration**   | Integer     | Minimum duration between process restarts in seconds. (Default: 15)
    **final**          | Boolean     | When True, this process is a finalizing one that should run last. (Default: False)
+   **logger**         | Logger      | Struct defining the log behavior for the process. (Default: Empty)
 
 #### name
 
@@ -143,6 +145,42 @@ Finalizing processes may not depend upon ordinary processes or
 vice-versa, however finalizing processes may depend upon other
 finalizing processes and otherwise run as a typical process
 schedule.
+
+#### logger
+
+The default behavior of Thermos is to allow stderr/stdout logs to grow unbounded. In the event
+that you have large log volume, you may want to configure Thermos to automatically rotate logs
+after they grow to a certain size, which can prevent your job from using more than its allocated
+disk space.
+
+A Logger union consists of a mode enum and a rotation policy. Rotation policies only apply to
+loggers whose mode is `rotate`. The acceptable values for the LoggerMode enum are `standard`
+and `rotate`. The rotation policy applies to both stderr and stdout.
+
+By default, all processes use the `standard` LoggerMode.
+
+  **Attribute Name**  | **Type**     | **Description**
+  ------------------- | :----------: | ---------------------------------
+   **mode**           | LoggerMode   | Mode of the logger. (Required)
+   **rotate**         | RotatePolicy | An optional rotation policy.
+
+A RotatePolicy describes log rotation behavior for when `mode` is set to `rotate`. It is ignored
+otherwise.
+
+  **Attribute Name**  | **Type**     | **Description**
+  ------------------- | :----------: | ---------------------------------
+   **log_size**       | Integer      | Maximum size (in bytes) of an individual log file. (Default: 100 MiB)
+   **backups**        | Integer      | The maximum number of backups to retain. (Default: 5)
+
+An example process configuration is as follows:
+
+        process = Process(
+          name='process',
+          logger=Logger(
+            mode=LoggerMode('rotate'),
+            rotate=RotatePolicy(log_size=5*MB, backups=5)
+          )
+        )
 
 Task Schema
 ===========

@@ -28,6 +28,7 @@ import traceback
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
+from apache.aurora.config.schema.base import LoggerMode
 from apache.aurora.executor.aurora_executor import AuroraExecutor
 from apache.aurora.executor.common.announcer import DefaultAnnouncerCheckerProvider
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
@@ -53,6 +54,8 @@ app.configure(debug=True)
 LogOptions.set_simple(True)
 LogOptions.set_disk_log_level('DEBUG')
 LogOptions.set_log_dir(CWD)
+
+_LOGGER_TYPES = ', '.join(LoggerMode.VALUES)
 
 
 app.add_option(
@@ -94,6 +97,27 @@ app.add_option(
     action='store_true',
     help='If set, the executor will not attempt to change users when running thermos_runner',
     default=False)
+
+
+app.add_option(
+    '--runner-logger-mode',
+    dest='runner_logger_mode',
+    type=str,
+    default=None,
+    help='The type of logger [%s] to use for all processes run by thermos.' % _LOGGER_TYPES)
+
+app.add_option(
+    '--runner-rotate-log-size-mb',
+    dest='runner_rotate_log_size_mb',
+    type=int,
+    help='Maximum size of the rotated stdout/stderr logs emitted by the thermos runner in MiB.')
+
+
+app.add_option(
+    '--runner-rotate-log-backups',
+    dest='runner_rotate_log_backups',
+    type=int,
+    help='Maximum number of rotated stdout/stderr logs emitted by the thermos runner.')
 
 
 # TODO(wickman) Consider just having the OSS version require pip installed
@@ -141,7 +165,10 @@ def initialize(options):
     thermos_runner_provider = UserOverrideThermosTaskRunnerProvider(
       dump_runner_pex(),
       checkpoint_root,
-      artifact_dir=cwd_path
+      artifact_dir=cwd_path,
+      process_logger_mode=options.runner_logger_mode,
+      rotate_log_size_mb=options.runner_rotate_log_size_mb,
+      rotate_log_backups=options.runner_rotate_log_backups
     )
     thermos_runner_provider.set_role(None)
 
@@ -154,7 +181,10 @@ def initialize(options):
     thermos_runner_provider = DefaultThermosTaskRunnerProvider(
       dump_runner_pex(),
       checkpoint_root,
-      artifact_dir=cwd_path
+      artifact_dir=cwd_path,
+      process_logger_mode=options.runner_logger_mode,
+      rotate_log_size_mb=options.runner_rotate_log_size_mb,
+      rotate_log_backups=options.runner_rotate_log_backups
     )
 
     thermos_executor = AuroraExecutor(

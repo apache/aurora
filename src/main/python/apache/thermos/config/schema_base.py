@@ -14,7 +14,19 @@
 
 # checkstyle: noqa
 
-from pystachio import Boolean, Default, Empty, Float, Integer, List, Map, Required, String, Struct
+from pystachio import (
+    Boolean,
+    Default,
+    Empty,
+    Enum,
+    Float,
+    Integer,
+    List,
+    Map,
+    Required,
+    String,
+    Struct
+)
 
 # Define constants for resources
 BYTES = 1
@@ -45,6 +57,19 @@ class Constraint(Struct):
   order = List(String)
 
 
+class RotatePolicy(Struct):
+  log_size = Default(Integer, 100*MB)
+  backups = Default(Integer, 5)
+
+
+LoggerMode = Enum('standard', 'rotate')
+
+
+class Logger(Struct):
+  mode = Required(LoggerMode)
+  rotate = RotatePolicy
+
+
 class Process(Struct):
   cmdline = Required(String)
   name    = Required(String)
@@ -60,6 +85,7 @@ class Process(Struct):
   min_duration  = Default(Integer, 5)      # integer seconds
   final         = Default(Boolean, False)  # if this process should be a finalizing process
                                            # that should always be run after regular processes
+  logger        = Default(Logger, Empty)
 
 
 class Task(Struct):

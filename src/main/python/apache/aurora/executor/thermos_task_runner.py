@@ -72,7 +72,10 @@ class ThermosTaskRunner(TaskRunner):
                checkpoint_root,
                artifact_dir=None,
                clock=time,
-               hostname=None):
+               hostname=None,
+               process_logger_mode=None,
+               rotate_log_size_mb=None,
+               rotate_log_backups=None):
     """
       runner_pex       location of the thermos_runner pex that this task runner should use
       task_id          task_id assigned by scheduler
@@ -98,6 +101,9 @@ class ThermosTaskRunner(TaskRunner):
     self._clock = clock
     self._artifact_dir = artifact_dir or safe_mkdtemp()
     self._hostname = hostname or socket.gethostname()
+    self._process_logger_mode = process_logger_mode
+    self._rotate_log_size_mb = rotate_log_size_mb
+    self._rotate_log_backups = rotate_log_backups
 
     # wait events
     self._dead = threading.Event()
@@ -233,13 +239,17 @@ class ThermosTaskRunner(TaskRunner):
                   sandbox=host_sandbox or self._root,
                   task_id=self._task_id,
                   thermos_json=self._task_filename,
-                  hostname=self._hostname)
+                  hostname=self._hostname,
+                  process_logger_mode=self._process_logger_mode,
+                  rotate_log_size_mb=self._rotate_log_size_mb,
+                  rotate_log_backups=self._rotate_log_backups)
 
     if getpass.getuser() == 'root' and self._role:
       params.update(setuid=self._role)
 
     cmdline_args = [sys.executable, self._runner_pex]
-    cmdline_args.extend('--%s=%s' % (flag, value) for flag, value in params.items())
+    cmdline_args.extend(
+        '--%s=%s' % (flag, value) for flag, value in params.items() if value is not None)
     if self._enable_chroot:
       cmdline_args.extend(['--enable_chroot'])
     for name, port in self._ports.items():
@@ -342,7 +352,10 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
                max_wait=Amount(1, Time.MINUTES),
                preemption_wait=Amount(1, Time.MINUTES),
                poll_interval=Amount(500, Time.MILLISECONDS),
-               clock=time):
+               clock=time,
+               process_logger_mode=None,
+               rotate_log_size_mb=None,
+               rotate_log_backups=None):
     self._artifact_dir = artifact_dir or safe_mkdtemp()
     self._checkpoint_root = checkpoint_root
     self._clock = clock
@@ -351,6 +364,9 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
     self._poll_interval = poll_interval
     self._preemption_wait = preemption_wait
     self._task_runner_class = task_runner_class
+    self._process_logger_mode = process_logger_mode
+    self._rotate_log_size_mb = rotate_log_size_mb
+    self._rotate_log_backups = rotate_log_backups
 
   def _get_role(self, assigned_task):
     return None if assigned_task.task.container.docker else assigned_task.task.job.role
@@ -379,7 +395,10 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
         self._checkpoint_root,
         artifact_dir=self._artifact_dir,
         clock=self._clock,
-        hostname=assigned_task.slaveHost)
+        hostname=assigned_task.slaveHost,
+        process_logger_mode=self._process_logger_mode,
+        rotate_log_size_mb=self._rotate_log_size_mb,
+        rotate_log_backups=self._rotate_log_backups)
 
     return HttpLifecycleManager.wrap(runner, mesos_task, mesos_ports)
 

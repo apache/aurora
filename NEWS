@@ -16,6 +16,9 @@
  - Added support for taking in an executor configuration in JSON via a command line argument
    `--custom_executor_config` which will override all other the command line arguments and default
    values pertaining to the executor.
+- Log rotation has been added to the thermos runner. See the configuration reference for details
+  on how configure rotation per-process. Command line options may also be passed through the
+  scheduler in order to configure the global default behavior.
 
 0.10.0
 ------
