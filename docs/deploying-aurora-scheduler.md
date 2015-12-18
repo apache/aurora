@@ -152,8 +152,6 @@ to ZooKeeper) or explicitly set in the startup script as follows:
     # ...
 
 ### Considerations for running jobs in docker containers
-*Note: Docker support is currently EXPERIMENTAL.*
-
 In order for Aurora to launch jobs using docker containers, a few extra configuration options
 must be set.  The [docker containerizer](http://mesos.apache.org/documentation/latest/docker-containerizer/)
 must be enabled on the mesos slaves by launching them with the `--containerizers=docker,mesos` option.
