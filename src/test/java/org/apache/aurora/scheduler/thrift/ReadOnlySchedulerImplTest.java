@@ -40,6 +40,7 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobStats;
 import org.apache.aurora.gen.JobSummary;
+import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateKey;
@@ -114,6 +115,7 @@ import static org.apache.aurora.scheduler.thrift.Fixtures.nonProductionTask;
 import static org.apache.aurora.scheduler.thrift.ReadOnlySchedulerImpl.NO_CRON;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ReadOnlySchedulerImplTest extends EasyMockTest {
@@ -190,11 +192,11 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         .setTaskConfig(ownedImmediateTaskInfo);
     Builder query = Query.roleScoped(ROLE);
 
-    Set<JobSummary> ownedImmedieteJobSummaryOnly = ImmutableSet.of(
+    Set<JobSummary> ownedImmediateJobSummaryOnly = ImmutableSet.of(
         new JobSummary().setJob(ownedImmediateJob).setStats(new JobStats().setActiveTaskCount(1)));
 
     expect(cronPredictor.predictNextRun(CrontabEntry.parse(CRON_SCHEDULE)))
-        .andReturn(new Date(nextCronRunMs))
+        .andReturn(Optional.of(new Date(nextCronRunMs)))
         .anyTimes();
 
     storageUtil.expectTaskFetch(query);
@@ -225,13 +227,40 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     Response jobSummaryResponse = thrift.getJobSummary(ROLE);
     assertEquals(
-        jobSummaryResponse(ownedImmedieteJobSummaryOnly),
+        jobSummaryResponse(ownedImmediateJobSummaryOnly),
         IResponse.build(jobSummaryResponse).newBuilder());
 
     assertEquals(jobSummaryResponse(ImmutableSet.of()), thrift.getJobSummary(ROLE));
 
     assertEquals(jobSummaryResponse(ownedCronJobSummaryWithRunningTask),
         thrift.getJobSummary(ROLE));
+  }
+
+  @Test
+  public void testGetJobSummaryWithoutNextRun() throws Exception {
+    // 31st of February, there is no such day.
+    String cronSchedule = "* * 31 2 *";
+
+    TaskConfig task = nonProductionTask()
+        .setJobName(JOB_KEY.getName())
+        .setOwner(ROLE_IDENTITY)
+        .setEnvironment(JOB_KEY.getEnvironment());
+    JobConfiguration job = makeJob()
+        .setCronSchedule(cronSchedule)
+        .setTaskConfig(task);
+    expect(cronPredictor.predictNextRun(CrontabEntry.parse(cronSchedule)))
+        .andReturn(Optional.absent())
+        .anyTimes();
+    storageUtil.expectTaskFetch(Query.roleScoped(ROLE));
+    Set<JobConfiguration> jobOnly = ImmutableSet.of(job);
+    expect(storageUtil.jobStore.fetchJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(jobOnly));
+
+    control.replay();
+
+    JobSummaryResult result = thrift.getJobSummary(ROLE).getResult().getJobSummaryResult();
+    assertEquals(1, result.getSummaries().size());
+    assertFalse(result.getSummariesIterator().next().isSetNextCronRunMs());
   }
 
   @Test

@@ -18,8 +18,9 @@ import java.util.TimeZone;
 
 import javax.inject.Inject;
 
-import org.apache.aurora.common.util.Clock;
+import com.google.common.base.Optional;
 
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.quartz.CronExpression;
@@ -37,8 +38,9 @@ class CronPredictorImpl implements CronPredictor {
   }
 
   @Override
-  public Date predictNextRun(CrontabEntry schedule) {
+  public Optional<Date> predictNextRun(CrontabEntry schedule) {
     CronExpression cronExpression = Quartz.cronExpression(schedule, timeZone);
-    return cronExpression.getNextValidTimeAfter(new Date(clock.nowMillis()));
+    // The getNextValidTimeAfter call may return null; eg: if the date is too far in the future.
+    return Optional.fromNullable(cronExpression.getNextValidTimeAfter(new Date(clock.nowMillis())));
   }
 }

@@ -17,6 +17,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -29,6 +30,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class CronPredictorImplTest {
   private static final TimeZone TIME_ZONE = TimeZone.getTimeZone("GMT");
@@ -49,7 +51,9 @@ public class CronPredictorImplTest {
     clock.advance(Amount.of(1L, Time.DAYS));
     Date expectedPrediction = new Date(Amount.of(1L, Time.DAYS).as(Time.MILLISECONDS)
             + Amount.of(1L, Time.MINUTES).as(Time.MILLISECONDS));
-    assertEquals(expectedPrediction, cronPredictor.predictNextRun(CrontabEntry.parse("* * * * *")));
+    assertEquals(
+        Optional.of(expectedPrediction),
+        cronPredictor.predictNextRun(CrontabEntry.parse("* * * * *")));
   }
 
   @Test
@@ -59,14 +63,25 @@ public class CronPredictorImplTest {
   }
 
   @Test
+  public void testInvalidPrediction() {
+    // Too far in the future to represent as a Date.
+    clock.advance(Amount.of(Long.MAX_VALUE, Time.DAYS));
+    assertEquals(Optional.absent(), cronPredictor.predictNextRun(CrontabEntry.parse("* * * * *")));
+  }
+
+  @Test
   public void testCronPredictorConforms() throws Exception {
     for (ExpectedPrediction expectedPrediction : ExpectedPrediction.getAll()) {
       List<Date> results = Lists.newArrayList();
       clock.setNowMillis(0);
       for (int i = 0; i < expectedPrediction.getTriggerTimes().size(); i++) {
-        Date nextTriggerTime = cronPredictor.predictNextRun(expectedPrediction.parseCrontabEntry());
-        results.add(nextTriggerTime);
-        clock.setNowMillis(nextTriggerTime.getTime());
+        Optional<Date> nextTriggerTime =
+            cronPredictor.predictNextRun(expectedPrediction.parseCrontabEntry());
+        assertTrue(nextTriggerTime.isPresent());
+
+        Date triggerTime = nextTriggerTime.get();
+        results.add(triggerTime);
+        clock.setNowMillis(triggerTime.getTime());
       }
       assertEquals(
           "Cron schedule " + expectedPrediction.getSchedule() + " made unexpected predictions.",

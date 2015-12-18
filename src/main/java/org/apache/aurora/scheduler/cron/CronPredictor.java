@@ -15,15 +15,20 @@ package org.apache.aurora.scheduler.cron;
 
 import java.util.Date;
 
+import com.google.common.base.Optional;
+
 /**
  * A utility function that predicts a cron run given a schedule.
  */
 public interface CronPredictor {
   /**
    * Predicts the next date at which a cron schedule will trigger.
+   * <p>
+   * NB: Some cron schedules can predict a run at an invalid date (eg: too far in the future); and
+   * it's these predictions that will result in an absent result.
    *
    * @param schedule Cron schedule to predict the next time for.
-   * @return A prediction for the next time a cron will run.
+   * @return A prediction for the next time a cron will run if a valid prediction can be made.
    */
-  Date predictNextRun(CrontabEntry schedule);
+  Optional<Date> predictNextRun(CrontabEntry schedule);
 }

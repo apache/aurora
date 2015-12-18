@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.thrift;
 
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -29,7 +30,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.base.Strings;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -247,10 +247,13 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
           .setJob(job.newBuilder())
           .setStats(Jobs.getJobStats(tasks.get(jobKey)).newBuilder());
 
-      return Strings.isNullOrEmpty(job.getCronSchedule())
-          ? summary
-          : summary.setNextCronRunMs(
-          cronPredictor.predictNextRun(CrontabEntry.parse(job.getCronSchedule())).getTime());
+      if (job.isSetCronSchedule()) {
+        CrontabEntry crontabEntry = CrontabEntry.parse(job.getCronSchedule());
+        Optional<Date> nextRun = cronPredictor.predictNextRun(crontabEntry);
+        return nextRun.transform(date -> summary.setNextCronRunMs(date.getTime())).or(summary);
+      } else {
+        return summary;
+      }
     };
 
     ImmutableSet<JobSummary> jobSummaries =
