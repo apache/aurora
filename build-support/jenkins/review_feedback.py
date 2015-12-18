@@ -27,12 +27,12 @@ import urllib2
 
 class ReviewBoard(object):
   def __init__(self, host, user, password):
-    self._host = host
+    self._base_url = 'https://%s' % host if not host.startswith('http') else host
     self.user = user
     self._password = password
 
   def api_url(self, api_path):
-    return 'https://%s/api/%s/' % (self._host, api_path)
+    return '%s/api/%s/' % (self._base_url, api_path)
 
   def get_resource_data(self, href, args=None, accept='application/json', data=None):
     href = '%s?%s' % (href, urllib.urlencode(args)) if args else href
@@ -135,12 +135,12 @@ def main():
       '--tail-lines',
       type=int,
       default=20,
-      help='Number of lines of command output to include in red build reviews.',
-      required=True)
+      help='Number of lines of command output to include in red build reviews.')
   parser.add_argument(
     '--git-clean-exclude',
     help='Patterns to pass to git-clean --exclude.',
-    nargs='*')
+    nargs='*',
+    default=[])
   args = parser.parse_args()
 
   credentials = args.reviewboard_credentials_file.readlines()
