@@ -1,45 +1,41 @@
 # Installing Aurora
 
 - [Components](#components)
-  - [Machine profiles](#machine-profiles)
-    - [Coordinator](#coordinator)
-    - [Worker](#worker)
-    - [Client](#client)
-  - [Getting Aurora](#getting-aurora)
+    - [Machine profiles](#machine-profiles)
+      - [Coordinator](#coordinator)
+      - [Worker](#worker)
+      - [Client](#client)
+- [Getting Aurora](#getting-aurora)
     - [Building your own binary packages](#building-your-own-binary-packages)
     - [RPMs](#rpms)
-  - [Installing the scheduler](#installing-the-scheduler)
+- [Installing the scheduler](#installing-the-scheduler)
     - [Ubuntu 14.04](#ubuntu-1404)
     - [CentOS 7](#centos-7)
     - [Finalizing](#finalizing)
     - [Configuration](#configuration)
-  - [Installing worker components](#installing-worker-components)
+- [Installing worker components](#installing-worker-components)
     - [Ubuntu 14.04](#ubuntu-1404-1)
     - [CentOS 7](#centos-7-1)
     - [Configuration](#configuration-1)
-  - [Installing the client](#installing-the-client)
+- [Installing the client](#installing-the-client)
     - [Ubuntu 14.04](#ubuntu-1404-2)
     - [CentOS 7](#centos-7-2)
     - [Configuration](#configuration-2)
-  - [See also](#see-also)
-  - [Installing Mesos](#installing-mesos)
+- [See also](#see-also)
+- [Installing Mesos](#installing-mesos)
     - [Mesos on Ubuntu 14.04](#mesos-on-ubuntu-1404)
     - [Mesos on CentOS 7](#mesos-on-centos-7)
-
-<!-- TODO(wfarner): Remove notes about "older RPM versions" once >=0.10.0 RPMs are released. -->
 
 ## Components
 Before installing Aurora, it's important to have an understanding of the components that make up
 a functioning Aurora cluster.
 
-* **Aurora scheduler**
-
+* **Aurora scheduler**  
   The scheduler will be your primary interface to the work you run in your cluster.  You will
   instruct it to run jobs, and it will manage them in Mesos for you.  You will also frequently use
   the scheduler's web interface as a heads-up display for what's running in your cluster.
 
-* **Aurora client**
-
+* **Aurora client**  
   The client (`aurora` command) is a command line tool that exposes primitives that you can use to
   interact with the scheduler.
 
@@ -47,32 +43,27 @@ a functioning Aurora cluster.
   cluster administrators.  You can use this tool to do things like manage user quotas and manage
   graceful maintenance on machines in cluster.
 
-* **Aurora executor**
-
+* **Aurora executor**  
   The executor (a.k.a. Thermos executor) is responsible for carrying out the workloads described in
   the Aurora DSL (`.aurora` files).  The executor is what actually executes user processes.  It will
   also perform health checking of tasks and register tasks in ZooKeeper for the purposes of dynamic
   service discovery.  You can find lots more detail on the executor and Thermos in the
   [user guide](user-guide.md).
 
-* **Aurora observer**
-
+* **Aurora observer**  
   The observer provides browser-based access to the status of individual tasks executing on worker
   machines.  It gives insight into the processes executing, and facilitates browsing of task sandbox
   directories.
 
-* **ZooKeeper**
-
+* **ZooKeeper**  
   [ZooKeeper](http://zookeeper.apache.org) is a distributed consensus system.  In an Aurora cluster
   it is used for reliable election of the leading Aurora scheduler and Mesos master.
 
-* **Mesos master**
-
+* **Mesos master**  
   The master is responsible for tracking worker machines and performing accounting of their
   resources.  The scheduler interfaces with the master to control the cluster.
 
-* **Mesos agent**
-
+* **Mesos agent**  
   The agent receives work assigned by the scheduler and executes them.  It interfaces with Linux
   isolation systems like cgroups, namespaces and Docker to manage the resource consumption of tasks.
   When a user task is launched, the agent will launch the executor (in the context of a Linux cgroup
@@ -130,8 +121,7 @@ We do have unofficial experimental RPMs available for testing purposes.
 ## Installing the scheduler
 ### Ubuntu 14.04
 
-1. Install Mesos
-
+1. Install Mesos  
    Skip down to [install mesos](#mesos-on-ubuntu-1404), then run:
 
         sudo start mesos-master
@@ -147,8 +137,7 @@ We do have unofficial experimental RPMs available for testing purposes.
 
 ### CentOS 7
 
-1. Install Mesos
-
+1. Install Mesos  
    Skip down to [install mesos](#mesos-on-centos-7), then run:
 
         sudo systemctl start mesos-master
@@ -205,8 +194,7 @@ For more detail on this topic, see the dedicated page on
 ## Installing worker components
 ### Ubuntu 14.04
 
-1. Install Mesos
-
+1. Install Mesos  
    Skip down to [install mesos](#mesos-on-ubuntu-1404), then run:
 
         sudo start mesos-slave
@@ -218,8 +206,7 @@ For more detail on this topic, see the dedicated page on
 
 ### CentOS 7
 
-1. Install Mesos
-
+1. Install Mesos  
    Skip down to [install mesos](#mesos-on-centos-7), then run:
 
         sudo systemctl start mesos-slave
@@ -237,16 +224,16 @@ be passed to the executor using a command line argument on the scheduler.
 ## Installing the client
 ### Ubuntu 14.04
 
-        sudo apt-get install -y python2.7 wget
+    sudo apt-get install -y python2.7 wget
 
-        wget https://apache.bintray.com/aurora/aurora-tools_0.10.0-1_amd64.deb
-        sudo dpkg -i aurora-tools_0.10.0-1_amd64.deb
+    wget https://apache.bintray.com/aurora/aurora-tools_0.10.0-1_amd64.deb
+    sudo dpkg -i aurora-tools_0.10.0-1_amd64.deb
 
 ### CentOS 7
 If you haven't already, read the section on [how to get Aurora RPMs](#rpms).
 
-        # Note: for older Aurora RPM versions, this may be called 'aurora-client'.
-        sudo yum install -y aurora-tools
+    # Note: for older Aurora RPM versions, this may be called 'aurora-client'.
+    sudo yum install -y aurora-tools
 
 ### Configuration
 Client configuration lives in a json file that describes the clusters available and how to reach
