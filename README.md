@@ -72,7 +72,7 @@ Are you using Aurora too?  Let us know, or submit a patch to join the list!
 ## Getting Started
 * [Try the tutorial](docs/tutorial.md)
 * [Running a Local Cluster with Vagrant](docs/vagrant.md)
-* [Deploying Aurora](docs/deploying-aurora-scheduler.md)
+* [Installing Aurora](docs/installing.md)
 * [Developing Aurora](docs/developing-aurora-scheduler.md)
 
 ## Getting Help
