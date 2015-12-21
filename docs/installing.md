@@ -9,21 +9,21 @@
     - [Building your own binary packages](#building-your-own-binary-packages)
     - [RPMs](#rpms)
 - [Installing the scheduler](#installing-the-scheduler)
-    - [Ubuntu 14.04](#ubuntu-1404)
+    - [Ubuntu Trusty](#ubuntu-trusty)
     - [CentOS 7](#centos-7)
     - [Finalizing](#finalizing)
     - [Configuration](#configuration)
 - [Installing worker components](#installing-worker-components)
-    - [Ubuntu 14.04](#ubuntu-1404-1)
+    - [Ubuntu Trusty](#ubuntu-trusty-1)
     - [CentOS 7](#centos-7-1)
     - [Configuration](#configuration-1)
 - [Installing the client](#installing-the-client)
-    - [Ubuntu 14.04](#ubuntu-1404-2)
+    - [Ubuntu Trusty](#ubuntu-trusty-2)
     - [CentOS 7](#centos-7-2)
     - [Configuration](#configuration-2)
 - [See also](#see-also)
 - [Installing Mesos](#installing-mesos)
-    - [Mesos on Ubuntu 14.04](#mesos-on-ubuntu-14-04)
+    - [Mesos on Ubuntu Trusty](#mesos-on-ubuntu-trusty)
     - [Mesos on CentOS 7](#mesos-on-centos-7)
 
 ## Components
@@ -119,10 +119,10 @@ We do have unofficial experimental RPMs available for testing purposes.
 
 
 ## Installing the scheduler
-### Ubuntu 14.04
+### Ubuntu Trusty
 
 1. Install Mesos  
-   Skip down to [install mesos](#mesos-on-ubuntu-14-04), then run:
+   Skip down to [install mesos](#mesos-on-ubuntu-trusty), then run:
 
         sudo start mesos-master
 
@@ -192,10 +192,10 @@ For more detail on this topic, see the dedicated page on
 
 
 ## Installing worker components
-### Ubuntu 14.04
+### Ubuntu Trusty
 
 1. Install Mesos  
-   Skip down to [install mesos](#mesos-on-ubuntu-14-04), then run:
+   Skip down to [install mesos](#mesos-on-ubuntu-trusty), then run:
 
         sudo start mesos-slave
 
@@ -222,7 +222,7 @@ The executor and observer typically do not require much configuration.  Command 
 be passed to the executor using a command line argument on the scheduler.
 
 ## Installing the client
-### Ubuntu 14.04
+### Ubuntu Trusty
 
     sudo apt-get install -y python2.7 wget
 
@@ -246,16 +246,17 @@ dev, test, prod) for a production job.
 
 ## See also
 We have other docs that you will find useful once you have your cluster up and running:
-* [Monitor](monitoring.md) your cluster
-* Enable scheduler [security](security.md)
-* View job SLA [statistics](sla.md)
-* Understand the internals of the scheduler's [storage](storage.md)
+
+- [Monitor](monitoring.md) your cluster
+- Enable scheduler [security](security.md)
+- View job SLA [statistics](sla.md)
+- Understand the internals of the scheduler's [storage](storage.md)
 
 ## Installing Mesos
 Mesos uses a single package for the Mesos master and slave.  As a result, the package dependencies
 are identical for both.
 
-### Mesos on Ubuntu 14.04
+### Mesos on Ubuntu Trusty
 
     sudo add-apt-repository ppa:openjdk-r/ppa -y
     sudo apt-get update
