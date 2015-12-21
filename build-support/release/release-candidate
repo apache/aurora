@@ -249,9 +249,11 @@ All,
 I propose that we accept the following release candidate as the official
 Apache Aurora ${current_version} release.
 
-
 Aurora ${current_version_tag} includes the following:
 ---
+The NEWS for the release is available at:
+${aurora_git_web_url}&f=NEWS&hb=${current_version_tag}
+
 The CHANGELOG for the release is available at:
 ${aurora_git_web_url}&f=CHANGELOG&hb=${current_version_tag}
 
