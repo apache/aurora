@@ -17,7 +17,7 @@ We encourage you to ask questions on the [Aurora developer list](http://aurora.a
  * [Cron Jobs](cron-jobs.md)
 
 ## Operators
- * [Deploy Aurora](deploying-aurora-scheduler.md)
+ * [Install Aurora](installing.md)
  * [Monitoring](monitoring.md)
  * [Hooks for Aurora Client API](hooks.md)
  * [Scheduler Storage](storage.md)
