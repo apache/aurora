@@ -23,7 +23,7 @@
     - [Configuration](#configuration-2)
 - [See also](#see-also)
 - [Installing Mesos](#installing-mesos)
-    - [Mesos on Ubuntu 14.04](#mesos-on-ubuntu-1404)
+    - [Mesos on Ubuntu 14.04](#mesos-on-ubuntu-14-04)
     - [Mesos on CentOS 7](#mesos-on-centos-7)
 
 ## Components
@@ -122,7 +122,7 @@ We do have unofficial experimental RPMs available for testing purposes.
 ### Ubuntu 14.04
 
 1. Install Mesos  
-   Skip down to [install mesos](#mesos-on-ubuntu-1404), then run:
+   Skip down to [install mesos](#mesos-on-ubuntu-14-04), then run:
 
         sudo start mesos-master
 
@@ -195,7 +195,7 @@ For more detail on this topic, see the dedicated page on
 ### Ubuntu 14.04
 
 1. Install Mesos  
-   Skip down to [install mesos](#mesos-on-ubuntu-1404), then run:
+   Skip down to [install mesos](#mesos-on-ubuntu-14-04), then run:
 
         sudo start mesos-slave
 
