@@ -109,10 +109,9 @@ import static org.apache.aurora.scheduler.thrift.Responses.ok;
 
 class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   private static final Function<Entry<ITaskConfig, Collection<Integer>>, ConfigGroup> TO_GROUP =
-      input -> new ConfigGroup(
-          input.getKey().newBuilder(),
-          ImmutableSet.copyOf(input.getValue()),
-          IRange.toBuildersSet(convertRanges(toRanges(input.getValue()))));
+      input -> new ConfigGroup()
+          .setConfig(input.getKey().newBuilder())
+          .setInstances(IRange.toBuildersSet(convertRanges(toRanges(input.getValue()))));
 
   private final Storage storage;
   private final NearestFit nearestFit;

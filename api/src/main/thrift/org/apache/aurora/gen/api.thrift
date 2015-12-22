@@ -329,7 +329,6 @@ struct Range {
 
 struct ConfigGroup {
   1: TaskConfig config
-  2: set<i32> instanceIds //TODO(maxim): deprecated. Remove in AURORA-1519.
   3: set<Range> instances
 }
 

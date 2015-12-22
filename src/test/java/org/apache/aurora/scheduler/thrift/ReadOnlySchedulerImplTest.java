@@ -94,7 +94,6 @@ import static org.apache.aurora.scheduler.ResourceAggregates.MEDIUM;
 import static org.apache.aurora.scheduler.ResourceAggregates.SMALL;
 import static org.apache.aurora.scheduler.ResourceAggregates.XLARGE;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
-import static org.apache.aurora.scheduler.base.Numbers.rangesToInstanceIds;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_JOB;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_SCHEDULE;
@@ -560,11 +559,9 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     ConfigGroup group1 = new ConfigGroup()
         .setConfig(firstGroupTask)
-        .setInstanceIds(Sets.newHashSet(0, 1))
         .setInstances(IRange.toBuildersSet(convertRanges(toRanges(ImmutableSet.of(0, 1)))));
     ConfigGroup group2 = new ConfigGroup()
         .setConfig(secondGroupTask)
-        .setInstanceIds(Sets.newHashSet(2))
         .setInstances(IRange.toBuildersSet(convertRanges(toRanges(ImmutableSet.of(2)))));
 
     ConfigSummary summary = new ConfigSummary()
@@ -867,7 +864,6 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   private static ConfigGroup group(TaskConfig task, Range range) {
     return new ConfigGroup()
         .setConfig(task)
-        .setInstanceIds(rangesToInstanceIds(ImmutableSet.of(IRange.build(range))))
         .setInstances(ImmutableSet.of(range));
   }
 }
