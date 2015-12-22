@@ -19,7 +19,6 @@ import javax.servlet.http.HttpServletRequest;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
@@ -32,10 +31,9 @@ import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.easymock.Capture;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.http.LeaderRedirect.HTTP_PORT_NAME;
+import static org.apache.aurora.scheduler.http.LeaderRedirect.LeaderStatus;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -46,8 +44,7 @@ public class LeaderRedirectTest extends EasyMockTest {
 
   private static final Function<HostAndPort, ServiceInstance> CREATE_INSTANCE =
       endpoint -> new ServiceInstance()
-          .setAdditionalEndpoints(ImmutableMap.of(HTTP_PORT_NAME,
-              new Endpoint(endpoint.getHostText(), endpoint.getPort())));
+          .setServiceEndpoint(new Endpoint(endpoint.getHostText(), endpoint.getPort()));
 
   private Capture<HostChangeMonitor<ServiceInstance>> monitorCapture;
 
@@ -72,13 +69,13 @@ public class LeaderRedirectTest extends EasyMockTest {
     leaderRedirector.monitor();
   }
 
-  @Ignore("https://issues.apache.org/jira/browse/AURORA-842")
   @Test
   public void testLeader() throws Exception {
     replayAndMonitor();
     publishSchedulers(localPort(HTTP_PORT));
 
     assertEquals(Optional.absent(), leaderRedirector.getRedirect());
+    assertEquals(LeaderStatus.LEADING, leaderRedirector.getLeaderStatus());
   }
 
   @Test
@@ -89,6 +86,7 @@ public class LeaderRedirectTest extends EasyMockTest {
     publishSchedulers(remote);
 
     assertEquals(Optional.of(remote), leaderRedirector.getRedirect());
+    assertEquals(LeaderStatus.NOT_LEADING, leaderRedirector.getLeaderStatus());
   }
 
   @Test
@@ -99,6 +97,7 @@ public class LeaderRedirectTest extends EasyMockTest {
     publishSchedulers(local);
 
     assertEquals(Optional.of(local), leaderRedirector.getRedirect());
+    assertEquals(LeaderStatus.NOT_LEADING, leaderRedirector.getLeaderStatus());
   }
 
   @Test
@@ -106,6 +105,7 @@ public class LeaderRedirectTest extends EasyMockTest {
     replayAndMonitor();
 
     assertEquals(Optional.absent(), leaderRedirector.getRedirect());
+    assertEquals(LeaderStatus.NO_LEADER, leaderRedirector.getLeaderStatus());
   }
 
   @Test
@@ -115,18 +115,17 @@ public class LeaderRedirectTest extends EasyMockTest {
     publishSchedulers(HostAndPort.fromParts("foobar", 500), HostAndPort.fromParts("baz", 800));
 
     assertEquals(Optional.absent(), leaderRedirector.getRedirect());
+    assertEquals(LeaderStatus.NO_LEADER, leaderRedirector.getLeaderStatus());
   }
 
   @Test
   public void testBadServiceInstance() throws Exception {
     replayAndMonitor();
 
-    ServiceInstance badLocal = new ServiceInstance()
-        .setAdditionalEndpoints(ImmutableMap.of("foo", new Endpoint("localhost", 500)));
-
-    publishSchedulers(ImmutableSet.of(badLocal));
+    publishSchedulers(ImmutableSet.of(new ServiceInstance()));
 
     assertEquals(Optional.absent(), leaderRedirector.getRedirect());
+    assertEquals(LeaderStatus.NO_LEADER, leaderRedirector.getLeaderStatus());
   }
 
   private HttpServletRequest mockRequest(String attributeValue, String queryString) {

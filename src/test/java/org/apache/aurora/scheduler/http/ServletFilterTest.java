@@ -13,17 +13,17 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import java.io.IOException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Resources;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.ClientResponse.Status;
 
-import org.apache.aurora.common.thrift.Endpoint;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -71,44 +71,55 @@ public class ServletFilterTest extends AbstractJettyTest {
 
   }
 
-  private void assertResponseStatus(String path, Status expectedStatus) {
+  private void assertResponseStatus(
+      String path,
+      Status expectedStatus,
+      Optional<URL> responseResource) throws IOException {
+
     ClientResponse response = get(path);
     assertEquals(expectedStatus.getStatusCode(), response.getStatus());
+
+    if (responseResource.isPresent()) {
+      assertEquals(
+          Resources.toString(responseResource.get(), StandardCharsets.UTF_8),
+          response.getEntity(String.class));
+    }
   }
 
-  private void setLeadingScheduler(String host, int port) {
-    ServiceInstance instance = new ServiceInstance()
-        .setAdditionalEndpoints(ImmutableMap.of("http", new Endpoint(host, port)));
-    schedulerWatcher.getValue().onChange(ImmutableSet.of(instance));
-  }
+  private void leaderRedirectSmokeTest(Status expectedStatus, Optional<URL> responseResource)
+      throws IOException {
 
-  private void leaderRedirectSmokeTest(Status expectedStatus) {
-    assertResponseStatus("/scheduler", expectedStatus);
-    assertResponseStatus("/scheduler/", expectedStatus);
-    assertResponseStatus("/scheduler/role", expectedStatus);
-    assertResponseStatus("/scheduler/role/env", expectedStatus);
-    assertResponseStatus("/scheduler/role/env/job", expectedStatus);
+    assertResponseStatus("/scheduler", expectedStatus, responseResource);
+    assertResponseStatus("/scheduler/", expectedStatus, responseResource);
+    assertResponseStatus("/scheduler/role", expectedStatus, responseResource);
+    assertResponseStatus("/scheduler/role/env", expectedStatus, responseResource);
+    assertResponseStatus("/scheduler/role/env/job", expectedStatus, responseResource);
 
-    assertResponseStatus("/updates", expectedStatus);
-    assertResponseStatus("/updates/", expectedStatus);
+    assertResponseStatus("/updates", expectedStatus, responseResource);
+    assertResponseStatus("/updates/", expectedStatus, responseResource);
   }
 
   @Test
   public void testLeaderRedirect() throws Exception {
     replayAndStart();
 
-    assertResponseStatus("/", Status.OK);
+    assertResponseStatus("/", Status.OK, Optional.absent());
 
-    // Scheduler is assumed leader at this point, since no members are present in the service
-    // (not even this process).
-    leaderRedirectSmokeTest(Status.OK);
+    // If there's no leader, we should send service unavailable and an error page.
+    unsetLeadingSchduler();
+    leaderRedirectSmokeTest(
+        Status.SERVICE_UNAVAILABLE,
+        Optional.of(
+            Resources.getResource(
+                LeaderRedirectFilter.class,
+                LeaderRedirectFilter.NO_LEADER_PAGE)));
 
     // This process is leading
     setLeadingScheduler(httpServer.getHostText(), httpServer.getPort());
-    leaderRedirectSmokeTest(Status.OK);
+    leaderRedirectSmokeTest(Status.OK, Optional.absent());
 
     setLeadingScheduler("otherHost", 1234);
-    leaderRedirectSmokeTest(Status.TEMPORARY_REDIRECT);
-    assertResponseStatus("/", Status.OK);
+    leaderRedirectSmokeTest(Status.TEMPORARY_REDIRECT, Optional.absent());
+    assertResponseStatus("/", Status.OK, Optional.absent());
   }
 }

@@ -19,6 +19,7 @@ import javax.servlet.ServletContextListener;
 import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
@@ -42,6 +43,7 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.util.BackoffStrategy;
 import org.apache.aurora.gen.ServerInfo;
@@ -79,7 +81,7 @@ public abstract class AbstractJettyTest extends EasyMockTest {
   private Injector injector;
   protected StorageTestUtil storage;
   protected HostAndPort httpServer;
-  protected Capture<HostChangeMonitor<ServiceInstance>> schedulerWatcher;
+  private Capture<HostChangeMonitor<ServiceInstance>> schedulerWatcher;
 
   /**
    * Subclasses should override with a module that configures the servlets they are testing.
@@ -138,6 +140,15 @@ public abstract class AbstractJettyTest extends EasyMockTest {
     expect(schedulers.watch(capture(schedulerWatcher))).andReturn(createMock(Command.class));
   }
 
+  protected void setLeadingScheduler(String host, int port) {
+    schedulerWatcher.getValue().onChange(
+        ImmutableSet.of(new ServiceInstance().setServiceEndpoint(new Endpoint(host, port))));
+  }
+
+  protected void unsetLeadingSchduler() {
+    schedulerWatcher.getValue().onChange(ImmutableSet.of());
+  }
+
   protected void replayAndStart() {
     control.replay();
     try {
@@ -151,6 +162,9 @@ public abstract class AbstractJettyTest extends EasyMockTest {
       throw Throwables.propagate(e);
     }
     httpServer = injector.getInstance(HttpService.class).getAddress();
+
+    // By default we'll set this instance to be the leader.
+    setLeadingScheduler(httpServer.getHostText(), httpServer.getPort());
   }
 
   protected String makeUrl(String path) {

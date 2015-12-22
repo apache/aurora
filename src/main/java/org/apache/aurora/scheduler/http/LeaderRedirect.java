@@ -39,6 +39,22 @@ import static java.util.Objects.requireNonNull;
  * leader.
  */
 public class LeaderRedirect {
+  public enum LeaderStatus {
+    /**
+     * This instance is currently the leading scheduler.
+     */
+    LEADING,
+
+    /**
+     * There is not currently an elected leading scheduler.
+     */
+    NO_LEADER,
+
+    /**
+     * This instance is not currently the leading scheduler.
+     */
+    NOT_LEADING,
+  }
 
   // TODO(wfarner): Should we tie this directly to the producer of the node (HttpModule?  It seems
   // like the right thing to do, but would introduce an otherwise unnecessary dependency.
@@ -73,8 +89,8 @@ public class LeaderRedirect {
       return Optional.absent();
     }
 
-    if (leadingScheduler.isSetAdditionalEndpoints()) {
-      Endpoint leaderHttp = leadingScheduler.getAdditionalEndpoints().get(HTTP_PORT_NAME);
+    if (leadingScheduler.isSetServiceEndpoint()) {
+      Endpoint leaderHttp = leadingScheduler.getServiceEndpoint();
       if (leaderHttp != null && leaderHttp.isSetHost() && leaderHttp.isSetPort()) {
         return Optional.of(HostAndPort.fromParts(leaderHttp.getHost(), leaderHttp.getPort()));
       }
@@ -111,6 +127,33 @@ public class LeaderRedirect {
       LOG.info("No leader found, not redirecting.");
       return Optional.absent();
     }
+  }
+
+  /**
+   * Gets the current status of the elected leader.
+   *
+   * @return a {@code LeaderStatus} indicating whether there is an elected leader (and if so, if
+   * this instance is the leader).
+   */
+  public LeaderStatus getLeaderStatus() {
+    ServiceInstance leadingScheduler = leader.get();
+    if (leadingScheduler == null) {
+      return LeaderStatus.NO_LEADER;
+    }
+
+    if (!leadingScheduler.isSetServiceEndpoint()) {
+      LOG.warning("Leader service instance seems to be incomplete: " + leadingScheduler);
+      return LeaderStatus.NO_LEADER;
+    }
+
+    Optional<HostAndPort> leaderHttp = getLeaderHttp();
+    Optional<HostAndPort> localHttp = getLocalHttp();
+
+    if (leaderHttp.isPresent() && leaderHttp.equals(localHttp)) {
+      return LeaderStatus.LEADING;
+    }
+
+    return LeaderStatus.NOT_LEADING;
   }
 
   /**
