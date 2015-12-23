@@ -196,7 +196,7 @@ To: dev@aurora.apache.org
 Subject: [RESULT][VOTE] Release Apache Aurora ${current_version_tag} RC${rc_tag_version}
 
 All,
-The vote to accept Apache Aurora ${current_version_tag} RC#{rc_tag_version}
+The vote to accept Apache Aurora ${current_version_tag} RC${rc_tag_version}
 as the official Apache Aurora ${current_version_tag} release has passed.
 
 
