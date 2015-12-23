@@ -16,6 +16,7 @@ package org.apache.aurora.benchmark.fakes;
 import java.util.Collection;
 
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.Status;
 import org.apache.mesos.SchedulerDriver;
 
 public class FakeSchedulerDriver implements SchedulerDriver {
@@ -133,6 +134,11 @@ public class FakeSchedulerDriver implements SchedulerDriver {
   @Override
   public Protos.Status reconcileTasks(
       Collection<Protos.TaskStatus> statuses) {
+    return null;
+  }
+
+  @Override
+  public Status suppressOffers() {
     return null;
   }
 }

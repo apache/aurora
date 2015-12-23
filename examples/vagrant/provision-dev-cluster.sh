@@ -34,7 +34,7 @@ update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
 
 readonly IP_ADDRESS=192.168.33.7
 
-readonly MESOS_VERSION=0.24.1
+readonly MESOS_VERSION=0.25.0
 
 function prepare_extras() {
   pushd aurora
@@ -59,8 +59,8 @@ function prepare_extras() {
 }
 
 function install_mesos {
-  deb=mesos_${MESOS_VERSION}-0.2.35.ubuntu1204_amd64.deb
-  wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/$deb
+  deb=mesos_${MESOS_VERSION}-0.2.70.ubuntu1404_amd64.deb
+  wget -c http://downloads.mesosphere.io/master/ubuntu/14.04/$deb
   dpkg --install $deb
 }
 
