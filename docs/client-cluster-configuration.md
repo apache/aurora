@@ -66,6 +66,5 @@ URL of your VIP in a loadbalancer or a roundrobin DNS name.
 #### auth_mechanism
 
 The identifier of an authentication mechanism that the client should use when communicating with the
-scheduler. Support for values other than `UNAUTHENTICATED` is currently not available, however work
-is [in progress](https://issues.apache.org/jira/browse/AURORA-720) to add federated authentication
-to Aurora which will allow for more robust configuration of client/scheduler authentication.
+scheduler. Support for values other than `UNAUTHENTICATED` requires a matching scheduler-side
+[security configuration](security.md).

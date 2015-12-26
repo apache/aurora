@@ -1,8 +1,25 @@
 Java code in the aurora repo is built with [Gradle](http://gradle.org).
 
+
+Prerequisite
+============
+
+When using Apache Aurora checked out from the source repository or the binary
+distribution, the Gradle wrapper and JavaScript dependencies are provided.
+However, you need to manually install them when using the source release
+downloads:
+
+1. Install Gradle following the instructions on the [Gradle web site](http://gradle.org)
+2. From the root directory of the Apache Aurora project generate the gradle
+wrapper by running:
+
+    gradle wrapper
+
+
 Getting Started
 ===============
-You will need Java 7 installed and on your `PATH` or unzipped somewhere with `JAVA_HOME` set. Then
+
+You will need Java 8 installed and on your `PATH` or unzipped somewhere with `JAVA_HOME` set. Then
 
     ./gradlew tasks
 
@@ -27,6 +44,21 @@ However, you should run these before posting a review diff, and **always** run t
 commit to origin/master.
 
     ./gradlew build -Pq
+
+Running integration tests
+-------------------------
+To run the same tests that are run in the Apache Aurora continuous integration
+environment:
+
+    ./build-support/jenkins/build.sh
+
+
+In addition, there is an end-to-end test that runs a suite of aurora commands
+using a virtual cluster:
+
+    bash src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh
+
+
 
 Creating a bundle for deployment
 --------------------------------

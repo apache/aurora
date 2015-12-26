@@ -22,6 +22,8 @@ are:
    * Build a client executable: `./pants binary src/main/python/apache/aurora/client:aurora`
    * Test client code: `./pants test src/test/python/apache/aurora/client/cli:all`
 
+If you want to build a source distribution of the client, you need to run `./build-support/release/make-python-sdists`.
+
 Running/Debugging the Client
 ============================
 
