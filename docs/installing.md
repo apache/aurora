@@ -30,6 +30,8 @@
 Before installing Aurora, it's important to have an understanding of the components that make up
 a functioning Aurora cluster.
 
+![Aurora Components](images/components.png)
+
 * **Aurora scheduler**  
   The scheduler will be your primary interface to the work you run in your cluster.  You will
   instruct it to run jobs, and it will manage them in Mesos for you.  You will also frequently use

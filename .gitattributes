@@ -8,3 +8,8 @@
 *.gzip export-ignore
 *.tar export-ignore
 *.tar.gz export-ignore
+
+# All files that are binary and whose line endings should not be modified.
+*.png binary
+*.jpg binary
+*.odg binary
