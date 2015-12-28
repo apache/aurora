@@ -26,6 +26,8 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.TaskIdGenerator;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.quota.QuotaManager;
@@ -86,6 +88,8 @@ public class ThriftIT extends EasyMockTest {
             bindMock(TaskIdGenerator.class);
             bindMock(UUIDGenerator.class);
             bindMock(JobUpdateController.class);
+            bind(ConfigurationManager.class).toInstance(TaskTestUtil.CONFIGURATION_MANAGER);
+            bind(Thresholds.class).toInstance(new Thresholds(1000, 2000));
             storageTestUtil = new StorageTestUtil(ThriftIT.this);
             bind(Storage.class).toInstance(storageTestUtil.storage);
             bind(NonVolatileStorage.class).toInstance(storageTestUtil.storage);

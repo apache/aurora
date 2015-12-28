@@ -13,9 +13,7 @@
  */
 package org.apache.aurora.scheduler.configuration;
 
-import java.util.List;
 import java.util.Objects;
-import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
 
@@ -27,14 +25,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConfig._Fields;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.UserProvidedStrings;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IContainer;
 import org.apache.aurora.scheduler.storage.entities.IIdentity;
@@ -43,30 +40,15 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 
-import static org.apache.aurora.gen.apiConstants.GOOD_IDENTIFIER_PATTERN_JVM;
-
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
  * defaults for optional values.
  *
  * TODO(William Farner): Add input validation to all fields (strings not empty, positive ints, etc).
  */
-public final class ConfigurationManager {
-
-  @CmdLine(name = "allowed_container_types",
-      help = "Container types that are allowed to be used by jobs.")
-  private static final Arg<List<Container._Fields>> ALLOWED_CONTAINER_TYPES =
-      Arg.create(ImmutableList.of(Container._Fields.MESOS));
-
-  @CmdLine(name = "allow_docker_parameters",
-      help = "Allow to pass docker container parameters in the job.")
-  private static final Arg<Boolean> ENABLE_DOCKER_PARAMETERS = Arg.create(false);
+public class ConfigurationManager {
 
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
-
-  private static final Pattern GOOD_IDENTIFIER = Pattern.compile(GOOD_IDENTIFIER_PATTERN_JVM);
-
-  private static final int MAX_IDENTIFIER_LENGTH = 255;
 
   private interface Validator<T> {
     void validate(T value) throws TaskDescriptionException;
@@ -114,20 +96,15 @@ public final class ConfigurationManager {
           new RequiredFieldValidator<>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")),
           new RequiredFieldValidator<>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")));
 
-  private ConfigurationManager() {
-    // Utility class.
-  }
+  private final ImmutableSet<Container._Fields> allowedContainerTypes;
+  private final boolean allowDockerParameters;
 
-  /**
-   * Verifies that an identifier is an acceptable name component.
-   *
-   * @param identifier Identifier to check.
-   * @return false if the identifier is null or invalid.
-   */
-  public static boolean isGoodIdentifier(@Nullable String identifier) {
-    return identifier != null
-        && GOOD_IDENTIFIER.matcher(identifier).matches()
-        && identifier.length() <= MAX_IDENTIFIER_LENGTH;
+  public ConfigurationManager(
+      ImmutableSet<Container._Fields> allowedContainerTypes,
+      boolean allowDockerParameters) {
+
+    this.allowedContainerTypes = Objects.requireNonNull(allowedContainerTypes);
+    this.allowDockerParameters = allowDockerParameters;
   }
 
   private static void requireNonNull(Object value, String error) throws TaskDescriptionException {
@@ -141,12 +118,12 @@ public final class ConfigurationManager {
     requireNonNull(jobOwner.getRole(), "No job role specified!");
     requireNonNull(jobOwner.getUser(), "No job user specified!");
 
-    if (!isGoodIdentifier(jobOwner.getRole())) {
+    if (!UserProvidedStrings.isGoodIdentifier(jobOwner.getRole())) {
       throw new TaskDescriptionException(
           "Job role contains illegal characters: " + jobOwner.getRole());
     }
 
-    if (!isGoodIdentifier(jobOwner.getUser())) {
+    if (!UserProvidedStrings.isGoodIdentifier(jobOwner.getUser())) {
       throw new TaskDescriptionException(
           "Job user contains illegal characters: " + jobOwner.getUser());
     }
@@ -178,7 +155,7 @@ public final class ConfigurationManager {
    * @return A deep copy of {@code job} that has been populated.
    * @throws TaskDescriptionException If the job configuration is invalid.
    */
-  public static IJobConfiguration validateAndPopulate(IJobConfiguration job)
+  public IJobConfiguration validateAndPopulate(IJobConfiguration job)
       throws TaskDescriptionException {
 
     Objects.requireNonNull(job);
@@ -227,9 +204,7 @@ public final class ConfigurationManager {
    * @return A reference to the modified {@code config} (for chaining).
    * @throws TaskDescriptionException If the task is invalid.
    */
-  public static ITaskConfig validateAndPopulate(ITaskConfig config)
-      throws TaskDescriptionException {
-
+  public ITaskConfig validateAndPopulate(ITaskConfig config) throws TaskDescriptionException {
     TaskConfig builder = config.newBuilder();
 
     if (!builder.isSetRequestedPorts()) {
@@ -238,17 +213,17 @@ public final class ConfigurationManager {
 
     maybeFillLinks(builder);
 
-    if (!isGoodIdentifier(config.getJobName())) {
+    if (!UserProvidedStrings.isGoodIdentifier(config.getJobName())) {
       throw new TaskDescriptionException(
           "Job name contains illegal characters: " + config.getJobName());
     }
 
-    if (!isGoodIdentifier(config.getEnvironment())) {
+    if (!UserProvidedStrings.isGoodIdentifier(config.getEnvironment())) {
       throw new TaskDescriptionException(
           "Environment contains illegal characters: " + config.getEnvironment());
     }
 
-    if (config.isSetTier() && !isGoodIdentifier(config.getTier())) {
+    if (config.isSetTier() && !UserProvidedStrings.isGoodIdentifier(config.getTier())) {
       throw new TaskDescriptionException("Tier contains illegal characters: " + config.getTier());
     }
 
@@ -311,7 +286,7 @@ public final class ConfigurationManager {
         }
         if (containerConfig.getDocker().isSetParameters()
             && !containerConfig.getDocker().getParameters().isEmpty()
-            && !ENABLE_DOCKER_PARAMETERS.get()) {
+            && !allowDockerParameters) {
           throw new TaskDescriptionException("Docker parameters not allowed.");
         }
       }
@@ -322,7 +297,7 @@ public final class ConfigurationManager {
     if (!containerType.isPresent()) {
       throw new TaskDescriptionException("A job must have a container type.");
     }
-    if (!ALLOWED_CONTAINER_TYPES.get().contains(containerType.get())) {
+    if (!allowedContainerTypes.contains(containerType.get())) {
       throw new TaskDescriptionException(
           "The container type " + containerType.get().toString() + " is not allowed");
     }

@@ -65,6 +65,7 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronPredictor;
@@ -136,6 +137,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     lockManager = createMock(LockManager.class);
 
     thrift = new ReadOnlySchedulerImpl(
+        TaskTestUtil.CONFIGURATION_MANAGER,
         storageUtil.storage,
         nearestFit,
         cronPredictor,
@@ -302,7 +304,8 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   @Test
   public void testPopulateJobConfig() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
-    SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
+    SanitizedConfiguration sanitized =
+        SanitizedConfiguration.fromUnsanitized(TaskTestUtil.CONFIGURATION_MANAGER, job);
     control.replay();
 
     Response response = assertOkResponse(thrift.populateJobConfig(job.newBuilder()));

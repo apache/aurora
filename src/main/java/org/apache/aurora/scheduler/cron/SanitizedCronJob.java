@@ -39,10 +39,10 @@ public final class SanitizedCronJob {
   private final SanitizedConfiguration config;
   private final CrontabEntry crontabEntry;
 
-  private SanitizedCronJob(IJobConfiguration unsanitized)
+  private SanitizedCronJob(ConfigurationManager configurationManager, IJobConfiguration unsanitized)
       throws CronException, ConfigurationManager.TaskDescriptionException {
 
-    this(SanitizedConfiguration.fromUnsanitized(unsanitized));
+    this(SanitizedConfiguration.fromUnsanitized(configurationManager, unsanitized));
   }
 
   private SanitizedCronJob(SanitizedConfiguration config) throws CronException {
@@ -94,10 +94,12 @@ public final class SanitizedCronJob {
    * @throws ConfigurationManager.TaskDescriptionException If validation fails with a non
    * cron-specific error.
    */
-  public static SanitizedCronJob fromUnsanitized(IJobConfiguration unsanitized)
+  public static SanitizedCronJob fromUnsanitized(
+      ConfigurationManager configurationManager,
+      IJobConfiguration unsanitized)
       throws CronException, ConfigurationManager.TaskDescriptionException {
 
-    return new SanitizedCronJob(unsanitized);
+    return new SanitizedCronJob(configurationManager, unsanitized);
   }
 
   /**

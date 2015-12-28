@@ -30,12 +30,13 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
 import static org.apache.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
+import static org.apache.aurora.scheduler.base.UserProvidedStrings.isGoodIdentifier;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static org.apache.aurora.scheduler.configuration.ConfigurationManager.isGoodIdentifier;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -93,6 +94,13 @@ public class ConfigurationManagerTest {
       .setContainer(Container.docker(new DockerContainer("testimage"))))
       .newBuilder();
 
+  private ConfigurationManager configurationManager;
+
+  @Before
+  public void setUp() {
+    configurationManager = new ConfigurationManager(ImmutableSet.of(), false);
+  }
+
   @Test
   public void testIsGoodIdentifier() {
     for (String identifier : VALID_IDENTIFIERS) {
@@ -108,7 +116,7 @@ public class ConfigurationManagerTest {
     TaskConfig taskConfig = CONFIG_WITH_CONTAINER.deepCopy();
     taskConfig.getContainer().getDocker().setImage(null);
 
-    ConfigurationManager.validateAndPopulate(ITaskConfig.build(taskConfig));
+    configurationManager.validateAndPopulate(ITaskConfig.build(taskConfig));
   }
 
   @Test(expected = TaskDescriptionException.class)
@@ -118,6 +126,6 @@ public class ConfigurationManagerTest {
         .setEnvironment("env")
         .setTier("pr/d"));
 
-    ConfigurationManager.validateAndPopulate(config);
+    configurationManager.validateAndPopulate(config);
   }
 }

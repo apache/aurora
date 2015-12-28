@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
+import org.apache.aurora.gen.Container._Fields;
 import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.ExecutorConfig;
@@ -33,6 +34,7 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.TierInfo;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -47,6 +49,8 @@ public final class TaskTestUtil {
 
   public static final IJobKey JOB = JobKeys.from("role", "env", "job");
   public static final TierInfo REVOCABLE_TIER = new TierInfo(true);
+  public static final ConfigurationManager CONFIGURATION_MANAGER =
+      new ConfigurationManager(ImmutableSet.of(_Fields.MESOS), false);
 
   private TaskTestUtil() {
     // Utility class.

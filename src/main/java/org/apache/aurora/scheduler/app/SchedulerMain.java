@@ -15,7 +15,9 @@ package org.apache.aurora.scheduler.app;
 
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -45,6 +47,7 @@ import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.args.constraints.NotNull;
 import org.apache.aurora.common.inject.Bindings;
 import org.apache.aurora.common.logging.RootLogConfig;
+import org.apache.aurora.common.logging.RootLogConfig.LogLevel;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.zookeeper.Group;
 import org.apache.aurora.common.zookeeper.SingletonService;
@@ -76,6 +79,30 @@ import static org.apache.aurora.common.logging.RootLogConfig.Configuration;
  */
 public class SchedulerMain {
   private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
+
+  @CmdLine(name = "logtostderr", help = "Log messages to stderr instead of logfiles.")
+  private static final Arg<Boolean> LOGTOSTDERR = Arg.create(false);
+
+  @CmdLine(name = "alsologtostderr",
+      help = "Log messages to stderr, in addition to log files. Ignored when --logtostderr")
+  private static final Arg<Boolean> ALSOLOGTOSTDERR = Arg.create(false);
+
+  @CmdLine(name = "vlog",
+      help = "The value is one of the constants in java.util.logging.Level. "
+          + "Shows all messages with level equal or higher "
+          + "than the value of this flag.")
+  private static final Arg<LogLevel> VLOG = Arg.create(LogLevel.INFO);
+
+  @CmdLine(name = "vmodule",
+      help = "Per-class verbose level. The argument has to contain a comma-separated list "
+          + "of <class_name>=<log_level>. <class_name> is the full-qualified name of a "
+          + "class, <log_level> is one of the constants in java.util.logging.Level. "
+          + "<log_level> overrides any value given by --vlog.")
+  private static final Arg<Map<Class<?>, LogLevel>> VMODULE =
+      Arg.<Map<Class<?>, LogLevel>>create(new HashMap<>());
+
+  @CmdLine(name = "use_glog_formatter", help = "True to use the glog formatter exclusively.")
+  private static final Arg<Boolean> USE_GLOG_FORMATTER = Arg.create(true);
 
   @NotNull
   @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
@@ -119,7 +146,13 @@ public class SchedulerMain {
     startupServices.awaitHealthy();
 
     // Setup log4j to match our jul glog config in order to pick up zookeeper logging.
-    Configuration logConfiguration = RootLogConfig.configurationFromFlags();
+    Configuration logConfiguration = RootLogConfig.builder()
+        .logToStderr(LOGTOSTDERR.get())
+        .alsoLogToStderr(ALSOLOGTOSTDERR.get())
+        .useGLogFormatter(USE_GLOG_FORMATTER.get())
+        .vlog(VLOG.get())
+        .vmodule(VMODULE.get())
+        .build();
     logConfiguration.apply();
     Log4jConfigurator.configureConsole(logConfiguration);
 

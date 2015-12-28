@@ -34,9 +34,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Range;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.gen.AcquireLockResult;
 import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.ConfigRewrite;
@@ -149,20 +146,6 @@ import static org.apache.aurora.scheduler.thrift.Responses.ok;
  */
 @DecoratedThrift
 class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
-  private static final int DEFAULT_MAX_TASKS_PER_JOB = 4000;
-  private static final int DEFAULT_MAX_UPDATE_INSTANCE_FAILURES =
-      DEFAULT_MAX_TASKS_PER_JOB * 5;
-
-  @Positive
-  @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
-  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(DEFAULT_MAX_TASKS_PER_JOB);
-
-  @Positive
-  @CmdLine(name = "max_update_instance_failures", help = "Upper limit on the number of "
-      + "failures allowed during a job update. This helps cap potentially unbounded entries into "
-      + "storage.")
-  public static final Arg<Integer> MAX_UPDATE_INSTANCE_FAILURES = Arg.create(
-      DEFAULT_MAX_UPDATE_INSTANCE_FAILURES);
 
   // This number is derived from the maximum file name length limit on most UNIX systems, less
   // the number of characters we've observed being added by mesos for the executor ID, prefix, and
@@ -172,6 +155,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
+  private final ConfigurationManager configurationManager;
+  private final Thresholds thresholds;
   private final NonVolatileStorage storage;
   private final LockManager lockManager;
   private final StorageBackup backup;
@@ -188,6 +173,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
   @Inject
   SchedulerThriftInterface(
+      ConfigurationManager configurationManager,
+      Thresholds thresholds,
       NonVolatileStorage storage,
       LockManager lockManager,
       StorageBackup backup,
@@ -202,6 +189,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       ReadOnlyScheduler.Iface readOnlyScheduler,
       AuditMessages auditMessages) {
 
+    this.configurationManager = requireNonNull(configurationManager);
+    this.thresholds = requireNonNull(thresholds);
     this.storage = requireNonNull(storage);
     this.lockManager = requireNonNull(lockManager);
     this.backup = requireNonNull(backup);
@@ -221,7 +210,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   public Response createJob(JobConfiguration mutableJob, @Nullable Lock mutableLock) {
     SanitizedConfiguration sanitized;
     try {
-      sanitized = SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(mutableJob));
+      sanitized = SanitizedConfiguration.fromUnsanitized(
+          configurationManager,
+          IJobConfiguration.build(mutableJob));
     } catch (TaskDescriptionException e) {
       return error(INVALID_REQUEST, e);
     }
@@ -287,7 +278,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
     SanitizedConfiguration sanitized;
     try {
-      sanitized = SanitizedConfiguration.fromUnsanitized(job);
+      sanitized = SanitizedConfiguration.fromUnsanitized(configurationManager, job);
     } catch (TaskDescriptionException e) {
       return error(INVALID_REQUEST, e);
     }
@@ -653,7 +644,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     IJobConfiguration rewrittenJob;
     Optional<String> error = Optional.absent();
     try {
-      rewrittenJob = ConfigurationManager.validateAndPopulate(jobRewrite.getRewrittenJob());
+      rewrittenJob = configurationManager.validateAndPopulate(jobRewrite.getRewrittenJob());
     } catch (TaskDescriptionException e) {
       // We could add an error here, but this is probably a hint of something wrong in
       // the client that's causing a bad configuration to be applied.
@@ -742,8 +733,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
     ITaskConfig task;
     try {
-      task = ConfigurationManager.validateAndPopulate(
-          ITaskConfig.build(config.getTaskConfig()));
+      task = configurationManager.validateAndPopulate(ITaskConfig.build(config.getTaskConfig()));
     } catch (TaskDescriptionException e) {
       return error(INVALID_REQUEST, e);
     }
@@ -834,10 +824,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       int totalInstances,
       QuotaCheckResult quotaCheck) throws TaskValidationException {
 
-    if (totalInstances <= 0 || totalInstances > MAX_TASKS_PER_JOB.get()) {
+    if (totalInstances <= 0 || totalInstances > thresholds.getMaxTasksPerJob()) {
       throw new TaskValidationException(String.format(
-          "Instance count must be between 1 and %d inclusive.",
-          MAX_TASKS_PER_JOB.get()));
+          "Instance count must be between 1 and %d inclusive.", thresholds.getMaxTasksPerJob()));
     }
 
     // TODO(maximk): This is a short-term hack to stop the bleeding from
@@ -900,7 +889,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     }
 
     if (settings.getMaxPerInstanceFailures() * mutableRequest.getInstanceCount()
-            > MAX_UPDATE_INSTANCE_FAILURES.get()) {
+            > thresholds.getMaxUpdateInstanceFailures()) {
       return invalidRequest(TOO_MANY_POTENTIAL_FAILED_INSTANCES);
     }
 
@@ -915,9 +904,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     IJobUpdateRequest request;
     try {
       request = IJobUpdateRequest.build(new JobUpdateRequest(mutableRequest).setTaskConfig(
-          ConfigurationManager.validateAndPopulate(
+          configurationManager.validateAndPopulate(
               ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
-
     } catch (TaskDescriptionException e) {
       return error(INVALID_REQUEST, e);
     }

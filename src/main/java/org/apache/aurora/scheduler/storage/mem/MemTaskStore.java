@@ -13,6 +13,10 @@
  */
 package org.apache.aurora.scheduler.storage.mem;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,6 +25,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -39,8 +44,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Amount;
@@ -65,12 +68,15 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private static final Logger LOG = Logger.getLogger(MemTaskStore.class.getName());
 
-  @CmdLine(name = "slow_query_log_threshold",
-      help = "Log all queries that take at least this long to execute.")
-  private static final Arg<Amount<Long, Time>> SLOW_QUERY_LOG_THRESHOLD =
-      Arg.create(Amount.of(25L, Time.MILLISECONDS));
+  /**
+   * When true, enable snapshot deflation.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.METHOD, ElementType.PARAMETER})
+  @Qualifier
+  public @interface SlowQueryThreshold { }
 
-  private final long slowQueryThresholdNanos = SLOW_QUERY_LOG_THRESHOLD.get().as(Time.NANOSECONDS);
+  private final long slowQueryThresholdNanos;
 
   private static final Function<Query.Builder, Optional<Set<IJobKey>>> QUERY_TO_JOB_KEY =
       JobKeys::from;
@@ -98,7 +104,10 @@ class MemTaskStore implements TaskStore.Mutable {
   private final AtomicLong taskQueriesAll;
 
   @Inject
-  MemTaskStore(StatsProvider statsProvider) {
+  MemTaskStore(
+      StatsProvider statsProvider,
+      @SlowQueryThreshold Amount<Long, Time> slowQueryThreshold) {
+
     secondaryIndices = ImmutableList.of(
         new SecondaryIndex<>(
             Tasks::getJob,
@@ -110,6 +119,7 @@ class MemTaskStore implements TaskStore.Mutable {
             QUERY_TO_SLAVE_HOST,
             statsProvider,
             "host"));
+    slowQueryThresholdNanos = slowQueryThreshold.as(Time.NANOSECONDS);
     taskQueriesById = statsProvider.makeCounter("task_queries_by_id");
     taskQueriesAll = statsProvider.makeCounter("task_queries_all");
   }

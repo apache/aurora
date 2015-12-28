@@ -24,7 +24,6 @@ import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskQuery;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
@@ -50,9 +49,9 @@ public final class JobKeys {
    */
   public static boolean isValid(@Nullable IJobKey jobKey) {
     return jobKey != null
-        && ConfigurationManager.isGoodIdentifier(jobKey.getRole())
-        && ConfigurationManager.isGoodIdentifier(jobKey.getEnvironment())
-        && ConfigurationManager.isGoodIdentifier(jobKey.getName());
+        && UserProvidedStrings.isGoodIdentifier(jobKey.getRole())
+        && UserProvidedStrings.isGoodIdentifier(jobKey.getEnvironment())
+        && UserProvidedStrings.isGoodIdentifier(jobKey.getName());
   }
 
   /**

@@ -74,7 +74,8 @@ import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.CronJobManager;
@@ -142,7 +143,6 @@ import static org.apache.aurora.scheduler.thrift.Fixtures.nonProductionTask;
 import static org.apache.aurora.scheduler.thrift.Fixtures.okResponse;
 import static org.apache.aurora.scheduler.thrift.Fixtures.productionTask;
 import static org.apache.aurora.scheduler.thrift.Fixtures.response;
-import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASKS_PER_JOB;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASK_ID_LENGTH;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NO_CRON;
@@ -163,6 +163,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static final String AUDIT_MESSAGE = "message";
   private static final AuditData AUDIT = new AuditData(USER, Optional.of(AUDIT_MESSAGE));
+  private static final Thresholds THRESHOLDS = new Thresholds(1000, 2000);
 
   private StorageTestUtil storageUtil;
   private LockManager lockManager;
@@ -198,6 +199,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     thrift = getResponseProxy(
         new SchedulerThriftInterface(
+            TaskTestUtil.CONFIGURATION_MANAGER,
+            THRESHOLDS,
             storageUtil.storage,
             lockManager,
             backup,
@@ -233,6 +236,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         });
   }
 
+  private static SanitizedConfiguration fromUnsanitized(IJobConfiguration job)
+      throws TaskDescriptionException {
+
+    return SanitizedConfiguration.fromUnsanitized(TaskTestUtil.CONFIGURATION_MANAGER, job);
+  }
+
+  private static IJobConfiguration validateAndPopulate(IJobConfiguration job)
+      throws TaskDescriptionException {
+
+    return TaskTestUtil.CONFIGURATION_MANAGER.validateAndPopulate(job);
+  }
+
   @Test
   public void testCreateJobNoLock() throws Exception {
     // Validate key is populated during sanitizing.
@@ -240,7 +255,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     jobConfig.getTaskConfig().unsetJob();
 
     IJobConfiguration job = IJobConfiguration.build(makeProdJob());
-    SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
+    SanitizedConfiguration sanitized = fromUnsanitized(job);
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expectNoCronJob();
@@ -261,7 +276,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobWithLock() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeProdJob());
-    SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
+    SanitizedConfiguration sanitized = fromUnsanitized(job);
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.of(LOCK));
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expectNoCronJob();
@@ -337,7 +352,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobFailsInstanceCheck() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(
-        makeJob(defaultTask(true), MAX_TASKS_PER_JOB.get() + 1));
+        makeJob(defaultTask(true), THRESHOLDS.getMaxTasksPerJob() + 1));
 
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
@@ -355,7 +370,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobFailsTaskIdLength() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
-    SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
+    SanitizedConfiguration sanitized = fromUnsanitized(job);
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expectNoCronJob();
@@ -375,7 +390,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateJobFailsQuotaCheck() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeProdJob());
-    SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
+    SanitizedConfiguration sanitized = fromUnsanitized(job);
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expectNoCronJob();
@@ -829,8 +844,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testReplaceCronTemplate() throws Exception {
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
-    SanitizedConfiguration sanitized =
-        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+    SanitizedConfiguration sanitized = fromUnsanitized(IJobConfiguration.build(CRON_JOB));
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
@@ -856,8 +870,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testReplaceCronTemplateDoesNotExist() throws Exception {
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
-    SanitizedConfiguration sanitized =
-        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+    SanitizedConfiguration sanitized = fromUnsanitized(IJobConfiguration.build(CRON_JOB));
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
@@ -888,8 +901,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testScheduleCronCreatesJob() throws Exception {
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
-    SanitizedConfiguration sanitized =
-        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+    SanitizedConfiguration sanitized = fromUnsanitized(IJobConfiguration.build(CRON_JOB));
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
@@ -905,8 +917,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testScheduleCronFailsCreationDueToExistingNonCron() throws Exception {
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
-    SanitizedConfiguration sanitized =
-        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+    SanitizedConfiguration sanitized = fromUnsanitized(IJobConfiguration.build(CRON_JOB));
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
@@ -923,8 +934,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testScheduleCronUpdatesJob() throws Exception {
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
-    SanitizedConfiguration sanitized =
-        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+    SanitizedConfiguration sanitized = fromUnsanitized(IJobConfiguration.build(CRON_JOB));
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
@@ -969,8 +979,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testScheduleCronFailsQuotaCheck() throws Exception {
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
-    SanitizedConfiguration sanitized =
-        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+    SanitizedConfiguration sanitized = fromUnsanitized(IJobConfiguration.build(CRON_JOB));
 
     expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(TASK_ID);
@@ -1185,8 +1194,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
     expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
         .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
-    storageUtil.jobStore.saveAcceptedJob(
-        ConfigurationManager.validateAndPopulate(IJobConfiguration.build(newJob)));
+    storageUtil.jobStore.saveAcceptedJob(validateAndPopulate(IJobConfiguration.build(newJob)));
 
     control.replay();
 
@@ -1634,8 +1642,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     JobUpdateRequest updateRequest = buildServiceJobUpdateRequest();
     updateRequest.getSettings()
-        .setMaxPerInstanceFailures(SchedulerThriftInterface.MAX_UPDATE_INSTANCE_FAILURES.get()
-            + 10);
+        .setMaxPerInstanceFailures(THRESHOLDS.getMaxUpdateInstanceFailures() + 10);
 
     assertEquals(
         invalidResponse(SchedulerThriftInterface.TOO_MANY_POTENTIAL_FAILED_INSTANCES),
@@ -1790,7 +1797,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartUpdateFailsInstanceCountCheck() throws Exception {
     JobUpdateRequest request = buildServiceJobUpdateRequest(populatedTask());
-    request.setInstanceCount(4001);
+    request.setInstanceCount(THRESHOLDS.getMaxTasksPerJob() + 1);
     expectGetRemoteUser();
     expectNoCronJob();
     expect(uuidGenerator.createNew()).andReturn(UU_ID);

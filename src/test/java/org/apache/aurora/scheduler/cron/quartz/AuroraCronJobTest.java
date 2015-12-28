@@ -23,6 +23,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -56,6 +57,7 @@ public class AuroraCronJobTest extends EasyMockTest {
     backoffHelper = createMock(BackoffHelper.class);
 
     auroraCronJob = new AuroraCronJob(
+        TaskTestUtil.CONFIGURATION_MANAGER,
         new AuroraCronJob.Config(backoffHelper), storage, stateManager);
   }
 

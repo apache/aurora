@@ -75,6 +75,7 @@ import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronPredictor;
@@ -113,6 +114,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
           .setConfig(input.getKey().newBuilder())
           .setInstances(IRange.toBuildersSet(convertRanges(toRanges(input.getValue()))));
 
+  private final ConfigurationManager configurationManager;
   private final Storage storage;
   private final NearestFit nearestFit;
   private final CronPredictor cronPredictor;
@@ -121,12 +123,14 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
 
   @Inject
   ReadOnlySchedulerImpl(
+      ConfigurationManager configurationManager,
       Storage storage,
       NearestFit nearestFit,
       CronPredictor cronPredictor,
       QuotaManager quotaManager,
       LockManager lockManager) {
 
+    this.configurationManager = requireNonNull(configurationManager);
     this.storage = requireNonNull(storage);
     this.nearestFit = requireNonNull(nearestFit);
     this.cronPredictor = requireNonNull(cronPredictor);
@@ -140,6 +144,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
 
     try {
       ITaskConfig populatedTaskConfig = SanitizedConfiguration.fromUnsanitized(
+          configurationManager,
           IJobConfiguration.build(description)).getJobConfig().getTaskConfig();
       return ok(Result.populateJobResult(
           new PopulateJobResult().setTaskConfig(populatedTaskConfig.newBuilder())));

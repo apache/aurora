@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.CronCollisionPolicy;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
@@ -162,6 +163,7 @@ public class CronJobManagerImplTest extends EasyMockTest {
   @Test
   public void testNoRunOverlap() throws Exception {
     SanitizedCronJob runOverlapJob = SanitizedCronJob.fromUnsanitized(
+        TaskTestUtil.CONFIGURATION_MANAGER,
         IJobConfiguration.build(QuartzTestUtil.JOB.newBuilder()
             .setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP)));
 

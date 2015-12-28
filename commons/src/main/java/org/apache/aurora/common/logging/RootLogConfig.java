@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.common.logging;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
@@ -24,9 +23,6 @@ import java.util.logging.Logger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 
 /**
  * A configuration class for the root java.util.logging Logger.
@@ -57,30 +53,6 @@ public class RootLogConfig {
       return level;
     }
   }
-
-  @CmdLine(name = "logtostderr", help = "Log messages to stderr instead of logfiles.")
-  private static Arg<Boolean> LOGTOSTDERR = Arg.create(false);
-
-  @CmdLine(name = "alsologtostderr",
-           help = "Log messages to stderr, in addition to log files. Ignored when --logtostderr")
-  private static Arg<Boolean> ALSOLOGTOSTDERR = Arg.create(false);
-
-  @CmdLine(name = "vlog",
-           help = "The value is one of the constants in java.util.logging.Level. "
-                  + "Shows all messages with level equal or higher "
-                  + "than the value of this flag.")
-  private static Arg<LogLevel> VLOG = Arg.create(LogLevel.INFO);
-
-  @CmdLine(name = "vmodule",
-           help = "Per-class verbose level. The argument has to contain a comma-separated list "
-                  + "of <class_name>=<log_level>. <class_name> is the full-qualified name of a "
-                  + "class, <log_level> is one of the constants in java.util.logging.Level. "
-                  + "<log_level> overrides any value given by --vlog.")
-  private static Arg<Map<Class<?>, LogLevel>> VMODULE =
-      Arg.<Map<Class<?>, LogLevel>>create(new HashMap<Class<?>, LogLevel>());
-
-  @CmdLine(name = "use_glog_formatter", help = "True to use the glog formatter exclusively.")
-  private static Arg<Boolean> USE_GLOG_FORMATTER = Arg.create(true);
 
   /**
    * Represents a logging configuration for java.util.logging.
@@ -244,21 +216,6 @@ public class RootLogConfig {
    */
   public static Builder builder() {
     return new Builder();
-  }
-
-  /**
-   * Creates a logging configuration using flags
-   *
-   * @return The logging configuration specified via command line flags.
-   */
-  public static Configuration configurationFromFlags() {
-    return builder()
-        .logToStderr(LOGTOSTDERR.get())
-        .alsoLogToStderr(ALSOLOGTOSTDERR.get())
-        .useGLogFormatter(USE_GLOG_FORMATTER.get())
-        .vlog(VLOG.get())
-        .vmodule(VMODULE.get())
-        .build();
   }
 
   private static void configure(Configuration configuration) {

@@ -30,6 +30,7 @@ import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
@@ -90,6 +91,7 @@ public class CronIT extends EasyMockTest {
         }), new AbstractModule() {
           @Override
           protected void configure() {
+            bind(ConfigurationManager.class).toInstance(TaskTestUtil.CONFIGURATION_MANAGER);
             bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
             bind(StateManager.class).toInstance(stateManager);
             bind(Storage.class).toInstance(storage);
@@ -176,7 +178,9 @@ public class CronIT extends EasyMockTest {
 
     boot();
 
-    cronJobManager.createJob(SanitizedCronJob.fromUnsanitized(CRON_JOB));
+    cronJobManager.createJob(SanitizedCronJob.fromUnsanitized(
+        TaskTestUtil.CONFIGURATION_MANAGER,
+        CRON_JOB));
     cronJobManager.startJobNow(JOB_KEY);
     firstExecutionTriggered.await();
     cronJobManager.startJobNow(JOB_KEY);

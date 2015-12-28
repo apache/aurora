@@ -73,16 +73,19 @@ class AuroraCronJob implements Job {
   @VisibleForTesting
   static final Optional<String> KILL_AUDIT_MESSAGE = Optional.of("Killed by cronScheduler");
 
+  private final ConfigurationManager configurationManager;
   private final Storage storage;
   private final StateManager stateManager;
   private final BackoffHelper delayedStartBackoff;
 
   @Inject
   AuroraCronJob(
+      ConfigurationManager configurationManager,
       Config config,
       Storage storage,
       StateManager stateManager) {
 
+    this.configurationManager = requireNonNull(configurationManager);
     this.storage = requireNonNull(storage);
     this.stateManager = requireNonNull(stateManager);
     this.delayedStartBackoff = requireNonNull(config.getDelayedStartBackoff());
@@ -126,7 +129,7 @@ class AuroraCronJob implements Job {
 
           SanitizedCronJob cronJob;
           try {
-            cronJob = SanitizedCronJob.fromUnsanitized(config.get());
+            cronJob = SanitizedCronJob.fromUnsanitized(configurationManager, config.get());
           } catch (ConfigurationManager.TaskDescriptionException | CronException e) {
             LOG.warning(String.format(
                 "Invalid cron job for %s in storage - failed to parse with %s", key, e));

@@ -53,10 +53,11 @@ public final class SanitizedConfiguration {
    * @return A wrapper containing the sanitized configuration.
    * @throws TaskDescriptionException If the configuration is invalid.
    */
-  public static SanitizedConfiguration fromUnsanitized(IJobConfiguration unsanitized)
-      throws TaskDescriptionException {
+  public static SanitizedConfiguration fromUnsanitized(
+      ConfigurationManager configurationManager,
+      IJobConfiguration unsanitized) throws TaskDescriptionException {
 
-    return new SanitizedConfiguration(ConfigurationManager.validateAndPopulate(unsanitized));
+    return new SanitizedConfiguration(configurationManager.validateAndPopulate(unsanitized));
   }
 
   public IJobConfiguration getJobConfig() {
