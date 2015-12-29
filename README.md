@@ -55,6 +55,7 @@ Are you using Aurora too?  Let us know, or submit a patch to join the list!
 - [Foursquare](https://foursquare.com)
 - [Gutefrage.net](https://www.gutefrage.net)
 - [Magine TV](https://magine.com)
+- [Medallia](http://www.medallia.com)
 - [Oscar Health](https://www.hioscar.com)
 - [Sabre Labs](http://www.sabre.com)
 - [TellApart](https://www.tellapart.com)
