@@ -18,7 +18,7 @@ import org.apache.aurora.gen.MaintenanceMode;
 /**
  * Type handler for {@link MaintenanceMode}.
  */
-class MaintenanceModeTypeHandler extends AbstractTEnumTypeHandler<MaintenanceMode> {
+public class MaintenanceModeTypeHandler extends AbstractTEnumTypeHandler<MaintenanceMode> {
   @Override
   protected MaintenanceMode fromValue(int value) {
     return MaintenanceMode.findByValue(value);

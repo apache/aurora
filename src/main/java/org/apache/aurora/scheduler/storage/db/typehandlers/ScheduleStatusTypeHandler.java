@@ -18,7 +18,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 /**
  * Type handler for {@link ScheduleStatus}.
  */
-class ScheduleStatusTypeHandler extends AbstractTEnumTypeHandler<ScheduleStatus> {
+public class ScheduleStatusTypeHandler extends AbstractTEnumTypeHandler<ScheduleStatus> {
   @Override
   protected ScheduleStatus fromValue(int value) {
     return ScheduleStatus.findByValue(value);

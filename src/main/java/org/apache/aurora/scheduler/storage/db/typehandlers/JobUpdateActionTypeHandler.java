@@ -18,7 +18,7 @@ import org.apache.aurora.gen.JobUpdateAction;
 /**
  * Type handler for {@link JobUpdateAction}.
  */
-class JobUpdateActionTypeHandler extends AbstractTEnumTypeHandler<JobUpdateAction> {
+public class JobUpdateActionTypeHandler extends AbstractTEnumTypeHandler<JobUpdateAction> {
   @Override
   protected JobUpdateAction fromValue(int value) {
     return JobUpdateAction.findByValue(value);
