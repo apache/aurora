@@ -85,7 +85,7 @@ class TestThermosTaskRunnerIntegration(object):
         print('Saved thermos executor at %s' % cls.PEX_PATH)
 
   @contextlib.contextmanager
-  def yield_runner(self, runner_class, portmap=None, clock=time, **bindings):
+  def yield_runner(self, runner_class, portmap=None, clock=time, preserve_env=False, **bindings):
     with contextlib.nested(temporary_dir(), temporary_dir()) as (td1, td2):
       sandbox = DirectorySandbox(td1)
       checkpoint_root = td2
@@ -101,15 +101,18 @@ class TestThermosTaskRunnerIntegration(object):
           clock=clock,
           sandbox=sandbox,
           checkpoint_root=checkpoint_root,
+          preserve_env=preserve_env,
       )
 
       yield task_runner
 
-  def yield_sleepy(self, runner_class, sleep, exit_code, portmap={}, clock=time):
+  def yield_sleepy(self, runner_class, sleep, exit_code, portmap={}, clock=time,
+          preserve_env=False):
     return self.yield_runner(
         runner_class,
         portmap=portmap,
         clock=clock,
+        preserve_env=preserve_env,
         command='sleep {{__sleep}} && exit {{__exit_code}}',
         __sleep=sleep,
         __exit_code=exit_code)
@@ -324,3 +327,24 @@ class TestThermosTaskRunnerIntegration(object):
       status = task_runner.compute_status()
       assert 'killed by signal 9' in status.reason
       assert status.status is mesos_pb2.TASK_KILLED
+
+  def test_thermos_preserve_env(self):
+    with self.yield_sleepy(
+        ThermosTaskRunner,
+        preserve_env=True,
+        sleep=0,
+        exit_code=0) as task_runner:
+
+      task_runner.start()
+      task_runner.forked.wait()
+
+      self.run_to_completion(task_runner)
+
+      assert task_runner.status is not None
+      assert task_runner.status.status == mesos_pb2.TASK_FINISHED
+
+      # no-op
+      task_runner.stop()
+
+      assert task_runner.status is not None
+      assert task_runner.status.status == mesos_pb2.TASK_FINISHED

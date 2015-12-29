@@ -120,6 +120,14 @@ app.add_option(
     help='Maximum number of rotated stdout/stderr logs emitted by the thermos runner.')
 
 
+app.add_option(
+     "--preserve_env",
+     dest="preserve_env",
+     default=False,
+     action='store_true',
+     help="Preserve thermos runners' environment variables for the task being run.")
+
+
 # TODO(wickman) Consider just having the OSS version require pip installed
 # thermos_runner binaries on every machine and instead of embedding the pex
 # as a resource, shell out to one on the PATH.
@@ -168,7 +176,8 @@ def initialize(options):
       artifact_dir=cwd_path,
       process_logger_mode=options.runner_logger_mode,
       rotate_log_size_mb=options.runner_rotate_log_size_mb,
-      rotate_log_backups=options.runner_rotate_log_backups
+      rotate_log_backups=options.runner_rotate_log_backups,
+      preserve_env=options.preserve_env
     )
     thermos_runner_provider.set_role(None)
 
@@ -184,7 +193,8 @@ def initialize(options):
       artifact_dir=cwd_path,
       process_logger_mode=options.runner_logger_mode,
       rotate_log_size_mb=options.runner_rotate_log_size_mb,
-      rotate_log_backups=options.runner_rotate_log_backups
+      rotate_log_backups=options.runner_rotate_log_backups,
+      preserve_env=options.preserve_env
     )
 
     thermos_executor = AuroraExecutor(

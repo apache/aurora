@@ -83,6 +83,14 @@ app.add_option(
 
 
 app.add_option(
+     "--preserve_env",
+     dest="preserve_env",
+     default=False,
+     action='store_true',
+     help="Preserve thermos runners' environment variables for the task being run.")
+
+
+app.add_option(
      "--port",
      type='string',
      nargs=1,
@@ -193,7 +201,8 @@ def proxy_main(args, opts):
       hostname=opts.hostname,
       process_logger_mode=opts.process_logger_mode,
       rotate_log_size_mb=opts.rotate_log_size_mb,
-      rotate_log_backups=opts.rotate_log_backups
+      rotate_log_backups=opts.rotate_log_backups,
+      preserve_env=opts.preserve_env
   )
 
   for sig in (signal.SIGUSR1, signal.SIGUSR2):

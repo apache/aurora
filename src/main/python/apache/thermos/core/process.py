@@ -30,6 +30,7 @@ import subprocess
 import sys
 import time
 from abc import abstractmethod
+from copy import deepcopy
 
 from twitter.common import log
 from twitter.common.dirutil import lock_file, safe_delete, safe_mkdir, safe_open
@@ -315,10 +316,12 @@ class Process(ProcessBase):
       Takes additional arguments:
         fork: the fork function to use [default: os.fork]
         chroot: whether or not to chroot into the sandbox [default: False]
+        preserve_env: whether or not to preserve env variables for the task [default: False]
     """
     fork = kw.pop('fork', os.fork)
     self._use_chroot = bool(kw.pop('chroot', False))
     self._rc = None
+    self._preserve_env = bool(kw.pop('preserve_env', False))
     kw['platform'] = RealPlatform(fork=fork)
     ProcessBase.__init__(self, *args, **kw)
     if self._use_chroot and self._sandbox is None:
@@ -363,12 +366,18 @@ class Process(ProcessBase):
       sandbox = self._sandbox if not self._use_chroot else '/'
 
     thermos_profile = os.path.join(sandbox, self.RCFILE)
-    env = {
+
+    if self._preserve_env:
+      env = deepcopy(os.environ)
+    else:
+      env = {}
+
+    env.update({
       'HOME': homedir if self._use_chroot else sandbox,
       'LOGNAME': username,
       'USER': username,
       'PATH': os.environ['PATH']
-    }
+    })
 
     if os.path.exists(thermos_profile):
       env.update(BASH_ENV=thermos_profile)

@@ -419,7 +419,8 @@ class TaskRunner(object):
   def __init__(self, task, checkpoint_root, sandbox, log_dir=None,
                task_id=None, portmap=None, user=None, chroot=False, clock=time,
                universal_handler=None, planner_class=TaskPlanner, hostname=None,
-               process_logger_mode=None, rotate_log_size_mb=None, rotate_log_backups=None):
+               process_logger_mode=None, rotate_log_size_mb=None, rotate_log_backups=None,
+               preserve_env=False):
     """
       required:
         task (config.Task) = the task to run
@@ -444,6 +445,8 @@ class TaskRunner(object):
         process_logger_mode (string) = The type of logger to use for all processes.
         rotate_log_size_mb (integer) = The maximum size of the rotated stdout/stderr logs in MiB.
         rotate_log_backups (integer) = The maximum number of rotated stdout/stderr log backups.
+        preserve_env (boolean) = whether or not env variables for the runner should be in the
+                                 env for the task being run
     """
     if not issubclass(planner_class, TaskPlanner):
       raise TypeError('planner_class must be a TaskPlanner.')
@@ -504,6 +507,7 @@ class TaskRunner(object):
     self._preemption_deadline = None
     self._watcher = ProcessMuxer(self._pathspec)
     self._state = RunnerState(processes={})
+    self._preserve_env = preserve_env
 
     # create runner state
     universal_handler = universal_handler or TaskRunnerUniversalHandler
@@ -708,7 +712,8 @@ class TaskRunner(object):
       fork=close_ckpt_and_fork,
       logger_mode=logger_mode,
       rotate_log_size=rotate_log_size,
-      rotate_log_backups=rotate_log_backups)
+      rotate_log_backups=rotate_log_backups,
+      preserve_env=self._preserve_env)
 
   def _build_process_logger_args(self, process):
     """

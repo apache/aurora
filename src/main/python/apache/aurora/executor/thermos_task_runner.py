@@ -75,7 +75,8 @@ class ThermosTaskRunner(TaskRunner):
                hostname=None,
                process_logger_mode=None,
                rotate_log_size_mb=None,
-               rotate_log_backups=None):
+               rotate_log_backups=None,
+               preserve_env=False):
     """
       runner_pex       location of the thermos_runner pex that this task runner should use
       task_id          task_id assigned by scheduler
@@ -86,6 +87,7 @@ class ThermosTaskRunner(TaskRunner):
       checkpoint_root  the checkpoint root for the thermos runner
       artifact_dir     scratch space for the thermos runner (basically cwd of thermos.pex)
       clock            clock
+      preserve_env
     """
     self._runner_pex = runner_pex
     self._task_id = task_id
@@ -97,6 +99,7 @@ class ThermosTaskRunner(TaskRunner):
     self._root = sandbox.root
     self._checkpoint_root = checkpoint_root
     self._enable_chroot = sandbox.chrooted
+    self._preserve_env = preserve_env
     self._role = role
     self._clock = clock
     self._artifact_dir = artifact_dir or safe_mkdtemp()
@@ -252,6 +255,8 @@ class ThermosTaskRunner(TaskRunner):
         '--%s=%s' % (flag, value) for flag, value in params.items() if value is not None)
     if self._enable_chroot:
       cmdline_args.extend(['--enable_chroot'])
+    if self._preserve_env:
+      cmdline_args.extend(['--preserve_env'])
     for name, port in self._ports.items():
       cmdline_args.extend(['--port=%s:%s' % (name, port)])
     return cmdline_args
@@ -348,6 +353,7 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
                pex_location,
                checkpoint_root,
                artifact_dir=None,
+               preserve_env=False,
                task_runner_class=ThermosTaskRunner,
                max_wait=Amount(1, Time.MINUTES),
                preemption_wait=Amount(1, Time.MINUTES),
@@ -358,6 +364,7 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
                rotate_log_backups=None):
     self._artifact_dir = artifact_dir or safe_mkdtemp()
     self._checkpoint_root = checkpoint_root
+    self._preserve_env = preserve_env
     self._clock = clock
     self._max_wait = max_wait
     self._pex_location = pex_location
@@ -398,7 +405,8 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
         hostname=assigned_task.slaveHost,
         process_logger_mode=self._process_logger_mode,
         rotate_log_size_mb=self._rotate_log_size_mb,
-        rotate_log_backups=self._rotate_log_backups)
+        rotate_log_backups=self._rotate_log_backups,
+        preserve_env=self._preserve_env)
 
     return HttpLifecycleManager.wrap(runner, mesos_task, mesos_ports)
 

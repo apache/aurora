@@ -2,6 +2,8 @@
 ------
 - Removed the deprecated field 'ConfigGroup.instanceIds' from the API.
 - Upgraded Mesos to 0.25.0.
+- Env variables can be passed through to task processes by passing `--preserve_env`
+  to thermos.
 
 0.11.0
 ------

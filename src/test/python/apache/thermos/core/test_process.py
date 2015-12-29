@@ -267,3 +267,26 @@ def assert_log_content(taskpath, log_name, expected_content):
 def assert_log_dne(taskpath, log_name):
   log = taskpath.with_filename(log_name).getpath('process_logdir')
   assert not os.path.exists(log)
+
+
+@mock.patch.dict('os.environ', values={'PATH': 'SOME_PATH', 'TEST': 'A_TEST_VAR'}, clear=True)
+def test_preserve_env(*mocks):
+
+  scenarios = [
+    ('PATH', True, 'SOME_PATH'),
+    ('TEST', True, 'A_TEST_VAR'),
+    ('PATH', False, 'SOME_PATH'),
+    ('TEST', False, ''),
+  ]
+
+  for var, preserve, expectation in scenarios:
+    with temporary_dir() as td:
+      taskpath = make_taskpath(td)
+      sandbox = setup_sandbox(td, taskpath)
+
+      p = TestProcess('process', 'echo $' + var, 0, taskpath, sandbox, preserve_env=preserve)
+      p.start()
+      rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
+
+      assert rc == 0
+      assert_log_content(taskpath, 'stdout', expectation + '\n')
