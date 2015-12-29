@@ -405,6 +405,13 @@ pmd {
   consoleOutput = true
 }
 
+// As recommended here to work around PMD bugs exposed by otherwise
+// handing it an `auxClasspath` to resolve types with:
+//   https://discuss.gradle.org/t/upgrading-gradle-from-2-7-to-2-8-results-in-pmd-false-positives/13460
+tasks.withType(Pmd) {
+  classpath = null
+}
+
 pmdMain {
   ruleSetFiles = files('config/pmd/common.xml', 'config/pmd/main.xml')
 }
