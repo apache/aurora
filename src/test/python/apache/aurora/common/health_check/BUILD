@@ -12,28 +12,12 @@
 # limitations under the License.
 #
 
-target(
-  name = 'all',
-  dependencies = [
-    ':test_http_signaler',
-    ':test_shell',
-  ]
-)
-
 python_tests(
-  name = 'test_http_signaler',
-  sources = ['test_http_signaler.py'],
+  name = 'health_check',
+  sources = globs('*py'),
   dependencies = [
+    '3rdparty/python:mock',
     '3rdparty/python:mox',
     'src/main/python/apache/aurora/common',
-  ]
-)
-
-python_tests(
-  name = 'test_shell',
-  sources = ['test_shell.py'],
-  dependencies = [
-  '3rdparty/python:mock',
-  'src/main/python/apache/aurora/common',
   ]
 )

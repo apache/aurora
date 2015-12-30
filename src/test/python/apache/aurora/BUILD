@@ -12,20 +12,8 @@
 # limitations under the License.
 #
 
-target(
-  name = 'all',
-  dependencies = [
-    'src/test/python/apache/aurora/admin:all',
-    'src/test/python/apache/aurora/client:all',
-    'src/test/python/apache/aurora/common:all',
-    'src/test/python/apache/aurora/config:all',
-    'src/test/python/apache/aurora/executor:all',
-    'src/test/python/apache/aurora/tools:all',
-  ]
-)
-
 python_library(
-  name = 'api_util',
+  name = 'aurora',
   sources = [ 'api_util.py' ],
   dependencies = [
     'api/src/main/thrift/org/apache/aurora/gen',

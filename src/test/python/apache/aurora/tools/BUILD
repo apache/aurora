@@ -12,14 +12,9 @@
 # limitations under the License.
 #
 
-target(name = 'all',
-  dependencies = [
-    ':thermos_observer_entry_point',
-  ]
-)
-
-python_tests(name = 'thermos_observer_entry_point',
-  sources = ['test_thermos_observer_entry_point.py'],
+python_tests(
+  name = 'tools',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/tools:thermos_observer',

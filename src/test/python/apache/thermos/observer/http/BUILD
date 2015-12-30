@@ -12,17 +12,9 @@
 # limitations under the License.
 #
 
-
-target(
-  name = 'all',
-  dependencies = [
-    ':test_file_browser',
-  ]
-)
-
 python_tests(
-  name = 'test_file_browser',
-  sources = ['test_file_browser.py'],
+  name = 'http',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/thermos/monitoring',

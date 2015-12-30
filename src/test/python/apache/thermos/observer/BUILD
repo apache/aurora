@@ -12,17 +12,9 @@
 # limitations under the License.
 #
 
-
-target(
-  name = 'all',
-  dependencies = [
-    ':test_detector',
-  ]
-)
-
 python_tests(
-  name = 'test_detector',
-  sources = ['test_detector.py'],
+  name = 'observer',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/thermos/observer',

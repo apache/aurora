@@ -12,28 +12,11 @@
 # limitations under the License.
 #
 
-target(
-  name = 'all',
-  dependencies = [
-    ':common',
-    ':main',
-    'src/test/python/apache/thermos/cli/commands',
-  ]
-)
-
 python_tests(
-  name = 'common',
-  sources = ['test_common.py'],
+  name = 'cli',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/thermos/cli',
-  ]
-)
-
-python_tests(
-  name = 'main',
-  sources = ['test_main.py'],
-  dependencies = [
     'src/main/python/apache/thermos/cli',
   ]
 )

@@ -12,46 +12,16 @@
 # limitations under the License.
 #
 
-target(name = 'all',
-  dependencies = [
-    ':test_base',
-    ':test_constraint_parsing',
-    ':test_loader',
-    ':test_thrift',
-  ]
-)
-
-python_tests(name = 'test_base',
-  sources = ['test_base.py'],
+python_tests(
+  name = 'config',
+  sources = globs('*py'),
   dependencies = [
     '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/config',
-  ]
-)
-
-python_tests(name = 'test_loader',
-  sources = ['test_loader.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.contextutil',
+    'api/src/main/thrift/org/apache/aurora/gen',
     'src/main/python/apache/aurora/config',
   ],
   coverage = [
     'apache.aurora.config',
     'apache.thermos.config'
-  ]
-)
-
-python_tests(name = 'test_constraint_parsing',
-  sources = ['test_constraint_parsing.py'],
-  dependencies = [
-    'src/main/python/apache/aurora/config',
-  ]
-)
-
-python_tests(name = 'test_thrift',
-  sources = ['test_thrift.py'],
-  dependencies = [
-    'src/main/python/apache/aurora/config',
-    'api/src/main/thrift/org/apache/aurora/gen',
   ]
 )

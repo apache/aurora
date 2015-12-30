@@ -12,21 +12,12 @@
 # limitations under the License.
 #
 
-target(name = 'all',
-  dependencies = [
-    ':base',
-    ':binding_helper',
-    ':config',
-    'src/test/python/apache/aurora/client/api:all',
-    'src/test/python/apache/aurora/client/cli:all',
-    'src/test/python/apache/aurora/client/hooks:all',
-  ],
-)
-
 python_tests(
-  name = 'binding_helper',
-  sources = ['test_binding_helper.py'],
+  name = 'client',
+  sources = globs('*.py'),
   dependencies = [
+    '3rdparty/python:mock',
+    '3rdparty/python:mox',
     '3rdparty/python:pystachio',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client',
@@ -34,25 +25,8 @@ python_tests(
   ],
 )
 
-python_tests(name = 'base',
-  sources = ['test_base.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client',
-  ],
-)
-
-python_tests(name = 'config',
-  sources = ['test_config.py'],
-  dependencies = [
-    '3rdparty/python:mox',
-    '3rdparty/python:pystachio',
-    'src/main/python/apache/aurora/client',
-  ],
-)
-
 python_library(
-  name = 'fake_scheduler_proxy',
+  name = 'lib_fake_scheduler_proxy',
   sources = ['fake_scheduler_proxy.py'],
   dependencies = [
     'src/main/python/apache/aurora/client',

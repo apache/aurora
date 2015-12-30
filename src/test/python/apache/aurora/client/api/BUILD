@@ -12,108 +12,15 @@
 # limitations under the License.
 #
 
-target(name = 'all',
-  dependencies = [
-    ':api',
-    ':instance_watcher',
-    ':job_monitor',
-    ':mux',
-    ':quota_check',
-    ':restarter',
-    ':scheduler_client',
-    ':sla',
-    ':task_util',
-    ':updater_util'
-  ],
-)
-
-python_tests(name = 'api',
-  sources = ['test_api.py'],
+python_tests(
+  name = 'api',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client',
-    'api/src/main/thrift/org/apache/aurora/gen'
-  ],
-)
-
-python_tests(name = 'job_monitor',
-  sources = ['test_job_monitor.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client',
-    'api/src/main/thrift/org/apache/aurora/gen',
-    'src/test/python/apache/aurora/client:fake_scheduler_proxy',
-  ],
-)
-
-python_tests(name = 'instance_watcher',
-  sources = ['test_instance_watcher.py', 'test_health_check.py'],
-  dependencies = [
     '3rdparty/python:mox',
-    'src/main/python/apache/aurora/client',
     'api/src/main/thrift/org/apache/aurora/gen',
-  ]
-)
-
-python_tests(name = 'mux',
-  sources = ['test_scheduler_mux.py'],
-  dependencies = [
-    'src/main/python/apache/aurora/client',
-  ]
-)
-
-python_tests(name = 'quota_check',
-  sources = ['test_quota_check.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client',
-    'api/src/main/thrift/org/apache/aurora/gen',
-  ]
-)
-
-python_tests(name = 'restarter',
-  sources = ['test_restarter.py'],
-  dependencies = [
-    '3rdparty/python:mox',
     'src/main/python/apache/aurora/client',
     'src/main/python/apache/aurora/common',
-    'api/src/main/thrift/org/apache/aurora/gen',
-    'src/test/python/apache/aurora/client:fake_scheduler_proxy',
-  ],
-)
-
-python_tests(name = 'scheduler_client',
-  sources = ['test_scheduler_client.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    '3rdparty/python:mox',
-    'src/main/python/apache/aurora/client',
-    'api/src/main/thrift/org/apache/aurora/gen',
-  ]
-)
-
-python_tests(name = 'sla',
-  sources = ['test_sla.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client',
-    'api/src/main/thrift/org/apache/aurora/gen',
-  ]
-)
-
-python_tests(name = 'task_util',
-  sources = ['test_task_util.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/main/python/apache/aurora/client',
-    'api/src/main/thrift/org/apache/aurora/gen',
-  ]
-)
-
-python_tests(name = 'updater_util',
-  sources = ['test_updater_util.py'],
-  dependencies = [
-    'src/main/python/apache/aurora/client',
-    'api/src/main/thrift/org/apache/aurora/gen'
+    'src/test/python/apache/aurora/client:lib_fake_scheduler_proxy',
   ],
 )

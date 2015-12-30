@@ -12,30 +12,9 @@
 # limitations under the License.
 #
 
-target(name = 'all',
-  dependencies = [
-    ':test_pathspec',
-    ':test_planner',
-    ':test_task_planner',
-  ]
-)
-
-python_tests(name = 'test_pathspec',
-  sources = ['test_pathspec.py'],
-  dependencies = [
-    'src/main/python/apache/thermos/common',
-  ],
-)
-
-python_tests(name = 'test_planner',
-  sources = ['test_planner.py'],
-  dependencies = [
-    'src/main/python/apache/thermos/common',
-  ],
-)
-
-python_tests(name = 'test_task_planner',
-  sources = ['test_task_planner.py'],
+python_tests(
+  name = 'common',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:twitter.common.testing',
     'src/main/python/apache/thermos/common',

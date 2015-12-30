@@ -12,14 +12,9 @@
 # limitations under the License.
 #
 
-target(name = 'all',
-  dependencies = [
-    ':test_schema',
-  ]
-)
-
-python_tests(name = 'test_schema',
-  sources = ['test_schema.py'],
+python_tests(
+  name = 'config',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:twitter.common.collections',
     'src/main/python/apache/thermos/config',

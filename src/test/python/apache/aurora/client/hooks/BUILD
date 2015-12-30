@@ -12,25 +12,10 @@
 # limitations under the License.
 #
 
-target(name = 'all',
-  dependencies = [
-    ':hooked_api',
-    ':non_hooked_api',
-  ],
-)
-
-python_tests(name = 'hooked_api',
-  sources = ['test_hooked_api.py'],
+python_tests(name = 'hooks',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
-    'src/main/python/apache/aurora/common',
-    'src/main/python/apache/aurora/client',
-  ]
-)
-
-python_tests(name = 'non_hooked_api',
-  sources = ['test_non_hooked_api.py'],
-  dependencies = [
     'src/main/python/apache/aurora/common',
     'src/main/python/apache/aurora/client',
   ],

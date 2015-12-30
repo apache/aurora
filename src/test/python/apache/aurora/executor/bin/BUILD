@@ -12,16 +12,9 @@
 # limitations under the License.
 #
 
-target(
-  name = 'all',
-  dependencies = [
-    ':thermos_executor_entry_point',
-  ]
-)
-
 python_tests(
-  name = 'thermos_executor_entry_point',
-  sources = ['test_thermos_executor_entry_point.py'],
+  name = 'bin',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/executor',

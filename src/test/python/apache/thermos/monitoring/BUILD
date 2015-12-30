@@ -12,36 +12,14 @@
 # limitations under the License.
 #
 
-target(name = 'all',
-  dependencies = [
-    ':test_disk',
-    ':test_detector',
-    ':test_resource',
-  ]
-)
-
-python_tests(name = 'test_disk',
-  sources = ['test_disk.py'],
-  dependencies = [
-    'src/main/python/apache/thermos/monitoring',
-    '3rdparty/python:twitter.common.quantity',
-  ]
-)
-
-python_tests(name = 'test_detector',
-  sources = ['test_detector.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.contextutil',
-    '3rdparty/python:twitter.common.dirutil',
-    'src/main/python/apache/thermos/common',
-    'src/main/python/apache/thermos/monitoring',
-  ]
-)
-
-python_tests(name = 'test_resource',
-  sources = ['test_resource.py'],
+python_tests(
+  name = 'monitoring',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.contextutil',
+    '3rdparty/python:twitter.common.dirutil',
+    '3rdparty/python:twitter.common.quantity',
     'src/main/python/apache/thermos/common',
     'src/main/python/apache/thermos/monitoring',
   ]
