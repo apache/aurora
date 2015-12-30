@@ -129,8 +129,8 @@ class RequestProcessor(object):
     dependencies = review_request['depends_on']
     if len(dependencies) > 1:
       raise self.PatchApplyError(
-          'Can only test reviews with 1 parent, found %d: %s' %
-          (len(dependencies), ' '.join('RB#%d' % d['href'] for d in dependencies)))
+          'Can only test reviews with 1 parent, found %d:\n\t%s' %
+          (len(dependencies), '\n\t'.join(d['href'] for d in dependencies)))
     elif len(dependencies) == 1:
       parent_request = self._server.get_resource(dependencies[0]['href'])['review_request']
       basis = 'RB#%d' % parent_request['id']
