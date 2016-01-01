@@ -72,6 +72,8 @@ class ThriftPlugin implements Plugin<Project> {
         classpath = configurations.thriftCompile
         destinationDir = file(thrift.genClassesDir)
         options.warnings = false
+        // Capture method parameter names in classfiles.
+        options.compilerArgs << '-parameters'
       }
 
       configurations.create('thriftRuntime')

@@ -272,6 +272,8 @@ compileJava {
   options.compilerArgs << '-Xlint:-processing'
   // Don't fail for serialVersionUID warnings.
   options.compilerArgs << '-Xlint:-serial'
+  // Capture method parameter names in classfiles.
+  options.compilerArgs << '-parameters'
 }
 
 task enforceVersion {
@@ -479,6 +481,8 @@ idea {
     ipr {
       withXml {
         def projectNode = it.asNode()
+
+        // Configure an annotation processor profile.
         def compilerConfiguration = projectNode.find {
           it.name() == 'component' && it.@name == 'CompilerConfiguration'
         }
@@ -501,6 +505,11 @@ idea {
           it.name() == 'component' && it.@name == 'ProjectRootManager'
         }
         projectRoot.remove(projectRoot.output)
+
+        // Add parameter names to generated class file debug info.
+        projectNode
+            .appendNode('component', [name: 'JavacSettings'])
+            .appendNode('option', [name: 'ADDITIONAL_OPTIONS_STRING', value: '-parameters'])
       }
     }
   }

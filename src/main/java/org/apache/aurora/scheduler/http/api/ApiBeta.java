@@ -16,11 +16,10 @@ package org.apache.aurora.scheduler.http.api;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Type;
+import java.lang.reflect.Parameter;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -89,30 +88,29 @@ public class ApiBeta {
    * will be substituted.
    *
    * @param json Incoming request data, to translate into method parameters.
-   * @param fields Field metadata map. Map <strong>iteration order must match</strong> the order
-   *               defined in the thrift method.
+   * @param method The thrift method to bind parameters for.
    * @return Parsed method parameters.
    * @throws WebApplicationException If a parameter could not be parsed.
    */
-  private Object[] readParams(JsonObject json, Map<String, Type> fields)
+  private Object[] readParams(JsonObject json, Method method)
       throws WebApplicationException {
 
     List<Object> params = Lists.newArrayList();
-    for (Map.Entry<String, Type> entry : fields.entrySet()) {
+    for (Parameter param : method.getParameters()) {
       try {
-        params.add(GSON.fromJson(getJsonMember(json, entry.getKey()), entry.getValue()));
+        params.add(GSON.fromJson(getJsonMember(json, param.getName()), param.getType()));
       } catch (JsonParseException e) {
         throw new WebApplicationException(
             e,
-            badRequest("Failed to parse parameter " + entry.getKey() + ": " + e.getMessage()));
+            badRequest("Failed to parse parameter " + param + ": " + e.getMessage()));
       }
     }
     return params.toArray();
   }
 
-  private Method getApiMethod(String name, Map<String, Type> metadata) {
+  private Method getApiMethod(String name, Class<?>[] parameterTypes) {
     try {
-      return Iface.class.getMethod(name, metadata.values().toArray(new Class<?>[0]));
+      return Iface.class.getMethod(name, parameterTypes);
     } catch (NoSuchMethodException e) {
       throw Throwables.propagate(e);
     }
@@ -127,8 +125,8 @@ public class ApiBeta {
     }
 
     // First, verify that this is a valid method on the interface.
-    Map<String, Type> methodMetadata = AuroraAdminMetadata.METHODS.get(methodName);
-    if (methodMetadata == null) {
+    Class<?>[] methodParameterTypes = AuroraAdminMetadata.METHODS.get(methodName);
+    if (methodParameterTypes == null) {
       return errorResponse(Status.NOT_FOUND, "Method " + methodName + " does not exist.");
     }
 
@@ -146,8 +144,8 @@ public class ApiBeta {
       throw new WebApplicationException(e, badRequest("Request must be valid JSON"));
     }
 
-    final Method method = getApiMethod(methodName, methodMetadata);
-    final Object[] params = readParams(parameters, methodMetadata);
+    final Method method = getApiMethod(methodName, methodParameterTypes);
+    final Object[] params = readParams(parameters, method);
     return Response.ok((StreamingOutput) output -> {
       try {
         Object response = method.invoke(api, params);

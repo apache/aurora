@@ -336,7 +336,7 @@ class Method(object):
     self.return_type = return_type
 
   def __str__(self):
-    return '%s(%s)' % (self.name, ', '.join(map(str, self.parameters)))
+    return '%s(%s)' % (self.name, ', '.join(self.parameters))
 
 class Parameter(object):
   def __init__(self, name, type_name):
@@ -353,31 +353,26 @@ class GenericParameter(Parameter):
 
 GET_SUPER_METHODS = '.putAll(%(super)sMetadata.METHODS)'
 
-PARAM_METADATA_TEMPLATE = '.put("%(name)s", %(type)s.class)'
-
-GENERIC_PARAM_METADATA_TEMPLATE = (
-    '.put("%(name)s", new TypeToken<%(type)s<%(params)s>>() {}.getType())')
+PARAM_METADATA_TEMPLATE = '%(type)s.class,'
 
 METHOD_METADATA_TEMPLATE = '''.put(
               "%(name)s",
-              ImmutableMap.<String, Type>builder()%(params)s
-                  .build())'''
+              new Class<?>[] {%(params)s
+                  })'''
 
 SERVICE_METADATA_TEMPLATE = '''package %(package)s;
 
-import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.gson.reflect.TypeToken;
 
 import org.apache.aurora.gen.*;
 
 public final class %(name)sMetadata {
-  public static final Map<String, Map<String, Type>> METHODS =
-      ImmutableMap.<String, Map<String, Type>>builder()
+  public static final ImmutableMap<String, Class<?>[]> METHODS =
+      ImmutableMap.<String, Class<?>[]>builder()
           %(methods)s
           .build();
 
@@ -391,7 +386,7 @@ SERVICE_RE = 'service (?P<name>\w+)\s+(extends\s+(?P<super>\w+)\s+)?{(?P<body>[^
 
 METHOD_RE = '\s*(?P<return>\w+)\s+(?P<name>\w+)\((?P<params>[^\)]*)\)'
 
-PARAM_RE = '\d+\:\s+%s\s+(?P<name>\w+)' % TYPE_PATTERN
+PARAM_RE = '\d+\:\s+%s\s+(?:\w+)' % TYPE_PATTERN
 
 THRIFT_TYPES = {
   'bool': PrimitiveType('boolean', 'Boolean'),
@@ -464,13 +459,7 @@ def parse_services(service_defs):
     for method in re.finditer(METHOD_RE, s.group('body'), flags=re.MULTILINE):
       params = []
       for param in re.finditer(PARAM_RE, method.group('params'), flags=re.MULTILINE):
-        if param.group('params'):
-          params.append(GenericParameter(
-              param.group('name'),
-              param.group('type'),
-              param.group('params').replace(' ', '').split(',')))
-        else:
-          params.append(Parameter(param.group('name'), param.group('type')))
+        params.append(param.group('type'))
       methods.append(Method(method.group('name'),
                             params,
                             method.group('return')))
@@ -695,21 +684,12 @@ if __name__ == '__main__':
         if isinstance(thrift_type, PrimitiveType):
           return thrift_type.boxed_name
         else:
-          return name
+          return thrift_type.name
       return name
 
     def add_param(param):
-      if param.type_name in THRIFT_TYPES:
-        thrift_type = THRIFT_TYPES[param.type_name]
-        if not isinstance(thrift_type, PrimitiveType):
-          return GENERIC_PARAM_METADATA_TEMPLATE % {
-            'name': param.name,
-            'type': thrift_type.name,
-            'params': ', '.join(map(get_type_name, param.parameters))
-          }
       return PARAM_METADATA_TEMPLATE % {
-        'name': param.name,
-        'type': get_type_name(param.type_name)
+        'type': get_type_name(param)
       }
 
     def add_method(method):
