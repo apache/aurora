@@ -34,6 +34,7 @@ We encourage you to ask questions on the [Aurora developer list](http://aurora.a
  * [Developing the Aurora Scheduler](developing-aurora-scheduler.md)
  * [Developing the Aurora Client](developing-aurora-client.md)
  * [Committers Guide](committers.md)
+ * [Design Documents](design-documents.md)
  * [Deprecation Guide](thrift-deprecation.md)
  * [Build System](build-system.md)
  * [Generating test resources](test-resource-generation.md)
