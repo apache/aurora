@@ -55,8 +55,6 @@ import static org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import static org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import static org.apache.aurora.scheduler.log.Log.Stream.InvalidPositionException;
 import static org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
-import static org.apache.aurora.scheduler.storage.log.LogManager.DeduplicateSnapshots;
-import static org.apache.aurora.scheduler.storage.log.LogManager.DeflateSnapshots;
 import static org.apache.aurora.scheduler.storage.log.LogManager.LogEntryHashFunction;
 
 class StreamManagerImpl implements StreamManager {
@@ -79,26 +77,20 @@ class StreamManagerImpl implements StreamManager {
   private final Object writeMutex = new Object();
   private final Log.Stream stream;
   private final EntrySerializer entrySerializer;
-  private final boolean deflateSnapshots;
   private final HashFunction hashFunction;
   private final SnapshotDeduplicator snapshotDeduplicator;
-  private final boolean deduplicateSnapshots;
 
   @Inject
   StreamManagerImpl(
       @Assisted Stream stream,
       EntrySerializer entrySerializer,
-      @DeflateSnapshots boolean deflateSnapshots,
       @LogEntryHashFunction HashFunction hashFunction,
-      SnapshotDeduplicator snapshotDeduplicator,
-      @DeduplicateSnapshots boolean deduplicateSnapshots) {
+      SnapshotDeduplicator snapshotDeduplicator) {
 
     this.stream = requireNonNull(stream);
     this.entrySerializer = requireNonNull(entrySerializer);
-    this.deflateSnapshots = deflateSnapshots;
     this.hashFunction = requireNonNull(hashFunction);
     this.snapshotDeduplicator = requireNonNull(snapshotDeduplicator);
-    this.deduplicateSnapshots = deduplicateSnapshots;
   }
 
   @Override
@@ -203,17 +195,8 @@ class StreamManagerImpl implements StreamManager {
   public void snapshot(Snapshot snapshot)
       throws CodingException, InvalidPositionException, StreamAccessException {
 
-    LogEntry entry;
-    if (deduplicateSnapshots) {
-      entry = LogEntry.deduplicatedSnapshot(snapshotDeduplicator.deduplicate(snapshot));
-    } else {
-      entry = LogEntry.snapshot(snapshot);
-    }
-
-    if (deflateSnapshots) {
-      entry = deflate(entry);
-    }
-
+    LogEntry entry =
+        deflate(LogEntry.deduplicatedSnapshot(snapshotDeduplicator.deduplicate(snapshot)));
     Log.Position position = appendAndGetPosition(entry);
     vars.snapshots.incrementAndGet();
     vars.unSnapshottedTransactions.set(0);

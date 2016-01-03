@@ -39,22 +39,6 @@ public class LogManager {
   public @interface MaxEntrySize { }
 
   /**
-   * When true, enable snapshot deflation.
-   */
-  @Retention(RetentionPolicy.RUNTIME)
-  @Target({ElementType.METHOD, ElementType.PARAMETER})
-  @Qualifier
-  public @interface DeflateSnapshots { }
-
-  /**
-   * When true, enable snapshot deduplication.
-   */
-  @Retention(RetentionPolicy.RUNTIME)
-  @Target({ElementType.METHOD, ElementType.PARAMETER})
-  @Qualifier
-  public @interface DeduplicateSnapshots { }
-
-  /**
    * Hash function used to verify log entries.
    */
   @Retention(RetentionPolicy.RUNTIME)

@@ -35,16 +35,13 @@ import org.eclipse.jetty.util.resource.Resource;
 public class ApiModule extends ServletModule {
   public static final String API_PATH = "/api";
 
-  @CmdLine(name = "enable_cors_support", help = "Enable CORS support for thrift end points.")
-  private static final Arg<Boolean> ENABLE_CORS_SUPPORT = Arg.create(false);
-
   /**
    * Set the {@code Access-Control-Allow-Origin} header for API requests. See
    * http://www.w3.org/TR/cors/
    */
   @CmdLine(name = "enable_cors_for",
       help = "List of domains for which CORS support should be enabled.")
-  private static final Arg<String> ENABLE_CORS_FOR = Arg.create("*");
+  private static final Arg<String> ENABLE_CORS_FOR = Arg.create(null);
 
   private static final String API_CLIENT_ROOT = Resource
       .newClassPathResource("org/apache/aurora/scheduler/gen/client")
@@ -52,7 +49,7 @@ public class ApiModule extends ServletModule {
 
   @Override
   protected void configureServlets() {
-    if (ENABLE_CORS_SUPPORT.get()) {
+    if (ENABLE_CORS_FOR.get() != null) {
       filter(API_PATH).through(new CorsFilter(ENABLE_CORS_FOR.get()));
     }
     serve(API_PATH).with(TServlet.class);

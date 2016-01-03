@@ -4,6 +4,11 @@
 - Upgraded Mesos to 0.25.0.
 - Env variables can be passed through to task processes by passing `--preserve_env`
   to thermos.
+- Removed scheduler command line arguments:
+  - `-enable_cors_support`.  Enabling CORS is now implicit by setting the argument
+    `-enable_cors_for`.
+  - `-deduplicate_snapshots` and `-deflate_snapshots`.  These features are good to always enable.
+  - `-enable_job_updates` and `-enable_job_creation`
 
 0.11.0
 ------

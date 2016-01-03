@@ -31,12 +31,10 @@ import org.apache.aurora.scheduler.storage.CallOrderEnforcingStorage;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
-import org.apache.aurora.scheduler.storage.log.LogManager.DeduplicateSnapshots;
 import org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
 import org.apache.aurora.scheduler.storage.log.LogStorage.Settings;
 
 import static org.apache.aurora.scheduler.storage.log.EntrySerializer.EntrySerializerImpl;
-import static org.apache.aurora.scheduler.storage.log.LogManager.DeflateSnapshots;
 import static org.apache.aurora.scheduler.storage.log.LogManager.LogEntryHashFunction;
 import static org.apache.aurora.scheduler.storage.log.SnapshotDeduplicator.SnapshotDeduplicatorImpl;
 
@@ -64,14 +62,6 @@ public class LogStorageModule extends PrivateModule {
   public static final Arg<Amount<Integer, Data>> MAX_LOG_ENTRY_SIZE =
       Arg.create(Amount.of(512, Data.KB));
 
-  @CmdLine(name = "deduplicate_snapshots",
-      help = "Write snapshots in deduplicated format. For details and backwards compatibility "
-          + "concerns see docs/scheduler-storage.md.")
-  private static final Arg<Boolean> DEDUPLICATE_SNAPSHOTS = Arg.create(false);
-
-  @CmdLine(name = "deflate_snapshots", help = "Whether snapshots should be deflate-compressed.")
-  private static final Arg<Boolean> DEFLATE_SNAPSHOTS = Arg.create(true);
-
   @Override
   protected void configure() {
     bind(Settings.class)
@@ -80,8 +70,6 @@ public class LogStorageModule extends PrivateModule {
     bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
         .toInstance(MAX_LOG_ENTRY_SIZE.get());
     bind(LogManager.class).in(Singleton.class);
-    bindConstant().annotatedWith(DeduplicateSnapshots.class).to(DEDUPLICATE_SNAPSHOTS.get());
-    bindConstant().annotatedWith(DeflateSnapshots.class).to(DEFLATE_SNAPSHOTS.get());
     bind(LogStorage.class).in(Singleton.class);
 
     install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));

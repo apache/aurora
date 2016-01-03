@@ -15,17 +15,19 @@ package org.apache.aurora.scheduler.storage.log.testing;
 
 import java.util.Objects;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.storage.DeduplicatedSnapshot;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
-import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
+import org.apache.aurora.scheduler.storage.log.Entries;
 import org.easymock.EasyMock;
 import org.easymock.IArgumentMatcher;
 import org.easymock.IExpectationSetters;
@@ -92,9 +94,13 @@ public class LogOpMatcher implements IArgumentMatcher {
      * @param snapshot Expected snapshot.
      * @return An expectation setter.
      */
-    public IExpectationSetters<Position> expectSnapshot(Snapshot snapshot) {
-      LogEntry entry = LogEntry.snapshot(snapshot);
-      return expect(stream.append(sameEntry(entry)));
+    public IExpectationSetters<Position> expectSnapshot(DeduplicatedSnapshot snapshot) {
+      try {
+        LogEntry entry = Entries.deflate(LogEntry.deduplicatedSnapshot(snapshot));
+        return expect(stream.append(sameEntry(entry)));
+      } catch (CodingException e) {
+        throw Throwables.propagate(e);
+      }
     }
   }
 

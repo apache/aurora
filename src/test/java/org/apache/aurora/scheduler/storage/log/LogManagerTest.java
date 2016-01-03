@@ -42,6 +42,7 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.storage.DeduplicatedSnapshot;
 import org.apache.aurora.gen.storage.Frame;
 import org.apache.aurora.gen.storage.FrameChunk;
 import org.apache.aurora.gen.storage.FrameHeader;
@@ -103,10 +104,8 @@ public class LogManagerTest extends EasyMockTest {
     return new StreamManagerImpl(
         stream,
         new EntrySerializer.EntrySerializerImpl(maxEntrySize, Hashing.md5()),
-        false,
         Hashing.md5(),
-        new SnapshotDeduplicatorImpl(),
-        false);
+        new SnapshotDeduplicatorImpl());
   }
 
   @Test
@@ -261,7 +260,8 @@ public class LogManagerTest extends EasyMockTest {
   @Test
   public void testTransactionSnapshot() throws CodingException {
     Snapshot snapshot = createSnapshot();
-    expectAppend(position1, LogEntry.snapshot(snapshot));
+    DeduplicatedSnapshot deduplicated = new SnapshotDeduplicatorImpl().deduplicate(snapshot);
+    expectAppend(position1, Entries.deflate(LogEntry.deduplicatedSnapshot(deduplicated)));
     stream.truncateBefore(position1);
 
     control.replay();
@@ -393,10 +393,8 @@ public class LogManagerTest extends EasyMockTest {
     final StreamManagerImpl streamManager = new StreamManagerImpl(
         mockStream,
         new EntrySerializer.EntrySerializerImpl(message1.chunkSize, Hashing.md5()),
-        false,
         Hashing.md5(),
-        new SnapshotDeduplicatorImpl(),
-        false);
+        new SnapshotDeduplicatorImpl());
     StreamTransaction tr1 = streamManager.startTransaction();
     tr1.add(op1);
 
@@ -485,7 +483,8 @@ public class LogManagerTest extends EasyMockTest {
   public void testWriteAndReadDeflatedEntry() throws Exception {
     Snapshot snapshot = createSnapshot();
     LogEntry snapshotLogEntry = LogEntry.snapshot(snapshot);
-    LogEntry deflatedSnapshotEntry = Entries.deflate(snapshotLogEntry);
+    LogEntry deflatedSnapshotEntry = Entries.deflate(
+        LogEntry.deduplicatedSnapshot(new SnapshotDeduplicatorImpl().deduplicate(snapshot)));
 
     Entry snapshotEntry = createMock(Entry.class);
     expect(stream.append(entryEq(deflatedSnapshotEntry))).andReturn(position1);
@@ -504,10 +503,8 @@ public class LogManagerTest extends EasyMockTest {
     StreamManagerImpl streamManager = new StreamManagerImpl(
         stream,
         new EntrySerializer.EntrySerializerImpl(NO_FRAMES_EVER_SIZE, md5),
-        true,
         md5,
-        new SnapshotDeduplicatorImpl(),
-        false);
+        new SnapshotDeduplicatorImpl());
     streamManager.snapshot(snapshot);
     streamManager.readFromBeginning(reader);
   }

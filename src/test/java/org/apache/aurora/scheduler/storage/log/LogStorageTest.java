@@ -56,6 +56,7 @@ import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.storage.DeduplicatedSnapshot;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
@@ -78,6 +79,7 @@ import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
@@ -104,6 +106,7 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.log.LogStorage.SchedulingService;
+import org.apache.aurora.scheduler.storage.log.SnapshotDeduplicator.SnapshotDeduplicatorImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -131,6 +134,7 @@ public class LogStorageTest extends EasyMockTest {
 
   private LogStorage logStorage;
   private Log log;
+  private SnapshotDeduplicator deduplicator;
   private Stream stream;
   private Position position;
   private StreamMatcher streamMatcher;
@@ -142,19 +146,15 @@ public class LogStorageTest extends EasyMockTest {
   @Before
   public void setUp() {
     log = createMock(Log.class);
-    SnapshotDeduplicator snapshotDeduplicator = createMock(SnapshotDeduplicator.class);
+    deduplicator = createMock(SnapshotDeduplicator.class);
 
     StreamManagerFactory streamManagerFactory = logStream -> {
       HashFunction md5 = Hashing.md5();
       return new StreamManagerImpl(
           logStream,
-          new EntrySerializer.EntrySerializerImpl(
-              Amount.of(1, Data.GB),
-              md5),
-          false,
+          new EntrySerializer.EntrySerializerImpl(Amount.of(1, Data.GB), md5),
           md5,
-          snapshotDeduplicator,
-          false);
+          deduplicator);
     };
     LogManager logManager = new LogManager(log, streamManagerFactory);
 
@@ -227,11 +227,12 @@ public class LogStorageTest extends EasyMockTest {
     Snapshot snapshotContents = new Snapshot()
         .setTimestamp(NOW)
         .setTasks(ImmutableSet.of(
-            new ScheduledTask()
-                .setStatus(ScheduleStatus.RUNNING)
-                .setAssignedTask(new AssignedTask().setTaskId("task_id"))));
+            TaskTestUtil.makeTask("task_id", TaskTestUtil.JOB).newBuilder()));
     expect(snapshotStore.createSnapshot()).andReturn(snapshotContents);
-    streamMatcher.expectSnapshot(snapshotContents).andReturn(position);
+    DeduplicatedSnapshot deduplicated =
+        new SnapshotDeduplicatorImpl().deduplicate(snapshotContents);
+    expect(deduplicator.deduplicate(snapshotContents)).andReturn(deduplicated);
+    streamMatcher.expectSnapshot(deduplicated).andReturn(position);
     stream.truncateBefore(position);
     Capture<MutateWork<Void, RuntimeException>> snapshotWork = createCapture();
     expect(storageUtil.storage.write(capture(snapshotWork))).andAnswer(

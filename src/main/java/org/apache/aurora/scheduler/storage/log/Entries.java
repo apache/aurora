@@ -25,7 +25,7 @@ import org.apache.aurora.gen.storage.LogEntry._Fields;
 /**
  * Utility class for working with log entries.
  */
-final class Entries {
+public final class Entries {
 
   private static final Logger LOG = Logger.getLogger(Entries.class.getName());
 
@@ -46,7 +46,7 @@ final class Entries {
    *         of the original entry.
    * @throws CodingException If the value could not be encoded or deflated.
    */
-  static LogEntry deflate(LogEntry entry) throws CodingException {
+  public static LogEntry deflate(LogEntry entry) throws CodingException {
     return LogEntry.deflatedEntry(ThriftBinaryCodec.deflateNonNull(entry));
   }
 
