@@ -56,7 +56,7 @@ environment:
 In addition, there is an end-to-end test that runs a suite of aurora commands
 using a virtual cluster:
 
-    bash src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh
+    ./src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh
 
 
 

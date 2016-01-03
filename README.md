@@ -1,7 +1,7 @@
 ![Aurora Logo](docs/images/aurora_logo.png)
 
-Apache Aurora lets you use an [Apache Mesos](http://mesos.apache.org) cluster as a private cloud.
-It supports running long-running services, cron jobs, and ad-hoc jobs.
+[Apache Aurora](https://aurora.apache.org/) lets you use an [Apache Mesos](http://mesos.apache.org)
+cluster as a private cloud. It supports running long-running services, cron jobs, and ad-hoc jobs.
 Aurora aims to make it extremely quick and easy to take a built application and run it on machines
 in a cluster, with an emphasis on reliability. It provides basic operations to manage services
 running in a cluster, such as rolling upgrades.
@@ -9,12 +9,10 @@ running in a cluster, such as rolling upgrades.
 To very concisely describe Aurora, it is like a distributed monit or distributed supervisord that
 you can instruct to do things like _run 100 of these, somewhere, forever_.
 
-https://aurora.apache.org/
-
 
 ## Features
 
-Aurora is build for users _and_ operators.
+Aurora is built for users _and_ operators.
 
 * User-facing Features:
   - Management of long-running services

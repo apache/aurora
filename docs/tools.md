@@ -1,6 +1,6 @@
 # Tools
 
-Various tools integrate with Aurora. There is a tool missing? Let us know, or submit a patch to add it!
+Various tools integrate with Aurora. Is there a tool missing? Let us know, or submit a patch to add it!
 
 * Load-balacing technology used to direct traffic to services running on Aurora
   - [synapse](https://github.com/airbnb/synapse) based on HAProxy

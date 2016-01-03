@@ -34,7 +34,6 @@ function require_healthy {
 
 function write_test_files {
   cat > hello_world.py <<EOF
-import sys
 import time
 
 def main(argv):
@@ -43,11 +42,10 @@ def main(argv):
   for i in xrang(100):
     print("Hello world! The time is now: %s. Sleeping for %d secs" % (
       time.asctime(), SLEEP_DELAY))
-    sys.stdout.flush()
     time.sleep(SLEEP_DELAY)
 
 if __name__ == "__main__":
-  main(sys.argv)
+  main()
 EOF
 
   cat > hello_world.aurora <<EOF
@@ -68,7 +66,7 @@ install = Process(
 # run the script
 hello_world = Process(
   name = 'hello_world',
-  cmdline = 'python hello_world.py')
+  cmdline = 'python -u hello_world.py')
 
 # describe the task
 hello_world_task = SequentialTask(
