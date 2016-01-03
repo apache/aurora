@@ -25,6 +25,7 @@ import org.apache.aurora.common.args.ParserOracle;
  * @author John Sirois
  */
 @ArgParser
+@SuppressWarnings("unused")
 public class EnumParser<T extends Enum<T>> implements Parser<T> {
 
   @Override

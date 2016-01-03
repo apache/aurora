@@ -53,7 +53,7 @@ public class OffersModule extends AbstractModule {
             new RandomJitterReturnDelay(
                 MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS),
                 OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
-                new Random.SystemRandom(new java.util.Random())));
+                Random.Util.newDefaultRandom()));
         bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
         bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
         expose(OfferManager.class);

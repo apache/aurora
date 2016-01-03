@@ -20,6 +20,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * @author John Sirois
@@ -54,37 +55,44 @@ public class TruncatedBinaryBackoffTest {
   public void testCalculateBackoffMs() {
     TruncatedBinaryBackoff backoff =
         new TruncatedBinaryBackoff(Amount.of(1L, Time.MILLISECONDS),
-            Amount.of(6L, Time.MILLISECONDS));
+            Amount.of(12L, Time.MILLISECONDS));
 
     try {
       backoff.calculateBackoffMs(-1L);
+      fail("calculateBackoffMs should throw an exception when give a negative value.");
     } catch (IllegalArgumentException e) {
       // expected
     }
 
-    assertEquals(1, backoff.calculateBackoffMs(0));
-    assertEquals(2, backoff.calculateBackoffMs(1));
-    assertEquals(4, backoff.calculateBackoffMs(2));
-    assertEquals(6, backoff.calculateBackoffMs(4));
-    assertEquals(6, backoff.calculateBackoffMs(8));
+    long calculateBackoffMs0 = backoff.calculateBackoffMs(0);
+    assertTrue(1 <= calculateBackoffMs0 && calculateBackoffMs0 <= 2);
+
+    long calculateBackoffMs1 = backoff.calculateBackoffMs(1);
+    assertTrue(1 <= calculateBackoffMs1 && calculateBackoffMs1 <= 2);
+
+    long calculateBackoffMs2 = backoff.calculateBackoffMs(2);
+    assertTrue(2 <= calculateBackoffMs2 && calculateBackoffMs2 <= 4);
+
+    long calculateBackoffMs4 = backoff.calculateBackoffMs(4);
+    assertTrue(4 <= calculateBackoffMs4 && calculateBackoffMs4 <= 8);
+
+    long calculateBackoffMs8 = backoff.calculateBackoffMs(8);
+    assertTrue(8 <= calculateBackoffMs8 && calculateBackoffMs8 <= 12);
+
+    assertEquals(12, backoff.calculateBackoffMs(16));
   }
 
   @Test
-  public void testCalculateBackoffStop() {
+  public void testShouldContinue() {
     TruncatedBinaryBackoff backoff =
         new TruncatedBinaryBackoff(Amount.of(1L, Time.MILLISECONDS),
             Amount.of(6L, Time.MILLISECONDS), true);
 
     assertTrue(backoff.shouldContinue(0));
-    assertEquals(1, backoff.calculateBackoffMs(0));
     assertTrue(backoff.shouldContinue(1));
-    assertEquals(2, backoff.calculateBackoffMs(1));
     assertTrue(backoff.shouldContinue(2));
-    assertEquals(4, backoff.calculateBackoffMs(2));
     assertTrue(backoff.shouldContinue(4));
-    assertEquals(6, backoff.calculateBackoffMs(4));
     assertFalse(backoff.shouldContinue(6));
-    assertEquals(6, backoff.calculateBackoffMs(8));
     assertFalse(backoff.shouldContinue(8));
   }
 }

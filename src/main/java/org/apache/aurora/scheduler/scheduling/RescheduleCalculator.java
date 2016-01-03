@@ -74,7 +74,7 @@ public interface RescheduleCalculator {
     private final Storage storage;
     private final RescheduleCalculatorSettings settings;
     // TODO(wfarner): Inject 'random' in the constructor for better test coverage.
-    private final Random random = new Random.SystemRandom(new java.util.Random());
+    private final Random random = Random.Util.newDefaultRandom();
 
     private static final Predicate<ScheduleStatus> IS_ACTIVE_STATUS =
         Predicates.in(Tasks.ACTIVE_STATES);
