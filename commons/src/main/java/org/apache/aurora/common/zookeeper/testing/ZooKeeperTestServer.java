@@ -26,7 +26,8 @@ import com.google.common.collect.Lists;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.apache.zookeeper.server.NIOServerCnxn;
+import org.apache.zookeeper.server.NIOServerCnxnFactory;
+import org.apache.zookeeper.server.ServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
 import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder;
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
@@ -42,7 +43,7 @@ public class ZooKeeperTestServer {
       Amount.of(100, Time.MILLISECONDS);
 
   protected final ZooKeeperServer zooKeeperServer;
-  private NIOServerCnxn.Factory connectionFactory;
+  private ServerCnxnFactory connectionFactory;
   private int port;
   private final Amount<Integer, Time> defaultSessionTimeout;
   private final LinkedList<Runnable> cleanupActions = Lists.newLinkedList();
@@ -76,7 +77,11 @@ public class ZooKeeperTestServer {
    * Starts zookeeper up on an ephemeral port.
    */
   public void startNetwork() throws IOException, InterruptedException {
-    connectionFactory = new NIOServerCnxn.Factory(new InetSocketAddress(port));
+    connectionFactory = new NIOServerCnxnFactory();
+    connectionFactory.configure(
+        new InetSocketAddress(port),
+        60 /*  Semi-arbitrary, max 60 connections is the default used by NIOServerCnxnFactory */);
+
     connectionFactory.startup(zooKeeperServer);
     cleanupActions.addFirst((this::shutdownNetwork));
     port = zooKeeperServer.getClientPort();
@@ -97,7 +102,7 @@ public class ZooKeeperTestServer {
    */
   public final void restartNetwork() throws IOException, InterruptedException {
     checkEphemeralPortAssigned();
-    Preconditions.checkState(!connectionFactory.isAlive());
+    Preconditions.checkState(connectionFactory == null);
     startNetwork();
   }
 
@@ -105,8 +110,9 @@ public class ZooKeeperTestServer {
    * Shuts down the in-process zookeeper network server.
    */
   public final void shutdownNetwork() {
-    if (connectionFactory != null && connectionFactory.isAlive()) {
+    if (connectionFactory != null) {
       connectionFactory.shutdown();
+      connectionFactory = null;
     }
   }
 
