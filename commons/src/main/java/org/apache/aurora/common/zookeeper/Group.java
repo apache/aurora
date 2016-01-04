@@ -15,8 +15,6 @@ package org.apache.aurora.common.zookeeper;
 
 import java.util.List;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
@@ -29,22 +27,22 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.KeeperException.NoNodeException;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.Watcher.Event.EventType;
-import org.apache.zookeeper.data.ACL;
-
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.base.Commands;
 import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.util.BackoffHelper;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionException;
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.EventType;
+import org.apache.zookeeper.data.ACL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class exposes methods for joining and monitoring distributed groups.  The groups this class
@@ -52,7 +50,7 @@ import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionExc
  * each member of a group.
  */
 public class Group {
-  private static final Logger LOG = Logger.getLogger(Group.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Group.class);
 
   private static final Supplier<byte[]> NO_MEMBER_DATA = Suppliers.ofInstance(null);
   private static final String DEFAULT_NODE_NAME_PREFIX = "member_";
@@ -267,11 +265,11 @@ public class Group {
         Thread.currentThread().interrupt();
         throw new JoinException("Interrupted trying to join group at path: " + path, e);
       } catch (ZooKeeperConnectionException e) {
-        LOG.log(Level.WARNING, "Temporary error trying to join group at path: " + path, e);
+        LOG.warn("Temporary error trying to join group at path: " + path, e);
         return null;
       } catch (KeeperException e) {
         if (zkClient.shouldRetry(e)) {
-          LOG.log(Level.WARNING, "Temporary error trying to join group at path: " + path, e);
+          LOG.warn("Temporary error trying to join group at path: " + path, e);
           return null;
         } else {
           throw new JoinException("Problem joining partition group at path: " + path, e);
@@ -289,11 +287,11 @@ public class Group {
         Thread.currentThread().interrupt();
         throw new JoinException("Interrupted trying to ensure group at path: " + path, e);
       } catch (ZooKeeperConnectionException e) {
-        LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+        LOG.warn("Problem connecting to ZooKeeper, retrying", e);
         return false;
       } catch (KeeperException e) {
         if (zkClient.shouldRetry(e)) {
-          LOG.log(Level.WARNING, "Temporary error ensuring path: " + path, e);
+          LOG.warn("Temporary error ensuring path: " + path, e);
           return false;
         } else {
           throw new JoinException("Problem ensuring group at path: " + path, e);
@@ -361,7 +359,7 @@ public class Group {
               Thread.currentThread().interrupt();
               throw new JoinException("Interrupted trying to cancel membership: " + nodePath, e);
             } catch (ZooKeeperConnectionException e) {
-              LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+              LOG.warn("Problem connecting to ZooKeeper, retrying", e);
               return false;
             } catch (NoNodeException e) {
               LOG.info("Membership already cancelled, node at path: " + nodePath +
@@ -369,7 +367,7 @@ public class Group {
               return true;
             } catch (KeeperException e) {
               if (zkClient.shouldRetry(e)) {
-                LOG.log(Level.WARNING, "Temporary error cancelling membership: " + nodePath, e);
+                LOG.warn("Temporary error cancelling membership: " + nodePath, e);
                 return false;
               } else {
                 throw new JoinException("Problem cancelling membership: " + nodePath, e);
@@ -428,11 +426,11 @@ public class Group {
             // Lost a cancel race - that's ok.
             return true;
           } catch (ZooKeeperConnectionException e) {
-            LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+            LOG.warn("Problem connecting to ZooKeeper, retrying", e);
             return false;
           } catch (KeeperException e) {
             if (zkClient.shouldRetry(e)) {
-              LOG.log(Level.WARNING, "Temporary error re-joining group: " + path, e);
+              LOG.warn("Temporary error re-joining group: " + path, e);
               return false;
             } else {
               throw new IllegalStateException("Permanent problem re-joining group: " + path, e);
@@ -532,11 +530,11 @@ public class Group {
         Thread.currentThread().interrupt();
         throw new WatchException("Interrupted trying to watch group at path: " + path, e);
       } catch (ZooKeeperConnectionException e) {
-        LOG.log(Level.WARNING, "Temporary error trying to watch group at path: " + path, e);
+        LOG.warn("Temporary error trying to watch group at path: " + path, e);
         return null;
       } catch (KeeperException e) {
         if (zkClient.shouldRetry(e)) {
-          LOG.log(Level.WARNING, "Temporary error trying to watch group at path: " + path, e);
+          LOG.warn("Temporary error trying to watch group at path: " + path, e);
           return null;
         } else {
           throw new WatchException("Problem trying to watch group at path: " + path, e);
@@ -570,11 +568,11 @@ public class Group {
             watchGroup();
             return true;
           } catch (ZooKeeperConnectionException e) {
-            LOG.log(Level.WARNING, "Problem connecting to ZooKeeper, retrying", e);
+            LOG.warn("Problem connecting to ZooKeeper, retrying", e);
             return false;
           } catch (KeeperException e) {
             if (zkClient.shouldRetry(e)) {
-              LOG.log(Level.WARNING, "Temporary error re-watching group: " + path, e);
+              LOG.warn("Temporary error re-watching group: " + path, e);
               return false;
             } else {
               throw new IllegalStateException("Permanent problem re-watching group: " + path, e);

@@ -17,8 +17,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.lang.reflect.Method;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Qualifier;
 
@@ -40,6 +38,8 @@ import com.google.inject.matcher.Matchers;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.aurora.common.collections.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -49,7 +49,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 public final class GuiceUtils {
 
-  private static final Logger LOG = Logger.getLogger(GuiceUtils.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(GuiceUtils.class);
 
   // Method annotation that allows a trapped interface to whitelist methods that may throw
   // unchecked exceptions.
@@ -160,7 +160,7 @@ public final class GuiceUtils {
             try {
               return invocation.proceed();
             } catch (RuntimeException e) {
-              LOG.log(Level.WARNING, "Trapped uncaught exception: " + e, e);
+              LOG.warn("Trapped uncaught exception: " + e, e);
               return null;
             }
           }

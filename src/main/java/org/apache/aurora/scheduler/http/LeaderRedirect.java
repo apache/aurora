@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -31,6 +30,8 @@ import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import org.apache.aurora.common.net.pool.DynamicHostSet.MonitorException;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -61,7 +62,7 @@ public class LeaderRedirect {
   @VisibleForTesting
   static final String HTTP_PORT_NAME = "http";
 
-  private static final Logger LOG = Logger.getLogger(LeaderRedirect.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(LeaderRedirect.class);
 
   private final HttpService httpService;
   private final DynamicHostSet<ServiceInstance> schedulers;
@@ -96,7 +97,7 @@ public class LeaderRedirect {
       }
     }
 
-    LOG.warning("Leader service instance seems to be incomplete: " + leadingScheduler);
+    LOG.warn("Leader service instance seems to be incomplete: " + leadingScheduler);
     return Optional.absent();
   }
 
@@ -142,7 +143,7 @@ public class LeaderRedirect {
     }
 
     if (!leadingScheduler.isSetServiceEndpoint()) {
-      LOG.warning("Leader service instance seems to be incomplete: " + leadingScheduler);
+      LOG.warn("Leader service instance seems to be incomplete: " + leadingScheduler);
       return LeaderStatus.NO_LEADER;
     }
 
@@ -199,7 +200,7 @@ public class LeaderRedirect {
     public void onChange(ImmutableSet<ServiceInstance> hostSet) {
       switch (hostSet.size()) {
         case 0:
-          LOG.warning("No schedulers in host set, will not redirect despite not being leader.");
+          LOG.warn("No schedulers in host set, will not redirect despite not being leader.");
           leader.set(null);
           break;
 
@@ -209,7 +210,7 @@ public class LeaderRedirect {
           break;
 
         default:
-          LOG.severe("Multiple schedulers detected, will not redirect: " + hostSet);
+          LOG.error("Multiple schedulers detected, will not redirect: " + hostSet);
           leader.set(null);
           break;
       }

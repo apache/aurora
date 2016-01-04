@@ -13,14 +13,11 @@
  */
 package org.apache.aurora.common.stats;
 
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -38,6 +35,8 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.BuildInfo;
 import org.apache.aurora.common.util.Clock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -49,7 +48,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class TimeSeriesRepositoryImpl
     extends AbstractScheduledService implements TimeSeriesRepository {
 
-  private static final Logger LOG = Logger.getLogger(TimeSeriesRepositoryImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesRepositoryImpl.class);
 
   /**
    * {@literal @Named} binding key for the sampling period.

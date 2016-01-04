@@ -16,7 +16,6 @@ package org.apache.aurora.common.zookeeper;
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
@@ -24,10 +23,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import org.apache.aurora.common.base.ExceptionalCommand;
-import org.apache.aurora.common.thrift.Status;
 import org.apache.aurora.common.zookeeper.Candidate.Leader;
 import org.apache.aurora.common.zookeeper.Group.JoinException;
-import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 
 /**

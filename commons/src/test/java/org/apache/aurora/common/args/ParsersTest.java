@@ -16,13 +16,12 @@ package org.apache.aurora.common.args;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.reflect.TypeToken;
 
-import org.junit.Before;
-import org.junit.Test;
-
 import org.apache.aurora.common.args.apt.Configuration.ParserInfo;
 import org.apache.aurora.common.args.parsers.NonParameterizedTypeParser;
 import org.apache.aurora.common.args.parsers.PairParser;
 import org.apache.aurora.common.collections.Pair;
+import org.junit.Before;
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;

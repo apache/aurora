@@ -13,13 +13,13 @@
  */
 package org.apache.aurora.scheduler.stats;
 
-import java.util.logging.Logger;
-
 import javax.inject.Inject;
 
 import org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
 import org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -27,7 +27,7 @@ import static java.util.Objects.requireNonNull;
  * Calculates and exports aggregate stats about resources consumed by active tasks.
  */
 class TaskStatCalculator implements Runnable {
-  private static final Logger LOG = Logger.getLogger(TaskStatCalculator.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(TaskStatCalculator.class);
 
   private final CachedCounters counters;
   private final ResourceCounter resourceCounter;
@@ -52,7 +52,7 @@ class TaskStatCalculator implements Runnable {
       }
       update("resources_allocated_quota", resourceCounter.computeQuotaAllocationTotals());
     } catch (StorageException e) {
-      LOG.fine("Unable to fetch metrics, storage is likely not ready.");
+      LOG.debug("Unable to fetch metrics, storage is likely not ready.");
     }
   }
 }

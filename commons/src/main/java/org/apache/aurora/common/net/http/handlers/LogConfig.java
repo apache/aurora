@@ -32,8 +32,6 @@ import javax.ws.rs.core.MediaType;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
 
-import org.antlr.stringtemplate.StringTemplate;
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.util.templating.StringTemplateHelper;
 import org.apache.aurora.common.util.templating.StringTemplateHelper.TemplateException;
 import org.apache.commons.lang.StringUtils;

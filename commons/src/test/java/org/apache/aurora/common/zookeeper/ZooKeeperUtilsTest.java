@@ -14,6 +14,7 @@
 package org.apache.aurora.common.zookeeper;
 
 import com.google.common.base.Charsets;
+
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException.BadVersionException;

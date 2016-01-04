@@ -19,10 +19,9 @@ import java.util.Map;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
 
-import org.junit.Before;
-
 import org.apache.aurora.common.stats.Stat;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.junit.Before;
 
 import static org.easymock.EasyMock.expect;
 

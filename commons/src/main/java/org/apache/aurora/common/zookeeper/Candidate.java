@@ -16,12 +16,11 @@ package org.apache.aurora.common.zookeeper;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 
-import org.apache.zookeeper.KeeperException;
-
 import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.common.zookeeper.Group.JoinException;
 import org.apache.aurora.common.zookeeper.Group.WatchException;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionException;
+import org.apache.zookeeper.KeeperException;
 
 /**
  * Interface definition for becoming or querying for a ZooKeeper-based group leader.

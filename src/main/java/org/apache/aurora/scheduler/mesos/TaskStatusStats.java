@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.mesos;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
@@ -31,6 +30,8 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStatusReceived;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.TaskStatus.Reason;
 import org.apache.mesos.Protos.TaskStatus.Source;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -39,7 +40,7 @@ import static java.util.Objects.requireNonNull;
  */
 class TaskStatusStats implements EventSubscriber {
 
-  private static final Logger LOG = Logger.getLogger(TaskStatusStats.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(TaskStatusStats.class);
 
   private final Clock clock;
 
@@ -110,7 +111,7 @@ class TaskStatusStats implements EventSubscriber {
         latencyTimers.getUnchecked(event.getSource().get())
             .requestComplete(nowMicros - event.getEpochTimestampMicros().get());
       } else {
-        LOG.fine("Not recording stats for status update with timestamp <= now");
+        LOG.debug("Not recording stats for status update with timestamp <= now");
       }
     }
   }

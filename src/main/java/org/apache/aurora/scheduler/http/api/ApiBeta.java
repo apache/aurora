@@ -21,8 +21,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -47,6 +45,8 @@ import org.apache.aurora.gen.AuroraAdmin.Iface;
 import org.apache.aurora.scheduler.storage.entities.AuroraAdminMetadata;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler.GSON;
 
@@ -58,7 +58,7 @@ import static org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler.GSON;
 public class ApiBeta {
   static final String PATH = "/apibeta";
 
-  private static final Logger LOG = Logger.getLogger(ApiBeta.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(ApiBeta.class);
 
   private final Iface api;
 
@@ -120,9 +120,7 @@ public class ApiBeta {
   @Path("{method}")
   @Produces(MediaType.APPLICATION_JSON)
   public Response invoke(@PathParam("method") String methodName, String postData) {
-    if (LOG.isLoggable(Level.FINE)) {
-      LOG.info("Call to " + methodName + " with data: " + postData);
-    }
+    LOG.debug("Call to {} with data: {}", methodName, postData);
 
     // First, verify that this is a valid method on the interface.
     Class<?>[] methodParameterTypes = AuroraAdminMetadata.METHODS.get(methodName);

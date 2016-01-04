@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.http;
 
 import java.io.IOException;
 import java.util.Objects;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.servlet.FilterChain;
@@ -28,13 +27,16 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.io.Resources;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.apache.aurora.scheduler.http.LeaderRedirect.LeaderStatus;
 
 /**
  * An HTTP filter that will redirect the request to the leading scheduler.
  */
 public class LeaderRedirectFilter extends AbstractFilter {
-  private static final Logger LOG = Logger.getLogger(LeaderRedirectFilter.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(LeaderRedirectFilter.class);
 
   @VisibleForTesting
   static final String NO_LEADER_PAGE = "no-leader.html";
@@ -72,7 +74,7 @@ public class LeaderRedirectFilter extends AbstractFilter {
           return;
         }
 
-        LOG.warning("Got no leader redirect contrary to leader status, treating as if no leader "
+        LOG.warn("Got no leader redirect contrary to leader status, treating as if no leader "
             + "was found.");
         sendServiceUnavailable(response);
         return;

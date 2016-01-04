@@ -22,8 +22,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -59,6 +57,8 @@ import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.StorageBackfill;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -91,7 +91,7 @@ import static org.apache.aurora.common.zookeeper.SingletonService.LeadershipList
  */
 public class SchedulerLifecycle implements EventSubscriber {
 
-  private static final Logger LOG = Logger.getLogger(SchedulerLifecycle.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SchedulerLifecycle.class);
 
   @VisibleForTesting
   enum State {
@@ -249,7 +249,7 @@ public class SchedulerLifecycle implements EventSubscriber {
         delayedActions.onRegistrationTimeout(
             () -> {
               if (!registrationAcked.get()) {
-                LOG.severe(
+                LOG.error(
                     "Framework has not been registered within the tolerated delay.");
                 stateMachine.transition(State.DEAD);
               }
@@ -278,7 +278,7 @@ public class SchedulerLifecycle implements EventSubscriber {
         try {
           leaderControl.get().advertise();
         } catch (JoinException | InterruptedException e) {
-          LOG.log(Level.SEVERE, "Failed to advertise leader, shutting down.");
+          LOG.error("Failed to advertise leader, shutting down.");
           throw Throwables.propagate(e);
         }
       }
@@ -301,9 +301,9 @@ public class SchedulerLifecycle implements EventSubscriber {
             try {
               control.leave();
             } catch (JoinException e) {
-              LOG.log(Level.WARNING, "Failed to leave leadership: " + e, e);
+              LOG.warn("Failed to leave leadership: " + e, e);
             } catch (ServerSet.UpdateException e) {
-              LOG.log(Level.WARNING, "Failed to leave server set: " + e, e);
+              LOG.warn("Failed to leave server set: " + e, e);
             }
           }
 
@@ -355,7 +355,7 @@ public class SchedulerLifecycle implements EventSubscriber {
       try {
         closure.execute(transition);
       } catch (RuntimeException e) {
-        LOG.log(Level.SEVERE, "Caught unchecked exception: " + e, e);
+        LOG.error("Caught unchecked exception: " + e, e);
         stateMachine.transition(State.DEAD);
         throw e;
       }
@@ -399,7 +399,7 @@ public class SchedulerLifecycle implements EventSubscriber {
 
     @Override
     public void onDefeated(@Nullable ServerSet.EndpointStatus status) {
-      LOG.severe("Lost leadership, committing suicide.");
+      LOG.error("Lost leadership, committing suicide.");
       stateMachine.transition(State.DEAD);
     }
   }

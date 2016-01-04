@@ -18,8 +18,6 @@ import java.net.UnknownHostException;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.Nonnegative;
 import javax.inject.Inject;
@@ -85,6 +83,8 @@ import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.resource.Resource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -100,7 +100,7 @@ import static com.sun.jersey.api.json.JSONConfiguration.FEATURE_POJO_MAPPING;
  * requests (for static assets) similar to what we currently do with path specs.
  */
 public class JettyServerModule extends AbstractModule {
-  private static final Logger LOG = Logger.getLogger(JettyServerModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(JettyServerModule.class);
 
   // The name of the request attribute where the path for the current request before it was
   // rewritten is stored.
@@ -155,7 +155,7 @@ public class JettyServerModule extends AbstractModule {
         InetAddress.getByName(hostnameOverride.get());
       } catch (UnknownHostException e) {
         /* Possible misconfiguration, so warn the user. */
-        LOG.warning("Unable to resolve name specified in -hostname. "
+        LOG.warn("Unable to resolve name specified in -hostname. "
                     + "Depending on your environment, this may be valid.");
       }
     }
@@ -408,7 +408,7 @@ public class JettyServerModule extends AbstractModule {
       try {
         server.stop();
       } catch (Exception e) {
-        LOG.log(Level.INFO, "Failed to stop jetty server: " + e, e);
+        LOG.info("Failed to stop jetty server: " + e, e);
       }
     }
   }

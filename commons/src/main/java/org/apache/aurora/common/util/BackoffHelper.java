@@ -13,14 +13,14 @@
  */
 package org.apache.aurora.common.util;
 
-import java.util.logging.Logger;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A utility for dealing with backoffs of retryable actions.
@@ -30,7 +30,7 @@ import org.apache.aurora.common.quantity.Time;
  * @author John Sirois
  */
 public class BackoffHelper {
-  private static final Logger LOG = Logger.getLogger(BackoffHelper.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(BackoffHelper.class);
 
   private static final Amount<Long,Time> DEFAULT_INITIAL_BACKOFF = Amount.of(1L, Time.SECONDS);
   private static final Amount<Long,Time> DEFAULT_MAX_BACKOFF = Amount.of(1L, Time.MINUTES);
@@ -110,7 +110,7 @@ public class BackoffHelper {
     long currentBackoffMs = 0;
     while (backoffStrategy.shouldContinue(currentBackoffMs)) {
       currentBackoffMs = backoffStrategy.calculateBackoffMs(currentBackoffMs);
-      LOG.fine("Operation failed, backing off for " + currentBackoffMs + "ms");
+      LOG.debug("Operation failed, backing off for " + currentBackoffMs + "ms");
       clock.waitFor(currentBackoffMs);
 
       T result = work.get();

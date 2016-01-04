@@ -17,7 +17,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
-import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 import javax.security.auth.Subject;
@@ -39,6 +38,8 @@ import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
 import org.ietf.jgss.Oid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Configures and provides a Shiro {@link org.apache.shiro.realm.Realm}.
@@ -46,7 +47,7 @@ import org.ietf.jgss.Oid;
  * @see org.apache.aurora.scheduler.http.api.security.Kerberos5Realm
  */
 public class Kerberos5ShiroRealmModule extends AbstractModule {
-  private static final Logger LOG = Logger.getLogger(Kerberos5ShiroRealmModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Kerberos5ShiroRealmModule.class);
 
   private static final String JAVA_SECURITY_LOGIN_KEY = "java.security.auth.login.config";
 
@@ -138,7 +139,7 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
         serverKeyTab.get().getAbsolutePath(),
         serverPrincipal.get().getName(),
         kerberosDebugEnabled);
-    LOG.fine("Generated jaas.conf: " + jaasConf);
+    LOG.debug("Generated jaas.conf: " + jaasConf);
 
     File jaasConfFile;
     try {

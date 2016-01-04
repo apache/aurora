@@ -14,8 +14,6 @@
 package org.apache.aurora.scheduler.mesos;
 
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -44,6 +42,8 @@ import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -64,7 +64,7 @@ public interface MesosTaskFactory {
 
   // TODO(wfarner): Move this class to its own file to reduce visibility to package private.
   class MesosTaskFactoryImpl implements MesosTaskFactory {
-    private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(MesosTaskFactoryImpl.class);
     private static final String EXECUTOR_PREFIX = "thermos-";
 
     private final ExecutorSettings executorSettings;
@@ -103,7 +103,7 @@ public interface MesosTaskFactory {
       try {
         taskInBytes = ThriftBinaryCodec.encode(task.newBuilder());
       } catch (ThriftBinaryCodec.CodingException e) {
-        LOG.log(Level.SEVERE, "Unable to serialize task.", e);
+        LOG.error("Unable to serialize task.", e);
         throw new SchedulerException("Internal error.", e);
       }
 
@@ -116,10 +116,9 @@ public interface MesosTaskFactory {
               : ImmutableSet.of(),
           tierManager.getTier(task.getTask()));
 
-      if (LOG.isLoggable(Level.FINE)) {
-        LOG.fine("Setting task resources to "
-            + Iterables.transform(resources, Protobufs::toString));
-      }
+      LOG.debug(
+          "Setting task resources to {}",
+          Iterables.transform(resources, Protobufs::toString));
       TaskInfo.Builder taskBuilder =
           TaskInfo.newBuilder()
               .setName(JobKeys.canonicalString(Tasks.getJob(task)))

@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.common.stats;
 
-import org.apache.aurora.common.base.MorePreconditions;
-
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.apache.aurora.common.base.MorePreconditions;
 
 /**
  * Tracks event statistics over a sliding window of time. An event is something that has a

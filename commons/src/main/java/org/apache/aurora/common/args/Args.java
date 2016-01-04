@@ -15,7 +15,6 @@ package org.apache.aurora.common.args;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
@@ -32,6 +31,8 @@ import com.google.common.collect.Iterables;
 
 import org.apache.aurora.common.args.apt.Configuration;
 import org.apache.aurora.common.args.apt.Configuration.ArgInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.common.args.apt.Configuration.ConfigurationException;
 
@@ -40,7 +41,7 @@ import static org.apache.aurora.common.args.apt.Configuration.ConfigurationExcep
  * a configuration database or from explicitly listed containing classes or objects.
  */
 public final class Args {
-  private static final Logger LOG = Logger.getLogger(Args.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Args.class);
 
   @VisibleForTesting
   static final Function<ArgInfo, Optional<Field>> TO_FIELD =
@@ -56,7 +57,7 @@ public final class Args {
           // the classes have been re-bundled with some subset including the class this ArgInfo
           // points to no longer available.  If the re-bundling is correct, then the arg truly is
           // not needed.
-          LOG.fine(String.format("Not on current classpath, skipping %s", info));
+          LOG.debug("Not on current classpath, skipping {}", info);
           return Optional.absent();
         }
       };

@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.common.net;
 
-import org.junit.Test;
-
 import java.net.InetSocketAddress;
+
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;

@@ -25,11 +25,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -37,10 +34,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.google.common.io.ByteSource;
 import com.google.common.io.CharSource;
 import com.google.common.io.CharStreams;
-import com.google.common.io.InputSupplier;
 import com.google.common.io.LineProcessor;
 import com.google.common.io.Resources;
 

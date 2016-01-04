@@ -16,8 +16,6 @@ package org.apache.aurora.scheduler.cron.quartz;
 import java.util.Date;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -45,6 +43,8 @@ import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -62,7 +62,7 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLING;
  */
 @DisallowConcurrentExecution
 class AuroraCronJob implements Job {
-  private static final Logger LOG = Logger.getLogger(AuroraCronJob.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(AuroraCronJob.class);
 
   private static final AtomicLong CRON_JOB_TRIGGERS = Stats.exportLong("cron_job_triggers");
   private static final AtomicLong CRON_JOB_MISFIRES = Stats.exportLong("cron_job_misfires");
@@ -120,9 +120,9 @@ class AuroraCronJob implements Job {
         (MutateWork.Quiet<Optional<DeferredLaunch>>) storeProvider -> {
           Optional<IJobConfiguration> config = storeProvider.getCronJobStore().fetchJob(key);
           if (!config.isPresent()) {
-            LOG.warning(String.format(
-                "Cron was triggered for %s but no job with that key was found in storage.",
-                path));
+            LOG.warn(
+                "Cron was triggered for {} but no job with that key was found in storage.",
+                path);
             CRON_JOB_MISFIRES.incrementAndGet();
             return Optional.absent();
           }
@@ -131,15 +131,15 @@ class AuroraCronJob implements Job {
           try {
             cronJob = SanitizedCronJob.fromUnsanitized(configurationManager, config.get());
           } catch (ConfigurationManager.TaskDescriptionException | CronException e) {
-            LOG.warning(String.format(
-                "Invalid cron job for %s in storage - failed to parse with %s", key, e));
+            LOG.warn(
+                "Invalid cron job for {} in storage - failed to parse with {}", key, e);
             CRON_JOB_PARSE_FAILURES.incrementAndGet();
             return Optional.absent();
           }
 
           CronCollisionPolicy collisionPolicy = cronJob.getCronCollisionPolicy();
-          LOG.info(String.format(
-              "Cron triggered for %s at %s with policy %s", path, new Date(), collisionPolicy));
+          LOG.info(
+              "Cron triggered for {} at %s with policy {}", path, new Date(), collisionPolicy);
           CRON_JOB_TRIGGERS.incrementAndGet();
 
           final Query.Builder activeQuery = Query.jobScoped(key).active();
@@ -160,15 +160,15 @@ class AuroraCronJob implements Job {
               return Optional.of(new DeferredLaunch(task, instanceIds, activeTasks));
 
             case RUN_OVERLAP:
-              LOG.severe(String.format("Ignoring trigger for job %s with deprecated collision"
-                  + "policy RUN_OVERLAP due to unterminated active tasks.", path));
+              LOG.error("Ignoring trigger for job {} with deprecated collision"
+                  + "policy RUN_OVERLAP due to unterminated active tasks.", path);
               return Optional.absent();
 
             case CANCEL_NEW:
               return Optional.absent();
 
             default:
-              LOG.severe("Unrecognized cron collision policy: " + collisionPolicy);
+              LOG.error("Unrecognized cron collision policy: " + collisionPolicy);
               return Optional.absent();
           }
         }
@@ -189,7 +189,7 @@ class AuroraCronJob implements Job {
       }
     });
 
-    LOG.info(String.format("Waiting for job to terminate before launching cron job %s.", path));
+    LOG.info("Waiting for job to terminate before launching cron job {}.", path);
 
     final Query.Builder query = Query.taskScoped(deferredLaunch.get().activeTaskIds).active();
     try {
@@ -210,7 +210,7 @@ class AuroraCronJob implements Job {
         }
       });
     } catch (InterruptedException e) {
-      LOG.log(Level.WARNING, "Interrupted while trying to launch cron " + path, e);
+      LOG.warn("Interrupted while trying to launch cron " + path, e);
       Thread.currentThread().interrupt();
       throw new JobExecutionException(e);
     }

@@ -15,8 +15,6 @@ package org.apache.aurora.scheduler.events;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.concurrent.Executor;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
@@ -39,9 +37,9 @@ import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
 
 import static org.easymock.EasyMock.anyString;
-import static org.easymock.EasyMock.eq;
 import static org.junit.Assert.assertEquals;
 
 public class PubsubEventModuleTest extends EasyMockTest {
@@ -61,7 +59,7 @@ public class PubsubEventModuleTest extends EasyMockTest {
 
   @Test
   public void testHandlesDeadEvent() {
-    logger.warning(String.format(PubsubEventModule.DEAD_EVENT_MESSAGE, "hello"));
+    logger.warn(String.format(PubsubEventModule.DEAD_EVENT_MESSAGE, "hello"));
 
     control.replay();
 
@@ -70,7 +68,7 @@ public class PubsubEventModuleTest extends EasyMockTest {
 
   @Test
   public void testPubsubExceptionTracking() throws Exception {
-    logger.log(eq(Level.SEVERE), anyString(), EasyMock.<Throwable>anyObject());
+    logger.error(anyString(), EasyMock.<Throwable>anyObject());
 
     control.replay();
 

@@ -22,7 +22,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
@@ -35,6 +34,11 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
+import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.base.MorePreconditions;
+import org.apache.aurora.common.net.InetSocketAddressHelper;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
@@ -44,12 +48,8 @@ import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.common.PathUtils;
-
-import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.MorePreconditions;
-import org.apache.aurora.common.net.InetSocketAddressHelper;
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages a connection to a ZooKeeper cluster.
@@ -183,7 +183,7 @@ public class ZooKeeperClient {
     }
   }
 
-  private static final Logger LOG = Logger.getLogger(ZooKeeperClient.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(ZooKeeperClient.class);
 
   private static final Amount<Long,Time> WAIT_FOREVER = Amount.of(0L, Time.MILLISECONDS);
 
@@ -467,7 +467,7 @@ public class ZooKeeperClient {
         zooKeeper.close();
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        LOG.warning("Interrupted trying to close zooKeeper");
+        LOG.warn("Interrupted trying to close zooKeeper");
       } finally {
         zooKeeper = null;
         sessionState = null;

@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.pruning;
 
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
@@ -29,13 +28,15 @@ import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.pruning.TaskHistoryPruner.HistoryPrunnerSettings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Binding module for background storage pruning.
  */
 public class PruningModule extends AbstractModule {
 
-  private static final Logger LOG = Logger.getLogger(PruningModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(PruningModule.class);
 
   @CmdLine(name = "history_prune_threshold",
       help = "Time after which the scheduler will prune terminated task history.")

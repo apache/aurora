@@ -14,27 +14,27 @@
 package org.apache.aurora.common.zookeeper;
 
 import java.util.List;
-import java.util.logging.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionException;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.common.PathUtils;
 import org.apache.zookeeper.data.ACL;
-
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utilities for dealing with zoo keeper.
  */
 public final class ZooKeeperUtils {
 
-  private static final Logger LOG = Logger.getLogger(ZooKeeperUtils.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(ZooKeeperUtils.class);
 
   /**
    * An appropriate default session timeout for Twitter ZooKeeper clusters.

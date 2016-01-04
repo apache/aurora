@@ -15,8 +15,6 @@ package org.apache.aurora.scheduler.cron.quartz;
 
 import java.util.Map;
 import java.util.TimeZone;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -41,6 +39,8 @@ import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.impl.matchers.GroupMatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -51,7 +51,7 @@ import static java.util.Objects.requireNonNull;
  * exit).
  */
 class CronJobManagerImpl implements CronJobManager {
-  private static final Logger LOG = Logger.getLogger(CronJobManagerImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(CronJobManagerImpl.class);
 
   private final Storage storage;
   private final Scheduler scheduler;
@@ -183,7 +183,7 @@ class CronJobManagerImpl implements CronJobManager {
       scheduler.deleteJob(Quartz.jobKey(jobKey));
       LOG.info(formatMessage("Successfully descheduled %s.", jobKey));
     } catch (SchedulerException e) {
-      LOG.log(Level.WARNING, formatMessage("Error descheduling %s: %s", jobKey, e), e);
+      LOG.warn(formatMessage("Error descheduling %s: %s", jobKey, e), e);
     }
   }
 

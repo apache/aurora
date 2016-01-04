@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -48,6 +47,8 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -55,7 +56,7 @@ import static java.util.Objects.requireNonNull;
  * A container that tracks and exports stat counters for tasks.
  */
 class TaskVars extends AbstractIdleService implements EventSubscriber {
-  private static final Logger LOG = Logger.getLogger(TaskVars.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(TaskVars.class);
   private static final ImmutableSet<ScheduleStatus> TRACKED_JOB_STATES =
       ImmutableSet.of(ScheduleStatus.LOST, ScheduleStatus.FAILED);
 
@@ -151,7 +152,7 @@ class TaskVars extends AbstractIdleService implements EventSubscriber {
       if (rack.isPresent()) {
         counters.getUnchecked(rackStatName(rack.get())).increment();
       } else {
-        LOG.warning("Failed to find rack attribute associated with host " + host);
+        LOG.warn("Failed to find rack attribute associated with host " + host);
       }
     }
   }

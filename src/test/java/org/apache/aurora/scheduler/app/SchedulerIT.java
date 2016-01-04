@@ -22,8 +22,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
@@ -97,6 +95,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.common.testing.easymock.EasyMockTest.createCapture;
 import static org.apache.mesos.Protos.FrameworkInfo;
@@ -110,7 +110,7 @@ import static org.junit.Assert.fail;
 
 public class SchedulerIT extends BaseZooKeeperTest {
 
-  private static final Logger LOG = Logger.getLogger(SchedulerIT.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SchedulerIT.class);
 
   private static final String CLUSTER_NAME = "integration_test_cluster";
   private static final String SERVERSET_PATH = "/fake/service/path";
@@ -149,7 +149,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
     addTearDown(() -> {
       if (mainException.get().isPresent()) {
         RuntimeException e = mainException.get().get();
-        LOG.log(Level.SEVERE, "Scheduler main exited with an exception", e);
+        LOG.error("Scheduler main exited with an exception", e);
         fail(e.getMessage());
       }
       control.verify();

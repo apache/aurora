@@ -13,11 +13,11 @@
  */
 package org.apache.aurora.common.application;
 
-import java.util.logging.Logger;
-
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.base.Command;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Application lifecycle manager, which coordinates orderly shutdown of an application.  This class
@@ -28,7 +28,7 @@ import org.apache.aurora.common.base.Command;
  */
 public class Lifecycle {
 
-  private static final Logger LOG = Logger.getLogger(Lifecycle.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Lifecycle.class);
 
   // Monitor and state for suspending and terminating execution.
   private final Object waitMonitor = new Object();

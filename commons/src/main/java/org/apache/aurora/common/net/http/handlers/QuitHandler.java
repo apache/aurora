@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.common.net.http.handlers;
 
-import java.util.logging.Logger;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -26,13 +24,16 @@ import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * A servlet that provides a way to remotely signal the process to initiate a clean shutdown
  * sequence.
  */
 @Path("/quitquitquit")
 public class QuitHandler {
-  private static final Logger LOG = Logger.getLogger(QuitHandler.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(QuitHandler.class);
 
   /**
    * A {@literal @Named} binding key for the QuitHandler listener.
@@ -57,8 +58,7 @@ public class QuitHandler {
   @POST
   @Produces(MediaType.TEXT_PLAIN)
   public String quit(@Context HttpServletRequest req) {
-    LOG.info(String.format("Received quit HTTP signal from %s (%s)",
-        req.getRemoteAddr(), req.getRemoteHost()));
+    LOG.info("Received quit HTTP signal from {} ({})", req.getRemoteAddr(), req.getRemoteHost());
 
     new Thread(quitListener).start();
     return "Notifying quit listener.";

@@ -23,8 +23,6 @@ import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
@@ -51,7 +49,6 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.gson.Gson;
 
 import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
@@ -62,6 +59,8 @@ import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -69,7 +68,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * ZooKeeper-backed implementation of {@link ServerSet}.
  */
 public class ServerSetImpl implements ServerSet {
-  private static final Logger LOG = Logger.getLogger(ServerSetImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(ServerSetImpl.class);
 
   private final ZooKeeperClient zkClient;
   private final Group group;
@@ -135,8 +134,7 @@ public class ServerSetImpl implements ServerSet {
       Map<String, InetSocketAddress> additionalEndpoints)
       throws Group.JoinException, InterruptedException {
 
-    LOG.log(Level.WARNING,
-        "Joining a ServerSet without a shard ID is deprecated and will soon break.");
+    LOG.warn("Joining a ServerSet without a shard ID is deprecated and will soon break.");
     return join(endpoint, additionalEndpoints, Optional.<Integer>absent());
   }
 
@@ -211,7 +209,7 @@ public class ServerSetImpl implements ServerSet {
         serviceInstance.setShard(shardId.get());
       }
 
-      LOG.fine("updating endpoint data to:\n\t" + serviceInstance);
+      LOG.debug("updating endpoint data to:\n\t" + serviceInstance);
       try {
         return ServerSets.serializeServiceInstance(serviceInstance, codec);
       } catch (IOException e) {
@@ -268,16 +266,14 @@ public class ServerSetImpl implements ServerSet {
             throw new ServiceInstanceFetchException(
                 "Interrupted updating service data for: " + nodePath, e);
           } catch (ZooKeeperClient.ZooKeeperConnectionException e) {
-            LOG.log(Level.WARNING,
-                "Temporary error trying to updating service data for: " + nodePath, e);
+            LOG.warn("Temporary error trying to updating service data for: " + nodePath, e);
             return null;
           } catch (NoNodeException e) {
             invalidateNodePath(nodePath);
             throw new ServiceInstanceDeletedException(nodePath);
           } catch (KeeperException e) {
             if (zkClient.shouldRetry(e)) {
-              LOG.log(Level.WARNING,
-                  "Temporary error trying to update service data for: " + nodePath, e);
+              LOG.warn("Temporary error trying to update service data for: " + nodePath, e);
               return null;
             } else {
               throw new ServiceInstanceFetchException(
@@ -352,14 +348,12 @@ public class ServerSetImpl implements ServerSet {
       // if the server's status has not changed, we can skip any onChange updates.
       if (!currentServerSet.equals(serverSet)) {
         if (currentServerSet.isEmpty()) {
-          LOG.warning("server set empty for path " + group.getPath());
+          LOG.warn("server set empty for path " + group.getPath());
         } else {
-          if (LOG.isLoggable(Level.INFO)) {
-            if (serverSet == null) {
-              LOG.info("received initial membership " + currentServerSet);
-            } else {
-              logChange(Level.INFO, currentServerSet);
-            }
+          if (serverSet == null) {
+            LOG.info("received initial membership {}", currentServerSet);
+          } else {
+            logChange(currentServerSet);
           }
         }
         serverSet = currentServerSet;
@@ -367,7 +361,7 @@ public class ServerSetImpl implements ServerSet {
       }
     }
 
-    private void logChange(Level level, ImmutableSet<ServiceInstance> newServerSet) {
+    private void logChange(ImmutableSet<ServiceInstance> newServerSet) {
       StringBuilder message = new StringBuilder("server set " + group.getPath() + " change: ");
       if (serverSet.size() != newServerSet.size()) {
         message.append("from ").append(serverSet.size())
@@ -386,7 +380,7 @@ public class ServerSetImpl implements ServerSet {
         message.append("\n\tjoined:\n\t\t").append(joiner.join(joined));
       }
 
-      LOG.log(level, message.toString());
+      LOG.info(message.toString());
     }
   }
 

@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.state;
 
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
@@ -39,6 +38,8 @@ import org.apache.aurora.common.util.StateMachine.Transition;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -80,7 +81,7 @@ import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.THROT
  * resulting actions.
  */
 class TaskStateMachine {
-  private static final Logger LOG = Logger.getLogger(TaskStateMachine.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(TaskStateMachine.class);
 
   private static final AtomicLong ILLEGAL_TRANSITIONS =
       Stats.exportLong("scheduler_illegal_task_state_transitions");
@@ -450,7 +451,7 @@ class TaskStateMachine {
                   }
                   previousState = Optional.of(from);
                 } else {
-                  LOG.severe("Illegal state transition attempted: " + transition);
+                  LOG.error("Illegal state transition attempted: " + transition);
                   ILLEGAL_TRANSITIONS.incrementAndGet();
                 }
               }

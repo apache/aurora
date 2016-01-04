@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.reconciliation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.logging.Logger;
 
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
@@ -36,6 +35,8 @@ import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.reconciliation.TaskReconciler.TaskReconcilerSettings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -47,7 +48,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 public class ReconciliationModule extends AbstractModule {
 
-  private static final Logger LOG = Logger.getLogger(ReconciliationModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(ReconciliationModule.class);
 
   @CmdLine(name = "transient_task_state_timeout",
       help = "The amount of time after which to treat a task stuck in a transient state as LOST.")

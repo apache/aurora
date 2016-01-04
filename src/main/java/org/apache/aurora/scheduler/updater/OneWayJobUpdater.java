@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.updater;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -29,6 +28,8 @@ import com.google.common.collect.Maps;
 
 import org.apache.aurora.common.util.StateMachine;
 import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -47,7 +48,7 @@ import static org.apache.aurora.scheduler.updater.StateEvaluator.Result;
  * @param <T> Instance data type.
  */
 class OneWayJobUpdater<K, T> {
-  private static final Logger LOG = Logger.getLogger(OneWayJobUpdater.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(OneWayJobUpdater.class);
 
   private final UpdateStrategy<K> strategy;
   private final int maxFailedInstances;

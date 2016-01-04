@@ -14,8 +14,6 @@
 package org.apache.aurora.scheduler.storage.db;
 
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -44,6 +42,8 @@ import org.apache.aurora.scheduler.storage.db.views.Pairs;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -58,7 +58,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class DbTaskStore implements TaskStore.Mutable {
 
-  private static final Logger LOG = Logger.getLogger(DbTaskStore.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(DbTaskStore.class);
 
   private final TaskMapper taskMapper;
   private final TaskConfigManager configManager;
@@ -72,7 +72,7 @@ class DbTaskStore implements TaskStore.Mutable {
       Clock clock,
       Amount<Long, Time> slowQueryThreshold) {
 
-    LOG.warning("DbTaskStore is experimental, and should not be used in production clusters!");
+    LOG.warn("DbTaskStore is experimental, and should not be used in production clusters!");
     this.taskMapper = requireNonNull(taskMapper);
     this.configManager = requireNonNull(configManager);
     this.clock = requireNonNull(clock);
@@ -89,10 +89,13 @@ class DbTaskStore implements TaskStore.Mutable {
     long start = clock.nowNanos();
     ImmutableSet<IScheduledTask> result = matches(query).toSet();
     long durationNanos = clock.nowNanos() - start;
-    Level level = durationNanos >= slowQueryThresholdNanos ? Level.INFO : Level.FINE;
-    if (LOG.isLoggable(level)) {
-      Long time = Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
-      LOG.log(level, "Query took " + time + " ms: " + query.get());
+    boolean infoLevel = durationNanos >= slowQueryThresholdNanos;
+    long time = Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
+    String message = "Query took {} ms: {}";
+    if (infoLevel) {
+      LOG.info(message, time, query.get());
+    } else {
+      LOG.debug(message, time, query.get());
     }
 
     return result;

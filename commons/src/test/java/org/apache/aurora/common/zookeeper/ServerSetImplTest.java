@@ -19,9 +19,7 @@ import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.logging.Logger;
 
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -55,7 +53,6 @@ import static org.junit.Assert.fail;
  * TODO(William Farner): Change this to remove thrift dependency.
  */
 public class ServerSetImplTest extends BaseZooKeeperTest {
-  private static final Logger LOG = Logger.getLogger(ServerSetImpl.class.getName());
   private static final List<ACL> ACL = ZooDefs.Ids.OPEN_ACL_UNSAFE;
   private static final String SERVICE = "/twitter/services/puffin_hosebird";
 
@@ -64,7 +61,7 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
 
   @Before
   public void mySetUp() throws IOException {
-    serverSetBuffer = new LinkedBlockingQueue<ImmutableSet<ServiceInstance>>();
+    serverSetBuffer = new LinkedBlockingQueue<>();
     serverSetMonitor = serverSetBuffer::offer;
   }
 

@@ -13,18 +13,18 @@
  */
 package org.apache.aurora.scheduler.http;
 
-import java.util.logging.Logger;
-
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.application.Lifecycle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HTTP quit callback, which invokes {@link Lifecycle#shutdown()}.
  */
 public class QuitCallback implements Runnable {
 
-  private static final Logger LOG = Logger.getLogger(QuitCallback.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(QuitCallback.class);
 
   private final Lifecycle lifecycle;
 

@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import org.antlr.stringtemplate.AutoIndentWriter;
 import org.antlr.stringtemplate.StringTemplate;
 import org.antlr.stringtemplate.StringTemplateGroup;
-
 import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.base.MorePreconditions;
 

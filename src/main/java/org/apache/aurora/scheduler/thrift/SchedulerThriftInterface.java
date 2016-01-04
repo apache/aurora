@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.thrift;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -118,6 +117,8 @@ import org.apache.aurora.scheduler.updater.JobUpdateController;
 import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -153,7 +154,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   @VisibleForTesting
   static final int MAX_TASK_ID_LENGTH = 255 - 90;
 
-  private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SchedulerThriftInterface.class);
 
   private final ConfigurationManager configurationManager;
   private final Thresholds thresholds;

@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.storage;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.gen.JobConfiguration;
@@ -27,12 +26,14 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 /**
  * Utility class to contain and perform storage backfill operations.
  */
 public final class StorageBackfill {
 
-  private static final Logger LOG = Logger.getLogger(StorageBackfill.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(StorageBackfill.class);
 
   private static final AtomicLong BACKFILLED_TASK_CONFIG_KEYS =
       Stats.exportLong("task_config_keys_backfilled");

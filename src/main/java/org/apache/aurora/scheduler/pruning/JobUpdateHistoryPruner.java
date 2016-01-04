@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.pruning;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -29,6 +28,8 @@ import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -36,7 +37,7 @@ import static java.util.Objects.requireNonNull;
  * Prunes per-job update history on a periodic basis.
  */
 class JobUpdateHistoryPruner extends AbstractIdleService {
-  private static final Logger LOG = Logger.getLogger(JobUpdateHistoryPruner.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(JobUpdateHistoryPruner.class);
 
   private final Clock clock;
   private final ScheduledExecutorService executor;

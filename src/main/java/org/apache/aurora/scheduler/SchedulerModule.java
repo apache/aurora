@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
@@ -44,6 +43,8 @@ import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.mesos.Protos;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.scheduler.SchedulerServicesModule.addSchedulerActiveServiceBinding;
 import static org.apache.aurora.scheduler.TierManager.TierManagerImpl.TierConfig;
@@ -53,7 +54,7 @@ import static org.apache.aurora.scheduler.TierManager.TierManagerImpl.TierConfig
  */
 public class SchedulerModule extends AbstractModule {
 
-  private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SchedulerModule.class);
 
   @CmdLine(name = "max_registration_delay",
       help = "Max allowable delay to allow the driver to register before aborting")
@@ -120,7 +121,7 @@ public class SchedulerModule extends AbstractModule {
       try {
         return Optional.of(Files.toString(TIER_CONFIG_FILE.get(), StandardCharsets.UTF_8));
       } catch (IOException e) {
-        LOG.severe("Error loading tier configuration file.");
+        LOG.error("Error loading tier configuration file.");
         throw Throwables.propagate(e);
       }
     }
@@ -134,7 +135,7 @@ public class SchedulerModule extends AbstractModule {
       try {
         return new ObjectMapper().readValue(input, TierConfig.class);
       } catch (IOException e) {
-        LOG.severe("Error parsing tier configuration file.");
+        LOG.error("Error parsing tier configuration file.");
         throw Throwables.propagate(e);
       }
     });

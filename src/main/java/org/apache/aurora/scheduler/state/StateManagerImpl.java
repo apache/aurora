@@ -18,8 +18,6 @@ import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -58,6 +56,8 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.SlaveID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -74,7 +74,7 @@ import static org.apache.aurora.scheduler.state.StateChangeResult.SUCCESS;
  * persisted state machine transitions, and their side-effects.
  */
 public class StateManagerImpl implements StateManager {
-  private static final Logger LOG = Logger.getLogger(StateManagerImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(StateManagerImpl.class);
 
   private final Clock clock;
   private final Driver driver;
@@ -207,7 +207,7 @@ public class StateManagerImpl implements StateManager {
         try {
           return InetAddress.getLocalHost().getHostName();
         } catch (UnknownHostException e) {
-          LOG.log(Level.SEVERE, "Failed to get self hostname.");
+          LOG.error("Failed to get self hostname.");
           throw Throwables.propagate(e);
         }
       });

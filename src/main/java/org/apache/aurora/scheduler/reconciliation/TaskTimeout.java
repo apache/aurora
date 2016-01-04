@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.reconciliation;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -36,6 +35,8 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -44,7 +45,7 @@ import static java.util.Objects.requireNonNull;
  * tasks will be transitioned to the LOST state.
  */
 class TaskTimeout extends AbstractIdleService implements EventSubscriber {
-  private static final Logger LOG = Logger.getLogger(TaskTimeout.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(TaskTimeout.class);
 
   @VisibleForTesting
   static final Amount<Long, Time> NOT_STARTED_RETRY = Amount.of(5L, Time.SECONDS);
@@ -130,7 +131,7 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
       } else {
         // Our service is not yet started.  We don't want to lose track of the task, so
         // we will try again later.
-        LOG.fine("Retrying timeout of task " + taskId + " in " + NOT_STARTED_RETRY);
+        LOG.debug("Retrying timeout of task " + taskId + " in " + NOT_STARTED_RETRY);
         // TODO(wfarner): This execution should not wait for a transaction, but a second executor
         // would be weird.
         executor.execute(this, NOT_STARTED_RETRY);

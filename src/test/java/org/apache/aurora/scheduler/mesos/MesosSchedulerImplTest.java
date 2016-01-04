@@ -15,8 +15,6 @@ package org.apache.aurora.scheduler.mesos;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -52,14 +50,16 @@ import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Protos.TaskStatus.Reason;
 import org.apache.mesos.Protos.TaskStatus.Source;
 import org.apache.mesos.SchedulerDriver;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.anyString;
-import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertTrue;
@@ -142,8 +142,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    Logger log = Logger.getAnonymousLogger();
-    log.setLevel(Level.INFO);
+    Logger log = LoggerFactory.getLogger("");
     initializeScheduler(log);
   }
 
@@ -161,8 +160,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         offerManager,
         eventSink,
         MoreExecutors.sameThreadExecutor(),
-        logger,
-        new CachedCounters(new FakeStatsProvider()));
+        new CachedCounters(new FakeStatsProvider()),
+        logger);
     driver = createMock(SchedulerDriver.class);
   }
 
@@ -196,11 +195,10 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testAcceptOfferFineLogging() {
+  public void testAcceptOfferDebugLogging() {
     Logger mockLogger = createMock(Logger.class);
     mockLogger.info(anyString());
-    expect(mockLogger.isLoggable(Level.FINE)).andReturn(true);
-    mockLogger.log(eq(Level.FINE), anyString());
+    mockLogger.debug(anyString(), EasyMock.<Object>anyObject());
     initializeScheduler(mockLogger);
 
     new AbstractOfferTest() {
@@ -347,10 +345,10 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testStatusReconciliationAcceptsFineLogging() {
+  public void testStatusReconciliationAcceptsDebugLogging() {
     Logger mockLogger = createMock(Logger.class);
     mockLogger.info(anyString());
-    mockLogger.log(eq(Level.FINE), anyString());
+    mockLogger.debug(anyString());
     initializeScheduler(mockLogger);
 
     new AbstractStatusReconciliationTest() {

@@ -18,7 +18,6 @@ import java.util.Objects;
 import org.apache.aurora.common.logging.RootLogConfig;
 import org.apache.aurora.common.logging.RootLogConfig.Configuration;
 import org.apache.aurora.common.logging.log4j.GlogLayout;
-
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
@@ -28,8 +27,8 @@ import org.apache.log4j.Logger;
  * Configures log4j logging.
  */
 final class Log4jConfigurator {
-  private static final java.util.logging.Logger LOG =
-      java.util.logging.Logger.getLogger(Log4jConfigurator.class.getName());
+  private static final org.slf4j.Logger LOG =
+      org.slf4j.LoggerFactory.getLogger(Log4jConfigurator.class.getName());
 
   /**
    * Configures log4j to log to stderr with a glog format.
@@ -58,7 +57,7 @@ final class Log4jConfigurator {
       case SEVERE:
         return Level.ERROR;
       default:
-        LOG.warning("Mapping unexpected vlog value of " + logConfig.getVlog() + " to log4j TRACE");
+        LOG.warn("Mapping unexpected vlog value of {} to log4j TRACE", logConfig.getVlog());
         return Level.TRACE;
     }
   }

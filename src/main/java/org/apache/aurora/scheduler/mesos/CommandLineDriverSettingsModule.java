@@ -19,7 +19,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
-import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -34,6 +33,8 @@ import org.apache.aurora.common.args.constraints.NotNull;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.mesos.Protos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.apache.mesos.Protos.FrameworkInfo.Capability;
@@ -45,7 +46,7 @@ import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RE
 public class CommandLineDriverSettingsModule extends AbstractModule {
 
   private static final Logger LOG =
-      Logger.getLogger(CommandLineDriverSettingsModule.class.getName());
+      LoggerFactory.getLogger(CommandLineDriverSettingsModule.class);
 
   @NotNull
   @CmdLine(name = "mesos_master_address",
@@ -115,12 +116,13 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       try {
         properties = parseCredentials(new FileInputStream(FRAMEWORK_AUTHENTICATION_FILE.get()));
       } catch (FileNotFoundException e) {
-        LOG.severe("Authentication File not Found");
+        LOG.error("Authentication File not Found");
         throw Throwables.propagate(e);
       }
 
-      LOG.info(String.format("Connecting to master using authentication (principal: %s).",
-          properties.get(PRINCIPAL_KEY)));
+      LOG.info(
+          "Connecting to master using authentication (principal: {}).",
+          properties.get(PRINCIPAL_KEY));
 
       return Optional.of(Protos.Credential.newBuilder()
           .setPrincipal(properties.getProperty(PRINCIPAL_KEY))
@@ -160,7 +162,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
     try {
       properties.load(credentialsStream);
     } catch (IOException e) {
-      LOG.severe("Unable to load authentication file");
+      LOG.error("Unable to load authentication file");
       throw Throwables.propagate(e);
     }
     Preconditions.checkState(properties.containsKey(PRINCIPAL_KEY),

@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.reconciliation;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -34,6 +33,8 @@ import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -42,7 +43,7 @@ import static java.util.Objects.requireNonNull;
  * retries {@link Driver#killTask(String)} until the task transitions.
  */
 public class KillRetry implements EventSubscriber {
-  private static final Logger LOG = Logger.getLogger(KillRetry.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(KillRetry.class);
 
   @VisibleForTesting
   static final String RETRIES_COUNTER = "task_kill_retries";

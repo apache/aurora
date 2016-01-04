@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage.db;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -28,6 +27,8 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -36,7 +37,7 @@ import static java.util.Objects.requireNonNull;
  */
 class RowGarbageCollector extends AbstractScheduledService {
 
-  private static final Logger LOG = Logger.getLogger(RowGarbageCollector.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(RowGarbageCollector.class);
 
   // Note: these are deliberately ordered to remove 'parent' references first, but since
   // this is an iterative process, it is not strictly necessary.

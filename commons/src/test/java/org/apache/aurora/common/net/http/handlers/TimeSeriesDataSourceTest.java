@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -27,14 +26,12 @@ import com.google.common.collect.Lists;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-import org.junit.Before;
-import org.junit.Test;
-
 import org.apache.aurora.common.collections.Iterables2;
-
 import org.apache.aurora.common.stats.TimeSeries;
 import org.apache.aurora.common.stats.TimeSeriesRepository;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.junit.Before;
+import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;

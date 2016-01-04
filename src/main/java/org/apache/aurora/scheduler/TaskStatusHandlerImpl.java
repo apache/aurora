@@ -19,8 +19,6 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -40,6 +38,8 @@ import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.mesos.Protos.TaskStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -54,7 +54,7 @@ import static java.util.Objects.requireNonNull;
 public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
     implements TaskStatusHandler {
 
-  private static final Logger LOG = Logger.getLogger(TaskStatusHandlerImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(TaskStatusHandlerImpl.class);
 
   @VisibleForTesting
   static final String MEMORY_LIMIT_DISPLAY = "Task used more memory than requested.";
@@ -108,7 +108,7 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
         new Listener() {
           @Override
           public void failed(State from, Throwable failure) {
-            LOG.log(Level.SEVERE, "TaskStatusHandler failed: ", failure);
+            LOG.error("TaskStatusHandler failed: ", failure);
             driver.abort();
           }
         },
@@ -169,7 +169,7 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
           driver.acknowledgeStatusUpdate(status);
         }
       } catch (RuntimeException e) {
-        LOG.log(Level.SEVERE, "Failed to process status update batch " + updates, e);
+        LOG.error("Failed to process status update batch " + updates, e);
       }
     }
   }

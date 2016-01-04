@@ -20,7 +20,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Random;
-
 import org.apache.aurora.scheduler.offers.OfferManager.OfferReturnDelay;
 
 import static com.google.common.base.Preconditions.checkArgument;

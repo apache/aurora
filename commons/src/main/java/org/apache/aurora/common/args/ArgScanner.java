@@ -20,7 +20,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -46,6 +45,8 @@ import com.google.common.collect.Sets;
 import org.apache.aurora.common.args.Args.ArgsInfo;
 import org.apache.aurora.common.args.apt.Configuration;
 import org.apache.aurora.common.collections.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -122,7 +123,7 @@ public final class ArgScanner {
   private static final Function<OptionInfo<?>, String> GET_CANONICAL_NEGATED_ARG_NAME =
       OptionInfo::getCanonicalNegatedName;
 
-  private static final Logger LOG = Logger.getLogger(ArgScanner.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(ArgScanner.class);
 
   // Pattern for the required argument format.
   private static final Pattern ARG_PATTERN =
@@ -314,7 +315,7 @@ public final class ArgScanner {
     Set<String> collisionsDropped = Sets.difference(ImmutableSet.copyOf(argAllShortNames),
         argAllShortNamesNoCollisions);
     if (!collisionsDropped.isEmpty()) {
-      LOG.warning("Found argument name collisions, args must be referenced by canonical names: "
+      LOG.warn("Found argument name collisions, args must be referenced by canonical names: "
           + collisionsDropped);
     }
     return argAllShortNamesNoCollisions;

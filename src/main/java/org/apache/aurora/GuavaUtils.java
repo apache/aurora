@@ -15,7 +15,6 @@ package org.apache.aurora;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Logger;
 import java.util.stream.Collector;
 
 import com.google.common.collect.ImmutableList;
@@ -27,6 +26,8 @@ import com.google.common.util.concurrent.ServiceManager;
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.application.Lifecycle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.stream.Collector.Characteristics.UNORDERED;
 
@@ -40,7 +41,7 @@ public final class GuavaUtils {
 
   public static class LifecycleShutdownListener extends ServiceManager.Listener {
     private final Lifecycle lifecycle;
-    private static final Logger LOG = Logger.getLogger(LifecycleShutdownListener.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(LifecycleShutdownListener.class);
 
     @Inject
     LifecycleShutdownListener(Lifecycle lifecycle) {
@@ -49,7 +50,7 @@ public final class GuavaUtils {
 
     @Override
     public void failure(Service service) {
-      LOG.severe("Service: " + service + " failed unexpectedly. Triggering shutdown.");
+      LOG.error("Service: " + service + " failed unexpectedly. Triggering shutdown.");
       lifecycle.shutdown();
     }
   }

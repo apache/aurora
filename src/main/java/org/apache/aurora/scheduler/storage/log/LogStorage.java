@@ -19,8 +19,6 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -75,6 +73,8 @@ import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -175,7 +175,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     }
   }
 
-  private static final Logger LOG = Logger.getLogger(LogStorage.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(LogStorage.class);
 
   private final LogManager logManager;
   private final SchedulingService schedulingService;
@@ -295,7 +295,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         quotaStore,
         attributeStore,
         jobUpdateStore,
-        Logger.getLogger(WriteAheadStorage.class.getName()),
+        LoggerFactory.getLogger(WriteAheadStorage.class),
         eventSink);
 
     this.logEntryReplayActions = buildLogEntryReplayActions();
@@ -472,9 +472,9 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
           snapshot();
         } catch (StorageException e) {
           if (e.getCause() == null) {
-            LOG.log(Level.WARNING, "StorageException when attempting to snapshot.", e);
+            LOG.warn("StorageException when attempting to snapshot.", e);
           } else {
-            LOG.log(Level.WARNING, e.getMessage(), e.getCause());
+            LOG.warn(e.getMessage(), e.getCause());
           }
         }
       });

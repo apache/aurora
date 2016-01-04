@@ -18,8 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -69,6 +67,8 @@ import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -106,7 +106,7 @@ import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatu
  * TODO(wfarner): Consider using AbstractIdleService here.
  */
 class JobUpdateControllerImpl implements JobUpdateController {
-  private static final Logger LOG = Logger.getLogger(JobUpdateControllerImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(JobUpdateControllerImpl.class);
 
   private final UpdateFactory updateFactory;
   private final LockManager lockManager;
@@ -282,10 +282,10 @@ class JobUpdateControllerImpl implements JobUpdateController {
       return JobUpdatePulseStatus.FINISHED;
     }
 
-    LOG.fine(String.format(
-        "Job update %s has been pulsed. Timeout of %d msec is reset.",
+    LOG.debug(
+        "Job update {} has been pulsed. Timeout of {} msec is reset.",
         key,
-        state.getPulseTimeoutMs()));
+        state.getPulseTimeoutMs());
 
     if (JobUpdateStateMachine.isAwaitingPulse(state.getStatus())) {
       // Attempt to unblock a job update previously blocked on expired pulse.
@@ -295,7 +295,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
               key,
               status -> new JobUpdateEvent().setStatus(GET_UNBLOCKED_STATE.apply(status)));
         } catch (UpdateStateException e) {
-          LOG.severe("Error while processing job update pulse: " + e);
+          LOG.error("Error while processing job update pulse: " + e);
         }
       });
     }
@@ -425,12 +425,12 @@ class JobUpdateControllerImpl implements JobUpdateController {
       status = proposedEvent.getStatus();
       record = recordChange;
     } else {
-      LOG.severe("Update " + key + " does not have a lock");
+      LOG.error("Update " + key + " does not have a lock");
       status = ERROR;
       record = true;
     }
 
-    LOG.info(String.format("Update %s is now in state %s", key, status));
+    LOG.info("Update {} is now in state {}", key, status);
     if (record) {
       updateStore.saveJobUpdateEvent(
           key,
@@ -465,7 +465,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       try {
         update = updateFactory.newUpdate(jobUpdate.getInstructions(), action == ROLL_FORWARD);
       } catch (RuntimeException e) {
-        LOG.log(Level.WARNING, "Uncaught exception: " + e, e);
+        LOG.warn("Uncaught exception: " + e, e);
         changeJobUpdateStatus(
             storeProvider,
             key,
@@ -505,7 +505,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     if (isCoordinatedUpdate(instructions)) {
       PulseState pulseState = pulseHandler.get(key);
       boolean result = pulseState == null || pulseState.isBlocked(clock);
-      LOG.info(String.format("Coordinated update %s pulse expired: %s", key, result));
+      LOG.info("Coordinated update {} pulse expired: {}", key, result);
       return result;
     } else {
       return false;
@@ -581,9 +581,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
         // A given instance update action may only be issued once during the update lifecycle.
         // Suppress duplicate events due to pause/resume operations.
         if (savedActions.contains(action)) {
-          LOG.info(String.format("Suppressing duplicate update %s for instance %s.",
-              action,
-              instanceId));
+          LOG.info("Suppressing duplicate update {} for instance {}.", action, instanceId);
         } else {
           IJobInstanceUpdateEvent event = IJobInstanceUpdateEvent.build(
               new JobInstanceUpdateEvent()

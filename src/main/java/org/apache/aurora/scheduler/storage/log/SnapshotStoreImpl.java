@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage.log;
 
 import java.util.Arrays;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -52,6 +51,8 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -61,7 +62,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
-  private static final Logger LOG = Logger.getLogger(SnapshotStoreImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SnapshotStoreImpl.class);
 
   private static final Iterable<SnapshotField> SNAPSHOT_FIELDS = Arrays.asList(
       new SnapshotField() {

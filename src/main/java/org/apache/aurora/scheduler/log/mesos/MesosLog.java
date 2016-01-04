@@ -21,8 +21,6 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -47,6 +45,8 @@ import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
 import org.apache.mesos.Log;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
@@ -58,7 +58,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class MesosLog implements org.apache.aurora.scheduler.log.Log {
 
-  private static final Logger LOG = Logger.getLogger(MesosLog.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(MesosLog.class);
 
   /**
    * Binding annotation for the opaque value of a log noop entry.
@@ -257,9 +257,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
             long start = System.nanoTime();
             try {
               Log.Position p = log.position(Longs.toByteArray(position));
-              if (LOG.isLoggable(Level.FINE)) {
-                LOG.fine("Reading position " + position + " from the log");
-              }
+              LOG.debug("Reading position {} from the log", position);
               List<Log.Entry> entries = reader.read(p, p, readTimeout, readTimeUnit);
 
               // N.B. HACK! There is currently no way to "increment" a position. Until the Mesos

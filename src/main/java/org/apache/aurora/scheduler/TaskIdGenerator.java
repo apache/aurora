@@ -19,7 +19,6 @@ import java.util.UUID;
 import javax.inject.Inject;
 
 import org.apache.aurora.common.util.Clock;
-
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**

@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage.log;
 
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ListMultimap;
@@ -29,6 +28,8 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.DeduplicatedScheduledTask;
 import org.apache.aurora.gen.storage.DeduplicatedSnapshot;
 import org.apache.aurora.gen.storage.Snapshot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.gen.AssignedTask._Fields.TASK;
 import static org.apache.aurora.gen.ScheduledTask._Fields.ASSIGNED_TASK;
@@ -59,7 +60,7 @@ public interface SnapshotDeduplicator {
   Snapshot reduplicate(DeduplicatedSnapshot snapshot) throws CodingException;
 
   class SnapshotDeduplicatorImpl implements SnapshotDeduplicator {
-    private static final Logger LOG = Logger.getLogger(SnapshotDeduplicatorImpl.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(SnapshotDeduplicatorImpl.class);
 
     private static final Function<ScheduledTask, TaskConfig> SCHEDULED_TO_CONFIG =
         task -> task.getAssignedTask().getTask();
@@ -103,14 +104,14 @@ public interface SnapshotDeduplicator {
     @Timed("snapshot_deduplicate")
     public DeduplicatedSnapshot deduplicate(Snapshot snapshot) {
       int numInputTasks = snapshot.getTasksSize();
-      LOG.info(String.format("Starting deduplication of a snapshot with %d tasks.", numInputTasks));
+      LOG.info("Starting deduplication of a snapshot with {} tasks.", numInputTasks);
 
       DeduplicatedSnapshot deduplicatedSnapshot = new DeduplicatedSnapshot()
           .setPartialSnapshot(deepCopyWithoutTasks(snapshot));
 
       // Nothing to do if we don't have any input tasks.
       if (!snapshot.isSetTasks()) {
-        LOG.warning("Got snapshot with unset tasks field.");
+        LOG.warn("Got snapshot with unset tasks field.");
         return deduplicatedSnapshot;
       }
 
@@ -145,7 +146,7 @@ public interface SnapshotDeduplicator {
       LOG.info("Starting reduplication.");
       Snapshot snapshot = new Snapshot(deduplicatedSnapshot.getPartialSnapshot());
       if (!deduplicatedSnapshot.isSetTaskConfigs()) {
-        LOG.warning("Got deduplicated snapshot with unset task configs.");
+        LOG.warn("Got deduplicated snapshot with unset task configs.");
         return snapshot;
       }
 

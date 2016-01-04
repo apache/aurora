@@ -13,21 +13,21 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.util.logging.Logger;
-
 import com.google.common.base.Preconditions;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.LogEntry._Fields;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for working with log entries.
  */
 public final class Entries {
 
-  private static final Logger LOG = Logger.getLogger(Entries.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Entries.class);
 
   private Entries() {
     // Utility class.

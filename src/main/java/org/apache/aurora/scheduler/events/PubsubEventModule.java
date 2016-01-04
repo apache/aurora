@@ -16,8 +16,6 @@ package org.apache.aurora.scheduler.events;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -40,6 +38,8 @@ import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -59,7 +59,7 @@ public final class PubsubEventModule extends AbstractModule {
   }
 
   public PubsubEventModule() {
-    this(Logger.getLogger(PubsubEventModule.class.getName()));
+    this(LoggerFactory.getLogger(PubsubEventModule.class));
   }
 
   @VisibleForTesting
@@ -81,8 +81,7 @@ public final class PubsubEventModule extends AbstractModule {
         executor,
         (exception, context) -> {
           subscriberExceptions.incrementAndGet();
-          log.log(
-              Level.SEVERE,
+          log.error(
               "Failed to dispatch event to " + context.getSubscriberMethod() + ": " + exception,
               exception);
         }
@@ -101,7 +100,7 @@ public final class PubsubEventModule extends AbstractModule {
   private class DeadEventHandler {
     @Subscribe
     public void logDeadEvent(DeadEvent event) {
-      log.warning(String.format(DEAD_EVENT_MESSAGE, event.getEvent()));
+      log.warn(String.format(DEAD_EVENT_MESSAGE, event.getEvent()));
     }
   }
 

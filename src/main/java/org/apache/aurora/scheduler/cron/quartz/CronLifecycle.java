@@ -15,8 +15,6 @@ package org.apache.aurora.scheduler.cron.quartz;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -30,6 +28,8 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -37,7 +37,7 @@ import static java.util.Objects.requireNonNull;
  * Manager for startup and teardown of Quartz scheduler.
  */
 class CronLifecycle extends AbstractIdleService {
-  private static final Logger LOG = Logger.getLogger(CronLifecycle.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(CronLifecycle.class);
 
   private static final AtomicInteger RUNNING_FLAG = Stats.exportInt("quartz_scheduler_running");
   private static final AtomicInteger LOADED_FLAG = Stats.exportInt("cron_jobs_loaded");
@@ -82,7 +82,7 @@ class CronLifecycle extends AbstractIdleService {
 
   private void logLaunchFailure(IJobConfiguration job, Exception e) {
     LAUNCH_FAILURES.incrementAndGet();
-    LOG.log(Level.SEVERE, "Scheduling failed for recovered job " + job, e);
+    LOG.error("Scheduling failed for recovered job " + job, e);
   }
 
   @Override

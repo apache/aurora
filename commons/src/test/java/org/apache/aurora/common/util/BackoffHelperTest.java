@@ -13,17 +13,17 @@
  */
 package org.apache.aurora.common.util;
 
+import java.io.IOException;
+
 import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-
-import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.fail;
 
 /**
  * @author John Sirois

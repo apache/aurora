@@ -19,10 +19,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import org.slf4j.Logger;
 
 import static java.util.Objects.requireNonNull;
 
@@ -120,11 +120,11 @@ public final class AsyncUtil {
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
         } catch (ExecutionException ee) {
-          logger.log(Level.SEVERE, ee.toString(), ee);
+          logger.error(ee.toString(), ee);
         }
       }
     } else {
-      logger.log(Level.SEVERE, throwable.toString(), throwable);
+      logger.error(throwable.toString(), throwable);
     }
   }
 }

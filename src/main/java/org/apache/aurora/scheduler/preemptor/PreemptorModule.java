@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
-import java.util.logging.Logger;
-
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
@@ -33,12 +31,14 @@ import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.preemptor.BiCache.BiCacheSettings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
 public class PreemptorModule extends AbstractModule {
 
-  private static final Logger LOG = Logger.getLogger(PreemptorModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(PreemptorModule.class);
 
   @CmdLine(name = "enable_preemptor",
       help = "Enable the preemptor and preemption")
@@ -114,7 +114,7 @@ public class PreemptorModule extends AbstractModule {
           expose(PendingTaskProcessor.class);
         } else {
           bind(Preemptor.class).toInstance(NULL_PREEMPTOR);
-          LOG.warning("Preemptor Disabled.");
+          LOG.warn("Preemptor Disabled.");
         }
         expose(Preemptor.class);
       }

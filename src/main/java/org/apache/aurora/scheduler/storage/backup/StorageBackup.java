@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -51,6 +49,8 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
 import org.apache.thrift.transport.TTransport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -70,7 +70,7 @@ public interface StorageBackup {
   void backupNow();
 
   class StorageBackupImpl implements StorageBackup, SnapshotStore<Snapshot> {
-    private static final Logger LOG = Logger.getLogger(StorageBackup.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(StorageBackup.class);
 
     private static final String FILE_PREFIX = "scheduler-backup-";
     private final BackupConfig config;
@@ -170,9 +170,9 @@ public interface StorageBackup {
         successes.incrementAndGet();
       } catch (IOException e) {
         failures.incrementAndGet();
-        LOG.log(Level.SEVERE, "Failed to prepare backup " + backupName + ": " + e, e);
+        LOG.error("Failed to prepare backup " + backupName + ": " + e, e);
       } catch (TException e) {
-        LOG.log(Level.SEVERE, "Failed to encode backup " + backupName + ": " + e, e);
+        LOG.error("Failed to encode backup " + backupName + ": " + e, e);
         failures.incrementAndGet();
       } finally {
         if (tempFile.exists()) {
@@ -183,7 +183,7 @@ public interface StorageBackup {
 
       File[] backups = config.dir.listFiles(BACKUP_FILTER);
       if (backups == null) {
-        LOG.severe("Failed to list backup dir " + config.dir);
+        LOG.error("Failed to list backup dir " + config.dir);
       } else {
         int backupsToDelete = backups.length - config.maxBackups;
         if (backupsToDelete > 0) {
@@ -200,7 +200,7 @@ public interface StorageBackup {
 
     private void tryDelete(File fileToDelete) {
       if (!fileToDelete.delete()) {
-        LOG.severe("Failed to delete file: " + fileToDelete.getName());
+        LOG.error("Failed to delete file: " + fileToDelete.getName());
       }
     }
 

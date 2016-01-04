@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.http;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 

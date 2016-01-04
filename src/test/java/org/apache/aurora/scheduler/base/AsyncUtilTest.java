@@ -19,16 +19,14 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
 
 import static org.easymock.EasyMock.contains;
-import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
 
 public class AsyncUtilTest extends EasyMockTest {
@@ -87,10 +85,7 @@ public class AsyncUtilTest extends EasyMockTest {
   }
 
   private void expectLogging() {
-    logger.log(
-        eq(Level.SEVERE),
-        contains("Expected exception."),
-        EasyMock.<ExecutionException>anyObject());
+    logger.error(contains("Expected exception."), EasyMock.<ExecutionException>anyObject());
 
     expectLastCall().andAnswer(() -> {
       latch.countDown();

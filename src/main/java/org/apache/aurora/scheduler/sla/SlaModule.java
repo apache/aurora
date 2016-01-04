@@ -18,7 +18,6 @@ import java.lang.annotation.Target;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -38,6 +37,8 @@ import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -54,7 +55,7 @@ import static org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory.PL
  */
 public class SlaModule extends AbstractModule {
 
-  private static final Logger LOG = Logger.getLogger(SlaModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SlaModule.class);
 
   @Positive
   @CmdLine(name = "sla_stat_refresh_interval", help = "The SLA stat refresh interval.")
@@ -133,7 +134,7 @@ public class SlaModule extends AbstractModule {
     protected void startUp() {
       long interval = settings.getRefreshRateMs();
       executor.scheduleAtFixedRate(calculator, interval, interval, TimeUnit.MILLISECONDS);
-      LOG.info(String.format("Scheduled SLA calculation with %d msec interval.", interval));
+      LOG.debug("Scheduled SLA calculation with {} msec interval.", interval);
     }
 
     @Override

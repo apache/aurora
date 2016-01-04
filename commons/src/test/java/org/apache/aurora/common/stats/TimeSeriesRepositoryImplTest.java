@@ -14,6 +14,7 @@
 package org.apache.aurora.common.stats;
 
 import com.google.common.collect.ImmutableList;
+
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;

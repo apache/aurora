@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.cron.quartz;
 import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
@@ -36,6 +35,8 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.simpl.SimpleThreadPool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.quartz.impl.StdSchedulerFactory.PROP_SCHED_INSTANCE_ID;
 import static org.quartz.impl.StdSchedulerFactory.PROP_SCHED_MAKE_SCHEDULER_THREAD_DAEMON;
@@ -50,7 +51,7 @@ import static org.quartz.impl.StdSchedulerFactory.PROP_THREAD_POOL_PREFIX;
  * schedule.
  */
 public class CronModule extends AbstractModule {
-  private static final Logger LOG = Logger.getLogger(CronModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(CronModule.class);
 
   @CmdLine(name = "cron_scheduler_num_threads",
       help = "Number of threads to use for the cron scheduler thread pool.")
@@ -98,7 +99,7 @@ public class CronModule extends AbstractModule {
     TimeZone timeZone = TimeZone.getTimeZone(CRON_TIMEZONE.get());
     TimeZone systemTimeZone = TimeZone.getDefault();
     if (!timeZone.equals(systemTimeZone)) {
-      LOG.warning("Cron schedules are configured to fire according to timezone "
+      LOG.warn("Cron schedules are configured to fire according to timezone "
           + timeZone.getDisplayName()
           + " but system timezone is set to "
           + systemTimeZone.getDisplayName());

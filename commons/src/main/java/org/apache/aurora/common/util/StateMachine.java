@@ -19,7 +19,6 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -34,6 +33,8 @@ import com.google.common.collect.Multimap;
 import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.base.Closures;
 import org.apache.commons.lang.builder.HashCodeBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -50,7 +51,7 @@ import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
  * TODO(William Farner): Consider merging the stats-tracking ala PipelineStats into this.
  */
 public class StateMachine<T> {
-  private static final Logger LOG = Logger.getLogger(StateMachine.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(StateMachine.class);
 
   private final String name;
 

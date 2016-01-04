@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.mesos;
 import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -33,6 +32,8 @@ import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.FrameworkInfo;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -44,7 +45,7 @@ import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
  * Manages the lifecycle of the scheduler driver, and provides a more constrained API to use it.
  */
 class SchedulerDriverService extends AbstractIdleService implements Driver {
-  private static final Logger LOG = Logger.getLogger(SchedulerDriverService.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SchedulerDriverService.class);
 
   private final AtomicLong killFailures = Stats.exportLong("scheduler_driver_kill_failures");
   private final DriverFactory driverFactory;
@@ -74,7 +75,7 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
 
     LOG.info("Connecting to mesos master: " + driverSettings.getMasterUri());
     if (!driverSettings.getCredentials().isPresent()) {
-      LOG.warning("Connecting to master without authentication!");
+      LOG.warn("Connecting to master without authentication!");
     }
 
     FrameworkInfo.Builder frameworkBuilder = driverSettings.getFrameworkInfo().toBuilder();
@@ -83,7 +84,7 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
       LOG.info("Found persisted framework ID: " + frameworkId);
       frameworkBuilder.setId(FrameworkID.newBuilder().setValue(frameworkId.get()));
     } else {
-      LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
+      LOG.warn("Did not find a persisted framework ID, connecting as a new framework.");
     }
 
     SchedulerDriver schedulerDriver = driverFactory.create(
@@ -134,8 +135,7 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
         Protos.TaskID.newBuilder().setValue(taskId).build());
 
     if (status != DRIVER_RUNNING) {
-      LOG.severe(String.format("Attempt to kill task %s failed with code %s",
-          taskId, status));
+      LOG.error("Attempt to kill task {} failed with code {}", taskId, status);
       killFailures.incrementAndGet();
     }
   }

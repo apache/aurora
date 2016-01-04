@@ -13,13 +13,14 @@
  */
 package org.apache.aurora.scheduler.http;
 
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Default handler to invoke when the process is being instructed to exit immediately.
  */
 class AbortCallback implements Runnable {
-  private static final Logger LOG = Logger.getLogger(AbortCallback.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(AbortCallback.class);
 
   @Override public void run() {
     LOG.info("ABORTING PROCESS IMMEDIATELY!");

@@ -16,8 +16,6 @@ package org.apache.aurora.common.zookeeper;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
@@ -29,15 +27,13 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 
-import org.apache.zookeeper.KeeperException;
-
-import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.ExceptionalCommand;
-import org.apache.aurora.common.zookeeper.Group.GroupChangeListener;
 import org.apache.aurora.common.zookeeper.Group.JoinException;
 import org.apache.aurora.common.zookeeper.Group.Membership;
 import org.apache.aurora.common.zookeeper.Group.WatchException;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionException;
+import org.apache.zookeeper.KeeperException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implements leader election for small groups of candidates.  This implementation is subject to the
@@ -45,7 +41,7 @@ import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionExc
  * herd effect</a> for a given group and should only be used for small (~10 member) candidate pools.
  */
 public class CandidateImpl implements Candidate {
-  private static final Logger LOG = Logger.getLogger(CandidateImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(CandidateImpl.class);
 
   private static final byte[] UNKNOWN_CANDIDATE_DATA = "<unknown>".getBytes(Charsets.UTF_8);
 
@@ -53,7 +49,7 @@ public class CandidateImpl implements Candidate {
     try {
       return InetAddress.getLocalHost().getHostAddress().getBytes();
     } catch (UnknownHostException e) {
-      LOG.log(Level.WARNING, "Failed to determine local address!", e);
+      LOG.warn("Failed to determine local address!", e);
       return UNKNOWN_CANDIDATE_DATA;
     }
   };
@@ -93,18 +89,18 @@ public class CandidateImpl implements Candidate {
       String memberId = membership.getMemberId();
 
       if (noCandidates) {
-        LOG.warning("All candidates have temporarily left the group: " + group);
+        LOG.warn("All candidates have temporarily left the group: " + group);
       } else if (!Iterables.contains(memberIds, memberId)) {
-        LOG.severe(String.format(
-            "Current member ID %s is not a candidate for leader, current voting: %s",
-            memberId, memberIds));
+        LOG.error(
+            "Current member ID {} is not a candidate for leader, current voting: {}",
+            memberId, memberIds);
       } else {
         boolean electedLeader = memberId.equals(getLeader(memberIds));
         boolean previouslyElected = elected.getAndSet(electedLeader);
 
         if (!previouslyElected && electedLeader) {
-          LOG.info(String.format("Candidate %s is now leader of group: %s",
-              membership.getMemberPath(), memberIds));
+          LOG.info("Candidate {} is now leader of group: {}",
+              membership.getMemberPath(), memberIds);
 
           leader.onElected(() -> {
             membership.cancel();
@@ -114,9 +110,9 @@ public class CandidateImpl implements Candidate {
           if (previouslyElected) {
             leader.onDefeated();
           }
-          LOG.info(String.format(
-              "Candidate %s waiting for the next leader election, current voting: %s",
-              membership.getMemberPath(), memberIds));
+          LOG.info(
+              "Candidate {} waiting for the next leader election, current voting: {}",
+              membership.getMemberPath(), memberIds);
         }
       }
     });

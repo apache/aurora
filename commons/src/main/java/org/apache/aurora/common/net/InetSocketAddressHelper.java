@@ -13,17 +13,11 @@
  */
 package org.apache.aurora.common.net;
 
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
-import org.apache.commons.lang.StringUtils;
-
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.util.Set;
+
+import com.google.common.base.Preconditions;
+
+import org.apache.commons.lang.StringUtils;
 
 /**
  * A utility that can parse [host]:[port] pairs or :[port] designators into instances of

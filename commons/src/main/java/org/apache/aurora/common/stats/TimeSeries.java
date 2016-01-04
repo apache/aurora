@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.common.stats;
 
-import java.util.Calendar;
-
 /**
  * A time series of values.
  *

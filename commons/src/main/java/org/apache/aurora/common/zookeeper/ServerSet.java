@@ -13,13 +13,12 @@
  */
 package org.apache.aurora.common.zookeeper;
 
-import org.apache.aurora.common.net.pool.DynamicHostSet;
-import org.apache.aurora.common.zookeeper.Group.JoinException;
-import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.common.thrift.Status;
-
 import java.net.InetSocketAddress;
 import java.util.Map;
+
+import org.apache.aurora.common.net.pool.DynamicHostSet;
+import org.apache.aurora.common.thrift.ServiceInstance;
+import org.apache.aurora.common.zookeeper.Group.JoinException;
 
 /**
  * A logical set of servers registered in ZooKeeper.  Intended to be used by both servers in a

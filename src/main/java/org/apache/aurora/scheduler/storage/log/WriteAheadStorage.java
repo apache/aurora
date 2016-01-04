@@ -15,8 +15,6 @@ package org.apache.aurora.scheduler.storage.log;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -64,6 +62,7 @@ import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.slf4j.Logger;
 
 import uno.perk.forward.Forward;
 
@@ -204,10 +203,9 @@ class WriteAheadStorage extends WriteAheadStorageForwarder implements
     ImmutableSet<IScheduledTask> mutated = taskStore.mutateTasks(query, mutator);
 
     Map<String, IScheduledTask> tasksById = Tasks.mapById(mutated);
-    if (log.isLoggable(Level.FINE)) {
-      log.fine("Storing updated tasks to log: "
-          + Maps.transformValues(tasksById, IScheduledTask::getStatus));
-    }
+    log.debug(
+        "Storing updated tasks to log: {}",
+        Maps.transformValues(tasksById, IScheduledTask::getStatus));
 
     // TODO(William Farner): Avoid writing an op when mutated is empty.
     write(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));

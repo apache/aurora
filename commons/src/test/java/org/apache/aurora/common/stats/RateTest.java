@@ -13,19 +13,23 @@
  */
 package org.apache.aurora.common.stats;
 
+import java.util.concurrent.atomic.AtomicLong;
+
+import com.google.common.base.Supplier;
+
 import org.apache.aurora.common.util.testing.FakeTicker;
 import org.easymock.IMocksControl;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.concurrent.atomic.AtomicLong;
-
-import com.google.common.base.Supplier;
-
-import static org.easymock.EasyMock.*;
-import static org.junit.Assert.*;
-import static org.hamcrest.CoreMatchers.*;
+import static org.easymock.EasyMock.createControl;
+import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
 
 /**
  * @author William Farner

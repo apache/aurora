@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.http.api.security;
 
 import java.io.IOException;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -29,12 +28,14 @@ import com.google.common.base.Optional;
 import org.apache.aurora.scheduler.http.AbstractFilter;
 import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.subject.Subject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
 public class ShiroKerberosAuthenticationFilter extends AbstractFilter {
   private static final Logger LOG =
-      Logger.getLogger(ShiroKerberosAuthenticationFilter.class.getName());
+      LoggerFactory.getLogger(ShiroKerberosAuthenticationFilter.class);
 
   /**
    * From http://tools.ietf.org/html/rfc4559.
@@ -57,7 +58,7 @@ public class ShiroKerberosAuthenticationFilter extends AbstractFilter {
     Optional<String> authorizationHeaderValue =
         Optional.fromNullable(request.getHeader(HttpHeaders.AUTHORIZATION));
     if (authorizationHeaderValue.isPresent()) {
-      LOG.fine("Authorization header is present");
+      LOG.debug("Authorization header is present");
       AuthorizeHeaderToken token;
       try {
         token = new AuthorizeHeaderToken(authorizationHeaderValue.get());
@@ -70,7 +71,7 @@ public class ShiroKerberosAuthenticationFilter extends AbstractFilter {
         subjectProvider.get().login(token);
         chain.doFilter(request, response);
       } catch (AuthenticationException e) {
-        LOG.warning("Login failed: " + e.getMessage());
+        LOG.warn("Login failed: " + e.getMessage());
         sendChallenge(response);
       }
     } else {

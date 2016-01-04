@@ -19,7 +19,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
@@ -85,6 +84,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -189,7 +189,7 @@ public class StatusUpdateBenchmark {
                 .annotatedWith(MesosSchedulerImpl.SchedulerExecutor.class)
                 .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor(
                     "SchedulerImpl-%d",
-                    Logger.getLogger(StatusUpdateBenchmark.class.getName())));
+                    LoggerFactory.getLogger(StatusUpdateBenchmark.class)));
             bind(DriverFactory.class)
                 .toInstance((s, credentials, frameworkInfo, master) -> new FakeSchedulerDriver());
             bind(OfferManager.class).toInstance(new FakeOfferManager());

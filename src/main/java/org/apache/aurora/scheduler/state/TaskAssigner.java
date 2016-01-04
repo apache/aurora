@@ -17,8 +17,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -43,6 +41,8 @@ import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.Protos.TaskInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -74,7 +74,7 @@ public interface TaskAssigner {
       Map<String, TaskGroupKey> slaveReservations);
 
   class TaskAssignerImpl implements TaskAssigner {
-    private static final Logger LOG = Logger.getLogger(TaskAssignerImpl.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(TaskAssignerImpl.class);
 
     @VisibleForTesting
     static final Optional<String> LAUNCH_FAILED_MSG =
@@ -123,8 +123,9 @@ public interface TaskAssigner {
           host,
           offer.getSlaveId(),
           portsByName);
-      LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-          host, offer.getSlaveId().getValue(), taskId));
+      LOG.info(
+          "Offer on slave {} (id {}) is being assigned task for {}.",
+          host, offer.getSlaveId().getValue(), taskId);
       return taskFactory.createFrom(assigned, offer.getSlaveId());
     }
 
@@ -164,7 +165,7 @@ public interface TaskAssigner {
             offerManager.launchTask(offer.getOffer().getId(), taskInfo);
             return true;
           } catch (OfferManager.LaunchException e) {
-            LOG.log(Level.WARNING, "Failed to launch task.", e);
+            LOG.warn("Failed to launch task.", e);
             launchFailures.incrementAndGet();
 
             // The attempt to schedule the task failed, so we need to backpedal on the
@@ -186,7 +187,7 @@ public interface TaskAssigner {
             offerManager.banOffer(offer.getOffer().getId(), groupKey);
           }
 
-          LOG.fine("Slave " + offer.getOffer().getHostname()
+          LOG.debug("Slave " + offer.getOffer().getHostname()
               + " vetoed task " + taskId + ": " + vetoes);
         }
       }

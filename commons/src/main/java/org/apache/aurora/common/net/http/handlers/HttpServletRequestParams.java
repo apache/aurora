@@ -13,15 +13,17 @@
  */
 package org.apache.aurora.common.net.http.handlers;
 
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Simple utility for parsing HttpServletRequest parameters by type.
  */
 public class HttpServletRequestParams {
-  private static final Logger LOG = Logger.getLogger(HttpServletRequestParams.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(HttpServletRequestParams.class);
 
   /**
    * Parses an int param from an HttpServletRequest, returns a default value
@@ -34,7 +36,7 @@ public class HttpServletRequestParams {
       try {
         result = Integer.parseInt(value);
       } catch (NumberFormatException e) {
-        LOG.warning("Invalid int for " + param + ": " + value);
+        LOG.warn("Invalid int for " + param + ": " + value);
       }
     }
     return result;
@@ -51,7 +53,7 @@ public class HttpServletRequestParams {
       try {
         result = Long.parseLong(value);
       } catch (NumberFormatException e) {
-        LOG.warning("Invalid long for " + param + ": " + value);
+        LOG.warn("Invalid long for " + param + ": " + value);
       }
     }
     return result;

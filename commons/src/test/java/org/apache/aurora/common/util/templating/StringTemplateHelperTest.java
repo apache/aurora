@@ -16,11 +16,8 @@ package org.apache.aurora.common.util.templating;
 import java.io.StringWriter;
 import java.util.Arrays;
 
-import org.antlr.stringtemplate.StringTemplate;
 import org.junit.Before;
 import org.junit.Test;
-
-import org.apache.aurora.common.base.Closure;
 
 import static org.junit.Assert.assertEquals;
 

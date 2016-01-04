@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.scheduling;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -38,6 +37,8 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -69,7 +70,7 @@ public interface RescheduleCalculator {
 
   class RescheduleCalculatorImpl implements RescheduleCalculator {
 
-    private static final Logger LOG = Logger.getLogger(TaskGroups.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(TaskGroups.class);
 
     private final Storage storage;
     private final RescheduleCalculatorSettings settings;

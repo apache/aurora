@@ -21,8 +21,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -71,6 +69,8 @@ import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule;
 import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import org.apache.aurora.scheduler.zookeeper.guice.client.flagged.FlaggedClientConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.common.logging.RootLogConfig.Configuration;
 
@@ -78,7 +78,7 @@ import static org.apache.aurora.common.logging.RootLogConfig.Configuration;
  * Launcher for the aurora scheduler.
  */
 public class SchedulerMain {
-  private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SchedulerMain.class);
 
   @CmdLine(name = "logtostderr", help = "Log messages to stderr instead of logfiles.")
   private static final Arg<Boolean> LOGTOSTDERR = Arg.create(false);
@@ -200,7 +200,7 @@ public class SchedulerMain {
     AtomicLong uncaughtExceptions = Stats.exportLong("uncaught_exceptions");
     Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
       uncaughtExceptions.incrementAndGet();
-      LOG.log(Level.SEVERE, "Uncaught exception from " + t + ":" + e, e);
+      LOG.error("Uncaught exception from " + t + ":" + e, e);
     });
 
     ClientConfig zkClientConfig = FlaggedClientConfig.create();
@@ -255,7 +255,7 @@ public class SchedulerMain {
   }
 
   private static void exit(String message, Exception error) {
-    LOG.log(Level.SEVERE, message + "\n" + error, error);
+    LOG.error(message + "\n" + error, error);
     System.exit(1);
   }
 

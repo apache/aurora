@@ -13,16 +13,15 @@
  */
 package org.apache.aurora.common.zookeeper;
 
+import java.net.InetSocketAddress;
+import java.util.Map;
+
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
-
-import java.net.InetSocketAddress;
-import java.util.Map;
-
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

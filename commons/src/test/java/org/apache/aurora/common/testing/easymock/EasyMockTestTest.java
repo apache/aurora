@@ -19,7 +19,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.common.collect.ImmutableList;
 
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expectLastCall;

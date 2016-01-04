@@ -15,8 +15,6 @@ package org.apache.aurora.scheduler.thrift.aop;
 
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.base.Throwables;
@@ -31,13 +29,15 @@ import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.shiro.ShiroException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A method interceptor that logs all invocations as well as any unchecked exceptions thrown from
  * the underlying call.
  */
 class LoggingInterceptor implements MethodInterceptor {
-  private static final Logger LOG = Logger.getLogger(LoggingInterceptor.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(LoggingInterceptor.class);
 
   private final Map<Class<?>, Function<Object, String>> printFunctions =
       ImmutableMap.of(
@@ -69,13 +69,13 @@ class LoggingInterceptor implements MethodInterceptor {
     try {
       return invocation.proceed();
     } catch (Storage.TransientStorageException e) {
-      LOG.log(Level.WARNING, "Uncaught transient exception while handling " + message, e);
+      LOG.warn("Uncaught transient exception while handling " + message, e);
       return Responses.addMessage(Responses.empty(), ResponseCode.ERROR_TRANSIENT, e);
     } catch (RuntimeException e) {
       // We need shiro's exceptions to bubble up to the Shiro servlet filter so we intentionally
       // do not swallow them here.
       Throwables.propagateIfInstanceOf(e, ShiroException.class);
-      LOG.log(Level.WARNING, "Uncaught exception while handling " + message, e);
+      LOG.warn("Uncaught exception while handling " + message, e);
       return Responses.addMessage(Responses.empty(), ResponseCode.ERROR, e);
     }
   }

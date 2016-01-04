@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.http.api.security;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -32,6 +31,8 @@ import org.apache.aurora.scheduler.spi.Permissions.Domain;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.shiro.authz.Permission;
 import org.apache.shiro.subject.Subject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -48,7 +49,7 @@ import static com.google.common.base.Preconditions.checkState;
  * {@code api:snapshot} permission.
  */
 class ShiroAuthorizingInterceptor implements MethodInterceptor {
-  private static final Logger LOG = Logger.getLogger(ShiroAuthorizingInterceptor.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(ShiroAuthorizingInterceptor.class);
 
   @VisibleForTesting
   static final String SHIRO_AUTHORIZATION_FAILURES = "shiro_authorization_failures";
@@ -88,7 +89,7 @@ class ShiroAuthorizingInterceptor implements MethodInterceptor {
       shiroAdminAuthorizationFailures.incrementAndGet();
       String responseMessage =
           "Subject " + subject.getPrincipal() + " lacks permission " + checkedPermission;
-      LOG.warning(responseMessage);
+      LOG.warn(responseMessage);
       // TODO(ksweeney): 403 FORBIDDEN would be a more accurate translation of this response code.
       return Responses.addMessage(Responses.empty(), ResponseCode.AUTH_FAILED, responseMessage);
     }

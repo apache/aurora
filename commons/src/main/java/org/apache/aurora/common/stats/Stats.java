@@ -21,7 +21,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -33,6 +32,8 @@ import com.google.common.collect.MapMaker;
 import com.google.common.util.concurrent.AtomicDouble;
 
 import org.apache.aurora.common.base.MorePreconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages {@link Stat}s that should be exported for monitoring.
@@ -44,7 +45,7 @@ import org.apache.aurora.common.base.MorePreconditions;
  */
 public class Stats {
 
-  private static final Logger LOG = Logger.getLogger(Stats.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Stats.class);
   private static final Pattern NOT_NAME_CHAR = Pattern.compile("[^A-Za-z0-9_/]");
 
   private static final ConcurrentMap<String, Stat<?>> VAR_MAP = new MapMaker().makeMap();
@@ -64,7 +65,7 @@ public class Stats {
   static String validateName(String name) {
     String normalized = normalizeName(name);
     if (!name.equals(normalized)) {
-      LOG.warning("Invalid stat name " + name + " exported as " + normalized);
+      LOG.warn("Invalid stat name " + name + " exported as " + normalized);
     }
     return normalized;
   }
@@ -178,7 +179,7 @@ public class Stats {
           "Unexpected error exporting stat " + validatedName, e.getCause());
     } finally {
       if (!exportStat.called.get()) {
-        LOG.warning("Re-using already registered variable for key " + validatedName);
+        LOG.warn("Re-using already registered variable for key " + validatedName);
       }
     }
   }
@@ -321,7 +322,7 @@ public class Stats {
 
   private static void exportStaticInternal(String name, Stat<?> stat) {
     if (VAR_MAP.put(name, stat) != null) {
-      LOG.warning("Warning - exported variable collision on " + name);
+      LOG.warn("Warning - exported variable collision on " + name);
     }
   }
 

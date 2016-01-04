@@ -21,8 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -58,6 +56,8 @@ import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -66,7 +66,7 @@ import static java.util.Objects.requireNonNull;
  */
 class MemTaskStore implements TaskStore.Mutable {
 
-  private static final Logger LOG = Logger.getLogger(MemTaskStore.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(MemTaskStore.class);
 
   /**
    * When true, enable snapshot deflation.
@@ -132,10 +132,13 @@ class MemTaskStore implements TaskStore.Mutable {
     long start = System.nanoTime();
     ImmutableSet<IScheduledTask> result = matches(query).transform(TO_SCHEDULED).toSet();
     long durationNanos = System.nanoTime() - start;
-    Level level = durationNanos >= slowQueryThresholdNanos ? Level.INFO : Level.FINE;
-    if (LOG.isLoggable(level)) {
-      Long time = Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
-      LOG.log(level, "Query took " + time + " ms: " + query.get());
+    boolean infoLevel = durationNanos >= slowQueryThresholdNanos;
+    long time = Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
+    String message = "Query took {} ms: {}";
+    if (infoLevel) {
+      LOG.info(message, time, query.get());
+    } else {
+      LOG.debug(message, time, query.get());
     }
 
     return result;

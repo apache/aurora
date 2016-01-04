@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.storage.db.views;
 import java.util.List;
 
 import org.apache.aurora.common.collections.Pair;
-
 import org.apache.aurora.gen.AssignedTask;
 
 public final class DbAssignedTask {

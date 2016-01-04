@@ -13,12 +13,13 @@
  */
 package org.apache.aurora.common.util.testing;
 
+import java.util.concurrent.TimeUnit;
+
 import com.google.common.base.Preconditions;
+
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * A clock for use in testing with a configurable value for {@link #nowMillis()}.

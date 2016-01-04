@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -50,6 +49,8 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -151,7 +152,7 @@ public interface OfferManager extends EventSubscriber {
 
   class OfferManagerImpl implements OfferManager {
     @VisibleForTesting
-    static final Logger LOG = Logger.getLogger(OfferManagerImpl.class.getName());
+    static final Logger LOG = LoggerFactory.getLogger(OfferManagerImpl.class);
 
     private final HostOffers hostOffers = new HostOffers();
     private final AtomicLong offerRaces = Stats.exportLong("offer_accept_races");
@@ -202,7 +203,7 @@ public interface OfferManager extends EventSubscriber {
     }
 
     void decline(OfferID id) {
-      LOG.fine("Declining offer " + id);
+      LOG.debug("Declining offer " + id);
       driver.declineOffer(id);
     }
 

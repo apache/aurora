@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.base;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -34,13 +33,15 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Collection of utility functions to convert mesos protobuf types to internal thrift types.
  */
 public final class Conversions {
 
-  private static final Logger LOG = Logger.getLogger(Conversions.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Conversions.class);
 
   private Conversions() {
     // Utility class.
@@ -91,7 +92,7 @@ public final class Conversions {
             return attribute.getText().getValue();
 
           default:
-            LOG.finest("Unrecognized attribute type:" + attribute.getType() + " , ignoring.");
+            LOG.debug("Unrecognized attribute type: {} , ignoring.", attribute.getType());
             return null;
         }
       };

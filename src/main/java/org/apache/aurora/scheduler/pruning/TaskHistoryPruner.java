@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.pruning;
 
 import java.util.Set;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -38,6 +37,8 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -49,7 +50,7 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
  * transitioning into one of the inactive states.
  */
 public class TaskHistoryPruner implements EventSubscriber {
-  private static final Logger LOG = Logger.getLogger(TaskHistoryPruner.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(TaskHistoryPruner.class);
 
   private final DelayExecutor executor;
   private final StateManager stateManager;
@@ -137,7 +138,7 @@ public class TaskHistoryPruner implements EventSubscriber {
       final String taskId,
       long timeRemaining) {
 
-    LOG.fine("Prune task " + taskId + " in " + timeRemaining + " ms.");
+    LOG.debug("Prune task " + taskId + " in " + timeRemaining + " ms.");
     executor.execute(
         () -> {
           LOG.info("Pruning expired inactive task " + taskId);

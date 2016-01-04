@@ -14,6 +14,7 @@
 package org.apache.aurora.common.util;
 
 import com.google.common.base.Preconditions;
+
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 

@@ -13,6 +13,14 @@
  */
 package org.apache.aurora.common.stats;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.concurrent.LinkedBlockingDeque;
+
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -21,14 +29,6 @@ import com.google.common.collect.Ordering;
 
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.util.Sampler;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.concurrent.LinkedBlockingDeque;
-
-import javax.annotation.Nullable;
 
 /**
  * A stats tracker to export percentiles of inputs based on a sampling rate.

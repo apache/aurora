@@ -22,10 +22,9 @@ import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadMXBean;
 import java.util.Map;
 
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
-
 import com.google.common.collect.Iterables;
+
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.quantity.Time;

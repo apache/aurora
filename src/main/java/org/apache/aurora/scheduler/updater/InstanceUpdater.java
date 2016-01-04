@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import java.util.logging.Logger;
-
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -28,6 +26,8 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -46,7 +46,7 @@ import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.SUCCEEDE
  * new configuration, and detecting whether a replaced instance becomes unstable.
  */
 class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
-  private static final Logger LOG = Logger.getLogger(InstanceUpdater.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(InstanceUpdater.class);
 
   private final Optional<ITaskConfig> desiredState;
   private final int toleratedFailures;

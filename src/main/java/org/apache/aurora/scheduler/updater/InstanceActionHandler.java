@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import java.util.logging.Logger;
-
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -33,6 +31,8 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -46,7 +46,7 @@ interface InstanceActionHandler {
       StateManager stateManager,
       JobUpdateStatus status);
 
-  Logger LOG = Logger.getLogger(InstanceActionHandler.class.getName());
+  Logger LOG = LoggerFactory.getLogger(InstanceActionHandler.class);
 
   static Optional<IScheduledTask> getExistingTask(
       MutableStoreProvider storeProvider,

@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.state;
 
 import java.util.Set;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -41,6 +40,8 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -101,7 +102,7 @@ public interface MaintenanceController {
   Set<HostStatus> endMaintenance(Set<String> hosts);
 
   class MaintenanceControllerImpl implements MaintenanceController, EventSubscriber {
-    private static final Logger LOG = Logger.getLogger(MaintenanceControllerImpl.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(MaintenanceControllerImpl.class);
     private final Storage storage;
     private final StateManager stateManager;
 
@@ -124,7 +125,7 @@ public interface MaintenanceController {
           LOG.info("No tasks to drain for host: " + host);
           emptyHosts.add(host);
         } else {
-          LOG.info(String.format("Draining tasks: %s on host: %s", activeTasks, host));
+          LOG.info("Draining tasks: {} on host: {}", activeTasks, host);
           for (String taskId : activeTasks) {
             stateManager.changeState(
                 store,
@@ -160,12 +161,10 @@ public interface MaintenanceController {
             Query.Builder builder = Query.slaveScoped(host).active();
             Iterable<IScheduledTask> activeTasks = store.getTaskStore().fetchTasks(builder);
             if (Iterables.isEmpty(activeTasks)) {
-              LOG.info(String.format("Moving host %s into DRAINED", host));
+              LOG.info("Moving host {} into DRAINED", host);
               setMaintenanceMode(store, ImmutableSet.of(host), DRAINED);
             } else {
-              LOG.info(String.format("Host %s is DRAINING with active tasks: %s",
-                  host,
-                  Tasks.ids(activeTasks)));
+              LOG.info("Host {} is DRAINING with active tasks: {}", host, Tasks.ids(activeTasks));
             }
           }
         });
@@ -229,7 +228,7 @@ public interface MaintenanceController {
       AttributeStore.Mutable store = storeProvider.getAttributeStore();
       ImmutableSet.Builder<HostStatus> statuses = ImmutableSet.builder();
       for (String host : hosts) {
-        LOG.info(String.format("Setting maintenance mode to %s for host %s", mode, host));
+        LOG.info("Setting maintenance mode to {} for host {}", mode, host);
         Optional<IHostAttributes> toSave = AttributeStore.Util.mergeMode(store, host, mode);
         if (toSave.isPresent()) {
           store.saveHostAttributes(toSave.get());

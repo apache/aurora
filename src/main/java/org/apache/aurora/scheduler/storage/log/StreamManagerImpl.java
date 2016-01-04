@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -48,6 +47,8 @@ import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -58,7 +59,7 @@ import static org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 import static org.apache.aurora.scheduler.storage.log.LogManager.LogEntryHashFunction;
 
 class StreamManagerImpl implements StreamManager {
-  private static final Logger LOG = Logger.getLogger(StreamManagerImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(StreamManagerImpl.class);
 
   private static class Vars {
     private final AtomicInteger unSnapshottedTransactions =
@@ -124,7 +125,7 @@ class StreamManagerImpl implements StreamManager {
   @Nullable
   private LogEntry tryDecodeFrame(Frame frame, Iterator<Log.Entry> entries) throws CodingException {
     if (!isHeader(frame)) {
-      LOG.warning("Found a frame with no preceding header, skipping.");
+      LOG.warn("Found a frame with no preceding header, skipping.");
       return null;
     }
     FrameHeader header = frame.getHeader();

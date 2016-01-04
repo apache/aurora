@@ -21,7 +21,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -53,6 +52,8 @@ import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -64,7 +65,7 @@ import static org.apache.mesos.Protos.FrameworkInfo;
 @SuppressWarnings("deprecation")
 public class FakeMaster implements SchedulerDriver, DriverFactory {
 
-  private static final Logger LOG = Logger.getLogger(FakeMaster.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(FakeMaster.class);
 
   private final Map<TaskID, Task> activeTasks = Collections.synchronizedMap(Maps.newHashMap());
   private final Map<OfferID, Offer> idleOffers = Collections.synchronizedMap(Maps.newHashMap());

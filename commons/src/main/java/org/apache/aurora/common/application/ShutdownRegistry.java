@@ -14,14 +14,14 @@
 package org.apache.aurora.common.application;
 
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.base.ExceptionalCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A shutdown action controller. It executes actions in the reverse order they were registered, and
@@ -45,7 +45,7 @@ public interface ShutdownRegistry {
    * Implementation of a shutdown registry.
    */
   public static class ShutdownRegistryImpl implements ShutdownRegistry, Command {
-    private static final Logger LOG = Logger.getLogger(ShutdownRegistry.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(ShutdownRegistry.class);
 
     private final List<ExceptionalCommand<? extends Exception>> actions = Lists.newLinkedList();
 
@@ -74,7 +74,7 @@ public interface ShutdownRegistry {
     @Override
     public synchronized void execute() {
       if (!completed) {
-        LOG.info(String.format("Executing %d shutdown commands.", actions.size()));
+        LOG.info("Executing {} shutdown commands.", actions.size());
         completed = true;
         try {
           for (ExceptionalCommand<? extends Exception> action : Lists.reverse(actions)) {
@@ -84,7 +84,7 @@ public interface ShutdownRegistry {
             try {
               action.execute();
             } catch (Exception e) {
-              LOG.log(Level.WARNING, "Shutdown action failed.", e);
+              LOG.warn("Shutdown action failed.", e);
             }
             // SUPPRESS CHECKSTYLE:ON IllegalCatch
           }

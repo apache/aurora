@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.storage.backup;
 
 import java.io.File;
 import java.util.concurrent.Executor;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -40,6 +39,8 @@ import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import org.apache.aurora.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -48,7 +49,7 @@ import static java.util.Objects.requireNonNull;
  * available for on-line recovery.
  */
 public class BackupModule extends PrivateModule {
-  private static final Logger LOG = Logger.getLogger(BackupModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(BackupModule.class);
 
   @CmdLine(name = "backup_interval", help = "Minimum interval on which to write a storage backup.")
   private static final Arg<Amount<Long, Time>> BACKUP_INTERVAL =

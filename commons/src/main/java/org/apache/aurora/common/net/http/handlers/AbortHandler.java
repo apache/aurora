@@ -14,7 +14,6 @@
 package org.apache.aurora.common.net.http.handlers;
 
 import java.io.IOException;
-import java.util.logging.Logger;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.POST;
@@ -26,6 +25,9 @@ import javax.ws.rs.core.MediaType;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A servlet that provides a way to remotely terminate the running process immediately.
@@ -39,7 +41,7 @@ public class AbortHandler {
   public static final String ABORT_HANDLER_KEY =
       "com.twitter.common.net.http.handlers.AbortHandler.listener";
 
-  private static final Logger LOG = Logger.getLogger(AbortHandler.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(AbortHandler.class);
 
   private final Runnable abortListener;
 
@@ -58,9 +60,7 @@ public class AbortHandler {
   @POST
   @Produces(MediaType.TEXT_PLAIN)
   public void abort(@Context HttpServletRequest req) throws IOException {
-    LOG.info(String.format("Received abort HTTP signal from %s (%s)",
-        req.getRemoteAddr(), req.getRemoteHost()));
-
+    LOG.info("Received abort HTTP signal from {} ({})", req.getRemoteAddr(), req.getRemoteHost());
     abortListener.run();
   }
 }

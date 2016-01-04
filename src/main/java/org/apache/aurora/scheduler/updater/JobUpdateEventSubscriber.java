@@ -14,8 +14,6 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.AbstractIdleService;
@@ -26,6 +24,8 @@ import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -36,7 +36,7 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
  * A pubsub event subscriber that forwards status updates to the job update controller.
  */
 class JobUpdateEventSubscriber extends AbstractIdleService implements PubsubEvent.EventSubscriber {
-  private static final Logger LOG = Logger.getLogger(JobUpdateEventSubscriber.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(JobUpdateEventSubscriber.class);
 
   private static final AtomicLong RECOVERY_ERRORS = Stats.exportLong("job_update_recovery_errors");
   private static final AtomicLong DELETE_ERRORS = Stats.exportLong("job_update_delete_errors");
@@ -55,7 +55,7 @@ class JobUpdateEventSubscriber extends AbstractIdleService implements PubsubEven
     try {
       controller.instanceChangedState(change.getTask());
     } catch (RuntimeException e) {
-      LOG.log(Level.SEVERE, "Failed to handle state change: " + e, e);
+      LOG.error("Failed to handle state change: " + e, e);
       STATE_CHANGE_ERRORS.incrementAndGet();
     }
   }
@@ -70,7 +70,7 @@ class JobUpdateEventSubscriber extends AbstractIdleService implements PubsubEven
               InstanceKeys.from(Tasks.getJob(task), task.getAssignedTask().getInstanceId()));
         }
       } catch (RuntimeException e) {
-        LOG.log(Level.SEVERE, "Failed to handle instance deletion: " + e, e);
+        LOG.error("Failed to handle instance deletion: " + e, e);
         DELETE_ERRORS.incrementAndGet();
       }
     }
@@ -82,7 +82,7 @@ class JobUpdateEventSubscriber extends AbstractIdleService implements PubsubEven
     try {
       controller.systemResume();
     } catch (RuntimeException e) {
-      LOG.log(Level.SEVERE, "Failed to resume job updates: " + e, e);
+      LOG.error("Failed to resume job updates: " + e, e);
       RECOVERY_ERRORS.incrementAndGet();
     }
   }

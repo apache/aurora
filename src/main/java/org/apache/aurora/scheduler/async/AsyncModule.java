@@ -18,7 +18,6 @@ import java.lang.annotation.Target;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -34,6 +33,8 @@ import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -45,7 +46,7 @@ import static java.util.Objects.requireNonNull;
  * Binding module for async task management.
  */
 public class AsyncModule extends AbstractModule {
-  private static final Logger LOG = Logger.getLogger(AsyncModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(AsyncModule.class);
 
   @CmdLine(name = "async_worker_threads",
       help = "The number of worker threads to process async task operations with.")

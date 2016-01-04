@@ -19,10 +19,9 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableList;
 
+import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.args.constraints.Range;
 import org.junit.Test;
-
-import org.apache.aurora.common.args.constraints.NotEmpty;
 
 import static junit.framework.Assert.assertEquals;
 

@@ -13,8 +13,9 @@
  */
 package org.apache.aurora.common.stats;
 
-import javax.annotation.Nullable;
 import java.util.concurrent.atomic.AtomicLong;
+
+import javax.annotation.Nullable;
 
 /**
  * A class to represent the statistics associated with a client connection to an external service.

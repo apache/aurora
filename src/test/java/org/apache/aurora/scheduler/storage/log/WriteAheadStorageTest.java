@@ -14,8 +14,6 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
@@ -48,6 +46,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -123,14 +122,13 @@ public class WriteAheadStorageTest extends EasyMockTest {
             new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId("a"))));
 
     expect(taskStore.mutateTasks(query, mutator)).andReturn(mutated);
-    expect(log.isLoggable(Level.FINE)).andReturn(false);
+    log.debug(EasyMock.anyString(), EasyMock.<Object>anyObject());
     expectOp(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
 
     // With increased logging.
     expect(taskStore.mutateTasks(query, mutator)).andReturn(mutated);
-    expect(log.isLoggable(Level.FINE)).andReturn(true);
     expectOp(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
-    log.fine(EasyMock.anyString());
+    log.debug(EasyMock.anyString(), EasyMock.<Object>anyObject());
 
     control.replay();
 

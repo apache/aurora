@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.app;
 
 import java.util.List;
-import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
@@ -30,6 +29,8 @@ import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 import org.apache.zookeeper.data.ACL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -38,7 +39,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class ServiceDiscoveryModule extends AbstractModule {
 
-  private static final Logger LOG = Logger.getLogger(ServiceDiscoveryModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(ServiceDiscoveryModule.class);
 
   private final String serverSetPath;
   private final Credentials zkCredentials;
@@ -57,7 +58,7 @@ public class ServiceDiscoveryModule extends AbstractModule {
   @Singleton
   List<ACL> provideAcls() {
     if (zkCredentials == Credentials.NONE) {
-      LOG.warning("Running without ZooKeeper digest credentials. ZooKeeper ACLs are disabled.");
+      LOG.warn("Running without ZooKeeper digest credentials. ZooKeeper ACLs are disabled.");
       return ZooKeeperUtils.OPEN_ACL_UNSAFE;
     } else {
       return ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL;

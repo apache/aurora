@@ -26,7 +26,6 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 
 import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
-
 import static org.apache.aurora.scheduler.storage.db.DbModule.testModule;
 
 /**

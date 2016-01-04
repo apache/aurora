@@ -16,8 +16,6 @@ package org.apache.aurora.scheduler.scheduling;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -43,6 +41,8 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -81,7 +81,7 @@ public interface TaskScheduler extends EventSubscriber {
     @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
     public @interface ReservationDuration { }
 
-    private static final Logger LOG = Logger.getLogger(TaskSchedulerImpl.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(TaskSchedulerImpl.class);
 
     private final Storage storage;
     private final TaskAssigner assigner;
@@ -114,7 +114,7 @@ public interface TaskScheduler extends EventSubscriber {
       } catch (RuntimeException e) {
         // We catch the generic unchecked exception here to ensure tasks are not abandoned
         // if there is a transient issue resulting in an unchecked exception.
-        LOG.log(Level.WARNING, "Task scheduling unexpectedly failed, will be retried", e);
+        LOG.warn("Task scheduling unexpectedly failed, will be retried", e);
         attemptsFailed.incrementAndGet();
         return false;
       }
@@ -122,7 +122,7 @@ public interface TaskScheduler extends EventSubscriber {
 
     @Timed("task_schedule_attempt_locked")
     protected boolean scheduleTask(MutableStoreProvider store, String taskId) {
-      LOG.fine("Attempting to schedule task " + taskId);
+      LOG.debug("Attempting to schedule task " + taskId);
       IAssignedTask assignedTask = Iterables.getOnlyElement(
           Iterables.transform(
               store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
@@ -130,7 +130,7 @@ public interface TaskScheduler extends EventSubscriber {
           null);
 
       if (assignedTask == null) {
-        LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");
+        LOG.warn("Failed to look up task " + taskId + ", it may have been deleted.");
       } else {
         ITaskConfig task = assignedTask.getTask();
         AttributeAggregate aggregate = AttributeAggregate.getJobActiveState(store, task.getJob());

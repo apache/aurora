@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import org.apache.aurora.common.base.Closure;
-
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.log.Log;

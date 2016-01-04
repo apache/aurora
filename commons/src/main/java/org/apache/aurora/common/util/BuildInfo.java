@@ -16,14 +16,14 @@ package org.apache.aurora.common.util;
 import java.io.InputStream;
 import java.util.Map;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
 import org.apache.aurora.common.base.MorePreconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -33,7 +33,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class BuildInfo {
 
-  private static final Logger LOG = Logger.getLogger(BuildInfo.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(BuildInfo.class);
 
   private static final String DEFAULT_BUILD_PROPERTIES_PATH = "build.properties";
 
@@ -68,7 +68,7 @@ public class BuildInfo {
     LOG.info("Fetching build properties from " + resourcePath);
     InputStream in = ClassLoader.getSystemResourceAsStream(resourcePath);
     if (in == null) {
-      LOG.warning("Failed to fetch build properties from " + resourcePath);
+      LOG.warn("Failed to fetch build properties from " + resourcePath);
       return;
     }
 
@@ -77,7 +77,7 @@ public class BuildInfo {
       buildProperties.load(in);
       properties = Maps.fromProperties(buildProperties);
     } catch (Exception e) {
-      LOG.log(Level.WARNING, "Failed to load properties file " + resourcePath, e);
+      LOG.warn("Failed to load properties file " + resourcePath, e);
     }
   }
 

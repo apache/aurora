@@ -13,9 +13,6 @@
  */
 package org.apache.aurora.scheduler.cron.quartz;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
@@ -29,13 +26,15 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.quartz.CronTrigger;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.cron.quartz.Quartz.jobKey;
 
 class CronSchedulerImpl implements CronScheduler {
-  private static final Logger LOG = Logger.getLogger(CronSchedulerImpl.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(CronSchedulerImpl.class);
 
   private final Scheduler scheduler;
 
@@ -54,7 +53,7 @@ class CronSchedulerImpl implements CronScheduler {
               .filter(CronTrigger.class)
               .transform(Quartz::crontabEntry)));
     } catch (SchedulerException e) {
-      LOG.log(Level.SEVERE,
+      LOG.error(
           "Error reading job " + JobKeys.canonicalString(jobKey) + " cronExpression Quartz: " + e,
           e);
       return Optional.absent();

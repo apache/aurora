@@ -15,11 +15,10 @@ package org.apache.aurora.common.net.http.handlers;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
-
-import org.apache.aurora.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;

@@ -24,7 +24,6 @@ import org.apache.aurora.common.args.constraints.NotNegative;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Random;
-
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 
 /**

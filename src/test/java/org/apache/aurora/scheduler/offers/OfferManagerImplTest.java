@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.offers;
 
-import java.util.logging.Level;
-
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -76,8 +74,6 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    OfferManagerImpl.LOG.setLevel(Level.FINE);
-    addTearDown(() -> OfferManagerImpl.LOG.setLevel(Level.INFO));
     driver = createMock(Driver.class);
     DelayExecutor executorMock = createMock(DelayExecutor.class);
     clock = FakeScheduledExecutor.fromDelayExecutor(executorMock);

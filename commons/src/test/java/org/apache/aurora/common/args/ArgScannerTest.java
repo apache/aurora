@@ -37,23 +37,22 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
 
+import org.apache.aurora.common.args.ArgScannerTest.StandardArgs.Optimizations;
+import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.args.constraints.NotNegative;
 import org.apache.aurora.common.args.constraints.NotNull;
 import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.common.args.constraints.Range;
 import org.apache.aurora.common.args.parsers.NonParameterizedTypeParser;
-import org.hamcrest.CoreMatchers;
-import org.junit.Before;
-import org.junit.Test;
-
-import org.apache.aurora.common.args.ArgScannerTest.StandardArgs.Optimizations;
-import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.quantity.Time;
+import org.hamcrest.CoreMatchers;
+import org.junit.Before;
+import org.junit.Test;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

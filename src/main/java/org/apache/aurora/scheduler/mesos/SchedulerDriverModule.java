@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.mesos;
 
 import java.util.concurrent.Executor;
-import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
@@ -24,12 +23,14 @@ import com.google.inject.PrivateModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.mesos.Scheduler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A module that creates a {@link Driver} binding.
  */
 public class SchedulerDriverModule extends AbstractModule {
-  private static final Logger LOG = Logger.getLogger(SchedulerDriverModule.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SchedulerDriverModule.class);
 
   @Override
   protected void configure() {
