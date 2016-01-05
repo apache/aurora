@@ -42,11 +42,14 @@ public class ZooKeeperTestServer {
   public static final Amount<Integer, Time> DEFAULT_SESSION_TIMEOUT =
       Amount.of(100, Time.MILLISECONDS);
 
-  protected final ZooKeeperServer zooKeeperServer;
+  private final LinkedList<Runnable> cleanupActions = Lists.newLinkedList();
+  private final File dataDir;
+  private final File snapDir;
+  private final Amount<Integer, Time> defaultSessionTimeout;
+
+  private ZooKeeperServer zooKeeperServer;
   private ServerCnxnFactory connectionFactory;
   private int port;
-  private final Amount<Integer, Time> defaultSessionTimeout;
-  private final LinkedList<Runnable> cleanupActions = Lists.newLinkedList();
 
   /**
    * @param defaultSessionTimeout the default session timeout for clients created with
@@ -59,7 +62,14 @@ public class ZooKeeperTestServer {
       File snapDir) throws IOException {
 
     this.defaultSessionTimeout = Preconditions.checkNotNull(defaultSessionTimeout);
+    this.dataDir = Preconditions.checkNotNull(dataDir);
+    this.snapDir = Preconditions.checkNotNull(snapDir);
+  }
 
+  /**
+   * Starts zookeeper up on an ephemeral port.
+   */
+  public void startNetwork() throws IOException, InterruptedException {
     zooKeeperServer =
         new ZooKeeperServer(
             new FileTxnSnapLog(dataDir, snapDir),
@@ -71,19 +81,13 @@ public class ZooKeeperTestServer {
             // noop
           }
         };
-  }
 
-  /**
-   * Starts zookeeper up on an ephemeral port.
-   */
-  public void startNetwork() throws IOException, InterruptedException {
     connectionFactory = new NIOServerCnxnFactory();
     connectionFactory.configure(
         new InetSocketAddress(port),
-        60 /*  Semi-arbitrary, max 60 connections is the default used by NIOServerCnxnFactory */);
-
+        60 /* Semi-arbitrary, max 60 connections is the default used by NIOServerCnxnFactory */);
     connectionFactory.startup(zooKeeperServer);
-    cleanupActions.addFirst((this::shutdownNetwork));
+    cleanupActions.addFirst(this::shutdownNetwork);
     port = zooKeeperServer.getClientPort();
   }
 
@@ -111,7 +115,7 @@ public class ZooKeeperTestServer {
    */
   public final void shutdownNetwork() {
     if (connectionFactory != null) {
-      connectionFactory.shutdown();
+      connectionFactory.shutdown(); // Also shuts down zooKeeperServer.
       connectionFactory = null;
     }
   }
