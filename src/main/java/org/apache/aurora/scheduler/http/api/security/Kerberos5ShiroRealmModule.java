@@ -30,6 +30,7 @@ import com.google.common.base.Throwables;
 import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
+import com.sun.security.auth.login.ConfigFile;
 import com.sun.security.auth.module.Krb5LoginModule;
 
 import org.apache.aurora.common.args.Arg;
@@ -48,8 +49,6 @@ import org.slf4j.LoggerFactory;
  */
 public class Kerberos5ShiroRealmModule extends AbstractModule {
   private static final Logger LOG = LoggerFactory.getLogger(Kerberos5ShiroRealmModule.class);
-
-  private static final String JAVA_SECURITY_LOGIN_KEY = "java.security.auth.login.config";
 
   /**
    * Standard Object Identifier for the Kerberos 5 GSS-API mechanism.
@@ -151,13 +150,13 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
       return;
     }
 
-    final GSSCredential serverCredential;
-
-    Optional<String> oldJavaSecurityLoginValue =
-        Optional.fromNullable(System.getProperty(JAVA_SECURITY_LOGIN_KEY));
+    GSSCredential serverCredential;
     try {
-      System.setProperty(JAVA_SECURITY_LOGIN_KEY, jaasConfFile.getAbsolutePath());
-      LoginContext loginContext = new LoginContext(getClass().getName());
+      LoginContext loginContext = new LoginContext(
+          getClass().getName(),
+          null /* subject (read from jaas config file passed below) */,
+          null /* callbackHandler */,
+          new ConfigFile(jaasConfFile.toURI()));
       loginContext.login();
       serverCredential = Subject.doAs(
           loginContext.getSubject(),
@@ -175,10 +174,6 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
     } catch (LoginException e) {
       addError(e);
       return;
-    } finally {
-      if (oldJavaSecurityLoginValue.isPresent()) {
-        System.setProperty(JAVA_SECURITY_LOGIN_KEY, oldJavaSecurityLoginValue.get());
-      }
     }
 
     install(new PrivateModule() {
