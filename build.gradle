@@ -169,6 +169,11 @@ project(':commons') {
     compile "org.easymock:easymock:3.4"
     compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
 
+    // There are a few testing support libs in the src/main/java trees that use junit - currently:
+    //   src/main/java/org/apache/aurora/common/zookeeper/testing
+    //   src/main/java/org/apache/aurora/common/testing
+    compile "junit:junit:${junitRev}"
+
     testCompile "junit:junit:${junitRev}"
   }
 }
