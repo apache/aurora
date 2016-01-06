@@ -852,6 +852,15 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     assertEquals(expected, thrift.getJobUpdateDiff(request));
   }
 
+  @Test
+  public void testGetJobUpdateDiffInvalidConfig() throws Exception {
+    control.replay();
+
+    JobUpdateRequest request =
+        new JobUpdateRequest().setTaskConfig(defaultTask(false).setNumCpus(-1));
+    assertResponse(INVALID_REQUEST, thrift.getJobUpdateDiff(request));
+  }
+
   private static void makeTasks(
       int start,
       int end,

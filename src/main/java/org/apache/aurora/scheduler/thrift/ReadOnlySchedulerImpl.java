@@ -103,8 +103,10 @@ import org.apache.thrift.TException;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
+import static org.apache.aurora.scheduler.thrift.Responses.error;
 import static org.apache.aurora.scheduler.thrift.Responses.invalidRequest;
 import static org.apache.aurora.scheduler.thrift.Responses.ok;
 
@@ -324,7 +326,15 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
 
   @Override
   public Response getJobUpdateDiff(JobUpdateRequest mutableRequest) {
-    IJobUpdateRequest request = IJobUpdateRequest.build(requireNonNull(mutableRequest));
+    IJobUpdateRequest request;
+    try {
+      request = IJobUpdateRequest.build(new JobUpdateRequest(mutableRequest).setTaskConfig(
+          configurationManager.validateAndPopulate(
+              ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
+    } catch (TaskDescriptionException e) {
+      return error(INVALID_REQUEST, e);
+    }
+
     IJobKey job = request.getTaskConfig().getJob();
 
     return storage.read(storeProvider -> {
