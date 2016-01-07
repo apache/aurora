@@ -260,10 +260,15 @@ are identical for both.
 
 ### Mesos on Ubuntu Trusty
 
+    sudo apt-get update
+    sudo apt-get install -y software-properties-common
     sudo add-apt-repository ppa:openjdk-r/ppa -y
     sudo apt-get update
 
-    sudo apt-get install -y software-properties-common wget libsvn1 libcurl3 openjdk-8-jre-headless
+    sudo apt-get install -y wget libsvn1 libcurl3 openjdk-8-jre-headless
+
+    # NOTE: This appears to be a missing dependency of the mesos deb package.
+    sudo apt-get install -y libcurl4-nss-dev
 
     wget -c http://downloads.mesosphere.io/master/ubuntu/14.04/mesos_0.23.0-1.0.ubuntu1404_amd64.deb
     sudo dpkg -i mesos_0.23.0-1.0.ubuntu1404_amd64.deb
