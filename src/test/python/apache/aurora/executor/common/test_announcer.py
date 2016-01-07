@@ -213,7 +213,7 @@ def make_assigned_task(thermos_config, assigned_ports=None):
       slaveHost='test-host')
 
 
-def make_job(role, environment, name, primary_port, portmap):
+def make_job(role, environment, name, primary_port, portmap, zk_path=None):
   from apache.aurora.config.schema.base import (
       Announcer,
       Job,
@@ -225,13 +225,17 @@ def make_job(role, environment, name, primary_port, portmap):
       name='ignore2',
       processes=[Process(name='ignore3', cmdline='ignore4')],
       resources=Resources(cpu=1, ram=1, disk=1))
+  if zk_path:
+    announce = Announcer(primary_port=primary_port, portmap=portmap, zk_path=zk_path)
+  else:
+    announce = Announcer(primary_port=primary_port, portmap=portmap)
   job = Job(
       role=role,
       environment=environment,
       name=name,
       cluster='ignore1',
       task=task,
-      announce=Announcer(primary_port=primary_port, portmap=portmap))
+      announce=announce)
   return job
 
 
@@ -301,3 +305,23 @@ def test_default_announcer_provider_without_announce():
   assigned_task = make_assigned_task(job)
 
   assert DefaultAnnouncerCheckerProvider('foo.bar').from_assigned_task(assigned_task, None) is None
+
+
+@patch('apache.aurora.executor.common.announcer.ServerSet')
+@patch('apache.aurora.executor.common.announcer.KazooClient')
+def test_announcer_provider_with_zkpath(mock_client_provider, mock_serverset_provider):
+  mock_client = create_autospec(spec=KazooClient, instance=True)
+  mock_client_provider.return_value = mock_client
+  mock_serverset = create_autospec(spec=ServerSet, instance=True)
+  mock_serverset_provider.return_value = mock_serverset
+
+  dap = DefaultAnnouncerCheckerProvider('zookeeper.example.com', '', True)
+  job = make_job('aurora', 'prod', 'proxy', 'primary', portmap={'http': 80, 'admin': 'primary'},
+   zk_path='/uns/v1/sjc1-prod/us1/service/prod')
+  assigned_task = make_assigned_task(job, assigned_ports={'primary': 12345})
+  checker = dap.from_assigned_task(assigned_task, None)
+
+  mock_client.start_async.assert_called_once_with()
+  mock_serverset_provider.assert_called_once_with(mock_client, '/uns/v1/sjc1-prod/us1/service/prod')
+  assert checker.name() == 'announcer'
+  assert checker.status is None

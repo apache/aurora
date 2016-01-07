@@ -20,7 +20,7 @@ from abc import abstractmethod
 from kazoo.client import KazooClient
 from kazoo.retry import KazooRetry
 from mesos.interface import mesos_pb2
-from twitter.common import log
+from twitter.common import app, log
 from twitter.common.concurrent.deferred import defer
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import LambdaGauge, Observable
@@ -54,8 +54,9 @@ def make_endpoints(hostname, portmap, primary_port):
 
 
 class AnnouncerCheckerProvider(StatusCheckerProvider):
-  def __init__(self, name=None):
+  def __init__(self, allow_custom_serverset_path=False, name=None):
     self.name = name
+    self.__allow_custom_serverset_path = allow_custom_serverset_path
     super(AnnouncerCheckerProvider, self).__init__()
 
   @abstractmethod
@@ -83,7 +84,14 @@ class AnnouncerCheckerProvider(StatusCheckerProvider):
       mesos_task.announce().primary_port().get())
 
     client = self.make_zk_client()
-    path = self.make_zk_path(assigned_task)
+    if mesos_task.announce().has_zk_path():
+      if self.__allow_custom_serverset_path:
+        path = mesos_task.announce().zk_path().get()
+      else:
+        app.error('Executor must be started with --announcer-allow-custom-serverset-path in order '
+            'to use zk_path in the Announcer config')
+    else:
+      path = self.make_zk_path(assigned_task)
 
     initial_interval = mesos_task.health_check_config().initial_interval_secs().get()
     interval = mesos_task.health_check_config().interval_secs().get()
@@ -103,10 +111,10 @@ class DefaultAnnouncerCheckerProvider(AnnouncerCheckerProvider):
       max_delay=DEFAULT_RETRY_MAX_DELAY.as_(Time.SECONDS),
   )
 
-  def __init__(self, ensemble, root='/aurora'):
+  def __init__(self, ensemble, root='/aurora', allow_custom_serverset_path=False):
     self.__ensemble = ensemble
     self.__root = root
-    super(DefaultAnnouncerCheckerProvider, self).__init__()
+    super(DefaultAnnouncerCheckerProvider, self).__init__(allow_custom_serverset_path)
 
   def make_zk_client(self):
     return KazooClient(self.__ensemble, connection_retry=self.DEFAULT_RETRY_POLICY)

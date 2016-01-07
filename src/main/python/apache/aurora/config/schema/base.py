@@ -97,6 +97,11 @@ class Announcer(Struct):
     'aurora': '{{primary_port}}'
   })
 
+  # Root of tree where annoucements are stored. If specified, this overrides the
+  # default path (executor must be started with --announcer-allow-custom-serverset-path for
+  # this setting to take effect)
+  zk_path      = String
+
 
 # The executorConfig populated inside of TaskConfig.
 class MesosTaskInstance(Struct):

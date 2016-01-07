@@ -83,6 +83,13 @@ app.add_option(
     help='The root of the tree into which ServerSets should be announced.  The paths will '
          'be of the form $ROOT/$ROLE/$ENVIRONMENT/$JOBNAME.')
 
+app.add_option(
+    '--announcer-allow-custom-serverset-path',
+    dest='announcer_allow_custom_serverset_path',
+    action='store_true',
+    default=False,
+    help='Allows setting arbitrary serverset path through the Announcer configuration.')
+
 
 app.add_option(
     '--execute-as-user',
@@ -165,7 +172,10 @@ def initialize(options):
     if options.announcer_ensemble is None:
       app.error('Must specify --announcer-ensemble if the announcer is enabled.')
     status_providers.append(DefaultAnnouncerCheckerProvider(
-      options.announcer_ensemble, options.announcer_serverset_path))
+      options.announcer_ensemble,
+      options.announcer_serverset_path,
+      options.announcer_allow_custom_serverset_path
+    ))
 
   # Create executor stub
   if options.execute_as_user or options.nosetuid:

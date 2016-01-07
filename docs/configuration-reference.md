@@ -457,13 +457,15 @@ Parameters for controlling a task's health checks via HTTP or a shell command.
 
 If the `announce` field in the Job configuration is set, each task will be
 registered in the ServerSet `/aurora/role/environment/jobname` in the
-zookeeper ensemble configured by the executor.  If no Announcer object is specified,
+zookeeper ensemble configured by the executor (which can be optionally overriden by specifying
+zk_path parameter).  If no Announcer object is specified,
 no announcement will take place.  For more information about ServerSets, see the [User Guide](user-guide.md).
 
 | object                         | type      | description
 | -------                        | :-------: | --------
 | ```primary_port```             | String    | Which named port to register as the primary endpoint in the ServerSet (Default: `http`)
 | ```portmap```                  | dict      | A mapping of additional endpoints to announced in the ServerSet (Default: `{ 'aurora': '{{primary_port}}' }`)
+| ```zk_path```                  | String    | Zookeeper serverset path override (executor must be started with the --announcer-allow-custom-serverset-path parameter)
 
 ### Port aliasing with the Announcer `portmap`
 
