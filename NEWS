@@ -10,6 +10,9 @@
   - `-deduplicate_snapshots` and `-deflate_snapshots`.  These features are good to always enable.
   - `-enable_job_updates` and `-enable_job_creation`
 - Upgraded the scheduler ZooKeeper client from 3.3.4 to 3.4.6.
+- Added support for jobs to specify arbitrary ZooKeeper paths for service registration.  See
+  https://github.com/apache/aurora/blob/master/docs/configuration-reference.md#announcer-objects
+  for details.
 
 0.11.0
 ------
