@@ -610,7 +610,7 @@ jmh {
   if (project.hasProperty('benchmarks')) {
     include = project.getProperty('benchmarks')
   }
-  jmhVersion = '1.7.1'
+  jmhVersion = '1.11.2'
   jvmArgsPrepend = '-Xmx3g'
   humanOutputFile = project.file("$jmhHumanOutputPath")
   resultsFile = project.file("$buildDir/reports/jmh/results.txt")
