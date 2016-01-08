@@ -111,11 +111,19 @@ app.add_option(
 
 
 app.add_option(
+    '--process_logger_destination',
+    dest='process_logger_destination',
+    type=str,
+    default=None,
+    help='The destination of logger to use for all processes run by thermos.')
+
+
+app.add_option(
     '--process_logger_mode',
     dest='process_logger_mode',
     type=str,
     default=None,
-    help='The type of logger to use for all processes run by thermos.')
+    help='The logger mode to use for all processes run by thermos.')
 
 
 app.add_option(
@@ -199,6 +207,7 @@ def proxy_main(args, opts):
       chroot=opts.chroot,
       planner_class=CappedTaskPlanner,
       hostname=opts.hostname,
+      process_logger_destination=opts.process_logger_destination,
       process_logger_mode=opts.process_logger_mode,
       rotate_log_size_mb=opts.rotate_log_size_mb,
       rotate_log_backups=opts.rotate_log_backups,

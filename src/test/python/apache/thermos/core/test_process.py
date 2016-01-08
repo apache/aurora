@@ -16,17 +16,28 @@ import grp
 import os
 import pwd
 import random
+import StringIO
+import sys
 import time
 
 import mock
 import pytest
-from twitter.common.contextutil import temporary_dir
+from twitter.common.contextutil import mutable_sys, temporary_dir
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.quantity import Amount, Data
 from twitter.common.recordio import ThriftRecordReader
 
 from apache.thermos.common.path import TaskPath
-from apache.thermos.core.process import LoggerMode, LogRotatingSubprocessExecutor, Process
+from apache.thermos.core.process import (
+    FileHandler,
+    LogDestinationResolver,
+    LoggerDestination,
+    LoggerMode,
+    PipedSubprocessExecutor,
+    Process,
+    StreamHandler,
+    TeeHandler
+)
 
 from gen.apache.thermos.ttypes import RunnerCkpt
 
@@ -206,7 +217,7 @@ def test_log_standard():
 
 def test_log_rotation():
   # During testing, read one byte at a time to make the file sizes deterministic.
-  LogRotatingSubprocessExecutor.READ_BUFFER_SIZE = 1
+  PipedSubprocessExecutor.READ_BUFFER_SIZE = 1
 
   def assert_stderr(taskpath, solo=True):
     if solo:
@@ -290,3 +301,155 @@ def test_preserve_env(*mocks):
 
       assert rc == 0
       assert_log_content(taskpath, 'stdout', expectation + '\n')
+
+
+def test_tee_class():
+  fileout = StringIO.StringIO()
+  stdout = StringIO.StringIO()
+  tee = TeeHandler(fileout, stdout)
+
+  tee.write("TEST")
+  assert fileout.getvalue() == "TEST"
+  assert stdout.getvalue() == "TEST"
+
+  tee.write("SECOND")
+  assert fileout.getvalue() == "TESTSECOND"
+  assert stdout.getvalue() == "TESTSECOND"
+
+
+def assert_log_file_exists(taskpath, log_name):
+  log = taskpath.with_filename(log_name).getpath('process_logdir')
+  assert os.path.exists(log)
+
+
+def test_resolver_none_output():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    r = LogDestinationResolver(taskpath, destination=LoggerDestination.NONE)
+    stdout, stderr = r.get_handlers()
+    assert type(stdout) == StreamHandler
+    assert type(stderr) == StreamHandler
+
+
+def test_resolver_console_output():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    r = LogDestinationResolver(taskpath, destination=LoggerDestination.CONSOLE)
+    stdout, stderr = r.get_handlers()
+    assert type(stdout) == StreamHandler
+    assert type(stderr) == StreamHandler
+    assert stdout._stream == sys.stdout
+    assert stderr._stream == sys.stderr
+
+
+def test_resolver_file_output():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    r = LogDestinationResolver(taskpath, destination=LoggerDestination.FILE)
+    stdout, stderr = r.get_handlers()
+    assert type(stdout) == FileHandler
+    assert type(stderr) == FileHandler
+    assert_log_file_exists(taskpath, 'stdout')
+    assert_log_file_exists(taskpath, 'stderr')
+
+
+def test_resolver_both_output():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    r = LogDestinationResolver(taskpath, destination=LoggerDestination.BOTH)
+    stdout, stderr = r.get_handlers()
+    assert type(stdout) == TeeHandler
+    assert type(stderr) == TeeHandler
+    assert_log_file_exists(taskpath, 'stdout')
+    assert_log_file_exists(taskpath, 'stderr')
+
+
+def test_resolver_both_with_rotation_output():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    r = LogDestinationResolver(taskpath, destination=LoggerDestination.BOTH,
+                               mode=LoggerMode.ROTATE,
+                               rotate_log_size=Amount(70, Data.BYTES),
+                               rotate_log_backups=2)
+    stdout, stderr = r.get_handlers()
+    assert type(stdout) == TeeHandler
+    assert type(stderr) == TeeHandler
+    assert_log_file_exists(taskpath, 'stdout')
+    assert_log_file_exists(taskpath, 'stderr')
+
+
+def test_log_none():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    sandbox = setup_sandbox(td, taskpath)
+
+    p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox,
+                    logger_destination=LoggerDestination.NONE)
+    p.start()
+    rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
+
+    assert rc == 0
+    assert_log_dne(taskpath, 'stdout')
+    assert_log_dne(taskpath, 'stderr')
+
+
+def test_log_console():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    sandbox = setup_sandbox(td, taskpath)
+
+    # Create file stdout for capturing output. We can't use StringIO mock
+    # because TestProcess is running fork.
+    with open(os.path.join(td, 'sys_stdout'), 'w+') as stdout:
+      with open(os.path.join(td, 'sys_stderr'), 'w+') as stderr:
+        with mutable_sys():
+          sys.stdout, sys.stderr = stdout, stderr
+
+          p = TestProcess('process', 'echo hello world; echo >&2 hello stderr', 0,
+                          taskpath, sandbox, logger_destination=LoggerDestination.CONSOLE)
+          p.start()
+          rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
+
+          assert rc == 0
+          # Check no log files were created in std path
+          assert_log_dne(taskpath, 'stdout')
+          assert_log_dne(taskpath, 'stderr')
+
+          # Check mock stdout
+          stdout.seek(0)
+          assert stdout.read() == 'hello world\n'
+
+          # Check mock stderr
+          stderr.seek(0)
+          assert stderr.read() == 'hello stderr\n'
+
+
+def test_log_tee():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    sandbox = setup_sandbox(td, taskpath)
+
+    # Create file stdout for capturing output. We can't use StringIO mock
+    # because TestProcess is running fork.
+    with open(os.path.join(td, 'sys_stdout'), 'w+') as stdout:
+      with open(os.path.join(td, 'sys_stderr'), 'w+') as stderr:
+        with mutable_sys():
+          sys.stdout, sys.stderr = stdout, stderr
+
+          p = TestProcess('process', 'echo hello world; echo >&2 hello stderr', 0,
+                          taskpath, sandbox, logger_destination=LoggerDestination.BOTH)
+          p.start()
+          rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
+
+          assert rc == 0
+          # Check log files were created in std path with correct content
+          assert_log_content(taskpath, 'stdout', 'hello world\n')
+          assert_log_content(taskpath, 'stderr', 'hello stderr\n')
+
+          # Check mock stdout
+          stdout.seek(0)
+          assert stdout.read() == 'hello world\n'
+
+          # Check mock stderr
+          stderr.seek(0)
+          assert stderr.read() == 'hello stderr\n'

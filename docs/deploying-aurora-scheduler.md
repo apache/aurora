@@ -15,7 +15,7 @@ machines.  This guide helps you get the scheduler set up and troubleshoot some c
   - [Considerations for running jobs in docker](#considerations-for-running-jobs-in-docker)
   - [Security Considerations](#security-considerations)
   - [Configuring Resource Oversubscription](#configuring-resource-oversubscription)
-  - [Process Log Rotation](#process-log-rotation)
+  - [Process Logs](#process-logs)
 - [Running Aurora](#running-aurora)
   - [Maintaining an Aurora Installation](#maintaining-an-aurora-installation)
   - [Monitoring](#monitoring)
@@ -172,7 +172,21 @@ tuples. For example `-global_container_mounts=/opt/secret_keys_dir:/mnt/secret_k
 In order to correctly execute processes inside a job, the docker container must have python 2.7
 installed.
 
-### Process Log Rotation
+### Process Logs
+
+#### Log destination
+By default, Thermos will write process stdout/stderr to log files in the sandbox. Process object configuration
+allows specifying alternate log file destinations like streamed stdout/stderr or suppression of all log output.
+Default behavior can be configured for the entire cluster with the following flag (through the -thermos_executor_flags
+argument to the Aurora scheduler):
+
+    --runner-logger-destination=both
+
+`both` configuration will send logs to files and stream to parent stdout/stderr outputs.
+
+See [this document](configuration-reference.md#logger) for all destination options.
+
+#### Log rotation
 By default, Thermos will not rotate the stdout/stderr logs from child processes and they will grow
 without bound. An individual user may change this behavior via configuration on the Process object,
 but it may also be desirable to change the default configuration for the entire cluster.

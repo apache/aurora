@@ -28,7 +28,7 @@ import traceback
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
-from apache.aurora.config.schema.base import LoggerMode
+from apache.aurora.config.schema.base import LoggerDestination, LoggerMode
 from apache.aurora.executor.aurora_executor import AuroraExecutor
 from apache.aurora.executor.common.announcer import DefaultAnnouncerCheckerProvider
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
@@ -55,7 +55,8 @@ LogOptions.set_simple(True)
 LogOptions.set_disk_log_level('DEBUG')
 LogOptions.set_log_dir(CWD)
 
-_LOGGER_TYPES = ', '.join(LoggerMode.VALUES)
+_LOGGER_DESTINATIONS = ', '.join(LoggerDestination.VALUES)
+_LOGGER_MODES = ', '.join(LoggerMode.VALUES)
 
 
 app.add_option(
@@ -107,11 +108,21 @@ app.add_option(
 
 
 app.add_option(
+    '--runner-logger-destination',
+    dest='runner_logger_destination',
+    type=str,
+    default='file',
+    help='The logger destination [%s] to use for all processes run by thermos.'
+      % _LOGGER_DESTINATIONS)
+
+
+app.add_option(
     '--runner-logger-mode',
     dest='runner_logger_mode',
     type=str,
     default=None,
-    help='The type of logger [%s] to use for all processes run by thermos.' % _LOGGER_TYPES)
+    help='The logger mode [%s] to use for all processes run by thermos.' % _LOGGER_MODES)
+
 
 app.add_option(
     '--runner-rotate-log-size-mb',
@@ -184,6 +195,7 @@ def initialize(options):
       dump_runner_pex(),
       checkpoint_root,
       artifact_dir=cwd_path,
+      process_logger_destination=options.runner_logger_destination,
       process_logger_mode=options.runner_logger_mode,
       rotate_log_size_mb=options.runner_rotate_log_size_mb,
       rotate_log_backups=options.runner_rotate_log_backups,
@@ -201,6 +213,7 @@ def initialize(options):
       dump_runner_pex(),
       checkpoint_root,
       artifact_dir=cwd_path,
+      process_logger_destination=options.runner_logger_destination,
       process_logger_mode=options.runner_logger_mode,
       rotate_log_size_mb=options.runner_rotate_log_size_mb,
       rotate_log_backups=options.runner_rotate_log_backups,

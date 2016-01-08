@@ -70,7 +70,7 @@ from apache.thermos.config.schema import ThermosContext
 
 from .helper import TaskRunnerHelper
 from .muxer import ProcessMuxer
-from .process import LoggerMode, Process
+from .process import LoggerDestination, LoggerMode, Process
 
 from gen.apache.thermos.ttypes import (
     ProcessState,
@@ -419,7 +419,8 @@ class TaskRunner(object):
   def __init__(self, task, checkpoint_root, sandbox, log_dir=None,
                task_id=None, portmap=None, user=None, chroot=False, clock=time,
                universal_handler=None, planner_class=TaskPlanner, hostname=None,
-               process_logger_mode=None, rotate_log_size_mb=None, rotate_log_backups=None,
+               process_logger_destination=None, process_logger_mode=None,
+               rotate_log_size_mb=None, rotate_log_backups=None,
                preserve_env=False):
     """
       required:
@@ -442,7 +443,8 @@ class TaskRunner(object):
         universal_handler = checkpoint record handler (only used for testing)
         planner_class (TaskPlanner class) = TaskPlanner class to use for constructing the task
                             planning policy.
-        process_logger_mode (string) = The type of logger to use for all processes.
+        process_logger_destination (string) = The destination of logger to use for all processes.
+        process_logger_mode (string) = The mode of logger to use for all processes.
         rotate_log_size_mb (integer) = The maximum size of the rotated stdout/stderr logs in MiB.
         rotate_log_backups (integer) = The maximum number of rotated stdout/stderr log backups.
         preserve_env (boolean) = whether or not env variables for the runner should be in the
@@ -469,6 +471,7 @@ class TaskRunner(object):
     self._portmap = portmap or {}
     self._launch_time = launch_time
     self._log_dir = log_dir or os.path.join(sandbox, '.logs')
+    self._process_logger_destination = process_logger_destination
     self._process_logger_mode = process_logger_mode
     self._rotate_log_size_mb = rotate_log_size_mb
     self._rotate_log_backups = rotate_log_backups
@@ -699,7 +702,10 @@ class TaskRunner(object):
         self._ckpt.close()
       return pid
 
-    logger_mode, rotate_log_size, rotate_log_backups = self._build_process_logger_args(process)
+    (logger_destination,
+     logger_mode,
+     rotate_log_size,
+     rotate_log_backups) = self._build_process_logger_args(process)
 
     return Process(
       process.name().get(),
@@ -710,6 +716,7 @@ class TaskRunner(object):
       self._user,
       chroot=self._chroot,
       fork=close_ckpt_and_fork,
+      logger_destination=logger_destination,
       logger_mode=logger_mode,
       rotate_log_size=rotate_log_size,
       rotate_log_backups=rotate_log_backups,
@@ -723,23 +730,28 @@ class TaskRunner(object):
       If no configuration (neither flags nor process config), default to
       "standard" mode.
     """
+    destination, mode, size, backups = None, None, None, None
     logger = process.logger()
     if logger is Empty:
-      if self._process_logger_mode:
-        return (
-          self._process_logger_mode,
-          Amount(self._rotate_log_size_mb, Data.MB),
-          self._rotate_log_backups
-        )
+      if self._process_logger_destination:
+        destination = self._process_logger_destination
       else:
-        return LoggerMode.STANDARD, None, None
+        destination = LoggerDestination.FILE
+
+      if self._process_logger_mode:
+        mode = self._process_logger_mode,
+        size = Amount(self._rotate_log_size_mb, Data.MB)
+        backups = self._rotate_log_backups
+      else:
+        mode = LoggerMode.STANDARD
     else:
+      destination = logger.destination().get()
       mode = logger.mode().get()
       if mode == LoggerMode.ROTATE:
         rotate = logger.rotate()
-        return mode, Amount(rotate.log_size().get(), Data.BYTES), rotate.backups().get()
-      else:
-        return mode, None, None
+        size = Amount(rotate.log_size().get(), Data.BYTES)
+        backups = rotate.backups().get()
+    return destination, mode, size, backups
 
   def deadlocked(self, plan=None):
     """Check whether a plan is deadlocked, i.e. there are no running/runnable processes, and the

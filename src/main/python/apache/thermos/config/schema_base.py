@@ -62,11 +62,15 @@ class RotatePolicy(Struct):
   backups = Default(Integer, 5)
 
 
+LoggerDestination = Enum('file', 'console', 'both', 'none')
+
+
 LoggerMode = Enum('standard', 'rotate')
 
 
 class Logger(Struct):
-  mode = Required(LoggerMode)
+  destination = Default(LoggerDestination, LoggerDestination('file'))
+  mode = Default(LoggerMode, LoggerMode('standard'))
   rotate = RotatePolicy
 
 

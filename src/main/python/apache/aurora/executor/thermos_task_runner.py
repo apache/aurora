@@ -73,6 +73,7 @@ class ThermosTaskRunner(TaskRunner):
                artifact_dir=None,
                clock=time,
                hostname=None,
+               process_logger_destination=None,
                process_logger_mode=None,
                rotate_log_size_mb=None,
                rotate_log_backups=None,
@@ -104,6 +105,7 @@ class ThermosTaskRunner(TaskRunner):
     self._clock = clock
     self._artifact_dir = artifact_dir or safe_mkdtemp()
     self._hostname = hostname or socket.gethostname()
+    self._process_logger_destination = process_logger_destination
     self._process_logger_mode = process_logger_mode
     self._rotate_log_size_mb = rotate_log_size_mb
     self._rotate_log_backups = rotate_log_backups
@@ -243,6 +245,7 @@ class ThermosTaskRunner(TaskRunner):
                   task_id=self._task_id,
                   thermos_json=self._task_filename,
                   hostname=self._hostname,
+                  process_logger_destination=self._process_logger_destination,
                   process_logger_mode=self._process_logger_mode,
                   rotate_log_size_mb=self._rotate_log_size_mb,
                   rotate_log_backups=self._rotate_log_backups)
@@ -359,6 +362,7 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
                preemption_wait=Amount(1, Time.MINUTES),
                poll_interval=Amount(500, Time.MILLISECONDS),
                clock=time,
+               process_logger_destination=None,
                process_logger_mode=None,
                rotate_log_size_mb=None,
                rotate_log_backups=None):
@@ -371,6 +375,7 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
     self._poll_interval = poll_interval
     self._preemption_wait = preemption_wait
     self._task_runner_class = task_runner_class
+    self._process_logger_destination = process_logger_destination
     self._process_logger_mode = process_logger_mode
     self._rotate_log_size_mb = rotate_log_size_mb
     self._rotate_log_backups = rotate_log_backups
@@ -403,6 +408,7 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
         artifact_dir=self._artifact_dir,
         clock=self._clock,
         hostname=assigned_task.slaveHost,
+        process_logger_destination=self._process_logger_destination,
         process_logger_mode=self._process_logger_mode,
         rotate_log_size_mb=self._rotate_log_size_mb,
         rotate_log_backups=self._rotate_log_backups,

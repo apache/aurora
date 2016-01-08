@@ -57,6 +57,19 @@ class Platform(Interface):
     pass
 
 
+class LoggerDestination(object):
+  FILE = 'file'
+  CONSOLE = 'console'
+  BOTH = 'both'
+  NONE = 'none'
+
+  _ALL_DESTINATIONS = [FILE, CONSOLE, BOTH, NONE]
+
+  @staticmethod
+  def is_valid(destination):
+    return destination in LoggerDestination._ALL_DESTINATIONS
+
+
 class LoggerMode(object):
   STANDARD = 'standard'
   ROTATE = 'rotate'
@@ -82,7 +95,8 @@ class ProcessBase(object):
   MAXIMUM_CONTROL_WAIT = Amount(1, Time.MINUTES)
 
   def __init__(self, name, cmdline, sequence, pathspec, sandbox_dir, user=None, platform=None,
-               logger_mode=LoggerMode.STANDARD, rotate_log_size=None, rotate_log_backups=None):
+               logger_destination=LoggerDestination.FILE, logger_mode=LoggerMode.STANDARD,
+               rotate_log_size=None, rotate_log_backups=None):
     """
       required:
         name        = name of the process
@@ -96,6 +110,7 @@ class ProcessBase(object):
         user               = the user to run as (if unspecified, will default to current user.)
                              if specified to a user that is not the current user, you must have root
                              access
+        logger_destination = The destination for logs output.
         logger_mode        = The type of logger to use for the process.
         rotate_log_size    = The maximum size of the rotated stdout/stderr logs.
         rotate_log_backups = The maximum number of rotated stdout/stderr log backups.
@@ -115,9 +130,13 @@ class ProcessBase(object):
     if platform is None:
       raise ValueError("Platform must be specified")
     self._platform = platform
+    self._logger_destination = logger_destination
     self._logger_mode = logger_mode
     self._rotate_log_size = rotate_log_size
     self._rotate_log_backups = rotate_log_backups
+
+    if not LoggerDestination.is_valid(self._logger_destination):
+      raise ValueError("Logger destination %s is invalid." % self._logger_destination)
 
     if not LoggerMode.is_valid(self._logger_mode):
       raise ValueError("Logger mode %s is invalid." % self._logger_mode)
@@ -390,16 +409,15 @@ class Process(ProcessBase):
       'pathspec': self._pathspec
     }
 
-    if self._logger_mode == LoggerMode.ROTATE:
-      log_size = int(self._rotate_log_size.as_(Data.BYTES))
-      self._log('Starting subprocess with log rotation. Size: %s, Backups: %s' % (
-        log_size, self._rotate_log_backups))
-      executor = LogRotatingSubprocessExecutor(max_bytes=log_size,
-                                               max_backups=self._rotate_log_backups,
-                                               **subprocess_args)
-    else:
-      self._log('Starting subprocess with no log rotation.')
-      executor = SubprocessExecutor(**subprocess_args)
+    log_destination_resolver = LogDestinationResolver(self._pathspec,
+                                                       destination=self._logger_destination,
+                                                       mode=self._logger_mode,
+                                                       rotate_log_size=self._rotate_log_size,
+                                                       rotate_log_backups=self._rotate_log_backups)
+    stdout, stderr = log_destination_resolver.get_handlers()
+    executor = PipedSubprocessExecutor(stdout=stdout,
+                                       stderr=stderr,
+                                       **subprocess_args)
 
     pid = executor.start()
 
@@ -448,9 +466,6 @@ class SubprocessExecutorBase(object):
     self._pathspec = pathspec
     self._popen = None
 
-  def _get_log_path(self, log_name):
-    return self._pathspec.with_filename(log_name).getpath('process_logdir')
-
   def _start_subprocess(self, stderr, stdout):
     return subprocess.Popen(self._args,
                             stderr=stderr,
@@ -468,57 +483,26 @@ class SubprocessExecutorBase(object):
     raise NotImplementedError()
 
 
-class SubprocessExecutor(SubprocessExecutorBase):
+class PipedSubprocessExecutor(SubprocessExecutorBase):
   """
-  Basic implementation of a SubprocessExecutor that writes stderr/stdout unconstrained log files.
-  """
-
-  def __init__(self, args, close_fds, cwd, env, pathspec):
-    """See SubprocessExecutorBase.__init__"""
-    self._stderr = None
-    self._stdout = None
-    super(SubprocessExecutor, self).__init__(args, close_fds, cwd, env, pathspec)
-
-  def start(self):
-    self._stderr = safe_open(self._get_log_path('stderr'), 'a')
-    self._stdout = safe_open(self._get_log_path('stdout'), 'a')
-
-    self._popen = self._start_subprocess(self._stderr, self._stdout)
-    return self._popen.pid
-
-  def wait(self):
-    return self._popen.wait()
-
-
-class LogRotatingSubprocessExecutor(SubprocessExecutorBase):
-  """
-  Implementation of a SubprocessExecutor that implements log rotation for stderr/stdout.
+  Implementation of SubprocessExecutorBase that passes logs to provided destinations
   """
 
   READ_BUFFER_SIZE = 2 ** 16
 
-  def __init__(self, args, close_fds, cwd, env, pathspec, max_bytes, max_backups):
+  def __init__(self, args, close_fds, cwd, env, pathspec, stdout=None, stderr=None):
     """
     See SubprocessExecutorBase.__init__
 
     Takes additional arguments:
-      max_bytes   = The maximum size of an individual log file.
-      max_backups = The maximum number of log file backups to create.
+      stdout = Destination handler for stdout output. Default is /dev/null.
+      stderr = Destination handler for stderr output. Default is /dev/null.
     """
-    self._max_bytes = max_bytes
-    self._max_backups = max_backups
-    self._stderr = None
-    self._stdout = None
-    super(LogRotatingSubprocessExecutor, self).__init__(args, close_fds, cwd, env, pathspec)
+    super(PipedSubprocessExecutor, self).__init__(args, close_fds, cwd, env, pathspec)
+    self._stderr = stderr
+    self._stdout = stdout
 
   def start(self):
-    self._stderr = RotatingFileHandler(self._get_log_path('stderr'),
-                                       self._max_bytes,
-                                       self._max_backups)
-    self._stdout = RotatingFileHandler(self._get_log_path('stdout'),
-                                       self._max_bytes,
-                                       self._max_backups)
-
     self._popen = self._start_subprocess(subprocess.PIPE, subprocess.PIPE)
     return self._popen.pid
 
@@ -546,6 +530,83 @@ class LogRotatingSubprocessExecutor(SubprocessExecutorBase):
           handler.write(buf)
 
     return rc
+
+
+class LogDestinationResolver(object):
+  """
+  Resolves correct stdout/stderr destinations based on process configuration
+  """
+
+  STDOUT = 'stdout'
+  STDERR = 'stderr'
+
+  def __init__(self, pathspec, destination=LoggerDestination.FILE, mode=LoggerMode.STANDARD,
+               rotate_log_size=None, rotate_log_backups=None):
+    """
+    pathspec           = TaskPath object for synthesizing path names.
+    destination        = Log destination.
+    logger_mode        = The type of logger to use for the process.
+    rotate_log_size    = The maximum size of the rotated stdout/stderr logs.
+    rotate_log_backups = The maximum number of rotated stdout/stderr log backups.
+    """
+    self._pathspec = pathspec
+    self._destination = destination
+    self._mode = mode
+    self._rotate_log_size = rotate_log_size
+    self._rotate_log_backups = rotate_log_backups
+
+    if not LoggerDestination.is_valid(self._destination):
+      raise ValueError("Logger destination %s is invalid." % self._destination)
+
+    if not LoggerMode.is_valid(self._mode):
+      raise ValueError("Logger mode %s is invalid." % self._mode)
+
+  def get_handlers(self):
+    """
+    Creates stdout/stderr handler by provided configuration
+    """
+    return self._get_handler(self.STDOUT), self._get_handler(self.STDERR)
+
+  def _get_handler(self, name):
+    """
+    Constructs correct handler by provided configuration
+    """
+
+    # On no destination write logs to /dev/null
+    if self._destination == LoggerDestination.NONE:
+      return StreamHandler(safe_open(os.devnull, 'w'))
+
+    # Streamed logs to predefined outputs
+    if self._destination == LoggerDestination.CONSOLE:
+      return self._get_stream(name)
+
+    # Streaming AND file logs are required
+    if self._destination == LoggerDestination.BOTH:
+      return TeeHandler(self._get_stream(name), self._get_file(name))
+
+    # File only logs are required
+    return self._get_file(name)
+
+  def _get_file(self, name):
+    if self._mode == LoggerMode.STANDARD:
+      return FileHandler(self._get_log_path(name))
+    if self._mode == LoggerMode.ROTATE:
+      log_size = int(self._rotate_log_size.as_(Data.BYTES))
+      return RotatingFileHandler(self._get_log_path(name),
+                                 log_size,
+                                 self._rotate_log_backups)
+
+  def _get_stream(self, name):
+    """
+    Returns OS stream by name
+    """
+    if name == self.STDOUT:
+      return StreamHandler(sys.stdout)
+    if name == self.STDERR:
+      return StreamHandler(sys.stderr)
+
+  def _get_log_path(self, log_name):
+    return self._pathspec.with_filename(log_name).getpath('process_logdir')
 
 
 class FileHandler(object):
@@ -637,3 +698,48 @@ class RotatingFileHandler(FileHandler):
 
     self.swap_files(self.filename, self.make_indexed_filename(1))
     self.file = safe_open(self.filename, mode='w')
+
+
+class StreamHandler(object):
+  """
+  Stream handler wraps stream objects and allows configuration of whether objects
+  should be closed when ending a subprocess.
+  """
+
+  def __init__(self, stream, close=False):
+    """
+    stream = Wrapped stream object.
+    """
+    self._stream = stream
+    self._close = close
+
+  def write(self, b):
+    self._stream.write(b)
+    self._stream.flush()
+
+  def close(self):
+    if self._close:
+      self._stream.close()
+
+
+class TeeHandler(object):
+  """
+  Tee handler mimicks the unix tee command and splits output between two destinations
+  """
+
+  def __init__(self, first, second):
+    """
+      required:
+        first  = First destination
+        second = Second destination
+    """
+    self._first = first
+    self._second = second
+
+  def write(self, b):
+    self._first.write(b)
+    self._second.write(b)
+
+  def close(self):
+    self._first.close()
+    self._second.close()

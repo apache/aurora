@@ -13,6 +13,9 @@
 - Added support for jobs to specify arbitrary ZooKeeper paths for service registration.  See
   https://github.com/apache/aurora/blob/master/docs/configuration-reference.md#announcer-objects
   for details.
+- Log destination is configurable for the thermos runner. See the configuration reference for details
+  on how to configure destination per-process. Command line options may also be passed through the
+  scheduler in order to configure the global default behavior.
 
 0.11.0
 ------
