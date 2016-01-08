@@ -44,8 +44,10 @@ public interface TierManager {
   class TierManagerImpl implements TierManager {
     private final TierConfig tierConfig;
 
-    static class TierConfig {
-      static final TierConfig EMPTY = new TierConfig(ImmutableMap.of());
+    @VisibleForTesting
+    public static class TierConfig {
+      @VisibleForTesting
+      public static final TierConfig EMPTY = new TierConfig(ImmutableMap.of());
 
       private final Map<String, TierInfo> tiers;
 

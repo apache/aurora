@@ -86,7 +86,7 @@ public class SchedulingBenchmarks {
   @Fork(1)
   @State(Scope.Thread)
   public abstract static class AbstractBase {
-    private static final Amount<Long, Time> NO_DELAY = Amount.of(0L, Time.MILLISECONDS);
+    private static final Amount<Long, Time> NO_DELAY = Amount.of(1L, Time.MILLISECONDS);
     private static final Amount<Long, Time> DELAY_FOREVER = Amount.of(30L, Time.DAYS);
     protected Storage storage;
     protected PendingTaskProcessor pendingTaskProcessor;
@@ -135,6 +135,8 @@ public class SchedulingBenchmarks {
               bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
               bind(TierManager.class).to(TierManager.TierManagerImpl.class);
               bind(TierManager.TierManagerImpl.class).in(Singleton.class);
+              bind(TierManager.TierManagerImpl.TierConfig.class)
+                  .toInstance(TierManager.TierManagerImpl.TierConfig.EMPTY);
               expose(TierManager.class);
               expose(TaskScheduler.class);
               expose(OfferManager.class);
