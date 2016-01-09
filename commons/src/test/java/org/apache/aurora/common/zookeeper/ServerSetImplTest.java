@@ -258,7 +258,7 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
     expect(zkClient.registerExpirationHandler(anyObject(Command.class)))
         .andReturn(onExpirationWatcher);
 
-    expect(zkClient.get()).andThrow(new InterruptedException());
+    expect(zkClient.get()).andThrow(new InterruptedException());  // See interrupted() note below.
     expect(zkClient.unregister(onExpirationWatcher)).andReturn(true);
     control.replay();
 
@@ -269,7 +269,14 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
       serverset.watch(hostSet -> {});
       fail("Expected MonitorException");
     } catch (DynamicHostSet.MonitorException e) {
-      // expected
+      // NB: The assert is not important to this test, but the call to `Thread.interrupted()` is.
+      // That call both returns the current interrupted status as well as clearing it.  The clearing
+      // is crucial depending on the order tests are run in this class.  If this test runs before
+      // one of the tests above that uses a `ZooKeeperClient` for example, those tests will fail
+      // executing `ZooKeeperClient.get` which internally blocks on s sync-point that takes part in
+      // the interruption mechanism and so immediately throws `InterruptedException` based on the
+      // un-cleared interrupted bit.
+      assertTrue(Thread.interrupted());
     }
     control.verify();
   }
@@ -281,15 +288,8 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
   private ServerSet.EndpointStatus join(ServerSet serverSet, String host)
       throws JoinException, InterruptedException {
 
-    return serverSet.join(InetSocketAddress.createUnresolved(host, 42), ImmutableMap.<String, InetSocketAddress>of());
-  }
-
-  private void assertChangeFired(Map<InetSocketAddress, Status> hostsStatuses)
-      throws InterruptedException {
-    assertChangeFired(
-        ImmutableSet.copyOf(Iterables.transform(ImmutableSet.copyOf(hostsStatuses.entrySet()),
-            e -> new ServiceInstance(new Endpoint(e.getKey().getHostName(), e.getKey().getPort()),
-                ImmutableMap.<String, Endpoint>of(), e.getValue()))));
+    return serverSet.join(
+        InetSocketAddress.createUnresolved(host, 42), ImmutableMap.<String, InetSocketAddress>of());
   }
 
   private void assertChangeFired(String... serviceHosts)
