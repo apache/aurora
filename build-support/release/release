@@ -111,7 +111,7 @@ else
 fi
 
 previous_version_tag="${current_version}-rc${rc_tag_version}"
-current_version_tag="${current_version}"
+current_version_tag="rel/${current_version}"
 
 # Make sure the tag does not exist
 if [[ $(git ls-remote --exit-code --tags origin refs/tags/${current_version} >/dev/null 2>&1) == 0 ]]; then
@@ -124,21 +124,20 @@ if [[ $publish == 0 ]]; then
   echo "Performing dry-run"
 fi
 
-dist_name="apache-aurora-${current_version_tag}"
+dist_name="apache-aurora-${current_version}"
 
 if [[ $publish == 1 ]]; then
   # Create release branch and tag and push them to the origin
-  echo "Creating ${current_version_tag} branch"
-  git checkout -b ${current_version_tag}
+  echo "Creating ${current_version_tag} staging branch"
+  git checkout -b "stage_${current_version_tag}"
 
   # Increment the version and create a branch
-  echo ${current_version_tag} > .auroraversion
+  echo ${current_version} > .auroraversion
   git add .auroraversion
-  git commit -m "Updating .auroraversion to release version ${current_version_tag}."
+  git commit -m "Updating .auroraversion to release version ${current_version}."
+  git tag -s "${current_version_tag}" \
+    -m "Apache Aurora ${current_version} release" ${current_version_tag}
   git push origin "${current_version_tag}"
-  git tag -s "${current_version_tag}" -m "Apache Aurora ${current_version_tag} release" ${current_version_tag}
-  # Need to disambiguate here, since we already have a local branch ref named for the release.
-  git push origin "refs/tags/${current_version_tag}"
 fi
 
 dist_dir=${base_dir}/dist
@@ -161,10 +160,10 @@ fi
 
 cd ${release_dir}
 
-# Rename the .auroraversion from -RC[:digit:] to release current_version_tag and repackage the release
+# Rename the .auroraversion from -RC[:digit:] to release current_version and repackage the release
 tar -xzf ${rc_dir}/apache-aurora-*.tar.gz
 mv apache-aurora-* ${dist_name}
-echo ${current_version_tag} > ${dist_name}/.auroraversion
+echo ${current_version} > ${dist_name}/.auroraversion
 tar -czf ${dist_name}.tar.gz ${dist_name}
 rm -rf ${dist_name}
 
@@ -193,11 +192,11 @@ echo
 # Create the email template for the release to be sent to the mailing lists.
 MESSAGE=$(cat <<__EOF__
 To: dev@aurora.apache.org
-Subject: [RESULT][VOTE] Release Apache Aurora ${current_version_tag} RC${rc_tag_version}
+Subject: [RESULT][VOTE] Release Apache Aurora ${current_version} RC${rc_tag_version}
 
 All,
-The vote to accept Apache Aurora ${current_version_tag} RC${rc_tag_version}
-as the official Apache Aurora ${current_version_tag} release has passed.
+The vote to accept Apache Aurora ${current_version} RC${rc_tag_version}
+as the official Apache Aurora ${current_version} release has passed.
 
 
 +1 (Binding)
@@ -211,7 +210,7 @@ as the official Apache Aurora ${current_version_tag} release has passed.
 There were no 0 or -1 votes. Thank you to all who helped make this release.
 
 
-Aurora ${current_version_tag} includes the following:
+Aurora ${current_version} includes the following:
 ---
 The CHANGELOG for the release is available at:
 ${aurora_git_web_url}&f=CHANGELOG&hb=${current_version_tag}
