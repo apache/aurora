@@ -123,6 +123,8 @@ public final class DbModule extends PrivateModule {
         // TODO(wfarner): H2 can ship these to slf4j, but is too noisy at our default level (info).
         // Use this logging and reduce the default level for h2's logger.
         .put("TRACE_LEVEL_SYSTEM_OUT", "1")
+        // Enable Query Statistics
+        .put("QUERY_STATISTICS", "TRUE")
         .build();
     this.jdbcSchema = dbName + ";" + Joiner.on(";").withKeyValueSeparator("=").join(args);
   }
