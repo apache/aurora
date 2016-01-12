@@ -16,6 +16,11 @@
 - Log destination is configurable for the thermos runner. See the configuration reference for details
   on how to configure destination per-process. Command line options may also be passed through the
   scheduler in order to configure the global default behavior.
+- Changed scheduler logging to use logback.
+  Operators wishing to customize logging may do so with standard logback configuration as described
+  at http://logback.qos.ch/manual/configuration.html
+  With this change, we have removed the following scheduler command line arguments as they were
+  made redundant: `logtostderr`, `alsologtostderr`, `vlog`, `vmodule`, and `use_glog_formatter`.
 
 0.11.0
 ------

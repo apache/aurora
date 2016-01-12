@@ -11,16 +11,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.common.net.http.handlers;
+package org.apache.aurora.scheduler.http;
 
 import java.io.StringWriter;
 import java.util.List;
 import java.util.Optional;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
-import java.util.logging.Logger;
-import java.util.logging.LoggingMXBean;
+import java.util.Set;
 
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -29,12 +25,18 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
 
 import org.apache.aurora.common.util.templating.StringTemplateHelper;
 import org.apache.aurora.common.util.templating.StringTemplateHelper.TemplateException;
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
 
 /**
  * Servlet that allows for dynamic adjustment of the logging configuration.
@@ -44,13 +46,13 @@ import org.apache.commons.lang.StringUtils;
 @Path("/logconfig")
 public class LogConfig {
   private static final List<String> LOG_LEVELS = Lists.newArrayList(
-      Level.SEVERE.getName(),
-      Level.WARNING.getName(),
-      Level.INFO.getName(),
-      Level.CONFIG.getName(),
-      Level.FINE.getName(),
-      Level.FINER.getName(),
-      Level.FINEST.getName(),
+      Level.OFF.levelStr,
+      Level.ERROR.levelStr,
+      Level.WARN.levelStr,
+      Level.INFO.levelStr,
+      Level.DEBUG.levelStr,
+      Level.TRACE.levelStr,
+      Level.ALL.levelStr,
       "INHERIT" // Display value for a null level, the logger inherits from its ancestor.
   );
 
@@ -65,12 +67,9 @@ public class LogConfig {
 
     Optional<String> configChange = Optional.empty();
     if (loggerName != null && loggerLevel != null) {
-      Logger logger = Logger.getLogger(loggerName);
-      Level newLevel = loggerLevel.equals("INHERIT") ? null : Level.parse(loggerLevel);
+      Logger logger = (Logger) LoggerFactory.getLogger(loggerName);
+      Level newLevel = Level.toLevel(loggerLevel, null);
       logger.setLevel(newLevel);
-      if (newLevel != null) {
-        maybeAdjustHandlerLevels(logger, newLevel);
-      }
 
       configChange = Optional.of(String.format("%s level changed to %s", loggerName, loggerLevel));
     }
@@ -88,40 +87,30 @@ public class LogConfig {
     StringWriter writer = new StringWriter();
 
     template.writeTemplate(writer, stringTemplate -> {
-      LoggingMXBean logBean = LogManager.getLoggingMXBean();
-
       if (configChange.isPresent()) {
         stringTemplate.setAttribute("configChange", configChange.get());
       }
 
-      List<LoggerConfig> loggerConfigs = Lists.newArrayList();
-      for (String logger : Ordering.natural().immutableSortedCopy(logBean.getLoggerNames())) {
-        loggerConfigs.add(new LoggerConfig(logger, logBean.getLoggerLevel(logger)));
-      }
+      LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
 
-      stringTemplate.setAttribute("loggers", loggerConfigs);
+      Set<LoggerConfig> loggers = FluentIterable.from(context.getLoggerList())
+          .transform(logger -> new LoggerConfig(
+              logger.getName(),
+              Optional.ofNullable(logger.getLevel()).map(l -> l.levelStr).orElse("INHERIT")))
+          .toSortedSet(Ordering.natural().onResultOf(LoggerConfig::getName));
+
+      stringTemplate.setAttribute("loggers", loggers);
       stringTemplate.setAttribute("levels", LOG_LEVELS);
     });
 
     return writer.toString();
   }
 
-  private void maybeAdjustHandlerLevels(Logger logger, Level newLevel) {
-    do {
-      for (Handler handler : logger.getHandlers()) {
-        Level handlerLevel = handler.getLevel();
-        if (newLevel.intValue() < handlerLevel.intValue()) {
-          handler.setLevel(newLevel);
-        }
-      }
-    } while (logger.getUseParentHandlers() && (logger = logger.getParent()) != null);
-  }
-
-  private class LoggerConfig {
+  private static class LoggerConfig {
     private final String name;
     private final String level;
 
-    public LoggerConfig(String name, String level) {
+    LoggerConfig(String name, String level) {
       this.name = name;
       this.level = StringUtils.isBlank(level) ? "INHERIT" : level;
     }

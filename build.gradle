@@ -87,7 +87,6 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.jerseyRev = '1.19'
   ext.jsrRev = '3.0.1'
   ext.junitRev = '4.12'
-  ext.log4jRev = '1.2.17'
   ext.protobufRev = '2.6.1'
   ext.servletRev = '3.1.0'
   ext.slf4jRev = '1.7.12'
@@ -100,6 +99,10 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   configurations {
     compile {
       exclude module: 'junit-dep'
+      // We use logback, so we do not want to pull in log4j artifacts.
+      exclude module: 'log4j'
+      exclude module: 'slf4j-log4j12'
+
       // ResolutionStrategy needs to be set in the allprojects block otherwise dependent projects
       // will not inherit it. Note that dependencies still need to be specified in a dependencies
       // block - this only affects strategy.
@@ -112,11 +115,9 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
         force "com.google.guava:guava:${guavaRev}"
         force "com.google.protobuf:protobuf-java:${protobufRev}"
         force "junit:junit:${junitRev}"
-        force "log4j:log4j:${log4jRev}"
         force "org.apache.thrift:libthrift:${thriftRev}"
         force "org.hamcrest:hamcrest-core:1.3"
         force "org.slf4j:slf4j-api:${slf4jRev}"
-        force "org.slf4j:slf4j-jdk14:${slf4jRev}"
       }
     }
   }
@@ -165,11 +166,9 @@ project(':commons') {
     compile "commons-lang:commons-lang:${commonsLangRev}"
     compile "javax.servlet:javax.servlet-api:${servletRev}"
     compile "joda-time:joda-time:2.9.1"
-    compile "log4j:log4j:${log4jRev}"
     compile "org.antlr:stringtemplate:${stringTemplateRev}"
     compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"
     compile "org.easymock:easymock:3.4"
-    compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
 
     // There are a few testing support libs in the src/main/java trees that use junit - currently:
     //   src/main/java/org/apache/aurora/common/zookeeper/testing
@@ -343,6 +342,7 @@ dependencies {
   compile project(':commons-args')
 
   compile 'aopalliance:aopalliance:1.0'
+  compile 'ch.qos.logback:logback-classic:1.1.3'
   compile "com.google.code.findbugs:jsr305:${jsrRev}"
   compile "com.google.inject:guice:${guiceRev}"
   compile "com.google.inject.extensions:guice-assistedinject:${guiceRev}"
@@ -357,7 +357,6 @@ dependencies {
   compile "com.sun.jersey.contribs:jersey-guice:${jerseyRev}"
   compile 'javax.inject:javax.inject:1'
   compile "javax.servlet:javax.servlet-api:${servletRev}"
-  compile "log4j:log4j:${log4jRev}"
   compile "org.antlr:stringtemplate:${stringTemplateRev}"
   compile 'org.apache.mesos:mesos:0.25.0'
   compile "org.apache.shiro:shiro-guice:${shiroRev}"
@@ -370,7 +369,6 @@ dependencies {
   compile 'org.mybatis:mybatis:3.3.0'
   compile 'org.mybatis:mybatis-guice:3.7'
   compile 'org.quartz-scheduler:quartz:2.2.2'
-  compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
   compile "uno.perk:forward:1.0.0"
 
   testCompile "com.sun.jersey:jersey-client:${jerseyRev}"

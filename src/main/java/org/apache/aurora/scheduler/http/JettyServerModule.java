@@ -59,7 +59,6 @@ import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.net.http.handlers.AbortHandler;
 import org.apache.aurora.common.net.http.handlers.ContentionPrinter;
 import org.apache.aurora.common.net.http.handlers.HealthHandler;
-import org.apache.aurora.common.net.http.handlers.LogConfig;
 import org.apache.aurora.common.net.http.handlers.QuitHandler;
 import org.apache.aurora.common.net.http.handlers.ThreadStackPrinter;
 import org.apache.aurora.common.net.http.handlers.TimeSeriesDataSource;

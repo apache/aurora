@@ -18,6 +18,8 @@ org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl
 org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl$1
 org/apache/aurora/scheduler/http/AbortCallback
 org/apache/aurora/scheduler/http/JerseyTemplateServlet
+org/apache/aurora/scheduler/http/LogConfig
+org/apache/aurora/scheduler/http/LogConfig$LoggerConfig
 org/apache/aurora/scheduler/http/Maintenance
 org/apache/aurora/scheduler/http/Maintenance$1
 org/apache/aurora/scheduler/http/Maintenance$2
