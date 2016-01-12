@@ -14,8 +14,8 @@
 #
 #
 # This script is used to create a release candidate. It will update the current
-# .auroraversion as well as creates a branch for the new release candidate and
-# publishes the source distrobution and signatures to be voted on.
+# .auroraversion as well as creates a tag for the new release candidate and
+# publishes the source distribution and signatures to be voted on.
 #
 #   master~1 (0.5.0-snapshot) ----- master (0.6.0-snapshot)
 #                             \---- 0.5.0 (0.5.0)
@@ -26,7 +26,7 @@
 set -o errexit
 set -o nounset
 
-rc_tag_version=0
+rc_number=0
 override_version=''
 aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/dev/aurora'
@@ -51,7 +51,7 @@ exit 0
 
 publish=0
 increment_level="patch"
-rc_tag_version=0
+rc_number=0
 while getopts ":hl:v:r:p" opt; do
   case $opt in
     l)
@@ -63,7 +63,7 @@ while getopts ":hl:v:r:p" opt; do
       esac
       ;;
     r)
-      rc_tag_version=${OPTARG}
+      rc_number=${OPTARG}
       ;;
     p)
       publish=1
@@ -90,9 +90,6 @@ fi
 git fetch --all -q
 git fetch --tags -q
 
-# Set the base dir for the script to be the top level of the repository
-base_dir=$(git rev-parse --show-toplevel)
-
 # Verify that this is a clean repository
 if [[ -n "`git status --porcelain`" ]]; then
   echo "ERROR: Please run from a clean git repository."
@@ -102,9 +99,9 @@ elif [[ "`git rev-parse --abbrev-ref HEAD`" != "master" ]]; then
   exit 1
 fi
 
-if [[ "$base_dir" != "$PWD" ]]; then
-  echo "Warrning: This script must be run from the root of the repository ${base_dir}"
-  cd $base_dir
+if [[ ! -f .auroraversion ]]; then
+  echo "Warrning: This script must be run from the root of the repository"
+  exit 1
 fi
 
 # Calculate the new version string
@@ -138,11 +135,16 @@ else
 fi
 
 # Add the rc tag to the current version
-current_version_tag="${current_version}-rc${rc_tag_version}"
+rc_version="${current_version}-rc${rc_number}"
+rc_version_tag="rel/${rc_version}"
 
-# Make sure the branch does not exist
-if git rev-parse $current_version_tag >/dev/null 2>&1; then
-  echo "ERROR: ${current_version_tag} exists."
+echo
+echo "Generating release candidate ${rc_version}"
+echo
+
+# Make sure the tag does not exist
+if git rev-parse ${rc_version_tag} >/dev/null 2>&1; then
+  echo "ERROR: tag ${rc_version_tag} exists."
   exit 1
 fi
 
@@ -154,7 +156,7 @@ To roll back your local repo you will need to run:
 
   git checkout master
   git reset --hard ${current_git_rev}
-  git branch -D ${current_version_tag}
+  git tag -D ${rc_version_tag}
 EOF
 }
 
@@ -167,67 +169,68 @@ trap print_rollback_instructions EXIT
 
 # All check are now complete, before we start alert if we are in dry-run
 if [[ $publish == 0 ]]; then
-  echo "Performing dry-run"
+  echo "Performing dry-run, run with '-p' when you are ready to run and publish a release candidate"
 fi
 
 # This should be a clean repo we are working against. Run clean just to ensure it is.
 git clean -fdxq
 
 echo "Generating changelog"
-${base_dir}/build-support/release/changelog $current_version
+./build-support/release/changelog $current_version
 git add CHANGELOG
 git commit -m "Updating CHANGELOG for ${current_version} release."
-
-echo "Creating ${current_version_tag} branch"
-git branch $current_version_tag $(git rev-parse HEAD)
 
 echo "Committing updated .auroraversion on master"
 echo $new_snapshot_version > .auroraversion
 git add .auroraversion
 git commit -m "Incrementing snapshot version to ${new_snapshot_version}."
 
-# Build the source distribution from the new branch
-echo "Checking out ${current_version_tag} branch and updating .auroraversion"
-git checkout $current_version_tag
-# Increment the version and create a branch
-echo $current_version_tag > .auroraversion
-git add .auroraversion
-git commit -m "Updating .auroraversion to ${current_version_tag}."
+echo "Creating ${rc_version} staging branch"
+git checkout -b "stage_${rc_version_tag}"
 
+echo "Updating .auroraversion on staging branch"
+# Increment the version and create a branch
+echo ${rc_version} > .auroraversion
+git add .auroraversion
+git commit -m "Updating .auroraversion to ${rc_version}."
+
+# Build the source distribution from the new branch
 echo "Building the source distribution"
-dist_dir=${base_dir}/dist
-dist_name="apache-aurora-${current_version_tag}"
+dist_dir=dist
+dist_name="apache-aurora-${rc_version}"
 
 mkdir -p ${dist_dir}
 git archive --prefix=${dist_name}/ -o ${dist_dir}/${dist_name}.tar.gz HEAD
+pushd ${dist_dir}
+  # Sign the tarball.
+  echo "Signing the distribution"
+  gpg --armor --output ${dist_name}.tar.gz.asc --detach-sig ${dist_name}.tar.gz
 
-cd ${dist_dir}
-# Sign the tarball.
-echo "Signing the distribution"
-gpg --armor --output ${dist_dir}/${dist_name}.tar.gz.asc --detach-sig ${dist_dir}/${dist_name}.tar.gz
+  # Create the checksums
+  echo "Creating checksums"
+  gpg --print-md MD5 ${dist_name}.tar.gz > ${dist_name}.tar.gz.md5
+  shasum ${dist_name}.tar.gz > ${dist_name}.tar.gz.sha
+popd
 
-# Create the checksums
-echo "Creating checksums"
-gpg --print-md MD5 ${dist_name}.tar.gz > ${dist_name}.tar.gz.md5
-shasum ${dist_name}.tar.gz > ${dist_name}.tar.gz.sha
+aurora_svn_rc_url="${aurora_svn_dist_url}/${rc_version}"
 
-# Publish release candidate to svn and commit and push the new git branch
+# Publish release candidate to svn and commit and push the new git tag
 if [[ $publish == 1 ]]; then
-  echo "Publishing release candidate to ${aurora_svn_dist_url}/${current_version_tag}"
-  svn mkdir ${aurora_svn_dist_url}/${current_version_tag} -m "aurora-${current_version} release candidate ${rc_tag_version}"
-  svn co --depth=empty ${aurora_svn_dist_url}/${current_version_tag} ${dist_dir}
+  echo "Publishing release candidate to ${aurora_svn_rc_url}"
+  svn mkdir ${aurora_svn_rc_url} -m "aurora-${current_version} release candidate ${rc_version_tag}"
+  svn co --depth=empty ${aurora_svn_rc_url} ${dist_dir}
   svn add ${dist_name}*
-  svn ci -m "aurora-${current_version} release candidate ${rc_tag_version}"
+  svn ci -m "aurora-${current_version} release candidate ${rc_version_tag}"
 
-  echo "Pushing new branch ${current_version_tag} to origin"
-  cd ${base_dir}
-  git push origin ${current_version_tag}
+  echo "Creating tag ${rc_version_tag}"
+  git tag -s ${rc_version_tag} \
+    -m "Apache Aurora ${current_version} release candidate ${rc_version_tag}"
+  git push origin "${rc_version_tag}"
+
   echo "Pushing updated .auroraversion to master"
   git checkout master
   git push origin master
 fi
-
-cd ${base_dir}
 
 echo "Done creating the release candidate. The following draft email has been created"
 echo "to send to the dev@aurora.apache.org mailing list"
@@ -242,32 +245,32 @@ fi
 
 MESSAGE=$(cat <<__EOF__
 To: dev@aurora.apache.org
-Subject: [VOTE] Release Apache Aurora ${current_version} RC${rc_tag_version}
+Subject: [VOTE] Release Apache Aurora ${current_version} RC${rc_number}
 
 All,
 
 I propose that we accept the following release candidate as the official
 Apache Aurora ${current_version} release.
 
-Aurora ${current_version_tag} includes the following:
+Aurora ${rc_version} includes the following:
 ---
 The NEWS for the release is available at:
-${aurora_git_web_url}&f=NEWS&hb=${current_version_tag}
+${aurora_git_web_url}&f=NEWS&hb=${rc_version_tag}
 
 The CHANGELOG for the release is available at:
-${aurora_git_web_url}&f=CHANGELOG&hb=${current_version_tag}
+${aurora_git_web_url}&f=CHANGELOG&hb=${rc_version_tag}
 
-The branch used to create the release candidate is:
-${aurora_git_web_url};a=shortlog;h=refs/heads/${current_version_tag}
+The tag used to create the release candidate is:
+${aurora_git_web_url};a=shortlog;h=refs/heads/${rc_version_tag}
 
 The release candidate is available at:
-${aurora_svn_dist_url}/${current_version_tag}/${dist_name}.tar.gz
+${aurora_svn_rc_url}/${dist_name}.tar.gz
 
 The MD5 checksum of the release candidate can be found at:
-${aurora_svn_dist_url}/${current_version_tag}/${dist_name}.tar.gz.md5
+${aurora_svn_rc_url}/${dist_name}.tar.gz.md5
 
 The signature of the release candidate can be found at:
-${aurora_svn_dist_url}/${current_version_tag}/${dist_name}.tar.gz.asc
+${aurora_svn_rc_url}/${dist_name}.tar.gz.asc
 
 The GPG key used to sign the release are available at:
 ${aurora_svn_dist_url}/KEYS
