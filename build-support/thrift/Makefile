@@ -47,11 +47,11 @@ define calculate_sha256
 endef
 
 $(THRIFT):
-	sha256=$$(curl -s $(THRIFT_URL) | tee $(THRIFT_DISTNAME).tar.gz | $(calculate_sha256)) && \
+	sha256=$$(curl -s --show-error $(THRIFT_URL) | tee $(THRIFT_DISTNAME).tar.gz | $(calculate_sha256)) && \
 	[ "$${sha256}" = "$(THRIFT_SHA256)" ] && \
 	tar zxvf $(THRIFT_DISTNAME).tar.gz && \
 	cd $(THRIFT_DISTNAME) && \
-	sha256=$$(curl -s $(THRIFT_PATCH_URL) | tee thrift.patch | $(calculate_sha256)) && \
+	sha256=$$(curl -s --show-error $(THRIFT_PATCH_URL) | tee thrift.patch | $(calculate_sha256)) && \
 	[ "$${sha256}" = "$(THRIFT_PATCH_SHA256)" ] && \
 	patch -p1 < thrift.patch && \
 	./configure $(THRIFT_CONFIGURE_FLAGS) && \
