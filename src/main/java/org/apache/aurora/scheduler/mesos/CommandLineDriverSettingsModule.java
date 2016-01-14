@@ -89,6 +89,12 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       help = "Allows receiving revocable resource offers from Mesos.")
   private static final Arg<Boolean> RECEIVE_REVOCABLE_RESOURCES = Arg.create(false);
 
+  @CmdLine(name = "mesos_role",
+      help = "The Mesos role this framework will register as. The default is to left this empty, "
+          + "and the framework will register without any role and only receive unreserved "
+          + "resources in offer.")
+  private static final Arg<String> MESOS_ROLE = Arg.create();
+
   // TODO(wfarner): Figure out a way to change this without risk of fallout (MESOS-703).
   private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
 
@@ -99,6 +105,8 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
     if (FRAMEWORK_ANNOUNCE_PRINCIPAL.get() && credentials.isPresent()) {
       principal = Optional.of(credentials.get().getPrincipal());
     }
+    Optional<String> role =
+        MESOS_ROLE.hasAppliedValue() ? Optional.of(MESOS_ROLE.get()) : Optional.absent();
     DriverSettings settings = new DriverSettings(
         MESOS_MASTER_ADDRESS.get(),
         credentials,
@@ -106,7 +114,8 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
             EXECUTOR_USER.get(),
             principal,
             FRAMEWORK_FAILOVER_TIMEOUT.get(),
-            RECEIVE_REVOCABLE_RESOURCES.get()));
+            RECEIVE_REVOCABLE_RESOURCES.get(),
+            role));
     bind(DriverSettings.class).toInstance(settings);
   }
 
@@ -138,7 +147,8 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       String executorUser,
       Optional<String> principal,
       Amount<Long, Time> failoverTimeout,
-      boolean revocable) {
+      boolean revocable,
+      Optional<String> role) {
 
     FrameworkInfo.Builder infoBuilder = FrameworkInfo.newBuilder()
         .setUser(executorUser)
@@ -153,6 +163,11 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
     if (revocable) {
       infoBuilder.addCapabilities(Capability.newBuilder().setType(REVOCABLE_RESOURCES));
     }
+
+    if (role.isPresent()) {
+      infoBuilder.setRole(role.get());
+    }
+
     return infoBuilder.build();
   }
 

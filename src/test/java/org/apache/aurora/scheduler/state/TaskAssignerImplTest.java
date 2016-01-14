@@ -135,7 +135,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         MESOS_OFFER.getSlaveId(),
         ImmutableMap.of(PORT_NAME, PORT)))
         .andReturn(TASK.getAssignedTask());
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER.getSlaveId()))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER))
         .andReturn(TASK_INFO);
 
     control.replay();
@@ -204,7 +204,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         LOST,
         LAUNCH_FAILED_MSG))
         .andReturn(StateChangeResult.SUCCESS);
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER.getSlaveId()))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER))
         .andReturn(TASK_INFO);
 
     control.replay();
@@ -261,7 +261,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         offer.getOffer().getSlaveId(),
         ImmutableMap.of(PORT_NAME, PORT)))
         .andReturn(TASK.getAssignedTask());
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), offer.getOffer().getSlaveId()))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), offer.getOffer()))
         .andReturn(TASK_INFO);
     offerManager.launchTask(offer.getOffer().getId(), TASK_INFO);
 
@@ -313,7 +313,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         OFFER.getOffer().getSlaveId(),
         ImmutableMap.of(PORT_NAME, PORT)))
         .andReturn(TASK.getAssignedTask());
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), OFFER.getOffer().getSlaveId()))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), OFFER.getOffer()))
         .andReturn(TASK_INFO);
     offerManager.launchTask(OFFER.getOffer().getId(), TASK_INFO);
 

@@ -88,29 +88,25 @@ public class ResourceSlotTest {
   }
 
   @Test
-  public void testToResourceListNoRevocable() {
+  public void testToResourceListNoRevoca() {
     ResourceSlot resources = ResourceSlot.from(TASK);
-    Set<Integer> ports = ImmutableSet.of(80, 443);
     assertEquals(
         ImmutableSet.of(
             makeMesosResource(CPUS, TASK.getNumCpus(), false),
             makeMesosResource(RAM_MB, TASK.getRamMb(), false),
-            makeMesosResource(DISK_MB, TASK.getDiskMb(), false),
-            makeMesosRangeResource(PORTS, ports)),
-        ImmutableSet.copyOf(resources.toResourceList(ports, DEFAULT)));
+            makeMesosResource(DISK_MB, TASK.getDiskMb(), false)),
+        ImmutableSet.copyOf(resources.toResourceList(DEFAULT)));
   }
 
   @Test
   public void testToResourceListRevocable() {
     ResourceSlot resources = ResourceSlot.from(TASK);
-    Set<Integer> ports = ImmutableSet.of(80, 443);
     assertEquals(
         ImmutableSet.of(
             makeMesosResource(CPUS, TASK.getNumCpus(), true),
             makeMesosResource(RAM_MB, TASK.getRamMb(), false),
-            makeMesosResource(DISK_MB, TASK.getDiskMb(), false),
-            makeMesosRangeResource(PORTS, ports)),
-        ImmutableSet.copyOf(resources.toResourceList(ports, REVOCABLE_TIER)));
+            makeMesosResource(DISK_MB, TASK.getDiskMb(), false)),
+        ImmutableSet.copyOf(resources.toResourceList(REVOCABLE_TIER)));
   }
 
   @Test

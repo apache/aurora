@@ -126,7 +126,7 @@ public interface TaskAssigner {
       LOG.info(
           "Offer on slave {} (id {}) is being assigned task for {}.",
           host, offer.getSlaveId().getValue(), taskId);
-      return taskFactory.createFrom(assigned, offer.getSlaveId());
+      return taskFactory.createFrom(assigned, offer);
     }
 
     @Timed("assigner_maybe_assign")

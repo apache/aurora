@@ -21,6 +21,8 @@
   at http://logback.qos.ch/manual/configuration.html
   With this change, we have removed the following scheduler command line arguments as they were
   made redundant: `logtostderr`, `alsologtostderr`, `vlog`, `vmodule`, and `use_glog_formatter`.
+- Added support for configuring Mesos role by passing `-mesos_role` to Aurora scheduler at start time.
+  This enables resource reservation for Aurora when running in a shared Mesos cluster.
 
 0.11.0
 ------

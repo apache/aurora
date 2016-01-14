@@ -28,8 +28,12 @@ import org.junit.Test;
 
 import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RESOURCES;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class CommandLineDriverSettingsModuleTest {
+
+  private static final String TEST_ROLE = "test-role";
 
   @Test(expected = IllegalStateException.class)
   public void testMissingPropertiesParsing() {
@@ -72,9 +76,11 @@ public class CommandLineDriverSettingsModuleTest {
         "user",
         Optional.absent(),
         Amount.of(1L, Time.MINUTES),
-        false);
+        false,
+        Optional.absent());
     assertEquals("", info.getPrincipal());
     assertEquals(0, info.getCapabilitiesCount());
+    assertFalse(info.hasRole());
   }
 
   @Test
@@ -83,10 +89,12 @@ public class CommandLineDriverSettingsModuleTest {
         "user",
         Optional.absent(),
         Amount.of(1L, Time.MINUTES),
-        true);
+        true,
+        Optional.absent());
     assertEquals("", info.getPrincipal());
     assertEquals(1, info.getCapabilitiesCount());
     assertEquals(REVOCABLE_RESOURCES, info.getCapabilities(0).getType());
+    assertFalse(info.hasRole());
   }
 
   @Test
@@ -95,20 +103,25 @@ public class CommandLineDriverSettingsModuleTest {
         "user",
         Optional.of("auroraprincipal"),
         Amount.of(1L, Time.MINUTES),
-        false);
+        false,
+        Optional.absent());
     assertEquals("auroraprincipal", info.getPrincipal());
     assertEquals(0, info.getCapabilitiesCount());
+    assertFalse(info.hasRole());
   }
 
   @Test
-  public void testFrameworkInfoRevocableWithAnnouncedPrincipal() {
+  public void testFrameworkInfoRevocableWithAnnouncedPrincipalAndRole() {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
         "user",
             Optional.of("auroraprincipal"),
         Amount.of(1L, Time.MINUTES),
-        true);
+        true,
+        Optional.of(TEST_ROLE));
     assertEquals("auroraprincipal", info.getPrincipal());
     assertEquals(1, info.getCapabilitiesCount());
     assertEquals(REVOCABLE_RESOURCES, info.getCapabilities(0).getType());
+    assertTrue(info.hasRole());
+    assertEquals(TEST_ROLE, info.getRole());
   }
 }

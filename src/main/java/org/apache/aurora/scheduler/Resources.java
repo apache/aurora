@@ -62,6 +62,14 @@ public final class Resources {
    */
   public static final Predicate<Resource> NON_REVOCABLE = Predicates.not(Resource::hasRevocable);
 
+  /**
+   * Convert range to set of integers.
+   */
+  public static final Function<Range, Set<Integer>> RANGE_TO_MEMBERS =
+      range -> ContiguousSet.create(
+          com.google.common.collect.Range.closed((int) range.getBegin(), (int) range.getEnd()),
+          DiscreteDomain.integers());
+
   private final Iterable<Resource> mesosResources;
 
   private Resources(Iterable<Resource> mesosResources) {
@@ -145,38 +153,33 @@ public final class Resources {
   }
 
   private double getScalarValue(String key) {
-    Resource resource = getResource(key);
-    if (resource == null) {
-      return 0;
+    Iterable<Resource> resources = getResources(key);
+    double value = 0;
+    for (Resource r : resources) {
+      value += r.getScalar().getValue();
     }
-
-    return resource.getScalar().getValue();
+    return value;
   }
 
-  private Resource getResource(String key) {
-    return Iterables.find(mesosResources, e -> e.getName().equals(key), null);
+  private Iterable<Resource> getResources(String key) {
+    return Iterables.filter(mesosResources, e -> e.getName().equals(key));
   }
 
   private Iterable<Range> getPortRanges() {
-    Resource resource = getResource(PORTS.getName());
-    if (resource == null) {
-      return ImmutableList.of();
+    ImmutableList.Builder<Range> ranges = ImmutableList.builder();
+    for (Resource r : getResources(PORTS.getName())) {
+      ranges.addAll(r.getRanges().getRangeList().iterator());
     }
 
-    return resource.getRanges().getRangeList();
+    return ranges.build();
   }
 
   /**
    * Thrown when there are insufficient resources to satisfy a request.
    */
-  static class InsufficientResourcesException extends RuntimeException {
+  public static class InsufficientResourcesException extends RuntimeException {
     InsufficientResourcesException(String message) {
       super(message);
     }
   }
-
-  private static final Function<Range, Set<Integer>> RANGE_TO_MEMBERS =
-      range -> ContiguousSet.create(
-          com.google.common.collect.Range.closed((int) range.getBegin(), (int) range.getEnd()),
-          DiscreteDomain.integers());
 }

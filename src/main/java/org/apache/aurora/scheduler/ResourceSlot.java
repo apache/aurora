@@ -23,7 +23,6 @@ import java.util.function.Predicate;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Range;
@@ -43,7 +42,6 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.common.quantity.Data.BYTES;
 import static org.apache.aurora.scheduler.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
-import static org.apache.aurora.scheduler.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
 
 /**
@@ -61,6 +59,15 @@ public final class ResourceSlot {
    */
   public static final ResourceSlot NONE =
       new ResourceSlot(0, Amount.of(0L, Data.BITS), Amount.of(0L, Data.BITS), 0);
+
+  /**
+   * Convert {@link com.google.common.collect.Range} to {@link org.apache.mesos.Protos.Value.Range}.
+   */
+  public static final Function<Range<Integer>, Protos.Value.Range> RANGE_TRANSFORM =
+      input -> Protos.Value.Range.newBuilder()
+          .setBegin(input.lowerEndpoint())
+          .setEnd(input.upperEndpoint())
+          .build();
 
   public ResourceSlot(
       double numCpus,
@@ -87,26 +94,6 @@ public final class ResourceSlot {
         Amount.of(task.getRamMb(), Data.MB),
         Amount.of(task.getDiskMb(), Data.MB),
         task.getRequestedPorts().size());
-  }
-
-  /**
-   * Adapts this slot object to a list of Mesos resources.
-   *
-   * @param selectedPorts The ports selected, to be applied as concrete task ranges.
-   * @param tierInfo Task tier info.
-   * @return Mesos resources.
-   */
-  public List<Protos.Resource> toResourceList(Set<Integer> selectedPorts, TierInfo tierInfo) {
-    ImmutableList.Builder<Protos.Resource> resourceBuilder =
-        ImmutableList.<Protos.Resource>builder()
-            .add(makeMesosResource(CPUS, numCpus, tierInfo.isRevocable()))
-            .add(makeMesosResource(DISK_MB, disk.as(Data.MB), false))
-            .add(makeMesosResource(RAM_MB, ram.as(Data.MB), false));
-    if (!selectedPorts.isEmpty()) {
-      resourceBuilder.add(makeMesosRangeResource(PORTS, selectedPorts));
-    }
-
-    return resourceBuilder.build();
   }
 
   /**
@@ -142,23 +129,26 @@ public final class ResourceSlot {
   /**
    * Convenience method for adapting to Mesos resources without applying a port range.
    *
-   * @see {@link #toResourceList(java.util.Set, TierInfo)}
    * @param tierInfo Task tier info.
    * @return Mesos resources.
    */
   public List<Protos.Resource> toResourceList(TierInfo tierInfo) {
-    return toResourceList(ImmutableSet.of(), tierInfo);
+    return ImmutableList.<Protos.Resource>builder()
+        .add(makeMesosResource(CPUS, numCpus, tierInfo.isRevocable()))
+        .add(makeMesosResource(DISK_MB, disk.as(Data.MB), false))
+        .add(makeMesosResource(RAM_MB, ram.as(Data.MB), false))
+        .build();
   }
 
   /**
    * Creates a mesos resource of integer ranges.
    *
    * @param resourceType Resource type.
-   * @param values Values to translate into ranges.
-   * @return A mesos ranges resource.
+   * @param values    Values to translate into ranges.
+   * @return A new mesos ranges resource.
    */
   @VisibleForTesting
-  static Protos.Resource makeMesosRangeResource(
+  public static Protos.Resource makeMesosRangeResource(
       ResourceType resourceType,
       Set<Integer> values) {
 
@@ -348,10 +338,4 @@ public final class ResourceSlot {
   };
 
   private static final Predicate<Integer> IS_ZERO = e -> e == 0;
-
-  private static final Function<Range<Integer>, Protos.Value.Range> RANGE_TRANSFORM =
-      input -> Protos.Value.Range.newBuilder()
-          .setBegin(input.lowerEndpoint())
-          .setEnd(input.upperEndpoint())
-          .build();
 }

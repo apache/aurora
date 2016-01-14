@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.stream.Collectors;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -27,6 +29,7 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.ResourceType;
 import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
@@ -37,6 +40,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo;
 import org.apache.mesos.Protos.ExecutorInfo;
+import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Parameter;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
@@ -46,9 +50,11 @@ import org.apache.mesos.Protos.Volume.Mode;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.ResourceSlot.makeMesosRangeResource;
 import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.NO_OVERHEAD_EXECUTOR;
+import static org.apache.aurora.scheduler.mesos.TaskExecutors.SOME_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_CONFIG;
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_EXECUTOR;
 import static org.easymock.EasyMock.expect;
@@ -85,6 +91,23 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
                       ImmutableList.of(new DockerParameter("label", "testparameter")))))));
 
   private static final SlaveID SLAVE = SlaveID.newBuilder().setValue("slave-id").build();
+  private static final Offer OFFER_THERMOS_EXECUTOR = Protos.Offer.newBuilder()
+      .setId(Protos.OfferID.newBuilder().setValue("offer-id"))
+      .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("framework-id"))
+      .setSlaveId(SLAVE)
+      .setHostname("slave-hostname")
+      .addAllResources(
+          ResourceSlot.from(TASK_CONFIG).add(THERMOS_EXECUTOR.getExecutorOverhead())
+              .toResourceList(DEFAULT))
+      .addResources(makeMesosRangeResource(ResourceType.PORTS, ImmutableSet.of(80)))
+      .build();
+  private static final Offer OFFER_SOME_OVERHEAD_EXECUTOR = OFFER_THERMOS_EXECUTOR.toBuilder()
+      .clearResources()
+      .addAllResources(
+              ResourceSlot.from(TASK_CONFIG).add(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())
+                      .toResourceList(DEFAULT))
+      .addResources(makeMesosRangeResource(ResourceType.PORTS, ImmutableSet.of(80)))
+      .build();
 
   private MesosTaskFactory taskFactory;
   private ExecutorSettings config;
@@ -106,6 +129,18 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         .build();
   }
 
+  private static ExecutorInfo purgeZeroResources(ExecutorInfo executor) {
+    return executor.toBuilder()
+        .clearResources()
+        .addAllResources(
+            executor.getResourcesList()
+                .stream()
+                .filter(
+                    e -> !e.hasScalar() || e.getScalar().getValue() > 0)
+                .collect(Collectors.toList()))
+        .build();
+  }
+
   @Test
   public void testExecutorInfoUnchanged() {
     expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEFAULT);
@@ -113,7 +148,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
     control.replay();
 
-    TaskInfo task = taskFactory.createFrom(TASK, SLAVE);
+    TaskInfo task = taskFactory.createFrom(TASK, OFFER_THERMOS_EXECUTOR);
 
     assertEquals(populateDynamicFields(DEFAULT_EXECUTOR, TASK), task.getExecutor());
     checkTaskResources(TASK.getTask(), task);
@@ -124,9 +159,17 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     expect(tierManager.getTier(TASK_CONFIG)).andReturn(REVOCABLE_TIER);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
+    Resource revocableCPU = OFFER_THERMOS_EXECUTOR.getResources(0).toBuilder()
+        .setRevocable(Resource.RevocableInfo.getDefaultInstance())
+        .build();
+    Offer withRevocable = OFFER_THERMOS_EXECUTOR.toBuilder()
+        .removeResources(0)
+        .addResources(0, revocableCPU)
+        .build();
+
     control.replay();
 
-    TaskInfo task = taskFactory.createFrom(TASK, SLAVE);
+    TaskInfo task = taskFactory.createFrom(TASK, withRevocable);
     checkTaskResources(TASK.getTask(), task);
     assertTrue(task.getResourcesList().stream().anyMatch(Resource::hasRevocable));
   }
@@ -142,7 +185,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
     control.replay();
 
-    TaskInfo task = taskFactory.createFrom(IAssignedTask.build(builder), SLAVE);
+    TaskInfo task = taskFactory.createFrom(IAssignedTask.build(builder), OFFER_THERMOS_EXECUTOR);
     checkTaskResources(ITaskConfig.build(builder.getTask()), task);
   }
 
@@ -156,9 +199,10 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
     control.replay();
 
-    TaskInfo task = taskFactory.createFrom(TASK, SLAVE);
+    TaskInfo task = taskFactory.createFrom(TASK, OFFER_THERMOS_EXECUTOR);
     assertEquals(
-        populateDynamicFields(NO_OVERHEAD_EXECUTOR.getExecutorConfig().getExecutor(), TASK),
+        purgeZeroResources(populateDynamicFields(
+            NO_OVERHEAD_EXECUTOR.getExecutorConfig().getExecutor(), TASK)),
         task.getExecutor());
 
     // Simulate the upsizing needed for the task to meet the minimum thermos requirements.
@@ -177,13 +221,14 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
   }
 
   private TaskInfo getDockerTaskInfo(IAssignedTask task) {
-    config = TaskExecutors.SOME_OVERHEAD_EXECUTOR;
+    config = SOME_OVERHEAD_EXECUTOR;
+
     expect(tierManager.getTier(task.getTask())).andReturn(DEFAULT);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager);
 
     control.replay();
 
-    return taskFactory.createFrom(task, SLAVE);
+    return taskFactory.createFrom(task, OFFER_SOME_OVERHEAD_EXECUTOR);
   }
 
   @Test
@@ -217,7 +262,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
     control.replay();
 
-    TaskInfo taskInfo = taskFactory.createFrom(TASK_WITH_DOCKER, SLAVE);
+    TaskInfo taskInfo = taskFactory.createFrom(TASK_WITH_DOCKER, OFFER_THERMOS_EXECUTOR);
     assertEquals(
         config.getExecutorConfig().getVolumeMounts(),
         taskInfo.getExecutor().getContainer().getVolumesList());
