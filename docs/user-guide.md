@@ -170,7 +170,7 @@ and performing these operations:
   then that instance is killed.
 - If an instance is not present in the scheduler but is present in
   the new config, then the instance is created.
-- If an instance is present in both the scheduler the new config, then
+- If an instance is present in both the scheduler and the new config, then
   the client diffs both task configs. If it detects any changes, it
   performs an instance update by killing the old config instance and adds
   the new config instance.
