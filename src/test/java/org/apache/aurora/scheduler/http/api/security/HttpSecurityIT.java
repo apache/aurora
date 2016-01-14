@@ -15,12 +15,20 @@ package org.apache.aurora.scheduler.http.api.security;
 
 import java.io.IOException;
 import java.util.Set;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.inject.AbstractModule;
+import com.google.inject.Key;
 import com.google.inject.Module;
+import com.google.inject.name.Named;
+import com.google.inject.name.Names;
 import com.google.inject.util.Modules;
 import com.sun.jersey.api.client.ClientResponse;
 
@@ -53,6 +61,7 @@ import org.apache.thrift.protocol.TJSONProtocol;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
+import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -60,6 +69,9 @@ import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PATH;
 import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PERM;
 import static org.apache.aurora.scheduler.http.api.ApiModule.API_PATH;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
+import static org.easymock.EasyMock.getCurrentArguments;
+import static org.easymock.EasyMock.isA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -92,15 +104,17 @@ public class HttpSecurityIT extends AbstractJettyTest {
 
   private static final IJobKey ADS_STAGING_JOB = JobKeys.from("ads", "staging", "job");
 
-  private Ini ini;
-  private AnnotatedAuroraAdmin auroraAdmin;
-
   private static final Joiner COMMA_JOINER = Joiner.on(", ");
   private static final String ADMIN_ROLE = "admin";
   private static final String ENG_ROLE = "eng";
   private static final String BACKUP_ROLE = "backup";
   private static final String DEPLOY_ROLE = "deploy";
   private static final String H2_ROLE = "h2access";
+  private static final Named SHIRO_AFTER_AUTH_FILTER_ANNOTATION = Names.named("shiro_post_filter");
+
+  private Ini ini;
+  private AnnotatedAuroraAdmin auroraAdmin;
+  private Filter shiroAfterAuthFilter;
 
   @Before
   public void setUp() {
@@ -133,6 +147,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
     roles.put(H2_ROLE, H2_PERM);
 
     auroraAdmin = createMock(AnnotatedAuroraAdmin.class);
+    shiroAfterAuthFilter = createMock(Filter.class);
   }
 
   @Override
@@ -140,10 +155,15 @@ public class HttpSecurityIT extends AbstractJettyTest {
     return Modules.combine(
         new ApiModule(),
         new H2ConsoleModule(true),
-        new HttpSecurityModule(new IniShiroRealmModule(ini)),
+        new HttpSecurityModule(
+            new IniShiroRealmModule(ini),
+            Key.get(Filter.class, SHIRO_AFTER_AUTH_FILTER_ANNOTATION)),
         new AbstractModule() {
           @Override
           protected void configure() {
+            bind(Filter.class)
+                .annotatedWith(SHIRO_AFTER_AUTH_FILTER_ANNOTATION)
+                .toInstance(shiroAfterAuthFilter);
             MockDecoratedThrift.bindForwardedMock(binder(), auroraAdmin);
           }
         });
@@ -175,9 +195,25 @@ public class HttpSecurityIT extends AbstractJettyTest {
     return getClient(defaultHttpClient);
   }
 
+  private IExpectationSetters<Object> expectShiroAfterAuthFilter()
+      throws ServletException, IOException {
+
+    shiroAfterAuthFilter.doFilter(
+        isA(HttpServletRequest.class),
+        isA(HttpServletResponse.class),
+        isA(FilterChain.class));
+
+    return expectLastCall().andAnswer(() -> {
+      Object[] args = getCurrentArguments();
+      ((FilterChain) args[2]).doFilter((HttpServletRequest) args[0], (HttpServletResponse) args[1]);
+      return null;
+    });
+  }
+
   @Test
-  public void testReadOnlyScheduler() throws TException {
+  public void testReadOnlyScheduler() throws TException, ServletException, IOException {
     expect(auroraAdmin.getRoleSummary()).andReturn(OK).times(3);
+    expectShiroAfterAuthFilter().times(3);
 
     replayAndStart();
 
@@ -198,7 +234,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
   }
 
   @Test
-  public void testAuroraSchedulerManager() throws TException, IOException {
+  public void testAuroraSchedulerManager() throws TException, ServletException, IOException {
     expect(auroraAdmin.killTasks(null, new Lock().setMessage("1"))).andReturn(OK);
     expect(auroraAdmin.killTasks(null, new Lock().setMessage("2"))).andReturn(OK);
 
@@ -206,12 +242,12 @@ public class HttpSecurityIT extends AbstractJettyTest {
     TaskQuery adsScopedQuery = Query.jobScoped(ADS_STAGING_JOB).get();
     expect(auroraAdmin.killTasks(adsScopedQuery, null)).andReturn(OK);
 
+    expectShiroAfterAuthFilter().times(19);
+
     replayAndStart();
 
-    assertEquals(OK,
-        getAuthenticatedClient(WFARNER).killTasks(null, new Lock().setMessage("1")));
-    assertEquals(OK,
-        getAuthenticatedClient(ROOT).killTasks(null, new Lock().setMessage("2")));
+    assertEquals(OK, getAuthenticatedClient(WFARNER).killTasks(null, new Lock().setMessage("1")));
+    assertEquals(OK, getAuthenticatedClient(ROOT).killTasks(null, new Lock().setMessage("2")));
     assertEquals(
         ResponseCode.INVALID_REQUEST,
         getAuthenticatedClient(UNPRIVILEGED).killTasks(null, null).getResponseCode());
@@ -233,9 +269,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
         getAuthenticatedClient(DEPLOY_SERVICE)
             .killTasks(jobScopedQuery, null)
             .getResponseCode());
-    assertEquals(
-        OK,
-        getAuthenticatedClient(DEPLOY_SERVICE).killTasks(adsScopedQuery, null));
+    assertEquals(OK, getAuthenticatedClient(DEPLOY_SERVICE).killTasks(adsScopedQuery, null));
 
     assertKillTasksFails(getUnauthenticatedClient());
     assertKillTasksFails(getAuthenticatedClient(INCORRECT));
@@ -252,9 +286,10 @@ public class HttpSecurityIT extends AbstractJettyTest {
   }
 
   @Test
-  public void testAuroraAdmin() throws TException {
+  public void testAuroraAdmin() throws TException, ServletException, IOException {
     expect(auroraAdmin.snapshot()).andReturn(OK);
     expect(auroraAdmin.listBackups()).andReturn(OK);
+    expectShiroAfterAuthFilter().times(12);
 
     replayAndStart();
 

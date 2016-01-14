@@ -217,6 +217,14 @@ You might find documentation on the Internet suggesting there are additional sec
 like `[main]` and `[urls]`. These are not supported by Aurora as it uses a different mechanism to configure
 those parts of Shiro. Think of Aurora's `security.ini` as a subset with only `[users]` and `[roles]` sections.
 
+## Implementing Delegated Authorization
+
+It is possible to leverage Shiro's `runAs` feature by implementing a custom Servlet Filter that provides
+the capability and passing it's fully qualified class name to the command line argument
+`-shiro_after_auth_filter`. The filter is registered in the same filter chain as the Shiro auth filters
+and is placed after the Shiro auth filters in the filter chain. This ensures that the Filter is invoked
+after the Shiro filters have had a chance to authenticate the request.
+
 # Implementing a Custom Realm
 
 Since Aurora’s security is backed by [Apache Shiro](https://shiro.apache.org), you can implement a

@@ -9,6 +9,9 @@
     `-enable_cors_for`.
   - `-deduplicate_snapshots` and `-deflate_snapshots`.  These features are good to always enable.
   - `-enable_job_updates` and `-enable_job_creation`
+- Added scheduler command line argument:
+  - `-shiro_after_auth_filter`. Optionally specify a class implementing javax.servlet.Filter
+    that will be included in the Filter chain following the Shiro auth filters.
 - Upgraded the scheduler ZooKeeper client from 3.3.4 to 3.4.6.
 - Added support for jobs to specify arbitrary ZooKeeper paths for service registration.  See
   https://github.com/apache/aurora/blob/master/docs/configuration-reference.md#announcer-objects
