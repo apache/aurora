@@ -19,9 +19,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import org.apache.aurora.common.stats.Stats;
 import org.slf4j.Logger;
 
 import static java.util.Objects.requireNonNull;
@@ -34,6 +36,9 @@ public final class AsyncUtil {
   private AsyncUtil() {
     // Utility class.
   }
+
+  private static final AtomicLong UNCAUGHT_EXCEPTIONS =
+      Stats.exportLong("async_executor_uncaught_exceptions");
 
   /**
    * Creates a {@link ScheduledThreadPoolExecutor} that logs unhandled errors.
@@ -121,10 +126,12 @@ public final class AsyncUtil {
           Thread.currentThread().interrupt();
         } catch (ExecutionException ee) {
           logger.error(ee.toString(), ee);
+          UNCAUGHT_EXCEPTIONS.incrementAndGet();
         }
       }
     } else {
       logger.error(throwable.toString(), throwable);
+      UNCAUGHT_EXCEPTIONS.incrementAndGet();
     }
   }
 }
