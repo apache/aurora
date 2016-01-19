@@ -43,6 +43,27 @@ public class OffersModule extends AbstractModule {
   private static final Arg<Amount<Integer, Time>> OFFER_HOLD_JITTER_WINDOW =
       Arg.create(Amount.of(1, Time.MINUTES));
 
+  interface Params {
+    Amount<Integer, Time> minOfferHoldTime();
+
+    Amount<Integer, Time> offerHoldJitterWindow();
+  }
+  private final Params params;
+
+  public OffersModule() {
+    params = new Params() {
+      @Override
+      public Amount<Integer, Time> minOfferHoldTime() {
+        return MIN_OFFER_HOLD_TIME.get();
+      }
+
+      @Override
+      public Amount<Integer, Time> offerHoldJitterWindow() {
+        return OFFER_HOLD_JITTER_WINDOW.get();
+      }
+    };
+  }
+
   @Override
   protected void configure() {
     install(new PrivateModule() {
@@ -50,8 +71,8 @@ public class OffersModule extends AbstractModule {
       protected void configure() {
         bind(OfferManager.OfferReturnDelay.class).toInstance(
             new RandomJitterReturnDelay(
-                MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS),
-                OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
+                params.minOfferHoldTime().as(Time.MILLISECONDS),
+                params.offerHoldJitterWindow().as(Time.MILLISECONDS),
                 Random.Util.newDefaultRandom()));
         bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
         bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);

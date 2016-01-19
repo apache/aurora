@@ -75,10 +75,25 @@ public final class DbModule extends PrivateModule {
   private static final Arg<Amount<Long, Time>> SLOW_QUERY_LOG_THRESHOLD =
       Arg.create(Amount.of(25L, Time.MILLISECONDS));
 
-  @CmdLine(name = "db_row_gc_interval",
-      help = "Interval on which to scan the database for unused row references.")
-  private static final Arg<Amount<Long, Time>> DB_ROW_GC_INTERVAL =
-      Arg.create(Amount.of(2L, Time.HOURS));
+  interface Params {
+    boolean useBetaDbTaskStore();
+
+    Amount<Long, Time> slowQueryLogThreshold();
+  }
+
+  private static Params paramsFromCommandLine() {
+    return new Params() {
+      @Override
+      public boolean useBetaDbTaskStore() {
+        return USE_DB_TASK_STORE.get();
+      }
+
+      @Override
+      public Amount<Long, Time> slowQueryLogThreshold() {
+        return SLOW_QUERY_LOG_THRESHOLD.get();
+      }
+    };
+  }
 
   private static final Set<Class<?>> MAPPER_CLASSES = ImmutableSet.<Class<?>>builder()
       .add(AttributeMapper.class)
@@ -192,7 +207,7 @@ public final class DbModule extends PrivateModule {
   }
 
   private static Module getTaskStoreModule(KeyFactory keyFactory) {
-    return USE_DB_TASK_STORE.get()
+    return paramsFromCommandLine().useBetaDbTaskStore()
         ? new TaskStoreModule(keyFactory)
         : new InMemStoresModule(keyFactory);
   }
@@ -228,7 +243,8 @@ public final class DbModule extends PrivateModule {
 
         addTypeHandlersClasses(TypeHandlers.getAll());
 
-        bind(new TypeLiteral<Amount<Long, Time>>() { }).toInstance(SLOW_QUERY_LOG_THRESHOLD.get());
+        bind(new TypeLiteral<Amount<Long, Time>>() { })
+            .toInstance(paramsFromCommandLine().slowQueryLogThreshold());
 
         // Exposed for unit tests.
         bind(TaskConfigManager.class);
@@ -295,6 +311,26 @@ public final class DbModule extends PrivateModule {
    * Module that sets up a periodic database garbage-collection routine.
    */
   public static class GarbageCollectorModule extends AbstractModule {
+    @CmdLine(name = "db_row_gc_interval",
+        help = "Interval on which to scan the database for unused row references.")
+    private static final Arg<Amount<Long, Time>> DB_ROW_GC_INTERVAL =
+        Arg.create(Amount.of(2L, Time.HOURS));
+
+    interface Params {
+      Amount<Long, Time> dbRowGcInterval();
+    }
+
+    private final Params params;
+
+    public GarbageCollectorModule() {
+      this.params = new Params() {
+        @Override
+        public Amount<Long, Time> dbRowGcInterval() {
+          return DB_ROW_GC_INTERVAL.get();
+        }
+      };
+    }
+
     @Override
     protected void configure() {
       install(new PrivateModule() {
@@ -304,8 +340,8 @@ public final class DbModule extends PrivateModule {
           bind(AbstractScheduledService.Scheduler.class).toInstance(
               AbstractScheduledService.Scheduler.newFixedRateSchedule(
                   0L,
-                  DB_ROW_GC_INTERVAL.get().getValue(),
-                  DB_ROW_GC_INTERVAL.get().getUnit().getTimeUnit()));
+                  params.dbRowGcInterval().getValue(),
+                  params.dbRowGcInterval().getUnit().getTimeUnit()));
           expose(RowGarbageCollector.class);
         }
       });

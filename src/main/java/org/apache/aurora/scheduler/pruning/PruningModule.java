@@ -66,6 +66,56 @@ public class PruningModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> JOB_UPDATE_HISTORY_PRUNING_THRESHOLD =
       Arg.create(Amount.of(30L, Time.DAYS));
 
+  interface Params {
+    Amount<Long, Time> historyPruneThreshold();
+
+    int historyMaxPerJobThreshold();
+
+    Amount<Long, Time> historyMinRetentionThreshold();
+
+    int jobUpdateHistoryPerJobThreshold();
+
+    Amount<Long, Time> jobUpdateHistoryPruningInterval();
+
+    Amount<Long, Time> jobUpdateHistoryPruningThreshold();
+  }
+
+  private final Params params;
+
+  public PruningModule() {
+    this.params = new Params() {
+      @Override
+      public Amount<Long, Time> historyPruneThreshold() {
+        return HISTORY_PRUNE_THRESHOLD.get();
+      }
+
+      @Override
+      public int historyMaxPerJobThreshold() {
+        return HISTORY_MAX_PER_JOB_THRESHOLD.get();
+      }
+
+      @Override
+      public Amount<Long, Time> historyMinRetentionThreshold() {
+        return HISTORY_MIN_RETENTION_THRESHOLD.get();
+      }
+
+      @Override
+      public int jobUpdateHistoryPerJobThreshold() {
+        return JOB_UPDATE_HISTORY_PER_JOB_THRESHOLD.get();
+      }
+
+      @Override
+      public Amount<Long, Time> jobUpdateHistoryPruningInterval() {
+        return JOB_UPDATE_HISTORY_PRUNING_INTERVAL.get();
+      }
+
+      @Override
+      public Amount<Long, Time> jobUpdateHistoryPruningThreshold() {
+        return JOB_UPDATE_HISTORY_PRUNING_THRESHOLD.get();
+      }
+    };
+  }
+
   @Override
   protected void configure() {
     install(new PrivateModule() {
@@ -74,10 +124,9 @@ public class PruningModule extends AbstractModule {
         // TODO(ksweeney): Create a configuration validator module so this can be injected.
         // TODO(William Farner): Revert this once large task counts is cheap ala hierarchichal store
         bind(HistoryPrunnerSettings.class).toInstance(new HistoryPrunnerSettings(
-            HISTORY_PRUNE_THRESHOLD.get(),
-            HISTORY_MIN_RETENTION_THRESHOLD.get(),
-            HISTORY_MAX_PER_JOB_THRESHOLD.get()
-        ));
+            params.historyPruneThreshold(),
+            params.historyMinRetentionThreshold(),
+            params.historyMaxPerJobThreshold()));
 
         bind(TaskHistoryPruner.class).in(Singleton.class);
         expose(TaskHistoryPruner.class);
@@ -90,9 +139,9 @@ public class PruningModule extends AbstractModule {
       protected void configure() {
         bind(JobUpdateHistoryPruner.HistoryPrunerSettings.class).toInstance(
             new JobUpdateHistoryPruner.HistoryPrunerSettings(
-                JOB_UPDATE_HISTORY_PRUNING_INTERVAL.get(),
-                JOB_UPDATE_HISTORY_PRUNING_THRESHOLD.get(),
-                JOB_UPDATE_HISTORY_PER_JOB_THRESHOLD.get()));
+                params.jobUpdateHistoryPruningInterval(),
+                params.jobUpdateHistoryPruningThreshold(),
+                params.jobUpdateHistoryPerJobThreshold()));
 
         bind(ScheduledExecutorService.class).toInstance(
             AsyncUtil.singleThreadLoggingScheduledExecutor("JobUpdatePruner-%d", LOG));

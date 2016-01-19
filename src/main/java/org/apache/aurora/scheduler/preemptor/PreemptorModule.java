@@ -59,23 +59,49 @@ public class PreemptorModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> PREEMPTION_SLOT_SEARCH_INTERVAL =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
-  private final boolean enablePreemptor;
-  private final Amount<Long, Time> preemptionDelay;
-  private final Amount<Long, Time> slotSearchInterval;
+  public interface Params {
+    default boolean enablePreemptor() {
+      return true;
+    }
+
+    Amount<Long, Time> preemptionDelay();
+
+    default Amount<Long, Time> preemptionSlotHoldTime() {
+      return Amount.of(5L, Time.MINUTES);
+    }
+
+    Amount<Long, Time> preemptionSlotSearchInterval();
+  }
+
+  private final Params params;
 
   @VisibleForTesting
-  public PreemptorModule(
-      boolean enablePreemptor,
-      Amount<Long, Time> preemptionDelay,
-      Amount<Long, Time> slotSearchInterval) {
-
-    this.enablePreemptor = enablePreemptor;
-    this.preemptionDelay = requireNonNull(preemptionDelay);
-    this.slotSearchInterval = requireNonNull(slotSearchInterval);
+  public PreemptorModule(Params params) {
+    this.params = requireNonNull(params);
   }
 
   public PreemptorModule() {
-    this(ENABLE_PREEMPTOR.get(), PREEMPTION_DELAY.get(), PREEMPTION_SLOT_SEARCH_INTERVAL.get());
+    this(new Params() {
+      @Override
+      public boolean enablePreemptor() {
+        return ENABLE_PREEMPTOR.get();
+      }
+
+      @Override
+      public Amount<Long, Time> preemptionDelay() {
+        return PREEMPTION_DELAY.get();
+      }
+
+      @Override
+      public Amount<Long, Time> preemptionSlotHoldTime() {
+        return PREEMPTION_SLOT_HOLD_TIME.get();
+      }
+
+      @Override
+      public Amount<Long, Time> preemptionSlotSearchInterval() {
+        return PREEMPTION_SLOT_SEARCH_INTERVAL.get();
+      }
+    });
   }
 
   @Override
@@ -83,7 +109,7 @@ public class PreemptorModule extends AbstractModule {
     install(new PrivateModule() {
       @Override
       protected void configure() {
-        if (enablePreemptor) {
+        if (params.enablePreemptor()) {
           LOG.info("Preemptor Enabled.");
           bind(PreemptorMetrics.class).in(Singleton.class);
           bind(PreemptionVictimFilter.class)
@@ -93,9 +119,9 @@ public class PreemptorModule extends AbstractModule {
           bind(Preemptor.PreemptorImpl.class).in(Singleton.class);
           bind(new TypeLiteral<Amount<Long, Time>>() { })
               .annotatedWith(PendingTaskProcessor.PreemptionDelay.class)
-              .toInstance(preemptionDelay);
+              .toInstance(params.preemptionDelay());
           bind(BiCacheSettings.class).toInstance(
-              new BiCacheSettings(PREEMPTION_SLOT_HOLD_TIME.get(), "preemption_slot_cache_size"));
+              new BiCacheSettings(params.preemptionSlotHoldTime(), "preemption_slot_cache_size"));
           bind(new TypeLiteral<BiCache<PreemptionProposal, TaskGroupKey>>() { })
               .in(Singleton.class);
           bind(PendingTaskProcessor.class).in(Singleton.class);
@@ -107,8 +133,8 @@ public class PreemptorModule extends AbstractModule {
           bind(AbstractScheduledService.Scheduler.class).toInstance(
               AbstractScheduledService.Scheduler.newFixedRateSchedule(
                   0L,
-                  slotSearchInterval.getValue(),
-                  slotSearchInterval.getUnit().getTimeUnit()));
+                  params.preemptionSlotSearchInterval().getValue(),
+                  params.preemptionSlotSearchInterval().getUnit().getTimeUnit()));
 
           expose(PreemptorService.class);
           expose(PendingTaskProcessor.class);
@@ -124,9 +150,8 @@ public class PreemptorModule extends AbstractModule {
     // and private modules due to multiple injectors.  We accept the added complexity here to keep
     // the other bindings private.
     PubsubEventModule.bindSubscriber(binder(), ClusterStateImpl.class);
-    if (enablePreemptor) {
-      SchedulerServicesModule.addSchedulerActiveServiceBinding(binder())
-          .to(PreemptorService.class);
+    if (params.enablePreemptor()) {
+      SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(PreemptorService.class);
     }
   }
 

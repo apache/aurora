@@ -52,7 +52,19 @@ public final class FlaggedClientConfig {
 
   @CmdLine(name = "zk_digest_credentials",
            help = "user:password to use when authenticating with ZooKeeper.")
-  private static final Arg<String> DIGEST_CREDENTIALS = Arg.create();
+  private static final Arg<String> DIGEST_CREDENTIALS = Arg.create(null);
+
+  interface Params {
+    boolean zkInProc();
+
+    List<InetSocketAddress> zkEndpoints();
+
+    Optional<String> zkChrootPath();
+
+    Amount<Integer, Time> zkSessionTimeout();
+
+    Optional<String> zkDigestCredentials();
+  }
 
   private FlaggedClientConfig() {
     // Utility class.
@@ -64,15 +76,41 @@ public final class FlaggedClientConfig {
    * @return Configuration instance.
    */
   public static ClientConfig create() {
+    Params params = new Params() {
+      @Override
+      public boolean zkInProc() {
+        return IN_PROCESS.get();
+      }
+
+      @Override
+      public List<InetSocketAddress> zkEndpoints() {
+        return ZK_ENDPOINTS.get();
+      }
+
+      @Override
+      public Optional<String> zkChrootPath() {
+        return Optional.fromNullable(CHROOT_PATH.get());
+      }
+
+      @Override
+      public Amount<Integer, Time> zkSessionTimeout() {
+        return SESSION_TIMEOUT.get();
+      }
+
+      @Override
+      public Optional<String> zkDigestCredentials() {
+        return Optional.fromNullable(DIGEST_CREDENTIALS.get());
+      }
+    };
+
     return new ClientConfig(
-        ZK_ENDPOINTS.get(),
-        Optional.fromNullable(CHROOT_PATH.get()),
-        IN_PROCESS.get(),
-        SESSION_TIMEOUT.get(),
-        DIGEST_CREDENTIALS.hasAppliedValue()
-            ? getCredentials(DIGEST_CREDENTIALS.get())
-            : Credentials.NONE
-    );
+        params.zkEndpoints(),
+        params.zkChrootPath(),
+        params.zkInProc(),
+        params.zkSessionTimeout(),
+        params.zkDigestCredentials()
+            .transform(FlaggedClientConfig::getCredentials)
+            .or(Credentials.NONE));
   }
 
   private static Credentials getCredentials(String userAndPass) {

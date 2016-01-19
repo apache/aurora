@@ -45,6 +45,28 @@ public class StatsModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> RETENTION_PERIOD =
       Arg.create(Amount.of(1L, Time.HOURS));
 
+  interface Params {
+    Amount<Long, Time> statSamplingInterval();
+
+    Amount<Long, Time> statRetentionPeriod();
+  }
+
+  private final Params params;
+
+  public StatsModule() {
+    this.params = new Params() {
+      @Override
+      public Amount<Long, Time> statSamplingInterval() {
+        return SAMPLING_INTERVAL.get();
+      }
+
+      @Override
+      public Amount<Long, Time> statRetentionPeriod() {
+        return RETENTION_PERIOD.get();
+      }
+    };
+  }
+
   @Override
   protected void configure() {
     requireBinding(ShutdownRegistry.class);
@@ -53,10 +75,10 @@ public class StatsModule extends AbstractModule {
     bind(StatRegistry.class).toInstance(Stats.STAT_REGISTRY);
     bind(new TypeLiteral<Amount<Long, Time>>() { })
         .annotatedWith(Names.named(TimeSeriesRepositoryImpl.SAMPLE_RETENTION_PERIOD))
-        .toInstance(RETENTION_PERIOD.get());
+        .toInstance(params.statRetentionPeriod());
     bind(new TypeLiteral<Amount<Long, Time>>() { })
         .annotatedWith(Names.named(TimeSeriesRepositoryImpl.SAMPLE_PERIOD))
-        .toInstance(SAMPLING_INTERVAL.get());
+        .toInstance(params.statSamplingInterval());
     bind(TimeSeriesRepository.class).to(TimeSeriesRepositoryImpl.class);
     bind(TimeSeriesRepositoryImpl.class).in(Singleton.class);
 

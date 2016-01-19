@@ -39,10 +39,23 @@ public class IniShiroRealmModule extends AbstractModule {
       help = "Path to shiro.ini for authentication and authorization configuration.")
   private static final Arg<Ini> SHIRO_INI_PATH = Arg.create(null);
 
+  interface Params {
+    Optional<Ini> shiroIniPath();
+  }
+
   private final Optional<Ini> ini;
 
   public IniShiroRealmModule() {
-    this(Optional.fromNullable(SHIRO_INI_PATH.get()));
+    this(new Params() {
+      @Override
+      public Optional<Ini> shiroIniPath() {
+        return Optional.fromNullable(SHIRO_INI_PATH.get());
+      }
+    });
+  }
+
+  public IniShiroRealmModule(Params params) {
+    this(params.shiroIniPath());
   }
 
   @VisibleForTesting

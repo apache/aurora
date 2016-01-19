@@ -114,6 +114,16 @@ public class JettyServerModule extends AbstractModule {
       help = "The port to start an HTTP server on.  Default value will choose a random port.")
   protected static final Arg<Integer> HTTP_PORT = Arg.create(0);
 
+  public interface Params {
+    default Optional<String> hostname() {
+      return Optional.absent();
+    }
+
+    default int httpPort() {
+      return 0;
+    }
+  }
+
   public static final Map<String, String> GUICE_CONTAINER_PARAMS = ImmutableMap.of(
       FEATURE_POJO_MAPPING, Boolean.TRUE.toString(),
       PROPERTY_CONTAINER_REQUEST_FILTERS, GZIPContentEncodingFilter.class.getName(),
@@ -124,14 +134,30 @@ public class JettyServerModule extends AbstractModule {
       .toString()
       .replace("assets/index.html", "");
 
+  private final Params params;
   private final boolean production;
 
   public JettyServerModule() {
-    this(true);
+    this(new Params() {
+      @Override
+      public Optional<String> hostname() {
+        return Optional.fromNullable(HOSTNAME_OVERRIDE.get());
+      }
+
+      @Override
+      public int httpPort() {
+        return HTTP_PORT.get();
+      }
+    });
+  }
+
+  public JettyServerModule(Params params) {
+    this(params, true);
   }
 
   @VisibleForTesting
-  JettyServerModule(boolean production) {
+  JettyServerModule(Params params, boolean production) {
+    this.params = requireNonNull(params);
     this.production = production;
   }
 
@@ -148,10 +174,9 @@ public class JettyServerModule extends AbstractModule {
         .annotatedWith(Names.named(HealthHandler.HEALTH_CHECKER_KEY))
         .toInstance(Suppliers.ofInstance(true));
 
-    final Optional<String> hostnameOverride = Optional.fromNullable(HOSTNAME_OVERRIDE.get());
-    if (hostnameOverride.isPresent()) {
+    if (params.hostname().isPresent()) {
       try {
-        InetAddress.getByName(hostnameOverride.get());
+        InetAddress.getByName(params.hostname().get());
       } catch (UnknownHostException e) {
         /* Possible misconfiguration, so warn the user. */
         LOG.warn("Unable to resolve name specified in -hostname. "
@@ -161,7 +186,7 @@ public class JettyServerModule extends AbstractModule {
     install(new PrivateModule() {
       @Override
       protected void configure() {
-        bind(new TypeLiteral<Optional<String>>() { }).toInstance(hostnameOverride);
+        bind(Params.class).toInstance(params);
         bind(HttpService.class).to(HttpServerLauncher.class);
         bind(HttpServerLauncher.class).in(Singleton.class);
         expose(HttpServerLauncher.class);
@@ -301,18 +326,18 @@ public class JettyServerModule extends AbstractModule {
   }
 
   public static final class HttpServerLauncher extends AbstractIdleService implements HttpService {
+    private final Params params;
     private final ServletContextListener servletContextListener;
-    private final Optional<String> advertisedHostOverride;
     private volatile Server server;
     private volatile HostAndPort serverAddress = null;
 
     @Inject
     HttpServerLauncher(
-        ServletContextListener servletContextListener,
-        Optional<String> advertisedHostOverride) {
+        Params params,
+        ServletContextListener servletContextListener) {
 
+      this.params = requireNonNull(params);
       this.servletContextListener = requireNonNull(servletContextListener);
-      this.advertisedHostOverride = requireNonNull(advertisedHostOverride);
     }
 
     private static final Map<String, String> REGEX_REWRITE_RULES =
@@ -352,7 +377,7 @@ public class JettyServerModule extends AbstractModule {
     public HostAndPort getAddress() {
       Preconditions.checkState(state() == State.RUNNING);
       return HostAndPort.fromParts(
-          advertisedHostOverride.or(serverAddress.getHostText()),
+          params.hostname().or(serverAddress.getHostText()),
           serverAddress.getPort());
     }
 
@@ -375,7 +400,7 @@ public class JettyServerModule extends AbstractModule {
       rootHandler.addHandler(servletHandler);
 
       ServerConnector connector = new ServerConnector(server);
-      connector.setPort(HTTP_PORT.get());
+      connector.setPort(params.httpPort());
       server.addConnector(connector);
       server.setHandler(getGzipHandler(getRewriteHandler(rootHandler)));
 

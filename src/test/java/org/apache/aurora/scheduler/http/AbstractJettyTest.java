@@ -135,7 +135,7 @@ public abstract class AbstractJettyTest extends EasyMockTest {
             });
           }
         },
-        new JettyServerModule(false));
+        new JettyServerModule(new JettyServerModule.Params() { }, false));
     schedulerWatcher = createCapture();
     expect(schedulers.watch(capture(schedulerWatcher))).andReturn(createMock(Command.class));
   }

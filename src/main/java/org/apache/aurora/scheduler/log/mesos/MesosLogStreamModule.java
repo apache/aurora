@@ -15,14 +15,14 @@ package org.apache.aurora.scheduler.log.mesos;
 
 import java.io.File;
 import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.inject.Singleton;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.Iterables;
+import com.google.common.collect.FluentIterable;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
@@ -39,6 +39,8 @@ import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
 import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import org.apache.mesos.Log;
 import org.apache.zookeeper.common.PathUtils;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Binds a native mesos Log implementation.
@@ -93,38 +95,87 @@ public class MesosLogStreamModule extends PrivateModule {
   private static final Arg<Amount<Long, Time>> WRITE_TIMEOUT =
       Arg.create(Amount.of(3L, Time.SECONDS));
 
-  private static <T> T getRequiredArg(Arg<T> arg, String name) {
-    if (!arg.hasAppliedValue()) {
+  private static void requireParam(Optional<?> arg, String name) {
+    if (!arg.isPresent()) {
       throw new IllegalStateException(
           String.format("A value for the -%s flag must be supplied", name));
     }
-    return arg.get();
   }
 
+  interface Params {
+    int nativeLogQuorumSize();
+
+    Optional<File> nativeLogFilePath();
+
+    Optional<String> nativeLogZkGroupPath();
+
+    Amount<Long, Time> nativeLogElectionTimeout();
+
+    int nativeLogElectionRetries();
+
+    Amount<Long, Time> nativeLogReadTimeout();
+
+    Amount<Long, Time> nativeLogWriteTimeout();
+  }
+
+  private final Params params;
   private final ClientConfig zkClientConfig;
-  private final File logPath;
-  private final String zkLogGroupPath;
 
   public MesosLogStreamModule(ClientConfig zkClientConfig) {
-    this(zkClientConfig,
-        getRequiredArg(LOG_PATH, "native_log_file_path"),
-        getRequiredArg(ZK_LOG_GROUP_PATH, "native_log_zk_group_path"));
+    this(
+        new Params() {
+          @Override
+          public int nativeLogQuorumSize() {
+            return QUORUM_SIZE.get();
+          }
+
+          @Override
+          public Optional<File> nativeLogFilePath() {
+            return Optional.ofNullable(LOG_PATH.get());
+          }
+
+          @Override
+          public Optional<String> nativeLogZkGroupPath() {
+            return Optional.ofNullable(ZK_LOG_GROUP_PATH.get());
+          }
+
+          @Override
+          public Amount<Long, Time> nativeLogElectionTimeout() {
+            return COORDINATOR_ELECTION_TIMEOUT.get();
+          }
+
+          @Override
+          public int nativeLogElectionRetries() {
+            return COORDINATOR_ELECTION_RETRIES.get();
+          }
+
+          @Override
+          public Amount<Long, Time> nativeLogReadTimeout() {
+            return READ_TIMEOUT.get();
+          }
+
+          @Override
+          public Amount<Long, Time> nativeLogWriteTimeout() {
+            return WRITE_TIMEOUT.get();
+          }
+        },
+        zkClientConfig);
   }
 
-  public MesosLogStreamModule(ClientConfig zkClientConfig, File logPath, String zkLogGroupPath) {
-    this.zkClientConfig = Objects.requireNonNull(zkClientConfig);
-    this.logPath = Objects.requireNonNull(logPath);
-
-    PathUtils.validatePath(zkLogGroupPath); // This checks for null.
-    this.zkLogGroupPath = zkLogGroupPath;
+  public MesosLogStreamModule(Params params, ClientConfig zkClientConfig) {
+    requireParam(params.nativeLogFilePath(), "native_log_file_path");
+    requireParam(params.nativeLogZkGroupPath(), "native_log_zk_group_path");
+    PathUtils.validatePath(params.nativeLogZkGroupPath().get());
+    this.params = requireNonNull(params);
+    this.zkClientConfig = requireNonNull(zkClientConfig);
   }
 
   @Override
   protected void configure() {
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.ReadTimeout.class)
-        .toInstance(READ_TIMEOUT.get());
+        .toInstance(params.nativeLogReadTimeout());
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.WriteTimeout.class)
-        .toInstance(WRITE_TIMEOUT.get());
+        .toInstance(params.nativeLogWriteTimeout());
 
     bind(org.apache.aurora.scheduler.log.Log.class).to(MesosLog.class);
     bind(MesosLog.class).in(Singleton.class);
@@ -134,21 +185,23 @@ public class MesosLogStreamModule extends PrivateModule {
   @Provides
   @Singleton
   Log provideLog() {
+    File logPath = params.nativeLogFilePath().get();
     File parentDir = logPath.getParentFile();
     if (!parentDir.exists() && !parentDir.mkdirs()) {
       addError("Failed to create parent directory to store native log at: %s", parentDir);
     }
 
-    String zkConnectString = Joiner.on(',').join(
-        Iterables.transform(zkClientConfig.servers, InetSocketAddressHelper::toString));
+    String zkConnectString = FluentIterable.from(zkClientConfig.servers)
+        .transform(InetSocketAddressHelper::toString)
+        .join(Joiner.on(','));
 
     return new Log(
-        QUORUM_SIZE.get(),
+        params.nativeLogQuorumSize(),
         logPath.getAbsolutePath(),
         zkConnectString,
         zkClientConfig.sessionTimeout.getValue(),
         zkClientConfig.sessionTimeout.getUnit().getTimeUnit(),
-        zkLogGroupPath,
+        params.nativeLogZkGroupPath().get(),
         zkClientConfig.credentials.scheme(),
         zkClientConfig.credentials.authToken());
   }
@@ -160,9 +213,12 @@ public class MesosLogStreamModule extends PrivateModule {
 
   @Provides
   Log.Writer provideWriter(Log log) {
-    Amount<Long, Time> electionTimeout = COORDINATOR_ELECTION_TIMEOUT.get();
-    return new Log.Writer(log, electionTimeout.getValue(), electionTimeout.getUnit().getTimeUnit(),
-        COORDINATOR_ELECTION_RETRIES.get());
+    Amount<Long, Time> electionTimeout = params.nativeLogElectionTimeout();
+    return new Log.Writer(
+        log,
+        electionTimeout.getValue(),
+        electionTimeout.getUnit().getTimeUnit(),
+        params.nativeLogElectionRetries());
   }
 
   @Provides

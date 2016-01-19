@@ -41,9 +41,20 @@ public final class InMemStoresModule extends PrivateModule {
   private static final Arg<Amount<Long, Time>> SLOW_QUERY_LOG_THRESHOLD =
       Arg.create(Amount.of(25L, Time.MILLISECONDS));
 
+  interface Params {
+    Amount<Long, Time> slowQueryLogThreshold();
+  }
+
+  private final Params params;
   private final KeyFactory keyFactory;
 
   public InMemStoresModule(KeyFactory keyFactory) {
+    this.params = new Params() {
+      @Override
+      public Amount<Long, Time> slowQueryLogThreshold() {
+        return SLOW_QUERY_LOG_THRESHOLD.get();
+      }
+    };
     this.keyFactory = requireNonNull(keyFactory);
   }
 
@@ -58,7 +69,7 @@ public final class InMemStoresModule extends PrivateModule {
   @Override
   protected void configure() {
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(SlowQueryThreshold.class)
-        .toInstance(SLOW_QUERY_LOG_THRESHOLD.get());
+        .toInstance(params.slowQueryLogThreshold());
     bindStore(TaskStore.Mutable.class, MemTaskStore.class);
     expose(TaskStore.Mutable.class);
     bindStore(CronJobStore.Mutable.class, MemCronJobStore.class);

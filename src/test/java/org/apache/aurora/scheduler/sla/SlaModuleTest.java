@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.sla;
 
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -34,6 +35,7 @@ import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory;
 import org.apache.aurora.scheduler.sla.SlaModule.SlaUpdater;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -63,9 +65,22 @@ public class SlaModuleTest extends EasyMockTest {
     clock = new FakeClock();
     statsProvider = createMock(StatsProvider.class);
     module = new SlaModule(
-        Amount.of(5L, Time.MILLISECONDS),
-        ImmutableSet.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME),
-        ImmutableSet.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME));
+        new SlaModule.Params() {
+          @Override
+          public Amount<Long, Time> slaStatRefreshInterval() {
+            return Amount.of(5L, Time.MILLISECONDS);
+          }
+
+          @Override
+          public Set<MetricCategory> slaProdMetrics() {
+            return ImmutableSet.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME);
+          }
+
+          @Override
+          public Set<MetricCategory> slaNonProdMetrics() {
+            return slaProdMetrics();
+          }
+        });
     injector = Guice.createInjector(
         ImmutableList.<Module>builder()
             .add(module)

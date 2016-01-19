@@ -88,6 +88,56 @@ public class ReconciliationModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> RECONCILIATION_SCHEDULE_SPREAD =
       Arg.create(Amount.of(30L, Time.MINUTES));
 
+  interface Params {
+    Amount<Long, Time> transientTaskStateTimeout();
+
+    Amount<Long, Time> initialTaskKillRetryInterval();
+
+    Amount<Long, Time> reconciliationInitialDelay();
+
+    Amount<Long, Time> reconciliationExplicitInterval();
+
+    Amount<Long, Time> reconciliationImplicitInterval();
+
+    Amount<Long, Time> reconciliationScheduleSpread();
+  }
+
+  private final Params params;
+
+  public ReconciliationModule() {
+    this.params = new Params() {
+      @Override
+      public Amount<Long, Time> transientTaskStateTimeout() {
+        return TRANSIENT_TASK_STATE_TIMEOUT.get();
+      }
+
+      @Override
+      public Amount<Long, Time> initialTaskKillRetryInterval() {
+        return INITIAL_TASK_KILL_RETRY_INTERVAL.get();
+      }
+
+      @Override
+      public Amount<Long, Time> reconciliationInitialDelay() {
+        return RECONCILIATION_INITIAL_DELAY.get();
+      }
+
+      @Override
+      public Amount<Long, Time> reconciliationExplicitInterval() {
+        return RECONCILIATION_EXPLICIT_INTERVAL.get();
+      }
+
+      @Override
+      public Amount<Long, Time> reconciliationImplicitInterval() {
+        return RECONCILIATION_IMPLICIT_INTERVAL.get();
+      }
+
+      @Override
+      public Amount<Long, Time> reconciliationScheduleSpread() {
+        return RECONCILIATION_SCHEDULE_SPREAD.get();
+      }
+    };
+  }
+
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   @interface BackgroundWorker { }
@@ -98,7 +148,7 @@ public class ReconciliationModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(new TypeLiteral<Amount<Long, Time>>() { })
-            .toInstance(TRANSIENT_TASK_STATE_TIMEOUT.get());
+            .toInstance(params.transientTaskStateTimeout());
 
         bind(TaskTimeout.class).in(Singleton.class);
         expose(TaskTimeout.class);
@@ -112,8 +162,8 @@ public class ReconciliationModule extends AbstractModule {
       protected void configure() {
         bind(BackoffStrategy.class).toInstance(
             new TruncatedBinaryBackoff(
-                INITIAL_TASK_KILL_RETRY_INTERVAL.get(),
-                TRANSIENT_TASK_STATE_TIMEOUT.get()));
+                params.initialTaskKillRetryInterval(),
+                params.transientTaskStateTimeout()));
         bind(KillRetry.class).in(Singleton.class);
         expose(KillRetry.class);
       }
@@ -124,10 +174,10 @@ public class ReconciliationModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(TaskReconcilerSettings.class).toInstance(new TaskReconcilerSettings(
-            RECONCILIATION_INITIAL_DELAY.get(),
-            RECONCILIATION_EXPLICIT_INTERVAL.get(),
-            RECONCILIATION_IMPLICIT_INTERVAL.get(),
-            RECONCILIATION_SCHEDULE_SPREAD.get()));
+            params.reconciliationInitialDelay(),
+            params.reconciliationExplicitInterval(),
+            params.reconciliationImplicitInterval(),
+            params.reconciliationScheduleSpread()));
         bind(ScheduledExecutorService.class).annotatedWith(BackgroundWorker.class)
             .toInstance(AsyncUtil.loggingScheduledExecutor(1, "TaskReconciler-%d", LOG));
         bind(TaskReconciler.class).in(Singleton.class);

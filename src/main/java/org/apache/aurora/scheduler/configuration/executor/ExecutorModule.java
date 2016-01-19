@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.configuration.executor;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
@@ -96,32 +95,96 @@ public class ExecutorModule extends AbstractModule {
           + "into all (non-mesos) containers.")
   private static final Arg<List<Volume>> GLOBAL_CONTAINER_MOUNTS = Arg.create(ImmutableList.of());
 
-  private static CommandInfo makeExecutorCommand() {
+  public interface Params {
+    Optional<File> customExecutorConfig();
+
+    String thermosExecutorPath();
+
+    List<String> thermosExecutorResources();
+
+    Optional<String> thermosExecutorFlags();
+
+    String thermosObserverRoot();
+
+    double executorOverheadCpus();
+
+    Amount<Long, Data> executorOverheadRam();
+
+    List<Volume> globalContainerMounts();
+  }
+
+  private final Params params;
+
+  public ExecutorModule() {
+    this.params = new Params() {
+      @Override
+      public Optional<File> customExecutorConfig() {
+        return Optional.ofNullable(CUSTOM_EXECUTOR_CONFIG.get());
+      }
+
+      @Override
+      public String thermosExecutorPath() {
+        return THERMOS_EXECUTOR_PATH.get();
+      }
+
+      @Override
+      public List<String> thermosExecutorResources() {
+        return THERMOS_EXECUTOR_RESOURCES.get();
+      }
+
+      @Override
+      public Optional<String> thermosExecutorFlags() {
+        return Optional.ofNullable(THERMOS_EXECUTOR_FLAGS.get());
+      }
+
+      @Override
+      public String thermosObserverRoot() {
+        return THERMOS_OBSERVER_ROOT.get();
+      }
+
+      @Override
+      public double executorOverheadCpus() {
+        return EXECUTOR_OVERHEAD_CPUS.get();
+      }
+
+      @Override
+      public Amount<Long, Data> executorOverheadRam() {
+        return EXECUTOR_OVERHEAD_RAM.get();
+      }
+
+      @Override
+      public List<Volume> globalContainerMounts() {
+        return GLOBAL_CONTAINER_MOUNTS.get();
+      }
+    };
+  }
+
+  private CommandInfo makeExecutorCommand() {
     Stream<String> resourcesToFetch = Stream.concat(
-        ImmutableList.of(THERMOS_EXECUTOR_PATH.get()).stream(),
-        THERMOS_EXECUTOR_RESOURCES.get().stream());
+        ImmutableList.of(params.thermosExecutorPath()).stream(),
+        params.thermosExecutorResources().stream());
 
     return CommandInfo.newBuilder()
         // Default to the value of $MESOS_SANDBOX if present.  This is necessary for docker tasks,
         // in which case the mesos agent is responsible for setting $MESOS_SANDBOX.
-        .setValue("${MESOS_SANDBOX=.}/" + uriBasename(THERMOS_EXECUTOR_PATH.get())
-            + " " + Optional.ofNullable(THERMOS_EXECUTOR_FLAGS.get()).orElse(""))
+        .setValue("${MESOS_SANDBOX=.}/" + uriBasename(params.thermosExecutorPath())
+            + " " + params.thermosExecutorFlags().orElse(""))
         .addAllUris(resourcesToFetch
             .map(r -> URI.newBuilder().setValue(r).setExecutable(true).build())
             .collect(GuavaUtils.toImmutableList()))
         .build();
   }
 
-  private static ExecutorSettings makeThermosExecutorSettings()  {
+  private ExecutorSettings makeThermosExecutorSettings()  {
     List<Protos.Volume> volumeMounts =
         ImmutableList.<Protos.Volume>builder()
             .add(Protos.Volume.newBuilder()
-                .setHostPath(THERMOS_OBSERVER_ROOT.get())
-                .setContainerPath(THERMOS_OBSERVER_ROOT.get())
+                .setHostPath(params.thermosObserverRoot())
+                .setContainerPath(params.thermosObserverRoot())
                 .setMode(Protos.Volume.Mode.RW)
                 .build())
             .addAll(Iterables.transform(
-                GLOBAL_CONTAINER_MOUNTS.get(),
+                params.globalContainerMounts(),
                 v -> Protos.Volume.newBuilder()
                     .setHostPath(v.getHostPath())
                     .setContainerPath(v.getContainerPath())
@@ -136,20 +199,16 @@ public class ExecutorModule extends AbstractModule {
                 // Necessary as executorId is a required field.
                 .setExecutorId(Executors.PLACEHOLDER_EXECUTOR_ID)
                 .setCommand(makeExecutorCommand())
-                .addResources(makeResource(CPUS, EXECUTOR_OVERHEAD_CPUS.get()))
-                .addResources(makeResource(RAM_MB, EXECUTOR_OVERHEAD_RAM.get().as(Data.MB)))
+                .addResources(makeResource(CPUS, params.executorOverheadCpus()))
+                .addResources(makeResource(RAM_MB, params.executorOverheadRam().as(Data.MB)))
                 .build(),
             volumeMounts));
   }
 
-  private static ExecutorSettings makeCustomExecutorSettings() {
+  private ExecutorSettings makeCustomExecutorSettings(File configFile) {
     try {
-      return
-          new ExecutorSettings(
-              ExecutorSettingsLoader.read(
-                  Files.newBufferedReader(
-                      CUSTOM_EXECUTOR_CONFIG.get().toPath(),
-                      StandardCharsets.UTF_8)));
+      return new ExecutorSettings(
+          ExecutorSettingsLoader.read(Files.newBufferedReader(configFile.toPath())));
     } catch (ExecutorSettingsLoader.ExecutorConfigException | IOException e) {
       throw new IllegalArgumentException("Failed to read executor settings: " + e, e);
     }
@@ -157,8 +216,8 @@ public class ExecutorModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(ExecutorSettings.class).toInstance(CUSTOM_EXECUTOR_CONFIG.hasAppliedValue()
-        ? makeCustomExecutorSettings()
+    bind(ExecutorSettings.class).toInstance(params.customExecutorConfig().isPresent()
+        ? makeCustomExecutorSettings(params.customExecutorConfig().get())
         : makeThermosExecutorSettings());
   }
 
