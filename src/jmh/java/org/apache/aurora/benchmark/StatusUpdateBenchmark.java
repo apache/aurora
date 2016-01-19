@@ -39,6 +39,7 @@ import org.apache.aurora.benchmark.fakes.FakeSchedulerDriver;
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.common.application.ShutdownStage;
 import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.base.Commands;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
@@ -195,10 +196,7 @@ public class StatusUpdateBenchmark {
             bind(OfferManager.class).toInstance(new FakeOfferManager());
             bind(TaskIdGenerator.class).to(TaskIdGenerator.TaskIdGeneratorImpl.class);
             bind(SchedulingFilter.class).to(SchedulingFilterImpl.class);
-            bind(Command.class).annotatedWith(ShutdownStage.class).toInstance(
-                () -> {
-                  // no-op
-                });
+            bind(Command.class).annotatedWith(ShutdownStage.class).toInstance(Commands.NOOP);
             bind(Thread.UncaughtExceptionHandler.class).toInstance(
                 (t, e) -> {
                   // no-op
@@ -227,6 +225,8 @@ public class StatusUpdateBenchmark {
             bind(TaskStatusHandlerImpl.class).in(Singleton.class);
             bind(TierManager.class).to(TierManager.TierManagerImpl.class);
             bind(TierManager.TierManagerImpl.class).in(Singleton.class);
+            bind(TierManager.TierManagerImpl.TierConfig.class)
+                .toInstance(TierManager.TierManagerImpl.TierConfig.EMPTY);
           }
         }
     );
