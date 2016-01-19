@@ -93,10 +93,30 @@ public class MesosLogStreamModule extends PrivateModule {
   private static final Arg<Amount<Long, Time>> WRITE_TIMEOUT =
       Arg.create(Amount.of(3L, Time.SECONDS));
 
+  private static <T> T getRequiredArg(Arg<T> arg, String name) {
+    if (!arg.hasAppliedValue()) {
+      throw new IllegalStateException(
+          String.format("A value for the -%s flag must be supplied", name));
+    }
+    return arg.get();
+  }
+
   private final ClientConfig zkClientConfig;
+  private final File logPath;
+  private final String zkLogGroupPath;
 
   public MesosLogStreamModule(ClientConfig zkClientConfig) {
+    this(zkClientConfig,
+        getRequiredArg(LOG_PATH, "native_log_file_path"),
+        getRequiredArg(ZK_LOG_GROUP_PATH, "native_log_zk_group_path"));
+  }
+
+  public MesosLogStreamModule(ClientConfig zkClientConfig, File logPath, String zkLogGroupPath) {
     this.zkClientConfig = Objects.requireNonNull(zkClientConfig);
+    this.logPath = Objects.requireNonNull(logPath);
+
+    PathUtils.validatePath(zkLogGroupPath); // This checks for null.
+    this.zkLogGroupPath = zkLogGroupPath;
   }
 
   @Override
@@ -114,7 +134,6 @@ public class MesosLogStreamModule extends PrivateModule {
   @Provides
   @Singleton
   Log provideLog() {
-    File logPath = LOG_PATH.get();
     File parentDir = logPath.getParentFile();
     if (!parentDir.exists() && !parentDir.mkdirs()) {
       addError("Failed to create parent directory to store native log at: %s", parentDir);
@@ -123,14 +142,13 @@ public class MesosLogStreamModule extends PrivateModule {
     String zkConnectString = Joiner.on(',').join(
         Iterables.transform(zkClientConfig.servers, InetSocketAddressHelper::toString));
 
-    PathUtils.validatePath(ZK_LOG_GROUP_PATH.get());
     return new Log(
         QUORUM_SIZE.get(),
         logPath.getAbsolutePath(),
         zkConnectString,
         zkClientConfig.sessionTimeout.getValue(),
         zkClientConfig.sessionTimeout.getUnit().getTimeUnit(),
-        ZK_LOG_GROUP_PATH.get(),
+        zkLogGroupPath,
         zkClientConfig.credentials.scheme(),
         zkClientConfig.credentials.authToken());
   }
