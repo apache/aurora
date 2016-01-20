@@ -58,35 +58,6 @@ public class AsyncStatsModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> SLOT_STAT_INTERVAL =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
-  interface Params {
-    Amount<Long, Time> asyncTaskStatUpdateInterval();
-
-    Amount<Long, Time> asyncSlotStatUpdateInterval();
-  }
-
-  private final Params params;
-
-  public AsyncStatsModule() {
-    this.params = new Params() {
-      @Override
-      public Amount<Long, Time> asyncTaskStatUpdateInterval() {
-        return TASK_STAT_INTERVAL.get();
-      }
-
-      @Override
-      public Amount<Long, Time> asyncSlotStatUpdateInterval() {
-        return SLOT_STAT_INTERVAL.get();
-      }
-    };
-  }
-
-  private static Scheduler fromDuration(Amount<Long, Time> duration) {
-    return Scheduler.newFixedDelaySchedule(
-        duration.getValue(),
-        duration.getValue(),
-        duration.getUnit().getTimeUnit());
-  }
-
   @Override
   protected void configure() {
     bind(TaskStatCalculator.class).in(Singleton.class);
@@ -98,7 +69,11 @@ public class AsyncStatsModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(TaskStatUpdaterService.class).in(Singleton.class);
-        bind(Scheduler.class).toInstance(fromDuration(params.asyncTaskStatUpdateInterval()));
+        bind(Scheduler.class).toInstance(
+            Scheduler.newFixedRateSchedule(
+                TASK_STAT_INTERVAL.get().getValue(),
+                TASK_STAT_INTERVAL.get().getValue(),
+                TASK_STAT_INTERVAL.get().getUnit().getTimeUnit()));
         expose(TaskStatUpdaterService.class);
       }
     });
@@ -109,7 +84,11 @@ public class AsyncStatsModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(SlotSizeCounterService.class).in(Singleton.class);
-        bind(Scheduler.class).toInstance(fromDuration(params.asyncSlotStatUpdateInterval()));
+        bind(Scheduler.class).toInstance(
+            Scheduler.newFixedRateSchedule(
+                SLOT_STAT_INTERVAL.get().getValue(),
+                SLOT_STAT_INTERVAL.get().getValue(),
+                SLOT_STAT_INTERVAL.get().getUnit().getTimeUnit()));
         expose(SlotSizeCounterService.class);
       }
     });

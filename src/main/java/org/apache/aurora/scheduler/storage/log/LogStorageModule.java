@@ -62,42 +62,13 @@ public class LogStorageModule extends PrivateModule {
   public static final Arg<Amount<Integer, Data>> MAX_LOG_ENTRY_SIZE =
       Arg.create(Amount.of(512, Data.KB));
 
-  interface Params {
-    Amount<Long, Time> dlogShutdownGracePeriod();
-
-    Amount<Long, Time> dlogSnapshotInterval();
-
-    Amount<Integer, Data> dlogMaxEntrySize();
-  }
-
-  private final Params params;
-
-  public LogStorageModule() {
-    this.params = new Params() {
-      @Override
-      public Amount<Long, Time> dlogShutdownGracePeriod() {
-        return SHUTDOWN_GRACE_PERIOD.get();
-      }
-
-      @Override
-      public Amount<Long, Time> dlogSnapshotInterval() {
-        return SNAPSHOT_INTERVAL.get();
-      }
-
-      @Override
-      public Amount<Integer, Data> dlogMaxEntrySize() {
-        return MAX_LOG_ENTRY_SIZE.get();
-      }
-    };
-  }
-
   @Override
   protected void configure() {
     bind(Settings.class)
-        .toInstance(new Settings(params.dlogShutdownGracePeriod(), params.dlogSnapshotInterval()));
+        .toInstance(new Settings(SHUTDOWN_GRACE_PERIOD.get(), SNAPSHOT_INTERVAL.get()));
 
     bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
-        .toInstance(params.dlogMaxEntrySize());
+        .toInstance(MAX_LOG_ENTRY_SIZE.get());
     bind(LogManager.class).in(Singleton.class);
     bind(LogStorage.class).in(Singleton.class);
 

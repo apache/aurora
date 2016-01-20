@@ -72,52 +72,37 @@ public class SlaModule extends AbstractModule {
   private static final Arg<Set<MetricCategory>> SLA_NON_PROD_METRICS =
       Arg.<Set<MetricCategory>>create(ImmutableSet.of());
 
-  public interface Params {
-    Amount<Long, Time> slaStatRefreshInterval();
-
-    Set<MetricCategory> slaProdMetrics();
-
-    Set<MetricCategory> slaNonProdMetrics();
-  }
-
   @VisibleForTesting
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   @interface SlaExecutor { }
 
-  private final Params params;
+  private final Amount<Long, Time> refreshInterval;
+  private final Set<MetricCategory> prodMetrics;
+  private final Set<MetricCategory> nonProdMetrics;
 
   @VisibleForTesting
-  SlaModule(Params params) {
-    this.params = requireNonNull(params);
+  SlaModule(
+      Amount<Long, Time> refreshInterval,
+      Set<MetricCategory> prodMetrics,
+      Set<MetricCategory> nonProdMetrics) {
+
+    this.refreshInterval = refreshInterval;
+    this.prodMetrics = prodMetrics;
+    this.nonProdMetrics = nonProdMetrics;
   }
 
   public SlaModule() {
-    this(new Params() {
-      @Override
-      public Amount<Long, Time> slaStatRefreshInterval() {
-        return SLA_REFRESH_INTERVAL.get();
-      }
-
-      @Override
-      public Set<MetricCategory> slaProdMetrics() {
-        return SLA_PROD_METRICS.get();
-      }
-
-      @Override
-      public Set<MetricCategory> slaNonProdMetrics() {
-        return SLA_NON_PROD_METRICS.get();
-      }
-    });
+    this(SLA_REFRESH_INTERVAL.get(), SLA_PROD_METRICS.get(), SLA_NON_PROD_METRICS.get());
   }
 
   @Override
   protected void configure() {
     bind(MetricCalculatorSettings.class)
         .toInstance(new MetricCalculatorSettings(
-            params.slaStatRefreshInterval().as(Time.MILLISECONDS),
-            params.slaProdMetrics(),
-            params.slaNonProdMetrics()));
+            refreshInterval.as(Time.MILLISECONDS),
+            prodMetrics,
+            nonProdMetrics));
 
     bind(MetricCalculator.class).in(Singleton.class);
     bind(ScheduledExecutorService.class)

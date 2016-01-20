@@ -9,7 +9,6 @@ org/apache/aurora/scheduler/app/SchedulerMain$2
 org/apache/aurora/scheduler/app/SchedulerMain$2$1
 org/apache/aurora/scheduler/app/SchedulerMain$3
 org/apache/aurora/scheduler/app/SchedulerMain$4
-org/apache/aurora/scheduler/app/SchedulerMain$Params
 org/apache/aurora/scheduler/async/OfferQueue$OfferQueueImpl$2
 org/apache/aurora/scheduler/base/Conversions$2
 org/apache/aurora/scheduler/base/Conversions$3
@@ -56,21 +55,16 @@ org/apache/aurora/scheduler/http/Utilization$5
 org/apache/aurora/scheduler/http/Utilization$Display
 org/apache/aurora/scheduler/http/Utilization$DisplayMetric
 org/apache/aurora/scheduler/http/api/security/FieldGetter$IdentityFieldGetter
-org/apache/aurora/scheduler/http/api/security/IniShiroRealmModule$1
 org/apache/aurora/scheduler/http/api/security/Kerberos5Realm
-org/apache/aurora/scheduler/http/api/security/Kerberos5ShiroRealmModule$1
 org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule
-org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$1
+org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$3
 org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$4
 org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$5
-org/apache/aurora/scheduler/mesos/CommandLineDriverSettingsModule$1
 org/apache/aurora/scheduler/mesos/DriverFactoryImpl
 org/apache/aurora/scheduler/mesos/LibMesosLoadingModule
-org/apache/aurora/scheduler/preemptor/PreemptorModule$Params
 org/apache/aurora/scheduler/stats/AsyncStatsModule$OfferAdapter$1
 org/apache/aurora/scheduler/stats/TaskStatCalculator
 org/apache/aurora/scheduler/storage/CallOrderEnforcingStorage$State
-org/apache/aurora/scheduler/storage/backup/BackupModule$1
 org/apache/aurora/scheduler/storage/backup/BackupModule$LifecycleHook
 org/apache/aurora/scheduler/storage/mem/MemTaskStore$Task
 org/apache/aurora/scheduler/storage/mem/Util
@@ -81,4 +75,3 @@ org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$1
 org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$LocalClientProvider
 org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$TestServerService
 org/apache/aurora/scheduler/zookeeper/guice/client/flagged/FlaggedClientConfig
-org/apache/aurora/scheduler/zookeeper/guice/client/flagged/FlaggedClientConfig$1

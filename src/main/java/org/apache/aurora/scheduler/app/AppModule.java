@@ -81,50 +81,14 @@ public class AppModule extends AbstractModule {
       help = "Allow to pass docker container parameters in the job.")
   private static final Arg<Boolean> ENABLE_DOCKER_PARAMETERS = Arg.create(false);
 
-  public interface Params {
-    int maxTasksPerJob();
-
-    int maxUpdateInstanceFailures();
-
-    Set<_Fields> allowedContainerTypes();
-
-    boolean enableDockerParameters();
-  }
-
-  private final Params params;
-
-  public AppModule() {
-    this.params = new Params() {
-      @Override
-      public int maxTasksPerJob() {
-        return MAX_TASKS_PER_JOB.get();
-      }
-
-      @Override
-      public int maxUpdateInstanceFailures() {
-        return MAX_UPDATE_INSTANCE_FAILURES.get();
-      }
-
-      @Override
-      public Set<_Fields> allowedContainerTypes() {
-        return ALLOWED_CONTAINER_TYPES.get();
-      }
-
-      @Override
-      public boolean enableDockerParameters() {
-        return ENABLE_DOCKER_PARAMETERS.get();
-      }
-    };
-  }
-
   @Override
   protected void configure() {
     bind(ConfigurationManager.class).toInstance(
         new ConfigurationManager(
-            ImmutableSet.copyOf(params.allowedContainerTypes()),
-            params.enableDockerParameters()));
+            ImmutableSet.copyOf(ALLOWED_CONTAINER_TYPES.get()),
+            ENABLE_DOCKER_PARAMETERS.get()));
     bind(Thresholds.class)
-        .toInstance(new Thresholds(params.maxTasksPerJob(), params.maxUpdateInstanceFailures()));
+        .toInstance(new Thresholds(MAX_TASKS_PER_JOB.get(), MAX_UPDATE_INSTANCE_FAILURES.get()));
 
     // Enable intercepted method timings and context classloader repair.
     TimedInterceptor.bind(binder());

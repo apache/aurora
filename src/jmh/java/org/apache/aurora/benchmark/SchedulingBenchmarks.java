@@ -108,18 +108,7 @@ public class SchedulingBenchmarks {
       // TODO(maxim): Find a way to DRY it and reuse existing modules instead.
       Injector injector = Guice.createInjector(
           new StateModule(),
-          new PreemptorModule(
-              new PreemptorModule.Params() {
-                @Override
-                public Amount<Long, Time> preemptionDelay() {
-                  return NO_DELAY;
-                }
-
-                @Override
-                public Amount<Long, Time> preemptionSlotSearchInterval() {
-                  return NO_DELAY;
-                }
-              }),
+          new PreemptorModule(true, NO_DELAY, NO_DELAY),
           new PrivateModule() {
             @Override
             protected void configure() {

@@ -67,27 +67,9 @@ public class PreemptorModuleTest extends EasyMockTest {
   @Test
   public void testPreemptorDisabled() throws Exception {
     Injector injector = createInjector(new PreemptorModule(
-        new PreemptorModule.Params() {
-          @Override
-          public boolean enablePreemptor() {
-            return false;
-          }
-
-          @Override
-          public Amount<Long, Time> preemptionDelay() {
-            return Amount.of(0L, Time.SECONDS);
-          }
-
-          @Override
-          public Amount<Long, Time> preemptionSlotHoldTime() {
-            return Amount.of(0L, Time.SECONDS);
-          }
-
-          @Override
-          public Amount<Long, Time> preemptionSlotSearchInterval() {
-            return Amount.of(0L, Time.SECONDS);
-          }
-        }));
+        false,
+        Amount.of(0L, Time.SECONDS),
+        Amount.of(0L, Time.SECONDS)));
 
     control.replay();
 

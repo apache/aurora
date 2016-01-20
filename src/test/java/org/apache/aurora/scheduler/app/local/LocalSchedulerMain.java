@@ -83,18 +83,6 @@ public final class LocalSchedulerMain {
       }
     };
 
-    SchedulerMain.Params testParams = new SchedulerMain.Params() {
-      @Override
-      public String clusterName() {
-        return "local";
-      }
-
-      @Override
-      public String serversetPath() {
-        return "/aurora/local/scheduler";
-      }
-    };
-
     Module fakeMesos = new AbstractModule() {
       @Override
       protected void configure() {
@@ -106,6 +94,6 @@ public final class LocalSchedulerMain {
       }
     };
 
-    SchedulerMain.main(testParams, Modules.combine(fakeMesos, persistentStorage));
+    SchedulerMain.flagConfiguredMain(Modules.combine(fakeMesos, persistentStorage));
   }
 }

@@ -62,7 +62,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       help = "Properties file which contains framework credentials to authenticate with Mesos"
           + "master. Must contain the properties '" + PRINCIPAL_KEY + "' and "
           + "'" + SECRET_KEY + "'.")
-  private static final Arg<File> FRAMEWORK_AUTHENTICATION_FILE = Arg.create(null);
+  private static final Arg<File> FRAMEWORK_AUTHENTICATION_FILE = Arg.create();
 
   @CmdLine(name = "framework_failover_timeout",
       help = "Time after which a framework is considered deleted.  SHOULD BE VERY HIGH.")
@@ -93,92 +93,37 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       help = "The Mesos role this framework will register as. The default is to left this empty, "
           + "and the framework will register without any role and only receive unreserved "
           + "resources in offer.")
-  private static final Arg<String> MESOS_ROLE = Arg.create(null);
-
-  interface Params {
-    String mesosMasterAddress();
-
-    Optional<File> frameworkAuthenticationFile();
-
-    Amount<Long, Time> frameworkFailoverTimeout();
-
-    boolean frameworkAnnouncePrincipal();
-
-    String executorUser();
-
-    boolean receiveRevocableResources();
-
-    Optional<String> mesosRole();
-  }
+  private static final Arg<String> MESOS_ROLE = Arg.create();
 
   // TODO(wfarner): Figure out a way to change this without risk of fallout (MESOS-703).
   private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
 
-  private final Params params;
-
-  public CommandLineDriverSettingsModule() {
-    this.params = new Params() {
-      @Override
-      public String mesosMasterAddress() {
-        return MESOS_MASTER_ADDRESS.get();
-      }
-
-      @Override
-      public Optional<File> frameworkAuthenticationFile() {
-        return Optional.fromNullable(FRAMEWORK_AUTHENTICATION_FILE.get());
-      }
-
-      @Override
-      public Amount<Long, Time> frameworkFailoverTimeout() {
-        return FRAMEWORK_FAILOVER_TIMEOUT.get();
-      }
-
-      @Override
-      public boolean frameworkAnnouncePrincipal() {
-        return FRAMEWORK_ANNOUNCE_PRINCIPAL.get();
-      }
-
-      @Override
-      public String executorUser() {
-        return EXECUTOR_USER.get();
-      }
-
-      @Override
-      public boolean receiveRevocableResources() {
-        return RECEIVE_REVOCABLE_RESOURCES.get();
-      }
-
-      @Override
-      public Optional<String> mesosRole() {
-        return Optional.fromNullable(MESOS_ROLE.get());
-      }
-    };
-  }
-
   @Override
   protected void configure() {
     Optional<Protos.Credential> credentials = getCredentials();
-    Optional<String> principal = params.frameworkAnnouncePrincipal() && credentials.isPresent()
-        ? Optional.of(credentials.get().getPrincipal())
-        : Optional.absent();
+    Optional<String> principal = Optional.absent();
+    if (FRAMEWORK_ANNOUNCE_PRINCIPAL.get() && credentials.isPresent()) {
+      principal = Optional.of(credentials.get().getPrincipal());
+    }
+    Optional<String> role =
+        MESOS_ROLE.hasAppliedValue() ? Optional.of(MESOS_ROLE.get()) : Optional.absent();
     DriverSettings settings = new DriverSettings(
-        params.mesosMasterAddress(),
+        MESOS_MASTER_ADDRESS.get(),
         credentials,
         buildFrameworkInfo(
-            params.executorUser(),
+            EXECUTOR_USER.get(),
             principal,
-            params.frameworkFailoverTimeout(),
-            params.receiveRevocableResources(),
-            params.mesosRole()));
+            FRAMEWORK_FAILOVER_TIMEOUT.get(),
+            RECEIVE_REVOCABLE_RESOURCES.get(),
+            role));
     bind(DriverSettings.class).toInstance(settings);
   }
 
-  private Optional<Protos.Credential> getCredentials() {
-    if (params.frameworkAuthenticationFile().isPresent()) {
+  private static Optional<Protos.Credential> getCredentials() {
+    if (FRAMEWORK_AUTHENTICATION_FILE.hasAppliedValue()) {
       Properties properties;
       try {
-        properties =
-            parseCredentials(new FileInputStream(params.frameworkAuthenticationFile().get()));
+        properties = parseCredentials(new FileInputStream(FRAMEWORK_AUTHENTICATION_FILE.get()));
       } catch (FileNotFoundException e) {
         LOG.error("Authentication File not Found");
         throw Throwables.propagate(e);

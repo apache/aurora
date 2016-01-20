@@ -70,41 +70,8 @@ public class CronModule extends AbstractModule {
   public static final Arg<Amount<Long, Time>> CRON_START_MAX_BACKOFF =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
-  interface Params {
-    int cronSchedulerNumThreads();
-
-    String cronTimezone();
-
-    Amount<Long, Time> cronStartInitialBackoff();
-
-    Amount<Long, Time> cronStartMaxBackoff();
-  }
-
-  private final Params params;
-
-  public CronModule() {
-    this.params = new Params() {
-      @Override
-      public int cronSchedulerNumThreads() {
-        return NUM_THREADS.get();
-      }
-
-      @Override
-      public String cronTimezone() {
-        return CRON_TIMEZONE.get();
-      }
-
-      @Override
-      public Amount<Long, Time> cronStartInitialBackoff() {
-        return CRON_START_INITIAL_BACKOFF.get();
-      }
-
-      @Override
-      public Amount<Long, Time> cronStartMaxBackoff() {
-        return CRON_START_MAX_BACKOFF.get();
-      }
-    };
-  }
+  // Global per-JVM ID number generator for the provided Quartz Scheduler.
+  private static final AtomicLong ID_GENERATOR = new AtomicLong();
 
   @Override
   protected void configure() {
@@ -121,7 +88,7 @@ public class CronModule extends AbstractModule {
 
     bind(AuroraCronJob.class).in(Singleton.class);
     bind(AuroraCronJob.Config.class).toInstance(new AuroraCronJob.Config(
-        new BackoffHelper(params.cronStartInitialBackoff(), params.cronStartMaxBackoff())));
+        new BackoffHelper(CRON_START_INITIAL_BACKOFF.get(), CRON_START_MAX_BACKOFF.get())));
 
     bind(CronLifecycle.class).in(Singleton.class);
     SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(CronLifecycle.class);
@@ -129,7 +96,7 @@ public class CronModule extends AbstractModule {
 
   @Provides
   TimeZone provideTimeZone() {
-    TimeZone timeZone = TimeZone.getTimeZone(params.cronTimezone());
+    TimeZone timeZone = TimeZone.getTimeZone(CRON_TIMEZONE.get());
     TimeZone systemTimeZone = TimeZone.getDefault();
     if (!timeZone.equals(systemTimeZone)) {
       LOG.warn("Cron schedules are configured to fire according to timezone "
@@ -140,12 +107,9 @@ public class CronModule extends AbstractModule {
     return timeZone;
   }
 
-  // Global per-JVM ID number generator for the provided Quartz Scheduler.
-  private static final AtomicLong ID_GENERATOR = new AtomicLong();
-
   @Provides
   @Singleton
-  Scheduler provideScheduler(AuroraCronJobFactory jobFactory) throws SchedulerException {
+  static Scheduler provideScheduler(AuroraCronJobFactory jobFactory) throws SchedulerException {
     // There are several ways to create a quartz Scheduler instance.  This path was chosen as the
     // simplest to create a Scheduler that uses a *daemon* QuartzSchedulerThread instance.
     Properties props = new Properties();
@@ -153,9 +117,7 @@ public class CronModule extends AbstractModule {
     props.setProperty(PROP_SCHED_NAME, name);
     props.setProperty(PROP_SCHED_INSTANCE_ID, name);
     props.setProperty(PROP_THREAD_POOL_CLASS, SimpleThreadPool.class.getCanonicalName());
-    props.setProperty(
-        PROP_THREAD_POOL_PREFIX + ".threadCount",
-        String.valueOf(params.cronSchedulerNumThreads()));
+    props.setProperty(PROP_THREAD_POOL_PREFIX + ".threadCount", NUM_THREADS.get().toString());
     props.setProperty(PROP_THREAD_POOL_PREFIX + ".makeThreadsDaemons", Boolean.TRUE.toString());
 
     props.setProperty(PROP_SCHED_MAKE_SCHEDULER_THREAD_DAEMON, Boolean.TRUE.toString());

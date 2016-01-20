@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.http.api;
 
-import java.util.Optional;
-
 import javax.inject.Singleton;
 
 import com.google.common.collect.ImmutableMap;
@@ -49,25 +47,10 @@ public class ApiModule extends ServletModule {
       .newClassPathResource("org/apache/aurora/scheduler/gen/client")
       .toString();
 
-  interface Params {
-    Optional<String> enableCorsFor();
-  }
-
-  private final Params params;
-
-  public ApiModule() {
-    this.params = new Params() {
-      @Override
-      public Optional<String> enableCorsFor() {
-        return Optional.ofNullable(ENABLE_CORS_FOR.get());
-      }
-    };
-  }
-
   @Override
   protected void configureServlets() {
-    if (params.enableCorsFor().isPresent()) {
-      filter(API_PATH).through(new CorsFilter(params.enableCorsFor().get()));
+    if (ENABLE_CORS_FOR.get() != null) {
+      filter(API_PATH).through(new CorsFilter(ENABLE_CORS_FOR.get()));
     }
     serve(API_PATH).with(TServlet.class);
 

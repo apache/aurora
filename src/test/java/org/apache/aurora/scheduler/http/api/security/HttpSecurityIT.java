@@ -14,9 +14,7 @@
 package org.apache.aurora.scheduler.http.api.security;
 
 import java.io.IOException;
-import java.util.Optional;
 import java.util.Set;
-
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
@@ -159,7 +157,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
         new H2ConsoleModule(true),
         new HttpSecurityModule(
             new IniShiroRealmModule(ini),
-            Optional.of(Key.get(Filter.class, SHIRO_AFTER_AUTH_FILTER_ANNOTATION))),
+            Key.get(Filter.class, SHIRO_AFTER_AUTH_FILTER_ANNOTATION)),
         new AbstractModule() {
           @Override
           protected void configure() {

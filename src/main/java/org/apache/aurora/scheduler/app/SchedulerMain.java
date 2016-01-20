@@ -92,20 +92,6 @@ public class SchedulerMain {
   @CmdLine(name = "viz_job_url_prefix", help = "URL prefix for job container stats.")
   private static final Arg<String> STATS_URL_PREFIX = Arg.create("");
 
-  public interface Params {
-    String clusterName();
-
-    String serversetPath();
-
-    default List<Class<? extends Module>> extraModules() {
-      return ImmutableList.of();
-    }
-
-    default String statsUrlPrefix() {
-      return "";
-    }
-  }
-
   @Inject private SingletonService schedulerService;
   @Inject private HttpService httpService;
   @Inject private SchedulerLifecycle schedulerLifecycle;
@@ -169,7 +155,7 @@ public class SchedulerMain {
    * @param appEnvironmentModule Additional modules based on the execution environment.
    */
   @VisibleForTesting
-  public static void main(Params params, Module appEnvironmentModule) {
+  public static void flagConfiguredMain(Module appEnvironmentModule) {
     AtomicLong uncaughtExceptions = Stats.exportLong("uncaught_exceptions");
     Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
       uncaughtExceptions.incrementAndGet();
@@ -181,7 +167,7 @@ public class SchedulerMain {
         appEnvironmentModule,
         getUniversalModule(),
         new ZooKeeperClientModule(zkClientConfig),
-        new ServiceDiscoveryModule(params.serversetPath(), zkClientConfig.credentials),
+        new ServiceDiscoveryModule(SERVERSET_PATH.get(), zkClientConfig.credentials),
         new BackupModule(SnapshotStoreImpl.class),
         new ExecutorModule(),
         new AbstractModule() {
@@ -190,8 +176,8 @@ public class SchedulerMain {
             bind(IServerInfo.class).toInstance(
                 IServerInfo.build(
                     new ServerInfo()
-                        .setClusterName(params.clusterName())
-                        .setStatsUrlPrefix(params.statsUrlPrefix())));
+                        .setClusterName(CLUSTER_NAME.get())
+                        .setStatsUrlPrefix(STATS_URL_PREFIX.get())));
           }
         });
 
@@ -216,37 +202,15 @@ public class SchedulerMain {
   public static void main(String... args) {
     applyStaticArgumentValues(args);
 
-    Params params = new Params() {
-      @Override
-      public String clusterName() {
-        return CLUSTER_NAME.get();
-      }
-
-      @Override
-      public String serversetPath() {
-        return SERVERSET_PATH.get();
-      }
-
-      @Override
-      public List<Class<? extends Module>> extraModules() {
-        return EXTRA_MODULES.get();
-      }
-
-      @Override
-      public String statsUrlPrefix() {
-        return STATS_URL_PREFIX.get();
-      }
-    };
-
     List<Module> modules = ImmutableList.<Module>builder()
         .add(
             new CommandLineDriverSettingsModule(),
             new LibMesosLoadingModule(),
             new MesosLogStreamModule(FlaggedClientConfig.create()),
             new LogStorageModule())
-        .addAll(Iterables.transform(params.extraModules(), MoreModules::getModule))
+        .addAll(Iterables.transform(EXTRA_MODULES.get(), MoreModules::getModule))
         .build();
-    main(params, Modules.combine(modules));
+    flagConfiguredMain(Modules.combine(modules));
   }
 
   private static void exit(String message, Exception error) {

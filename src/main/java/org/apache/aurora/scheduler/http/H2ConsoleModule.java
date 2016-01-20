@@ -33,23 +33,10 @@ public class H2ConsoleModule extends ServletModule {
   @CmdLine(name = "enable_h2_console", help = "Enable H2 DB management console.")
   private static final Arg<Boolean> ENABLE_H2_CONSOLE = Arg.create(false);
 
-  interface Params {
-    boolean enableH2Console();
-  }
-
   private final boolean enabled;
 
   public H2ConsoleModule() {
-    this(new Params() {
-      @Override
-      public boolean enableH2Console() {
-        return ENABLE_H2_CONSOLE.get();
-      }
-    });
-  }
-
-  public H2ConsoleModule(Params params) {
-    this(params.enableH2Console());
+    this(ENABLE_H2_CONSOLE.get());
   }
 
   @VisibleForTesting

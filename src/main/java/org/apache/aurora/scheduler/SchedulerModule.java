@@ -74,43 +74,7 @@ public class SchedulerModule extends AbstractModule {
   @CanRead
   @CmdLine(name = "tier_config",
       help = "Configuration file defining supported task tiers, task traits and behaviors.")
-  private static final Arg<File> TIER_CONFIG_FILE = Arg.create(null);
-
-  interface Params {
-    Amount<Long, Time> maxRegistrationDelay();
-
-    Amount<Long, Time> maxLeadingDuration();
-
-    int maxStatusUpdateBatchSize();
-
-    Optional<File> tierConfig();
-  }
-
-  private final Params params;
-
-  public SchedulerModule() {
-    this.params = new Params() {
-      @Override
-      public Amount<Long, Time> maxRegistrationDelay() {
-        return MAX_REGISTRATION_DELAY.get();
-      }
-
-      @Override
-      public Amount<Long, Time> maxLeadingDuration() {
-        return MAX_LEADING_DURATION.get();
-      }
-
-      @Override
-      public int maxStatusUpdateBatchSize() {
-        return MAX_STATUS_UPDATE_BATCH_SIZE.get();
-      }
-
-      @Override
-      public Optional<File> tierConfig() {
-        return Optional.fromNullable(TIER_CONFIG_FILE.get());
-      }
-    };
-  }
+  private static final Arg<File> TIER_CONFIG_FILE = Arg.create();
 
   @Override
   protected void configure() {
@@ -120,7 +84,7 @@ public class SchedulerModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(LeadingOptions.class).toInstance(
-            new LeadingOptions(params.maxRegistrationDelay(), params.maxLeadingDuration()));
+            new LeadingOptions(MAX_REGISTRATION_DELAY.get(), MAX_LEADING_DURATION.get()));
 
         final ScheduledExecutorService executor =
             AsyncUtil.singleThreadLoggingScheduledExecutor("Lifecycle-%d", LOG);
@@ -141,7 +105,7 @@ public class SchedulerModule extends AbstractModule {
         .toInstance(new LinkedBlockingQueue<>());
     bind(new TypeLiteral<Integer>() { })
         .annotatedWith(TaskStatusHandlerImpl.MaxBatchSize.class)
-        .toInstance(params.maxStatusUpdateBatchSize());
+        .toInstance(MAX_STATUS_UPDATE_BATCH_SIZE.get());
 
     bind(TaskStatusHandler.class).to(TaskStatusHandlerImpl.class);
     bind(TaskStatusHandlerImpl.class).in(Singleton.class);
@@ -152,15 +116,17 @@ public class SchedulerModule extends AbstractModule {
     addSchedulerActiveServiceBinding(binder()).to(TaskStatusHandlerImpl.class);
   }
 
-  private Optional<String> readTierFile() {
-    return params.tierConfig().transform(file -> {
+  private static Optional<String> readTierFile() {
+    if (TIER_CONFIG_FILE.hasAppliedValue()) {
       try {
-        return Files.toString(file, StandardCharsets.UTF_8);
+        return Optional.of(Files.toString(TIER_CONFIG_FILE.get(), StandardCharsets.UTF_8));
       } catch (IOException e) {
         LOG.error("Error loading tier configuration file.");
         throw Throwables.propagate(e);
       }
-    });
+    }
+
+    return Optional.<String>absent();
   }
 
   @VisibleForTesting

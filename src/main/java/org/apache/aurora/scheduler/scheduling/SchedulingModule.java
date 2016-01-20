@@ -29,7 +29,6 @@ import org.apache.aurora.common.util.TruncatedBinaryBackoff;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.preemptor.BiCache;
-import org.apache.aurora.scheduler.preemptor.BiCache.BiCacheSettings;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator.RescheduleCalculatorImpl;
 
 /**
@@ -84,96 +83,23 @@ public class SchedulingModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> RESERVATION_DURATION =
       Arg.create(Amount.of(3L, Time.MINUTES));
 
-  interface Params {
-    double maxScheduleAttemptsPerSec();
-
-    Amount<Long, Time> flappingTaskThreshold();
-
-    Amount<Long, Time> initialFlappingTaskDelay();
-
-    Amount<Long, Time> maxFlappingTaskDelay();
-
-    Amount<Integer, Time> maxRescheduleTaskDelayOnStartup();
-
-    Amount<Long, Time> firstScheduleDelay();
-
-    Amount<Long, Time> initialSchedulePenalty();
-
-    Amount<Long, Time> maxSchedulePenalty();
-
-    Amount<Long, Time> offerReservationDuration();
-  }
-
-  private final Params params;
-
-  public SchedulingModule() {
-    this.params = new Params() {
-      @Override
-      public double maxScheduleAttemptsPerSec() {
-        return MAX_SCHEDULE_ATTEMPTS_PER_SEC.get();
-      }
-
-      @Override
-      public Amount<Long, Time> flappingTaskThreshold() {
-        return FLAPPING_THRESHOLD.get();
-      }
-
-      @Override
-      public Amount<Long, Time> initialFlappingTaskDelay() {
-        return INITIAL_FLAPPING_DELAY.get();
-      }
-
-      @Override
-      public Amount<Long, Time> maxFlappingTaskDelay() {
-        return MAX_FLAPPING_DELAY.get();
-      }
-
-      @Override
-      public Amount<Integer, Time> maxRescheduleTaskDelayOnStartup() {
-        return MAX_RESCHEDULING_DELAY.get();
-      }
-
-      @Override
-      public Amount<Long, Time> firstScheduleDelay() {
-        return FIRST_SCHEDULE_DELAY.get();
-      }
-
-      @Override
-      public Amount<Long, Time> initialSchedulePenalty() {
-        return INITIAL_SCHEDULE_PENALTY.get();
-      }
-
-      @Override
-      public Amount<Long, Time> maxSchedulePenalty() {
-        return MAX_SCHEDULE_PENALTY.get();
-      }
-
-      @Override
-      public Amount<Long, Time> offerReservationDuration() {
-        return RESERVATION_DURATION.get();
-      }
-    };
-  }
-
   @Override
   protected void configure() {
     install(new PrivateModule() {
       @Override
       protected void configure() {
         bind(TaskGroups.TaskGroupsSettings.class).toInstance(new TaskGroups.TaskGroupsSettings(
-            params.firstScheduleDelay(),
+            FIRST_SCHEDULE_DELAY.get(),
             new TruncatedBinaryBackoff(
-                params.initialSchedulePenalty(),
-                params.maxSchedulePenalty()),
-            RateLimiter.create(params.maxScheduleAttemptsPerSec())));
+                INITIAL_SCHEDULE_PENALTY.get(),
+                MAX_SCHEDULE_PENALTY.get()),
+            RateLimiter.create(MAX_SCHEDULE_ATTEMPTS_PER_SEC.get())));
 
         bind(RescheduleCalculatorImpl.RescheduleCalculatorSettings.class)
             .toInstance(new RescheduleCalculatorImpl.RescheduleCalculatorSettings(
-                new TruncatedBinaryBackoff(
-                    params.initialFlappingTaskDelay(),
-                    params.maxFlappingTaskDelay()),
-                params.flappingTaskThreshold(),
-                params.maxRescheduleTaskDelayOnStartup()));
+                new TruncatedBinaryBackoff(INITIAL_FLAPPING_DELAY.get(), MAX_FLAPPING_DELAY.get()),
+                FLAPPING_THRESHOLD.get(),
+                MAX_RESCHEDULING_DELAY.get()));
 
         bind(RescheduleCalculator.class).to(RescheduleCalculatorImpl.class).in(Singleton.class);
         expose(RescheduleCalculator.class);
@@ -187,8 +113,8 @@ public class SchedulingModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(new TypeLiteral<BiCache<String, TaskGroupKey>>() { }).in(Singleton.class);
-        bind(BiCacheSettings.class).toInstance(
-            new BiCacheSettings(params.offerReservationDuration(), "reservation_cache_size"));
+        bind(BiCache.BiCacheSettings.class).toInstance(
+            new BiCache.BiCacheSettings(RESERVATION_DURATION.get(), "reservation_cache_size"));
         bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
         bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
         expose(TaskScheduler.class);

@@ -81,7 +81,7 @@ public class HttpSecurityModule extends ServletModule {
   @CmdLine(name = "shiro_after_auth_filter",
       help = "Fully qualified class name of the servlet filter to be applied after the"
           + " shiro auth filters are applied.")
-  private static final Arg<Class<? extends Filter>> SHIRO_AFTER_AUTH_FILTER = Arg.create(null);
+  private static final Arg<Class<? extends Filter>> SHIRO_AFTER_AUTH_FILTER = Arg.create();
 
   @VisibleForTesting
   static final Matcher<Method> AURORA_SCHEDULER_MANAGER_SERVICE =
@@ -112,48 +112,21 @@ public class HttpSecurityModule extends ServletModule {
   private static final Arg<HttpAuthenticationMechanism> HTTP_AUTHENTICATION_MECHANISM =
       Arg.create(HttpAuthenticationMechanism.NONE);
 
-  interface Params {
-    Set<Module> shiroRealmModule();
-
-    Optional<Class<? extends Filter>> shiroAfterAuthFilter();
-
-    HttpAuthenticationMechanism httpAuthenticationMechanism();
-  }
-
   private final HttpAuthenticationMechanism mechanism;
   private final Set<Module> shiroConfigurationModules;
   private final Optional<Key<? extends Filter>> shiroAfterAuthFilterKey;
 
   public HttpSecurityModule() {
-    this(new Params() {
-      @Override
-      public Set<Module> shiroRealmModule() {
-        return SHIRO_REALM_MODULE.get();
-      }
-
-      @Override
-      public Optional<Class<? extends Filter>> shiroAfterAuthFilter() {
-        return Optional.ofNullable(SHIRO_AFTER_AUTH_FILTER.get());
-      }
-
-      @Override
-      public HttpAuthenticationMechanism httpAuthenticationMechanism() {
-        return HTTP_AUTHENTICATION_MECHANISM.get();
-      }
-    });
-  }
-
-  public HttpSecurityModule(Params params) {
     this(
-        params.httpAuthenticationMechanism(),
-        params.shiroRealmModule(),
-        params.shiroAfterAuthFilter().map(Key::get));
+        HTTP_AUTHENTICATION_MECHANISM.get(),
+        SHIRO_REALM_MODULE.get(),
+        SHIRO_AFTER_AUTH_FILTER.hasAppliedValue() ? Key.get(SHIRO_AFTER_AUTH_FILTER.get()) : null);
   }
 
   @VisibleForTesting
   HttpSecurityModule(
       Module shiroConfigurationModule,
-      Optional<Key<? extends Filter>> shiroAfterAuthFilterKey) {
+      Key<? extends Filter> shiroAfterAuthFilterKey) {
 
     this(HttpAuthenticationMechanism.BASIC,
         ImmutableSet.of(shiroConfigurationModule),
@@ -163,11 +136,11 @@ public class HttpSecurityModule extends ServletModule {
   private HttpSecurityModule(
       HttpAuthenticationMechanism mechanism,
       Set<Module> shiroConfigurationModules,
-      Optional<Key<? extends Filter>> shiroAfterAuthFilterKey) {
+      Key<? extends Filter> shiroAfterAuthFilterKey) {
 
     this.mechanism = requireNonNull(mechanism);
     this.shiroConfigurationModules = requireNonNull(shiroConfigurationModules);
-    this.shiroAfterAuthFilterKey = requireNonNull(shiroAfterAuthFilterKey);
+    this.shiroAfterAuthFilterKey = Optional.ofNullable(shiroAfterAuthFilterKey);
   }
 
   @Override

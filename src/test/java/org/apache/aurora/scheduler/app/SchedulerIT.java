@@ -163,8 +163,9 @@ public class SchedulerIT extends BaseZooKeeperTest {
     log = control.createMock(Log.class);
     logStream = control.createMock(Stream.class);
     streamMatcher = LogOpMatcher.matcherFor(logStream);
-    entrySerializer =
-        new EntrySerializer.EntrySerializerImpl(Amount.of(512, Data.KB), Hashing.md5());
+    entrySerializer = new EntrySerializer.EntrySerializerImpl(
+        LogStorageModule.MAX_LOG_ENTRY_SIZE.get(),
+        Hashing.md5());
 
     zkClient = createZkClient();
   }
@@ -185,14 +186,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
             0);
         bind(ExecutorSettings.class)
             .toInstance(TestExecutorSettings.thermosOnlyWithOverhead(executorOverhead));
-        install(new BackupModule(
-            new BackupModule.Params() {
-              @Override
-              public File backupDir() {
-                return backupDir;
-              }
-            },
-            SnapshotStoreImpl.class));
+        install(new BackupModule(backupDir, SnapshotStoreImpl.class));
 
         bind(IServerInfo.class).toInstance(
             IServerInfo.build(

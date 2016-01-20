@@ -64,20 +64,8 @@ public class BackupModule extends PrivateModule {
       help = "Directory to store backups under. Will be created if it does not exist.")
   private static final Arg<File> BACKUP_DIR = Arg.create();
 
-  public interface Params {
-    default Amount<Long, Time> backupInterval() {
-      return Amount.of(1L, Time.HOURS);
-    }
-
-    default int maxSavedBackups() {
-      return 48;
-    }
-
-    File backupDir();
-  }
-
-  private final Params params;
   private final Class<? extends SnapshotStore<Snapshot>> snapshotStore;
+  private final File unvalidatedBackupDir;
 
   /**
    * Creates a new backup module.
@@ -85,35 +73,18 @@ public class BackupModule extends PrivateModule {
    * @param snapshotStore Snapshot store implementation class.
    */
   public BackupModule(Class<? extends SnapshotStore<Snapshot>> snapshotStore) {
-    this(
-        new Params() {
-          @Override
-          public Amount<Long, Time> backupInterval() {
-            return BACKUP_INTERVAL.get();
-          }
-
-          @Override
-          public int maxSavedBackups() {
-            return MAX_SAVED_BACKUPS.get();
-          }
-
-          @Override
-          public File backupDir() {
-            return BACKUP_DIR.get();
-          }
-        },
-        snapshotStore);
+    this(BACKUP_DIR.get(), snapshotStore);
   }
 
   /**
    * Creates a new backup module using a given backupDir instead of a flagged one.
    *
-   * @param params Module configuration parameters.
+   * @param backupDir Directory to write backups to.
    * @param snapshotStore Snapshot store implementation class.
    */
   @VisibleForTesting
-  public BackupModule(Params params, Class<? extends SnapshotStore<Snapshot>> snapshotStore) {
-    this.params = requireNonNull(params);
+  public BackupModule(File backupDir, Class<? extends SnapshotStore<Snapshot>> snapshotStore) {
+    this.unvalidatedBackupDir = requireNonNull(backupDir);
     this.snapshotStore = requireNonNull(snapshotStore);
   }
 
@@ -155,7 +126,6 @@ public class BackupModule extends PrivateModule {
 
   @Provides
   File provideBackupDir() {
-    File unvalidatedBackupDir = params.backupDir();
     if (!unvalidatedBackupDir.exists()) {
       if (unvalidatedBackupDir.mkdirs()) {
         LOG.info("Created backup dir " + unvalidatedBackupDir.getPath() + ".");
@@ -175,6 +145,6 @@ public class BackupModule extends PrivateModule {
 
   @Provides
   BackupConfig provideBackupConfig(File backupDir) {
-    return new BackupConfig(backupDir, params.maxSavedBackups(), params.backupInterval());
+    return new BackupConfig(backupDir, MAX_SAVED_BACKUPS.get(), BACKUP_INTERVAL.get());
   }
 }

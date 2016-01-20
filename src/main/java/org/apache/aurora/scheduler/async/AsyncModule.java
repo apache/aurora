@@ -53,28 +53,14 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Integer> ASYNC_WORKER_THREADS = Arg.create(8);
   private final ScheduledThreadPoolExecutor afterTransaction;
 
-  interface Params {
-    int asyncWorkerThreads();
-  }
-
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface AsyncExecutor { }
 
   public AsyncModule() {
-    this(new Params() {
-      @Override
-      public int asyncWorkerThreads() {
-        return ASYNC_WORKER_THREADS.get();
-      }
-    });
-  }
-
-  private AsyncModule(Params params) {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
     // TODO(wfarner): Should we use a bounded caching thread pool executor instead?
-    this(
-        AsyncUtil.loggingScheduledExecutor(params.asyncWorkerThreads(), "AsyncProcessor-%d", LOG));
+    this(AsyncUtil.loggingScheduledExecutor(ASYNC_WORKER_THREADS.get(), "AsyncProcessor-%d", LOG));
   }
 
   @VisibleForTesting

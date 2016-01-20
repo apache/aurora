@@ -81,44 +81,17 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
   @CmdLine(name = "kerberos_debug", help = "Produce additional Kerberos debugging output.")
   private static final Arg<Boolean> DEBUG = Arg.create(false);
 
-  interface Params {
-    Optional<File> kerberosServerKeytab();
-
-    Optional<KerberosPrincipal> kerberosServerPrincipal();
-
-    boolean kerberosDebug();
-  }
-
   private final Optional<File> serverKeyTab;
   private final Optional<KerberosPrincipal> serverPrincipal;
   private final GSSManager gssManager;
   private final boolean kerberosDebugEnabled;
 
   public Kerberos5ShiroRealmModule() {
-    this(new Params() {
-      @Override
-      public Optional<File> kerberosServerKeytab() {
-        return Optional.fromNullable(SERVER_KEYTAB.get());
-      }
-
-      @Override
-      public Optional<KerberosPrincipal> kerberosServerPrincipal() {
-        return Optional.fromNullable(SERVER_PRINCIPAL.get());
-      }
-
-      @Override
-      public boolean kerberosDebug() {
-        return DEBUG.get();
-      }
-    });
-  }
-
-  public Kerberos5ShiroRealmModule(Params params) {
     this(
-        params.kerberosServerKeytab(),
-        params.kerberosServerPrincipal(),
+        Optional.fromNullable(SERVER_KEYTAB.get()),
+        Optional.fromNullable(SERVER_PRINCIPAL.get()),
         GSSManager.getInstance(),
-        params.kerberosDebug());
+        DEBUG.get());
   }
 
   @VisibleForTesting
