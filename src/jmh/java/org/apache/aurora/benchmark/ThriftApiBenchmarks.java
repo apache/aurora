@@ -17,6 +17,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import com.google.inject.AbstractModule;
@@ -154,7 +155,8 @@ public class ThriftApiBenchmarks {
             bind(ConfigurationManager.class).toInstance(
                 new ConfigurationManager(
                     ImmutableSet.of(Container._Fields.MESOS),
-                    /* allowDockerParameters */ false));
+                    /* allowDockerParameters */ false,
+                    /* defaultDockerParameters */ ImmutableMultimap.of()));
           }
         },
         new AsyncModule(),
