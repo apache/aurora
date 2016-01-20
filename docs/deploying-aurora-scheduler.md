@@ -164,20 +164,38 @@ wrapper script and executor are correctly copied into the sandbox. Finally, ensu
 script does not access resources outside of the sandbox, as when the script is run from within a
 docker container those resources will not exist.
 
+In order to correctly execute processes inside a job, the docker container must have python 2.7
+installed.
+
 A scheduler flag, `-global_container_mounts` allows mounting paths from the host (i.e., the slave)
 into all containers on that host. The format is a comma separated list of host_path:container_path[:mode]
 tuples. For example `-global_container_mounts=/opt/secret_keys_dir:/mnt/secret_keys_dir:ro` mounts
 `/opt/secret_keys_dir` from the slaves into all launched containers. Valid modes are `ro` and `rw`.
 
-In order to correctly execute processes inside a job, the docker container must have python 2.7
-installed.
+If you would like to supply your own parameters to `docker run` when launching jobs in docker
+containers, you may use the following flags:
+
+    -allow_docker_parameters
+    -default_docker_parameters
+
+`-allow_docker_parameters` controls whether or not users may pass their own configuration parameters
+through the job configuration files. If set to `false` (the default), the scheduler will reject
+jobs with custom parameters. *NOTE*: this setting should be used with caution as it allows any job
+owner to specify any parameters they wish, including those that may introduce security concerns
+(`privileged=true`, for example).
+
+`-default_docker_parameters` allows a cluster operator to specify a universal set of parameters that
+should be used for every container that does not have parameters explicitly configured at the job
+level. The argument accepts a multimap format:
+
+    -default_docker_parameters="read-only=true,tmpfs=/tmp,tmpfs=/run"
 
 ### Process Logs
 
 #### Log destination
 By default, Thermos will write process stdout/stderr to log files in the sandbox. Process object configuration
 allows specifying alternate log file destinations like streamed stdout/stderr or suppression of all log output.
-Default behavior can be configured for the entire cluster with the following flag (through the -thermos_executor_flags
+Default behavior can be configured for the entire cluster with the following flag (through the `-thermos_executor_flags`
 argument to the Aurora scheduler):
 
     --runner-logger-destination=both

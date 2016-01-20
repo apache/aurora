@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.base;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -50,7 +51,7 @@ public final class TaskTestUtil {
   public static final IJobKey JOB = JobKeys.from("role", "env", "job");
   public static final TierInfo REVOCABLE_TIER = new TierInfo(true);
   public static final ConfigurationManager CONFIGURATION_MANAGER =
-      new ConfigurationManager(ImmutableSet.of(_Fields.MESOS), false);
+      new ConfigurationManager(ImmutableSet.of(_Fields.MESOS), false, ImmutableMultimap.of());
 
   private TaskTestUtil() {
     // Utility class.

@@ -26,6 +26,9 @@
   made redundant: `logtostderr`, `alsologtostderr`, `vlog`, `vmodule`, and `use_glog_formatter`.
 - Added support for configuring Mesos role by passing `-mesos_role` to Aurora scheduler at start time.
   This enables resource reservation for Aurora when running in a shared Mesos cluster.
+- Added new scheduler flag `-default_docker_parameters` to allow a cluster operator to specify a
+  universal set of parameters that should be used for every container that does not have parameters
+  explicitly configured at the job level.
 
 0.11.0
 ------

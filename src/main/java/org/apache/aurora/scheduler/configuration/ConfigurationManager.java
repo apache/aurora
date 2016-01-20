@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.configuration;
 
+import java.util.Map;
 import java.util.Objects;
 
 import javax.annotation.Nullable;
@@ -24,8 +25,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Multimap;
 
 import org.apache.aurora.gen.Container;
+import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConfig._Fields;
@@ -98,13 +101,16 @@ public class ConfigurationManager {
 
   private final ImmutableSet<Container._Fields> allowedContainerTypes;
   private final boolean allowDockerParameters;
+  private final Multimap<String, String> defaultDockerParameters;
 
   public ConfigurationManager(
       ImmutableSet<Container._Fields> allowedContainerTypes,
-      boolean allowDockerParameters) {
+      boolean allowDockerParameters,
+      Multimap<String, String> defaultDockerParameters) {
 
     this.allowedContainerTypes = Objects.requireNonNull(allowedContainerTypes);
     this.allowDockerParameters = allowDockerParameters;
+    this.defaultDockerParameters = Objects.requireNonNull(defaultDockerParameters);
   }
 
   private static void requireNonNull(Object value, String error) throws TaskDescriptionException {
@@ -282,12 +288,18 @@ public class ConfigurationManager {
       containerType = Optional.of(containerConfig.getSetField());
       if (containerConfig.isSetDocker()) {
         if (!containerConfig.getDocker().isSetImage()) {
-          throw new TaskDescriptionException("A container must specify an image");
+          throw new TaskDescriptionException("A container must specify an image.");
         }
-        if (containerConfig.getDocker().isSetParameters()
-            && !containerConfig.getDocker().getParameters().isEmpty()
-            && !allowDockerParameters) {
-          throw new TaskDescriptionException("Docker parameters not allowed.");
+        if (!containerConfig.getDocker().isSetParameters()
+            || containerConfig.getDocker().getParameters().isEmpty()) {
+          for (Map.Entry<String, String> e : this.defaultDockerParameters.entries()) {
+            builder.getContainer().getDocker().addToParameters(
+                new DockerParameter(e.getKey(), e.getValue()));
+          }
+        } else {
+          if (!allowDockerParameters) {
+            throw new TaskDescriptionException("Docker parameters not allowed.");
+          }
         }
       }
     } else {

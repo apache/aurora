@@ -13,13 +13,18 @@
  */
 package org.apache.aurora.scheduler.configuration;
 
+import java.util.Arrays;
+import java.util.List;
+
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.DockerContainer;
+import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
@@ -29,19 +34,31 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import org.apache.aurora.scheduler.storage.entities.IDockerParameter;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import static org.apache.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
 import static org.apache.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
 import static org.apache.aurora.scheduler.base.UserProvidedStrings.isGoodIdentifier;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 // TODO(kevints): Improve test coverage for this class.
 public class ConfigurationManagerTest {
+
+  @Rule
+  public ExpectedException expectedException = ExpectedException.none();
+
+  private static final ImmutableSet<Container._Fields> ALL_CONTAINER_TYPES =
+      ImmutableSet.of(Container._Fields.DOCKER, Container._Fields.MESOS);
+
   private static final JobConfiguration UNSANITIZED_JOB_CONFIGURATION = new JobConfiguration()
       .setKey(new JobKey("owner-role", "devel", "email_stats"))
       .setCronSchedule("0 2 * * *")
@@ -95,10 +112,15 @@ public class ConfigurationManagerTest {
       .newBuilder();
 
   private ConfigurationManager configurationManager;
+  private ConfigurationManager dockerConfigurationManager;
 
   @Before
   public void setUp() {
-    configurationManager = new ConfigurationManager(ImmutableSet.of(), false);
+    configurationManager = new ConfigurationManager(
+        ALL_CONTAINER_TYPES, false, ImmutableMultimap.of());
+
+    dockerConfigurationManager = new ConfigurationManager(
+        ALL_CONTAINER_TYPES, true, ImmutableMultimap.of("foo", "bar"));
   }
 
   @Test
@@ -111,21 +133,67 @@ public class ConfigurationManagerTest {
     }
   }
 
-  @Test(expected = TaskDescriptionException.class)
+  @Test
   public void testBadContainerConfig() throws TaskDescriptionException {
     TaskConfig taskConfig = CONFIG_WITH_CONTAINER.deepCopy();
     taskConfig.getContainer().getDocker().setImage(null);
 
+    expectTaskDescriptionException("A container must specify an image");
     configurationManager.validateAndPopulate(ITaskConfig.build(taskConfig));
   }
 
-  @Test(expected = TaskDescriptionException.class)
+  @Test
+  public void testDisallowedDockerParameters() throws TaskDescriptionException {
+    TaskConfig taskConfig = CONFIG_WITH_CONTAINER.deepCopy();
+    taskConfig.getContainer().getDocker().addToParameters(new DockerParameter("foo", "bar"));
+
+    ConfigurationManager noParamsManager = new ConfigurationManager(
+        ALL_CONTAINER_TYPES, false, ImmutableMultimap.of());
+
+    expectTaskDescriptionException("Docker parameters not allowed");
+    noParamsManager.validateAndPopulate(ITaskConfig.build(taskConfig));
+  }
+
+  @Test
   public void testInvalidTier() throws TaskDescriptionException {
     ITaskConfig config = ITaskConfig.build(UNSANITIZED_JOB_CONFIGURATION.deepCopy().getTaskConfig()
         .setJobName("job")
         .setEnvironment("env")
         .setTier("pr/d"));
 
+    expectTaskDescriptionException("Tier contains illegal characters");
     configurationManager.validateAndPopulate(config);
+  }
+
+  @Test
+  public void testDefaultDockerParameters() throws TaskDescriptionException {
+    ITaskConfig result = dockerConfigurationManager.validateAndPopulate(
+        ITaskConfig.build(CONFIG_WITH_CONTAINER.deepCopy()));
+
+    // The resulting task config should contain parameters supplied to the ConfigurationManager.
+    List<IDockerParameter> params = result.getContainer().getDocker().getParameters();
+    assertThat(
+        params, is(Arrays.asList(IDockerParameter.build(new DockerParameter("foo", "bar")))));
+  }
+
+  @Test
+  public void testPassthroughDockerParameters() throws TaskDescriptionException {
+    TaskConfig taskConfig = CONFIG_WITH_CONTAINER.deepCopy();
+    DockerParameter userParameter = new DockerParameter("bar", "baz");
+    taskConfig.getContainer().getDocker().getParameters().clear();
+    taskConfig.getContainer().getDocker().addToParameters(userParameter);
+
+    ITaskConfig result = dockerConfigurationManager.validateAndPopulate(
+        ITaskConfig.build(taskConfig));
+
+    // The resulting task config should contain parameters supplied from user config.
+    List<IDockerParameter> params = result.getContainer().getDocker().getParameters();
+    assertThat(
+        params, is(Arrays.asList(IDockerParameter.build(userParameter))));
+  }
+
+  private void expectTaskDescriptionException(String message) {
+    expectedException.expect(TaskDescriptionException.class);
+    expectedException.expectMessage(message);
   }
 }
