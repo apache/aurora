@@ -14,7 +14,7 @@
 package org.apache.aurora.scheduler.http.api.security;
 
 import java.lang.reflect.Method;
-import java.util.List;
+import java.lang.reflect.Parameter;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,10 +33,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.reflect.Invokable;
-import com.google.common.reflect.Parameter;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
@@ -62,7 +59,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.shiro.authz.Permission;
 import org.apache.shiro.subject.Subject;
-import org.apache.thrift.TBase;
 
 import static java.util.Objects.requireNonNull;
 
@@ -105,6 +101,16 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
           }
         }
       };
+
+  private static class JobKeyGetter {
+    private final int index;
+    private final Function<Object, Optional<JobKey>> func;
+
+    JobKeyGetter(int index, Function<Object, Optional<JobKey>> func) {
+      this.index = index;
+      this.func = func;
+    }
+  }
 
   private static final FieldGetter<JobUpdateRequest, TaskConfig> UPDATE_REQUEST_GETTER =
       new ThriftFieldGetter<>(
@@ -195,26 +201,33 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
     };
   }
 
-  private static int annotatedParameterIndex(Method method) {
+  private static Iterable<JobKeyGetter> annotatedParameterGetters(Method method) {
     for (Method candidateMethod : getCandidateMethods(method)) {
-      List<Parameter> parameters = Invokable.from(candidateMethod).getParameters();
-      List<Integer> parameterIndicies = Lists.newArrayList();
-      for (int i = 0; i < parameters.size(); i++) {
-        if (parameters.get(i).isAnnotationPresent(AuthorizingParam.class)) {
-          parameterIndicies.add(i);
+      Parameter[] parameters = candidateMethod.getParameters();
+      ImmutableList.Builder<JobKeyGetter> jobKeyGetters = ImmutableList.builder();
+      for (int i = 0; i < parameters.length; i++) {
+        Parameter param = parameters[i];
+        if (param.isAnnotationPresent(AuthorizingParam.class)) {
+          Class<?> parameterType = param.getType();
+          @SuppressWarnings("unchecked")
+          Optional<Function<Object, Optional<JobKey>>> jobKeyGetter =
+              Optional.fromNullable(
+                  (Function<Object, Optional<JobKey>>) FIELD_GETTERS_BY_TYPE.get(parameterType));
+          if (!jobKeyGetter.isPresent()) {
+            throw new UnsupportedOperationException(
+                "No "
+                    + JobKey.class.getName()
+                    + " field getter was supplied for "
+                    + parameterType.getName());
+          }
+
+          jobKeyGetters.add(new JobKeyGetter(i, jobKeyGetter.get()));
         }
       }
 
-      if (parameterIndicies.size() == 1) {
-        return Iterables.getOnlyElement(parameterIndicies);
-      } else if (parameterIndicies.size() > 1) {
-        throw new UnsupportedOperationException(
-            "Too many parameters annotated with "
-                + AuthorizingParam.class.getName()
-                + " found on method "
-                + method.getName()
-                + " of class "
-                + method.getDeclaringClass().getName());
+      ImmutableList<JobKeyGetter> getters = jobKeyGetters.build();
+      if (!Iterables.isEmpty(getters)) {
+        return getters;
       }
     }
 
@@ -242,30 +255,25 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
                     + Response.class.getName());
           }
 
-          final int index = annotatedParameterIndex(method);
-          ImmutableList<Parameter> parameters = Invokable.from(method).getParameters();
-          Class<?> parameterType = parameters.get(index).getType().getRawType();
-          if (!TBase.class.isAssignableFrom(parameterType)) {
-            throw new UnsupportedOperationException(
-                "Annotated parameter must be a thrift struct.");
-          }
-          @SuppressWarnings("unchecked")
-          final Optional<Function<Object, Optional<JobKey>>> jobKeyGetter =
-              Optional.fromNullable(
-                  (Function<Object, Optional<JobKey>>) FIELD_GETTERS_BY_TYPE.get(parameterType));
-          if (!jobKeyGetter.isPresent()) {
-            throw new UnsupportedOperationException(
-                "No "
-                    + JobKey.class.getName()
-                    + " field getter was supplied for "
-                    + parameterType.getName());
-          }
+          Iterable<JobKeyGetter> getters = annotatedParameterGetters(method);
           return arguments -> {
-            Optional<Object> argument = Optional.fromNullable(arguments[index]);
-            if (argument.isPresent()) {
-              return jobKeyGetter.get().apply(argument.get());
-            } else {
+            Iterable<JobKeyGetter> nonNullArgGetters =
+                Iterables.filter(getters, getter -> arguments[getter.index] != null);
+            if (Iterables.isEmpty(nonNullArgGetters)) {
               return Optional.absent();
+            } else {
+              if (Iterables.size(nonNullArgGetters) > 1) {
+                throw new IllegalStateException(
+                    "Too many non-null arguments annotated with "
+                        + AuthorizingParam.class.getName()
+                        + " passed to "
+                        + method.getName()
+                        + " of "
+                        + method.getDeclaringClass().getName());
+              }
+
+              JobKeyGetter getter = Iterables.getOnlyElement(nonNullArgGetters);
+              return getter.func.apply(arguments[getter.index]);
             }
           };
         }

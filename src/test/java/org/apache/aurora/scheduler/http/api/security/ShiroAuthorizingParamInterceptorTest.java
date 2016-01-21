@@ -16,7 +16,10 @@ package org.apache.aurora.scheduler.http.api.security;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.matcher.Matchers;
@@ -24,6 +27,8 @@ import com.google.inject.matcher.Matchers;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.TaskQuery;
@@ -186,5 +191,56 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
             new TaskQuery().setJobKeys(
                 ImmutableSet.of(JOB_KEY.newBuilder(), JOB_KEY.newBuilder().setName("other"))))
         .orNull());
+  }
+
+  @Test
+  public void testHandlesMultipleAnnotations() {
+    control.replay();
+
+    Function<Object[], Optional<JobKey>> func =
+        interceptor.getAuthorizingParamGetters().getUnchecked(Params.class.getMethods()[0]);
+
+    func.apply(new Object[]{new TaskQuery(), null, null});
+    func.apply(new Object[]{null, new JobKey(), null});
+    func.apply(new Object[]{null, null, new JobUpdateRequest()});
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void testThrowsOnMultipleNonNullArguments() {
+    control.replay();
+
+    Function<Object[], Optional<JobKey>> func =
+        interceptor.getAuthorizingParamGetters().getUnchecked(Params.class.getMethods()[0]);
+
+    func.apply(new Object[]{new TaskQuery(), new JobKey(), null});
+  }
+
+  @Test(expected = UncheckedExecutionException.class)
+     public void testThrowsNoAuthParams() {
+    control.replay();
+
+    interceptor.getAuthorizingParamGetters().getUnchecked(NoParams.class.getMethods()[0]);
+  }
+
+  @Test(expected = UncheckedExecutionException.class)
+  public void testThrowsNoResponseReturned() {
+    control.replay();
+
+    interceptor.getAuthorizingParamGetters().getUnchecked(NoResponse.class.getMethods()[0]);
+  }
+
+  private interface NoResponse {
+    void test(@AuthorizingParam TaskQuery query);
+  }
+
+  private interface NoParams {
+    Response test(TaskQuery query);
+  }
+
+  private interface Params {
+    Response test(
+        @AuthorizingParam TaskQuery query,
+        @AuthorizingParam JobKey job,
+        @AuthorizingParam JobUpdateRequest request);
   }
 }

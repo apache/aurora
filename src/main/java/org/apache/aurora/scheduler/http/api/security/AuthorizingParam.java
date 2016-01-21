@@ -26,9 +26,14 @@ import java.lang.annotation.Target;
  * parameter, otherwise a privilege escalation vulnerability exists.
  *
  * <p>
- * A method intercepted by this interceptor that does not contain an AuthorizingParam or with
- * multiple AuthorizingParams will result in an {@link java.lang.IllegalStateException} from the
- * interceptor.
+ * A method intercepted by this interceptor that does not contain an AuthorizingParam will result
+ * in an {@link java.lang.IllegalStateException} from the interceptor.
+ *
+ * <p>
+ * It is possible to have more than one AuthorizingParam annotations applied to a method. This may
+ * be needed to ensure graceful deprecation cycle of the old annotated parameter for backwards
+ * compatibility reasons. In such cases, only one of the annotated arguments must be non-null or
+ * an {@link java.lang.IllegalStateException} is thrown.
  *
  * <p>
  * If the parameter type is not known to the interceptor an {@link java.lang.IllegalStateException}
