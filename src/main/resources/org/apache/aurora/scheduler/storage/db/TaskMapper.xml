@@ -58,7 +58,7 @@
       e.message AS message,
       e.scheduler_host AS scheduler
     FROM task_events AS e
-    WHERE e.task_row_id = #{id}
+    WHERE e.task_row_id = (SELECT id FROM tasks WHERE task_id = #{task_id})
     ORDER BY e.timestamp_ms ASC
   </select>
 
@@ -80,12 +80,12 @@
     <collection
         property="assignedTask.assignedPorts"
         select="selectPorts"
-        column="row_id"
+        column="task_id"
         foreignColumn="task_row_id"/>
     <collection
         property="taskEvents"
         select="selectTaskEvents"
-        column="row_id"
+        column="task_id"
         foreignColumn="task_row_id"/>
   </resultMap>
 
@@ -225,7 +225,7 @@
       name,
       port
     FROM task_ports
-    WHERE task_row_id = #{taskRowId}
+    WHERE task_row_id = (SELECT id FROM tasks WHERE task_id = #{task_id})
   </select>
 
   <delete id="truncate">

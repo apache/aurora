@@ -18,7 +18,6 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.FluentIterable;
@@ -537,31 +536,6 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     } finally {
       MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS);
     }
-  }
-
-  @Test
-  public void testLegacyPermissiveTransactionIsolation() throws Exception {
-    // Ensures that a thread launched within a transaction can read the uncommitted changes caused
-    // by the transaction.  This is not a pattern that we should embrace, but is necessary for
-    // DbStorage to match behavior with MemStorage.
-    // TODO(wfarner): Create something like a transaction-aware Executor so that we can still
-    // asynchronously react to a completed transaction, but in a way that allows for more strict
-    // transaction isolation.
-
-    ExecutorService executor = Executors.newFixedThreadPool(1,
-        new ThreadFactoryBuilder().setNameFormat("AsyncRead-%d").setDaemon(true).build());
-    addTearDown(() -> MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS));
-
-    saveTasks(TASK_A);
-    storage.write((NoResult<Exception>) storeProvider -> {
-      IScheduledTask taskARunning = TaskTestUtil.addStateTransition(TASK_A, RUNNING, 1000L);
-      saveTasks(taskARunning);
-
-      Future<ScheduleStatus> asyncReadState = executor.submit(
-          () -> Iterables.getOnlyElement(fetchTasks(Query.taskScoped(Tasks.id(TASK_A))))
-              .getStatus());
-      assertEquals(RUNNING, asyncReadState.get());
-    });
   }
 
   @Test

@@ -112,12 +112,9 @@ public final class DbModule extends PrivateModule {
         .putAll(jdbcUriArgs)
         // We always disable the MvStore, as it is in beta as of this writing.
         .put("MV_STORE", "false")
-        // In several scenarios, we initiate asynchronous work in the context of a transaction,
-        // which can cause the asynchronous work to read yet-to-be-committed data.  Since this
-        // is currently only used as an in-memory store, we allow reads of uncommitted data to match
-        // previous behavior of the map-based store, and allow this type of pattern to work without
-        // regression.
-        .put("LOCK_MODE", "0")
+        // READ COMMITTED transaction isolation.  More details here
+        // http://www.h2database.com/html/advanced.html?#transaction_isolation
+        .put("LOCK_MODE", "3")
         // Error-level reporting for H2.
         // See http://www.h2database.com/html/features.html#trace_options
         // TODO(wfarner): H2 can ship these to slf4j, but is too noisy at our default level (info).
