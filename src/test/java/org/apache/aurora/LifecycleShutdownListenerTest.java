@@ -13,11 +13,10 @@
  */
 package org.apache.aurora;
 
-import com.google.common.util.concurrent.AbstractService;
-import com.google.common.util.concurrent.Service;
 import com.google.common.util.concurrent.ServiceManager;
 
 import org.apache.aurora.GuavaUtils.LifecycleShutdownListener;
+import org.apache.aurora.GuavaUtils.PassiveService;
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
@@ -25,18 +24,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class LifecycleShutdownListenerTest extends EasyMockTest {
-
-  private static final Service NOOP_SERVICE = new AbstractService() {
-    @Override
-    protected void doStart() {
-      // Noop.
-    }
-
-    @Override
-    protected void doStop() {
-      // Noop.
-    }
-  };
 
   private Command shutdown;
   private ServiceManager.Listener listener;
@@ -53,6 +40,6 @@ public class LifecycleShutdownListenerTest extends EasyMockTest {
 
     control.replay();
 
-    listener.failure(NOOP_SERVICE);
+    listener.failure(new PassiveService());
   }
 }

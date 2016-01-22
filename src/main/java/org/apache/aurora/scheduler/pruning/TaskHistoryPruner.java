@@ -14,9 +14,6 @@
 package org.apache.aurora.scheduler.pruning;
 
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
 
@@ -25,10 +22,9 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Queues;
 import com.google.common.eventbus.Subscribe;
-import com.google.common.util.concurrent.AbstractScheduledService;
 
+import org.apache.aurora.GuavaUtils.PassiveService;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
@@ -56,7 +52,7 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
  * Prunes tasks in a job based on per-job history and an inactive time threshold by observing tasks
  * transitioning into one of the inactive states.
  */
-public class TaskHistoryPruner extends AbstractScheduledService implements EventSubscriber {
+public class TaskHistoryPruner extends PassiveService implements EventSubscriber {
   private static final Logger LOG = LoggerFactory.getLogger(TaskHistoryPruner.class);
 
   private final DelayExecutor executor;
@@ -64,7 +60,6 @@ public class TaskHistoryPruner extends AbstractScheduledService implements Event
   private final Clock clock;
   private final HistoryPrunnerSettings settings;
   private final Storage storage;
-  private final ConcurrentLinkedQueue<FutureTask<Void>> futureTasks;
 
   private final Predicate<IScheduledTask> safeToDelete = new Predicate<IScheduledTask>() {
     @Override
@@ -103,7 +98,6 @@ public class TaskHistoryPruner extends AbstractScheduledService implements Event
     this.clock = requireNonNull(clock);
     this.settings = requireNonNull(settings);
     this.storage = requireNonNull(storage);
-    this.futureTasks = Queues.newConcurrentLinkedQueue();
   }
 
   @VisibleForTesting
@@ -133,22 +127,6 @@ public class TaskHistoryPruner extends AbstractScheduledService implements Event
     }
   }
 
-  @Override
-  protected void runOneIteration() throws Exception {
-    // Check if the prune attempts fail and propagate the exception. This will trigger
-    // service (and the scheduler) to shut down.
-    FutureTask<Void> future;
-
-    while ((future = futureTasks.poll()) != null) {
-      future.get();
-    }
-  }
-
-  @Override
-  protected Scheduler scheduler() {
-    return AbstractScheduledService.Scheduler.newFixedDelaySchedule(0, 5, TimeUnit.SECONDS);
-  }
-
   private void deleteTasks(final Set<String> taskIds) {
     LOG.info("Pruning inactive tasks " + taskIds);
     storage.write(
@@ -160,6 +138,16 @@ public class TaskHistoryPruner extends AbstractScheduledService implements Event
     return Query.jobScoped(jobKey).byStatus(apiConstants.TERMINAL_STATES);
   }
 
+  private Runnable failureNotifyingRunnable(Runnable runnable) {
+    return () -> {
+      try {
+        runnable.run();
+      } catch (Throwable t) {
+        notifyFailed(t);
+      }
+    };
+  }
+
   private void registerInactiveTask(
       final IJobKey jobKey,
       final String taskId,
@@ -167,15 +155,14 @@ public class TaskHistoryPruner extends AbstractScheduledService implements Event
 
     LOG.debug("Prune task " + taskId + " in " + timeRemaining + " ms.");
 
-    FutureTask<Void> pruneSingleTask = new FutureTask<>(() -> {
-      LOG.info("Pruning expired inactive task " + taskId);
-      deleteTasks(ImmutableSet.of(taskId));
-    }, null);
-    futureTasks.add(pruneSingleTask);
+    executor.execute(
+        failureNotifyingRunnable(() -> {
+          LOG.info("Pruning expired inactive task " + taskId);
+          deleteTasks(ImmutableSet.of(taskId));
+        }),
+        Amount.of(timeRemaining, Time.MILLISECONDS));
 
-    executor.execute(pruneSingleTask, Amount.of(timeRemaining, Time.MILLISECONDS));
-
-    FutureTask<Void> pruneRemainingTasksFromJob = new FutureTask<>(() -> {
+    executor.execute(failureNotifyingRunnable(() -> {
       Iterable<IScheduledTask> inactiveTasks =
           Storage.Util.fetchTasks(storage, jobHistoryQuery(jobKey));
       int numInactiveTasks = Iterables.size(inactiveTasks);
@@ -191,9 +178,6 @@ public class TaskHistoryPruner extends AbstractScheduledService implements Event
           deleteTasks(toPrune);
         }
       }
-    }, null);
-    futureTasks.add(pruneRemainingTasksFromJob);
-
-    executor.execute(pruneRemainingTasksFromJob);
+    }));
   }
 }
