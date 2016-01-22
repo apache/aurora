@@ -32,7 +32,6 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.BackoffStrategy;
 import org.apache.aurora.common.util.Random;
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -147,10 +146,7 @@ public interface RescheduleCalculator {
         return Optional.absent();
       }
 
-      Iterable<IScheduledTask> res =
-          Storage.Util.fetchTasks(storage, Query.taskScoped(task.getAncestorId()));
-
-      return Optional.fromNullable(Iterables.getOnlyElement(res, null));
+      return Storage.Util.fetchTask(storage, task.getAncestorId());
     }
 
     @Override

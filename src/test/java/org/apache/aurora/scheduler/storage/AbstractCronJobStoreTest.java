@@ -26,7 +26,6 @@ import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
@@ -114,8 +113,8 @@ public abstract class AbstractCronJobStoreTest {
     saveAcceptedJob(JOB_A);
 
     storage.write(storeProvider ->
-        storeProvider.getUnsafeTaskStore().mutateTasks(
-            Query.taskScoped(Tasks.id(instance)),
+        storeProvider.getUnsafeTaskStore().mutateTask(
+            Tasks.id(instance),
             task -> IScheduledTask.build(task.newBuilder().setStatus(ScheduleStatus.RUNNING))));
   }
 

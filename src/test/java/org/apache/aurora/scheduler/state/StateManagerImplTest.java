@@ -202,7 +202,7 @@ public class StateManagerImplTest extends EasyMockTest {
             .setTask(NON_SERVICE_CONFIG.newBuilder()));
     assertEquals(
         ImmutableSet.of(IScheduledTask.build(expected)),
-        Storage.Util.fetchTasks(storage, Query.taskScoped(taskId)));
+        Storage.Util.fetchTask(storage, taskId).asSet());
   }
 
   @Test
@@ -343,8 +343,7 @@ public class StateManagerImplTest extends EasyMockTest {
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
     changeState(taskId, FAILED);
-    IScheduledTask rescheduledTask = Iterables.getOnlyElement(
-        Storage.Util.fetchTasks(storage, Query.taskScoped(taskId2)));
+    IScheduledTask rescheduledTask = Storage.Util.fetchTask(storage, taskId2).get();
     assertEquals(taskId, rescheduledTask.getAncestorId());
     assertEquals(1, rescheduledTask.getFailureCount());
   }
@@ -422,8 +421,7 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTask(task, 0);
     assignTask(taskId, HOST_A, ImmutableMap.of("one", 80, "two", 81, "three", 82));
 
-    IScheduledTask actual = Iterables.getOnlyElement(
-        Storage.Util.fetchTasks(storage, Query.taskScoped(taskId)));
+    IScheduledTask actual = Storage.Util.fetchTask(storage, taskId).get();
 
     assertEquals(
         requestedPorts,
@@ -453,8 +451,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
     assignTask(newTaskId, HOST_A, ImmutableMap.of("one", 86));
 
-    IScheduledTask actual = Iterables.getOnlyElement(
-        Storage.Util.fetchTasks(storage, Query.taskScoped(newTaskId)));
+    IScheduledTask actual = Storage.Util.fetchTask(storage, newTaskId).get();
 
     assertEquals(ImmutableMap.of("one", 86), actual.getAssignedTask().getAssignedPorts());
   }

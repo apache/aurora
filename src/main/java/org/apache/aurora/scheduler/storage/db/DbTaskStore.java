@@ -79,6 +79,14 @@ class DbTaskStore implements TaskStore.Mutable {
     this.slowQueryThresholdNanos =  slowQueryThreshold.as(Time.NANOSECONDS);
   }
 
+  @Timed("db_storage_fetch_task")
+  @Override
+  public Optional<IScheduledTask> fetchTask(String taskId) {
+    requireNonNull(taskId);
+    return Optional.fromNullable(taskMapper.selectById(taskId))
+        .transform(DbScheduledTask::toImmutable);
+  }
+
   @Timed("db_storage_fetch_tasks")
   @Override
   public ImmutableSet<IScheduledTask> fetchTasks(Builder query) {
@@ -160,6 +168,34 @@ class DbTaskStore implements TaskStore.Mutable {
     }
   }
 
+  private Function<IScheduledTask, IScheduledTask> mutateAndSave(
+      Function<IScheduledTask, IScheduledTask> mutator) {
+
+    return original -> {
+      IScheduledTask maybeMutated = mutator.apply(original);
+      requireNonNull(maybeMutated);
+      if (!original.equals(maybeMutated)) {
+        Preconditions.checkState(
+            Tasks.id(original).equals(Tasks.id(maybeMutated)),
+            "A task's ID may not be mutated.");
+        saveTasks(ImmutableSet.of(maybeMutated));
+      }
+      return maybeMutated;
+    };
+  }
+
+  @Timed("db_storage_mutate_task")
+  @Override
+  public Optional<IScheduledTask> mutateTask(
+      String taskId,
+      Function<IScheduledTask, IScheduledTask> mutator) {
+
+    requireNonNull(taskId);
+    requireNonNull(mutator);
+
+    return fetchTask(taskId).transform(mutateAndSave(mutator));
+  }
+
   @Timed("db_storage_mutate_tasks")
   @Override
   public ImmutableSet<IScheduledTask> mutateTasks(
@@ -169,19 +205,13 @@ class DbTaskStore implements TaskStore.Mutable {
     requireNonNull(query);
     requireNonNull(mutator);
 
-    ImmutableSet.Builder<IScheduledTask> mutated = ImmutableSet.builder();
-    for (IScheduledTask original : fetchTasks(query)) {
-      IScheduledTask maybeMutated = mutator.apply(original);
-      if (!original.equals(maybeMutated)) {
-        Preconditions.checkState(
-            Tasks.id(original).equals(Tasks.id(maybeMutated)),
-            "A task's ID may not be mutated.");
-        saveTasks(ImmutableSet.of(maybeMutated));
-        mutated.add(maybeMutated);
-      }
-    }
-
-    return mutated.build();
+    Function<IScheduledTask, IScheduledTask> mutateFunction = mutateAndSave(mutator);
+    Iterable<Optional<IScheduledTask>> mutations = matches(query)
+        .transform(original -> {
+          IScheduledTask mutateResult = mutateFunction.apply(original);
+          return original.equals(mutateResult) ? Optional.absent() : Optional.of(mutateResult);
+        });
+    return ImmutableSet.copyOf(Optional.presentInstances(mutations));
   }
 
   @Timed("db_storage_unsafe_modify_in_place")
@@ -189,8 +219,7 @@ class DbTaskStore implements TaskStore.Mutable {
   public boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration) {
     checkNotNull(taskId);
     checkNotNull(taskConfiguration);
-    Optional<IScheduledTask> task =
-        Optional.fromNullable(Iterables.getOnlyElement(fetchTasks(Query.taskScoped(taskId)), null));
+    Optional<IScheduledTask> task = fetchTask(taskId);
     if (task.isPresent()) {
       deleteTasks(ImmutableSet.of(taskId));
       ScheduledTask builder = task.get().newBuilder();

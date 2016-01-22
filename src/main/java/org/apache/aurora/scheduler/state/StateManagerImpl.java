@@ -31,7 +31,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
@@ -47,6 +46,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
+import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.state.SideEffect.Action;
@@ -163,18 +163,16 @@ public class StateManagerImpl implements StateManager {
   public IAssignedTask assignTask(
       MutableStoreProvider storeProvider,
       String taskId,
-      final String slaveHost,
-      final SlaveID slaveId,
-      final Map<String, Integer> assignedPorts) {
+      String slaveHost,
+      SlaveID slaveId,
+      Map<String, Integer> assignedPorts) {
 
     checkNotBlank(taskId);
     checkNotBlank(slaveHost);
     requireNonNull(slaveId);
     requireNonNull(assignedPorts);
 
-    Query.Builder query = Query.taskScoped(taskId);
-
-    storeProvider.getUnsafeTaskStore().mutateTasks(query,
+    IScheduledTask mutated = storeProvider.getUnsafeTaskStore().mutateTask(taskId,
         task -> {
           ScheduledTask builder = task.newBuilder();
           builder.getAssignedTask()
@@ -182,7 +180,7 @@ public class StateManagerImpl implements StateManager {
               .setSlaveHost(slaveHost)
               .setSlaveId(slaveId.getValue());
           return IScheduledTask.build(builder);
-        });
+        }).get();
 
     StateChangeResult changeResult = updateTaskAndExternalState(
         storeProvider.getUnsafeTaskStore(),
@@ -195,10 +193,7 @@ public class StateManagerImpl implements StateManager {
         changeResult == SUCCESS,
         "Attempt to assign task " + taskId + " to " + slaveHost + " failed");
 
-    return Iterables.getOnlyElement(
-        Iterables.transform(
-            storeProvider.getTaskStore().fetchTasks(query),
-            IScheduledTask::getAssignedTask));
+    return mutated.getAssignedTask();
   }
 
   @VisibleForTesting
@@ -219,9 +214,7 @@ public class StateManagerImpl implements StateManager {
       ScheduleStatus targetState,
       Optional<String> transitionMessage) {
 
-    Optional<IScheduledTask> task = Optional.fromNullable(Iterables.getOnlyElement(
-        taskStore.fetchTasks(Query.taskScoped(taskId)),
-        null));
+    Optional<IScheduledTask> task = taskStore.fetchTask(taskId);
 
     // CAS operation fails if the task does not exist, or the states don't match.
     if (casState.isPresent()
@@ -264,34 +257,32 @@ public class StateManagerImpl implements StateManager {
   private StateChangeResult updateTaskAndExternalState(
       TaskStore.Mutable taskStore,
       String taskId,
-      // Note: This argument is deliberately non-final, and should not be made final.
+      // Note: This argument should be used with caution.
       // This is because using the captured value within the storage operation below is
       // highly-risky, since it doesn't necessarily represent the value in storage.
       // As a result, it would be easy to accidentally clobber mutations.
       Optional<IScheduledTask> task,
-      final Optional<ScheduleStatus> targetState,
-      final Optional<String> transitionMessage) {
+      Optional<ScheduleStatus> targetState,
+      Optional<String> transitionMessage) {
 
     if (task.isPresent()) {
       Preconditions.checkArgument(taskId.equals(task.get().getAssignedTask().getTaskId()));
     }
 
-    final List<PubsubEvent> events = Lists.newArrayList();
+    List<PubsubEvent> events = Lists.newArrayList();
 
-    final TaskStateMachine stateMachine = task.isPresent()
+    TaskStateMachine stateMachine = task.isPresent()
         ? new TaskStateMachine(task.get())
         : new TaskStateMachine(taskId);
 
     TransitionResult result = stateMachine.updateState(targetState);
-    Query.Builder query = Query.taskScoped(taskId);
 
     for (SideEffect sideEffect : ACTION_ORDER.sortedCopy(result.getSideEffects())) {
-      Optional<IScheduledTask> upToDateTask = Optional.fromNullable(
-          Iterables.getOnlyElement(taskStore.fetchTasks(query), null));
+      Optional<IScheduledTask> upToDateTask = taskStore.fetchTask(taskId);
 
       switch (sideEffect.getAction()) {
         case INCREMENT_FAILURES:
-          taskStore.mutateTasks(query, task1 -> IScheduledTask.build(
+          taskStore.mutateTask(taskId, task1 -> IScheduledTask.build(
               task1.newBuilder().setFailureCount(task1.getFailureCount() + 1)));
           break;
 
@@ -300,7 +291,7 @@ public class StateManagerImpl implements StateManager {
               upToDateTask.isPresent(),
               "Operation expected task " + taskId + " to be present.");
 
-          taskStore.mutateTasks(query, task1 -> {
+          Optional<IScheduledTask> mutated = taskStore.mutateTask(taskId, task1 -> {
             ScheduledTask mutableTask = task1.newBuilder();
             mutableTask.setStatus(targetState.get());
             mutableTask.addToTaskEvents(new TaskEvent()
@@ -310,10 +301,7 @@ public class StateManagerImpl implements StateManager {
                 .setScheduler(LOCAL_HOST_SUPPLIER.get()));
             return IScheduledTask.build(mutableTask);
           });
-          events.add(
-              PubsubEvent.TaskStateChange.transition(
-                  Iterables.getOnlyElement(taskStore.fetchTasks(query)),
-                  stateMachine.getPreviousState()));
+          events.add(TaskStateChange.transition(mutated.get(), stateMachine.getPreviousState()));
           break;
 
         case RESCHEDULE:

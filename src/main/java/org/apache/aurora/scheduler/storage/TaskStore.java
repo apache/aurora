@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.storage;
 import java.util.Set;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
 
@@ -34,8 +35,16 @@ import static com.google.common.base.CharMatcher.WHITESPACE;
 public interface TaskStore {
 
   /**
+   * Fetches a task.
+   *
+   * @param taskId ID of the task to fetch.
+   * @return The task, if it exists.
+   */
+  Optional<IScheduledTask> fetchTask(String taskId);
+
+  /**
    * Fetches a read-only view of tasks matching a query and filters. Intended for use with a
-   * {@link org.apache.aurora.scheduler.base.Query.Builder}.
+   * {@link Query.Builder}.
    *
    * @param query Builder of the query to identify tasks with.
    * @return A read-only view of matching tasks.
@@ -82,14 +91,23 @@ public interface TaskStore {
     void deleteTasks(Set<String> taskIds);
 
     /**
+     * Mutates a single task, if present.
+     *
+     * @param taskId Unique ID of the task to mutate.
+     * @param mutator The mutate operation.
+     * @return The result of the mutate operation, if performed.
+     */
+    Optional<IScheduledTask> mutateTask(
+        String taskId,
+        Function<IScheduledTask, IScheduledTask> mutator);
+
+    /**
      * Offers temporary mutable access to tasks.  If a task ID is not found, it will be silently
      * skipped, and no corresponding task will be returned.
-     * TODO(wfarner): Consider a non-batch variant of this, since that's a more common use case,
-     * and it prevents the caller from worrying about a bad query having broad impact.
      *
      * @param query Query to match tasks against.
      * @param mutator The mutate operation.
-     * @return Immutable copies of only the tasks that were mutated.
+     * @return Immutable copies <em>of only the tasks that were mutated</em>.
      */
     ImmutableSet<IScheduledTask> mutateTasks(
         Query.Builder query,

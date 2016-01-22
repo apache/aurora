@@ -29,7 +29,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator.RescheduleCalculatorImpl;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -78,7 +77,7 @@ public class RescheduleCalculatorImplTest extends EasyMockTest {
   @Test
   public void testNoPenaltyDeletedAncestor() {
     String ancestorId = "a";
-    storageUtil.expectTaskFetch(Query.taskScoped(ancestorId));
+    storageUtil.expectTaskFetch(ancestorId);
 
     control.replay();
 
@@ -90,7 +89,7 @@ public class RescheduleCalculatorImplTest extends EasyMockTest {
   @Test
   public void testFlappingTask() {
     IScheduledTask ancestor = makeFlappyTask("a");
-    storageUtil.expectTaskFetch(Query.taskScoped(Tasks.id(ancestor)), ancestor);
+    storageUtil.expectTaskFetch(Tasks.id(ancestor), ancestor);
     long penaltyMs = 1000L;
     expect(backoff.calculateBackoffMs(0L)).andReturn(penaltyMs);
 
@@ -119,9 +118,7 @@ public class RescheduleCalculatorImplTest extends EasyMockTest {
 
     long lastPenalty = 0L;
     for (Map.Entry<IScheduledTask, Long> taskAndPenalty : ancestorsAndPenalties.entrySet()) {
-      storageUtil.expectTaskFetch(
-          Query.taskScoped(Tasks.id(taskAndPenalty.getKey())),
-          taskAndPenalty.getKey());
+      storageUtil.expectTaskFetch(Tasks.id(taskAndPenalty.getKey()), taskAndPenalty.getKey());
       expect(backoff.calculateBackoffMs(lastPenalty)).andReturn(taskAndPenalty.getValue());
       lastPenalty = taskAndPenalty.getValue();
     }
@@ -137,7 +134,7 @@ public class RescheduleCalculatorImplTest extends EasyMockTest {
     IScheduledTask ancestor = setEvents(
         makeTask("a", KILLED),
         ImmutableMap.of(INIT, 0L, PENDING, 100L, RUNNING, 200L, KILLING, 300L, KILLED, 400L));
-    storageUtil.expectTaskFetch(Query.taskScoped(Tasks.id(ancestor)), ancestor);
+    storageUtil.expectTaskFetch(Tasks.id(ancestor), ancestor);
 
     control.replay();
 

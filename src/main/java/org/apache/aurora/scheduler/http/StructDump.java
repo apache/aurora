@@ -23,15 +23,14 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.Iterables;
 
 import org.apache.aurora.common.thrift.Util;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.thrift.TBase;
 
 import static java.util.Objects.requireNonNull;
@@ -73,13 +72,10 @@ public class StructDump extends JerseyTemplateServlet {
   public Response dumpJob(
       @PathParam("task") final String taskId) {
 
-    return dumpEntity("Task " + taskId, storeProvider -> {
-      // Deep copy the struct to sidestep any subclass trickery inside the storage system.
-      return Optional.fromNullable(Iterables.getOnlyElement(
-              storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskId)),
-              null)
-          .newBuilder());
-    });
+    return dumpEntity(
+        "Task " + taskId,
+        storeProvider ->
+            storeProvider.getTaskStore().fetchTask(taskId).transform(IScheduledTask::newBuilder));
   }
 
   /**

@@ -124,13 +124,20 @@ class MemTaskStore implements TaskStore.Mutable {
     taskQueriesAll = statsProvider.makeCounter("task_queries_all");
   }
 
+  @Timed("mem_storage_fetch_task")
+  @Override
+  public Optional<IScheduledTask> fetchTask(String taskId) {
+    requireNonNull(taskId);
+    return Optional.fromNullable(tasks.get(taskId)).transform(t -> t.storedTask);
+  }
+
   @Timed("mem_storage_fetch_tasks")
   @Override
   public ImmutableSet<IScheduledTask> fetchTasks(Query.Builder query) {
     requireNonNull(query);
 
     long start = System.nanoTime();
-    ImmutableSet<IScheduledTask> result = matches(query).transform(TO_SCHEDULED).toSet();
+    ImmutableSet<IScheduledTask> result = matches(query).toSet();
     long durationNanos = System.nanoTime() - start;
     boolean infoLevel = durationNanos >= slowQueryThresholdNanos;
     long time = Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
@@ -196,6 +203,34 @@ class MemTaskStore implements TaskStore.Mutable {
     }
   }
 
+  private Function<IScheduledTask, IScheduledTask> mutateAndSave(
+      Function<IScheduledTask, IScheduledTask> mutator) {
+
+    return original -> {
+      IScheduledTask maybeMutated = mutator.apply(original);
+      requireNonNull(maybeMutated);
+      if (!original.equals(maybeMutated)) {
+        Preconditions.checkState(
+            Tasks.id(original).equals(Tasks.id(maybeMutated)),
+            "A task's ID may not be mutated.");
+        tasks.put(Tasks.id(maybeMutated), toTask.apply(maybeMutated));
+        for (SecondaryIndex<?> index : secondaryIndices) {
+          index.replace(original, maybeMutated);
+        }
+      }
+      return maybeMutated;
+    };
+  }
+
+  @Timed("mem_storage_mutate_task")
+  @Override
+  public Optional<IScheduledTask> mutateTask(
+      String taskId,
+      Function<IScheduledTask, IScheduledTask> mutator) {
+
+    return fetchTask(taskId).transform(mutateAndSave(mutator));
+  }
+
   @Timed("mem_storage_mutate_tasks")
   @Override
   public ImmutableSet<IScheduledTask> mutateTasks(
@@ -205,23 +240,13 @@ class MemTaskStore implements TaskStore.Mutable {
     requireNonNull(query);
     requireNonNull(mutator);
 
-    ImmutableSet.Builder<IScheduledTask> mutated = ImmutableSet.builder();
-    for (Task original : matches(query).toList()) {
-      IScheduledTask maybeMutated = mutator.apply(original.storedTask);
-      if (!original.storedTask.equals(maybeMutated)) {
-        Preconditions.checkState(
-            Tasks.id(original.storedTask).equals(Tasks.id(maybeMutated)),
-            "A task's ID may not be mutated.");
-        tasks.put(Tasks.id(maybeMutated), toTask.apply(maybeMutated));
-        for (SecondaryIndex<?> index : secondaryIndices) {
-          index.replace(original.storedTask, maybeMutated);
-        }
-
-        mutated.add(maybeMutated);
-      }
-    }
-
-    return mutated.build();
+    Function<IScheduledTask, IScheduledTask> mutateFunction = mutateAndSave(mutator);
+    Iterable<Optional<IScheduledTask>> mutations = matches(query)
+        .transform(original -> {
+          IScheduledTask mutateResult = mutateFunction.apply(original);
+          return original.equals(mutateResult) ? Optional.absent() : Optional.of(mutateResult);
+        });
+    return ImmutableSet.copyOf(Optional.presentInstances(mutations));
   }
 
   @Timed("mem_storage_unsafe_modify_in_place")
@@ -259,7 +284,7 @@ class MemTaskStore implements TaskStore.Mutable {
         .toList();
   }
 
-  private FluentIterable<Task> matches(Query.Builder query) {
+  private FluentIterable<IScheduledTask> matches(Query.Builder query) {
     // Apply the query against the working set.
     Optional<? extends Iterable<Task>> from = Optional.absent();
     if (query.get().isSetTaskIds()) {
@@ -284,7 +309,9 @@ class MemTaskStore implements TaskStore.Mutable {
       }
     }
 
-    return FluentIterable.from(from.get()).filter(queryFilter(query));
+    return FluentIterable.from(from.get())
+        .filter(queryFilter(query))
+        .transform(TO_SCHEDULED);
   }
 
   private static final Function<Task, IScheduledTask> TO_SCHEDULED = task -> task.storedTask;

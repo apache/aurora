@@ -193,12 +193,21 @@ class WriteAheadStorage extends WriteAheadStorageForwarder implements
   }
 
   @Override
-  public ImmutableSet<IScheduledTask> mutateTasks(
-      final Query.Builder query,
-      final Function<IScheduledTask, IScheduledTask> mutator) {
+  public Optional<IScheduledTask> mutateTask(
+      String taskId,
+      Function<IScheduledTask, IScheduledTask> mutator) {
 
-    requireNonNull(query);
-    requireNonNull(mutator);
+    Optional<IScheduledTask> mutated = taskStore.mutateTask(taskId, mutator);
+    log.debug("Storing updated task to log: {}={}", taskId, mutated.get().getStatus());
+    write(Op.saveTasks(new SaveTasks(ImmutableSet.of(mutated.get().newBuilder()))));
+
+    return mutated;
+  }
+
+  @Override
+  public ImmutableSet<IScheduledTask> mutateTasks(
+      Query.Builder query,
+      Function<IScheduledTask, IScheduledTask> mutator) {
 
     ImmutableSet<IScheduledTask> mutated = taskStore.mutateTasks(query, mutator);
 

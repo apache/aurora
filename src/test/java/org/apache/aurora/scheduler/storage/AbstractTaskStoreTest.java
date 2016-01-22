@@ -20,10 +20,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -101,6 +101,10 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     });
   }
 
+  private Optional<IScheduledTask> fetchTask(String taskId) {
+    return storage.read(storeProvider -> storeProvider.getTaskStore().fetchTask(taskId));
+  }
+
   private Iterable<IScheduledTask> fetchTasks(Query.Builder query) {
     return storage.read(storeProvider -> storeProvider.getTaskStore().fetchTasks(query));
   }
@@ -114,10 +118,12 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
         storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.copyOf(tasks)));
   }
 
-  private ImmutableSet<IScheduledTask> mutateTasks(
-      final Query.Builder query,
-      final TaskMutation mutation) {
+  private Optional<IScheduledTask> mutateTask(String taskId, TaskMutation mutation) {
+    return storage.write(
+        storeProvider -> storeProvider.getUnsafeTaskStore().mutateTask(taskId, mutation));
+  }
 
+  private ImmutableSet<IScheduledTask> mutateTasks(Query.Builder query, TaskMutation mutation) {
     return storage.write(
         storeProvider -> storeProvider.getUnsafeTaskStore().mutateTasks(query, mutation));
   }
@@ -261,9 +267,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     saveTasks(TASK_A, TASK_B, TASK_C, TASK_D);
     assertQueryResults(Query.statusScoped(RUNNING));
 
-    mutateTasks(
-        Query.taskScoped("a"),
-        task -> IScheduledTask.build(task.newBuilder().setStatus(RUNNING)));
+    mutateTask("a", task -> IScheduledTask.build(task.newBuilder().setStatus(RUNNING)));
 
     assertQueryResults(
         Query.statusScoped(RUNNING),
@@ -293,10 +297,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
 
     saveTasks(TASK_A);
     assertTrue(unsafeModifyInPlace(taskId, updated));
-    Query.Builder query = Query.taskScoped(taskId);
-    ITaskConfig stored =
-        Iterables.getOnlyElement(fetchTasks(query)).getAssignedTask().getTask();
-    assertEquals(updated, stored);
+    assertEquals(updated, fetchTask(taskId).get().getAssignedTask().getTask());
 
     deleteTasks(taskId);
     assertFalse(unsafeModifyInPlace(taskId, updated));
@@ -413,22 +414,22 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     assertQueryResults(Query.slaveScoped(HOST_A.getHost()));
 
     final IScheduledTask b = setHost(a, HOST_A);
-    Set<IScheduledTask> result = mutateTasks(Query.taskScoped(Tasks.id(a)),
+    Optional<IScheduledTask> result = mutateTask(Tasks.id(a),
         task -> {
           assertEquals(a, task);
           return b;
         });
-    assertEquals(ImmutableSet.of(b), result);
+    assertEquals(Optional.of(b), result);
     assertQueryResults(Query.slaveScoped(HOST_A.getHost()), b);
 
     // Unrealistic behavior, but proving that the secondary index can handle key mutations.
     final IScheduledTask c = setHost(b, HOST_B);
-    Set<IScheduledTask> result2 = mutateTasks(Query.taskScoped(Tasks.id(a)),
+    Optional<IScheduledTask> result2 = mutateTask(Tasks.id(a),
         task -> {
           assertEquals(b, task);
           return c;
         });
-    assertEquals(ImmutableSet.of(c), result2);
+    assertEquals(Optional.of(c), result2);
     assertQueryResults(Query.slaveScoped(HOST_B.getHost()), c);
 
     deleteTasks(Tasks.id(a));
@@ -444,12 +445,12 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     assertQueryResults(Query.slaveScoped(HOST_A.getHost()), a);
 
     final IScheduledTask b = unsetHost(a);
-    Set<IScheduledTask> result = mutateTasks(Query.taskScoped(Tasks.id(a)),
+    Optional<IScheduledTask> result = mutateTask(Tasks.id(a),
         task -> {
           assertEquals(a, task);
           return b;
         });
-    assertEquals(ImmutableSet.of(b), result);
+    assertEquals(Optional.of(b), result);
     assertQueryResults(Query.slaveScoped(HOST_A.getHost()));
     assertQueryResults(Query.taskScoped(Tasks.id(b)), b);
   }
