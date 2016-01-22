@@ -307,21 +307,17 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
     expect(log.open()).andReturn(logStream);
     expect(logStream.readAll()).andReturn(recoveredEntries.iterator()).anyTimes();
-    // An empty saveTasks is an artifact of the fact that mutateTasks always writes a log operation
-    // even if nothing is changed.
-    streamMatcher.expectTransaction(Op.saveTasks(new SaveTasks(ImmutableSet.of())))
-        .andReturn(nextPosition());
     streamMatcher.expectTransaction(Op.saveFrameworkId(new SaveFrameworkId(FRAMEWORK_ID)))
         .andReturn(nextPosition());
 
-    final CountDownLatch driverStarted = new CountDownLatch(1);
+    CountDownLatch driverStarted = new CountDownLatch(1);
     expect(driver.start()).andAnswer(() -> {
       driverStarted.countDown();
       return Status.DRIVER_RUNNING;
     });
 
     // Try to be a good test suite citizen by releasing the blocked thread when the test case exits.
-    final CountDownLatch testCompleted = new CountDownLatch(1);
+    CountDownLatch testCompleted = new CountDownLatch(1);
     expect(driver.join()).andAnswer(() -> {
       testCompleted.await();
       return Status.DRIVER_STOPPED;

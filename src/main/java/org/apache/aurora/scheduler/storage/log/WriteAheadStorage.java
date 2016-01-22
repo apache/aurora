@@ -13,14 +13,12 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
@@ -38,8 +36,6 @@ import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
 import org.apache.aurora.gen.storage.SaveLock;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.SaveTasks;
-import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -201,23 +197,6 @@ class WriteAheadStorage extends WriteAheadStorageForwarder implements
     log.debug("Storing updated task to log: {}={}", taskId, mutated.get().getStatus());
     write(Op.saveTasks(new SaveTasks(ImmutableSet.of(mutated.get().newBuilder()))));
 
-    return mutated;
-  }
-
-  @Override
-  public ImmutableSet<IScheduledTask> mutateTasks(
-      Query.Builder query,
-      Function<IScheduledTask, IScheduledTask> mutator) {
-
-    ImmutableSet<IScheduledTask> mutated = taskStore.mutateTasks(query, mutator);
-
-    Map<String, IScheduledTask> tasksById = Tasks.mapById(mutated);
-    log.debug(
-        "Storing updated tasks to log: {}",
-        Maps.transformValues(tasksById, IScheduledTask::getStatus));
-
-    // TODO(William Farner): Avoid writing an op when mutated is empty.
-    write(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
     return mutated;
   }
 

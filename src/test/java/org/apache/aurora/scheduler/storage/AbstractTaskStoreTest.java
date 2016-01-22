@@ -39,7 +39,6 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.Metadata;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
@@ -57,6 +56,7 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
 import static org.junit.Assert.assertEquals;
@@ -123,11 +123,6 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
         storeProvider -> storeProvider.getUnsafeTaskStore().mutateTask(taskId, mutation));
   }
 
-  private ImmutableSet<IScheduledTask> mutateTasks(Query.Builder query, TaskMutation mutation) {
-    return storage.write(
-        storeProvider -> storeProvider.getUnsafeTaskStore().mutateTasks(query, mutation));
-  }
-
   private boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration) {
     return storage.write(storeProvider ->
         storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(taskId, taskConfiguration));
@@ -183,7 +178,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     assertQueryResults(Query.envScoped("role-c", "env-c"), TASK_C);
     assertQueryResults(Query.envScoped("role-c", "devel"));
     assertQueryResults(
-        Query.unscoped().byStatus(ScheduleStatus.PENDING),
+        Query.unscoped().byStatus(ASSIGNED),
         TASK_A, TASK_B, TASK_C, TASK_D);
     assertQueryResults(
         Query.instanceScoped(JobKeys.from("role-a", "env-a", "job-a"), 2).active(), TASK_A);
@@ -273,15 +268,17 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
         Query.statusScoped(RUNNING),
         IScheduledTask.build(TASK_A.newBuilder().setStatus(RUNNING)));
 
-    mutateTasks(
-        Query.unscoped(),
-        task -> IScheduledTask.build(task.newBuilder().setStatus(ScheduleStatus.ASSIGNED)));
+    assertEquals(
+        Optional.absent(),
+        mutateTask(
+            "nonexistent",
+            task -> IScheduledTask.build(task.newBuilder().setStatus(RUNNING))));
 
     assertStoreContents(
-        IScheduledTask.build(TASK_A.newBuilder().setStatus(ScheduleStatus.ASSIGNED)),
-        IScheduledTask.build(TASK_B.newBuilder().setStatus(ScheduleStatus.ASSIGNED)),
-        IScheduledTask.build(TASK_C.newBuilder().setStatus(ScheduleStatus.ASSIGNED)),
-        IScheduledTask.build(TASK_D.newBuilder().setStatus(ScheduleStatus.ASSIGNED)));
+        IScheduledTask.build(TASK_A.newBuilder().setStatus(RUNNING)),
+        IScheduledTask.build(TASK_B.newBuilder().setStatus(ASSIGNED)),
+        IScheduledTask.build(TASK_C.newBuilder().setStatus(ASSIGNED)),
+        IScheduledTask.build(TASK_D.newBuilder().setStatus(ASSIGNED)));
   }
 
   @Test
@@ -323,14 +320,14 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
 
   @Test
   public void testConsistentJobIndex() {
-    final IScheduledTask a = makeTask("a", JobKeys.from("jim", "test", "job"));
-    final IScheduledTask b = makeTask("b", JobKeys.from("jim", "test", "job"));
-    final IScheduledTask c = makeTask("c", JobKeys.from("jim", "test", "job2"));
-    final IScheduledTask d = makeTask("d", JobKeys.from("joe", "test", "job"));
-    final IScheduledTask e = makeTask("e", JobKeys.from("jim", "prod", "job"));
-    final Query.Builder jimsJob = Query.jobScoped(JobKeys.from("jim", "test", "job"));
-    final Query.Builder jimsJob2 = Query.jobScoped(JobKeys.from("jim", "test", "job2"));
-    final Query.Builder joesJob = Query.jobScoped(JobKeys.from("joe", "test", "job"));
+    IScheduledTask a = makeTask("a", JobKeys.from("jim", "test", "job"));
+    IScheduledTask b = makeTask("b", JobKeys.from("jim", "test", "job"));
+    IScheduledTask c = makeTask("c", JobKeys.from("jim", "test", "job2"));
+    IScheduledTask d = makeTask("d", JobKeys.from("joe", "test", "job"));
+    IScheduledTask e = makeTask("e", JobKeys.from("jim", "prod", "job"));
+    Query.Builder jimsJob = Query.jobScoped(JobKeys.from("jim", "test", "job"));
+    Query.Builder jimsJob2 = Query.jobScoped(JobKeys.from("jim", "test", "job2"));
+    Query.Builder joesJob = Query.jobScoped(JobKeys.from("joe", "test", "job"));
 
     saveTasks(a, b, c, d, e);
     assertQueryResults(jimsJob, a, b);
@@ -342,7 +339,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob, d);
 
-    mutateTasks(jimsJob, task -> IScheduledTask.build(task.newBuilder().setStatus(RUNNING)));
+    mutateTask(Tasks.id(a), task -> IScheduledTask.build(task.newBuilder().setStatus(RUNNING)));
     IScheduledTask aRunning = IScheduledTask.build(a.newBuilder().setStatus(RUNNING));
     assertQueryResults(jimsJob, aRunning);
     assertQueryResults(jimsJob2, c);

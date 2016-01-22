@@ -16,21 +16,20 @@ package org.apache.aurora.scheduler.storage.log;
 import java.util.Set;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.MaintenanceMode;
-import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
 import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -43,10 +42,9 @@ import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -59,7 +57,6 @@ public class WriteAheadStorageTest extends EasyMockTest {
   private TaskStore.Mutable taskStore;
   private AttributeStore.Mutable attributeStore;
   private JobUpdateStore.Mutable jobUpdateStore;
-  private Logger log;
   private EventSink eventSink;
   private WriteAheadStorage storage;
 
@@ -69,7 +66,6 @@ public class WriteAheadStorageTest extends EasyMockTest {
     taskStore = createMock(TaskStore.Mutable.class);
     attributeStore = createMock(AttributeStore.Mutable.class);
     jobUpdateStore = createMock(JobUpdateStore.Mutable.class);
-    log = createMock(Logger.class);
     eventSink = createMock(EventSink.class);
 
     storage = new WriteAheadStorage(
@@ -81,7 +77,7 @@ public class WriteAheadStorageTest extends EasyMockTest {
         createMock(QuotaStore.Mutable.class),
         attributeStore,
         jobUpdateStore,
-        log,
+        LoggerFactory.getLogger(WriteAheadStorageTest.class),
         eventSink);
   }
 
@@ -115,25 +111,17 @@ public class WriteAheadStorageTest extends EasyMockTest {
 
   @Test
   public void testMutate() {
-    Query.Builder query = Query.taskScoped("a");
+    String taskId = "a";
     Function<IScheduledTask, IScheduledTask> mutator =
         createMock(new Clazz<Function<IScheduledTask, IScheduledTask>>() { });
-    ImmutableSet<IScheduledTask> mutated = ImmutableSet.of(IScheduledTask.build(
-            new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId("a"))));
+    Optional<IScheduledTask> mutated = Optional.of(TaskTestUtil.makeTask(taskId, TaskTestUtil.JOB));
 
-    expect(taskStore.mutateTasks(query, mutator)).andReturn(mutated);
-    log.debug(EasyMock.anyString(), EasyMock.<Object>anyObject());
-    expectOp(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
-
-    // With increased logging.
-    expect(taskStore.mutateTasks(query, mutator)).andReturn(mutated);
-    expectOp(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
-    log.debug(EasyMock.anyString(), EasyMock.<Object>anyObject());
+    expect(taskStore.mutateTask(taskId, mutator)).andReturn(mutated);
+    expectOp(Op.saveTasks(new SaveTasks(ImmutableSet.of(mutated.get().newBuilder()))));
 
     control.replay();
 
-    assertEquals(mutated, storage.mutateTasks(query, mutator));
-    assertEquals(mutated, storage.mutateTasks(query, mutator));
+    assertEquals(mutated, storage.mutateTask(taskId, mutator));
   }
 
   @Test

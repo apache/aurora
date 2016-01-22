@@ -203,10 +203,13 @@ class MemTaskStore implements TaskStore.Mutable {
     }
   }
 
-  private Function<IScheduledTask, IScheduledTask> mutateAndSave(
+  @Timed("mem_storage_mutate_task")
+  @Override
+  public Optional<IScheduledTask> mutateTask(
+      String taskId,
       Function<IScheduledTask, IScheduledTask> mutator) {
 
-    return original -> {
+    return fetchTask(taskId).transform(original -> {
       IScheduledTask maybeMutated = mutator.apply(original);
       requireNonNull(maybeMutated);
       if (!original.equals(maybeMutated)) {
@@ -219,34 +222,7 @@ class MemTaskStore implements TaskStore.Mutable {
         }
       }
       return maybeMutated;
-    };
-  }
-
-  @Timed("mem_storage_mutate_task")
-  @Override
-  public Optional<IScheduledTask> mutateTask(
-      String taskId,
-      Function<IScheduledTask, IScheduledTask> mutator) {
-
-    return fetchTask(taskId).transform(mutateAndSave(mutator));
-  }
-
-  @Timed("mem_storage_mutate_tasks")
-  @Override
-  public ImmutableSet<IScheduledTask> mutateTasks(
-      Query.Builder query,
-      Function<IScheduledTask, IScheduledTask> mutator) {
-
-    requireNonNull(query);
-    requireNonNull(mutator);
-
-    Function<IScheduledTask, IScheduledTask> mutateFunction = mutateAndSave(mutator);
-    Iterable<Optional<IScheduledTask>> mutations = matches(query)
-        .transform(original -> {
-          IScheduledTask mutateResult = mutateFunction.apply(original);
-          return original.equals(mutateResult) ? Optional.absent() : Optional.of(mutateResult);
-        });
-    return ImmutableSet.copyOf(Optional.presentInstances(mutations));
+    });
   }
 
   @Timed("mem_storage_unsafe_modify_in_place")

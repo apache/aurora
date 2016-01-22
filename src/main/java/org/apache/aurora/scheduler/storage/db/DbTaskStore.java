@@ -168,22 +168,6 @@ class DbTaskStore implements TaskStore.Mutable {
     }
   }
 
-  private Function<IScheduledTask, IScheduledTask> mutateAndSave(
-      Function<IScheduledTask, IScheduledTask> mutator) {
-
-    return original -> {
-      IScheduledTask maybeMutated = mutator.apply(original);
-      requireNonNull(maybeMutated);
-      if (!original.equals(maybeMutated)) {
-        Preconditions.checkState(
-            Tasks.id(original).equals(Tasks.id(maybeMutated)),
-            "A task's ID may not be mutated.");
-        saveTasks(ImmutableSet.of(maybeMutated));
-      }
-      return maybeMutated;
-    };
-  }
-
   @Timed("db_storage_mutate_task")
   @Override
   public Optional<IScheduledTask> mutateTask(
@@ -193,25 +177,17 @@ class DbTaskStore implements TaskStore.Mutable {
     requireNonNull(taskId);
     requireNonNull(mutator);
 
-    return fetchTask(taskId).transform(mutateAndSave(mutator));
-  }
-
-  @Timed("db_storage_mutate_tasks")
-  @Override
-  public ImmutableSet<IScheduledTask> mutateTasks(
-      Builder query,
-      Function<IScheduledTask, IScheduledTask> mutator) {
-
-    requireNonNull(query);
-    requireNonNull(mutator);
-
-    Function<IScheduledTask, IScheduledTask> mutateFunction = mutateAndSave(mutator);
-    Iterable<Optional<IScheduledTask>> mutations = matches(query)
-        .transform(original -> {
-          IScheduledTask mutateResult = mutateFunction.apply(original);
-          return original.equals(mutateResult) ? Optional.absent() : Optional.of(mutateResult);
-        });
-    return ImmutableSet.copyOf(Optional.presentInstances(mutations));
+    return fetchTask(taskId).transform(original -> {
+      IScheduledTask maybeMutated = mutator.apply(original);
+      requireNonNull(maybeMutated);
+      if (!original.equals(maybeMutated)) {
+        Preconditions.checkState(
+            Tasks.id(original).equals(Tasks.id(maybeMutated)),
+            "A task's ID may not be mutated.");
+        saveTasks(ImmutableSet.of(maybeMutated));
+      }
+      return maybeMutated;
+    });
   }
 
   @Timed("db_storage_unsafe_modify_in_place")

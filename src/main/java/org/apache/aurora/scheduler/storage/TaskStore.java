@@ -18,7 +18,6 @@ import java.util.Set;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
-import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.Query;
@@ -99,18 +98,6 @@ public interface TaskStore {
      */
     Optional<IScheduledTask> mutateTask(
         String taskId,
-        Function<IScheduledTask, IScheduledTask> mutator);
-
-    /**
-     * Offers temporary mutable access to tasks.  If a task ID is not found, it will be silently
-     * skipped, and no corresponding task will be returned.
-     *
-     * @param query Query to match tasks against.
-     * @param mutator The mutate operation.
-     * @return Immutable copies <em>of only the tasks that were mutated</em>.
-     */
-    ImmutableSet<IScheduledTask> mutateTasks(
-        Query.Builder query,
         Function<IScheduledTask, IScheduledTask> mutator);
 
     /**

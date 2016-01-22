@@ -56,7 +56,6 @@ import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
-import org.apache.aurora.scheduler.storage.StorageBackfill;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -242,7 +241,10 @@ public class SchedulerLifecycle implements EventSubscriber {
       @Override
       public void execute(Transition<State> transition) {
         LOG.info("Elected as leading scheduler!");
-        storage.start(StorageBackfill::backfill);
+
+        storage.start(stores -> {
+          // If storage backfill operations are necessary, they can be done here.
+        });
 
         driver.startAsync().awaitRunning();
 
