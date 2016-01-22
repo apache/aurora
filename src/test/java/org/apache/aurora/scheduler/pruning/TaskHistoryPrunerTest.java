@@ -13,26 +13,15 @@
  */
 package org.apache.aurora.scheduler.pruning;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.io.Closer;
-import com.google.common.util.concurrent.MoreExecutors;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.Key;
+import com.google.common.util.concurrent.Service;
 
-import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.AssignedTask;
@@ -43,8 +32,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.async.AsyncModule;
-import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -53,14 +40,12 @@ import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
@@ -68,11 +53,12 @@ import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 public class TaskHistoryPrunerTest extends EasyMockTest {
   private static final String JOB_A = "job-a";
-  private static final String TASK_ID = "task_id";
   private static final String SLAVE_HOST = "HOST_A";
   private static final Amount<Long, Time> ONE_MS = Amount.of(1L, Time.MILLISECONDS);
   private static final Amount<Long, Time> ONE_MINUTE = Amount.of(1L, Time.MINUTES);
@@ -101,6 +87,8 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
         new HistoryPrunnerSettings(ONE_DAY, ONE_MINUTE, PER_JOB_HISTORY),
         storageUtil.storage);
     closer = Closer.create();
+
+    pruner.startAsync().awaitRunning();
   }
 
   @After
@@ -249,89 +237,30 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
     changeState(d, dLost);
   }
 
-  // TODO(William Farner): Consider removing the thread safety tests.  Now that intrinsic locks
-  // are not used, it is rather awkward to test this.
   @Test
-  public void testThreadSafeStateChangeEvent() throws Exception {
-    // This tests against regression where an executor pruning a task holds an intrinsic lock and
-    // an unrelated task state change in the scheduler fires an event that requires this intrinsic
-    // lock. This causes a deadlock when the executor tries to acquire a lock held by the event
-    // fired.
+  public void serviceShutdownOnFailure() {
+    IScheduledTask running = makeTask("a", RUNNING);
+    IScheduledTask killed = copy(running, KILLED);
+    expectNoImmediatePrune(ImmutableSet.of(running));
+    Capture<Runnable> delayedDelete = expectDefaultDelayedPrune();
 
-    ScheduledThreadPoolExecutor realExecutor = new ScheduledThreadPoolExecutor(1,
-        new ThreadFactoryBuilder()
-            .setDaemon(true)
-            .setNameFormat("testThreadSafeEvents-executor")
-            .build());
-    closer.register(
-        () -> MoreExecutors.shutdownAndAwaitTermination(realExecutor, 1L, TimeUnit.SECONDS));
-
-    Injector injector = Guice.createInjector(
-        new AsyncModule(realExecutor),
-        new AbstractModule() {
-          @Override
-          protected void configure() {
-            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
-          }
-        });
-    executor = injector.getInstance(Key.get(DelayExecutor.class, AsyncExecutor.class));
-
-    pruner = buildPruner(executor);
-    // The goal is to verify that the call does not deadlock. We do not care about the outcome.
-    Command onDeleted = () -> changeState(makeTask("b", ASSIGNED), STARTING);
-    CountDownLatch taskDeleted = expectTaskDeleted(onDeleted, TASK_ID);
+    expectDeleteTasks("a");
+    expectLastCall().andThrow(new RuntimeException("oops"));
 
     control.replay();
 
-    // Change the task to a terminal state and wait for it to be pruned.
-    changeState(makeTask(TASK_ID, RUNNING), KILLED);
-    taskDeleted.await();
-  }
+    changeState(running, killed);
+    clock.advance(ONE_HOUR);
+    delayedDelete.getValue().run();
+    // awaitTerminated throws an IllegalStateException if the service fails
+    try {
+      pruner.awaitTerminated();
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(Service.State.FAILED, pruner.state());
+    }
 
-  private TaskHistoryPruner buildPruner(DelayExecutor delayExecutor) {
-    return new TaskHistoryPruner(
-        delayExecutor,
-        stateManager,
-        clock,
-        new HistoryPrunnerSettings(Amount.of(1L, Time.MILLISECONDS), ONE_MS, PER_JOB_HISTORY),
-        storageUtil.storage);
-  }
-
-  private CountDownLatch expectTaskDeleted(Command onDelete, String taskId) {
-    CountDownLatch deleteCalled = new CountDownLatch(1);
-    CountDownLatch eventDelivered = new CountDownLatch(1);
-
-    Thread eventDispatch = new Thread() {
-      @Override
-      public void run() {
-        try {
-          deleteCalled.await();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          fail("Interrupted while awaiting for delete call.");
-          return;
-        }
-        onDelete.execute();
-        eventDelivered.countDown();
-      }
-    };
-    eventDispatch.setDaemon(true);
-    eventDispatch.setName(getClass().getName() + "-EventDispatch");
-    eventDispatch.start();
-
-    stateManager.deleteTasks(storageUtil.mutableStoreProvider, ImmutableSet.of(taskId));
-    expectLastCall().andAnswer(() -> {
-      deleteCalled.countDown();
-      try {
-        eventDelivered.await();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        fail("Interrupted while awaiting for event delivery.");
-      }
-      return null;
-    });
-
-    return eventDelivered;
+    assertNotNull(pruner.failureCause());
   }
 
   private void expectDeleteTasks(String... tasks) {
@@ -382,11 +311,6 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
 
   private void changeState(IScheduledTask oldStateTask, IScheduledTask newStateTask) {
     pruner.recordStateChange(TaskStateChange.transition(newStateTask, oldStateTask.getStatus()));
-  }
-
-  private void changeState(IScheduledTask oldStateTask, ScheduleStatus status) {
-    pruner.recordStateChange(
-        TaskStateChange.transition(copy(oldStateTask, status), oldStateTask.getStatus()));
   }
 
   private IScheduledTask copy(IScheduledTask task, ScheduleStatus status) {
