@@ -25,7 +25,6 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -82,11 +81,6 @@ public class SchedulerMain {
   @NotEmpty
   @CmdLine(name = "serverset_path", help = "ZooKeeper ServerSet path to register at.")
   private static final Arg<String> SERVERSET_PATH = Arg.create();
-
-  @CmdLine(name = "extra_modules",
-      help = "A list of modules that provide additional functionality.")
-  private static final Arg<List<Class<? extends Module>>> EXTRA_MODULES =
-      Arg.create(ImmutableList.of());
 
   // TODO(Suman Karumuri): Rename viz_job_url_prefix to stats_job_url_prefix for consistency.
   @CmdLine(name = "viz_job_url_prefix", help = "URL prefix for job container stats.")
@@ -208,7 +202,6 @@ public class SchedulerMain {
             new LibMesosLoadingModule(),
             new MesosLogStreamModule(FlaggedClientConfig.create()),
             new LogStorageModule())
-        .addAll(Iterables.transform(EXTRA_MODULES.get(), MoreModules::getModule))
         .build();
     flagConfiguredMain(Modules.combine(modules));
   }

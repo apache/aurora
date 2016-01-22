@@ -29,6 +29,7 @@
 - Added new scheduler flag `-default_docker_parameters` to allow a cluster operator to specify a
   universal set of parameters that should be used for every container that does not have parameters
   explicitly configured at the job level.
+- Removed scheduler flag `-extra_modules`.
 
 0.11.0
 ------
