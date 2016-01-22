@@ -25,7 +25,7 @@ import org.apache.aurora.gen.AuroraSchedulerManager;
 import org.apache.aurora.scheduler.http.api.security.AuthorizingParam;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 public class AnnotatedAuroraAdminTest {
   @Test
@@ -45,11 +45,10 @@ public class AnnotatedAuroraAdminTest {
           annotatedInvokable.getParameters(),
           input -> input.getAnnotation(AuthorizingParam.class) != null);
 
-      assertEquals(
-          "Method " + invokable + " should have 1 " + AuthorizingParam.class.getName()
-              + " annotation but " + annotatedParameters.size() + " were found.",
-          1,
-          annotatedParameters.size());
+      assertFalse(
+          "Method " + invokable + " should have at least 1 " + AuthorizingParam.class.getName()
+              + " annotation but none were found.",
+          annotatedParameters.isEmpty());
     }
   }
 }

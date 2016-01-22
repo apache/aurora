@@ -418,24 +418,40 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     }
   }
 
-  private static Query.Builder implicitKillQuery(TaskQuery mutableQuery) {
-    Query.Builder query = Query.arbitrary(mutableQuery);
+  private static Query.Builder implicitKillQuery(Query.Builder query) {
     // Unless statuses were specifically supplied, only attempt to kill active tasks.
     return query.get().isSetStatuses() ? query : query.byStatus(ACTIVE_STATES);
   }
 
   @Override
-  public Response killTasks(TaskQuery mutableQuery, Lock mutableLock) {
-    requireNonNull(mutableQuery);
+  public Response killTasks(
+      @Nullable TaskQuery mutableQuery,
+      @Nullable Lock mutableLock,
+      @Nullable JobKey mutableJob,
+      @Nullable Set<Integer> instances) {
 
-    if (mutableQuery.getJobName() != null && WHITESPACE.matchesAllOf(mutableQuery.getJobName())) {
-      return invalidRequest(String.format("Invalid job name: '%s'", mutableQuery.getJobName()));
+    final Query.Builder query;
+    Response response = empty();
+    if (mutableQuery == null) {
+      IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJob));
+      if (instances == null || Iterables.isEmpty(instances)) {
+        query = implicitKillQuery(Query.jobScoped(jobKey));
+      } else {
+        query = implicitKillQuery(Query.instanceScoped(jobKey, instances));
+      }
+    } else {
+      requireNonNull(mutableQuery);
+      addMessage(response, "The TaskQuery field is deprecated.");
+
+      if (mutableQuery.getJobName() != null && WHITESPACE.matchesAllOf(mutableQuery.getJobName())) {
+        return invalidRequest(String.format("Invalid job name: '%s'", mutableQuery.getJobName()));
+      }
+
+      query = implicitKillQuery(Query.arbitrary(mutableQuery));
+      Preconditions.checkState(
+          !mutableQuery.isSetOwner(),
+          "The owner field in a query should have been unset by Query.Builder.");
     }
-
-    Query.Builder query = implicitKillQuery(mutableQuery);
-    Preconditions.checkState(
-        !query.get().isSetOwner(),
-        "The owner field in a query should have been unset by Query.Builder.");
 
     return storage.write(storeProvider -> {
       Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(query);
@@ -460,8 +476,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       }
 
       return tasksKilled
-          ? ok()
-          : addMessage(empty(), OK, NO_TASKS_TO_KILL_MESSAGE);
+          ? response.setResponseCode(OK)
+          : addMessage(response, OK, NO_TASKS_TO_KILL_MESSAGE);
     });
   }
 

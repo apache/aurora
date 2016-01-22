@@ -71,7 +71,9 @@ public interface AnnotatedAuroraAdmin extends AuroraAdmin.Iface {
   @Override
   Response killTasks(
       @AuthorizingParam @Nullable TaskQuery query,
-      @Nullable Lock lock) throws TException;
+      @Nullable Lock lock,
+      @AuthorizingParam @Nullable JobKey job,
+      @Nullable Set<Integer> instances) throws TException;
 
   @Override
   Response addInstances(

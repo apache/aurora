@@ -33,6 +33,7 @@ import com.google.inject.util.Modules;
 import com.sun.jersey.api.client.ClientResponse;
 
 import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
@@ -226,7 +227,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
 
   private void assertKillTasksFails(AuroraAdmin.Client client) throws TException {
     try {
-      client.killTasks(null, null);
+      client.killTasks(null, null, null, null);
       fail("killTasks should fail.");
     } catch (TTransportException e) {
       // Expected.
@@ -235,41 +236,72 @@ public class HttpSecurityIT extends AbstractJettyTest {
 
   @Test
   public void testAuroraSchedulerManager() throws TException, ServletException, IOException {
-    expect(auroraAdmin.killTasks(null, new Lock().setMessage("1"))).andReturn(OK);
-    expect(auroraAdmin.killTasks(null, new Lock().setMessage("2"))).andReturn(OK);
+    expect(auroraAdmin.killTasks(null, new Lock().setMessage("1"), null, null)).andReturn(OK);
+    expect(auroraAdmin.killTasks(null, new Lock().setMessage("2"), null, null)).andReturn(OK);
 
-    TaskQuery jobScopedQuery = Query.jobScoped(JobKeys.from("role", "env", "name")).get();
+    JobKey job = JobKeys.from("role", "env", "name").newBuilder();
+    TaskQuery jobScopedQuery = Query.jobScoped(IJobKey.build(job)).get();
     TaskQuery adsScopedQuery = Query.jobScoped(ADS_STAGING_JOB).get();
-    expect(auroraAdmin.killTasks(adsScopedQuery, null)).andReturn(OK);
+    expect(auroraAdmin.killTasks(adsScopedQuery, null, null, null)).andReturn(OK);
+    expect(auroraAdmin.killTasks(null, null, ADS_STAGING_JOB.newBuilder(), null)).andReturn(OK);
 
-    expectShiroAfterAuthFilter().times(19);
+    expectShiroAfterAuthFilter().times(24);
 
     replayAndStart();
 
-    assertEquals(OK, getAuthenticatedClient(WFARNER).killTasks(null, new Lock().setMessage("1")));
-    assertEquals(OK, getAuthenticatedClient(ROOT).killTasks(null, new Lock().setMessage("2")));
+    assertEquals(
+        OK,
+        getAuthenticatedClient(WFARNER).killTasks(null, new Lock().setMessage("1"), null, null));
+    assertEquals(
+        OK,
+        getAuthenticatedClient(ROOT).killTasks(null, new Lock().setMessage("2"), null, null));
+
     assertEquals(
         ResponseCode.INVALID_REQUEST,
-        getAuthenticatedClient(UNPRIVILEGED).killTasks(null, null).getResponseCode());
+        getAuthenticatedClient(UNPRIVILEGED).killTasks(null, null, null, null).getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(UNPRIVILEGED)
-            .killTasks(jobScopedQuery, null)
+            .killTasks(jobScopedQuery, null, null, null)
+            .getResponseCode());
+    assertEquals(
+        ResponseCode.AUTH_FAILED,
+        getAuthenticatedClient(UNPRIVILEGED)
+            .killTasks(null, null, job, null)
             .getResponseCode());
     assertEquals(
         ResponseCode.INVALID_REQUEST,
-        getAuthenticatedClient(BACKUP_SERVICE).killTasks(null, null).getResponseCode());
+        getAuthenticatedClient(BACKUP_SERVICE).killTasks(null, null, null, null).getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(BACKUP_SERVICE)
-            .killTasks(jobScopedQuery, null)
+            .killTasks(jobScopedQuery, null, null, null)
+            .getResponseCode());
+    assertEquals(
+        ResponseCode.AUTH_FAILED,
+        getAuthenticatedClient(BACKUP_SERVICE)
+            .killTasks(null, null, job, null)
             .getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(DEPLOY_SERVICE)
-            .killTasks(jobScopedQuery, null)
+            .killTasks(jobScopedQuery, null, null, null)
             .getResponseCode());
-    assertEquals(OK, getAuthenticatedClient(DEPLOY_SERVICE).killTasks(adsScopedQuery, null));
+    assertEquals(
+        ResponseCode.AUTH_FAILED,
+        getAuthenticatedClient(DEPLOY_SERVICE)
+            .killTasks(null, null, job, null)
+            .getResponseCode());
+    assertEquals(
+        OK,
+        getAuthenticatedClient(DEPLOY_SERVICE).killTasks(adsScopedQuery, null, null, null));
+    assertEquals(
+        OK,
+        getAuthenticatedClient(DEPLOY_SERVICE).killTasks(
+            null,
+            null,
+            ADS_STAGING_JOB.newBuilder(),
+            null));
 
     assertKillTasksFails(getUnauthenticatedClient());
     assertKillTasksFails(getAuthenticatedClient(INCORRECT));

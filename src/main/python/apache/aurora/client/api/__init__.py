@@ -100,13 +100,11 @@ class AuroraClientAPI(object):
     log.info("Killing tasks for job: %s" % job_key)
     self._assert_valid_job_key(job_key)
 
-    # Leave query.owner.user unset so the query doesn't filter jobs only submitted by a particular
-    # user.
-    query = job_key.to_thrift_query()
     if instances is not None:
       log.info("Instances to be killed: %s" % instances)
-      query.instanceIds = frozenset([int(s) for s in instances])
-    return self._scheduler_proxy.killTasks(query, lock)
+      instances = frozenset([int(s) for s in instances])
+
+    return self._scheduler_proxy.killTasks(None, lock, job_key.to_thrift(), instances)
 
   def check_status(self, job_key):
     self._assert_valid_job_key(job_key)

@@ -33,7 +33,6 @@ import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.spi.Permissions.Domain;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.Responses;
@@ -71,7 +70,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
     subject = createMock(Subject.class);
     statsProvider = createMock(StatsProvider.class);
     thrift = createMock(AnnotatedAuroraAdmin.class);
-  };
+  }
 
   private void replayAndInitialize() {
     expect(statsProvider.makeCounter(SHIRO_AUTHORIZATION_FAILURES))
@@ -126,23 +125,36 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
 
   @Test
   public void testKillTasksWithWildcardPermission() throws TException {
-    TaskQuery taskQuery = Query.unscoped().get();
     Response response = Responses.ok();
 
+    // TODO(maxim): Remove wildcard (unscoped) permissions when TaskQuery is gone from killTasks
+    // AURORA-1592.
     expect(subject.isPermitted(interceptor.makeWildcardPermission("killTasks")))
         .andReturn(true);
-    expect(thrift.killTasks(taskQuery, null))
+    expect(thrift.killTasks(new TaskQuery(), null, null, null))
         .andReturn(response);
 
     replayAndInitialize();
 
-    assertSame(response, decoratedThrift.killTasks(taskQuery, null));
+    assertSame(response, decoratedThrift.killTasks(new TaskQuery(), null, null, null));
   }
 
   @Test
-  public void testKillTasksWithoutWildcardPermission() throws TException {
-    TaskQuery taskQuery = Query.unscoped().get();
+  public void testKillTasksWithTargetedPermission() throws TException {
+    expect(subject.isPermitted(interceptor.makeWildcardPermission("killTasks")))
+        .andReturn(false);
+    expect(subject.isPermitted(interceptor.makeTargetPermission("killTasks", JOB_KEY)))
+        .andReturn(false);
 
+    replayAndInitialize();
+
+    assertEquals(
+        ResponseCode.AUTH_FAILED,
+        decoratedThrift.killTasks(null, null, JOB_KEY.newBuilder(), null).getResponseCode());
+  }
+
+  @Test
+  public void testKillTasksInvalidJobKey() throws TException {
     expect(subject.isPermitted(interceptor.makeWildcardPermission("killTasks")))
         .andReturn(false);
 
@@ -150,7 +162,11 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
 
     assertEquals(
         ResponseCode.INVALID_REQUEST,
-        decoratedThrift.killTasks(taskQuery, null).getResponseCode());
+        decoratedThrift.killTasks(
+            null,
+            null,
+            JOB_KEY.newBuilder().setName(null),
+            null).getResponseCode());
   }
 
   @Test

@@ -608,11 +608,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(okEmptyResponse(), thrift.killTasks(query, null));
+    Response response = thrift.killTasks(query, null, null, null);
+    assertOkResponse(response);
+    assertMessageMatches(response, "The TaskQuery field is deprecated.");
   }
 
   @Test
-  public void testKillQueryActive() throws Exception {
+  public void testJobScopedKillsActive() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY);
     storageUtil.expectTaskFetch(query.active(), buildScheduledTask());
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
@@ -620,7 +622,19 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertOkResponse(thrift.killTasks(query.get(), null));
+    assertOkResponse(thrift.killTasks(null, null, JOB_KEY.newBuilder(), null));
+  }
+
+  @Test
+  public void testInstanceScoped() throws Exception {
+    Query.Builder query = Query.instanceScoped(JOB_KEY, ImmutableSet.of(1)).active();
+    storageUtil.expectTaskFetch(query, buildScheduledTask());
+    lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
+    expectTransitionsToKilling();
+
+    control.replay();
+
+    assertOkResponse(thrift.killTasks(null, null, JOB_KEY.newBuilder(), ImmutableSet.of(1)));
   }
 
   @Test
@@ -636,7 +650,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(LOCK_ERROR, thrift.killTasks(query.get(), LOCK.newBuilder()));
+    assertResponse(
+        LOCK_ERROR,
+        thrift.killTasks(null, LOCK.newBuilder(), JOB_KEY.newBuilder(), null));
   }
 
   @Test
@@ -651,7 +667,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertOkResponse(thrift.killTasks(query.get(), null));
+    assertOkResponse(thrift.killTasks(query.get(), null, null, null));
   }
 
   @Test
@@ -662,7 +678,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.killTasks(query, null));
+    assertResponse(INVALID_REQUEST, thrift.killTasks(query, null, null, null));
   }
 
   @Test
@@ -672,7 +688,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    Response response = thrift.killTasks(query.get(), null);
+    Response response = thrift.killTasks(null, null, JOB_KEY.newBuilder(), null);
     assertOkResponse(response);
     assertMessageMatches(response, SchedulerThriftInterface.NO_TASKS_TO_KILL_MESSAGE);
   }

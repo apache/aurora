@@ -139,9 +139,13 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.make_scheduler_proxy().getJobs(ROLE)
 
   def test_killTasks(self):
-    self.mock_thrift_client.killTasks(IsA(TaskQuery)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.killTasks(
+        IgnoreArg(),
+        IgnoreArg(),
+        IsA(JobKey),
+        IgnoreArg()).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().killTasks(TaskQuery())
+    self.make_scheduler_proxy().killTasks(None, None, JobKey(), set([0]))
 
   def test_getQuota(self):
     self.mock_thrift_client.getQuota(IgnoreArg()).AndReturn(DEFAULT_RESPONSE)
@@ -411,7 +415,7 @@ class TestSchedulerClient(unittest.TestCase):
     client.get.return_value = mock_scheduler_client
 
     proxy = scheduler_client.SchedulerProxy(Cluster(name='local'))
-    proxy.killTasks(TaskQuery(), None)
+    proxy.killTasks(None, None, JobKey(), None)
 
     assert mock_thrift_client.killTasks.call_count == 3
 

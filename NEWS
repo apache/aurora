@@ -30,6 +30,8 @@
   universal set of parameters that should be used for every container that does not have parameters
   explicitly configured at the job level.
 - Removed scheduler flag `-extra_modules`.
+- Deprecated `TaskQuery` argument in `killTasks` thrift RPC to disallow killing tasks across
+  multiple roles. The new safer approach is using `JobKey` with `instances` instead.
 
 0.11.0
 ------

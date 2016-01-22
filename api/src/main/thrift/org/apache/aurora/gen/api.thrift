@@ -1029,8 +1029,8 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   /** Restarts a batch of shards. */
   Response restartShards(5: JobKey job, 3: set<i32> shardIds, 6: Lock lock)
 
-  /** Initiates a kill on tasks. */
-  Response killTasks(1: TaskQuery query, 3: Lock lock)
+  /** Initiates a kill on tasks. TODO(maxim): remove TaskQuery in AURORA-1591. */
+  Response killTasks(1: TaskQuery query, 3: Lock lock, 4: JobKey job, 5: set<i32> instances)
 
   /**
    * Adds new instances specified by the AddInstancesConfig. A job represented by the JobKey must be
