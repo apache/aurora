@@ -206,7 +206,7 @@ public class Utilization {
       @PathParam("role") String role) {
 
     MetricType type = getTypeByName(metric);
-    Function<ITaskConfig, Display> toKey = task -> new Display(task.getJobName(), null);
+    Function<ITaskConfig, Display> toKey = task -> new Display(task.getJob().getName(), null);
     Map<Display, Metric> byJob =
         counter.computeAggregates(Query.roleScoped(role).active(), type.filter, toKey);
     return Response.ok(fillTemplate(byJob)).build();

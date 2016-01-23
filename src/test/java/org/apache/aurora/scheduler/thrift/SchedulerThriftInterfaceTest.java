@@ -54,6 +54,7 @@ import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
@@ -91,6 +92,7 @@ import org.apache.aurora.scheduler.state.UUIDGenerator;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
+import org.apache.aurora.scheduler.storage.entities.IHostStatus;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -1233,13 +1235,17 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task), null));
   }
 
+  private static Set<IHostStatus> status(String host, MaintenanceMode mode) {
+    return ImmutableSet.of(IHostStatus.build(new HostStatus(host, mode)));
+  }
+
   @Test
   public void testHostMaintenance() throws Exception {
     Set<String> hostnames = ImmutableSet.of("a");
-    Set<HostStatus> none = ImmutableSet.of(new HostStatus("a", NONE));
-    Set<HostStatus> scheduled = ImmutableSet.of(new HostStatus("a", SCHEDULED));
-    Set<HostStatus> draining = ImmutableSet.of(new HostStatus("a", DRAINING));
-    Set<HostStatus> drained = ImmutableSet.of(new HostStatus("a", DRAINING));
+    Set<IHostStatus> none = status("a", NONE);
+    Set<IHostStatus> scheduled = status("a", SCHEDULED);
+    Set<IHostStatus> draining = status("a", DRAINING);
+    Set<IHostStatus> drained = status("a", DRAINING);
     expect(maintenance.getStatus(hostnames)).andReturn(none);
     expect(maintenance.startMaintenance(hostnames)).andReturn(scheduled);
     expect(maintenance.drain(hostnames)).andReturn(draining);
@@ -1252,26 +1258,26 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Hosts hosts = new Hosts(hostnames);
 
     assertEquals(
-        none,
+        IHostStatus.toBuildersSet(none),
         thrift.maintenanceStatus(hosts).getResult().getMaintenanceStatusResult()
             .getStatuses());
     assertEquals(
-        scheduled,
+        IHostStatus.toBuildersSet(scheduled),
         thrift.startMaintenance(hosts).getResult().getStartMaintenanceResult()
             .getStatuses());
     assertEquals(
-        draining,
+        IHostStatus.toBuildersSet(draining),
         thrift.drainHosts(hosts).getResult().getDrainHostsResult().getStatuses());
     assertEquals(
-        draining,
+        IHostStatus.toBuildersSet(draining),
         thrift.maintenanceStatus(hosts).getResult().getMaintenanceStatusResult()
             .getStatuses());
     assertEquals(
-        drained,
+        IHostStatus.toBuildersSet(drained),
         thrift.maintenanceStatus(hosts).getResult().getMaintenanceStatusResult()
             .getStatuses());
     assertEquals(
-        none,
+        IHostStatus.toBuildersSet(none),
         thrift.endMaintenance(hosts).getResult().getEndMaintenanceResult().getStatuses());
   }
 

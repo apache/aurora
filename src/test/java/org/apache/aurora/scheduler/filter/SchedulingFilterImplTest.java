@@ -27,7 +27,6 @@ import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConfig;
@@ -35,6 +34,7 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.Resources;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
@@ -44,6 +44,7 @@ import org.apache.aurora.scheduler.mesos.Offers;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
@@ -67,16 +68,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final String RACK_ATTRIBUTE = "rack";
   private static final String HOST_ATTRIBUTE = "host";
 
-  private static final String JOB_A = "myJobA";
-  private static final String JOB_B = "myJobB";
-
-  private static final String ROLE_A = "roleA";
-  private static final String USER_A = "userA";
-  private static final Identity OWNER_A = new Identity(ROLE_A, USER_A);
-
-  private static final String ROLE_B = "roleB";
-  private static final String USER_B = "userB";
-  private static final Identity OWNER_B = new Identity(ROLE_B, USER_B);
+  private static final IJobKey JOB_A = JobKeys.from("roleA", "env", "jobA");
+  private static final IJobKey JOB_B = JobKeys.from("roleB", "env", "jobB");
 
   private static final int DEFAULT_CPUS = 4;
   private static final long DEFAULT_RAM = 1000;
@@ -164,22 +157,21 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testDedicatedRole() {
     control.replay();
 
-    IHostAttributes hostA = hostAttributes(HOST_A, dedicated(ROLE_A));
-    checkConstraint(hostA, DEDICATED_ATTRIBUTE, true, ROLE_A);
-    assertVetoes(makeTask(OWNER_B, JOB_B), hostA, Veto.dedicatedHostConstraintMismatch());
+    IHostAttributes hostA = hostAttributes(HOST_A, dedicated(JOB_A.getRole()));
+    checkConstraint(hostA, DEDICATED_ATTRIBUTE, true, JOB_A.getRole());
+    assertVetoes(makeTask(JOB_B), hostA, Veto.dedicatedHostConstraintMismatch());
   }
 
   @Test
   public void testSharedDedicatedHost() {
     control.replay();
 
-    String dedicated1 = "userA/jobA";
-    String dedicated2 = "kestrel/kestrel";
+    String dedicated1 = dedicatedFor(JOB_A);
+    String dedicated2 = dedicatedFor(JOB_B);
     IHostAttributes hostA = hostAttributes(HOST_A, dedicated(dedicated1, dedicated2));
     assertNoVetoes(
         checkConstraint(
-            new Identity().setRole("userA"),
-            "jobA",
+            JOB_A,
             hostA,
             DEDICATED_ATTRIBUTE,
             true,
@@ -187,8 +179,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         hostA);
     assertNoVetoes(
         checkConstraint(
-            new Identity().setRole("kestrel"),
-            "kestrel",
+            JOB_B,
             hostA,
             DEDICATED_ATTRIBUTE,
             true,
@@ -246,11 +237,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint constraint2 = makeConstraint(DEDICATED_ATTRIBUTE, "xxx");
 
     assertVetoes(
-        makeTask(OWNER_A, JOB_A, constraint1, constraint2),
+        makeTask(JOB_A, constraint1, constraint2),
         hostAttributes(HOST_A, dedicated(HOST_A), host(HOST_A)),
         Veto.constraintMismatch(DEDICATED_ATTRIBUTE));
     assertNoVetoes(
-        makeTask(OWNER_B, JOB_B, constraint1, constraint2),
+        makeTask(JOB_B, constraint1, constraint2),
         hostAttributes(HOST_B, dedicated("xxx"), host(HOST_A)));
   }
 
@@ -263,12 +254,12 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     Constraint hostLimit = limitConstraint("host", 1);
     assertVetoes(
-        makeTask(OWNER_A, JOB_A, hostLimit, makeConstraint(DEDICATED_ATTRIBUTE, "xxx")),
+        makeTask(JOB_A, hostLimit, makeConstraint(DEDICATED_ATTRIBUTE, "xxx")),
         hostAttributes(HOST_A, host(HOST_A)),
         Veto.constraintMismatch(DEDICATED_ATTRIBUTE));
     assertVetoes(
-        makeTask(OWNER_B, JOB_A, hostLimit, makeConstraint(DEDICATED_ATTRIBUTE, "xxx")),
-        hostAttributes(HOST_B, dedicated(OWNER_B.getRole() + "/" + JOB_B), host(HOST_B)),
+        makeTask(JOB_A, hostLimit, makeConstraint(DEDICATED_ATTRIBUTE, "xxx")),
+        hostAttributes(HOST_B, dedicated(dedicatedFor(JOB_B)), host(HOST_B)),
         Veto.constraintMismatch(DEDICATED_ATTRIBUTE));
   }
 
@@ -289,6 +280,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   private IAttribute dedicated(String value, String... values) {
     return valueAttribute(DEDICATED_ATTRIBUTE, value, values);
+  }
+
+  private String dedicatedFor(IJobKey job) {
+    return job.getRole() + "/" + job.getName();
   }
 
   @Test
@@ -317,39 +312,39 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     IHostAttributes hostA = hostAttributes(HOST_A, host(HOST_A), rack(RACK_A));
     IHostAttributes hostB = hostAttributes(HOST_B, host(HOST_B), rack(RACK_A));
     IHostAttributes hostC = hostAttributes(HOST_C, host(HOST_C), rack(RACK_B));
-    assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 2), hostA, stateA);
+    assertNoVetoes(hostLimitTask(JOB_A, 2), hostA, stateA);
     assertVetoes(
-        hostLimitTask(OWNER_A, JOB_A, 1),
+        hostLimitTask(JOB_A, 1),
         hostB,
         stateA,
         Veto.unsatisfiedLimit(HOST_ATTRIBUTE));
     assertVetoes(
-        hostLimitTask(OWNER_A, JOB_A, 2),
+        hostLimitTask(JOB_A, 2),
         hostB,
         stateA,
         Veto.unsatisfiedLimit(HOST_ATTRIBUTE));
-    assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 3), hostB, stateA);
+    assertNoVetoes(hostLimitTask(JOB_A, 3), hostB, stateA);
 
     assertVetoes(
-        rackLimitTask(OWNER_B, JOB_A, 2),
+        rackLimitTask(JOB_A, 2),
         hostB,
         stateB,
         Veto.unsatisfiedLimit(RACK_ATTRIBUTE));
     assertVetoes(
-        rackLimitTask(OWNER_B, JOB_A, 3),
+        rackLimitTask(JOB_A, 3),
         hostB,
         stateB,
         Veto.unsatisfiedLimit(RACK_ATTRIBUTE));
-    assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 4), hostB, stateB);
+    assertNoVetoes(rackLimitTask(JOB_A, 4), hostB, stateB);
 
-    assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 1), hostC, stateB);
+    assertNoVetoes(rackLimitTask(JOB_A, 1), hostC, stateB);
 
     assertVetoes(
-        rackLimitTask(OWNER_A, JOB_A, 1),
+        rackLimitTask(JOB_A, 1),
         hostC,
         stateA,
         Veto.unsatisfiedLimit(RACK_ATTRIBUTE));
-    assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 2), hostC, stateB);
+    assertNoVetoes(rackLimitTask(JOB_A, 2), hostC, stateB);
   }
 
   @Test
@@ -402,7 +397,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint jvmConstraint = makeConstraint("jvm", "1.6");
     Constraint zoneConstraint = makeConstraint("zone", "c");
 
-    ITaskConfig task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
+    ITaskConfig task = makeTask(JOB_A, jvmConstraint, zoneConstraint);
     assertEquals(
         ImmutableSet.of(),
         defaultFilter.filter(
@@ -414,7 +409,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint zoneNegated = jvmConstraint.deepCopy();
     zoneNegated.getConstraint().getValue().setNegated(true);
     assertVetoes(
-        makeTask(OWNER_A, JOB_A, jvmNegated, zoneNegated),
+        makeTask(JOB_A, jvmNegated, zoneNegated),
         hostA,
         Veto.constraintMismatch("jvm"));
   }
@@ -476,19 +471,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       String value,
       String... vs) {
 
-    return checkConstraint(
-        OWNER_A,
-        JOB_A,
-        hostAttributes,
-        constraintName,
-        expected,
-        value,
-        vs);
+    return checkConstraint(JOB_A, hostAttributes, constraintName, expected, value, vs);
   }
 
   private ITaskConfig checkConstraint(
-      Identity owner,
-      String jobName,
+      IJobKey job,
       IHostAttributes hostAttributes,
       String constraintName,
       boolean expected,
@@ -496,8 +483,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       String... vs) {
 
     return checkConstraint(
-        owner,
-        jobName,
+        job,
         EMPTY,
         hostAttributes,
         constraintName,
@@ -507,8 +493,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   private ITaskConfig checkConstraint(
-      Identity owner,
-      String jobName,
+      IJobKey job,
       AttributeAggregate aggregate,
       IHostAttributes hostAttributes,
       String constraintName,
@@ -516,7 +501,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       ValueConstraint value) {
 
     Constraint constraint = new Constraint(constraintName, TaskConstraint.value(value));
-    ITaskConfig task = makeTask(owner, jobName, constraint);
+    ITaskConfig task = makeTask(job, constraint);
     assertEquals(
         expected,
         defaultFilter.filter(
@@ -526,7 +511,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     Constraint negated = constraint.deepCopy();
     negated.getConstraint().getValue().setNegated(!value.isNegated());
-    ITaskConfig negatedTask = makeTask(owner, jobName, negated);
+    ITaskConfig negatedTask = makeTask(job, negated);
     assertEquals(
         !expected,
         defaultFilter.filter(
@@ -598,36 +583,27 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return new Constraint(name, TaskConstraint.limit(new LimitConstraint(value)));
   }
 
-  private ITaskConfig makeTask(Identity owner, String jobName, Constraint... constraint) {
-    return ITaskConfig.build(makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+  private ITaskConfig makeTask(IJobKey job, Constraint... constraint) {
+    return ITaskConfig.build(makeTask(job, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .newBuilder()
-        .setOwner(owner)
-        .setJobName(jobName)
         .setConstraints(Sets.newHashSet(constraint)));
   }
 
-  private ITaskConfig hostLimitTask(Identity owner, String jobName, int maxPerHost) {
-    return makeTask(owner, jobName, limitConstraint(HOST_ATTRIBUTE, maxPerHost));
+  private ITaskConfig hostLimitTask(IJobKey job, int maxPerHost) {
+    return makeTask(job, limitConstraint(HOST_ATTRIBUTE, maxPerHost));
   }
 
   private ITaskConfig hostLimitTask(int maxPerHost) {
-    return hostLimitTask(OWNER_A, JOB_A, maxPerHost);
+    return hostLimitTask(JOB_A, maxPerHost);
   }
 
-  private ITaskConfig rackLimitTask(Identity owner, String jobName, int maxPerRack) {
-    return makeTask(owner, jobName, limitConstraint(RACK_ATTRIBUTE, maxPerRack));
+  private ITaskConfig rackLimitTask(IJobKey job, int maxPerRack) {
+    return makeTask(job, limitConstraint(RACK_ATTRIBUTE, maxPerRack));
   }
 
-  private ITaskConfig makeTask(
-      Identity owner,
-      String jobName,
-      int cpus,
-      long ramMb,
-      long diskMb) {
-
+  private ITaskConfig makeTask(IJobKey job, int cpus, long ramMb, long diskMb) {
     return ITaskConfig.build(new TaskConfig()
-        .setOwner(owner)
-        .setJobName(jobName)
+        .setJob(job.newBuilder())
         .setNumCpus(cpus)
         .setRamMb(ramMb)
         .setDiskMb(diskMb)
@@ -635,7 +611,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   }
 
   private ITaskConfig makeTask(int cpus, long ramMb, long diskMb) {
-    return makeTask(OWNER_A, JOB_A, cpus, ramMb, diskMb);
+    return makeTask(JOB_A, cpus, ramMb, diskMb);
   }
 
   private ITaskConfig makeTask() {

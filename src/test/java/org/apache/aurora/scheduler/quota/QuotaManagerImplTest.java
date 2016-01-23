@@ -20,9 +20,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Constraint;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
@@ -32,13 +30,13 @@ import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ResourceAggregate;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -126,13 +124,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
     final String pcRole = "pc-role";
     ScheduledTask ignoredProdTask = prodTask(pcRole, 20, 20, 20).newBuilder();
     ignoredProdTask.getAssignedTask().getTask()
-        .setOwner(new Identity(pcRole, "ignored"))
         .setJob(new JobKey(pcRole, ENV, pcRole));
 
     final String npcRole = "npc-role";
     ScheduledTask ignoredNonProdTask = nonProdTask(npcRole, 20, 20, 20).newBuilder();
     ignoredNonProdTask.getAssignedTask().getTask()
-        .setOwner(new Identity(npcRole, "ignored"))
         .setJob(new JobKey(npcRole, ENV, npcRole));
 
     expectCronJobs(
@@ -976,21 +972,14 @@ public class QuotaManagerImplTest extends EasyMockTest {
       boolean production,
       int instanceId) {
 
-    return IScheduledTask.build(new ScheduledTask()
-        .setStatus(ScheduleStatus.RUNNING)
-        .setAssignedTask(
-            new AssignedTask()
-                .setTaskId(taskId)
-                .setInstanceId(instanceId)
-                .setTask(new TaskConfig()
-                    .setJob(new JobKey(ROLE, ENV, jobName))
-                    .setOwner(new Identity(ROLE, ROLE))
-                    .setEnvironment(ENV)
-                    .setJobName(jobName)
-                    .setNumCpus(cpus)
-                    .setRamMb(ramMb)
-                    .setDiskMb(diskMb)
-                    .setProduction(production))));
+    ScheduledTask builder = TaskTestUtil.makeTask(taskId, JobKeys.from(ROLE, ENV, jobName))
+        .newBuilder();
+    builder.getAssignedTask().setInstanceId(instanceId);
+    builder.getAssignedTask().getTask().setNumCpus(cpus)
+        .setRamMb(ramMb)
+        .setDiskMb(diskMb)
+        .setProduction(production);
+    return IScheduledTask.build(builder);
   }
 
   private IJobConfiguration createJob(IScheduledTask scheduledTask, int instanceCount) {

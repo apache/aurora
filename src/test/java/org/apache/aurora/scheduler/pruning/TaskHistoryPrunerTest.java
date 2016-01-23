@@ -24,15 +24,11 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.testing.FakeClock;
-import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.ExecutorConfig;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.async.DelayExecutor;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.pruning.TaskHistoryPruner.HistoryPrunnerSettings;
@@ -58,7 +54,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 public class TaskHistoryPrunerTest extends EasyMockTest {
-  private static final String JOB_A = "job-a";
   private static final String SLAVE_HOST = "HOST_A";
   private static final Amount<Long, Time> ONE_MS = Amount.of(1L, Time.MILLISECONDS);
   private static final Amount<Long, Time> ONE_MINUTE = Amount.of(1L, Time.MINUTES);
@@ -131,7 +126,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
 
     clock.advance(ONE_MINUTE);
     IScheduledTask d = makeTask("d", FINISHED);
-    IScheduledTask e = makeTask("job-x", "e", FINISHED);
+    IScheduledTask e = makeTask(JobKeys.from("role", "env", "job-x"), "e", FINISHED);
 
     expectNoImmediatePrune(ImmutableSet.of(a));
     expectOneDelayedPrune(taskATimestamp);
@@ -318,29 +313,19 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
   }
 
   private IScheduledTask makeTask(
-      String job,
+      IJobKey job,
       String taskId,
       ScheduleStatus status) {
 
-    return IScheduledTask.build(new ScheduledTask()
-        .setStatus(status)
-        .setTaskEvents(ImmutableList.of(new TaskEvent(clock.nowMillis(), status)))
-        .setAssignedTask(makeAssignedTask(job, taskId)));
+    ScheduledTask builder = TaskTestUtil.addStateTransition(
+        TaskTestUtil.makeTask(taskId, job), status, clock.nowMillis())
+        .newBuilder();
+    builder.getAssignedTask().setSlaveHost(SLAVE_HOST);
+    return IScheduledTask.build(builder);
   }
 
   private IScheduledTask makeTask(String taskId, ScheduleStatus status) {
-    return makeTask(JOB_A, taskId, status);
+    return makeTask(TaskTestUtil.JOB, taskId, status);
   }
 
-  private AssignedTask makeAssignedTask(String job, String taskId) {
-    return new AssignedTask()
-        .setSlaveHost(SLAVE_HOST)
-        .setTaskId(taskId)
-        .setTask(new TaskConfig()
-            .setJob(new JobKey("role", "staging45", job))
-            .setOwner(new Identity().setRole("role").setUser("user"))
-            .setEnvironment("staging45")
-            .setJobName(job)
-            .setExecutorConfig(new ExecutorConfig("aurora", "config")));
-  }
 }

@@ -25,11 +25,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
-import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.SideEffect.Action;
 import org.apache.aurora.scheduler.state.TaskStateMachine.TaskState;
@@ -315,16 +313,12 @@ public class TaskStateMachineTest {
   }
 
   private static ScheduledTask makeTask(boolean service) {
-    return new ScheduledTask()
-        .setStatus(INIT.getStatus().get())
-        .setAssignedTask(
-            new AssignedTask()
-                .setTaskId("test")
-                .setTask(
-                    new TaskConfig()
-                        .setOwner(new Identity().setRole("roleA"))
-                        .setJobName("jobA")
-                        .setIsService(service)));
+    ScheduledTask builder = TaskTestUtil.makeTask("test", TaskTestUtil.JOB).newBuilder();
+    builder.setStatus(INIT.getStatus().get());
+    builder.getAssignedTask().getTask()
+        .setMaxTaskFailures(0)
+        .setIsService(service);
+    return builder;
   }
 
   private static final TransitionResult SAVE = new TransitionResult(

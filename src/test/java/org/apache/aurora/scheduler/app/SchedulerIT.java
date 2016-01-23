@@ -49,14 +49,9 @@ import org.apache.aurora.common.zookeeper.ServerSetImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
-import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.ServerInfo;
-import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
@@ -66,6 +61,7 @@ import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
@@ -75,6 +71,7 @@ import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.log.EntrySerializer;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
@@ -272,19 +269,14 @@ public class SchedulerIT extends BaseZooKeeperTest {
         });
   }
 
-  private static ScheduledTask makeTask(String id, ScheduleStatus status) {
-    return new ScheduledTask()
-        .setStatus(status)
-        .setTaskEvents(ImmutableList.of(new TaskEvent(100, status)))
-        .setAssignedTask(new AssignedTask()
-            .setSlaveId("slaveId")
-            .setTaskId(id)
-            .setTask(new TaskConfig()
-                .setJob(new JobKey("role-" + id, "test", "job-" + id))
-                .setJobName("job-" + id)
-                .setEnvironment("test")
-                .setExecutorConfig(new org.apache.aurora.gen.ExecutorConfig("AuroraExecutor", ""))
-                .setOwner(new Identity("role-" + id, "user-" + id))));
+  private static IScheduledTask makeTask(String id, ScheduleStatus status) {
+    ScheduledTask builder = TaskTestUtil.addStateTransition(
+        TaskTestUtil.makeTask(id, TaskTestUtil.JOB),
+        status,
+        100)
+        .newBuilder();
+    builder.getAssignedTask().setSlaveId("slave-id");
+    return IScheduledTask.build(builder);
   }
 
   @Test
@@ -297,12 +289,13 @@ public class SchedulerIT extends BaseZooKeeperTest {
         eq(SETTINGS.getMasterUri())))
         .andReturn(driver).anyTimes();
 
-    ScheduledTask snapshotTask = makeTask("snapshotTask", ScheduleStatus.ASSIGNED);
-    ScheduledTask transactionTask = makeTask("transactionTask", ScheduleStatus.RUNNING);
+    IScheduledTask snapshotTask = makeTask("snapshotTask", ScheduleStatus.ASSIGNED);
+    IScheduledTask transactionTask = makeTask("transactionTask", ScheduleStatus.RUNNING);
     Iterable<Entry> recoveredEntries = toEntries(
-        LogEntry.snapshot(new Snapshot().setTasks(ImmutableSet.of(snapshotTask))),
+        LogEntry.snapshot(new Snapshot().setTasks(ImmutableSet.of(snapshotTask.newBuilder()))),
         LogEntry.transaction(new Transaction(
-            ImmutableList.of(Op.saveTasks(new SaveTasks(ImmutableSet.of(transactionTask)))),
+            ImmutableList.of(Op.saveTasks(
+                new SaveTasks(ImmutableSet.of(transactionTask.newBuilder())))),
             storageConstants.CURRENT_SCHEMA_VERSION)));
 
     expect(log.open()).andReturn(logStream);

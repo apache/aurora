@@ -18,15 +18,10 @@ import com.google.common.eventbus.EventBus;
 import com.google.common.util.concurrent.Service;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
 import org.junit.Test;
@@ -37,22 +32,10 @@ import static org.easymock.EasyMock.expectLastCall;
 
 public class JobUpdateEventSubscriberTest extends EasyMockTest {
 
-  private static final IJobKey JOB = JobKeys.from("role", "env", "name");
-
-  private static final IScheduledTask TASK = IScheduledTask.build(
-      new ScheduledTask()
-          .setStatus(ScheduleStatus.PENDING)
-          .setAssignedTask(
-              new AssignedTask()
-                  .setInstanceId(5)
-                  .setTask(new TaskConfig()
-                      .setJob(JOB.newBuilder())
-                      .setOwner(new Identity().setRole(JOB.getRole()))
-                      .setEnvironment(JOB.getEnvironment())
-                      .setJobName(JOB.getName()))));
+  private static final IScheduledTask TASK = TaskTestUtil.makeTask("id", TaskTestUtil.JOB);
   private static final IInstanceKey INSTANCE_A = IInstanceKey.build(
       new InstanceKey()
-          .setJobKey(JOB.newBuilder())
+          .setJobKey(TaskTestUtil.JOB.newBuilder())
           .setInstanceId(TASK.getAssignedTask().getInstanceId()));
 
   private JobUpdateController updater;

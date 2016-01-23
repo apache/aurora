@@ -28,15 +28,11 @@ import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 
 import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.CronCollisionPolicy;
-import org.apache.aurora.gen.ExecutorConfig;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
-import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.Response;
@@ -45,9 +41,8 @@ import org.apache.aurora.gen.RoleSummary;
 import org.apache.aurora.gen.RoleSummaryResult;
 import org.apache.aurora.gen.ScheduleStatusResult;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.http.AbstractJettyTest;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IResponse;
@@ -84,22 +79,7 @@ public class ApiBetaTest extends AbstractJettyTest {
     );
   }
 
-  private static final ITaskConfig TASK_CONFIG = ITaskConfig.build(
-      new TaskConfig()
-          .setOwner(new Identity().setUser("user").setRole("role"))
-          .setEnvironment("test")
-          .setDiskMb(1024)
-          .setRamMb(4096)
-          .setNumCpus(1.0)
-          .setIsService(true)
-          .setJobName("jobName")
-          .setConstraints(ImmutableSet.of(new Constraint()
-              .setName("rack")
-              .setConstraint(TaskConstraint.limit(new LimitConstraint().setLimit(1)))))
-          .setExecutorConfig(
-              new ExecutorConfig()
-                  .setData("executor config data")
-                  .setName("executor name")));
+  private static final ITaskConfig TASK_CONFIG = TaskTestUtil.makeConfig(TaskTestUtil.JOB);
   private static final IJobConfiguration JOB_CONFIG = IJobConfiguration.build(
       new JobConfiguration()
           .setCronCollisionPolicy(CronCollisionPolicy.CANCEL_NEW)

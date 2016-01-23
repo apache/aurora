@@ -23,15 +23,13 @@ import com.google.common.collect.Maps;
 
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -39,6 +37,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.EasyMock;
@@ -63,11 +62,8 @@ import static org.junit.Assert.assertNotNull;
 
 public class TaskVarsTest extends EasyMockTest {
 
-  private static final String ROLE_A = "role_a";
-  private static final String JOB_A = "job_a";
-  private static final String JOB_B = "job_b";
-  private static final String TASK_ID = "task_id";
-  private static final String ENV = "test";
+  private static final IJobKey JOB_A = JobKeys.from("role_a", "test", "job_a");
+  private static final IJobKey JOB_B = JobKeys.from("role_a", "test", "job_b");
 
   private static final String STATIC_COUNTER = VETO_GROUPS_TO_COUNTERS.get(VetoGroup.STATIC);
   private static final String DYNAMIC_COUNTER = VETO_GROUPS_TO_COUNTERS.get(VetoGroup.DYNAMIC);
@@ -102,7 +98,9 @@ public class TaskVarsTest extends EasyMockTest {
     expect(provider.makeGauge(EasyMock.eq(name), EasyMock.<Supplier<Long>>anyObject()))
         .andAnswer(() -> {
           assertFalse(globalCounters.containsKey(name));
-          globalCounters.put(name, (Supplier<Long>) EasyMock.getCurrentArguments()[1]);
+          @SuppressWarnings("unchecked")
+          Supplier<Long> varSupplier = (Supplier<Long>) EasyMock.getCurrentArguments()[1];
+          globalCounters.put(name, varSupplier);
           return null;
         });
   }
@@ -132,16 +130,9 @@ public class TaskVarsTest extends EasyMockTest {
     vars.startAsync().awaitRunning();
   }
 
-  private IScheduledTask makeTask(String job, ScheduleStatus status, String host) {
-    ScheduledTask task = new ScheduledTask()
-        .setStatus(status)
-        .setAssignedTask(new AssignedTask()
-            .setTaskId(TASK_ID)
-            .setTask(new TaskConfig()
-                .setJob(new JobKey(ROLE_A, ENV, job))
-                .setJobName(job)
-                .setEnvironment(ENV)
-                .setOwner(new Identity(ROLE_A, ROLE_A + "-user"))));
+  private IScheduledTask makeTask(IJobKey job, ScheduleStatus status, String host) {
+    ScheduledTask task = TaskTestUtil.makeTask("task_id", job).newBuilder()
+        .setStatus(status);
     if (Tasks.SLAVE_ASSIGNED_STATES.contains(status) || Tasks.isTerminated(status)) {
       task.getAssignedTask().setSlaveHost(host);
     }
@@ -149,7 +140,7 @@ public class TaskVarsTest extends EasyMockTest {
     return IScheduledTask.build(task);
   }
 
-  private IScheduledTask makeTask(String job, ScheduleStatus status) {
+  private IScheduledTask makeTask(IJobKey job, ScheduleStatus status) {
     return makeTask(job, status, "hostA");
   }
 
@@ -306,10 +297,11 @@ public class TaskVarsTest extends EasyMockTest {
     expectStatExport(rackStatName("rackA"));
     expectStatExport(rackStatName("rackB"));
 
-    IScheduledTask a = makeTask("jobA", RUNNING, "host1");
-    IScheduledTask b = makeTask("jobB", RUNNING, "host2");
-    IScheduledTask c = makeTask("jobD", RUNNING, "host3");
-    IScheduledTask d = makeTask("jobD", RUNNING, "host1");
+    IScheduledTask a = makeTask(JOB_A, RUNNING, "host1");
+    IScheduledTask b = makeTask(JOB_B, RUNNING, "host2");
+    IJobKey jobD = JobKeys.from(JOB_A.getRole(), JOB_A.getEnvironment(), "jobD");
+    IScheduledTask c = makeTask(jobD, RUNNING, "host3");
+    IScheduledTask d = makeTask(jobD, RUNNING, "host1");
 
     expectStatExport(jobStatName(a, LOST), untrackedProvider);
     expectStatExport(jobStatName(b, LOST), untrackedProvider);

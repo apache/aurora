@@ -23,12 +23,10 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.BackoffStrategy;
-import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator.RescheduleCalculatorImpl;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -151,14 +149,9 @@ public class RescheduleCalculatorImplTest extends EasyMockTest {
   }
 
   private IScheduledTask makeTask(String taskId) {
-    return IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask()
-            .setInstanceId(0)
-            .setTaskId(taskId)
-            .setTask(new TaskConfig()
-                .setJobName("job-" + taskId)
-                .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))
-                .setEnvironment("env-" + taskId))));
+    ScheduledTask builder = TaskTestUtil.makeTask(taskId, TaskTestUtil.JOB).newBuilder();
+    builder.unsetAncestorId();
+    return IScheduledTask.build(builder);
   }
 
   private IScheduledTask makeTask(String taskId, ScheduleStatus status) {

@@ -25,7 +25,6 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.testing.FakeClock;
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.scheduler.base.JobKeys;
@@ -47,9 +46,8 @@ import static org.junit.Assert.assertEquals;
 
 public class LockManagerImplTest extends EasyMockTest {
   private static final String USER = "jim-user";
-  private static final Identity JIM = new Identity("jim", USER);
   private static final String MY_JOB = "myJob";
-  private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), "devel", MY_JOB);
+  private static final IJobKey JOB_KEY = JobKeys.from("jim", "devel", MY_JOB);
   private static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
   private static final UUID TOKEN = UUID.fromString("79d6d790-3212-11e3-aa6e-0800200c9a66");
 

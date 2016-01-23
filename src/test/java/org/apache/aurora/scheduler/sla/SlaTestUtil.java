@@ -19,13 +19,10 @@ import java.util.Map;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
-import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
@@ -41,23 +38,15 @@ final class SlaTestUtil {
 
   static IScheduledTask makeTask(Map<Long, ScheduleStatus> events, int instanceId, boolean isProd) {
     List<ITaskEvent> taskEvents = makeEvents(events);
-    return IScheduledTask.build(new ScheduledTask()
+    ScheduledTask builder = TaskTestUtil.makeTask("task_id", TaskTestUtil.JOB).newBuilder()
         .setStatus(Iterables.getLast(taskEvents).getStatus())
-        .setTaskEvents(ITaskEvent.toBuildersList(taskEvents))
-        .setAssignedTask(new AssignedTask()
-            .setTaskId("task_Id")
-            .setSlaveHost("host")
-            .setInstanceId(instanceId)
-            .setTask(new TaskConfig()
-                .setJob(new JobKey("role", "env", "job"))
-                .setJobName("job")
-                .setIsService(true)
-                .setProduction(isProd)
-                .setEnvironment("env")
-                .setOwner(new Identity("role", "role-user")))));
+        .setTaskEvents(ITaskEvent.toBuildersList(taskEvents));
+    builder.getAssignedTask().setInstanceId(instanceId);
+    builder.getAssignedTask().getTask().setProduction(isProd);
+    return IScheduledTask.build(builder);
   }
 
-  static List<ITaskEvent> makeEvents(Map<Long, ScheduleStatus> events) {
+  private static List<ITaskEvent> makeEvents(Map<Long, ScheduleStatus> events) {
     ImmutableList.Builder<ITaskEvent> taskEvents = ImmutableList.builder();
     for (Map.Entry<Long, ScheduleStatus> entry : events.entrySet()) {
       taskEvents.add(ITaskEvent.build(new TaskEvent(entry.getKey(), entry.getValue())));

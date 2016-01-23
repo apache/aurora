@@ -102,7 +102,6 @@ public class MetricCalculatorTest extends EasyMockTest {
         ImmutableSet.of(task1, task2, task3, task4),
         ImmutableSet.of(PROD_METRICS, NON_PROD_METRICS));
 
-    assertEquals(PROD_METRICS.size() + NON_PROD_METRICS.size(), names.getValues().size());
     assertEquals(metricNames, ImmutableSet.copyOf(names.getValues()));
   }
 

@@ -133,10 +133,10 @@ public interface TaskStore {
           return false;
         }
         if (query.getEnvironment() != null
-            && !query.getEnvironment().equals(config.getEnvironment())) {
+            && !query.getEnvironment().equals(config.getJob().getEnvironment())) {
           return false;
         }
-        if (query.getJobName() != null && !query.getJobName().equals(config.getJobName())) {
+        if (query.getJobName() != null && !query.getJobName().equals(config.getJob().getName())) {
           return false;
         }
 

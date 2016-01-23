@@ -14,7 +14,8 @@
 package org.apache.aurora.codec;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
-import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -24,21 +25,23 @@ public class ThriftBinaryCodecTest {
 
   @Test
   public void testRoundTrip() throws CodingException {
-    Identity original = new Identity("mesos", "jack");
+    ScheduledTask original = TaskTestUtil.makeTask("id", TaskTestUtil.JOB).newBuilder();
     assertEquals(original,
-        ThriftBinaryCodec.decode(Identity.class, ThriftBinaryCodec.encode(original)));
+        ThriftBinaryCodec.decode(ScheduledTask.class, ThriftBinaryCodec.encode(original)));
   }
 
   @Test
   public void testRoundTripNull() throws CodingException {
-    assertNull(ThriftBinaryCodec.decode(Identity.class, ThriftBinaryCodec.encode(null)));
+    assertNull(ThriftBinaryCodec.decode(ScheduledTask.class, ThriftBinaryCodec.encode(null)));
   }
 
   @Test
   public void testRoundTripNonNull() throws CodingException {
-    Identity original = new Identity("mesos", "jill");
+    ScheduledTask original = TaskTestUtil.makeTask("id", TaskTestUtil.JOB).newBuilder();
     assertEquals(original,
-        ThriftBinaryCodec.decodeNonNull(Identity.class, ThriftBinaryCodec.encodeNonNull(original)));
+        ThriftBinaryCodec.decodeNonNull(
+            ScheduledTask.class,
+            ThriftBinaryCodec.encodeNonNull(original)));
   }
 
   @Test(expected = NullPointerException.class)
@@ -48,16 +51,16 @@ public class ThriftBinaryCodecTest {
 
   @Test(expected = NullPointerException.class)
   public void testDecodeNonNull() throws CodingException {
-    ThriftBinaryCodec.decodeNonNull(Identity.class, null);
+    ThriftBinaryCodec.decodeNonNull(ScheduledTask.class, null);
   }
 
   @Test
   public void testInflateDeflateRoundTrip() throws CodingException {
-    Identity original = new Identity("aurora", "jsmith");
+    ScheduledTask original = TaskTestUtil.makeTask("id", TaskTestUtil.JOB).newBuilder();
 
     byte[] deflated = ThriftBinaryCodec.deflateNonNull(original);
 
-    Identity inflated = ThriftBinaryCodec.inflateNonNull(Identity.class, deflated);
+    ScheduledTask inflated = ThriftBinaryCodec.inflateNonNull(ScheduledTask.class, deflated);
 
     assertEquals(original, inflated);
   }

@@ -95,6 +95,7 @@ import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IConfigRewrite;
+import org.apache.aurora.scheduler.storage.entities.IHostStatus;
 import org.apache.aurora.scheduler.storage.entities.IInstanceConfigRewrite;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobConfigRewrite;
@@ -543,26 +544,30 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   public Response startMaintenance(Hosts hosts) {
     return ok(Result.startMaintenanceResult(
         new StartMaintenanceResult()
-            .setStatuses(maintenance.startMaintenance(hosts.getHostNames()))));
+            .setStatuses(IHostStatus.toBuildersSet(
+                maintenance.startMaintenance(hosts.getHostNames())))));
   }
 
   @Override
   public Response drainHosts(Hosts hosts) {
     return ok(Result.drainHostsResult(
-        new DrainHostsResult().setStatuses(maintenance.drain(hosts.getHostNames()))));
+        new DrainHostsResult().setStatuses(IHostStatus.toBuildersSet(
+            maintenance.drain(hosts.getHostNames())))));
   }
 
   @Override
   public Response maintenanceStatus(Hosts hosts) {
     return ok(Result.maintenanceStatusResult(
-        new MaintenanceStatusResult().setStatuses(maintenance.getStatus(hosts.getHostNames()))));
+        new MaintenanceStatusResult().setStatuses(IHostStatus.toBuildersSet(
+            maintenance.getStatus(hosts.getHostNames())))));
   }
 
   @Override
   public Response endMaintenance(Hosts hosts) {
     return ok(Result.endMaintenanceResult(
         new EndMaintenanceResult()
-            .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))));
+            .setStatuses(IHostStatus.toBuildersSet(
+                maintenance.endMaintenance(hosts.getHostNames())))));
   }
 
   @Override

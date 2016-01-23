@@ -24,14 +24,13 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.DockerParameter;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.ResourceType;
 import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.TierManager;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
@@ -63,16 +62,10 @@ import static org.junit.Assert.assertTrue;
 
 public class MesosTaskFactoryImplTest extends EasyMockTest {
 
-  private static final ITaskConfig TASK_CONFIG = ITaskConfig.build(new TaskConfig()
-      .setJob(new JobKey("role", "environment", "job-name"))
-      .setOwner(new Identity("role", "user"))
-      .setEnvironment("environment")
-      .setJobName("job-name")
-      .setDiskMb(10)
-      .setRamMb(100)
-      .setNumCpus(5)
-      .setContainer(Container.mesos(new MesosContainer()))
-      .setRequestedPorts(ImmutableSet.of("http")));
+  private static final ITaskConfig TASK_CONFIG = ITaskConfig.build(
+      TaskTestUtil.makeConfig(TaskTestUtil.JOB)
+          .newBuilder()
+          .setContainer(Container.mesos(new MesosContainer())));
   private static final IAssignedTask TASK = IAssignedTask.build(new AssignedTask()
       .setInstanceId(2)
       .setTaskId("task-id")
