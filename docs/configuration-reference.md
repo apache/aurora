@@ -498,7 +498,7 @@ tasks with the same static port allocations from being co-scheduled.
 External constraints such as slave attributes should be used to enforce such
 guarantees should they be needed.
 
-### Container Object
+### Container Objects
 
 *Note: The only container type currently supported is "docker".  Docker support is currently EXPERIMENTAL.*
 *Note: In order to correctly execute processes inside a job, the Docker container must have python 2.7 installed.*
