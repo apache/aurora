@@ -76,7 +76,6 @@ final class JobUpdates {
                     .setUpdateGroupSize(100)
                     .setMaxFailedInstances(1)
                     .setMaxPerInstanceFailures(1)
-                    .setMaxWaitToInstanceRunningMs(1)
                     .setMinWaitInInstanceRunningMs(1)
                     .setRollbackOnFailure(true)
                     .setWaitForBatchCompletion(false))

@@ -61,7 +61,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         instances = 20,
         update_config = UpdateConfig(
           batch_size = 5,
-          restart_threshold = 30,
           watch_secs = 10,
           max_per_shard_failures = 2,
         ),

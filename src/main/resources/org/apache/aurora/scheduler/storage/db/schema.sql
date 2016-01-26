@@ -250,7 +250,6 @@ CREATE TABLE job_updates(
   update_group_size INT NOT NULL,
   max_per_instance_failures INT NOT NULL,
   max_failed_instances INT NOT NULL,
-  max_wait_to_instance_running_ms INT NOT NULL,
   min_wait_in_instance_running_ms INT NOT NULL,
   rollback_on_failure BOOLEAN NOT NULL,
   wait_for_batch_completion BOOLEAN NOT NULL,

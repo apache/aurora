@@ -41,7 +41,6 @@ public class UpdateFactoryImplTest {
           .setSettings(new JobUpdateSettings()
               .setMaxFailedInstances(1)
               .setMaxPerInstanceFailures(1)
-              .setMaxWaitToInstanceRunningMs(100)
               .setMinWaitInInstanceRunningMs(100)
               .setUpdateGroupSize(2)
               .setUpdateOnlyTheseInstances(ImmutableSet.of())));

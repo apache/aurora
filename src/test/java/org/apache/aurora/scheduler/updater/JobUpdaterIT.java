@@ -133,7 +133,6 @@ public class JobUpdaterIT extends EasyMockTest {
   private static final IJobKey JOB = JobKeys.from("role", "env", "job1");
   private static final IJobUpdateKey UPDATE_ID =
       IJobUpdateKey.build(new JobUpdateKey(JOB.newBuilder(), "update_id"));
-  private static final Amount<Long, Time> RUNNING_TIMEOUT = Amount.of(1000L, Time.MILLISECONDS);
   private static final Amount<Long, Time> WATCH_TIMEOUT = Amount.of(2000L, Time.MILLISECONDS);
   private static final Amount<Long, Time> FLAPPING_THRESHOLD = Amount.of(1L, Time.MILLISECONDS);
   private static final Amount<Long, Time> ONE_DAY = Amount.of(1L, Time.DAYS);
@@ -695,10 +694,9 @@ public class JobUpdaterIT extends EasyMockTest {
         .putAll(1, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     changeState(JOB, 1, FINISHED, ASSIGNED, STARTING, RUNNING);
-    clock.advance(Amount.of(RUNNING_TIMEOUT.getValue() / 2, Time.MILLISECONDS));
+    clock.advance(Amount.of(WATCH_TIMEOUT.getValue() / 2, Time.MILLISECONDS));
     changeState(JOB, 0, FINISHED, ASSIGNED, STARTING, RUNNING);
-    clock.advance(
-        Amount.of(WATCH_TIMEOUT.getValue() - (RUNNING_TIMEOUT.getValue() / 2), Time.MILLISECONDS));
+    clock.advance(Amount.of(WATCH_TIMEOUT.getValue() / 2, Time.MILLISECONDS));
 
     // Instance 1 finished first, but update does not yet proceed until 0 finishes.
     actions.putAll(1, INSTANCE_UPDATED);
@@ -1181,8 +1179,6 @@ public class JobUpdaterIT extends EasyMockTest {
     actions.putAll(0, INSTANCE_UPDATED)
         .putAll(1, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
-    clock.advance(RUNNING_TIMEOUT);
-    assertState(ROLLING_FORWARD, actions.build());
 
     updater.abort(update.getSummary().getKey(), AUDIT);
     assertState(ABORTED, actions.build());
@@ -1344,7 +1340,6 @@ public class JobUpdaterIT extends EasyMockTest {
             .setSettings(new JobUpdateSettings()
                 .setUpdateGroupSize(1)
                 .setRollbackOnFailure(true)
-                .setMaxWaitToInstanceRunningMs(RUNNING_TIMEOUT.as(Time.MILLISECONDS).intValue())
                 .setMinWaitInInstanceRunningMs(WATCH_TIMEOUT.as(Time.MILLISECONDS).intValue())
                 .setUpdateOnlyTheseInstances(ImmutableSet.of())));
 

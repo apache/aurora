@@ -44,7 +44,6 @@ class TestJobUpdateApis(unittest.TestCase):
 
   UPDATE_CONFIG = {
       'batch_size': 1,
-      'restart_threshold': 50,
       'watch_secs': 50,
       'max_per_shard_failures': 2,
       'max_total_failures': 1,

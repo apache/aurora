@@ -46,15 +46,15 @@ class TestRangeConversion(unittest.TestCase):
     assert UpdaterConfig.instances_to_ranges([]) is None, "Result must be None."
 
   def test_pulse_interval_secs(self):
-    config = UpdaterConfig(1, 1, 1, 1, 1, pulse_interval_secs=60)
+    config = UpdaterConfig(1, 1, 1, 1, pulse_interval_secs=60)
     assert 60000 == config.to_thrift_update_settings().blockIfNoPulsesAfterMs
 
   def test_pulse_interval_unset(self):
-    config = UpdaterConfig(1, 1, 1, 1, 1)
+    config = UpdaterConfig(1, 1, 1, 1)
     assert config.to_thrift_update_settings().blockIfNoPulsesAfterMs is None
 
   def test_pulse_interval_too_low(self):
     threshold = UpdaterConfig.MIN_PULSE_INTERVAL_SECONDS
     with raises(ValueError) as e:
-      UpdaterConfig(1, 1, 1, 1, 1, pulse_interval_secs=threshold - 1)
+      UpdaterConfig(1, 1, 1, 1, pulse_interval_secs=threshold - 1)
     assert 'Pulse interval seconds must be at least %s seconds.' % threshold in e.value.message

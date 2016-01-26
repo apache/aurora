@@ -2080,7 +2080,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setUpdateGroupSize(10)
         .setMaxFailedInstances(2)
         .setMaxPerInstanceFailures(1)
-        .setMaxWaitToInstanceRunningMs(30000)
         .setMinWaitInInstanceRunningMs(15000)
         .setRollbackOnFailure(true);
   }

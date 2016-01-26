@@ -26,7 +26,6 @@ class UpdaterConfig(object):
 
   def __init__(self,
                batch_size,
-               restart_threshold,
                watch_secs,
                max_per_shard_failures,
                max_total_failures,
@@ -41,8 +40,6 @@ class UpdaterConfig(object):
     if pulse_interval_secs is not None and pulse_interval_secs < self.MIN_PULSE_INTERVAL_SECONDS:
       raise ValueError('Pulse interval seconds must be at least %s seconds.'
                        % self.MIN_PULSE_INTERVAL_SECONDS)
-    if restart_threshold:
-      log.warn('restart_threshold has been deprecated and will be removed in a future release')
 
     self.batch_size = batch_size
     self.watch_secs = watch_secs

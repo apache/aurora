@@ -979,12 +979,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
           .setInstructions(instructions));
 
       Response response = empty();
-      if (update.getInstructions().getSettings().getMaxWaitToInstanceRunningMs() > 0) {
-        addMessage(
-            response,
-            "The maxWaitToInstanceRunningMs (restart_threshold) field is deprecated.");
-      }
-
       try {
         validateTaskLimits(
             request.getTaskConfig(),

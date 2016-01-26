@@ -265,7 +265,6 @@ HELLO_WORLD = Job(
   %(inner)s
   update_config = UpdateConfig(
     batch_size = 1,
-    restart_threshold = 60,
     watch_secs = 45,
     max_per_shard_failures = 2,
   ),
@@ -300,7 +299,6 @@ jobs = [HELLO_WORLD]
         instances = '{{instances_binding}}',
         update_config = UpdateConfig(
           batch_size = "{{TEST_BATCH}}",
-          restart_threshold = 60,
           watch_secs = 45,
           max_per_shard_failures = 2,
         ),

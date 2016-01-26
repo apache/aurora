@@ -1039,7 +1039,6 @@ public class DbJobUpdateStoreTest {
             .setUpdateGroupSize(1)
             .setMaxPerInstanceFailures(1)
             .setMaxFailedInstances(1)
-            .setMaxWaitToInstanceRunningMs(100)
             .setMinWaitInInstanceRunningMs(200)
             .setRollbackOnFailure(true)
             .setWaitForBatchCompletion(true)
