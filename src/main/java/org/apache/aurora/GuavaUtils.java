@@ -20,7 +20,6 @@ import java.util.stream.Collector;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.util.concurrent.AbstractService;
 import com.google.common.util.concurrent.Service;
 import com.google.common.util.concurrent.Service.State;
 import com.google.common.util.concurrent.ServiceManager;
@@ -53,23 +52,6 @@ public final class GuavaUtils {
     public void failure(Service service) {
       LOG.error("Service: " + service + " failed unexpectedly. Triggering shutdown.");
       lifecycle.shutdown();
-    }
-  }
-
-  /**
-   * A Service that does nothing; useful for building passive services driven by an external
-   * event loop.
-   */
-  public static class PassiveService extends AbstractService {
-
-    @Override
-    protected void doStart() {
-      notifyStarted();
-    }
-
-    @Override
-    protected void doStop() {
-      notifyStopped();
     }
   }
 

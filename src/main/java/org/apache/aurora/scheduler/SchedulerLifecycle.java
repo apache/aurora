@@ -51,7 +51,6 @@ import org.apache.aurora.common.util.StateMachine.Transition;
 import org.apache.aurora.common.zookeeper.Group.JoinException;
 import org.apache.aurora.common.zookeeper.ServerSet;
 import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
-import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -118,7 +117,6 @@ public class SchedulerLifecycle implements EventSubscriber {
       Driver driver,
       LeadingOptions leadingOptions,
       ScheduledExecutorService executorService,
-      EventSink eventSink,
       ShutdownRegistry shutdownRegistry,
       StatsProvider statsProvider,
       @SchedulerActive ServiceManagerIface schedulerActiveServiceManager) {
@@ -128,7 +126,6 @@ public class SchedulerLifecycle implements EventSubscriber {
         lifecycle,
         driver,
         new DefaultDelayedActions(leadingOptions, executorService),
-        eventSink,
         shutdownRegistry,
         statsProvider,
         schedulerActiveServiceManager);
@@ -189,7 +186,6 @@ public class SchedulerLifecycle implements EventSubscriber {
       final Lifecycle lifecycle,
       final Driver driver,
       final DelayedActions delayedActions,
-      final EventSink eventSink,
       final ShutdownRegistry shutdownRegistry,
       StatsProvider statsProvider,
       final ServiceManagerIface schedulerActiveServiceManager) {
@@ -198,7 +194,6 @@ public class SchedulerLifecycle implements EventSubscriber {
     requireNonNull(lifecycle);
     requireNonNull(driver);
     requireNonNull(delayedActions);
-    requireNonNull(eventSink);
     requireNonNull(shutdownRegistry);
 
     statsProvider.makeGauge(

@@ -24,7 +24,6 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
 import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
 import org.apache.aurora.scheduler.SchedulerLifecycle.DelayedActions;
-import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
@@ -49,7 +48,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   private Driver driver;
   private LeaderControl leaderControl;
   private DelayedActions delayedActions;
-  private EventSink eventSink;
   private FakeStatsProvider statsProvider;
   private ServiceManagerIface serviceManager;
 
@@ -62,7 +60,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     driver = createMock(Driver.class);
     leaderControl = createMock(LeaderControl.class);
     delayedActions = createMock(DelayedActions.class);
-    eventSink = createMock(EventSink.class);
     statsProvider = new FakeStatsProvider();
     serviceManager = createMock(ServiceManagerIface.class);
   }
@@ -84,7 +81,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
         new Lifecycle(shutdownRegistry),
         driver,
         delayedActions,
-        eventSink,
         shutdownRegistry,
         statsProvider,
         serviceManager);

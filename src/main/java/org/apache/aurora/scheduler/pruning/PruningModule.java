@@ -83,7 +83,6 @@ public class PruningModule extends AbstractModule {
         expose(TaskHistoryPruner.class);
       }
     });
-    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(TaskHistoryPruner.class);
     PubsubEventModule.bindSubscriber(binder(), TaskHistoryPruner.class);
 
     install(new PrivateModule() {

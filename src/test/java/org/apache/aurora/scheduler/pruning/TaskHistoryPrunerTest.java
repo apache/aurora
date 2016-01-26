@@ -18,8 +18,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.io.Closer;
-import com.google.common.util.concurrent.Service;
 
+import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
@@ -49,9 +50,6 @@ import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
 
 public class TaskHistoryPrunerTest extends EasyMockTest {
   private static final String SLAVE_HOST = "HOST_A";
@@ -67,6 +65,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private TaskHistoryPruner pruner;
   private Closer closer;
+  private Command shutdownCommand;
 
   @Before
   public void setUp() {
@@ -75,15 +74,15 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
+    shutdownCommand = createMock(Command.class);
     pruner = new TaskHistoryPruner(
         executor,
         stateManager,
         clock,
         new HistoryPrunnerSettings(ONE_DAY, ONE_MINUTE, PER_JOB_HISTORY),
-        storageUtil.storage);
+        storageUtil.storage,
+        new Lifecycle(shutdownCommand));
     closer = Closer.create();
-
-    pruner.startAsync().awaitRunning();
   }
 
   @After
@@ -242,20 +241,13 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
     expectDeleteTasks("a");
     expectLastCall().andThrow(new RuntimeException("oops"));
 
+    shutdownCommand.execute();
+
     control.replay();
 
     changeState(running, killed);
     clock.advance(ONE_HOUR);
     delayedDelete.getValue().run();
-    // awaitTerminated throws an IllegalStateException if the service fails
-    try {
-      pruner.awaitTerminated();
-      fail();
-    } catch (IllegalStateException e) {
-      assertEquals(Service.State.FAILED, pruner.state());
-    }
-
-    assertNotNull(pruner.failureCause());
   }
 
   private void expectDeleteTasks(String... tasks) {

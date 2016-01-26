@@ -24,7 +24,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
 
-import org.apache.aurora.GuavaUtils.PassiveService;
+import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
@@ -43,8 +43,6 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.google.common.base.Preconditions.checkState;
-
 import static org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 
@@ -52,7 +50,7 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
  * Prunes tasks in a job based on per-job history and an inactive time threshold by observing tasks
  * transitioning into one of the inactive states.
  */
-public class TaskHistoryPruner extends PassiveService implements EventSubscriber {
+public class TaskHistoryPruner implements EventSubscriber {
   private static final Logger LOG = LoggerFactory.getLogger(TaskHistoryPruner.class);
 
   private final DelayExecutor executor;
@@ -60,6 +58,7 @@ public class TaskHistoryPruner extends PassiveService implements EventSubscriber
   private final Clock clock;
   private final HistoryPrunnerSettings settings;
   private final Storage storage;
+  private final Lifecycle lifecycle;
 
   private final Predicate<IScheduledTask> safeToDelete = new Predicate<IScheduledTask>() {
     @Override
@@ -91,13 +90,15 @@ public class TaskHistoryPruner extends PassiveService implements EventSubscriber
       StateManager stateManager,
       Clock clock,
       HistoryPrunnerSettings settings,
-      Storage storage) {
+      Storage storage,
+      Lifecycle lifecycle) {
 
     this.executor = requireNonNull(executor);
     this.stateManager = requireNonNull(stateManager);
     this.clock = requireNonNull(clock);
     this.settings = requireNonNull(settings);
     this.storage = requireNonNull(storage);
+    this.lifecycle = requireNonNull(lifecycle);
   }
 
   @VisibleForTesting
@@ -114,8 +115,6 @@ public class TaskHistoryPruner extends PassiveService implements EventSubscriber
    */
   @Subscribe
   public void recordStateChange(TaskStateChange change) {
-    checkState(isRunning());
-
     if (Tasks.isTerminated(change.getNewState())) {
       long timeoutBasis = change.isTransition()
           ? clock.nowMillis()
@@ -138,12 +137,15 @@ public class TaskHistoryPruner extends PassiveService implements EventSubscriber
     return Query.jobScoped(jobKey).byStatus(apiConstants.TERMINAL_STATES);
   }
 
-  private Runnable failureNotifyingRunnable(Runnable runnable) {
+  private Runnable shutdownOnError(String subject, Runnable runnable) {
     return () -> {
       try {
         runnable.run();
       } catch (Throwable t) {
-        notifyFailed(t);
+        LOG.error(
+            "Unexpected problem pruning task history for " + subject + ". Triggering shutdown",
+            t);
+        lifecycle.shutdown();
       }
     };
   }
@@ -156,13 +158,13 @@ public class TaskHistoryPruner extends PassiveService implements EventSubscriber
     LOG.debug("Prune task " + taskId + " in " + timeRemaining + " ms.");
 
     executor.execute(
-        failureNotifyingRunnable(() -> {
+        shutdownOnError("task: " + taskId, () -> {
           LOG.info("Pruning expired inactive task " + taskId);
           deleteTasks(ImmutableSet.of(taskId));
         }),
         Amount.of(timeRemaining, Time.MILLISECONDS));
 
-    executor.execute(failureNotifyingRunnable(() -> {
+    executor.execute(shutdownOnError("job: " + jobKey, () -> {
       Iterable<IScheduledTask> inactiveTasks =
           Storage.Util.fetchTasks(storage, jobHistoryQuery(jobKey));
       int numInactiveTasks = Iterables.size(inactiveTasks);
