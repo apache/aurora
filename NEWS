@@ -35,6 +35,9 @@
 - Removed the deprecated 'JobUpdateSettings.maxWaitToInstanceRunningMs' thrift api field (
   UpdateConfig.restart_threshold in client-side configuration). This aspect of job restarts is now
   controlled exclusively via the client with `aurora job restart --restart-threshold=[seconds]`.
+- Removed executor flag `--announcer-enable`.  Enabling the announcer previously required both flags
+  `--announcer-enable` and `--announcer-ensemble`, but now only `--announcer-ensemble` must be set.
+
 
 0.11.0
 ------

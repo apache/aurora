@@ -60,15 +60,6 @@ _LOGGER_MODES = ', '.join(LoggerMode.VALUES)
 
 
 app.add_option(
-    '--announcer-enable',
-    dest='announcer_enable',
-    action='store_true',
-    default=False,
-    help='Enable the ServerSet announcer for this executor.  Jobs must still activate using '
-         'the Announcer configuration.')
-
-
-app.add_option(
     '--announcer-ensemble',
     dest='announcer_ensemble',
     type=str,
@@ -179,9 +170,7 @@ def initialize(options):
       ResourceManagerProvider(checkpoint_root=checkpoint_root)
   ]
 
-  if options.announcer_enable:
-    if options.announcer_ensemble is None:
-      app.error('Must specify --announcer-ensemble if the announcer is enabled.')
+  if options.announcer_ensemble is not None:
     status_providers.append(DefaultAnnouncerCheckerProvider(
       options.announcer_ensemble,
       options.announcer_serverset_path,

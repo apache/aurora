@@ -4,7 +4,6 @@
     "command": {
       "value": "thermos_executor.pex",
       "arguments": [
-        "--announcer-enable",
         "--announcer-ensemble",
         "localhost:2181"
       ],

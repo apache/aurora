@@ -41,7 +41,6 @@ public final class TestExecutorSettings {
       .setExecutorId(Executors.PLACEHOLDER_EXECUTOR_ID)
       .setCommand(CommandInfo.newBuilder().setValue("thermos_executor.pex")
           .addAllArguments(ImmutableList.of(
-              "--announcer-enable",
               "--announcer-ensemble",
               "localhost:2181"))
           .addAllUris(ImmutableList.of(
