@@ -115,11 +115,9 @@ public final class DbModule extends PrivateModule {
         // READ COMMITTED transaction isolation.  More details here
         // http://www.h2database.com/html/advanced.html?#transaction_isolation
         .put("LOCK_MODE", "3")
-        // Error-level reporting for H2.
-        // See http://www.h2database.com/html/features.html#trace_options
-        // TODO(wfarner): H2 can ship these to slf4j, but is too noisy at our default level (info).
-        // Use this logging and reduce the default level for h2's logger.
-        .put("TRACE_LEVEL_SYSTEM_OUT", "1")
+        // Send log messages from H2 to SLF4j
+        // See http://www.h2database.com/html/features.html#other_logging
+        .put("TRACE_LEVEL_FILE", "4")
         // Enable Query Statistics
         .put("QUERY_STATISTICS", "TRUE")
         .build();

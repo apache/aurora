@@ -18,7 +18,7 @@ limitations under the License.
  to provide a reasonable default, but allow users to override in any format they wish.
  http://logback.qos.ch/manual/configuration.html
 -->
-<configuration>
+<configuration debug="true">
   <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
     <target>System.err</target>
     <encoder>
@@ -27,6 +27,10 @@ limitations under the License.
       </pattern>
     </encoder>
   </appender>
+
+  <logger name="h2database" level="warn">
+  </logger>
+
   <root level="info">
     <appender-ref ref="STDERR" />
   </root>
