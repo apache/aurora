@@ -29,6 +29,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
@@ -80,6 +81,8 @@ final class Fixtures {
       IResourceAggregate.build(new ResourceAggregate(10.0, 1024, 2048));
   static final QuotaCheckResult ENOUGH_QUOTA = new QuotaCheckResult(SUFFICIENT_QUOTA);
   static final QuotaCheckResult NOT_ENOUGH_QUOTA = new QuotaCheckResult(INSUFFICIENT_QUOTA);
+  static final InstanceKey INSTANCE_KEY = new InstanceKey(JOB_KEY.newBuilder(), 0);
+  static final TaskConfig INVALID_TASK_CONFIG = defaultTask(true).setTier(",");
 
   private Fixtures() {
     // Utility class.

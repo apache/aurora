@@ -110,10 +110,6 @@ public final class Query {
     return unscoped().byStatus(status, statuses);
   }
 
-  public static Builder statusScoped(Iterable<ScheduleStatus> statuses) {
-    return unscoped().byStatus(statuses);
-  }
-
   /**
    * A Builder of TaskQueries. Builders are immutable and provide access to a set of convenience
    * methods to return a new builder of another scope. Available scope filters include slave,

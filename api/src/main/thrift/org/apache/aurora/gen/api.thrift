@@ -1027,10 +1027,14 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   Response killTasks(1: TaskQuery query, 3: Lock lock, 4: JobKey job, 5: set<i32> instances)
 
   /**
-   * Adds new instances specified by the AddInstancesConfig. A job represented by the JobKey must be
-   * protected by Lock.
+   * Adds new instances with the TaskConfig of the existing instance pointed by the key.
+   * TODO(maxim): remove AddInstancesConfig in AURORA-1595.
    */
-  Response addInstances(1: AddInstancesConfig config, 2: Lock lock)
+  Response addInstances(
+      1: AddInstancesConfig config,
+      2: Lock lock,
+      3: InstanceKey key,
+      4: i32 count)
 
   /**
    * Creates and saves a new Lock instance guarding against multiple mutating operations within the

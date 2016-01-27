@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.thrift;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,6 +24,8 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ContiguousSet;
+import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -39,6 +42,7 @@ import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
 import org.apache.aurora.gen.Hosts;
+import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
@@ -748,18 +752,16 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response addInstances(AddInstancesConfig config, @Nullable Lock mutableLock) {
-    requireNonNull(config);
-    checkNotBlank(config.getInstanceIds());
-    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(config.getKey()));
+  public Response addInstances(
+      @Nullable AddInstancesConfig config,
+      @Nullable Lock mutableLock,
+      @Nullable InstanceKey key,
+      int count) {
 
-    ITaskConfig task;
-    try {
-      task = configurationManager.validateAndPopulate(ITaskConfig.build(config.getTaskConfig()));
-    } catch (TaskDescriptionException e) {
-      return error(INVALID_REQUEST, e);
-    }
+    IJobKey jobKey =
+        JobKeys.assertValid(IJobKey.build(config == null ? key.getJobKey() : config.getKey()));
 
+    Response response = empty();
     return storage.write(storeProvider -> {
       try {
         if (getCronJob(storeProvider, jobKey).isPresent()) {
@@ -770,23 +772,53 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
             ILockKey.build(LockKey.job(jobKey.newBuilder())),
             java.util.Optional.ofNullable(mutableLock).map(ILock::build));
 
-        Iterable<IScheduledTask> currentTasks = storeProvider.getTaskStore().fetchTasks(
-            Query.jobScoped(task.getJob()).active());
+        FluentIterable<IScheduledTask> currentTasks = FluentIterable.from(
+            storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()));
+
+        ITaskConfig task;
+        Set<Integer> instanceIds;
+        if (config == null) {
+          if (count <= 0) {
+            return invalidRequest(INVALID_INSTANCE_COUNT);
+          }
+
+          Optional<IScheduledTask> templateTask = Iterables.tryFind(
+              currentTasks,
+              e -> e.getAssignedTask().getInstanceId() == key.getInstanceId());
+          if (!templateTask.isPresent()) {
+            return invalidRequest(INVALID_INSTANCE_ID);
+          }
+
+          task = templateTask.get().getAssignedTask().getTask();
+          int lastId = currentTasks
+              .transform(e -> e.getAssignedTask().getInstanceId())
+              .toList()
+              .stream()
+              .max(Comparator.naturalOrder()).get();
+
+          instanceIds = ContiguousSet.create(
+              Range.openClosed(lastId, lastId + count),
+              DiscreteDomain.integers());
+        } else {
+          checkNotBlank(config.getInstanceIds());
+          addMessage(response, "The AddInstancesConfig field is deprecated.");
+
+          task = configurationManager.validateAndPopulate(
+              ITaskConfig.build(config.getTaskConfig()));
+          instanceIds = ImmutableSet.copyOf(config.getInstanceIds());
+        }
 
         validateTaskLimits(
             task,
-            Iterables.size(currentTasks) + config.getInstanceIdsSize(),
-            quotaManager.checkInstanceAddition(task, config.getInstanceIdsSize(), storeProvider));
+            Iterables.size(currentTasks) + instanceIds.size(),
+            quotaManager.checkInstanceAddition(task, instanceIds.size(), storeProvider));
 
-        stateManager.insertPendingTasks(
-            storeProvider,
-            task,
-            ImmutableSet.copyOf(config.getInstanceIds()));
+        stateManager.insertPendingTasks(storeProvider, task, instanceIds);
 
-        return ok();
+        return response.setResponseCode(OK);
       } catch (LockException e) {
         return error(LOCK_ERROR, e);
-      } catch (TaskValidationException | IllegalArgumentException e) {
+      } catch (TaskDescriptionException | TaskValidationException | IllegalArgumentException e) {
         return error(INVALID_REQUEST, e);
       }
     });
@@ -1121,4 +1153,10 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
   @VisibleForTesting
   static final String INVALID_PULSE_TIMEOUT = "blockIfNoPulsesAfterMs must be positive.";
+
+  @VisibleForTesting
+  static final String INVALID_INSTANCE_ID = "No active task found for a given instance ID.";
+
+  @VisibleForTesting
+  static final String INVALID_INSTANCE_COUNT = "Instance count must be positive.";
 }

@@ -99,7 +99,7 @@ public class LockManagerImpl implements LockManager {
     if (!stored.equals(heldLock)) {
       if (stored.isPresent()) {
         throw new LockException(String.format(
-            "Unable to perform operation for: %s. Use override/cancel option.",
+            "Unable to perform operation for %s due to active lock held",
             formatLockKey(context)));
       } else if (heldLock.isPresent()) {
         throw new LockException(

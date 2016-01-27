@@ -39,6 +39,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.AddInstancesConfig;
+import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdateKey;
@@ -139,6 +140,9 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
           AddInstancesConfig._Fields.KEY,
           JobKey.class);
 
+  private static final FieldGetter<InstanceKey, JobKey> INSTANCE_KEY_GETTER =
+      new ThriftFieldGetter<>(InstanceKey.class, InstanceKey._Fields.JOB_KEY, JobKey.class);
+
   @SuppressWarnings("unchecked")
   private static final Set<FieldGetter<?, JobKey>> FIELD_GETTERS =
       ImmutableSet.of(
@@ -150,13 +154,12 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
           JOB_UPDATE_KEY_GETTER,
           ADD_INSTANCES_CONFIG_GETTER,
           QUERY_TO_JOB_KEY,
+          INSTANCE_KEY_GETTER,
           new IdentityFieldGetter<>(JobKey.class));
 
   private static final Map<Class<?>, Function<?, Optional<JobKey>>> FIELD_GETTERS_BY_TYPE =
       ImmutableMap.<Class<?>, Function<?, Optional<JobKey>>>builder()
-          .putAll(Maps.uniqueIndex(
-              FIELD_GETTERS,
-              (Function<FieldGetter<?, JobKey>, Class<?>>) FieldGetter::getStructClass))
+          .putAll(Maps.uniqueIndex(FIELD_GETTERS, FieldGetter::getStructClass))
           .build();
 
   @VisibleForTesting

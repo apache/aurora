@@ -37,7 +37,8 @@
   controlled exclusively via the client with `aurora job restart --restart-threshold=[seconds]`.
 - Removed executor flag `--announcer-enable`.  Enabling the announcer previously required both flags
   `--announcer-enable` and `--announcer-ensemble`, but now only `--announcer-ensemble` must be set.
-
+- Deprecated `AddInstancesConfig` argument in `addInstances` thrift RPC. The new behavior is to
+  increase job instance count (scale out) based on the task template pointed by instance `key`.
 
 0.11.0
 ------
