@@ -224,18 +224,11 @@ class HealthCheckerProvider(StatusCheckerProvider):
       portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)
       if 'health' not in portmap:
         return None
-      if HTTP_HEALTH_CHECK in health_checker:
-        # Assume user has already switched over to the new config since we found the key.
-        http_config = health_checker.get(HTTP_HEALTH_CHECK, {})
-        http_endpoint = http_config.get('endpoint')
-        http_expected_response = http_config.get('expected_response')
-        http_expected_response_code = http_config.get('expected_response_code')
-      else:
-        # TODO (AURORA-1563): Remove this clause after we deprecate support for following keys
-        # directly in HealthCheckConfig
-        http_endpoint = health_check_config.get('endpoint')
-        http_expected_response = health_check_config.get('expected_response')
-        http_expected_response_code = health_check_config.get('expected_response_code')
+      http_config = health_checker.get(HTTP_HEALTH_CHECK, {})
+      http_endpoint = http_config.get('endpoint')
+      http_expected_response = http_config.get('expected_response')
+      http_expected_response_code = http_config.get('expected_response_code')
+
       http_signaler = HttpSignaler(
         portmap['health'],
         timeout_secs=timeout_secs)

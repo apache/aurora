@@ -430,9 +430,6 @@ Parameters for controlling a task's health checks via HTTP or a shell command.
 
 | param                          | type      | description
 | -------                        | :-------: | --------
-| *```endpoint```*               | String    | HTTP endpoint to check (Default: /health) **Deprecated.**
-| *```expected_response```*      | String    | If not empty, fail the HTTP health check if the response differs. Case insensitive. (Default: ok) **Deprecated.**
-| *```expected_response_code```* | Integer   | If not zero, fail the HTTP health check if the response code differs. (Default: 0) **Deprecated.**
 | ```health_checker```           | HealthCheckerConfig | Configure what kind of health check to use.
 | ```initial_interval_secs```    | Integer   | Initial delay for performing a health check. (Default: 15)
 | ```interval_secs```            | Integer   | Interval on which to check the task's health. (Default: 10)

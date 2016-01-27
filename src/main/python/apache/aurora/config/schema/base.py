@@ -42,7 +42,7 @@ class HttpHealthChecker(Struct):
 
 
 class ShellHealthChecker(Struct):
-  shell_command            = String
+  shell_command            = Required(String)
 
 
 class HealthCheckerConfig(Struct):
@@ -54,9 +54,6 @@ DefaultHealthChecker      = HealthCheckerConfig(http=HttpHealthChecker())
 
 
 class HealthCheckConfig(Struct):
-  endpoint                 = Default(String, '/health')
-  expected_response        = Default(String, 'ok')
-  expected_response_code   = Default(Integer, 0)
   health_checker           = Default(HealthCheckerConfig, DefaultHealthChecker)
   initial_interval_secs    = Default(Float, 15.0)
   interval_secs            = Default(Float, 10.0)

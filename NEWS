@@ -39,6 +39,9 @@
   `--announcer-enable` and `--announcer-ensemble`, but now only `--announcer-ensemble` must be set.
 - Deprecated `AddInstancesConfig` argument in `addInstances` thrift RPC. The new behavior is to
   increase job instance count (scale out) based on the task template pointed by instance `key`.
+- Removed the following deprecated `HealthCheckConfig` client-side configuration fields: `endpoint`,
+  `expected_response`, `expected_response_code`.  These are now set exclusively in like-named fields
+  of `HttpHealthChecker.`
 
 0.11.0
 ------

@@ -16,22 +16,18 @@ import os
 from io import BytesIO
 
 import pytest
-from twitter.common import log
 from twitter.common.contextutil import temporary_dir
 
 from apache.aurora.client import config
 from apache.aurora.client.config import get_config as get_aurora_config
-from apache.aurora.client.config import HTTP_DEPRECATION_WARNING
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
 from apache.aurora.config.schema.base import (
     MB,
     Announcer,
     HealthCheckConfig,
-    HealthCheckerConfig,
     Job,
     Resources,
-    ShellHealthChecker,
     Task,
     UpdateConfig
 )
@@ -182,90 +178,6 @@ def test_dedicated_portmap():
     config._validate_announce_configuration(
         AuroraConfig(base_job(announce=Announcer(portmap={'http': 80}),
                               constraints={'foo': 'bar'})))
-
-
-def test_health_check_config_http_ok():
-  base_job = Job(
-    name='hello_bond', role='james', cluster='marine-cluster',
-    health_check_config=HealthCheckConfig(
-      max_consecutive_failures=1,
-    ),
-    task=Task(name='main', processes=[],
-              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-  config._validate_health_check_config(AuroraConfig(base_job))
-
-
-def test_health_check_config_shell_ok():
-  base_job = Job(
-    name='hello_bond', role='james', cluster='marine-cluster',
-
-    health_check_config=HealthCheckConfig(
-      max_consecutive_failures=1,
-      health_checker=HealthCheckerConfig(
-        shell=ShellHealthChecker(shell_command='foo bar')
-      )
-    ),
-    task=Task(name='main', processes=[],
-              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-  config._validate_health_check_config(AuroraConfig(base_job))
-
-
-def test_health_check_config_invalid_type():
-  # Must be 'shell' or 'http' type of config.
-  with pytest.raises(ValueError):
-    Job(
-      name='hello_bond', role='james', cluster='marine-cluster',
-      health_check_config=HealthCheckConfig(
-      max_consecutive_failures=1,
-      health_checker='foo',
-    ),
-    task=Task(name='main', processes=[],
-              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-
-
-def test_health_check_config_deprecate_message(monkeypatch):
-  base_job = Job(
-    name='hello_bond', role='james', cluster='marine-cluster',
-    health_check_config=HealthCheckConfig(
-      max_consecutive_failures=1,
-      endpoint='/to_be_deprecated'
-    ),
-    task=Task(name='main', processes=[],
-              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-  log_items = []
-  def capture_log(msg):
-    log_items.append(msg)
-  monkeypatch.setattr(log, 'warn', capture_log)
-  config._validate_health_check_config(AuroraConfig(base_job))
-  assert log_items == [HTTP_DEPRECATION_WARNING]
-
-
-def test_health_check_config_shell_no_command():
-  # If we chose shell config, we must define shell_command.
-  base_job = Job(
-    name='hello_bond', role='james', cluster='marine-cluster',
-    health_check_config=HealthCheckConfig(
-      max_consecutive_failures=1,
-      health_checker=HealthCheckerConfig(shell=ShellHealthChecker())
-    ),
-    task=Task(name='main', processes=[],
-              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-  with pytest.raises(SystemExit):
-    config._validate_health_check_config(AuroraConfig(base_job))
-
-
-def test_health_check_config_shell_empty_command():
-  # shell_command must not be left empty.
-  base_job = Job(
-      name='hello_bond', role='james', cluster='marine-cluster',
-      health_check_config=HealthCheckConfig(
-        max_consecutive_failures=1,
-        health_checker=HealthCheckerConfig(shell=ShellHealthChecker(shell_command=''))
-      ),
-      task=Task(name='main', processes=[],
-                resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-  with pytest.raises(SystemExit):
-    config._validate_health_check_config(AuroraConfig(base_job))
 
 
 def test_update_config_passes_with_default_values():
