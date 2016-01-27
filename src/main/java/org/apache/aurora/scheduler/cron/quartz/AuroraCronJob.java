@@ -139,7 +139,7 @@ class AuroraCronJob implements Job {
 
           CronCollisionPolicy collisionPolicy = cronJob.getCronCollisionPolicy();
           LOG.info(
-              "Cron triggered for {} at %s with policy {}", path, new Date(), collisionPolicy);
+              "Cron triggered for {} at {} with policy {}", path, new Date(), collisionPolicy);
           CRON_JOB_TRIGGERS.incrementAndGet();
 
           final Query.Builder activeQuery = Query.jobScoped(key).active();
