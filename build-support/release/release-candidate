@@ -219,8 +219,10 @@ if [[ $publish == 1 ]]; then
   echo "Publishing release candidate to ${aurora_svn_rc_url}"
   svn mkdir ${aurora_svn_rc_url} -m "aurora-${current_version} release candidate ${rc_version_tag}"
   svn co --depth=empty ${aurora_svn_rc_url} ${dist_dir}
+  pushd ${dist_dir}
   svn add ${dist_name}*
   svn ci -m "aurora-${current_version} release candidate ${rc_version_tag}"
+  popd
 
   echo "Creating tag ${rc_version_tag}"
   git tag -s ${rc_version_tag} \
