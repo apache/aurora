@@ -42,6 +42,10 @@
 - Removed the following deprecated `HealthCheckConfig` client-side configuration fields: `endpoint`,
   `expected_response`, `expected_response_code`.  These are now set exclusively in like-named fields
   of `HttpHealthChecker.`
+- Removed deprecated (now redundant) fields:
+  - `Identity.role`
+  - `TaskConfig.environment`
+  - `TaskConfig.jobName`
 
 0.11.0
 ------

@@ -138,7 +138,7 @@ public abstract class AbstractCronJobStoreTest {
         IJobConfiguration.build(
             new JobConfiguration()
                 .setKey(job.newBuilder())
-                .setOwner(new Identity(job.getRole(), "user"))
+                .setOwner(new Identity().setUser("user"))
                 .setCronSchedule("schedule")
                 .setCronCollisionPolicy(CronCollisionPolicy.CANCEL_NEW)
                 .setTaskConfig(config.newBuilder())

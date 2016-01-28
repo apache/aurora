@@ -919,12 +919,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   public Response startJobUpdate(JobUpdateRequest mutableRequest, @Nullable String message) {
     requireNonNull(mutableRequest);
 
-    // TODO(maxim): Switch to key field instead when AURORA-749 is fixed.
-    IJobKey job = JobKeys.assertValid(IJobKey.build(new JobKey()
-        .setRole(mutableRequest.getTaskConfig().getOwner().getRole())
-        .setEnvironment(mutableRequest.getTaskConfig().getEnvironment())
-        .setName(mutableRequest.getTaskConfig().getJobName())));
-
     if (!mutableRequest.getTaskConfig().isIsService()) {
       return invalidRequest(NON_SERVICE_TASK);
     }
@@ -965,6 +959,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     }
 
     return storage.write(storeProvider -> {
+      IJobKey job = request.getTaskConfig().getJob();
       if (getCronJob(storeProvider, job).isPresent()) {
         return invalidRequest(NO_CRON);
       }

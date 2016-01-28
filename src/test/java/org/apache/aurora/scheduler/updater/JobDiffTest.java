@@ -228,9 +228,8 @@ public class JobDiffTest extends EasyMockTest {
 
   private static ITaskConfig makeTask(String job, String config) {
     return ITaskConfig.build(new TaskConfig()
-        .setOwner(new Identity("owner", "owner"))
-        .setEnvironment("test")
-        .setJobName(job)
+        .setJob(JobKeys.from("role", "test", job).newBuilder())
+        .setOwner(new Identity().setUser("owner"))
         .setExecutorConfig(new ExecutorConfig().setData(config)));
   }
 }

@@ -121,9 +121,6 @@
       <if test="role != null">
         j.role = #{role}
       </if>
-      <if test="owner != null and owner.role != null">
-        AND j.role = #{owner.role}
-      </if>
       <if test="environment != null">
         AND j.environment = #{environment}
       </if>

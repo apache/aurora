@@ -28,7 +28,6 @@ from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     GetJobsResult,
-    Identity,
     JobConfiguration,
     JobKey,
     Metadata,
@@ -52,7 +51,6 @@ class TestJobStatus(AuroraClientCommandTest):
       instance += 1
       task.assignedTask.instanceId = instance
       task.assignedTask.task.job = JobKey(role='bozo', environment='test', name='woops')
-      task.assignedTask.task.jobName = 'woops'
     return tasks
 
   @classmethod
@@ -149,9 +147,6 @@ class TestJobStatus(AuroraClientCommandTest):
           slaveHost="junk.nothing",
           task=TaskConfig(
             job=JobKey(role="nobody", environment="prod", name='flibber'),
-            owner=Identity(role="nobody"),
-            environment="prod",
-            jobName="flibber",
             isService=False,
             numCpus=2,
             ramMb=2048,
@@ -437,18 +432,13 @@ class TestJobStatus(AuroraClientCommandTest):
                 "assignedTask": {
                   "task": {
                     "isService": False,
-                    "environment": "prod",
                     "container": {
                       "mesos": {}
                     },
                     "requestedPorts": [
                       "http"
                     ],
-                    "jobName": "flibber",
                     "priority": 7,
-                    "owner": {
-                      "role": "nobody"
-                    },
                     "job": {
                       "environment": "prod",
                       "role": "nobody",
@@ -493,18 +483,13 @@ class TestJobStatus(AuroraClientCommandTest):
                 "assignedTask": {
                   "task": {
                     "isService": False,
-                    "environment": "prod",
                     "container": {
                       "mesos": {}
                     },
                     "requestedPorts": [
                       "http"
                     ],
-                    "jobName": "flibber",
                     "priority": 7,
-                    "owner": {
-                      "role": "nobody"
-                    },
                     "job": {
                       "environment": "prod",
                       "role": "nobody",

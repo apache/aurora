@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -21,13 +20,13 @@ import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
-import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -550,9 +549,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
             .setJob(new JobKey(role, env, job))
             .setPriority(priority)
             .setProduction(production)
-            .setJobName(job)
-            .setEnvironment(env)
-            .setConstraints(new HashSet<Constraint>()));
+            .setConstraints(Sets.newHashSet()));
     return new ScheduledTask().setAssignedTask(assignedTask);
   }
 

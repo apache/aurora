@@ -511,7 +511,7 @@
                   var job = summary.job;
                   return job.cronSchedule !== null &&
                     job.key.environment === env &&
-                    job.taskConfig.jobName === jobName;
+                    job.key.name === jobName;
                 })
                 .map(function (summary) {
                   var collisionPolicy =

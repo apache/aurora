@@ -106,9 +106,6 @@ class TestJobUpdateApis(unittest.TestCase):
     mock_task_config = create_autospec(spec=JobConfiguration, instance=True)
     mock_task_config.taskConfig = TaskConfig()
     config.job.return_value = mock_task_config
-    config.role.return_value = "role"
-    config.environment.return_value = "env"
-    config.name.return_value = "name"
     config.instances.return_value = 5
     return config
 

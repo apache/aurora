@@ -60,9 +60,7 @@ public final class TaskTestUtil {
   public static ITaskConfig makeConfig(IJobKey job) {
     return ITaskConfig.build(new TaskConfig()
         .setJob(job.newBuilder())
-        .setJobName(job.getName())
-        .setEnvironment(job.getEnvironment())
-        .setOwner(new Identity(job.getRole(), job.getRole() + "-user"))
+        .setOwner(new Identity().setUser(job.getRole() + "-user"))
         .setIsService(true)
         .setNumCpus(1.0)
         .setRamMb(1024)

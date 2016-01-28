@@ -57,9 +57,7 @@ public class CronIT extends EasyMockTest {
   public static final CrontabEntry CRONTAB_ENTRY = CrontabEntry.parse("* * * * *");
 
   private static final IJobKey JOB_KEY = JobKeys.from("roll", "b", "c");
-  private static final Identity IDENTITY = new Identity()
-      .setRole(JOB_KEY.getRole())
-      .setUser("user");
+  private static final Identity IDENTITY = new Identity().setUser("user");
 
   private static final IJobConfiguration CRON_JOB = IJobConfiguration.build(
       new JobConfiguration()

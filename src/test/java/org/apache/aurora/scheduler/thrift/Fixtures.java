@@ -62,7 +62,7 @@ import static org.junit.Assert.assertEquals;
 final class Fixtures {
   static final String ROLE = "bar_role";
   static final String USER = "foo_user";
-  static final Identity ROLE_IDENTITY = new Identity(ROLE, USER);
+  static final Identity IDENTITY = new Identity().setUser(USER);
   static final String JOB_NAME = "job_foo";
   static final IJobKey JOB_KEY = JobKeys.from(ROLE, "devel", JOB_NAME);
   static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
@@ -94,7 +94,7 @@ final class Fixtures {
 
   static JobConfiguration makeJob(TaskConfig task, int shardCount) {
     return new JobConfiguration()
-        .setOwner(ROLE_IDENTITY)
+        .setOwner(IDENTITY)
         .setInstanceCount(shardCount)
         .setTaskConfig(task)
         .setKey(JOB_KEY.newBuilder());
@@ -103,9 +103,7 @@ final class Fixtures {
   static TaskConfig defaultTask(boolean production) {
     return new TaskConfig()
         .setJob(JOB_KEY.newBuilder())
-        .setOwner(new Identity(ROLE, USER))
-        .setEnvironment("devel")
-        .setJobName(JOB_NAME)
+        .setOwner(IDENTITY)
         .setContactEmail("testing@twitter.com")
         .setExecutorConfig(new ExecutorConfig("aurora", "data"))
         .setNumCpus(1)
