@@ -59,8 +59,8 @@ it run
                ./build-support/release/release-candidate -l m -p
 
 3. Update, if necessary, the draft email created from the `release-candidate` script in step #2 and
-send the [VOTE] email to the dev@ and private@ mailing lists. You can verify the release signature
-and checksums by running
+send the [VOTE] email to the dev@ mailing list. You can verify the release signature and checksums
+by running
 
 				./build-support/release/verify-release-candidate
 
