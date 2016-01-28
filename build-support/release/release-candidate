@@ -263,7 +263,7 @@ The CHANGELOG for the release is available at:
 ${aurora_git_web_url}&f=CHANGELOG&hb=${rc_version_tag}
 
 The tag used to create the release candidate is:
-${aurora_git_web_url};a=shortlog;h=refs/heads/${rc_version_tag}
+${aurora_git_web_url};a=shortlog;h=refs/tags/${rc_version_tag}
 
 The release candidate is available at:
 ${aurora_svn_rc_url}/${dist_name}.tar.gz
