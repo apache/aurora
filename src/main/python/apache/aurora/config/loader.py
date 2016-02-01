@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import json
 import pkgutil
 
 from pystachio.config import Config as PystachioConfig
@@ -65,11 +66,19 @@ class AuroraConfigLoader(PystachioConfig):
   @classmethod
   def load_json(cls, filename):
     with open(filename) as fp:
-      return base_schema.Job.json_load(fp)
+      return cls.loads_json(fp.read())
 
   @classmethod
   def loads_json(cls, string):
-    return base_schema.Job.json_loads(string)
+    parsed = json.loads(string)
+    if 'jobs' not in parsed:
+      # Convert the legacy single-job format
+      parsed = {'jobs': [parsed]}
+
+    parsed.update({
+      'jobs': [base_schema.Job(x) for x in parsed.get('jobs')]
+    })
+    return parsed
 
 
 AuroraConfigLoader.flush_schemas()

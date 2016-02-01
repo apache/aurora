@@ -27,8 +27,7 @@ BAD_MESOS_CONFIG = """
 3 2 1 3 2 4 2 3
 """
 
-
-MESOS_CONFIG = """
+JOB1 = """
 HELLO_WORLD = MesosJob(
   name = 'hello_world',
   role = 'john_doe',
@@ -39,7 +38,27 @@ HELLO_WORLD = MesosJob(
     resources = Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576),
   )
 )
+"""
+
+JOB2 = """
+OTHERJOB = MesosJob(
+  name = 'otherjob',
+  role = 'john_doe',
+  cluster = 'smf1-test',
+  task = Task(
+    name = 'main',
+    processes = [Process(name = 'otherthing', cmdline = 'echo {{mesos.instance}}')],
+    resources = Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576),
+  )
+)
+"""
+
+MESOS_CONFIG = JOB1 + """
 jobs = [HELLO_WORLD]
+"""
+
+MESOS_CONFIG_MULTI = JOB1 + JOB2 + """
+jobs = [HELLO_WORLD, OTHERJOB]
 """
 
 
@@ -59,19 +78,27 @@ def test_filter_schema():
   job_dict = env['jobs'][0].get()
   job_dict['unknown_attribute'] = 'foo bar baz'
   job_json_string = json.dumps(job_dict)
-  # If this fails, will raise an InvalidConfigError or other exception and fail the test.
-  AuroraConfigLoader.loads_json(job_json_string)
+  with pytest.raises(AttributeError):
+    AuroraConfigLoader.loads_json(job_json_string)
 
 
 def test_empty_config():
   AuroraConfigLoader.load(BytesIO())
 
 
-def test_load_json():
+def test_load_json_single():
   env = AuroraConfigLoader.load(BytesIO(MESOS_CONFIG))
   job = env['jobs'][0]
-  new_job = AuroraConfigLoader.loads_json(json.dumps(job.get()))
+  new_job = AuroraConfigLoader.loads_json(json.dumps(job.get()))['jobs'][0]
   assert new_job == job
+
+
+def test_load_json_multi():
+  env = AuroraConfigLoader.load(BytesIO(MESOS_CONFIG_MULTI))
+  jobs = env['jobs']
+  json_env = AuroraConfigLoader.loads_json(json.dumps({'jobs': [job.get() for job in jobs]}))
+  json_jobs = json_env['jobs']
+  assert jobs == json_jobs
 
 
 def test_load():

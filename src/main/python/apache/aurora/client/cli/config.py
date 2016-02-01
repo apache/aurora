@@ -21,7 +21,7 @@ from __future__ import print_function
 
 from apache.aurora.client.cli import EXIT_COMMAND_FAILURE, EXIT_OK, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
-from apache.aurora.client.cli.options import BIND_OPTION, CONFIG_ARGUMENT
+from apache.aurora.client.cli.options import BIND_OPTION, CONFIG_ARGUMENT, JSON_READ_OPTION
 from apache.aurora.client.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
 
@@ -36,7 +36,7 @@ class ListJobsCommand(Verb):
     return "List all of the jobs defined in a configuration file"
 
   def get_options(self):
-    return [BIND_OPTION, CONFIG_ARGUMENT]
+    return [BIND_OPTION, CONFIG_ARGUMENT, JSON_READ_OPTION]
 
   def execute(self, context):
     def maybe_bind(j):
@@ -47,7 +47,10 @@ class ListJobsCommand(Verb):
           job.name().get()])
 
     try:
-      env = AuroraConfigLoader.load(context.options.config_file)
+      if context.options.read_json:
+        env = AuroraConfigLoader.load_json(context.options.config_file)
+      else:
+        env = AuroraConfigLoader.load(context.options.config_file)
     except (AuroraConfig.Error, AuroraConfigLoader.Error, ValueError) as e:
       context.print_err("Error loading configuration file: %s" % e)
       return EXIT_COMMAND_FAILURE

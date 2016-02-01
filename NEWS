@@ -1,3 +1,10 @@
+0.13.0
+------
+- When using --read-json, aurora can now load multiple jobs from one json file,
+  similar to the usual pystachio structure: `{"jobs": [job1, job2, ...]}`. The
+  older single-job json format is also still supported.
+- `aurora config list` command now supports `--read-json`
+
 0.12.0
 ------
 - Removed the deprecated field 'ConfigGroup.instanceIds' from the API.

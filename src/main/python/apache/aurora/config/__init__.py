@@ -122,14 +122,18 @@ class AuroraConfig(object):
         cls, filename, name=None, bindings=None,
         select_cluster=None, select_role=None, select_env=None):
     # TODO(atollenaere): should take a JobKey when non-jobkey interface is deprecated
-    job = AuroraConfigLoader.load_json(filename)
-    return cls.apply_plugins(cls(job.bind(*bindings) if bindings else job))
+    env = AuroraConfigLoader.load_json(filename)
+    return cls.apply_plugins(
+        cls(cls.pick(env, name, bindings, select_cluster, select_role, select_env)), env)
 
   @classmethod
-  def loads_json(cls, string, name=None, bindings=None, select_cluster=None, select_env=None):
+  def loads_json(
+        cls, string, name=None, bindings=None,
+        select_cluster=None, select_role=None, select_env=None):
     # TODO(atollenaere): should take a JobKey when non-jobkey interface is deprecated
-    job = AuroraConfigLoader.loads_json(string)
-    return cls.apply_plugins(cls(job.bind(*bindings) if bindings else job))
+    env = AuroraConfigLoader.loads_json(string)
+    return cls.apply_plugins(
+        cls(cls.pick(env, name, bindings, select_cluster, select_role, select_env)), env)
 
   @classmethod
   def validate_job(cls, job):
