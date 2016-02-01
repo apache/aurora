@@ -14,7 +14,7 @@
 #
 # Wrapper for self-bootstrapping virtualenv
 set -ex
-VIRTUALENV_VERSION=12.1.1
+VIRTUALENV_VERSION=14.0.5
 
 if which python2.7 >/dev/null; then
   PY=`which python2.7`
@@ -30,7 +30,6 @@ if ! [ -f "$HERE/virtualenv-$VIRTUALENV_VERSION/BOOTSTRAPPED" ]; then
   pushd "$HERE"
   curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-$VIRTUALENV_VERSION.tar.gz
   tar zxvf virtualenv-$VIRTUALENV_VERSION.tar.gz
-  # TODO(ksweeney): Checksum
   touch virtualenv-$VIRTUALENV_VERSION/BOOTSTRAPPED  # 2PC
   popd
 fi
