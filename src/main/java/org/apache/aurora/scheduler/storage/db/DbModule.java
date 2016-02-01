@@ -80,6 +80,11 @@ public final class DbModule extends PrivateModule {
   private static final Arg<Amount<Long, Time>> DB_ROW_GC_INTERVAL =
       Arg.create(Amount.of(2L, Time.HOURS));
 
+  // http://h2database.com/html/grammar.html#set_lock_timeout
+  @CmdLine(name = "db_lock_timeout", help = "H2 table lock timeout")
+  private static final Arg<Amount<Long, Time>> H2_LOCK_TIMEOUT =
+      Arg.create(Amount.of(1L, Time.MINUTES));
+
   private static final Set<Class<?>> MAPPER_CLASSES = ImmutableSet.<Class<?>>builder()
       .add(AttributeMapper.class)
       .add(CronJobMapper.class)
@@ -120,6 +125,8 @@ public final class DbModule extends PrivateModule {
         .put("TRACE_LEVEL_FILE", "4")
         // Enable Query Statistics
         .put("QUERY_STATISTICS", "TRUE")
+        // Configure the lock timeout
+        .put("LOCK_TIMEOUT", H2_LOCK_TIMEOUT.get().as(Time.MILLISECONDS).toString())
         .build();
     this.jdbcSchema = dbName + ";" + Joiner.on(";").withKeyValueSeparator("=").join(args);
   }
