@@ -44,10 +44,18 @@ public class StatsTest {
   }
 
   @Test
-  public void testSlashesSupported() {
+  public void testSupportedSpecialChars() {
+    AtomicLong hyphen = Stats.exportLong("c-d");
     AtomicLong slash = Stats.exportLong("d/f");
+    AtomicLong dot = Stats.exportLong("f.g");
+
+    hyphen.incrementAndGet();
     slash.incrementAndGet();
+    dot.incrementAndGet();
+
+    assertCounter("c-d", 1);
     assertCounter("d/f", 1);
+    assertCounter("f.g", 1);
   }
 
   @Test
@@ -80,14 +88,11 @@ public class StatsTest {
   public void testNormalizesIllegalChars() {
     AtomicLong colon = Stats.exportLong("a:b");
     AtomicLong plus = Stats.exportLong("b+c");
-    AtomicLong hyphen = Stats.exportLong("c-d");
 
     colon.incrementAndGet();
     plus.incrementAndGet();
-    hyphen.incrementAndGet();
     assertCounter("a_b", 1);
     assertCounter("b_c", 1);
-    assertCounter("c_d", 1);
   }
 
   private void assertCounter(String name, long value) {
