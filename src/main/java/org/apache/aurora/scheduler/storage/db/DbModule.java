@@ -225,6 +225,11 @@ public final class DbModule extends PrivateModule {
 
         bind(new TypeLiteral<Amount<Long, Time>>() { }).toInstance(SLOW_QUERY_LOG_THRESHOLD.get());
 
+        // Enable a ping query which will prevent the use of invalid connections in the
+        // connection pool.
+        bindProperties(binder(), ImmutableMap.of("mybatis.pooled.pingEnabled", "true"));
+        bindProperties(binder(), ImmutableMap.of("mybatis.pooled.pingQuery", "SELECT 1;"));
+
         // Exposed for unit tests.
         bind(TaskConfigManager.class);
         expose(TaskConfigManager.class);
