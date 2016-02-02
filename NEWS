@@ -45,8 +45,9 @@ Deprecations and removals:
 - Removed the deprecated 'JobUpdateSettings.maxWaitToInstanceRunningMs' thrift api field (
   UpdateConfig.restart_threshold in client-side configuration). This aspect of job restarts is now
   controlled exclusively via the client with `aurora job restart --restart-threshold=[seconds]`.
-- Removed executor flag `--announcer-enable`.  Enabling the announcer previously required both flags
+- Deprecated executor flag `--announcer-enable`. Enabling the announcer previously required both flags
   `--announcer-enable` and `--announcer-ensemble`, but now only `--announcer-ensemble` must be set.
+  `--announcer-enable` is a no-op flag now and will be removed in future version.
 - Removed scheduler command line arguments:
   - `-enable_cors_support`.  Enabling CORS is now implicit by setting the argument
     `-enable_cors_for`.

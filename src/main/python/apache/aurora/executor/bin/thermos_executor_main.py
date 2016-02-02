@@ -59,6 +59,15 @@ _LOGGER_DESTINATIONS = ', '.join(LoggerDestination.VALUES)
 _LOGGER_MODES = ', '.join(LoggerMode.VALUES)
 
 
+# TODO(AURORA-1606): remove this flag after deprecation cycle.
+app.add_option(
+    '--announcer-enable',
+    dest='announcer_enable',
+    action='store_true',
+    default=False,
+    help='Deprecated and no-op.')
+
+
 app.add_option(
     '--announcer-ensemble',
     dest='announcer_ensemble',
@@ -169,6 +178,9 @@ def initialize(options):
       HealthCheckerProvider(),
       ResourceManagerProvider(checkpoint_root=checkpoint_root)
   ]
+
+  if options.announcer_enable:
+    log.warn('Please remove the deprecated and no-op --announcer-enable flag in scheduler config!')
 
   if options.announcer_ensemble is not None:
     status_providers.append(DefaultAnnouncerCheckerProvider(
