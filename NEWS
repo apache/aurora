@@ -1,83 +1,105 @@
-0.13.0
-------
-- When using --read-json, aurora can now load multiple jobs from one json file,
-  similar to the usual pystachio structure: `{"jobs": [job1, job2, ...]}`. The
-  older single-job json format is also still supported.
-- `aurora config list` command now supports `--read-json`
-
 0.12.0
 ------
-- Removed the deprecated field 'ConfigGroup.instanceIds' from the API.
+
+New/updated:
+
 - Upgraded Mesos to 0.25.0.
-- Env variables can be passed through to task processes by passing `--preserve_env`
-  to thermos.
-- Removed scheduler command line arguments:
-  - `-enable_cors_support`.  Enabling CORS is now implicit by setting the argument
-    `-enable_cors_for`.
-  - `-deduplicate_snapshots` and `-deflate_snapshots`.  These features are good to always enable.
-  - `-enable_job_updates` and `-enable_job_creation`
-- Added scheduler command line argument:
-  - `-shiro_after_auth_filter`. Optionally specify a class implementing javax.servlet.Filter
-    that will be included in the Filter chain following the Shiro auth filters.
 - Upgraded the scheduler ZooKeeper client from 3.3.4 to 3.4.6.
+- Added support for configuring Mesos role by passing `-mesos_role` to Aurora scheduler at start time.
+  This enables resource reservation for Aurora when running in a shared Mesos cluster.
+- Aurora task metadata is now mapped to Mesos task labels. Labels are prefixed with
+  `org.apache.aurora.metadata.` to prevent clashes with other, external label sources.
+- Added new scheduler flag `-default_docker_parameters` to allow a cluster operator to specify a
+  universal set of parameters that should be used for every container that does not have parameters
+  explicitly configured at the job level.
 - Added support for jobs to specify arbitrary ZooKeeper paths for service registration.  See
   https://github.com/apache/aurora/blob/master/docs/configuration-reference.md#announcer-objects
   for details.
 - Log destination is configurable for the thermos runner. See the configuration reference for details
   on how to configure destination per-process. Command line options may also be passed through the
   scheduler in order to configure the global default behavior.
+- Env variables can be passed through to task processes by passing `--preserve_env`
+  to thermos.
 - Changed scheduler logging to use logback.
   Operators wishing to customize logging may do so with standard logback configuration as described
   at http://logback.qos.ch/manual/configuration.html
-  With this change, we have removed the following scheduler command line arguments as they were
-  made redundant: `logtostderr`, `alsologtostderr`, `vlog`, `vmodule`, and `use_glog_formatter`.
-- Added support for configuring Mesos role by passing `-mesos_role` to Aurora scheduler at start time.
-  This enables resource reservation for Aurora when running in a shared Mesos cluster.
-- Added new scheduler flag `-default_docker_parameters` to allow a cluster operator to specify a
-  universal set of parameters that should be used for every container that does not have parameters
-  explicitly configured at the job level.
-- Removed scheduler flag `-extra_modules`.
+- When using --read-json, aurora can now load multiple jobs from one json file,
+  similar to the usual pystachio structure: `{"jobs": [job1, job2, ...]}`. The
+  older single-job json format is also still supported.
+- `aurora config list` command now supports `--read-json`
+- Added scheduler command line argument `-shiro_after_auth_filter`. Optionally specify a class
+  implementing javax.servlet.Filter that will be included in the Filter chain following the Shiro
+  auth filters.
+- The `addInstances` thrift RPC does now increase job instance count (scale out) based on the
+  task template pointed by instance `key`.
+
+Deprecations and removals:
+
+- Deprecated `AddInstancesConfig` argument in `addInstances` thrift RPC.
 - Deprecated `TaskQuery` argument in `killTasks` thrift RPC to disallow killing tasks across
   multiple roles. The new safer approach is using `JobKey` with `instances` instead.
+- Removed the deprecated field 'ConfigGroup.instanceIds' from the API.
+- Removed the following deprecated `HealthCheckConfig` client-side configuration fields: `endpoint`,
+  `expected_response`, `expected_response_code`.  These are now set exclusively in like-named fields
+  of `HttpHealthChecker.`
 - Removed the deprecated 'JobUpdateSettings.maxWaitToInstanceRunningMs' thrift api field (
   UpdateConfig.restart_threshold in client-side configuration). This aspect of job restarts is now
   controlled exclusively via the client with `aurora job restart --restart-threshold=[seconds]`.
 - Removed executor flag `--announcer-enable`.  Enabling the announcer previously required both flags
   `--announcer-enable` and `--announcer-ensemble`, but now only `--announcer-ensemble` must be set.
-- Deprecated `AddInstancesConfig` argument in `addInstances` thrift RPC. The new behavior is to
-  increase job instance count (scale out) based on the task template pointed by instance `key`.
-- Removed the following deprecated `HealthCheckConfig` client-side configuration fields: `endpoint`,
-  `expected_response`, `expected_response_code`.  These are now set exclusively in like-named fields
-  of `HttpHealthChecker.`
-- Aurora task metadata is now mapped to Mesos task labels. Labels are prefixed with
-  `org.apache.aurora.metadata.` to prevent clashes with other, external label sources.
+- Removed scheduler command line arguments:
+  - `-enable_cors_support`.  Enabling CORS is now implicit by setting the argument
+    `-enable_cors_for`.
+  - `-deduplicate_snapshots` and `-deflate_snapshots`.  These features are good to always enable.
+  - `-enable_job_updates` and `-enable_job_creation`
+  - `-extra_modules`
+  - `-logtostderr`, `-alsologtostderr`, `-vlog`, `-vmodule`, and `use_glog_formatter`. Removed
+     in favor of the new logback configuration.
+
 
 0.11.0
 ------
+
+New/updated:
+
 - Upgraded Mesos to 0.24.1.
+- Added a new scheduler flag 'framework_announce_principal' to support use of authorization and
+  rate limiting in Mesos.
+- Added support for shell-based health checkers in addition to HTTP health checkers. In concert with
+  this change the `HealthCheckConfig` schema has been restructured to more cleanly allow configuring
+  varied health checkers.
+- Added support for taking in an executor configuration in JSON via a command line argument
+  `--custom_executor_config` which will override all other the command line arguments and default
+  values pertaining to the executor.
+- Log rotation has been added to the thermos runner. See the configuration reference for details
+  on how configure rotation per-process. Command line options may also be passed through the
+  scheduler in order to configure the global default behavior.
+
+Deprecations and removals:
+
 - The client-side updater has been removed, along with the CLI commands that used it:
   'aurora job update' and 'aurora job cancel-update'.  Users are encouraged to take
   advantage of scheduler-driven updates (see 'aurora update -h' for usage), which has been a
   stable feature for several releases.
+- The following fields from `HealthCheckConfig` are now deprecated:
+  `endpoint`, `expected_response`, `expected_response_code` in favor of setting them as part of an
+  `HttpHealthChecker.`
 - The field 'JobUpdateSettings.maxWaitToInstanceRunningMs' (UpdateConfig.restart_threshold in
   client-side configuration) is now deprecated.  This setting was brittle in practice, and is
   ignored by the 0.11.0 scheduler.
-- Added support for shell-based health checkers in addition to HTTP health checkers. In concert with
-  this change the `HealthCheckConfig` schema has been restructured to more cleanly allow configuring
-  varied health checkers. The following fields from `HealthCheckConfig` are now deprecated:
-  `endpoint`, `expected_response`, `expected_response_code` in favor of setting them as part of an
-  `HttpHealthChecker.`
- - Added support for taking in an executor configuration in JSON via a command line argument
-   `--custom_executor_config` which will override all other the command line arguments and default
-   values pertaining to the executor.
-- Log rotation has been added to the thermos runner. See the configuration reference for details
-  on how configure rotation per-process. Command line options may also be passed through the
-  scheduler in order to configure the global default behavior.
-- Added a new scheduler flag 'framework_announce_principal' to support use of authorization and
-  rate limiting in Mesos.
+
 
 0.10.0
 ------
+
+New/updated:
+
+- Upgraded Mesos to 0.23.0. NOTE: Aurora executor now requires openssl runtime dependencies that
+  were not previously enforced. You will need libcurl available on every Mesos slave (or Docker
+  container) to successfully launch Aurora executor. See
+  https://github.com/apache/mesos/blob/ebcf8cc2f2f6c236f6e9315447c247e6348141e1/docs/getting-started.md
+  for more details on Mesos runtime dependencies.
+- Resource quota is no longer consumed by production jobs with a dedicated constraint (AURORA-1457).
 - The Python build layout has changed:
   * The apache.thermos package has been removed.
   * The apache.gen.aurora package has been renamed to apache.aurora.thrift.
@@ -86,16 +108,14 @@
   * A new apache.aurora.kerberos package has been introduced, containing the Kerberos-supporting
     versions of aurora and aurora_admin (kaurora and kaurora_admin).
   * Most BUILD targets under src/main have been removed, see http://s.apache.org/b8z for details.
-- Upgraded Mesos to 0.23.0. NOTE: Aurora executor now requires openssl runtime dependencies that
-  were not previously enforced. You will need libcurl available on every Mesos slave (or Docker
-  container) to successfully launch Aurora executor. See
-  https://github.com/apache/mesos/blob/ebcf8cc2f2f6c236f6e9315447c247e6348141e1/docs/getting-started.md
-  for more details on Mesos runtime dependencies.
-- Resource quota is no longer consumed by production jobs with a dedicated constraint (AURORA-1457).
+
+Deprecations and removals:
+
+- Removed the `--root` option from the observer.
 - Thrift ConfigGroup.instanceIds field has been deprecated. Use ConfigGroup.instances instead.
 - Deprecated SessionValidator and CapabilityValidator interfaces have been removed. All
   SessionKey-typed arguments are now nullable and ignored by the scheduler Thrift API.
-- Removed the `--root` option from the observer.
+
 
 0.9.0
 -----
@@ -108,6 +128,7 @@
 - SLA metrics for non-production jobs have been disabled by default. They can
   be enabled via the scheduler command line. Metric names have changed from
   '...nonprod_ms' to "...ms_nonprod" (AURORA-1350).
+
 
 0.8.0
 -----
