@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
 
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.scheduler.AcceptedOffer;
@@ -40,6 +41,8 @@ import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
+import org.apache.mesos.Protos.Label;
+import org.apache.mesos.Protos.Labels;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
@@ -69,6 +72,9 @@ public interface MesosTaskFactory {
   class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = LoggerFactory.getLogger(MesosTaskFactoryImpl.class);
     private static final String EXECUTOR_PREFIX = "thermos-";
+
+    @VisibleForTesting
+    static final String METADATA_LABEL_PREFIX = "org.apache.aurora.metadata.";
 
     private final ExecutorSettings executorSettings;
     private final TierManager tierManager;
@@ -140,6 +146,8 @@ public interface MesosTaskFactory {
               .addAllResources(resources)
               .setData(ByteString.copyFrom(taskInBytes));
 
+      configureTaskLabels(config, taskBuilder);
+
       if (config.getContainer().isSetMesos()) {
         configureTaskForNoContainer(task, config, taskBuilder, acceptedOffer);
       } else if (config.getContainer().isSetDocker()) {
@@ -203,6 +211,19 @@ public interface MesosTaskFactory {
 
     private void configureContainerVolumes(ContainerInfo.Builder containerBuilder) {
       containerBuilder.addAllVolumes(executorSettings.getExecutorConfig().getVolumeMounts());
+    }
+
+    private void configureTaskLabels(ITaskConfig taskConfig, TaskInfo.Builder taskBuilder) {
+      ImmutableSet<Label> labels = taskConfig.getMetadata().stream()
+          .map(m -> Label.newBuilder()
+              .setKey(METADATA_LABEL_PREFIX + m.getKey())
+              .setValue(m.getValue())
+              .build())
+          .collect(GuavaUtils.toImmutableSet());
+
+      if (!labels.isEmpty()) {
+        taskBuilder.setLabels(Labels.newBuilder().addAllLabels(labels));
+      }
     }
   }
 }

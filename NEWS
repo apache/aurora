@@ -49,6 +49,8 @@
 - Removed the following deprecated `HealthCheckConfig` client-side configuration fields: `endpoint`,
   `expected_response`, `expected_response_code`.  These are now set exclusively in like-named fields
   of `HttpHealthChecker.`
+- Aurora task metadata is now mapped to Mesos task labels. Labels are prefixed with
+  `org.apache.aurora.metadata.` to prevent clashes with other, external label sources.
 
 0.11.0
 ------

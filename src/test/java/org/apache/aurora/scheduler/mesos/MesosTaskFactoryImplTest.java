@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Container;
@@ -52,6 +53,7 @@ import org.junit.Test;
 import static org.apache.aurora.scheduler.ResourceSlot.makeMesosRangeResource;
 import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
+import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.METADATA_LABEL_PREFIX;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.NO_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.SOME_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_CONFIG;
@@ -259,6 +261,26 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     assertEquals(
         config.getExecutorConfig().getVolumeMounts(),
         taskInfo.getExecutor().getContainer().getVolumesList());
+  }
+
+  @Test
+  public void testMetadataLabelMapping() {
+    expect(tierManager.getTier(TASK.getTask())).andReturn(DEFAULT);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager);
+
+    control.replay();
+
+    TaskInfo task = taskFactory.createFrom(TASK, OFFER_THERMOS_EXECUTOR);
+    ImmutableSet<String> labels = task.getLabels().getLabelsList().stream()
+        .map(l -> l.getKey() + l.getValue())
+        .collect(GuavaUtils.toImmutableSet());
+
+    ImmutableSet<String> metadata = TASK.getTask().getMetadata().stream()
+        .map(m -> METADATA_LABEL_PREFIX + m.getKey() + m.getValue())
+        .collect(GuavaUtils.toImmutableSet());
+
+    assertTrue(labels.size() > 0);
+    assertEquals(labels, metadata);
   }
 
   private static ResourceSlot getTotalTaskResources(TaskInfo task) {
