@@ -670,9 +670,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testKillTasksInvalidJobName() throws Exception {
-    TaskQuery query = new TaskQuery()
-        .setOwner(IDENTITY)
-        .setJobName("");
+    TaskQuery query = new TaskQuery().setJobName("");
 
     control.replay();
 

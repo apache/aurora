@@ -503,8 +503,6 @@ struct GetJobsResult {
  * (terms are AND'ed together).
  */
 struct TaskQuery {
-  // TODO(maxim): Remove in 0.7.0. (AURORA-749)
-  8: Identity owner
   14: string role
   9: string environment
   2: string jobName

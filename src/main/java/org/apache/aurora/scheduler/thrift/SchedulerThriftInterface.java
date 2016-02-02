@@ -23,7 +23,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.FluentIterable;
@@ -453,9 +452,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       }
 
       query = implicitKillQuery(Query.arbitrary(mutableQuery));
-      Preconditions.checkState(
-          !mutableQuery.isSetOwner(),
-          "The owner field in a query should have been unset by Query.Builder.");
     }
 
     return storage.write(storeProvider -> {
