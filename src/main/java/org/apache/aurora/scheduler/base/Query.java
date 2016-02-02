@@ -130,8 +130,15 @@ public final class Query {
       this.query = new TaskQuery();
     }
 
-    Builder(TaskQuery query) {
+    Builder(final TaskQuery query) {
       // It is expected that the caller calls deepCopy.
+      // TODO(maxim): Safe to keep only Role here as TaskQuery is not returned back to the client.
+      // Remove in 0.7.0. (AURORA-749)
+      if (query.isSetOwner()) {
+        query.setRole(query.getOwner().getRole());
+        query.unsetOwner();
+      }
+
       this.query = query;
     }
 

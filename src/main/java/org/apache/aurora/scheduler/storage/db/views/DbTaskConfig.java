@@ -32,6 +32,8 @@ public final class DbTaskConfig {
   private long rowId;
   private JobKey job;
   private Identity owner;
+  private String environment;
+  private String jobName;
   private boolean isService;
   private double numCpus;
   private long ramMb;
@@ -59,6 +61,8 @@ public final class DbTaskConfig {
     return new TaskConfig()
         .setJob(job)
         .setOwner(owner)
+        .setEnvironment(environment)
+        .setJobName(jobName)
         .setIsService(isService)
         .setNumCpus(numCpus)
         .setRamMb(ramMb)

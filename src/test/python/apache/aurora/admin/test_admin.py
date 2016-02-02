@@ -26,6 +26,7 @@ from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     GetLocksResult,
     GetQuotaResult,
+    Identity,
     JobKey,
     Lock,
     LockKey,
@@ -53,7 +54,7 @@ class TestQueryCommand(AuroraClientCommandTest):
     mock_options.force = force
     mock_options.shards = shards
     mock_options.states = states
-    mock_options.listformat = listformat or '%role%/%name%/%instanceId% %status%'
+    mock_options.listformat = listformat or '%role%/%jobName%/%instanceId% %status%'
     mock_options.verbosity = False
     return mock_options
 
@@ -69,8 +70,7 @@ class TestQueryCommand(AuroraClientCommandTest):
     return [ScheduledTask(
         assignedTask=AssignedTask(
             instanceId=0,
-            task=TaskConfig(job=JobKey(role='role', environment='test', name='job'))
-        ),
+            task=TaskConfig(owner=Identity(role='test_role'), jobName='test_job')),
         status=ScheduleStatus.RUNNING
     )]
 

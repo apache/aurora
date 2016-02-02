@@ -133,7 +133,7 @@
             return {
               role: $scope.role, // required for roleEnvLink directive
               environment: summary.job.key.environment,
-              jobName: summary.job.key.name,
+              jobName: summary.job.taskConfig.jobName,
               jobType: getJobType(summary.job),
               isProduction: summary.job.taskConfig.production ? 'yes' : '',
               pendingTasks: summary.stats.pendingTaskCount,

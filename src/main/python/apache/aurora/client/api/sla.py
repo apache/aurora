@@ -35,9 +35,9 @@ def job_key_from_scheduled(task, cluster):
   config = task.assignedTask.task
   return AuroraJobKey(
       cluster=cluster.name,
-      role=config.job.role,
-      env=config.job.environment,
-      name=config.job.name
+      role=config.job.role if config.job else config.owner.role,
+      env=config.job.environment if config.job else config.environment,
+      name=config.job.name if config.job else config.jobName
   )
 
 

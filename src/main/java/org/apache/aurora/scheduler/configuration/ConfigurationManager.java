@@ -37,6 +37,7 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.UserProvidedStrings;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IContainer;
+import org.apache.aurora.scheduler.storage.entities.IIdentity;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
@@ -112,6 +113,28 @@ public class ConfigurationManager {
     this.defaultDockerParameters = Objects.requireNonNull(defaultDockerParameters);
   }
 
+  private static void requireNonNull(Object value, String error) throws TaskDescriptionException {
+    if (value == null) {
+      throw new TaskDescriptionException(error);
+    }
+  }
+
+  private static void assertOwnerValidity(IIdentity jobOwner) throws TaskDescriptionException {
+    requireNonNull(jobOwner, "No job owner specified!");
+    requireNonNull(jobOwner.getRole(), "No job role specified!");
+    requireNonNull(jobOwner.getUser(), "No job user specified!");
+
+    if (!UserProvidedStrings.isGoodIdentifier(jobOwner.getRole())) {
+      throw new TaskDescriptionException(
+          "Job role contains illegal characters: " + jobOwner.getRole());
+    }
+
+    if (!UserProvidedStrings.isGoodIdentifier(jobOwner.getUser())) {
+      throw new TaskDescriptionException(
+          "Job user contains illegal characters: " + jobOwner.getUser());
+    }
+  }
+
   private static String getRole(IValueConstraint constraint) {
     return Iterables.getOnlyElement(constraint.getValues()).split("/")[0];
   }
@@ -157,9 +180,12 @@ public class ConfigurationManager {
       throw new TaskDescriptionException("Job key " + job.getKey() + " is invalid.");
     }
 
-    if (job.isSetOwner() && !UserProvidedStrings.isGoodIdentifier(job.getOwner().getUser())) {
-      throw new TaskDescriptionException(
-          "Job user contains illegal characters: " + job.getOwner().getUser());
+    if (job.isSetOwner()) {
+      assertOwnerValidity(job.getOwner());
+
+      if (!job.getKey().getRole().equals(job.getOwner().getRole())) {
+        throw new TaskDescriptionException("Role in job key must match job owner.");
+      }
     }
 
     builder.setTaskConfig(
@@ -193,13 +219,39 @@ public class ConfigurationManager {
 
     maybeFillLinks(builder);
 
+    if (!UserProvidedStrings.isGoodIdentifier(config.getJobName())) {
+      throw new TaskDescriptionException(
+          "Job name contains illegal characters: " + config.getJobName());
+    }
+
+    if (!UserProvidedStrings.isGoodIdentifier(config.getEnvironment())) {
+      throw new TaskDescriptionException(
+          "Environment contains illegal characters: " + config.getEnvironment());
+    }
+
     if (config.isSetTier() && !UserProvidedStrings.isGoodIdentifier(config.getTier())) {
       throw new TaskDescriptionException("Tier contains illegal characters: " + config.getTier());
     }
 
-    if (!JobKeys.isValid(config.getJob())) {
-      // Job key is set but invalid
-      throw new TaskDescriptionException("Job key " + config.getJob() + " is invalid.");
+    if (config.isSetJob()) {
+      if (!JobKeys.isValid(config.getJob())) {
+        // Job key is set but invalid
+        throw new TaskDescriptionException("Job key " + config.getJob() + " is invalid.");
+      }
+
+      if (!config.getJob().getRole().equals(config.getOwner().getRole())) {
+        // Both owner and job key are set but don't match
+        throw new TaskDescriptionException("Role must match job owner.");
+      }
+    } else {
+      // TODO(maxim): Make sure both key and owner are populated to support older clients.
+      // Remove in 0.7.0. (AURORA-749).
+      // Job key is not set -> populate from owner, environment and name
+      assertOwnerValidity(config.getOwner());
+      builder.setJob(JobKeys.from(
+          config.getOwner().getRole(),
+          config.getEnvironment(),
+          config.getJobName()).newBuilder());
     }
 
     if (!builder.isSetExecutorConfig()) {
@@ -224,7 +276,7 @@ public class ConfigurationManager {
       }
 
       String dedicatedRole = getRole(valueConstraint);
-      if (!config.getJob().getRole().equals(dedicatedRole)) {
+      if (!config.getOwner().getRole().equals(dedicatedRole)) {
         throw new TaskDescriptionException(
             "Only " + dedicatedRole + " may use hosts dedicated for that role.");
       }

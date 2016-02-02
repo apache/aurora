@@ -121,7 +121,10 @@ class DefaultAnnouncerCheckerProvider(AnnouncerCheckerProvider):
 
   def make_zk_path(self, assigned_task):
     config = assigned_task.task
-    role, environment, name = (config.job.role, config.job.environment, config.job.name)
+    role, environment, name = (
+        config.job.role if config.job else config.owner.role,
+        config.job.environment if config.job else config.environment,
+        config.job.name if config.job else config.jobName)
     return posixpath.join(self.__root, role, environment, name)
 
 

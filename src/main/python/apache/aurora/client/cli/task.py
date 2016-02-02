@@ -124,7 +124,7 @@ class SshCommand(Verb):
     ssh_command = ['ssh', '-t']
     ssh_command += context.options.ssh_options if context.options.ssh_options else []
     assigned = first_task.assignedTask
-    role = assigned.task.job.role
+    role = assigned.task.job.role if assigned.task.job else assigned.task.owner.role
     slave_host = assigned.slaveHost
 
     for tunnel in context.options.tunnels:

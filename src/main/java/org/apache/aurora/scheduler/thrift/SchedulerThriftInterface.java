@@ -23,6 +23,7 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.FluentIterable;
@@ -452,6 +453,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       }
 
       query = implicitKillQuery(Query.arbitrary(mutableQuery));
+      Preconditions.checkState(
+          !mutableQuery.isSetOwner(),
+          "The owner field in a query should have been unset by Query.Builder.");
     }
 
     return storage.write(storeProvider -> {
@@ -915,6 +919,12 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   public Response startJobUpdate(JobUpdateRequest mutableRequest, @Nullable String message) {
     requireNonNull(mutableRequest);
 
+    // TODO(maxim): Switch to key field instead when AURORA-749 is fixed.
+    IJobKey job = JobKeys.assertValid(IJobKey.build(new JobKey()
+        .setRole(mutableRequest.getTaskConfig().getOwner().getRole())
+        .setEnvironment(mutableRequest.getTaskConfig().getEnvironment())
+        .setName(mutableRequest.getTaskConfig().getJobName())));
+
     if (!mutableRequest.getTaskConfig().isIsService()) {
       return invalidRequest(NON_SERVICE_TASK);
     }
@@ -955,7 +965,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     }
 
     return storage.write(storeProvider -> {
-      IJobKey job = request.getTaskConfig().getJob();
       if (getCronJob(storeProvider, job).isPresent()) {
         return invalidRequest(NO_CRON);
       }

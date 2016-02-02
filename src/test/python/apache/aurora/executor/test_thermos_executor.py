@@ -57,7 +57,7 @@ from apache.thermos.core.runner import TaskRunner
 from apache.thermos.monitoring.monitor import TaskMonitor
 
 from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME
-from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, JobKey, TaskConfig
+from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, Identity, JobKey, TaskConfig
 
 if 'THERMOS_DEBUG' in os.environ:
   LogOptions.set_stderr_log_level('google:DEBUG')
@@ -139,7 +139,8 @@ def make_task(thermos_config, assigned_ports={}, **kw):
           executorConfig=ExecutorConfig(
               name=AURORA_EXECUTOR_NAME,
               data=thermos_config.json_dumps()),
-          job=JobKey(role=role, environment='env', name='name')),
+          job=JobKey(role=role, environment='env', name='name'),
+          owner=Identity(role=role, user=role)),
       assignedPorts=assigned_ports,
       **kw)
   td = mesos_pb2.TaskInfo()
@@ -539,6 +540,7 @@ class TestThermosExecutor(object):
         AssignedTask(
             task=TaskConfig(
                 job=JobKey(role=role, environment='env', name='name'),
+                owner=Identity(role=role, user=role),
                 executorConfig=ExecutorConfig(name=AURORA_EXECUTOR_NAME, data='garbage'))))
 
     te = FastThermosExecutor(

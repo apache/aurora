@@ -56,9 +56,10 @@ def test_simple_config():
   assert job.instanceCount == 1
   tti = job.taskConfig
   assert job.key == expected_key
-  assert job.owner == Identity(user=getpass.getuser())
+  assert job.owner == Identity(role=HELLO_WORLD.role().get(), user=getpass.getuser())
   assert job.cronSchedule is None
   assert tti.job == expected_key
+  assert tti.jobName == 'hello_world'
   assert tti.isService is False
   assert tti.numCpus == 0.1
   assert tti.ramMb == 64
@@ -69,6 +70,7 @@ def test_simple_config():
   assert tti.maxTaskFailures == 1
   assert tti.constraints == set()
   assert tti.metadata == set()
+  assert tti.environment == HELLO_WORLD.environment().get()
   assert tti.tier is None
 
 
@@ -109,6 +111,7 @@ def test_config_with_options():
   assert tti.isService
   assert job.cronCollisionPolicy == CronCollisionPolicy.RUN_OVERLAP
   assert len(tti.constraints) == 2
+  assert tti.environment == 'prod'
   assert job.key.environment == 'prod'
 
 

@@ -65,6 +65,7 @@
       type="org.apache.aurora.scheduler.storage.db.views.DbJobConfiguration">
 
     <id column="c_id" />
+    <result property="owner.role" column="j_role"/>
     <result property="owner.user" column="creator_user"/>
     <result
         property="cronCollisionPolicy"

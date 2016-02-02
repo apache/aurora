@@ -38,6 +38,7 @@ const string AURORA_EXECUTOR_NAME = 'AuroraExecutor'
 
 // TODO(maxim): Remove in 0.7.0. (AURORA-749)
 struct Identity {
+  1: string role
   2: string user
 }
 
@@ -217,6 +218,12 @@ struct TaskConfig {
  // TODO(maxim): Remove in 0.7.0. (AURORA-749)
  /** contains the role component of JobKey */
  17: Identity owner
+ // TODO(maxim): Remove in 0.7.0. (AURORA-749)
+ /** contains the environment component of JobKey */
+ 26: string environment
+ // TODO(maxim): Remove in 0.7.0. (AURORA-749)
+ /** contains the name component of JobKey */
+  3: string jobName
   7: bool isService
   8: double numCpus
   9: i64 ramMb
@@ -503,6 +510,8 @@ struct GetJobsResult {
  * (terms are AND'ed together).
  */
 struct TaskQuery {
+  // TODO(maxim): Remove in 0.7.0. (AURORA-749)
+  8: Identity owner
   14: string role
   9: string environment
   2: string jobName

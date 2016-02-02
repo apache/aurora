@@ -98,11 +98,11 @@ import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_JOB;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_SCHEDULE;
-import static org.apache.aurora.scheduler.thrift.Fixtures.IDENTITY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.JOB_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.LOCK;
 import static org.apache.aurora.scheduler.thrift.Fixtures.QUOTA;
 import static org.apache.aurora.scheduler.thrift.Fixtures.ROLE;
+import static org.apache.aurora.scheduler.thrift.Fixtures.ROLE_IDENTITY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.UPDATE_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.USER;
 import static org.apache.aurora.scheduler.thrift.Fixtures.assertOkResponse;
@@ -148,21 +148,27 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   @Test
   public void testGetJobSummary() throws Exception {
     long nextCronRunMs = 100;
-    TaskConfig ownedCronJobTask = nonProductionTask().setJob(JOB_KEY.newBuilder());
+    TaskConfig ownedCronJobTask = nonProductionTask()
+        .setJob(JOB_KEY.newBuilder())
+        .setJobName(JOB_KEY.getName())
+        .setOwner(ROLE_IDENTITY)
+        .setEnvironment(JOB_KEY.getEnvironment());
     JobConfiguration ownedCronJob = makeJob()
         .setCronSchedule(CRON_SCHEDULE)
         .setTaskConfig(ownedCronJobTask);
     IScheduledTask ownedCronJobScheduledTask = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask))
         .setStatus(ScheduleStatus.ASSIGNED));
-    Identity otherOwner = new Identity().setUser("other");
+    Identity otherOwner = new Identity("other", "other");
     JobConfiguration unownedCronJob = makeJob()
         .setOwner(otherOwner)
         .setCronSchedule(CRON_SCHEDULE)
         .setKey(JOB_KEY.newBuilder().setRole("other"))
         .setTaskConfig(ownedCronJobTask.deepCopy().setOwner(otherOwner));
     TaskConfig ownedImmediateTaskInfo = defaultTask(false)
-        .setJob(JOB_KEY.newBuilder().setName("immediate"));
+        .setJob(JOB_KEY.newBuilder().setName("immediate"))
+        .setJobName("immediate")
+        .setOwner(ROLE_IDENTITY);
     Set<JobConfiguration> ownedCronJobOnly = ImmutableSet.of(ownedCronJob);
     Set<JobSummary> ownedCronJobSummaryOnly = ImmutableSet.of(
         new JobSummary()
@@ -182,7 +188,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         .setStatus(ScheduleStatus.ASSIGNED));
     JobConfiguration ownedImmediateJob = new JobConfiguration()
         .setKey(JOB_KEY.newBuilder().setName("immediate"))
-        .setOwner(IDENTITY)
+        .setOwner(ROLE_IDENTITY)
         .setInstanceCount(1)
         .setTaskConfig(ownedImmediateTaskInfo);
     Builder query = Query.roleScoped(ROLE);
@@ -237,8 +243,9 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     String cronSchedule = "* * 31 2 *";
 
     TaskConfig task = nonProductionTask()
-        .setJob(JOB_KEY.newBuilder())
-        .setOwner(IDENTITY);
+        .setJobName(JOB_KEY.getName())
+        .setOwner(ROLE_IDENTITY)
+        .setEnvironment(JOB_KEY.getEnvironment());
     JobConfiguration job = makeJob()
         .setCronSchedule(cronSchedule)
         .setTaskConfig(task);
@@ -386,13 +393,15 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         .setKey(jobKey2)
         .setTaskConfig(nonProductionTask());
     TaskConfig immediateTaskConfig = defaultTask(false)
-        .setJob(JOB_KEY.newBuilder().setName("immediate"));
+        .setJob(JOB_KEY.newBuilder().setName("immediate"))
+        .setJobName("immediate")
+        .setOwner(ROLE_IDENTITY);
     IScheduledTask immediateTask = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig))
         .setStatus(ScheduleStatus.ASSIGNED));
     JobConfiguration immediateJob = new JobConfiguration()
         .setKey(JOB_KEY.newBuilder().setName("immediate"))
-        .setOwner(IDENTITY)
+        .setOwner(ROLE_IDENTITY)
         .setInstanceCount(1)
         .setTaskConfig(immediateTaskConfig);
 
@@ -412,21 +421,26 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testGetJobs() throws Exception {
-    TaskConfig ownedCronJobTask = nonProductionTask();
+    TaskConfig ownedCronJobTask = nonProductionTask()
+        .setJobName(JOB_KEY.getName())
+        .setOwner(ROLE_IDENTITY)
+        .setEnvironment(JOB_KEY.getEnvironment());
     JobConfiguration ownedCronJob = makeJob()
         .setCronSchedule(CRON_SCHEDULE)
         .setTaskConfig(ownedCronJobTask);
     IScheduledTask ownedCronJobScheduledTask = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask))
         .setStatus(ScheduleStatus.ASSIGNED));
-    Identity otherOwner = new Identity().setUser("other");
+    Identity otherOwner = new Identity("other", "other");
     JobConfiguration unownedCronJob = makeJob()
         .setOwner(otherOwner)
         .setCronSchedule(CRON_SCHEDULE)
         .setKey(JOB_KEY.newBuilder().setRole("other"))
         .setTaskConfig(ownedCronJobTask.deepCopy().setOwner(otherOwner));
     TaskConfig ownedImmediateTaskInfo = defaultTask(false)
-        .setJob(JOB_KEY.newBuilder().setName("immediate"));
+        .setJob(JOB_KEY.newBuilder().setName("immediate"))
+        .setJobName("immediate")
+        .setOwner(ROLE_IDENTITY);
     Set<JobConfiguration> ownedCronJobOnly = ImmutableSet.of(ownedCronJob);
     Set<JobConfiguration> unownedCronJobOnly = ImmutableSet.of(unownedCronJob);
     Set<JobConfiguration> bothCronJobs = ImmutableSet.of(ownedCronJob, unownedCronJob);
@@ -435,7 +449,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         .setStatus(ScheduleStatus.ASSIGNED));
     JobConfiguration ownedImmediateJob = new JobConfiguration()
         .setKey(JOB_KEY.newBuilder().setName("immediate"))
-        .setOwner(IDENTITY)
+        .setOwner(ROLE_IDENTITY)
         .setInstanceCount(1)
         .setTaskConfig(ownedImmediateTaskInfo);
     Query.Builder query = Query.roleScoped(ROLE).active();
@@ -635,8 +649,8 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testGetRoleSummary() throws Exception {
-    String bazRole = "baz_role";
-    Identity bazRoleIdentity = new Identity().setUser(USER);
+    final String BAZ_ROLE = "baz_role";
+    final Identity BAZ_ROLE_IDENTITY = new Identity(BAZ_ROLE, USER);
 
     JobConfiguration cronJobOne = makeJob()
         .setCronSchedule("1 * * * *")
@@ -649,28 +663,32 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     JobConfiguration cronJobThree = makeJob()
         .setCronSchedule("3 * * * *")
-        .setKey(JOB_KEY.newBuilder().setRole(bazRole))
+        .setKey(JOB_KEY.newBuilder().setRole(BAZ_ROLE))
         .setTaskConfig(nonProductionTask())
-        .setOwner(bazRoleIdentity);
+        .setOwner(BAZ_ROLE_IDENTITY);
 
     Set<JobConfiguration> crons = ImmutableSet.of(cronJobOne, cronJobTwo, cronJobThree);
 
     TaskConfig immediateTaskConfig = defaultTask(false)
-        .setJob(JOB_KEY.newBuilder().setName("immediate"));
+        .setJob(JOB_KEY.newBuilder().setName("immediate"))
+        .setJobName("immediate")
+        .setOwner(ROLE_IDENTITY);
     IScheduledTask task1 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig)));
     IScheduledTask task2 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig.setNumCpus(2))));
 
     TaskConfig immediateTaskConfigTwo = defaultTask(false)
-        .setJob(JOB_KEY.newBuilder().setRole(bazRole).setName("immediateTwo"))
-        .setOwner(bazRoleIdentity);
+        .setJob(JOB_KEY.newBuilder().setRole(BAZ_ROLE_IDENTITY.getRole()).setName("immediateTwo"))
+        .setJobName("immediateTwo")
+        .setOwner(BAZ_ROLE_IDENTITY);
     IScheduledTask task3 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfigTwo)));
 
     TaskConfig immediateTaskConfigThree = defaultTask(false)
-        .setJob(JOB_KEY.newBuilder().setRole(bazRole).setName("immediateThree"))
-        .setOwner(bazRoleIdentity);
+        .setJob(JOB_KEY.newBuilder().setRole(BAZ_ROLE_IDENTITY.getRole()).setName("immediateThree"))
+        .setJobName("immediateThree")
+        .setOwner(BAZ_ROLE_IDENTITY);
     IScheduledTask task4 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfigThree)));
 
@@ -684,7 +702,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     expectedResult.addToSummaries(
         new RoleSummary().setRole(ROLE).setCronJobCount(2).setJobCount(1));
     expectedResult.addToSummaries(
-        new RoleSummary().setRole(bazRole).setCronJobCount(1).setJobCount(2));
+        new RoleSummary().setRole(BAZ_ROLE).setCronJobCount(1).setJobCount(2));
 
     control.replay();
 

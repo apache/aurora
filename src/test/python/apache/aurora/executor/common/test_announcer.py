@@ -189,6 +189,7 @@ def make_assigned_task(thermos_config, assigned_ports=None):
   from gen.apache.aurora.api.ttypes import (
       AssignedTask,
       ExecutorConfig,
+      Identity,
       JobKey,
       TaskConfig
   )
@@ -200,6 +201,9 @@ def make_assigned_task(thermos_config, assigned_ports=None):
           role=thermos_config.role().get(),
           environment="prod",
           name=thermos_config.name().get()),
+      owner=Identity(role=thermos_config.role().get(), user=thermos_config.role().get()),
+      environment=thermos_config.environment().get(),
+      jobName=thermos_config.name().get(),
       executorConfig=executor_config)
 
   return AssignedTask(

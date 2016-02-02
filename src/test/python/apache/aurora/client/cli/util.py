@@ -29,6 +29,7 @@ from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     ExecutorConfig,
+    Identity,
     JobKey,
     Response,
     ResponseCode,
@@ -215,6 +216,9 @@ class AuroraClientCommandTest(unittest.TestCase):
         executorConfig=ExecutorConfig(data='fake data'),
         metadata=[],
         job=JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name),
+        owner=Identity(role=cls.TEST_ROLE),
+        environment=cls.TEST_ENV,
+        jobName=name,
         numCpus=2,
         ramMb=2,
         diskMb=2)
