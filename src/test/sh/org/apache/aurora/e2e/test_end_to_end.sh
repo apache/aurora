@@ -357,4 +357,5 @@ test_admin "${TEST_ADMIN_ARGS[@]}"
 test_basic_auth_unauthenticated  "${TEST_JOB_ARGS[@]}"
 
 /vagrant/src/test/sh/org/apache/aurora/e2e/test_kerberos_end_to_end.sh
+/vagrant/src/test/sh/org/apache/aurora/e2e/test_bypass_leader_redirect_end_to_end.sh
 RETCODE=0

@@ -67,8 +67,14 @@ def make_admin_client(cluster):
   if cluster not in CLUSTERS:
     die('Unknown cluster: %s. Known clusters: %s' % (cluster, ", ".join(CLUSTERS.keys())))
 
-  verbose = getattr(app.get_options(), 'verbosity', 'normal') == 'verbose'
-  return AuroraClientAPI(CLUSTERS[cluster], AURORA_ADMIN_USER_AGENT_NAME, verbose=verbose)
+  options = app.get_options()
+  verbose = getattr(options, 'verbosity', 'normal') == 'verbose'
+
+  return AuroraClientAPI(
+      CLUSTERS[cluster],
+      AURORA_ADMIN_USER_AGENT_NAME,
+      verbose=verbose,
+      bypass_leader_redirect=options.bypass_leader_redirect)
 
 
 @app.command

@@ -1175,3 +1175,6 @@ service AuroraAdmin extends AuroraSchedulerManager {
    */
   Response rewriteConfigs(1: RewriteConfigsRequest request)
 }
+
+// The name of the header that should be sent to bypass leader redirection in the Scheduler.
+const string BYPASS_LEADER_REDIRECT_HEADER_NAME = 'Bypass-Leader-Redirect'

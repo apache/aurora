@@ -40,6 +40,13 @@ LogOptions.disable_disk_logging()
 app.set_name('aurora-admin')
 app.set_usage(generate_terse_usage())
 
+app.add_option(
+    '--bypass-leader-redirect',
+    action='store_true',
+    default=False,
+    dest='bypass_leader_redirect',
+    help='Bypass the scheduler\'s leader redirect filter')
+
 
 def proxy_main():
   app.main()

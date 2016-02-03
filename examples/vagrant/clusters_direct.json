@@ -1,0 +1,7 @@
+[{
+  "name": "devcluster",
+  "scheduler_uri": "http://localhost:8081",
+  "auth_mechanism": "UNAUTHENTICATED",
+  "slave_run_directory": "latest",
+  "slave_root": "/var/lib/mesos"
+}]

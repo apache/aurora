@@ -27,6 +27,7 @@ import com.sun.jersey.api.client.ClientResponse.Status;
 
 import org.junit.Test;
 
+import static org.apache.aurora.gen.apiConstants.BYPASS_LEADER_REDIRECT_HEADER_NAME;
 import static org.junit.Assert.assertEquals;
 
 public class ServletFilterTest extends AbstractJettyTest {
@@ -122,5 +123,18 @@ public class ServletFilterTest extends AbstractJettyTest {
     setLeadingScheduler("otherHost", 1234);
     leaderRedirectSmokeTest(Status.TEMPORARY_REDIRECT, Optional.absent());
     assertResponseStatus("/", Status.OK, Optional.absent());
+  }
+
+  @Test
+  public void testHeaderOverridesLeaderRedirect() throws Exception {
+    replayAndStart();
+
+    unsetLeadingSchduler();
+
+    ClientResponse response = getRequestBuilder("/scheduler")
+        .header(BYPASS_LEADER_REDIRECT_HEADER_NAME, "true")
+        .get(ClientResponse.class);
+
+    assertEquals(Status.OK.getStatusCode(), response.getStatus());
   }
 }

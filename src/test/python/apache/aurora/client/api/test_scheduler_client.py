@@ -32,6 +32,7 @@ from apache.aurora.common.transport import TRequestsTransport
 
 import gen.apache.aurora.api.AuroraAdmin as AuroraAdmin
 import gen.apache.aurora.api.AuroraSchedulerManager as AuroraSchedulerManager
+from gen.apache.aurora.api.constants import BYPASS_LEADER_REDIRECT_HEADER_NAME
 from gen.apache.aurora.api.ttypes import (
     Hosts,
     JobConfiguration,
@@ -394,7 +395,67 @@ class TestSchedulerClient(unittest.TestCase):
     uri = 'https://scheduler.example.com:1337'
     client._connect_scheduler(uri, mock_time)
 
-    mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
+    mock_transport.assert_called_once_with(
+        uri,
+        auth=auth.auth(),
+        user_agent=user_agent,
+        session_factory=mock.ANY)
+
+  @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport',
+              spec=TRequestsTransport)
+  def test_connect_scheduler_without_bypass_leader_redirect(self, mock_transport):
+    mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
+    mock_time = mock.create_autospec(spec=time, instance=True)
+
+    auth = mock_auth()
+    user_agent = 'Some-User-Agent'
+
+    client = scheduler_client.SchedulerClient(
+        auth,
+        user_agent,
+        verbose=True,
+        bypass_leader_redirect=False)
+
+    uri = 'https://scheduler.example.com:1337'
+    client._connect_scheduler(uri, mock_time)
+
+    mock_transport.assert_called_once_with(
+        uri,
+        auth=auth.auth(),
+        user_agent=user_agent,
+        session_factory=mock.ANY)
+
+    _, _, kwargs = mock_transport.mock_calls[0]
+    session = kwargs['session_factory']()
+    assert session.headers.get(BYPASS_LEADER_REDIRECT_HEADER_NAME) is None
+
+  @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport',
+              spec=TRequestsTransport)
+  def test_connect_scheduler_with_bypass_leader_redirect(self, mock_transport):
+    mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
+    mock_time = mock.create_autospec(spec=time, instance=True)
+
+    auth = mock_auth()
+    user_agent = 'Some-User-Agent'
+
+    client = scheduler_client.SchedulerClient(
+        auth,
+        user_agent,
+        verbose=True,
+        bypass_leader_redirect=True)
+
+    uri = 'https://scheduler.example.com:1337'
+    client._connect_scheduler(uri, mock_time)
+
+    mock_transport.assert_called_once_with(
+        uri,
+        auth=auth.auth(),
+        user_agent=user_agent,
+        session_factory=mock.ANY)
+
+    _, _, kwargs = mock_transport.mock_calls[0]
+    session = kwargs['session_factory']()
+    assert session.headers[BYPASS_LEADER_REDIRECT_HEADER_NAME] == 'true'
 
   @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
               spec=scheduler_client.SchedulerClient)
@@ -454,7 +515,11 @@ class TestSchedulerClient(unittest.TestCase):
 
     client._connect_scheduler(uri, mock_time)
 
-    mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
+    mock_transport.assert_called_once_with(
+        uri,
+        auth=auth.auth(),
+        user_agent=user_agent,
+        session_factory=mock.ANY)
 
   @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport',
               spec=TRequestsTransport)
@@ -477,7 +542,11 @@ class TestSchedulerClient(unittest.TestCase):
 
     client._connect_scheduler(uri, mock_time)
 
-    mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
+    mock_transport.assert_called_once_with(
+        uri,
+        auth=auth.auth(),
+        user_agent=user_agent,
+        session_factory=mock.ANY)
 
   @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport',
               spec=TRequestsTransport)
@@ -500,7 +569,11 @@ class TestSchedulerClient(unittest.TestCase):
 
     client._connect_scheduler(uri, mock_time)
 
-    mock_transport.assert_called_once_with(uri, auth=auth.auth(), user_agent=user_agent)
+    mock_transport.assert_called_once_with(
+        uri,
+        auth=auth.auth(),
+        user_agent=user_agent,
+        session_factory=mock.ANY)
 
   def test_no_zk_or_scheduler_uri(self):
     cluster = None

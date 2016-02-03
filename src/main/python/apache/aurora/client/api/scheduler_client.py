@@ -17,6 +17,7 @@ import threading
 import time
 import traceback
 
+import requests
 from pystachio import Default, Integer, String
 from thrift.protocol import TJSONProtocol
 from thrift.transport import TTransport
@@ -31,6 +32,7 @@ from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.transport import TRequestsTransport
 
 from gen.apache.aurora.api import AuroraAdmin
+from gen.apache.aurora.api.constants import BYPASS_LEADER_REDIRECT_HEADER_NAME
 from gen.apache.aurora.api.ttypes import ResponseCode
 
 try:
@@ -46,6 +48,15 @@ class SchedulerClientTrait(Cluster.Trait):
   scheduler_uri     = String  # noqa
   proxy_url         = String  # noqa
   auth_mechanism    = Default(String, 'UNAUTHENTICATED')  # noqa
+
+
+def _bypass_leader_redirect_session_factory(should_bypass=False):
+  session = requests.session()
+
+  if should_bypass:
+    session.headers[BYPASS_LEADER_REDIRECT_HEADER_NAME] = 'true'
+
+  return session
 
 
 class SchedulerClient(object):
@@ -71,11 +82,12 @@ class SchedulerClient(object):
     else:
       raise ValueError('"cluster" does not specify zk or scheduler_uri')
 
-  def __init__(self, auth, user_agent, verbose=False):
+  def __init__(self, auth, user_agent, verbose=False, bypass_leader_redirect=False):
     self._client = None
     self._auth_handler = auth
     self._user_agent = user_agent
     self._verbose = verbose
+    self._bypass_leader_redirect = bypass_leader_redirect
 
   def get_thrift_client(self):
     if self._client is None:
@@ -91,7 +103,14 @@ class SchedulerClient(object):
     return None
 
   def _connect_scheduler(self, uri, clock=time):
-    transport = TRequestsTransport(uri, auth=self._auth_handler.auth(), user_agent=self._user_agent)
+    transport = TRequestsTransport(
+        uri,
+        auth=self._auth_handler.auth(),
+        user_agent=self._user_agent,
+        session_factory=functools.partial(
+            _bypass_leader_redirect_session_factory,
+            should_bypass=self._bypass_leader_redirect))
+
     protocol = TJSONProtocol.TJSONProtocol(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
     for _ in range(self.THRIFT_RETRIES):

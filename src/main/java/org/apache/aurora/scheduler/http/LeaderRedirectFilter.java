@@ -30,6 +30,7 @@ import com.google.common.io.Resources;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.aurora.gen.apiConstants.BYPASS_LEADER_REDIRECT_HEADER_NAME;
 import static org.apache.aurora.scheduler.http.LeaderRedirect.LeaderStatus;
 
 /**
@@ -57,6 +58,13 @@ public class LeaderRedirectFilter extends AbstractFilter {
   @Override
   public void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws IOException, ServletException {
+
+    if (request.getHeader(BYPASS_LEADER_REDIRECT_HEADER_NAME) != null) {
+      LOG.info(BYPASS_LEADER_REDIRECT_HEADER_NAME + " header was present on the request, bypassing "
+          + "leader redirection.");
+      chain.doFilter(request, response);
+      return;
+    }
 
     LeaderStatus leaderStatus = redirector.getLeaderStatus();
     switch (leaderStatus) {

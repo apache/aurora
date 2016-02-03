@@ -48,15 +48,18 @@ class AuroraClientAPI(object):
       self,
       cluster,
       user_agent,
-      verbose=False):
+      verbose=False,
+      bypass_leader_redirect=False):
 
     if not isinstance(cluster, Cluster):
       raise TypeError('AuroraClientAPI expects instance of Cluster for "cluster", got %s' %
           type(cluster))
+
     self._scheduler_proxy = SchedulerProxy(
         cluster,
         verbose=verbose,
-        user_agent=user_agent)
+        user_agent=user_agent,
+        bypass_leader_redirect=bypass_leader_redirect)
     self._cluster = cluster
 
   @property
