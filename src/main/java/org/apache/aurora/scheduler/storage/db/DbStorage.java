@@ -17,12 +17,16 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
+import javax.sql.DataSource;
+
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Supplier;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateStatus;
@@ -40,6 +44,8 @@ import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.ibatis.builder.StaticSqlSource;
+import org.apache.ibatis.datasource.pooled.PoolState;
+import org.apache.ibatis.datasource.pooled.PooledDataSource;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.mapping.MappedStatement.Builder;
 import org.apache.ibatis.session.Configuration;
@@ -63,6 +69,7 @@ class DbStorage extends AbstractIdleService implements Storage {
   private final MutableStoreProvider storeProvider;
   private final EnumValueMapper enumValueMapper;
   private final GatedWorkQueue gatedWorkQueue;
+  private final StatsProvider statsProvider;
 
   @Inject
   DbStorage(
@@ -75,7 +82,8 @@ class DbStorage extends AbstractIdleService implements Storage {
       final AttributeStore.Mutable attributeStore,
       final LockStore.Mutable lockStore,
       final QuotaStore.Mutable quotaStore,
-      final JobUpdateStore.Mutable jobUpdateStore) {
+      final JobUpdateStore.Mutable jobUpdateStore,
+      StatsProvider statsProvider) {
 
     this.sessionFactory = requireNonNull(sessionFactory);
     this.enumValueMapper = requireNonNull(enumValueMapper);
@@ -128,6 +136,7 @@ class DbStorage extends AbstractIdleService implements Storage {
         return jobUpdateStore;
       }
     };
+    this.statsProvider = requireNonNull(statsProvider);
   }
 
   @Timed("db_storage_read_operation")
@@ -250,10 +259,34 @@ class DbStorage extends AbstractIdleService implements Storage {
     for (ScheduleStatus status : ScheduleStatus.values()) {
       enumValueMapper.addEnumValue("task_states", status.getValue(), status.name());
     }
+
+    createPoolMetrics();
   }
 
   @Override
   protected void shutDown() {
     // noop
+  }
+
+  private void createPoolMetrics() {
+    DataSource dataSource = sessionFactory.getConfiguration().getEnvironment().getDataSource();
+    // Should not fail because we specify a PoolDataSource in DbModule
+    PoolState poolState = ((PooledDataSource) dataSource).getPoolState();
+
+    createPoolGauge("requests", poolState::getRequestCount);
+    createPoolGauge("average_request_time_ms", poolState::getAverageRequestTime);
+    createPoolGauge("average_wait_time_ms", poolState::getAverageWaitTime);
+    createPoolGauge("connections_had_to_wait", poolState::getHadToWaitCount);
+    createPoolGauge("bad_connections", poolState::getBadConnectionCount);
+    createPoolGauge("claimed_overdue_connections", poolState::getClaimedOverdueConnectionCount);
+    createPoolGauge("average_overdue_checkout_time_ms", poolState::getAverageOverdueCheckoutTime);
+    createPoolGauge("average_checkout_time_ms", poolState::getAverageCheckoutTime);
+    createPoolGauge("idle_connections", poolState::getIdleConnectionCount);
+    createPoolGauge("active_connections", poolState::getActiveConnectionCount);
+  }
+
+  private void createPoolGauge(String name, Supplier<? extends Number> gauge) {
+    String prefix = "db_storage_mybatis_connection_pool_";
+    statsProvider.makeGauge(prefix + name, gauge);
   }
 }

@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.async.GatedWorkQueue;
 import org.apache.aurora.scheduler.async.GatedWorkQueue.GatedOperation;
@@ -55,6 +56,7 @@ public class DbStorageTest extends EasyMockTest {
     gatedWorkQueue = createMock(GatedWorkQueue.class);
     readWork = createMock(new Clazz<Work.Quiet<String>>() { });
     writeWork = createMock(new Clazz<MutateWork.NoResult.Quiet>() { });
+    StatsProvider statsProvider = createMock(StatsProvider.class);
 
     storage = new DbStorage(
         sessionFactory,
@@ -66,7 +68,8 @@ public class DbStorageTest extends EasyMockTest {
         createMock(AttributeStore.Mutable.class),
         createMock(LockStore.Mutable.class),
         createMock(QuotaStore.Mutable.class),
-        createMock(JobUpdateStore.Mutable.class));
+        createMock(JobUpdateStore.Mutable.class),
+        statsProvider);
   }
 
   @Test(expected = StorageException.class)
