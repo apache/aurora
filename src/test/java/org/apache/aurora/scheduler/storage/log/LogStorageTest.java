@@ -24,6 +24,7 @@ import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
@@ -37,6 +38,7 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
@@ -121,6 +123,7 @@ import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.notNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class LogStorageTest extends EasyMockTest {
@@ -274,17 +277,27 @@ public class LogStorageTest extends EasyMockTest {
     builder.add(createTransaction(Op.saveFrameworkId(new SaveFrameworkId("bob"))));
     storageUtil.schedulerStore.saveFrameworkId("bob");
 
-    SaveCronJob cronJob = new SaveCronJob().setJobConfig(new JobConfiguration());
-    builder.add(createTransaction(Op.saveCronJob(cronJob)));
-    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(cronJob.getJobConfig()));
+    TaskConfig task = new TaskConfig()
+        .setJob(JOB_KEY.newBuilder())
+        .setOwner(new Identity(null, "user"));
+    TaskConfig backfilledTask = new TaskConfig(task)
+        .setJobName(JOB_KEY.getName())
+        .setEnvironment(JOB_KEY.getEnvironment());
+    backfilledTask.getOwner().setRole(JOB_KEY.getRole());
+
+    builder.add(createTransaction(Op.saveCronJob(new SaveCronJob()
+        .setJobConfig(new JobConfiguration().setTaskConfig(task)))));
+    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(new JobConfiguration()
+        .setTaskConfig(backfilledTask)));
 
     RemoveJob removeJob = new RemoveJob(JOB_KEY.newBuilder());
     builder.add(createTransaction(Op.removeJob(removeJob)));
     storageUtil.jobStore.removeJob(JOB_KEY);
 
-    SaveTasks saveTasks = new SaveTasks(ImmutableSet.of(new ScheduledTask()));
-    builder.add(createTransaction(Op.saveTasks(saveTasks)));
-    storageUtil.taskStore.saveTasks(IScheduledTask.setFromBuilders(saveTasks.getTasks()));
+    builder.add(createTransaction(Op.saveTasks(new SaveTasks(ImmutableSet.of(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(task)))))));
+    storageUtil.taskStore.saveTasks(ImmutableSet.of(IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(backfilledTask)))));
 
     RewriteTask rewriteTask = new RewriteTask("id1", new TaskConfig());
     builder.add(createTransaction(Op.rewriteTask(rewriteTask)));
@@ -327,12 +340,22 @@ public class LogStorageTest extends EasyMockTest {
     builder.add(createTransaction(Op.removeLock(removeLock)));
     storageUtil.lockStore.removeLock(ILockKey.build(removeLock.getLockKey()));
 
-    JobUpdate update = new JobUpdate().setSummary(
-        new JobUpdateSummary().setKey(UPDATE_ID.newBuilder()));
+    JobUpdate update = new JobUpdate()
+        .setSummary(new JobUpdateSummary().setKey(UPDATE_ID.newBuilder()))
+        .setInstructions(new JobUpdateInstructions()
+            .setDesiredState(new InstanceTaskConfig().setTask(task))
+            .setInitialState(ImmutableSet.of(new InstanceTaskConfig().setTask(task))));
+    JobUpdate backfilledUpdate = new JobUpdate(update);
+    backfilledUpdate.getInstructions()
+        .setDesiredState(new InstanceTaskConfig().setTask(backfilledTask))
+        .setInitialState(ImmutableSet.of(new InstanceTaskConfig().setTask(backfilledTask)));
     SaveJobUpdate saveUpdate = new SaveJobUpdate(update, "token");
+
+    assertNull(Iterables.getOnlyElement(
+        saveUpdate.getJobUpdate().getInstructions().getInitialState()).getTask().getJobName());
     builder.add(createTransaction(Op.saveJobUpdate(saveUpdate)));
     storageUtil.jobUpdateStore.saveJobUpdate(
-        IJobUpdate.build(saveUpdate.getJobUpdate()),
+        IJobUpdate.build(backfilledUpdate),
         Optional.of(saveUpdate.getLockToken()));
 
     SaveJobUpdateEvent saveUpdateEvent =

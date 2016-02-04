@@ -40,8 +40,12 @@ class TaskConfigManager {
   }
 
   private Optional<Long> getConfigRow(ITaskConfig config) {
-    // We could optimize this slightly by first comparing the un-hydrated row and breaking early.
+    // NOTE: The 'config' object passed in MUST have all version-relevant fields populated in order
+    // to correctly compare with objects loaded from DB. This may not hold true if a 'config' is
+    // passed from storage recovery routine during version downgrade and fields are not properly
+    // backfilled. See AURORA-1603 for more details.
 
+    // We could optimize this slightly by first comparing the un-hydrated row and breaking early.
     Map<ITaskConfig, DbTaskConfig> rowsByConfig =
         Maps.uniqueIndex(
             configMapper.selectConfigsByJob(config.getJob()),
