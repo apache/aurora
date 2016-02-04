@@ -64,7 +64,6 @@
 
   <resultMap id="scheduledTaskMap" type="org.apache.aurora.scheduler.storage.db.views.DbScheduledTask">
     <id column="row_id"/>
-    <result column="c_id" property="taskConfigRowId"/>
     <result property="status"
             column="status"
             typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.ScheduleStatusTypeHandler" />
