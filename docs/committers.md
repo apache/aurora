@@ -62,11 +62,13 @@ it run
 send the [VOTE] email to the dev@ mailing list. You can verify the release signature and checksums
 by running
 
-				./build-support/release/verify-release-candidate
+               ./build-support/release/verify-release-candidate
 
-4. Wait for the vote to complete. If the vote fails address any issues and go back to step #1 and
-run again, this time you will use the -r flag to increment the release candidate version. This will
-automatically clean up the release candidate rc0 branch and source distribution.
+4. Wait for the vote to complete. If the vote fails close the vote by replying to the initial [VOTE]
+email sent in step #3 by editing the subject to [RESULT][VOTE] ... and noting the failure reason
+(example [here](http://markmail.org/message/d4d6xtvj7vgwi76f)). Now address any issues and go back to
+step #1 and run again, this time you will use the -r flag to increment the release candidate
+version. This will automatically clean up the release candidate rc0 branch and source distribution.
 
                ./build-support/release/release-candidate -l m -r 1 -p
 
@@ -75,5 +77,5 @@ automatically clean up the release candidate rc0 branch and source distribution.
                ./build-support/release/release
 
 6. Update the draft email created fom the `release` script in step #5 to include the Apache ID's for
-all binding votes and send the [RESULT][VOTE] email to the dev@ and private@ mailing lists.
+all binding votes and send the [RESULT][VOTE] email to the dev@ mailing list.
 
