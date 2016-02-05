@@ -1,3 +1,53 @@
+Aurora 0.12.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1574] - ServerSetImplTest occasionally results in an exception.
+    * [AURORA-1573] - SchedulingBenchmarks result in exception.
+    * [AURORA-1385] - Traceback rendering cron jobs without an upcoming next run 
+    * [AURORA-492] - Python thrift files are being generated with thrift 0.5.0
+    * [AURORA-1587] - scheduler fails in a hard to decipher way when -native_log_file_path is not set
+    * [AURORA-1570] - TaskObserverTest::test_run_loop is flaky
+    * [AURORA-1582] - Task History Pruning attempts can fail silently
+    * [AURORA-1175] - Two python_binary targets called 'thermos' can cause build failure
+    * [AURORA-1580] - java.util.NoSuchElementException from Tasks.getLatestEvent with DbTaskStore
+    * [AURORA-1593] - PubSubEventModule fails to dispatch events to TaskHistoryPruner on startup
+    * [AURORA-1571] - The getJobUpdateDiff RPC does not populate taskLinks
+    * [AURORA-1603] - Scheduler fails to start after rollback
+    * [AURORA-1601] - Add a flag to disable the HTTP redirect to the leader
+    * [AURORA-1596] - Invalid connection error from MyBatis.
+    * [AURORA-1610] - JobConfiguration.identity needs backfill
+
+## Story
+    * [AURORA-1563] - Remove deprecated endpoint, expected_response and expected_response_code from HealthCheckConfig
+    * [AURORA-1472] - TaskThrottle should have a jitter
+    * [AURORA-852] - create architectural diagram with description of components
+    * [AURORA-1552] - Perform explicit config validation in the executor when configuring health checker
+    * [AURORA-1589] - Dupe debs are showing up
+    * [AURORA-1413] - Wrong help indications of usable constants for the aurora-scheduler's -vlog argument
+    * [AURORA-1548] - Add option to forward running process logs to stdout/stderr
+    * [AURORA-1575] - Allow cluster administrators to apply global default Docker parameters.
+    * [AURORA-1540] - Thermos should pass environment variables set for container to process being monitored
+    * [AURORA-1109] - Add mesos role  feature
+    * [AURORA-1569] - Support custom serverset path for announcements
+    * [AURORA-1052] - Populate Labels in TaskConfig
+    * [AURORA-855] - Add documentation on how to build the client
+
+## Task
+    * [AURORA-1560] - Aurora 0.12.0 backwards incompatible changes
+    * [AURORA-1483] - Add a getting started guide using released packages
+    * [AURORA-1576] - Allow for plugging in cli-configurable filters that are invoked post shiro filters.
+    * [AURORA-1425] - Speed up iteration speed when developing UI code
+    * [AURORA-1583] - Consider changing killTasks RPC to be job-scoped
+    * [AURORA-663] - Update website to include releases
+    * [AURORA-294] - Update Aurora homepage to highlight "features"
+    * [AURORA-1559] - Aurora 0.12.0 deprecations
+    * [AURORA-1565] - Upgrade mesos dependency to 0.25.0
+    * [AURORA-1393] - Publish nightly and release packages for major operating systems
+    * [AURORA-1566] - Upgrade to Gradle 2.10
+    * [AURORA-876] - cache python dependencies in 3rdparty on svn.a.o
+    * [AURORA-1423] - Upgrade to h2 1.4.188
+
+
 Aurora 0.11.0
 --------------------------------------------------------------------------------
 ## Bug
