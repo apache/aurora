@@ -123,10 +123,14 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     // dropped.
     IHostAttributes legacyAttribute = IHostAttributes.build(
         new HostAttributes("host", ImmutableSet.of()));
-    StoredCronJob job =
-        new StoredCronJob(new JobConfiguration().setKey(JOB_KEY).setTaskConfig(task.newBuilder()));
+    StoredCronJob job = new StoredCronJob(new JobConfiguration()
+        .setOwner(new Identity().setUser("user"))
+        .setKey(JOB_KEY)
+        .setTaskConfig(task.newBuilder()));
     IJobConfiguration backFilledJob = IJobConfiguration.build(
-        new JobConfiguration(job.getJobConfiguration()).setTaskConfig(backfilledTask.newBuilder()));
+        new JobConfiguration(job.getJobConfiguration())
+            .setOwner(new Identity(job.getJobConfiguration().getOwner()).setRole(JOB_KEY.getRole()))
+            .setTaskConfig(backfilledTask.newBuilder()));
     String frameworkId = "framework_id";
     ILock lock = ILock.build(new Lock()
         .setKey(LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()))

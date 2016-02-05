@@ -16,21 +16,28 @@ package org.apache.aurora.scheduler.storage.log;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
+import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
-import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
+import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
 public class ThriftBackfillTest {
+  private static final IJobKey JOB_KEY = JobKeys.from("role", "env", "name");
   private static final ITaskConfig TASK = ITaskConfig.build(new TaskConfig()
-      .setJob(new JobKey("role", "env", "name"))
+      .setJob(JOB_KEY.newBuilder())
       .setOwner(new Identity(null, "user")));
 
   @Test
@@ -40,6 +47,33 @@ public class ThriftBackfillTest {
     populateTask(expected.getInstructions().getDesiredState().getTask());
     populateTask(Iterables.getOnlyElement(expected.getInstructions().getInitialState()).getTask());
     assertEquals(IJobUpdate.build(expected), ThriftBackfill.backFillJobUpdate(update));
+  }
+
+  @Test
+  public void testTaskBackfill() {
+    ScheduledTask task =
+        new ScheduledTask().setAssignedTask(new AssignedTask().setTask(TASK.newBuilder()));
+    ScheduledTask expected = new ScheduledTask(task);
+    expected.getAssignedTask().setTask(populateTask(TASK.newBuilder()));
+
+    assertEquals(
+        ImmutableSet.of(IScheduledTask.build(expected)),
+        ThriftBackfill.backFillScheduledTasks(ImmutableSet.of(task)));
+  }
+
+  @Test
+  public void testJobConfigurationBackfill() {
+    JobConfiguration configuration = new JobConfiguration()
+        .setKey(JOB_KEY.newBuilder())
+        .setTaskConfig(TASK.newBuilder())
+        .setOwner(new Identity().setUser("user"));
+    JobConfiguration expected = new JobConfiguration(configuration);
+    expected.getOwner().setRole(JOB_KEY.getRole());
+    expected.setTaskConfig(populateTask(TASK.newBuilder()));
+
+    assertEquals(
+        IJobConfiguration.build(expected),
+        ThriftBackfill.backFillJobConfiguration(configuration));
   }
 
   @Test

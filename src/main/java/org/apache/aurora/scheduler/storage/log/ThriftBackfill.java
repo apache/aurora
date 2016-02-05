@@ -43,6 +43,7 @@ final class ThriftBackfill {
 
   static IJobConfiguration backFillJobConfiguration(JobConfiguration jobConfiguration) {
     backFillTaskConfig(jobConfiguration.getTaskConfig());
+    jobConfiguration.getOwner().setRole(jobConfiguration.getKey().getRole());
     return IJobConfiguration.build(jobConfiguration);
   }
 

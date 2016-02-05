@@ -285,10 +285,16 @@ public class LogStorageTest extends EasyMockTest {
         .setEnvironment(JOB_KEY.getEnvironment());
     backfilledTask.getOwner().setRole(JOB_KEY.getRole());
 
-    builder.add(createTransaction(Op.saveCronJob(new SaveCronJob()
-        .setJobConfig(new JobConfiguration().setTaskConfig(task)))));
-    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(new JobConfiguration()
-        .setTaskConfig(backfilledTask)));
+    JobConfiguration jobConfig = new JobConfiguration()
+        .setKey(JOB_KEY.newBuilder())
+        .setOwner(new Identity().setUser(task.getOwner().getUser()))
+        .setTaskConfig(task);
+    JobConfiguration backfilledJobConfig = new JobConfiguration(jobConfig)
+        .setOwner(new Identity(jobConfig.getOwner()).setRole(JOB_KEY.getRole()))
+        .setTaskConfig(backfilledTask);
+
+    builder.add(createTransaction(Op.saveCronJob(new SaveCronJob().setJobConfig(jobConfig))));
+    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(backfilledJobConfig));
 
     RemoveJob removeJob = new RemoveJob(JOB_KEY.newBuilder());
     builder.add(createTransaction(Op.removeJob(removeJob)));
