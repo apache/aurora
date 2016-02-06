@@ -3,14 +3,8 @@ Aurora User Guide
 
 - [Overview](#user-content-overview)
 - [Job Lifecycle](#user-content-job-lifecycle)
-	- [Life Of A Task](#user-content-life-of-a-task)
-	- [PENDING to RUNNING states](#user-content-pending-to-running-states)
 	- [Task Updates](#user-content-task-updates)
-	- [HTTP Health Checking and Graceful Shutdown](#user-content-http-health-checking-and-graceful-shutdown)
-		- [Tearing a task down](#user-content-tearing-a-task-down)
-	- [Giving Priority to Production Tasks: PREEMPTING](#user-content-giving-priority-to-production-tasks-preempting)
-	- [Natural Termination: FINISHED, FAILED](#user-content-natural-termination-finished-failed)
-	- [Forceful Termination: KILLING, RESTARTING](#user-content-forceful-termination-killing-restarting)
+	- [HTTP Health Checking](#user-content-http-health-checking)
 - [Service Discovery](#user-content-service-discovery)
 - [Configuration](#user-content-configuration)
 - [Creating Jobs](#user-content-creating-jobs)
@@ -99,60 +93,13 @@ will be around forever, e.g. by building log saving or other
 checkpointing mechanisms directly into your application or into your
 `Job` description.
 
+
 Job Lifecycle
 -------------
 
-When Aurora reads a configuration file and finds a `Job` definition, it:
+`Job`s and their `Task`s have various states that are described in the [Task Lifecycle](task-lifecycle.md).
+However, in day to day use, you'll be primarily concerned with launching new jobs and updating existing ones.
 
-1.  Evaluates the `Job` definition.
-2.  Splits the `Job` into its constituent `Task`s.
-3.  Sends those `Task`s to the scheduler.
-4.  The scheduler puts the `Task`s into `PENDING` state, starting each
-    `Task`'s life cycle.
-
-### Life Of A Task
-
-![Life of a task](images/lifeofatask.png)
-
-### PENDING to RUNNING states
-
-When a `Task` is in the `PENDING` state, the scheduler constantly
-searches for machines satisfying that `Task`'s resource request
-requirements (RAM, disk space, CPU time) while maintaining configuration
-constraints such as "a `Task` must run on machines  dedicated  to a
-particular role" or attribute limit constraints such as "at most 2
-`Task`s from the same `Job` may run on each rack". When the scheduler
-finds a suitable match, it assigns the `Task` to a machine and puts the
-`Task` into the `ASSIGNED` state.
-
-From the `ASSIGNED` state, the scheduler sends an RPC to the slave
-machine containing `Task` configuration, which the slave uses to spawn
-an executor responsible for the `Task`'s lifecycle. When the scheduler
-receives an acknowledgement that the machine has accepted the `Task`,
-the `Task` goes into `STARTING` state.
-
-`STARTING` state initializes a `Task` sandbox. When the sandbox is fully
-initialized, Thermos begins to invoke `Process`es. Also, the slave
-machine sends an update to the scheduler that the `Task` is
-in `RUNNING` state.
-
-If a `Task` stays in `ASSIGNED` or `STARTING` for too long, the
-scheduler forces it into `LOST` state, creating a new `Task` in its
-place that's sent into `PENDING` state. This is technically true of any
-active state: if the Mesos core tells the scheduler that a slave has
-become unhealthy (or outright disappeared), the `Task`s assigned to that
-slave go into `LOST` state and new `Task`s are created in their place.
-From `PENDING` state, there is no guarantee a `Task` will be reassigned
-to the same machine unless job constraints explicitly force it there.
-
-If there is a state mismatch, (e.g. a machine returns from a `netsplit`
-and the scheduler has marked all its `Task`s `LOST` and rescheduled
-them), a state reconciliation process kills the errant `RUNNING` tasks,
-which may take up to an hour. But to emphasize this point: there is no
-uniqueness guarantee for a single instance of a job in the presence of
-network partitions. If the Task requires that, it should be baked in at
-the application level using a distributed coordination service such as
-Zookeeper.
 
 ### Task Updates
 
@@ -186,14 +133,14 @@ with old instance configs and batch updates proceed backwards
 from the point where the update failed. E.g.; (0,1,2) (3,4,5) (6,7,
 8-FAIL) results in a rollback in order (8,7,6) (5,4,3) (2,1,0).
 
-### HTTP Health Checking and Graceful Shutdown
+### HTTP Health Checking
 
 The Executor implements a protocol for rudimentary control of a task via HTTP.  Tasks subscribe for
 this protocol by declaring a port named `health`.  Take for example this configuration snippet:
 
     nginx = Process(
       name = 'nginx',
-      cmdline = './run_nginx.sh -port {{thermos.ports[http]}}')
+      cmdline = './run_nginx.sh -port {{thermos.ports[health]}}')
 
 When this Process is included in a job, the job will be allocated a port, and the command line
 will be replaced with something like:
@@ -208,8 +155,6 @@ requests:
 | HTTP request            | Description                             |
 | ------------            | -----------                             |
 | `GET /health`           | Inquires whether the task is healthy.   |
-| `POST /quitquitquit`    | Task should initiate graceful shutdown. |
-| `POST /abortabortabort` | Final warning task is being killed.     |
 
 Please see the
 [configuration reference](configuration-reference.md#user-content-healthcheckconfig-objects) for
@@ -227,62 +172,6 @@ process.
 WARNING: Remember to remove this when you are done, otherwise your instance will have permanently
 disabled health checks.
 
-#### Tearing a task down
-
-The Executor follows an escalation sequence when killing a running task:
-
-  1. If `health` port is not present, skip to (5)
-  2. POST /quitquitquit
-  3. wait 5 seconds
-  4. POST /abortabortabort
-  5. Send SIGTERM (`kill`)
-  6. Send SIGKILL (`kill -9`)
-
-If the Executor notices that all Processes in a Task have aborted during this sequence, it will
-not proceed with subsequent steps.  Note that graceful shutdown is best-effort, and due to the many
-inevitable realities of distributed systems, it may not be performed.
-
-### Giving Priority to Production Tasks: PREEMPTING
-
-Sometimes a Task needs to be interrupted, such as when a non-production
-Task's resources are needed by a higher priority production Task. This
-type of interruption is called a *pre-emption*. When this happens in
-Aurora, the non-production Task is killed and moved into
-the `PREEMPTING` state  when both the following are true:
-
-- The task being killed is a non-production task.
-- The other task is a `PENDING` production task that hasn't been
-  scheduled due to a lack of resources.
-
-Since production tasks are much more important, Aurora kills off the
-non-production task to free up resources for the production task. The
-scheduler UI shows the non-production task was preempted in favor of the
-production task. At some point, tasks in `PREEMPTING` move to `KILLED`.
-
-Note that non-production tasks consuming many resources are likely to be
-preempted in favor of production tasks.
-
-### Natural Termination: FINISHED, FAILED
-
-A `RUNNING` `Task` can terminate without direct user interaction. For
-example, it may be a finite computation that finishes, even something as
-simple as `echo hello world. `Or it could be an exceptional condition in
-a long-lived service. If the `Task` is successful (its underlying
-processes have succeeded with exit status `0` or finished without
-reaching failure limits) it moves into `FINISHED` state. If it finished
-after reaching a set of failure limits, it goes into `FAILED` state.
-
-### Forceful Termination: KILLING, RESTARTING
-
-You can terminate a `Task` by issuing an `aurora job kill` command, which
-moves it into `KILLING` state. The scheduler then sends the slave  a
-request to terminate the `Task`. If the scheduler receives a successful
-response, it moves the Task into `KILLED` state and never restarts it.
-
-The scheduler has access to a non-public `RESTARTING` state. If a `Task`
-is forced into the `RESTARTING` state, the scheduler kills the
-underlying task but in parallel schedules an identical replacement for
-it.
 
 Configuration
 -------------

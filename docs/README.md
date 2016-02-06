@@ -11,6 +11,7 @@ We encourage you to ask questions on the [Aurora user list](http://aurora.apache
  * [Install Aurora on virtual machines on your private machine](vagrant.md)
  * [Hello World Tutorial](tutorial.md)
  * [User Guide](user-guide.md)
+ * [Task Lifecycle](task-lifecycle.md)
  * [Configuration Tutorial](configuration-tutorial.md)
  * [Aurora + Thermos Reference](configuration-reference.md)
  * [Command Line Client](client-commands.md)

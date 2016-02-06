@@ -312,10 +312,10 @@ upon one final Process ("reducer") to tabulate the results:
 
 #### finalization_wait
 
-Tasks have three active stages: `ACTIVE`, `CLEANING`, and `FINALIZING`. The
-`ACTIVE` stage is when ordinary processes run. This stage lasts as
-long as Processes are running and the Task is healthy. The moment either
-all Processes have finished successfully or the Task has reached a
+Process execution is organizued into three active stages: `ACTIVE`,
+`CLEANING`, and `FINALIZING`. The `ACTIVE` stage is when ordinary processes run.
+This stage lasts as long as Processes are running and the Task is healthy.
+The moment either all Processes have finished successfully or the Task has reached a
 maximum Process failure limit, it goes into `CLEANING` stage and send
 SIGTERMs to all currently running Processes and their process trees.
 Once all Processes have terminated, the Task goes into `FINALIZING` stage
@@ -327,10 +327,7 @@ finish during that time, all remaining Processes are sent SIGKILLs
 (or if they depend upon uncompleted Processes, are
 never invoked.)
 
-Client applications with higher priority may force a shorter
-finalization wait (e.g. through parameters to `thermos kill`), so this
-is mostly a best-effort signal.
-
+When running on Aurora, the `finalization_wait` is capped at 60 seconds.
 
 ### Constraint Object
 
@@ -515,7 +512,7 @@ Describes the container the job's processes will run inside.
 ### Docker Parameter Object
 
 Docker CLI parameters. This needs to be enabled by the scheduler `enable_docker_parameters` option.
-See [Docker Command Line Reference](https://docs.docker.com/reference/commandline/run/) for valid parameters. 
+See [Docker Command Line Reference](https://docs.docker.com/reference/commandline/run/) for valid parameters.
 
   param            | type            | description
   -----            | :----:          | -----------
@@ -610,6 +607,10 @@ to distinguish between Task replicas.
 | --------------- | :--------: | -------------
 | ```instance```    | Integer    | The instance number of the created task. A job with 5 replicas has instance numbers 0, 1, 2, 3, and 4.
 | ```hostname``` | String | The instance hostname that the task was launched on.
+
+Please note, there is no uniqueness guarantee for `instance` in the presence of
+network partitions. If that is required, it should be baked in at the application
+level using a distributed coordination service such as Zookeeper.
 
 ### thermos Namespace
 
