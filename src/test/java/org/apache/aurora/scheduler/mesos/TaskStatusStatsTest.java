@@ -64,7 +64,7 @@ public class TaskStatusStatsTest extends EasyMockTest {
     expect(statsProvider.makeRequestTimer(latencyTimerName(Source.SOURCE_MASTER)))
         .andReturn(masterDeliveryDelay);
     masterDeliveryDelay.requestComplete(ONE_SECOND.as(Time.MICROSECONDS));
-    expectLastCall().times(3);
+    expectLastCall().times(4);
 
     AtomicLong masterLostCounter = new AtomicLong();
     expect(statsProvider.makeCounter(lostCounterName(Source.SOURCE_MASTER)))
@@ -75,8 +75,12 @@ public class TaskStatusStatsTest extends EasyMockTest {
         .andReturn(slaveDisconnectedCounter);
 
     AtomicLong memoryLimitCounter = new AtomicLong();
-    expect(statsProvider.makeCounter(reasonCounterName(Reason.REASON_MEMORY_LIMIT)))
+    expect(statsProvider.makeCounter(reasonCounterName(Reason.REASON_CONTAINER_LIMITATION_MEMORY)))
         .andReturn(memoryLimitCounter);
+
+    AtomicLong diskLimitCounter = new AtomicLong();
+    expect(statsProvider.makeCounter(reasonCounterName(Reason.REASON_CONTAINER_LIMITATION_DISK)))
+        .andReturn(diskLimitCounter);
 
     control.replay();
 
@@ -96,7 +100,12 @@ public class TaskStatusStatsTest extends EasyMockTest {
     eventBus.post(new TaskStatusReceived(
         TaskState.TASK_FAILED,
         Optional.of(Source.SOURCE_MASTER),
-        Optional.of(Reason.REASON_MEMORY_LIMIT),
+        Optional.of(Reason.REASON_CONTAINER_LIMITATION_MEMORY),
+        Optional.of(agoMicros(ONE_SECOND))));
+    eventBus.post(new TaskStatusReceived(
+        TaskState.TASK_FAILED,
+        Optional.of(Source.SOURCE_MASTER),
+        Optional.of(Reason.REASON_CONTAINER_LIMITATION_DISK),
         Optional.of(agoMicros(ONE_SECOND))));
 
     // No counting for these since they do not have both a source and timestamp.
@@ -127,5 +136,6 @@ public class TaskStatusStatsTest extends EasyMockTest {
     assertEquals(3L, masterLostCounter.get());
     assertEquals(3L, slaveDisconnectedCounter.get());
     assertEquals(1L, memoryLimitCounter.get());
+    assertEquals(1L, diskLimitCounter.get());
   }
 }

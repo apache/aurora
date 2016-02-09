@@ -255,7 +255,7 @@ public class MesosSchedulerImpl implements Scheduler {
   public void executorLost(SchedulerDriver schedulerDriver, ExecutorID executorID, SlaveID slaveID,
       int status) {
 
-    log.info("Lost executor " + executorID);
+    log.warn("Lost executor " + executorID);
     counters.get("scheduler_lost_executors").incrementAndGet();
   }
 

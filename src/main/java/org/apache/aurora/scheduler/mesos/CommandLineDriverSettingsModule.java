@@ -25,7 +25,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.inject.AbstractModule;
-import com.google.protobuf.ByteString;
 
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
@@ -135,7 +134,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
 
       return Optional.of(Protos.Credential.newBuilder()
           .setPrincipal(properties.getProperty(PRINCIPAL_KEY))
-          .setSecret(ByteString.copyFromUtf8(properties.getProperty(SECRET_KEY)))
+          .setSecret(properties.getProperty(SECRET_KEY))
           .build());
     } else {
       return Optional.absent();

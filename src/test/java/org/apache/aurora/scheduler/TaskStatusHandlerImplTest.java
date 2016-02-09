@@ -100,7 +100,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
         Optional.of("fake message")))
         .andReturn(StateChangeResult.SUCCESS);
 
-    final CountDownLatch latch = new CountDownLatch(1);
+    CountDownLatch latch = new CountDownLatch(1);
 
     driver.acknowledgeStatusUpdate(status);
     waitAndAnswer(latch);
@@ -116,7 +116,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
   public void testFailedStatusUpdate() throws Exception {
     storageUtil.expectWrite();
 
-    final CountDownLatch latch = new CountDownLatch(1);
+    CountDownLatch latch = new CountDownLatch(1);
 
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
@@ -149,7 +149,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     TaskStatus status = TaskStatus.newBuilder()
         .setState(TaskState.TASK_FAILED)
         .setTaskId(TaskID.newBuilder().setValue(TASK_ID_A))
-        .setReason(TaskStatus.Reason.REASON_MEMORY_LIMIT)
+        .setReason(TaskStatus.Reason.REASON_CONTAINER_LIMITATION_MEMORY)
         .setMessage("Some Message")
         .build();
 
@@ -161,7 +161,38 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
         Optional.of(TaskStatusHandlerImpl.MEMORY_LIMIT_DISPLAY)))
         .andReturn(StateChangeResult.SUCCESS);
 
-    final CountDownLatch latch = new CountDownLatch(1);
+    CountDownLatch latch = new CountDownLatch(1);
+
+    driver.acknowledgeStatusUpdate(status);
+    waitAndAnswer(latch);
+
+    control.replay();
+
+    statusHandler.statusUpdate(status);
+
+    assertTrue(latch.await(5L, TimeUnit.SECONDS));
+  }
+
+  @Test
+  public void testDiskLimitTranslation() throws Exception {
+    storageUtil.expectWrite();
+
+    TaskStatus status = TaskStatus.newBuilder()
+        .setState(TaskState.TASK_FAILED)
+        .setTaskId(TaskID.newBuilder().setValue(TASK_ID_A))
+        .setReason(TaskStatus.Reason.REASON_CONTAINER_LIMITATION_DISK)
+        .setMessage("Some Message")
+        .build();
+
+    expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
+        TASK_ID_A,
+        Optional.absent(),
+        FAILED,
+        Optional.of(TaskStatusHandlerImpl.DISK_LIMIT_DISPLAY)))
+        .andReturn(StateChangeResult.SUCCESS);
+
+    CountDownLatch latch = new CountDownLatch(1);
 
     driver.acknowledgeStatusUpdate(status);
     waitAndAnswer(latch);
@@ -192,7 +223,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
         Optional.absent()))
         .andReturn(StateChangeResult.SUCCESS);
 
-    final CountDownLatch latch = new CountDownLatch(1);
+    CountDownLatch latch = new CountDownLatch(1);
 
     driver.acknowledgeStatusUpdate(status);
     waitAndAnswer(latch);
@@ -229,7 +260,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
       throw new RuntimeException();
     });
 
-    final CountDownLatch latch = new CountDownLatch(1);
+    CountDownLatch latch = new CountDownLatch(1);
 
     driver.abort();
     waitAndAnswer(latch);

@@ -358,7 +358,7 @@ dependencies {
   compile 'javax.inject:javax.inject:1'
   compile "javax.servlet:javax.servlet-api:${servletRev}"
   compile "org.antlr:stringtemplate:${stringTemplateRev}"
-  compile 'org.apache.mesos:mesos:0.25.0'
+  compile 'org.apache.mesos:mesos:0.26.0'
   compile "org.apache.shiro:shiro-guice:${shiroRev}"
   compile "org.apache.shiro:shiro-web:${shiroRev}"
   compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"

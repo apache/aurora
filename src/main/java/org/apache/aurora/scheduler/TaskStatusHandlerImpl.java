@@ -59,6 +59,9 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
   @VisibleForTesting
   static final String MEMORY_LIMIT_DISPLAY = "Task used more memory than requested.";
 
+  @VisibleForTesting
+  static final String DISK_LIMIT_DISPLAY = "Task used more disk than requested.";
+
   private static final String STATUS_STAT_FORMAT = "status_update_%s_%s";
 
   private final Storage storage;
@@ -187,9 +190,14 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
 
     if (status.hasReason()) {
       switch (status.getReason()) {
-        case REASON_MEMORY_LIMIT:
+        case REASON_CONTAINER_LIMITATION_MEMORY:
           // Add a failure explanation to the user
           message = Optional.of(MEMORY_LIMIT_DISPLAY);
+          break;
+
+        case REASON_CONTAINER_LIMITATION_DISK:
+          // Add a failure explanation to the user
+          message = Optional.of(DISK_LIMIT_DISPLAY);
           break;
 
         case REASON_EXECUTOR_UNREGISTERED:
