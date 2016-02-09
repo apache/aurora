@@ -216,7 +216,7 @@ The CHANGELOG for the release is available at:
 ${aurora_git_web_url}&f=CHANGELOG&hb=${current_version_tag}
 
 The tag used to create the release with is ${current_version_tag}:
-${aurora_git_web_url}&hb=${current_version_tag}
+${aurora_git_web_url}&a=shortlog&h=refs/tags/${current_version_tag}
 
 The release is available at:
 ${aurora_svn_dist_url}/${current_version}/${dist_name}.tar.gz
@@ -225,7 +225,7 @@ The MD5 checksum of the release can be found at:
 ${aurora_svn_dist_url}/${current_version}/${dist_name}.tar.gz.md5
 
 The signature of the release can be found at:
-${aurora_svn_dist_url}/${current_version}/${dist_name}.asc
+${aurora_svn_dist_url}/${current_version}/${dist_name}.tar.gz.asc
 
 The GPG key used to sign the release are available at:
 ${aurora_svn_dist_url}/KEYS
