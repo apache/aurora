@@ -221,7 +221,7 @@ CREATE TABLE cron_jobs(
   job_key_id BIGINT NOT NULL REFERENCES job_keys(id),
   creator_user VARCHAR NOT NULL,
   cron_schedule VARCHAR NOT NULL,
-  cron_collision_policy INT REFERENCES cron_policies(id),
+  cron_collision_policy INT NOT NULL REFERENCES cron_policies(id),
   task_config_row_id BIGINT NOT NULL REFERENCES task_configs(id),
   instance_count INT NOT NULL,
 

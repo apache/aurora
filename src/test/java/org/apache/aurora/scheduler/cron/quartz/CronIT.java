@@ -47,6 +47,7 @@ import org.quartz.Scheduler;
 import org.quartz.Trigger;
 import org.quartz.TriggerListener;
 
+import static org.apache.aurora.gen.CronCollisionPolicy.KILL_EXISTING;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.isA;
 import static org.junit.Assert.assertEquals;
@@ -65,6 +66,7 @@ public class CronIT extends EasyMockTest {
           .setKey(JOB_KEY.newBuilder())
           .setInstanceCount(2)
           .setOwner(IDENTITY)
+          .setCronCollisionPolicy(KILL_EXISTING)
           .setTaskConfig(makeTaskConfig()));
 
   private Injector injector;

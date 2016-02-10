@@ -22,6 +22,8 @@ import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.TypeHandler;
 import org.apache.thrift.TEnum;
 
+import static com.google.common.base.Preconditions.checkState;
+
 /**
  * Type handler for fields of type {@link TEnum}.  Implementers need only override
  * {@link #fromValue(int)}.
@@ -47,16 +49,22 @@ abstract class AbstractTEnumTypeHandler<T extends TEnum> implements TypeHandler<
 
   @Override
   public final T getResult(ResultSet rs, String columnName) throws SQLException {
-    return fromValue(rs.getInt(columnName));
+    int i = rs.getInt(columnName);
+    checkState(!rs.wasNull());
+    return fromValue(i);
   }
 
   @Override
   public final T getResult(ResultSet rs, int columnIndex) throws SQLException {
-    return fromValue(rs.getInt(columnIndex));
+    int i = rs.getInt(columnIndex);
+    checkState(!rs.wasNull());
+    return fromValue(i);
   }
 
   @Override
   public final T getResult(CallableStatement cs, int columnIndex) throws SQLException {
-    return fromValue(cs.getInt(columnIndex));
+    int i = cs.getInt(columnIndex);
+    checkState(!cs.wasNull());
+    return fromValue(i);
   }
 }
