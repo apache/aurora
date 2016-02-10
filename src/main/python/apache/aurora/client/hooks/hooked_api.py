@@ -49,6 +49,9 @@ class NonHookedAuroraClientAPI(AuroraClientAPI):
     * is thus available to API methods in subclasses
   """
 
+  def add_instances(self, job_key, instance_id, count, config=None):
+    return super(NonHookedAuroraClientAPI, self).add_instances(job_key, instance_id, count)
+
   def kill_job(self, job_key, instances=None, lock=None, config=None):
     return super(NonHookedAuroraClientAPI, self).kill_job(job_key, instances=instances, lock=lock)
 
@@ -153,6 +156,11 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
   def create_job(self, config, lock=None):
     return self._hooked_call(config, None,
         _partial(super(HookedAuroraClientAPI, self).create_job, config, lock))
+
+  def add_instances(self, job_key, instance_id, count, config=None):
+    return self._hooked_call(config, job_key,
+        _partial(super(HookedAuroraClientAPI, self).add_instances,
+            job_key, instance_id, count, config=config))
 
   def kill_job(self, job_key, instances=None, lock=None, config=None):
     return self._hooked_call(config, job_key,

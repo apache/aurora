@@ -24,6 +24,7 @@ from apache.aurora.config.schema.base import UpdateConfig
 from ...api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
+    InstanceKey,
     JobConfiguration,
     JobKey,
     JobUpdateKey,
@@ -108,6 +109,19 @@ class TestJobUpdateApis(unittest.TestCase):
     config.job.return_value = mock_task_config
     config.instances.return_value = 5
     return config
+
+  def test_add_instances(self):
+    """Test adding instances."""
+    api, mock_proxy = self.mock_api()
+    job_key = AuroraJobKey("foo", "role", "env", "name")
+    mock_proxy.addInstances.return_value = self.create_simple_success_response()
+    api.add_instances(job_key, 1, 10)
+
+    mock_proxy.addInstances.assert_called_once_with(
+        None,
+        None,
+        InstanceKey(jobKey=job_key.to_thrift(), instanceId=1),
+        10)
 
   def test_start_job_update(self):
     """Test successful job update start."""

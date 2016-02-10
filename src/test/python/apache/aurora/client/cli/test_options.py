@@ -17,7 +17,12 @@ from argparse import ArgumentTypeError
 
 import pytest
 
-from apache.aurora.client.cli.options import parse_instances
+from apache.aurora.client.cli.options import (
+    binding_parser,
+    instance_specifier,
+    parse_instances,
+    parse_task_instance_key
+)
 
 
 class TestParseInstances(unittest.TestCase):
@@ -34,3 +39,23 @@ class TestParseInstances(unittest.TestCase):
 
     with pytest.raises(ArgumentTypeError):
       parse_instances("1-0")
+
+  def test_instance_specifier_fails_on_empty(self):
+    with pytest.raises(ArgumentTypeError):
+      instance_specifier("")
+
+  def test_parse_task_instance_key_missing_instance(self):
+    with pytest.raises(ArgumentTypeError):
+      parse_task_instance_key("cluster/role/env/name")
+
+  def test_parse_task_instance_key_fails_on_range(self):
+    with pytest.raises(ArgumentTypeError):
+      parse_task_instance_key("cluster/role/env/name/0-5")
+
+  def binding_parser_fails_on_invalid_parts(self):
+    with pytest.raises(ArgumentTypeError):
+      binding_parser("p=")
+
+  def binding_parser_fails_parsing(self):
+    with pytest.raises(ArgumentTypeError):
+      binding_parser("p=2342")

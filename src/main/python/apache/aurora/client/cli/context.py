@@ -71,9 +71,8 @@ def add_auth_error_handler(api):
 
 class AuroraCommandContext(Context):
 
-  LOCK_ERROR_MSG = """Error: job is locked by an incomplete update.
-                      run 'aurora job cancel-update' to release the lock if no update
-                      is in progress"""
+  LOCK_ERROR_MSG = """Error: job is locked by an active update.
+      Run 'aurora update abort' or wait for the active update to finish."""
 
   """A context object used by Aurora commands to manage command processing state
   and common operations.
@@ -183,18 +182,32 @@ class AuroraCommandContext(Context):
           key.role, key.env, key.name)
       return jobs
 
-  def get_active_instances(self, key):
-    """Returns a list of the currently active instances of a job"""
+  def get_active_tasks(self, key):
+    """Returns a list of the currently active tasks of a job
+
+    :param key: Job key
+    :type key: AuroraJobKey
+    :return: set of active tasks
+    """
     api = self.get_api(key.cluster)
     resp = api.query_no_configs(
         api.build_query(key.role, key.name, env=key.env, statuses=ACTIVE_STATES))
     self.log_response_and_raise(resp, err_code=EXIT_INVALID_PARAMETER)
     return resp.result.scheduleStatusResult.tasks
 
-  def verify_instances_option_validity(self, jobkey, instances):
-    """Verifies all provided job instances are currently active."""
-    active = set(task.assignedTask.instanceId for task in self.get_active_instances(jobkey) or [])
+  def get_active_instances_or_raise(self, key, instances):
+    """Same as get_active_instances but raises error if
+       any of the requested instances are not active.
+
+    :param key: Job key
+    :type key: AuroraJobKey
+    :param instances: instances to verify
+    :type instances: list of int
+    :return: set of all currently active instances
+    """
+    active = set(task.assignedTask.instanceId for task in self.get_active_tasks(key) or [])
     unrecognized = set(instances) - active
     if unrecognized:
       raise self.CommandError(EXIT_INVALID_PARAMETER,
           "Invalid instance parameter: %s" % (list(unrecognized)))
+    return active

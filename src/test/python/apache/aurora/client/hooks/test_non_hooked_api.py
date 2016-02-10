@@ -18,8 +18,7 @@ import unittest
 from apache.aurora.client.hooks.hooked_api import NonHookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-API_METHODS = ('create_job', 'kill_job', 'restart', 'start_cronjob')
-API_METHODS_WITH_CONFIG_PARAM_ADDED = ('kill_job', 'restart', 'start_cronjob')
+API_METHODS = ('add_instances', 'create_job', 'kill_job', 'restart', 'start_cronjob')
 
 
 class TestNonHookedAuroraClientAPI(unittest.TestCase):

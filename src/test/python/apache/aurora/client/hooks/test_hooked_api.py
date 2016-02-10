@@ -20,7 +20,8 @@ from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI, NonHookedAuroraClientAPI
 from apache.aurora.common.cluster import Cluster
 
-API_METHODS = ('create_job', 'kill_job', 'restart', 'start_cronjob', 'start_job_update')
+API_METHODS = ('add_instances', 'create_job', 'kill_job', 'restart',
+               'start_cronjob', 'start_job_update')
 API_METHODS_WITH_CONFIG_PARAM_ADDED = ('kill_job', 'restart', 'start_cronjob')
 
 

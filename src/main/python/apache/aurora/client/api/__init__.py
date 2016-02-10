@@ -26,6 +26,7 @@ from .updater_util import UpdaterConfig
 
 from gen.apache.aurora.api.constants import LIVE_STATES
 from gen.apache.aurora.api.ttypes import (
+    InstanceKey,
     JobKey,
     JobUpdateKey,
     JobUpdateQuery,
@@ -98,6 +99,12 @@ class AuroraClientAPI(object):
   def get_jobs(self, role):
     log.info("Retrieving jobs for role %s" % role)
     return self._scheduler_proxy.getJobs(role)
+
+  def add_instances(self, job_key, instance_id, count):
+    key = InstanceKey(jobKey=job_key.to_thrift(), instanceId=instance_id)
+    log.info("Adding %s instances to %s using the task config of instance %s"
+             % (count, job_key, instance_id))
+    return self._scheduler_proxy.addInstances(None, None, key, count)
 
   def kill_job(self, job_key, instances=None, lock=None):
     log.info("Killing tasks for job: %s" % job_key)

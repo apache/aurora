@@ -116,19 +116,19 @@ TaskInstanceKey = namedtuple('TaskInstanceKey', ['jobkey', 'instance'])
 def parse_task_instance_key(key):
   pieces = key.split('/')
   if len(pieces) != 5:
-    raise ValueError('Task instance specifier %s is not in the form '
+    raise ArgumentTypeError('Task instance specifier %s is not in the form '
         'CLUSTER/ROLE/ENV/NAME/INSTANCE' % key)
   (cluster, role, env, name, instance_str) = pieces
   try:
     instance = int(instance_str)
   except ValueError:
-    raise ValueError('Instance must be an integer, but got %s' % instance_str)
+    raise ArgumentTypeError('Instance must be an integer, but got %s' % instance_str)
   return TaskInstanceKey(AuroraJobKey(cluster, role, env, name), instance)
 
 
 def instance_specifier(spec_str):
   if spec_str is None or spec_str == '':
-    raise ValueError('Instance specifier must be non-empty')
+    raise ArgumentTypeError('Instance specifier must be non-empty')
   parts = spec_str.split('/')
   if len(parts) == 4:
     jobkey = AuroraJobKey(*parts)
@@ -149,11 +149,11 @@ def binding_parser(binding):
   """
   binding_parts = binding.split("=", 1)
   if len(binding_parts) < 2:
-    raise ValueError('Binding parameter must be formatted name=value')
+    raise ArgumentTypeError('Binding parameter must be formatted name=value')
   try:
     ref = Ref.from_address(binding_parts[0])
   except Ref.InvalidRefError as e:
-    raise ValueError("Could not parse binding parameter %s: %s" % (binding, e))
+    raise ArgumentTypeError("Could not parse binding parameter %s: %s" % (binding, e))
   return {ref: binding_parts[1]}
 
 
@@ -271,6 +271,13 @@ STRICT_OPTION = CommandOption('--strict', default=False, action='store_true',
 
 TASK_INSTANCE_ARGUMENT = CommandOption('task_instance', type=parse_task_instance_key,
     help='A task instance specifier, in the form CLUSTER/ROLE/ENV/NAME/INSTANCE')
+
+
+ADD_INSTANCE_WAIT_OPTION = CommandOption('--wait-until',
+            choices=('PENDING', 'RUNNING', 'FINISHED'),
+            default='PENDING',
+            help='Block the client until all the tasks have transitioned into the requested '
+                 'state. Default: PENDING')
 
 
 WATCH_OPTION = CommandOption('--watch-secs', type=int, default=30,

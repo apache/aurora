@@ -46,6 +46,7 @@ from apache.aurora.client.cli import (
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
+    ADD_INSTANCE_WAIT_OPTION,
     ALL_INSTANCES,
     BATCH_OPTION,
     BIND_OPTION,
@@ -61,6 +62,7 @@ from apache.aurora.client.cli.options import (
     MAX_TOTAL_FAILURES_OPTION,
     NO_BATCHING_OPTION,
     STRICT_OPTION,
+    TASK_INSTANCE_ARGUMENT,
     WATCH_OPTION,
     CommandOption
 )
@@ -91,6 +93,26 @@ WILDCARD_JOBKEY_OPTION = CommandOption("jobspec", type=arg_type_jobkey,
         help="A jobkey, optionally containing wildcards")
 
 
+def wait_until(wait_until_option, job_key, api, instances=None):
+  """Waits for job instances to reach specified status.
+
+  :param wait_until_option: Expected instance status
+  :type wait_until_option: ADD_INSTANCE_WAIT_OPTION
+  :param job_key: Job key to wait on
+  :type job_key: AuroraJobKey
+  :param api: Aurora scheduler API
+  :type api: AuroraClientAPI
+  :param instances: Specific instances to wait on
+  :type instances: set of int
+  """
+  if wait_until_option == "RUNNING":
+    JobMonitor(api.scheduler_proxy, job_key).wait_until(
+        JobMonitor.running_or_finished,
+        instances=instances)
+  elif wait_until_option == "FINISHED":
+    JobMonitor(api.scheduler_proxy, job_key).wait_until(JobMonitor.terminal, instances=instances)
+
+
 class CreateJobCommand(Verb):
   @property
   def name(self):
@@ -100,14 +122,9 @@ class CreateJobCommand(Verb):
   def help(self):
     return "Create a service or ad hoc job using aurora"
 
-  CREATE_STATES = ("PENDING", "RUNNING", "FINISHED")
-
   def get_options(self):
     return [BIND_OPTION, JSON_READ_OPTION,
-        CommandOption("--wait-until", choices=self.CREATE_STATES,
-            default="PENDING",
-            help=("Block the client until all the tasks have transitioned into the requested "
-                "state. Default: PENDING")),
+        ADD_INSTANCE_WAIT_OPTION,
         BROWSER_OPTION,
         JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
@@ -124,10 +141,9 @@ class CreateJobCommand(Verb):
                                    err_msg="Job creation failed due to error:")
     if context.options.open_browser:
       webbrowser.open_new_tab(get_job_page(api, context.options.jobspec))
-    if context.options.wait_until == "RUNNING":
-      JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
-    elif context.options.wait_until == "FINISHED":
-      JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.terminal)
+
+    wait_until(context.options.wait_until, config.job_key(), api)
+
     # Check to make sure the job was created successfully.
     status_response = api.check_status(config.job_key())
     if (status_response.responseCode is not ResponseCode.OK or
@@ -392,8 +408,8 @@ class AbstractKillCommand(Verb):
 
   def kill_in_batches(self, context, job, instances_arg, config):
     api = context.get_api(job.cluster)
-    # query the job, to get the list of active instances.
-    tasks = context.get_active_instances(job)
+    # query the job, to get the list of active tasks.
+    tasks = context.get_active_tasks(job)
     if tasks is None or len(tasks) == 0:
       context.print_err("No tasks to kill found for job %s" % job)
       return EXIT_INVALID_PARAMETER
@@ -424,6 +440,46 @@ class AbstractKillCommand(Verb):
       raise context.CommandError(EXIT_COMMAND_FAILURE, "Errors occurred while killing instances")
 
 
+class AddCommand(Verb):
+  @property
+  def name(self):
+    return "add"
+
+  @property
+  def help(self):
+    return textwrap.dedent("""\
+        Add instances to a scheduled job. The task config to replicate is specified by the
+        /INSTANCE value of the task_instance argument.""")
+
+  def get_options(self):
+    return [BROWSER_OPTION,
+        BIND_OPTION,
+        ADD_INSTANCE_WAIT_OPTION,
+        CONFIG_OPTION,
+        JSON_READ_OPTION,
+        TASK_INSTANCE_ARGUMENT,
+        CommandOption('instance_count', type=int, help='Number of instances to add.')]
+
+  def execute(self, context):
+    job = context.options.task_instance.jobkey
+    instance = context.options.task_instance.instance
+    count = context.options.instance_count
+
+    active = context.get_active_instances_or_raise(job, [instance])
+    start = max(list(active)) + 1
+
+    api = context.get_api(job.cluster)
+    resp = api.add_instances(job, instance, count)
+    context.log_response_and_raise(resp)
+
+    wait_until(context.options.wait_until, job, api, range(start, start + count))
+
+    if context.options.open_browser:
+      webbrowser.open_new_tab(get_job_page(api, job))
+
+    return EXIT_OK
+
+
 class KillCommand(AbstractKillCommand):
   @property
   def name(self):
@@ -444,7 +500,7 @@ class KillCommand(AbstractKillCommand):
           "The instances list cannot be omitted in a kill command!; "
           "use killall to kill all instances")
     if context.options.strict:
-      context.verify_instances_option_validity(job, instances_arg)
+      context.get_active_instances_or_raise(job, instances_arg)
     api = context.get_api(job.cluster)
     config = context.get_job_config_optional(job, context.options.config)
     if context.options.no_batching:
@@ -581,7 +637,7 @@ class RestartCommand(Verb):
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
     if instances is not None and context.options.strict:
-      context.verify_instances_option_validity(job, instances)
+      context.get_active_instances_or_raise(job, instances)
     api = context.get_api(job.cluster)
     config = context.get_job_config_optional(job, context.options.config)
     restart_settings = RestartSettings(
@@ -775,3 +831,4 @@ class Job(Noun):
     self.register_verb(OpenCommand())
     self.register_verb(RestartCommand())
     self.register_verb(StatusCommand())
+    self.register_verb(AddCommand())
