@@ -39,9 +39,7 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.DeduplicatedSnapshot;
 import org.apache.aurora.gen.storage.Frame;
 import org.apache.aurora.gen.storage.FrameChunk;
@@ -56,6 +54,7 @@ import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
@@ -514,10 +513,7 @@ public class LogManagerTest extends EasyMockTest {
         .setTimestamp(1L)
         .setHostAttributes(ImmutableSet.of(new HostAttributes("host",
             ImmutableSet.of(new Attribute("hostname", ImmutableSet.of("abc"))))))
-        .setTasks(ImmutableSet.of(
-            new ScheduledTask().setStatus(ScheduleStatus.RUNNING)
-                .setAssignedTask(new AssignedTask().setTaskId("task_id")
-                    .setTask(new TaskConfig().setJobName("job_name")))));
+        .setTasks(ImmutableSet.of(TaskTestUtil.makeTask("task_id", TaskTestUtil.JOB).newBuilder()));
   }
 
   private SaveTasks createSaveTasks(String... taskIds) {

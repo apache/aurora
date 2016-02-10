@@ -17,7 +17,6 @@
     ACTIVE_STATES:false,
     ACTIVE_JOB_UPDATE_STATES: false,
     CronCollisionPolicy: false,
-    Identity:false,
     JobKey: false,
     JobUpdateQuery:false,
     JobUpdateAction:false,
@@ -29,10 +28,8 @@
   'use strict';
 
   function makeJobTaskQuery(role, environment, jobName, instance) {
-    var id = new Identity();
-    id.role = role;
     var taskQuery = new TaskQuery();
-    taskQuery.owner = id;
+    taskQuery.role = role;
     taskQuery.environment = environment;
     taskQuery.jobName = jobName;
 
@@ -83,23 +80,6 @@
               auroraClient.getSchedulerClient().getQuota(role, function (response) {
                 var result = auroraClient.processResponse(response);
                 result.quota = response.result !== null ? response.result.getQuotaResult : [];
-                deferred.resolve(result);
-              });
-            });
-          },
-
-          getTasks: function (role, environment, jobName) {
-            var id = new Identity();
-            id.role = role;
-            var taskQuery = new TaskQuery();
-            taskQuery.owner = id;
-            taskQuery.environment = environment;
-            taskQuery.jobName = jobName;
-            return async(function (deferred) {
-              auroraClient.getSchedulerClient().getTasksStatus(taskQuery, function (response) {
-                var result = auroraClient.processResponse(response);
-                result.tasks = response.result !== null ?
-                  response.result.scheduleStatusResult.tasks : [];
                 deferred.resolve(result);
               });
             });
@@ -511,7 +491,7 @@
                   var job = summary.job;
                   return job.cronSchedule !== null &&
                     job.key.environment === env &&
-                    job.taskConfig.jobName === jobName;
+                    job.key.name === jobName;
                 })
                 .map(function (summary) {
                   var collisionPolicy =

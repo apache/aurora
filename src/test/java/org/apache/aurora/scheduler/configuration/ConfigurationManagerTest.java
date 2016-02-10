@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.scheduler.configuration;
 
-import java.util.Arrays;
 import java.util.List;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.CronCollisionPolicy;
-import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
@@ -33,6 +32,8 @@ import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.storage.entities.IDockerParameter;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -69,9 +70,7 @@ public class ConfigurationManagerTest {
               .setIsService(false)
               .setTaskLinks(ImmutableMap.of())
               .setExecutorConfig(new ExecutorConfig("aurora", "config"))
-              .setEnvironment("devel")
               .setRequestedPorts(ImmutableSet.of())
-              .setJobName(null)
               .setPriority(0)
               .setOwner(null)
               .setContactEmail("foo@twitter.com")
@@ -97,19 +96,9 @@ public class ConfigurationManagerTest {
                           .setName(DEDICATED_ATTRIBUTE)
                           .setConstraint(TaskConstraint.value(new ValueConstraint(
                               false, ImmutableSet.of("foo"))))))
-              .setOwner(new Identity()
-                  .setRole("owner-role")
-                  .setUser("owner-user")));
-  private static final TaskConfig CONFIG_WITH_CONTAINER = ITaskConfig.build(new TaskConfig()
-      .setJobName("container-test")
-      .setEnvironment("devel")
-      .setExecutorConfig(new ExecutorConfig())
-      .setOwner(new Identity("role", "user"))
-      .setNumCpus(1)
-      .setRamMb(1)
-      .setDiskMb(1)
-      .setContainer(Container.docker(new DockerContainer("testimage"))))
-      .newBuilder();
+              .setOwner(new Identity().setUser("owner-user")));
+  private static final ITaskConfig CONFIG_WITH_CONTAINER =
+      TaskTestUtil.makeConfig(JobKeys.from("role", "env", "job"));
 
   private ConfigurationManager configurationManager;
   private ConfigurationManager dockerConfigurationManager;
@@ -135,7 +124,7 @@ public class ConfigurationManagerTest {
 
   @Test
   public void testBadContainerConfig() throws TaskDescriptionException {
-    TaskConfig taskConfig = CONFIG_WITH_CONTAINER.deepCopy();
+    TaskConfig taskConfig = CONFIG_WITH_CONTAINER.newBuilder();
     taskConfig.getContainer().getDocker().setImage(null);
 
     expectTaskDescriptionException("A container must specify an image");
@@ -144,7 +133,7 @@ public class ConfigurationManagerTest {
 
   @Test
   public void testDisallowedDockerParameters() throws TaskDescriptionException {
-    TaskConfig taskConfig = CONFIG_WITH_CONTAINER.deepCopy();
+    TaskConfig taskConfig = CONFIG_WITH_CONTAINER.newBuilder();
     taskConfig.getContainer().getDocker().addToParameters(new DockerParameter("foo", "bar"));
 
     ConfigurationManager noParamsManager = new ConfigurationManager(
@@ -157,8 +146,6 @@ public class ConfigurationManagerTest {
   @Test
   public void testInvalidTier() throws TaskDescriptionException {
     ITaskConfig config = ITaskConfig.build(UNSANITIZED_JOB_CONFIGURATION.deepCopy().getTaskConfig()
-        .setJobName("job")
-        .setEnvironment("env")
         .setTier("pr/d"));
 
     expectTaskDescriptionException("Tier contains illegal characters");
@@ -167,18 +154,20 @@ public class ConfigurationManagerTest {
 
   @Test
   public void testDefaultDockerParameters() throws TaskDescriptionException {
-    ITaskConfig result = dockerConfigurationManager.validateAndPopulate(
-        ITaskConfig.build(CONFIG_WITH_CONTAINER.deepCopy()));
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.getContainer().getDocker().setParameters(ImmutableList.of());
+
+    ITaskConfig result = dockerConfigurationManager.validateAndPopulate(ITaskConfig.build(builder));
 
     // The resulting task config should contain parameters supplied to the ConfigurationManager.
     List<IDockerParameter> params = result.getContainer().getDocker().getParameters();
     assertThat(
-        params, is(Arrays.asList(IDockerParameter.build(new DockerParameter("foo", "bar")))));
+        params, is(ImmutableList.of(IDockerParameter.build(new DockerParameter("foo", "bar")))));
   }
 
   @Test
   public void testPassthroughDockerParameters() throws TaskDescriptionException {
-    TaskConfig taskConfig = CONFIG_WITH_CONTAINER.deepCopy();
+    TaskConfig taskConfig = CONFIG_WITH_CONTAINER.newBuilder();
     DockerParameter userParameter = new DockerParameter("bar", "baz");
     taskConfig.getContainer().getDocker().getParameters().clear();
     taskConfig.getContainer().getDocker().addToParameters(userParameter);
@@ -188,8 +177,7 @@ public class ConfigurationManagerTest {
 
     // The resulting task config should contain parameters supplied from user config.
     List<IDockerParameter> params = result.getContainer().getDocker().getParameters();
-    assertThat(
-        params, is(Arrays.asList(IDockerParameter.build(userParameter))));
+    assertThat(params, is(ImmutableList.of(IDockerParameter.build(userParameter))));
   }
 
   private void expectTaskDescriptionException(String message) {

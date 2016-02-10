@@ -51,7 +51,7 @@ class SandboxInterface(Interface):
 
 class SandboxProvider(Interface):
   def _get_sandbox_user(self, assigned_task):
-    return assigned_task.task.job.role if assigned_task.task.job else assigned_task.task.owner.role
+    return assigned_task.task.job.role
 
   @abstractmethod
   def from_assigned_task(self, assigned_task):

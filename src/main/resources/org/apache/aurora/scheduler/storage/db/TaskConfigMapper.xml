@@ -128,9 +128,6 @@
 
   <resultMap id="taskConfigMap" type="org.apache.aurora.scheduler.storage.db.views.DbTaskConfig">
     <id column="id" property="rowId" />
-    <result column="j_role" property="owner.role"/>
-    <result column="j_environment" property="environment"/>
-    <result column="j_name" property="jobName"/>
     <result column="creator_user" property="owner.user"/>
     <result column="executor_name" property="executorConfig.name"/>
     <result column="executor_data" property="executorConfig.data"/>

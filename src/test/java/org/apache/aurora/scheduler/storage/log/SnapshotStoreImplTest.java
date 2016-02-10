@@ -25,18 +25,14 @@ import com.google.common.collect.Maps;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.testing.FakeBuildInfo;
 import org.apache.aurora.common.util.testing.FakeClock;
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateEvent;
-import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
@@ -44,7 +40,6 @@ import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
@@ -61,7 +56,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.junit.Before;
 import org.junit.Test;
@@ -95,23 +89,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
 
   @Test
   public void testCreateAndRestoreNewSnapshot() {
-    // Having immutable objects is important here to overcome m -> i -> m' problem with our wrappers
-    // when some primitive fields are not set.
-    ITaskConfig task = ITaskConfig.build(
-        new TaskConfig().setJob(JOB_KEY).setOwner(new Identity(null, "user")));
-    TaskConfig taskBuilder = new TaskConfig(task.newBuilder())
-        .setJobName(JOB_KEY.getName())
-        .setEnvironment(JOB_KEY.getEnvironment());
-    taskBuilder.getOwner().setRole(JOB_KEY.getRole());
-    ITaskConfig backfilledTask = ITaskConfig.build(taskBuilder);
-
-    ImmutableSet<IScheduledTask> tasks = ImmutableSet.of(IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask().setTask(task.newBuilder()))
-        .setStatus(ScheduleStatus.PENDING)));
-    ImmutableSet<IScheduledTask> backFilledTasks = ImmutableSet.of(IScheduledTask.build(
-        new ScheduledTask()
-            .setAssignedTask(new AssignedTask().setTask(backfilledTask.newBuilder()))
-            .setStatus(ScheduleStatus.PENDING)));
+    ImmutableSet<IScheduledTask> tasks = ImmutableSet.of(
+        IScheduledTask.build(new ScheduledTask().setStatus(ScheduleStatus.PENDING)));
 
     Set<QuotaConfiguration> quotas =
         ImmutableSet.of(
@@ -123,14 +102,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     // dropped.
     IHostAttributes legacyAttribute = IHostAttributes.build(
         new HostAttributes("host", ImmutableSet.of()));
-    StoredCronJob job = new StoredCronJob(new JobConfiguration()
-        .setOwner(new Identity().setUser("user"))
-        .setKey(JOB_KEY)
-        .setTaskConfig(task.newBuilder()));
-    IJobConfiguration backFilledJob = IJobConfiguration.build(
-        new JobConfiguration(job.getJobConfiguration())
-            .setOwner(new Identity(job.getJobConfiguration().getOwner()).setRole(JOB_KEY.getRole()))
-            .setTaskConfig(backfilledTask.newBuilder()));
+    StoredCronJob job = new StoredCronJob(
+        new JobConfiguration().setKey(new JobKey("owner", "env", "name")));
     String frameworkId = "framework_id";
     ILock lock = ILock.build(new Lock()
         .setKey(LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()))
@@ -145,26 +118,14 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     IJobUpdateKey updateId1 =  makeKey("updateId1");
     IJobUpdateKey updateId2 = makeKey("updateId2");
     IJobUpdateDetails updateDetails1 = IJobUpdateDetails.build(new JobUpdateDetails()
-        .setUpdate(new JobUpdate()
-            .setSummary(new JobUpdateSummary().setKey(updateId1.newBuilder()))
-            .setInstructions(new JobUpdateInstructions()
-                .setDesiredState(new InstanceTaskConfig().setTask(task.newBuilder()))
-                .setInitialState(ImmutableSet.of(new InstanceTaskConfig().setTask(task.newBuilder()
-                )))))
+        .setUpdate(new JobUpdate().setSummary(
+            new JobUpdateSummary().setKey(updateId1.newBuilder())))
         .setUpdateEvents(ImmutableList.of(new JobUpdateEvent().setStatus(JobUpdateStatus.ERROR)))
         .setInstanceEvents(ImmutableList.of(new JobInstanceUpdateEvent().setTimestampMs(123L))));
 
-    // The saved object for update1 should be backfilled with TaskConfig fields.
-    JobUpdateDetails backFilledDetails1 = new JobUpdateDetails(updateDetails1.newBuilder());
-    backFilledDetails1.getUpdate().getInstructions().getDesiredState()
-        .setTask(backfilledTask.newBuilder());
-    Iterables.getOnlyElement(backFilledDetails1.getUpdate().getInstructions().getInitialState())
-        .setTask(backfilledTask.newBuilder());
-
     IJobUpdateDetails updateDetails2 = IJobUpdateDetails.build(new JobUpdateDetails()
-        .setUpdate(new JobUpdate()
-            .setSummary(new JobUpdateSummary().setKey(updateId2.newBuilder()))
-            .setInstructions(new JobUpdateInstructions().setInitialState(ImmutableSet.of()))));
+        .setUpdate(new JobUpdate().setSummary(
+            new JobUpdateSummary().setKey(updateId2.newBuilder()))));
 
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
@@ -183,14 +144,14 @@ public class SnapshotStoreImplTest extends EasyMockTest {
             new StoredJobUpdateDetails(updateDetails2.newBuilder(), null)));
 
     expectDataWipe();
-    storageUtil.taskStore.saveTasks(backFilledTasks);
+    storageUtil.taskStore.saveTasks(tasks);
     storageUtil.quotaStore.saveQuota("steve", ResourceAggregates.EMPTY);
     expect(storageUtil.attributeStore.saveHostAttributes(attribute)).andReturn(true);
-    storageUtil.jobStore.saveAcceptedJob(backFilledJob);
+    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(job.getJobConfiguration()));
     storageUtil.schedulerStore.saveFrameworkId(frameworkId);
     storageUtil.lockStore.saveLock(lock);
     storageUtil.jobUpdateStore.saveJobUpdate(
-        IJobUpdate.build(backFilledDetails1.getUpdate()), Optional.fromNullable(lockToken));
+        updateDetails1.getUpdate(), Optional.fromNullable(lockToken));
     storageUtil.jobUpdateStore.saveJobUpdateEvent(
         updateId1,
         Iterables.getOnlyElement(updateDetails1.getUpdateEvents()));

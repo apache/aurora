@@ -176,7 +176,7 @@ THERMOS_TASK_ID_REF = Ref.from_address('thermos.task_id')
 def convert(job, metadata=frozenset(), ports=frozenset()):
   """Convert a Pystachio MesosJob to an Aurora Thrift JobConfiguration."""
 
-  owner = Identity(role=fully_interpolated(job.role()), user=getpass.getuser())
+  owner = Identity(user=getpass.getuser())
   key = JobKey(
     role=assert_valid_field('role', fully_interpolated(job.role())),
     environment=assert_valid_field('environment', fully_interpolated(job.environment())),
@@ -191,8 +191,6 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
     return default if item is Empty else fully_interpolated(item)
 
   # job components
-  task.jobName = fully_interpolated(job.name())
-  task.environment = fully_interpolated(job.environment())
   task.production = fully_interpolated(job.production(), bool)
   task.isService = select_service_bit(job)
   task.maxTaskFailures = fully_interpolated(job.max_task_failures())

@@ -126,6 +126,7 @@ import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DED
 import static org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_JOB;
 import static org.apache.aurora.scheduler.thrift.Fixtures.ENOUGH_QUOTA;
+import static org.apache.aurora.scheduler.thrift.Fixtures.IDENTITY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.INSTANCE_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.INVALID_TASK_CONFIG;
 import static org.apache.aurora.scheduler.thrift.Fixtures.JOB_KEY;
@@ -134,7 +135,6 @@ import static org.apache.aurora.scheduler.thrift.Fixtures.LOCK;
 import static org.apache.aurora.scheduler.thrift.Fixtures.LOCK_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.NOT_ENOUGH_QUOTA;
 import static org.apache.aurora.scheduler.thrift.Fixtures.ROLE;
-import static org.apache.aurora.scheduler.thrift.Fixtures.ROLE_IDENTITY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.TASK_ID;
 import static org.apache.aurora.scheduler.thrift.Fixtures.UPDATE_KEY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.USER;
@@ -255,10 +255,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testCreateJobNoLock() throws Exception {
-    // Validate key is populated during sanitizing.
-    JobConfiguration jobConfig = makeProdJob();
-    jobConfig.getTaskConfig().unsetJob();
-
     IJobConfiguration job = IJobConfiguration.build(makeProdJob());
     SanitizedConfiguration sanitized = fromUnsanitized(job);
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
@@ -275,7 +271,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertOkResponse(thrift.createJob(jobConfig, null));
+    assertOkResponse(thrift.createJob(makeProdJob(), null));
   }
 
   @Test
@@ -419,7 +415,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     JobConfiguration job =
-        new JobConfiguration().setKey(JOB_KEY.newBuilder()).setOwner(ROLE_IDENTITY);
+        new JobConfiguration().setKey(JOB_KEY.newBuilder()).setOwner(IDENTITY);
     assertResponse(INVALID_REQUEST, thrift.createJob(job, null));
   }
 
@@ -501,10 +497,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setDiskMb(1024)
         .setIsService(true)
         .setProduction(true)
-        .setOwner(ROLE_IDENTITY)
-        .setEnvironment("devel")
+        .setOwner(IDENTITY)
         .setContainer(Container.mesos(new MesosContainer()))
-        .setJobName(JOB_NAME);
+        .setJob(JOB_KEY.newBuilder());
     JobConfiguration job = makeJob(task);
 
     JobConfiguration sanitized = job.deepCopy();
@@ -519,8 +514,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setRequestedPorts(ImmutableSet.of())
         .setTaskLinks(ImmutableMap.of())
         .setConstraints(ImmutableSet.of())
-        .setMaxTaskFailures(0)
-        .setEnvironment("devel");
+        .setMaxTaskFailures(0);
 
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
@@ -590,9 +584,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setInstanceId(0)
             .setTask(new TaskConfig()
                 .setJob(JOB_KEY.newBuilder().setName(jobName))
-                .setOwner(ROLE_IDENTITY)
-                .setEnvironment("devel")
-                .setJobName(jobName))));
+                .setOwner(IDENTITY))));
   }
 
   private void expectTransitionsToKilling() {
@@ -678,9 +670,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testKillTasksInvalidJobName() throws Exception {
-    TaskQuery query = new TaskQuery()
-        .setOwner(ROLE_IDENTITY)
-        .setJobName("");
+    TaskQuery query = new TaskQuery().setJobName("");
 
     control.replay();
 
@@ -874,10 +864,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
     control.replay();
 
-    // Validate key is populated during sanitizing.
-    JobConfiguration jobConfig = CRON_JOB;
-    jobConfig.getTaskConfig().unsetJob();
-    assertOkResponse(thrift.replaceCronTemplate(jobConfig, null));
+    assertOkResponse(thrift.replaceCronTemplate(CRON_JOB, null));
   }
 
   @Test
@@ -966,10 +953,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
     control.replay();
 
-    // Validate key is populated during sanitizing.
-    JobConfiguration jobConfig = CRON_JOB;
-    jobConfig.getTaskConfig().unsetJob();
-    assertResponse(OK, thrift.scheduleCronJob(jobConfig, null));
+    assertResponse(OK, thrift.scheduleCronJob(CRON_JOB, null));
   }
 
   @Test
@@ -1081,7 +1065,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     IJobConfiguration job = IJobConfiguration.build(makeJob());
     JobKey rewrittenJobKey = JobKeys.from("a", "b", "c").newBuilder();
-    Identity rewrittenIdentity = new Identity(rewrittenJobKey.getRole(), "steve");
+    Identity rewrittenIdentity = new Identity().setUser("steve");
     RewriteConfigsRequest request = new RewriteConfigsRequest(
         ImmutableList.of(ConfigRewrite.jobRewrite(new JobConfigRewrite(
             job.newBuilder(),
@@ -1100,12 +1084,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
     IScheduledTask storedTask = IScheduledTask.build(
         new ScheduledTask().setAssignedTask(new AssignedTask().setTask(storedConfig)));
-    InstanceKey instance = new InstanceKey(
-        JobKeys.from(
-            storedConfig.getOwner().getRole(),
-            storedConfig.getEnvironment(),
-            storedConfig.getJobName()).newBuilder(),
-        0);
+    InstanceKey instance = new InstanceKey(storedConfig.getJob(), 0);
 
     storageUtil.expectTaskFetch(
         Query.instanceScoped(IInstanceKey.build(instance)).active(), storedTask);
@@ -1128,12 +1107,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         new AssignedTask()
             .setTaskId(taskId)
             .setTask(storedConfig)));
-    InstanceKey instanceKey = new InstanceKey(
-        JobKeys.from(
-            storedConfig.getOwner().getRole(),
-            storedConfig.getEnvironment(),
-            storedConfig.getJobName()).newBuilder(),
-        0);
+    InstanceKey instanceKey = new InstanceKey(storedConfig.getJob(), 0);
 
     storageUtil.expectTaskFetch(
         Query.instanceScoped(IInstanceKey.build(instanceKey)).active(), storedTask);
@@ -1155,12 +1129,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         new AssignedTask()
             .setTaskId(taskId)
             .setTask(config)));
-    InstanceKey instanceKey = new InstanceKey(
-        JobKeys.from(
-            config.getOwner().getRole(),
-            config.getEnvironment(),
-            config.getJobName()).newBuilder(),
-        0);
+    InstanceKey instanceKey = new InstanceKey(config.getJob(), 0);
 
     storageUtil.expectTaskFetch(
         Query.instanceScoped(IInstanceKey.build(instanceKey)).active(), task);
@@ -1219,10 +1188,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     storageUtil.jobStore.saveAcceptedJob(validateAndPopulate(IJobConfiguration.build(newJob)));
 
     control.replay();
-
-    // Validate key is populated during sanitizing.
-    JobConfiguration requestConfig = oldJob.deepCopy();
-    requestConfig.getTaskConfig().unsetJob();
 
     RewriteConfigsRequest request = new RewriteConfigsRequest(
         ImmutableList.of(ConfigRewrite.jobRewrite(
@@ -1338,9 +1303,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    // Validate key is populated during sanitizing.
     AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
-    config.getTaskConfig().unsetJob();
     assertOkResponse(deprecatedAddInstances(config, LOCK.newBuilder()));
   }
 
@@ -1610,11 +1573,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    // Validate key is populated during sanitizing.
-    JobUpdateRequest request = buildJobUpdateRequest(update);
-    request.getTaskConfig().unsetJob();
-
-    Response response = assertOkResponse(thrift.startJobUpdate(request, AUDIT_MESSAGE));
+    Response response =
+        assertOkResponse(thrift.startJobUpdate(buildJobUpdateRequest(update), AUDIT_MESSAGE));
     assertEquals(
         new StartJobUpdateResult(UPDATE_KEY.newBuilder()),
         response.getResult().getStartJobUpdateResult());
@@ -1679,20 +1639,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
     thrift.startJobUpdate(
         new JobUpdateRequest(null, 5, buildJobUpdateSettings()),
-        AUDIT_MESSAGE);
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testStartUpdateFailsInvalidJobKey() throws Exception {
-    control.replay();
-    thrift.startJobUpdate(
-        new JobUpdateRequest(
-            new TaskConfig()
-                .setJobName("&")
-                .setEnvironment("devel")
-                .setOwner(new Identity(ROLE, null)),
-            5,
-            buildJobUpdateSettings()),
         AUDIT_MESSAGE);
   }
 
@@ -2175,7 +2121,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return IJobUpdate.build(new JobUpdate()
         .setSummary(new JobUpdateSummary()
             .setKey(UPDATE_KEY.newBuilder())
-            .setUser(ROLE_IDENTITY.getUser()))
+            .setUser(IDENTITY.getUser()))
         .setInstructions(new JobUpdateInstructions()
             .setSettings(buildJobUpdateSettings())
             .setDesiredState(new InstanceTaskConfig()

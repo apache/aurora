@@ -26,7 +26,6 @@ from apache.aurora.common.cluster import Cluster
 from gen.apache.aurora.api.constants import LIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
-    Identity,
     JobKey,
     Response,
     ResponseCode,
@@ -69,10 +68,7 @@ class SlaTest(unittest.TestCase):
             slaveHost=host,
             task=TaskConfig(
                 production=prod if prod is not None else True,
-                job=JobKey(role=self._role, environment=self._env, name=name or self._name),
-                jobName=name or self._name,
-                owner=Identity(role=self._role),
-                environment=self._env)),
+                job=JobKey(role=self._role, environment=self._env, name=name or self._name))),
         status=ScheduleStatus.RUNNING,
         taskEvents=[TaskEvent(
             status=ScheduleStatus.RUNNING,

@@ -5,6 +5,14 @@ New/updated:
 
 - Upgraded Mesos to 0.26.0
 
+Deprecations and removals:
+
+- Removed deprecated (now redundant) fields:
+  - `Identity.role`
+  - `TaskConfig.environment`
+  - `TaskConfig.jobName`
+  - `TaskQuery.owner`
+
 0.12.0
 ------
 
