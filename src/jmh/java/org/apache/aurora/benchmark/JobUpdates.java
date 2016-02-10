@@ -47,6 +47,7 @@ final class JobUpdates {
     private static final String USER = "user";
     private int numEvents = 1;
     private int numInstanceEvents = 5000;
+    private int numInstanceOverrides = 1;
 
     Builder setNumEvents(int newCount) {
       numEvents = newCount;
@@ -55,6 +56,11 @@ final class JobUpdates {
 
     Builder setNumInstanceEvents(int newCount) {
       numInstanceEvents = newCount;
+      return this;
+    }
+
+    Builder setNumInstanceOverrides(int newCount) {
+      numInstanceOverrides = newCount;
       return this;
     }
 
@@ -78,10 +84,9 @@ final class JobUpdates {
                     .setMaxPerInstanceFailures(1)
                     .setMinWaitInInstanceRunningMs(1)
                     .setRollbackOnFailure(true)
-                    .setWaitForBatchCompletion(false))
-                .setInitialState(ImmutableSet.of(new InstanceTaskConfig()
-                    .setTask(task)
-                    .setInstances(ImmutableSet.of(new Range(0, 10)))))
+                    .setWaitForBatchCompletion(false)
+                    .setUpdateOnlyTheseInstances(ranges(numInstanceOverrides)))
+                .setInitialState(instanceConfigs(task, numInstanceOverrides))
                 .setDesiredState(new InstanceTaskConfig()
                     .setTask(task)
                     .setInstances(ImmutableSet.of(new Range(0, numInstanceEvents)))));
@@ -102,6 +107,24 @@ final class JobUpdates {
             .setUpdate(update)
             .setUpdateEvents(events.build())
             .setInstanceEvents(instances.build())));
+      }
+
+      return result.build();
+    }
+
+    private static Set<InstanceTaskConfig> instanceConfigs(TaskConfig task, int count) {
+      ImmutableSet.Builder<InstanceTaskConfig> result = ImmutableSet.builder();
+      for (int i = 0; i < count; i++) {
+        result.add(new InstanceTaskConfig(task, ImmutableSet.of(new Range(i, i))));
+      }
+
+      return result.build();
+    }
+
+    private static Set<Range> ranges(int count) {
+      ImmutableSet.Builder<Range> result = ImmutableSet.builder();
+      for (int i = 0; i < count; i++) {
+        result.add(new Range(i, i));
       }
 
       return result.build();

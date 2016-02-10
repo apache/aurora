@@ -48,6 +48,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
 public class UpdateStoreBenchmarks {
+  private static final String USER = "user";
 
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.SECONDS)
@@ -56,7 +57,6 @@ public class UpdateStoreBenchmarks {
   @Fork(1)
   @State(Scope.Thread)
   public static class JobDetailsBenchmark {
-    private static final String USER = "user";
     private Storage storage;
     private Set<IJobUpdateKey> keys;
 
@@ -71,29 +71,10 @@ public class UpdateStoreBenchmarks {
     @Setup(Level.Iteration)
     public void setUpIteration() {
       storage.write((NoResult.Quiet) storeProvider -> {
-        JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
         Set<IJobUpdateDetails> updates =
             new JobUpdates.Builder().setNumInstanceEvents(instances).build(1);
 
-        ImmutableSet.Builder<IJobUpdateKey> keyBuilder = ImmutableSet.builder();
-        for (IJobUpdateDetails details : updates) {
-          IJobUpdateKey key = details.getUpdate().getSummary().getKey();
-          keyBuilder.add(key);
-          String lockToken = UUID.randomUUID().toString();
-          storeProvider.getLockStore().saveLock(
-              ILock.build(new Lock(LockKey.job(key.getJob().newBuilder()), lockToken, USER, 0L)));
-
-          updateStore.saveJobUpdate(details.getUpdate(), Optional.of(lockToken));
-
-          for (IJobUpdateEvent updateEvent : details.getUpdateEvents()) {
-            updateStore.saveJobUpdateEvent(key, updateEvent);
-          }
-
-          for (IJobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
-            updateStore.saveJobInstanceUpdateEvent(key, instanceEvent);
-          }
-        }
-        keys = keyBuilder.build();
+        keys = saveToStore(updates, storeProvider);
       });
     }
 
@@ -110,5 +91,74 @@ public class UpdateStoreBenchmarks {
       return storage.read(store -> store.getJobUpdateStore().fetchJobUpdateDetails(
           Iterables.getOnlyElement(keys)).get());
     }
+  }
+
+  @BenchmarkMode(Mode.Throughput)
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  @Warmup(iterations = 1, time = 10, timeUnit = TimeUnit.SECONDS)
+  @Measurement(iterations = 5, time = 5, timeUnit = TimeUnit.SECONDS)
+  @Fork(1)
+  @State(Scope.Thread)
+  public static class JobInstructionsBenchmark {
+    private Storage storage;
+    private Set<IJobUpdateKey> keys;
+
+    @Param({"1", "10", "100", "1000"})
+    private int instanceOverrides;
+
+    @Setup(Level.Trial)
+    public void setUp() {
+      storage = DbUtil.createStorage();
+    }
+
+    @Setup(Level.Iteration)
+    public void setUpIteration() {
+      storage.write((NoResult.Quiet) storeProvider -> {
+        Set<IJobUpdateDetails> updates =
+            new JobUpdates.Builder().setNumInstanceOverrides(instanceOverrides).build(1);
+
+        keys = saveToStore(updates, storeProvider);
+      });
+    }
+
+    @TearDown(Level.Iteration)
+    public void tearDownIteration() {
+      storage.write((NoResult.Quiet) storeProvider -> {
+        storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+        storeProvider.getLockStore().deleteLocks();
+      });
+    }
+
+    @Benchmark
+    public IJobUpdateDetails run() throws TException {
+      return storage.read(store -> store.getJobUpdateStore().fetchJobUpdateDetails(
+          Iterables.getOnlyElement(keys)).get());
+    }
+  }
+
+  private static Set<IJobUpdateKey> saveToStore(
+      Set<IJobUpdateDetails> updates,
+      Storage.MutableStoreProvider storeProvider) {
+
+    JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
+    ImmutableSet.Builder<IJobUpdateKey> keyBuilder = ImmutableSet.builder();
+    for (IJobUpdateDetails details : updates) {
+      IJobUpdateKey key = details.getUpdate().getSummary().getKey();
+      keyBuilder.add(key);
+      String lockToken = UUID.randomUUID().toString();
+      storeProvider.getLockStore().saveLock(
+          ILock.build(new Lock(LockKey.job(key.getJob().newBuilder()), lockToken, USER, 0L)));
+
+      updateStore.saveJobUpdate(details.getUpdate(), Optional.of(lockToken));
+
+      for (IJobUpdateEvent updateEvent : details.getUpdateEvents()) {
+        updateStore.saveJobUpdateEvent(key, updateEvent);
+      }
+
+      for (IJobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
+        updateStore.saveJobInstanceUpdateEvent(key, instanceEvent);
+      }
+    }
+    return keyBuilder.build();
   }
 }

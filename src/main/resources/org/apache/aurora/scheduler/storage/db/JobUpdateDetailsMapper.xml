@@ -170,9 +170,9 @@
   <resultMap id="jobUpdateSettingsMap" type="org.apache.aurora.gen.JobUpdateSettings">
     <id column="id" />
     <collection property="updateOnlyTheseInstances"
-                resultMap="rangeMap"
-                columnPrefix="r_"
-                notNullColumn="id" />
+                select="selectInstanceOverrides"
+                column="id"
+                foreignColumn="update_row_id" />
   </resultMap>
 
   <resultMap
@@ -182,9 +182,9 @@
     <association property="desiredState" resultMap="instanceConfigMap" columnPrefix="ditc_" />
     <association property="settings" resultMap="jobUpdateSettingsMap" columnPrefix="juse_"/>
     <collection property="initialState"
-                resultMap="instanceConfigMap"
-                columnPrefix="iitc_"
-                notNullColumn="id" />
+                select="selectInstanceConfigs"
+                column="id"
+                foreignColumn="update_row_id" />
   </resultMap>
 
   <resultMap id="jobUpdateMap" type="org.apache.aurora.scheduler.storage.db.views.DbJobUpdate">
@@ -350,23 +350,12 @@
       cn.task_config_row_id AS jui_ditc_task_config_row_id,
       di.id AS jui_ditc_r_id,
       di.first AS jui_ditc_r_first,
-      di.last AS jui_ditc_r_last,
-      co.id AS jui_iitc_id,
-      co.task_config_row_id AS jui_iitc_task_config_row_id,
-      ci.id AS jui_iitc_r_id,
-      ci.first AS jui_iitc_r_first,
-      ci.last AS jui_iitc_r_last,
-      io.id AS jui_juse_r_id,
-      io.first AS jui_juse_r_first,
-      io.last AS jui_juse_r_last
+      di.last AS jui_ditc_r_last
   </sql>
 
   <sql id="job_update_outer_joins">
     LEFT OUTER JOIN job_update_configs AS cn ON cn.update_row_id = u.id AND cn.is_new = TRUE
-    LEFT OUTER JOIN job_update_configs AS co ON co.update_row_id = u.id AND co.is_new = FALSE
-    LEFT OUTER JOIN job_update_configs_to_instances AS ci ON ci.config_id = co.id
     LEFT OUTER JOIN job_updates_to_desired_instances AS di ON di.update_row_id = u.id
-    LEFT OUTER JOIN job_updates_to_instance_overrides AS io ON io.update_row_id = u.id
   </sql>
 
   <sql id="lock_outer_join">
@@ -402,15 +391,7 @@
       cn.task_config_row_id AS ditc_task_config_row_id,
       di.id AS ditc_r_id,
       di.first AS ditc_r_first,
-      di.last AS ditc_r_last,
-      co.id AS iitc_id,
-      co.task_config_row_id AS iitc_task_config_row_id,
-      ci.id AS iitc_r_id,
-      ci.first AS iitc_r_first,
-      ci.last AS iitc_r_last,
-      io.id AS juse_r_id,
-      io.first AS juse_r_first,
-      io.last AS juse_r_last
+      di.last AS ditc_r_last
     FROM job_updates AS u
     <include refid="job_key_inner_join" />
     <include refid="job_update_outer_joins" />
@@ -448,6 +429,28 @@
     INNER JOIN job_updates u ON l.update_row_id = u.id
     <include refid="job_key_inner_join" />
     WHERE <include refid="filter_by_update_key"/>
+  </select>
+
+  <select id="selectInstanceConfigs" resultMap="instanceConfigMap">
+    SELECT
+      co.id,
+      co.task_config_row_id AS task_config_row_id,
+      ci.id AS r_id,
+      ci.first AS r_first,
+      ci.last AS r_last
+    FROM job_update_configs as co
+    INNER JOIN job_update_configs_to_instances AS ci ON ci.config_id = co.id
+    WHERE co.update_row_id = #{id}
+      AND co.is_new = FALSE
+  </select>
+
+  <select id="selectInstanceOverrides" resultMap="rangeMap">
+    SELECT
+      o.id,
+      o.first,
+      o.last
+    FROM job_updates_to_instance_overrides as o
+    WHERE update_row_id = #{id}
   </select>
 
   <select id="selectInstanceUpdateEvents" resultMap="jobInstanceUpdateMap">
