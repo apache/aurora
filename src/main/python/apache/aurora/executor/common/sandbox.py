@@ -122,8 +122,11 @@ class DirectorySandbox(SandboxInterface):
 class DockerDirectorySandbox(DirectorySandbox):
   """ A sandbox implementation that configures the sandbox correctly for docker. """
 
+  MESOS_DIRECTORY_ENV_VARIABLE = 'MESOS_DIRECTORY'
+  MESOS_SANDBOX_ENV_VARIABLE = 'MESOS_SANDBOX'
+
   def __init__(self, sandbox_name):
-    self._mesos_host_sandbox = os.environ['MESOS_DIRECTORY']
+    self._mesos_host_sandbox = os.environ[self.MESOS_DIRECTORY_ENV_VARIABLE]
     self._root = os.path.join(self._mesos_host_sandbox, sandbox_name)
     super(DockerDirectorySandbox, self).__init__(self._root, user=None)
 
@@ -136,8 +139,11 @@ class DockerDirectorySandbox(DirectorySandbox):
     # $MESOS_SANDBOX is provided in the environment by the Mesos docker containerizer.
 
     mesos_host_sandbox_root = os.path.dirname(self._mesos_host_sandbox)
-    os.makedirs(mesos_host_sandbox_root)
-    os.symlink(os.environ['MESOS_SANDBOX'], self._mesos_host_sandbox)
+    try:
+      safe_mkdir(mesos_host_sandbox_root)
+      os.symlink(os.environ[self.MESOS_SANDBOX_ENV_VARIABLE], self._mesos_host_sandbox)
+    except (IOError, OSError) as e:
+      raise self.CreationError('Failed to create the sandbox root: %s' % e)
 
   def create(self):
     self._create_symlinks()

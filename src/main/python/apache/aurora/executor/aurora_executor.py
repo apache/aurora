@@ -129,6 +129,9 @@ class AuroraExecutor(ExecutorBase, Observable):
     except self._sandbox.Error as e:
       self._die(driver, mesos_pb2.TASK_FAILED, 'Failed to initialize sandbox: %s' % e)
       return
+    except Exception as e:
+      self._die(driver, mesos_pb2.TASK_FAILED, 'Unknown exception initializing sandbox: %s' % e)
+      return
     self.sandbox_created.set()
     return True
 

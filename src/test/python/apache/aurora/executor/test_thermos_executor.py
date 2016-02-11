@@ -84,13 +84,20 @@ class FailingStartingTaskRunner(ThermosTaskRunner):
 
 
 class FailingSandbox(DirectorySandbox):
+  def __init__(self, root, exception_type):
+    self._exception_type = exception_type
+    super(FailingSandbox, self).__init__(root)
+
   def create(self):
-    raise self.CreationError('Could not create directory!')
+    raise self._exception_type('Could not create directory!')
 
 
 class FailingSandboxProvider(SandboxProvider):
+  def __init__(self, exception_type=DirectorySandbox.CreationError):
+    self._exception_type = exception_type
+
   def from_assigned_task(self, assigned_task):
-    return FailingSandbox(safe_mkdtemp())
+    return FailingSandbox(safe_mkdtemp(), exception_type=self._exception_type)
 
 
 class SlowSandbox(DirectorySandbox):
@@ -472,6 +479,19 @@ class TestThermosExecutor(object):
       te = FastThermosExecutor(
           runner_provider=make_provider(td),
           sandbox_provider=FailingSandboxProvider())
+      te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
+      proxy_driver.wait_stopped()
+
+      updates = proxy_driver.method_calls['sendStatusUpdate']
+      assert updates[-1][0][0].state == mesos_pb2.TASK_FAILED
+
+  def test_failing_runner_initialize_unknown_exception(self):
+    proxy_driver = ProxyDriver()
+
+    with temporary_dir() as td:
+      te = FastThermosExecutor(
+              runner_provider=make_provider(td),
+              sandbox_provider=FailingSandboxProvider(exception_type=Exception))
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
       proxy_driver.wait_stopped()
 
