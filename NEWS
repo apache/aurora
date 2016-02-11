@@ -4,6 +4,7 @@
 New/updated:
 
 - Upgraded Mesos to 0.26.0
+- Added a new `aurora job add` client command to scale out an existing job.
 
 Deprecations and removals:
 

@@ -9,6 +9,7 @@ Aurora Client Commands
     - [Creating and Running a Job](#creating-and-running-a-job)
     - [Running a Command On a Running Job](#running-a-command-on-a-running-job)
     - [Killing a Job](#killing-a-job)
+    - [Adding Instances](#adding-instances)
     - [Updating a Job](#updating-a-job)
         - [Coordinated job updates](#user-content-coordinated-job-updates)
     - [Renaming a Job](#renaming-a-job)
@@ -163,6 +164,15 @@ are terminated. Defaults to killing all instances in the Job.
 The `<configuration file>` argument for `kill` is optional. Use it only
 if it contains hook definitions and activations that affect the
 kill command.
+
+### Adding Instances
+
+    aurora job add CLUSTER/ROLE/ENV/NAME/INSTANCE <count>
+
+Adds `<count>` instances to the existing job. The configuration of the new instances is derived from
+an active job instance pointed by the `/INSTANCE` part of the job specification. This command is
+a simpler way to scale out an existing job when an instance with desired task configuration
+already exists. Use `aurora update start` to add instances with a new (updated) configuration.
 
 ### Updating a Job
 
