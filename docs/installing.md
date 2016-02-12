@@ -220,8 +220,32 @@ For more detail on this topic, see the dedicated page on
         sudo yum install -y aurora-executor
 
 ### Configuration
-The executor and observer typically do not require much configuration.  Command line arguments can
+The executor typically does not require configuration.  Command line arguments can
 be passed to the executor using a command line argument on the scheduler.
+
+The observer needs to be configured to look at the correct mesos directory in order to find task
+sandboxes. You should 1st find the Mesos working directory by looking for the Mesos master
+`--work_dir` flag. You should see something like:
+
+        ps -eocmd | grep "mesos-master" | grep -v grep | tr ' ' '\n' | grep "\--work_dir"
+        --work_dir=/var/lib/mesos
+
+The value you find for `--work_dir`, `/var/lib/mesos` in this example, should match the Aurora
+observer value for `--mesos-root`.  You can look for that setting in a similar way on a worker
+node by grepping for `thermos_observer` and `--mesos-root`.  If the flag is not set, you can view
+the default value like so:
+
+        thermos_observer -h
+        Options:
+          ...
+          --mesos-root=MESOS_ROOT
+                                The mesos root directory to search for Thermos
+                                executor sandboxes [default: /var/lib/mesos]
+          ...
+
+In this case the default is `/var/lib/mesos` and we have a match. If there is no match, you can
+either adjust the mesos-master start script(s) and restart the master(s) or else adjust the
+Aurora observer start scripts and restart the observers.
 
 ## Installing the client
 ### Ubuntu Trusty
