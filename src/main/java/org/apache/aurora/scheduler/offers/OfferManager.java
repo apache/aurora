@@ -27,6 +27,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
@@ -222,7 +223,7 @@ public interface OfferManager extends EventSubscriber {
 
     @Override
     public Iterable<HostOffer> getOffers() {
-      return hostOffers.getWeaklyConsistentOffers();
+      return hostOffers.getOffers();
     }
 
     @Override
@@ -321,8 +322,8 @@ public interface OfferManager extends EventSubscriber {
         }
       }
 
-      synchronized Iterable<HostOffer> getWeaklyConsistentOffers() {
-        return Iterables.unmodifiableIterable(offers);
+      synchronized Iterable<HostOffer> getOffers() {
+        return ImmutableSet.copyOf(offers);
       }
 
       synchronized Iterable<HostOffer> getWeaklyConsistentOffers(TaskGroupKey groupKey) {
