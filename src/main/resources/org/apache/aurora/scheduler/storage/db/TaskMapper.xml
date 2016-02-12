@@ -48,19 +48,10 @@
     <result property="status"
             column="status"
             typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.ScheduleStatusTypeHandler" />
+    <result column="timestamp_ms" property="timestamp" />
+    <result column="message" property="message" />
+    <result column="scheduler_host" property="scheduler" />
   </resultMap>
-
-  <select id="selectTaskEvents" resultMap="taskEventMap">
-    SELECT
-      e.id AS id,
-      e.timestamp_ms AS timestamp,
-      e.status AS status,
-      e.message AS message,
-      e.scheduler_host AS scheduler
-    FROM task_events AS e
-    WHERE e.task_row_id = (SELECT id FROM tasks WHERE task_id = #{task_id})
-    ORDER BY e.timestamp_ms ASC
-  </select>
 
   <resultMap id="scheduledTaskMap" type="org.apache.aurora.scheduler.storage.db.views.DbScheduledTask">
     <id column="row_id"/>
@@ -78,14 +69,13 @@
         foreignColumn="row_id"/>
     <collection
         property="assignedTask.assignedPorts"
-        select="selectPorts"
-        column="task_id"
-        foreignColumn="task_row_id"/>
+        resultMap="portMap"
+        columnPrefix="tp_"/>
     <collection
         property="taskEvents"
-        select="selectTaskEvents"
-        column="task_id"
-        foreignColumn="task_row_id"/>
+        resultMap="taskEventMap"
+        columnPrefix="te_"
+        notNullColumn="status"/>
   </resultMap>
 
   <sql id="unscopedSelect">
@@ -101,10 +91,18 @@
       j.environment AS c_j_environment,
       j.name AS c_j_name,
       h.slave_id AS slave_id,
-      h.host AS slave_host
+      h.host AS slave_host,
+      tp.name as tp_name,
+      tp.port as tp_port,
+      te.timestamp_ms as te_timestamp,
+      te.status as te_status,
+      te.message as te_message,
+      te.scheduler_host as te_scheduler
     FROM tasks AS t
     INNER JOIN task_configs as c ON c.id = t.task_config_row_id
     INNER JOIN job_keys AS j ON j.id = c.job_key_id
+    LEFT OUTER JOIN task_ports as tp ON tp.task_row_id = t.id
+    LEFT OUTER JOIN task_events as te ON te.task_row_id = t.id
     LEFT OUTER JOIN host_attributes AS h ON h.id = t.slave_row_id
   </sql>
 
@@ -208,21 +206,11 @@
     )
   </insert>
 
-  <resultMap id="portMap" type="org.apache.aurora.common.collections.Pair">
-    <constructor>
-      <arg column="name"/>
-      <arg column="port"/>
-    </constructor>
+  <resultMap id="portMap" type="org.apache.aurora.scheduler.storage.db.views.DbAssginedPort">
+    <id column="id"/>
+    <result column="name" property="name" />
+    <result column="port" property="port" />
   </resultMap>
-
-  <select id="selectPorts" resultMap="portMap">
-    SELECT
-      id,
-      name,
-      port
-    FROM task_ports
-    WHERE task_row_id = (SELECT id FROM tasks WHERE task_id = #{task_id})
-  </select>
 
   <delete id="truncate">
     <!--

@@ -13,7 +13,11 @@
  */
 package org.apache.aurora.scheduler.storage.db.views;
 
+import java.util.Collections;
 import java.util.List;
+
+import com.google.common.collect.Ordering;
+import com.google.common.primitives.Longs;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
@@ -31,6 +35,7 @@ public final class DbScheduledTask {
   }
 
   public IScheduledTask toImmutable() {
+    Collections.sort(taskEvents, BY_TIMESTAMP);
     return IScheduledTask.build(
         new ScheduledTask()
             .setAssignedTask(assignedTask.toThrift())
@@ -39,4 +44,11 @@ public final class DbScheduledTask {
             .setTaskEvents(taskEvents)
             .setAncestorId(ancestorId));
   }
+
+  private static final Ordering<TaskEvent> BY_TIMESTAMP = new Ordering<TaskEvent>() {
+    @Override
+    public int compare(TaskEvent left, TaskEvent right) {
+      return Longs.compare(left.getTimestamp(), right.getTimestamp());
+    }
+  };
 }

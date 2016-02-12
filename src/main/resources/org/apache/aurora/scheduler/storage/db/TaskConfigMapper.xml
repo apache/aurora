@@ -79,22 +79,6 @@
     <association property="constraint" resultMap="taskConstraintMap"/>
   </resultMap>
 
-  <select id="selectConstraints" resultMap="constraintMap">
-    SELECT
-      tc.id AS id,
-      tc.name AS name,
-      tlc.id AS l_id,
-      tlc.value AS l_limit,
-      tvc.id AS v_id,
-      tvc.negated AS v_negated,
-      tvcv.value AS v_v_value
-    FROM task_constraints AS tc
-    LEFT OUTER JOIN limit_constraints AS tlc ON tlc.constraint_id = tc.id
-    LEFT OUTER JOIN value_constraints AS tvc ON tvc.constraint_id = tc.id
-    LEFT OUTER JOIN value_constraint_values AS tvcv ON tvcv.value_constraint_id = tvc.id
-    WHERE tc.task_config_id = #{id}
-  </select>
-
   <resultMap id="dockerParameterMap" type="org.apache.aurora.gen.DockerParameter">
     <id column="id"/>
   </resultMap>
@@ -138,9 +122,8 @@
     <association property="container" resultMap="containerMap" columnPrefix="c_"/>
     <collection
         property="constraints"
-        select="selectConstraints"
-        column="id"
-        foreignColumn="task_config_id"/>
+        columnPrefix="constraint_"
+        resultMap="constraintMap"/>
     <collection property="requestedPorts" ofType="String" columnPrefix="p_">
       <result column="port_name" />
     </collection>
@@ -175,12 +158,23 @@
       d.image AS c_image,
       m.id AS m_id,
       m.key AS m_key,
-      m.value AS m_value
+      m.value AS m_value,
+      tc.id AS constraint_id,
+      tc.name AS constraint_name,
+      tlc.id AS constraint_l_id,
+      tlc.value AS constraint_l_limit,
+      tvc.id AS constraint_v_id,
+      tvc.negated AS constraint_v_negated,
+      tvcv.value as constraint_v_v_value
     FROM task_configs AS c
     INNER JOIN job_keys AS j ON j.id = c.job_key_id
     LEFT OUTER JOIN task_config_requested_ports AS p ON p.task_config_id = c.id
     LEFT OUTER JOIN task_config_docker_containers AS d ON d.task_config_id = c.id
     LEFT OUTER JOIN task_config_metadata AS m ON m.task_config_id = c.id
+    LEFT OUTER JOIN task_constraints AS tc ON tc.task_config_id = c.id
+    LEFT OUTER JOIN limit_constraints as tlc ON tlc.constraint_id = tc.id
+    LEFT OUTER JOIN value_constraints as tvc ON tvc.constraint_id = tc.id
+    LEFT OUTER JOIN value_constraint_values AS tvcv ON tvcv.value_constraint_id = tvc.id
   </sql>
 
   <select id="selectConfig" resultMap="taskConfigMap">

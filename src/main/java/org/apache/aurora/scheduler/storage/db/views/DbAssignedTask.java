@@ -14,8 +14,10 @@
 package org.apache.aurora.scheduler.storage.db.views;
 
 import java.util.List;
+import java.util.Map;
 
-import org.apache.aurora.common.collections.Pair;
+import com.google.common.collect.Maps;
+
 import org.apache.aurora.gen.AssignedTask;
 
 public final class DbAssignedTask {
@@ -23,19 +25,24 @@ public final class DbAssignedTask {
   private String slaveId;
   private String slaveHost;
   private DbTaskConfig task;
-  private List<Pair<String, Integer>> assignedPorts;
+  private List<DbAssginedPort> assignedPorts;
   private int instanceId;
 
   private DbAssignedTask() {
   }
 
   AssignedTask toThrift() {
+    Map<String, Integer> ports = Maps.newHashMap();
+    for (DbAssginedPort port: assignedPorts) {
+      ports.put(port.getName(), port.getPort());
+    }
+
     return new AssignedTask()
         .setTaskId(taskId)
         .setSlaveId(slaveId)
         .setSlaveHost(slaveHost)
         .setTask(task.toThrift())
-        .setAssignedPorts(Pairs.toMap(assignedPorts))
+        .setAssignedPorts(ports)
         .setInstanceId(instanceId);
   }
 }
