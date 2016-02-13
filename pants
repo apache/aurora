@@ -25,7 +25,7 @@
 PYTHON=${PYTHON:-$(which python2.7)}
 
 PANTS_HOME="${PANTS_HOME:-${HOME}/.cache/pants/setup}"
-PANTS_BOOTSTRAP="${PANTS_HOME}/bootstrap"
+PANTS_BOOTSTRAP="${PANTS_HOME}/bootstrap-$(uname -s)-$(uname -m)"
 
 VENV_VERSION=13.1.0
 
@@ -53,7 +53,7 @@ function bootstrap_venv {
     (
       mkdir -p "${PANTS_BOOTSTRAP}" && \
       staging_dir=$(tempdir "${PANTS_BOOTSTRAP}") && \
-      cd ${staging_dir} && \
+      cd "${staging_dir}" && \
       curl -O https://pypi.python.org/packages/source/v/virtualenv/${VENV_TARBALL} && \
       tar -xzf ${VENV_TARBALL} && \
       ln -s "${staging_dir}/${VENV_PACKAGE}" "${staging_dir}/latest" && \
