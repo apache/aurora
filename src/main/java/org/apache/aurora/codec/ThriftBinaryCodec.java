@@ -145,24 +145,26 @@ public final class ThriftBinaryCodec {
   public static byte[] deflateNonNull(TBase<?, ?> tBase) throws CodingException {
     requireNonNull(tBase);
 
+    // NOTE: Buffering is needed here for performance.
+    // There are actually 2 buffers in play here - the BufferedOutputStream prevents thrift from
+    // causing a call to deflate() on every encoded primitive. The DeflaterOutputStream buffer
+    // allows the underlying Deflater to operate on a larger chunk at a time without stopping to
+    // copy the intermediate compressed output to outBytes.
+    // See http://bugs.java.com/bugdatabase/view_bug.do?bug_id=4986239
     ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+    TTransport transport = new TIOStreamTransport(
+        new BufferedOutputStream(
+            new DeflaterOutputStream(outBytes, new Deflater(DEFLATE_LEVEL), DEFLATER_BUFFER_SIZE),
+            DEFLATER_BUFFER_SIZE));
     try {
-      // NOTE: Buffering is needed here for performance.
-      // There are actually 2 buffers in play here - the BufferedOutputStream prevents thrift from
-      // causing a call to deflate() on every encoded primitive. The DeflaterOutputStream buffer
-      // allows the underlying Deflater to operate on a larger chunk at a time without stopping to
-      // copy the intermediate compressed output to outBytes.
-      // See http://bugs.java.com/bugdatabase/view_bug.do?bug_id=4986239
-      TTransport transport = new TIOStreamTransport(
-          new BufferedOutputStream(
-              new DeflaterOutputStream(outBytes, new Deflater(DEFLATE_LEVEL), DEFLATER_BUFFER_SIZE),
-              DEFLATER_BUFFER_SIZE));
       TProtocol protocol = PROTOCOL_FACTORY.getProtocol(transport);
       tBase.write(protocol);
-      transport.close();
+      transport.close(); // calls finish() on the underlying stream, completing the compression
       return outBytes.toByteArray();
     } catch (TException e) {
       throw new CodingException("Failed to serialize: " + tBase, e);
+    } finally {
+      transport.close();
     }
   }
 
@@ -181,14 +183,16 @@ public final class ThriftBinaryCodec {
     requireNonNull(buffer);
 
     T tBase = newInstance(clazz);
-    try {
-      TTransport transport = new TIOStreamTransport(
+    TTransport transport = new TIOStreamTransport(
           new InflaterInputStream(new ByteArrayInputStream(buffer)));
+    try {
       TProtocol protocol = PROTOCOL_FACTORY.getProtocol(transport);
       tBase.read(protocol);
       return tBase;
     } catch (TException e) {
       throw new CodingException("Failed to deserialize: " + e, e);
+    } finally {
+      transport.close();
     }
   }
 
