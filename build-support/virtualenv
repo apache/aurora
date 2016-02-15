@@ -14,7 +14,7 @@
 #
 # Wrapper for self-bootstrapping virtualenv
 set -ex
-VIRTUALENV_VERSION=14.0.5
+VIRTUALENV_VERSION=14.0.6
 
 if which python2.7 >/dev/null; then
   PY=`which python2.7`
