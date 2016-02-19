@@ -89,13 +89,13 @@ class DbTaskStore implements TaskStore.Mutable {
 
   @Timed("db_storage_fetch_tasks")
   @Override
-  public ImmutableSet<IScheduledTask> fetchTasks(Builder query) {
+  public Iterable<IScheduledTask> fetchTasks(Builder query) {
     requireNonNull(query);
 
     // TODO(wfarner): Consider making slow query logging more reusable, or pushing it down into the
     //                database.
     long start = clock.nowNanos();
-    ImmutableSet<IScheduledTask> result = matches(query).toSet();
+    Iterable<IScheduledTask> result = matches(query);
     long durationNanos = clock.nowNanos() - start;
     boolean infoLevel = durationNanos >= slowQueryThresholdNanos;
     long time = Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);

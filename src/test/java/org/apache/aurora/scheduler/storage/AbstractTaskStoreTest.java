@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -564,7 +565,13 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   }
 
   private void assertQueryResults(Query.Builder query, Set<IScheduledTask> tasks) {
-    assertEquals(tasks, fetchTasks(query));
+    Iterable<IScheduledTask> result = fetchTasks(query);
+    assertQueryHasNoDupes(result);
+    assertEquals(tasks, ImmutableSet.copyOf(fetchTasks(query)));
+  }
+
+  private void assertQueryHasNoDupes(Iterable<IScheduledTask> result) {
+    assertEquals(ImmutableList.copyOf(result).size(), ImmutableSet.copyOf(result).size());
   }
 
   private static IScheduledTask createTask(String id) {
