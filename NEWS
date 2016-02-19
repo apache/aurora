@@ -13,6 +13,7 @@ Deprecations and removals:
   - `TaskConfig.environment`
   - `TaskConfig.jobName`
   - `TaskQuery.owner`
+- Task ID strings are no longer prefixed by a timestamp.
 
 0.12.0
 ------

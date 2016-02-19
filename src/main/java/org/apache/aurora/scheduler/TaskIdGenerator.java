@@ -48,17 +48,15 @@ public interface TaskIdGenerator {
     public String generate(ITaskConfig task, int instanceId) {
       String sep = "-";
       return new StringBuilder()
-          .append(clock.nowMillis())               // Allows chronological sorting.
-          .append(sep)
-          .append(task.getJob().getRole())       // Identification and collision prevention.
+          .append(task.getJob().getRole())
           .append(sep)
           .append(task.getJob().getEnvironment())
           .append(sep)
           .append(task.getJob().getName())
           .append(sep)
-          .append(instanceId)                      // Collision prevention within job.
+          .append(instanceId)
           .append(sep)
-          .append(UUID.randomUUID())               // Just-in-case collision prevention.
+          .append(UUID.randomUUID())
           .toString().replaceAll("[^\\w-]", sep);  // Constrain character set.
     }
   }
