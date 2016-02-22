@@ -15,10 +15,10 @@
   <div>
     <span title='{{formatedValue | scheduleStatusTooltip}}'>
       <span ng-if='!showDetails'>
-        <i class='glyphicon glyphicon-plus' ng-click="toggleShowDetails()"></i>
+        <i class='glyphicon glyphicon-plus clickable' ng-click="toggleShowDetails()"></i>
       </span>
       <span ng-if='showDetails'>
-        <i class='glyphicon glyphicon-minus' ng-click="toggleShowDetails()"></i>
+        <i class='glyphicon glyphicon-minus clickable' ng-click="toggleShowDetails()"></i>
       </span>
       <span>
         {{dataRow.latestActivity | toElapsedTime}} ago -
