@@ -366,7 +366,7 @@ dependencies {
   compile "org.eclipse.jetty:jetty-server:${jettyDep}"
   compile "org.eclipse.jetty:jetty-servlet:${jettyDep}"
   compile "org.eclipse.jetty:jetty-servlets:${jettyDep}"
-  compile 'org.mybatis:mybatis:3.3.0'
+  compile 'org.mybatis:mybatis:3.3.1'
   compile 'org.mybatis:mybatis-guice:3.7'
   compile 'org.quartz-scheduler:quartz:2.2.2'
   compile "uno.perk:forward:1.0.0"
