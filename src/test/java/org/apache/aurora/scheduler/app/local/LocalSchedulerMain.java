@@ -70,6 +70,8 @@ public final class LocalSchedulerMain {
         .add("-shiro_ini_path="
             + ResourceUtils.CLASSPATH_PREFIX
             + "org/apache/aurora/scheduler/http/api/security/shiro-example.ini")
+        .add("-tier_config="
+            + ResourceUtils.CLASSPATH_PREFIX + "org/apache/aurora/scheduler/tiers.json")
         .add("-enable_h2_console=true")
         .build();
     SchedulerMain.applyStaticArgumentValues(arguments.toArray(new String[] {}));

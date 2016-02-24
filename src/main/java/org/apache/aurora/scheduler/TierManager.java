@@ -51,8 +51,9 @@ public interface TierManager {
 
       private final Map<String, TierInfo> tiers;
 
+      @VisibleForTesting
       @JsonCreator
-      TierConfig(@JsonProperty("tiers") Map<String, TierInfo> tiers) {
+      public TierConfig(@JsonProperty("tiers") Map<String, TierInfo> tiers) {
         this.tiers = ImmutableMap.copyOf(tiers);
       }
 

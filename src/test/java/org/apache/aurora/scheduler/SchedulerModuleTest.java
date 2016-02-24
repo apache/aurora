@@ -18,7 +18,7 @@ import com.google.common.collect.ImmutableMap;
 
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.SchedulerModule.parseTierConfig;
+import static org.apache.aurora.scheduler.TierModule.parseTierConfig;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.junit.Assert.assertEquals;
 

@@ -61,6 +61,8 @@ import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.TierManager.TierManagerImpl.TierConfig;
+import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.log.Log;
@@ -200,6 +202,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
     Injector injector = Guice.createInjector(
         ImmutableList.<Module>builder()
             .add(SchedulerMain.getUniversalModule())
+            .add(new TierModule(TierConfig.EMPTY))
             .add(new LogStorageModule())
             .add(new ZooKeeperClientModule(zkClientConfig))
             .add(new ServiceDiscoveryModule(SERVERSET_PATH, credentials))

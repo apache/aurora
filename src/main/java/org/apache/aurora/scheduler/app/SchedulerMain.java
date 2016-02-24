@@ -48,6 +48,7 @@ import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
+import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorModule;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.http.HttpService;
@@ -201,7 +202,8 @@ public class SchedulerMain {
             new CommandLineDriverSettingsModule(),
             new LibMesosLoadingModule(),
             new MesosLogStreamModule(FlaggedClientConfig.create()),
-            new LogStorageModule())
+            new LogStorageModule(),
+            new TierModule())
         .build();
     flagConfiguredMain(Modules.combine(modules));
   }
