@@ -13,11 +13,13 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
@@ -25,7 +27,12 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Guice;
@@ -550,6 +557,28 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     saveTasks(a);
     saveTasks(b);
     saveTasks(c);
+  }
+
+  @Test
+  public void testConcurrentFetchTasks() throws Exception {
+    // Test for regression of AURORA-1625
+    ListeningExecutorService executor =
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(5));
+    assertStoreContents();
+    saveTasks(TASK_A, TASK_B, TASK_C, TASK_D);
+
+    List<ListenableFuture<Integer>> futures = Lists.newArrayList();
+
+    for (int i = 0; i < 100; i++) {
+      futures.add(executor.submit(() -> Iterables.size(fetchTasks(Query.unscoped()))));
+    }
+
+    Future<List<Integer>> f = Futures.allAsList(futures);
+
+    executor.shutdown();
+    executor.awaitTermination(1, TimeUnit.MINUTES);
+
+    assertEquals(Iterables.getOnlyElement(ImmutableSet.copyOf(f.get())), (Integer) 4);
   }
 
   private void assertStoreContents(IScheduledTask... tasks) {

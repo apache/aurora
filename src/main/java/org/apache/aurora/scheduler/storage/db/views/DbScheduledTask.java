@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.storage.db.views;
 
-import java.util.Collections;
 import java.util.List;
 
 import com.google.common.collect.Ordering;
@@ -35,13 +34,14 @@ public final class DbScheduledTask {
   }
 
   public IScheduledTask toImmutable() {
-    Collections.sort(taskEvents, BY_TIMESTAMP);
     return IScheduledTask.build(
         new ScheduledTask()
             .setAssignedTask(assignedTask.toThrift())
             .setStatus(status)
             .setFailureCount(failureCount)
-            .setTaskEvents(taskEvents)
+            // Must be sorting a copy because taskEvents is populated by MyBatis and it might
+            // reuse the same instance.
+            .setTaskEvents(BY_TIMESTAMP.immutableSortedCopy(taskEvents))
             .setAncestorId(ancestorId));
   }
 
