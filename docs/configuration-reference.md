@@ -496,6 +496,8 @@ guarantees should they be needed.
 *Note: The only container type currently supported is "docker".  Docker support is currently EXPERIMENTAL.*
 *Note: In order to correctly execute processes inside a job, the Docker container must have python 2.7 installed.*
 
+*Note: For private docker registry, mesos mandates the docker credential file to be named as `.dockercfg`, even though docker may create a credential file with a different name on various platforms. Also, the `.dockercfg` file needs to be copied into the sandbox using the `-thermos_executor_resources` flag, specified while starting Aurora.*
+
 Describes the container the job's processes will run inside.
 
   param          | type           | description
