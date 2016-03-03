@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.base;
 
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -24,13 +23,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -113,21 +110,12 @@ public final class Tasks {
     return task.getAssignedTask().getTaskId();
   }
 
-  // TODO(William Farner: Remove this once the code base is switched to IScheduledTask.
-  public static String id(ScheduledTask task) {
-    return task.getAssignedTask().getTaskId();
-  }
-
   public static Set<String> ids(Iterable<IScheduledTask> tasks) {
     return ImmutableSet.copyOf(Iterables.transform(tasks, Tasks::id));
   }
 
   public static Set<String> ids(IScheduledTask... tasks) {
     return ids(ImmutableList.copyOf(tasks));
-  }
-
-  public static Map<String, IScheduledTask> mapById(Iterable<IScheduledTask> tasks) {
-    return Maps.uniqueIndex(tasks, Tasks::id);
   }
 
   /**
