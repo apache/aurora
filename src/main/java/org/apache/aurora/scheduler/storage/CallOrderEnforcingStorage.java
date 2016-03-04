@@ -114,14 +114,6 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
   }
 
   @Override
-  public <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work)
-      throws StorageException, E {
-
-    checkInState(State.PREPARED);
-    wrapped.bulkLoad(work);
-  }
-
-  @Override
   public <T, E extends Exception> T write(MutateWork<T, E> work)
       throws StorageException, E {
     checkInState(State.READY);

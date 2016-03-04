@@ -167,7 +167,7 @@ public class ThriftApiBenchmarks {
   private static void bulkLoadTasks(Storage storage, final TestConfiguration config) {
     // Ideally we would use the API to populate the storage, but wiring in the writable thrift
     // interface requires considerably more binding setup.
-    storage.bulkLoad(storeProvider -> {
+    storage.write((Storage.MutateWork.NoResult.Quiet) storeProvider -> {
       for (int roleId = 0; roleId < config.roles; roleId++) {
         String role = "role" + roleId;
         for (int envId = 0; envId < config.envs; envId++) {

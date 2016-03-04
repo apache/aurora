@@ -23,13 +23,11 @@ import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.ibatis.exceptions.PersistenceException;
-import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
@@ -40,26 +38,19 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class DbStorageTest extends EasyMockTest {
-
-  private SqlSessionFactory sessionFactory;
-  private SqlSession session;
   private GatedWorkQueue gatedWorkQueue;
   private Work.Quiet<String> readWork;
-  private MutateWork.NoResult.Quiet writeWork;
 
   private DbStorage storage;
 
   @Before
   public void setUp() {
-    sessionFactory = createMock(SqlSessionFactory.class);
-    session = createMock(SqlSession.class);
     gatedWorkQueue = createMock(GatedWorkQueue.class);
     readWork = createMock(new Clazz<Work.Quiet<String>>() { });
-    writeWork = createMock(new Clazz<MutateWork.NoResult.Quiet>() { });
     StatsProvider statsProvider = createMock(StatsProvider.class);
 
     storage = new DbStorage(
-        sessionFactory,
+        createMock(SqlSessionFactory.class),
         createMock(EnumValueMapper.class),
         gatedWorkQueue,
         createMock(CronJobStore.Mutable.class),
@@ -97,32 +88,6 @@ public class DbStorageTest extends EasyMockTest {
           GatedOperation<?, ?> op = (GatedOperation<?, ?>) EasyMock.getCurrentArguments()[0];
           return op.doWithGateClosed();
         });
-  }
-
-  @Test(expected = StorageException.class)
-  public void testBulkLoadFails() throws Exception {
-    expect(sessionFactory.openSession(false)).andReturn(session);
-    expect(session.update(DbStorage.DISABLE_UNDO_LOG)).andThrow(new PersistenceException());
-    expect(session.update(DbStorage.ENABLE_UNDO_LOG)).andReturn(0);
-    expectGateClosed();
-
-    control.replay();
-
-    storage.bulkLoad(writeWork);
-  }
-
-  @Test
-  public void testBulkLoad() throws Exception {
-    expect(sessionFactory.openSession(false)).andReturn(session);
-    expect(session.update(DbStorage.DISABLE_UNDO_LOG)).andReturn(0);
-    expect(writeWork.apply(EasyMock.anyObject())).andReturn(null);
-    session.close();
-    expect(session.update(DbStorage.ENABLE_UNDO_LOG)).andReturn(0);
-    expectGateClosed();
-
-    control.replay();
-
-    storage.bulkLoad(writeWork);
   }
 
   @Test

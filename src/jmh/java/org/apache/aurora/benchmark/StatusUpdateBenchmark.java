@@ -142,14 +142,6 @@ public class StatusUpdateBenchmark {
     }
 
     @Override
-    public <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work)
-        throws StorageException, E {
-
-      maybeSleep();
-      underlyingStorage.bulkLoad(work);
-    }
-
-    @Override
     public void prepare() throws StorageException {
       underlyingStorage.prepare();
     }

@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 
 import javax.sql.DataSource;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Supplier;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.AbstractIdleService;
@@ -173,35 +172,6 @@ class DbStorage extends AbstractIdleService implements Storage {
     });
   }
 
-  @VisibleForTesting
-  static final String DISABLE_UNDO_LOG = "DISABLE_UNDO_LOG";
-  @VisibleForTesting
-  static final String ENABLE_UNDO_LOG = "ENABLE_UNDO_LOG";
-
-  // TODO(wfarner): Including @Transactional here seems to render the UNDO_LOG changes useless,
-  // resulting in no performance gain.  Figure out why.
-  @Timed("db_storage_bulk_load_operation")
-  @Override
-  public <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work)
-      throws StorageException, E {
-
-    gatedWorkQueue.closeDuring(() -> {
-      // Disabling the undo log disables transaction rollback, but dramatically speeds up a bulk
-      // insert.
-      try (SqlSession session = sessionFactory.openSession(false)) {
-        try {
-          session.update(DISABLE_UNDO_LOG);
-          work.apply(storeProvider);
-        } catch (PersistenceException e) {
-          throw new StorageException(e.getMessage(), e);
-        } finally {
-          session.update(ENABLE_UNDO_LOG);
-        }
-      }
-      return null;
-    });
-  }
-
   @Override
   public void prepare() {
     startAsync().awaitRunning();
@@ -233,8 +203,6 @@ class DbStorage extends AbstractIdleService implements Storage {
         CharStreams.toString(new InputStreamReader(
             DbStorage.class.getResourceAsStream("schema.sql"),
             StandardCharsets.UTF_8)));
-    addMappedStatement(configuration, DISABLE_UNDO_LOG, "SET UNDO_LOG 0;");
-    addMappedStatement(configuration, ENABLE_UNDO_LOG, "SET UNDO_LOG 1;");
 
     try (SqlSession session = sessionFactory.openSession()) {
       session.update(createStatementName);

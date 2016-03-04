@@ -110,7 +110,6 @@ import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.Capture;
-import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -369,12 +368,6 @@ public class LogStorageTest extends EasyMockTest {
       expect(entry.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(logEntry));
     }
 
-    storageUtil.storage.bulkLoad(EasyMock.anyObject());
-    expectLastCall().andAnswer(() -> {
-      NoResult work = (NoResult<?>) EasyMock.getCurrentArguments()[0];
-      work.apply(storageUtil.mutableStoreProvider);
-      return null;
-    });
     expect(stream.readAll()).andReturn(entryBuilder.build().iterator());
   }
 
@@ -414,12 +407,6 @@ public class LogStorageTest extends EasyMockTest {
         return null;
       });
 
-      storageUtil.storage.bulkLoad(EasyMock.anyObject());
-      expectLastCall().andAnswer(() -> {
-        NoResult work = (NoResult<?>) EasyMock.getCurrentArguments()[0];
-        work.apply(storageUtil.mutableStoreProvider);
-        return null;
-      });
       expect(stream.readAll()).andReturn(Collections.emptyIterator());
       Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
       expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
@@ -962,17 +949,6 @@ public class LogStorageTest extends EasyMockTest {
             pruneHistory.getHistoryPruneThresholdMs());
       }
     }.run();
-  }
-
-  @Test(expected = UnsupportedOperationException.class)
-  public void testBulkLoad() throws Exception {
-    expect(log.open()).andReturn(stream);
-    MutateWork.NoResult.Quiet load = createMock(new Clazz<NoResult.Quiet>() { });
-
-    control.replay();
-
-    logStorage.prepare();
-    logStorage.bulkLoad(load);
   }
 
   private LogEntry createTransaction(Op... ops) {

@@ -51,13 +51,6 @@ class FakeNonVolatileStorage implements NonVolatileStorage {
   }
 
   @Override
-  public <E extends Exception> void bulkLoad(MutateWork.NoResult<E> work)
-      throws StorageException, E {
-
-    delegate.bulkLoad(work);
-  }
-
-  @Override
   public <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E {
     return delegate.write(work);
   }
