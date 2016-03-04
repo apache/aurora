@@ -29,17 +29,21 @@ Change is applied in a way that does not break scheduler/client with this versio
 communicate with scheduler/client from vCurrent-1.
 * Do not remove or rename the old field
 * Add a new field as an eventual replacement of the old one and implement a dual read/write
-anywhere the old field is used
+anywhere the old field is used. If a thrift struct is mapped in the DB store make sure both columns
+are marked as `NOT NULL`
 * Check [storage.thrift](../api/src/main/thrift/org/apache/aurora/gen/storage.thrift) to see if the
 affected struct is stored in Aurora scheduler storage. If so, you most likely need to backfill
-existing data to ensure both fields are populated eagerly on startup
-See [StorageBackfill.java](../src/main/java/org/apache/aurora/scheduler/storage/StorageBackfill.java)
+existing data to ensure both fields are populated eagerly on startup. See
+[this patch](https://reviews.apache.org/r/43172) as a real-life example of thrift-struct
+backfilling. IMPORTANT: backfilling implementation needs to ensure both fields are populated. This
+is critical to enable graceful scheduler upgrade as well as rollback to the old version if needed.
 * Add a deprecation jira ticket into the vCurrent+1 release candidate
 * Add a TODO for the deprecated field mentioning the jira ticket
 
 ### vCurrent+1
 Finalize the change by removing the deprecated fields from the Thrift schema.
 * Drop any dual read/write routines added in the previous version
+* Remove thrift backfilling in scheduler
 * Remove the deprecated Thrift field
 
 ## Testing

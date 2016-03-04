@@ -61,12 +61,6 @@ Maximum number of backups to retain before deleting the oldest backup(s).
 
 ## Recovering from a scheduler backup
 
-- [Overview](#overview)
-- [Preparation](#preparation)
-- [Assess Mesos replicated log damage](#assess-mesos-replicated-log-damage)
-- [Restore from backup](#restore-from-backup)
-- [Cleanup](#cleanup)
-
 **Be sure to read the entire page before attempting to restore from a backup, as it may have
 unintended consequences.**
 
@@ -82,6 +76,9 @@ Usually, it is a bad idea to restore a backup that is not extremely recent (i.e.
 hours). This is because the scheduler will expect the cluster to look exactly as the backup does,
 so any tasks that have been rescheduled since the backup was taken will be killed.
 
+Instructions below have been verified in [Vagrant environment](vagrant.md) and with minor
+syntax/path changes should be applicable to any Aurora cluster.
+
 ### Preparation
 
 Follow these steps to prepare the cluster for restoring from a backup:
@@ -91,13 +88,25 @@ Follow these steps to prepare the cluster for restoring from a backup:
 * Consider blocking external traffic on a port defined in `-http_port` for all schedulers to
 prevent users from interacting with the scheduler during the restoration process. This will help
 troubleshooting by reducing the scheduler log noise and prevent users from making changes that will
-be erased after the backup snapshot is restored
+be erased after the backup snapshot is restored.
+
+* Configure `aurora_admin` access to run all commands listed in
+  [Restore from backup](#restore-from-backup) section locally on the leading scheduler:
+  * Make sure the [clusters.json](client-commands.md#cluster-configuration) file configured to
+    access scheduler directly. Set `scheduler_uri` setting and remove `zk`. Since leader can get
+    re-elected during the restore steps, consider doing it on all scheduler replicas.
+  * Depending on your particular security approach you will need to either turn off scheduler
+    authorization by removing scheduler `-http_authentication_mechanism` flag or make sure the
+    direct scheduler access is properly authorized. E.g.: in case of Kerberos you will need to make
+    a `/etc/hosts` file change to match your local IP to the scheduler URL configured in keytabs:
+
+        <local_ip> <scheduler_domain_in_keytabs>
 
 * Next steps are required to put scheduler into a partially disabled state where it would still be
 able to accept storage recovery requests but unable to schedule or change task states. This may be
 accomplished by updating the following scheduler configuration options:
   * Set `-mesos_master_address` to a non-existent zk address. This will prevent scheduler from
-    registering with Mesos. E.g.: `-mesos_master_address=zk://localhost:2181`
+    registering with Mesos. E.g.: `-mesos_master_address=zk://localhost:1111/mesos/master`
   * `-max_registration_delay` - set to sufficiently long interval to prevent registration timeout
     and as a result scheduler suicide. E.g: `-max_registration_delay=360mins`
   * Make sure `-reconciliation_initial_delay` option is set high enough (e.g.: `365days`) to
@@ -108,34 +117,36 @@ accomplished by updating the following scheduler configuration options:
 
 ### Cleanup and re-initialize Mesos replicated log
 
-Get rid of the corrupted files and re-initialize Mesos replicate log:
+Get rid of the corrupted files and re-initialize Mesos replicated log:
 
 * Stop schedulers
 * Delete all files under `-native_log_file_path` on all schedulers
-* Initialize Mesos replica's log file: `mesos-log initialize --path=<-native_log_file_path>`
-* Restart schedulers
+* Initialize Mesos replica's log file: `sudo mesos-log initialize --path=<-native_log_file_path>`
+* Start schedulers
 
 ### Restore from backup
 
 At this point the scheduler is ready to rehydrate from the backup:
 
 * Identify the leading scheduler by:
-  * running `aurora_admin get_scheduler <cluster>` - if scheduler is responsive
+  * examining the `scheduler_lifecycle_LEADER_AWAITING_REGISTRATION` metric at the scheduler
+    `/vars` endpoint. Leader will have 1. All other replicas - 0.
   * examining scheduler logs
   * or examining Zookeeper registration under the path defined by `-zk_endpoints`
     and `-serverset_path`
 
-* Locate the desired backup file, copy it to the leading scheduler and stage recovery by running
-the following command on a leader
-`aurora_admin scheduler_stage_recovery <cluster> scheduler-backup-<yyyy-MM-dd-HH-mm>`
+* Locate the desired backup file, copy it to the leading scheduler's `-backup_dir` folder and stage
+recovery by running the following command on a leader
+`aurora_admin scheduler_stage_recovery --bypass-leader-redirect <cluster> scheduler-backup-<yyyy-MM-dd-HH-mm>`
 
 * At this point, the recovery snapshot is staged and available for manual verification/modification
-via `aurora_admin scheduler_print_recovery_tasks` and `scheduler_delete_recovery_tasks` commands.
+via `aurora_admin scheduler_print_recovery_tasks --bypass-leader-redirect` and
+`scheduler_delete_recovery_tasks --bypass-leader-redirect` commands.
 See `aurora_admin help <command>` for usage details.
 
-* Commit recovery. This instructs the scheduler to overwrite the existing Mesosreplicated log with
+* Commit recovery. This instructs the scheduler to overwrite the existing Mesos replicated log with
 the provided backup snapshot and initiate a mandatory failover
-`aurora_admin scheduler_commit_recovery <cluster>`
+`aurora_admin scheduler_commit_recovery --bypass-leader-redirect  <cluster>`
 
 ### Cleanup
 Undo any modification done during [Preparation](#preparation) sequence.

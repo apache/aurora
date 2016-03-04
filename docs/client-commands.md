@@ -69,7 +69,7 @@ communicates with a single (non-leader-elected) scheduler.  For example:
 ```javascript
 [{
   "name": "example",
-  "scheduler_uri": "localhost:55555",
+  "scheduler_uri": "http://localhost:55555",
 }]
 ```
 
