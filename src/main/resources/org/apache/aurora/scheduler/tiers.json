@@ -1,6 +1,10 @@
 {
   "tiers":
   {
+    "preferred":
+    {
+      "revocable": false
+    },
     "revocable":
     {
       "revocable": true

@@ -18,9 +18,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
+import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.io.Files;
+import com.google.common.io.Resources;
 import com.google.inject.AbstractModule;
 
 import org.apache.aurora.common.args.Arg;
@@ -34,11 +35,16 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * Binding module for tier management.
  */
 public class TierModule extends AbstractModule {
   private static final Logger LOG = LoggerFactory.getLogger(TierModule.class);
+
+  @VisibleForTesting
+  static final String TIER_CONFIG_PATH = "org/apache/aurora/scheduler/tiers.json";
 
   @CanRead
   @CmdLine(name = "tier_config",
@@ -61,29 +67,27 @@ public class TierModule extends AbstractModule {
     bind(TierManager.class).toInstance(new TierManagerImpl(tierConfig));
   }
 
-  static Optional<String> readTierFile() {
-    if (TIER_CONFIG_FILE.hasAppliedValue()) {
-      try {
-        return Optional.of(Files.toString(TIER_CONFIG_FILE.get(), StandardCharsets.UTF_8));
-      } catch (IOException e) {
-        LOG.error("Error loading tier configuration file.");
-        throw Throwables.propagate(e);
-      }
+  static String readTierFile() {
+    try {
+      return TIER_CONFIG_FILE.hasAppliedValue()
+          ? Files.toString(TIER_CONFIG_FILE.get(), StandardCharsets.UTF_8)
+          : Resources.toString(
+              TierModule.class.getClassLoader().getResource(TIER_CONFIG_PATH),
+              StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      LOG.error("Error loading tier configuration file.");
+      throw Throwables.propagate(e);
     }
-
-    return Optional.<String>absent();
   }
 
   @VisibleForTesting
-  static TierConfig parseTierConfig(Optional<String> config) {
-    Optional<TierConfig> map = config.transform(input -> {
-      try {
-        return new ObjectMapper().readValue(input, TierConfig.class);
-      } catch (IOException e) {
-        LOG.error("Error parsing tier configuration file.");
-        throw Throwables.propagate(e);
-      }
-    });
-    return map.or(TierConfig.EMPTY);
+  static TierConfig parseTierConfig(String config) {
+    checkArgument(!Strings.isNullOrEmpty(config), "configuration cannot be empty");
+    try {
+      return new ObjectMapper().readValue(config, TierConfig.class);
+    } catch (IOException e) {
+      LOG.error("Error parsing tier configuration file.");
+      throw Throwables.propagate(e);
+    }
   }
 }

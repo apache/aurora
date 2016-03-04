@@ -35,9 +35,10 @@ import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskIdGenerator;
-import org.apache.aurora.scheduler.TierManager;
+import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.async.DelayExecutor;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -109,6 +110,7 @@ public class SchedulingBenchmarks {
       Injector injector = Guice.createInjector(
           new StateModule(),
           new PreemptorModule(true, NO_DELAY, NO_DELAY),
+          new TierModule(TaskTestUtil.DEV_TIER_CONFIG),
           new PrivateModule() {
             @Override
             protected void configure() {
@@ -133,11 +135,6 @@ public class SchedulingBenchmarks {
                   new BiCache.BiCacheSettings(DELAY_FOREVER, ""));
               bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
               bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
-              bind(TierManager.class).to(TierManager.TierManagerImpl.class);
-              bind(TierManager.TierManagerImpl.class).in(Singleton.class);
-              bind(TierManager.TierManagerImpl.TierConfig.class)
-                  .toInstance(TierManager.TierManagerImpl.TierConfig.EMPTY);
-              expose(TierManager.class);
               expose(TaskScheduler.class);
               expose(OfferManager.class);
             }

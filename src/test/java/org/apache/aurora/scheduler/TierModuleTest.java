@@ -13,32 +13,49 @@
  */
 package org.apache.aurora.scheduler;
 
-import com.google.common.base.Optional;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.Files;
 
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.TierModule.TIER_CONFIG_PATH;
 import static org.apache.aurora.scheduler.TierModule.parseTierConfig;
+import static org.apache.aurora.scheduler.TierModule.readTierFile;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
-public class SchedulerModuleTest {
+public class TierModuleTest {
+
   @Test
-  public void testNoTierConfigFile() {
-    assertEquals(ImmutableMap.of(), parseTierConfig(Optional.absent()).getTiers());
+  public void testTierConfigArgumentNotSpecified() throws Exception {
+    String tierFileContents = readTierFile();
+    assertFalse(Strings.isNullOrEmpty(tierFileContents));
+    assertEquals(
+        tierFileContents,
+        Files.toString(
+            new File(TierModule.class.getClassLoader().getResource(TIER_CONFIG_PATH).getFile()),
+            StandardCharsets.UTF_8));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testEmptyTierConfigFile() {
+    parseTierConfig("");
   }
 
   @Test
   public void testTierConfigFile() {
     assertEquals(
         ImmutableMap.of("revocable", REVOCABLE_TIER),
-        parseTierConfig(Optional.of("{\"tiers\":{\"revocable\": {\"revocable\": true}}}"))
-            .getTiers());
+        parseTierConfig("{\"tiers\":{\"revocable\": {\"revocable\": true}}}").getTiers());
   }
 
   @Test(expected = RuntimeException.class)
   public void testTierConfigExtraKeysNotAllowed() {
-    parseTierConfig(
-        Optional.of("{\"tiers\":{\"revocable\": {\"revocable\": true, \"foo\": false}}}"));
+    parseTierConfig("{\"tiers\":{\"revocable\": {\"revocable\": true, \"foo\": false}}}");
   }
 }

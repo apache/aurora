@@ -24,9 +24,10 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.codehaus.jackson.annotate.JsonCreator;
 import org.codehaus.jackson.annotate.JsonProperty;
 
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Translates job tier configuration into a set of task traits/attributes.
@@ -46,14 +47,12 @@ public interface TierManager {
 
     @VisibleForTesting
     public static class TierConfig {
-      @VisibleForTesting
-      public static final TierConfig EMPTY = new TierConfig(ImmutableMap.of());
-
       private final Map<String, TierInfo> tiers;
 
       @VisibleForTesting
       @JsonCreator
       public TierConfig(@JsonProperty("tiers") Map<String, TierInfo> tiers) {
+        checkArgument(!tiers.isEmpty(), "Tiers cannot be empty.");
         this.tiers = ImmutableMap.copyOf(tiers);
       }
 
@@ -70,14 +69,12 @@ public interface TierManager {
 
     @Override
     public TierInfo getTier(ITaskConfig taskConfig) {
-      if (taskConfig.isSetTier()) {
-        // The default behavior in case of tier config file absence or tier name mismatch is to use
-        // non-revocable resources. This is subject to change once the feature is ready.
-        // Tracked by AURORA-1443.
-        return tierConfig.tiers.getOrDefault(taskConfig.getTier(), DEFAULT);
-      }
+      checkArgument(
+          !taskConfig.isSetTier() || tierConfig.tiers.containsKey(taskConfig.getTier()),
+          format("Invalid tier '%s' in TaskConfig.", taskConfig.getTier()));
 
-      return DEFAULT;
+      // Backward compatibility mode until tier is required in TaskConfig (AURORA-1624).
+      return taskConfig.isSetTier() ? tierConfig.tiers.get(taskConfig.getTier()) : TierInfo.DEFAULT;
     }
   }
 }

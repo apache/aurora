@@ -35,6 +35,7 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.TierInfo;
+import org.apache.aurora.scheduler.TierManager.TierManagerImpl.TierConfig;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -50,6 +51,8 @@ public final class TaskTestUtil {
 
   public static final IJobKey JOB = JobKeys.from("role", "env", "job");
   public static final TierInfo REVOCABLE_TIER = new TierInfo(true);
+  public static final TierConfig DEV_TIER_CONFIG =
+      new TierConfig(ImmutableMap.of("tier-dev", new TierInfo(false)));
   public static final ConfigurationManager CONFIGURATION_MANAGER =
       new ConfigurationManager(ImmutableSet.of(_Fields.MESOS), false, ImmutableMultimap.of());
 

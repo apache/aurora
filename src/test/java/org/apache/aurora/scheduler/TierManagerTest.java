@@ -13,52 +13,39 @@
  */
 package org.apache.aurora.scheduler;
 
-import com.google.common.base.Optional;
-
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.TierManager.TierManagerImpl;
-import org.apache.aurora.scheduler.TierManager.TierManagerImpl.TierConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
 import static org.apache.aurora.scheduler.TierModule.parseTierConfig;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.junit.Assert.assertEquals;
 
 public class TierManagerTest {
-
   @Test
   public void testRevocable() {
     TierManager manager = new TierManagerImpl(
-        parseTierConfig(Optional.of("{\"tiers\":{\"revocable\": {\"revocable\": true}}}")));
+        parseTierConfig("{\"tiers\":{"
+            + "\"revocable\": {\"revocable\": true},"
+            + "\"preferred\": {\"revocable\": false}"
+            + "}}"));
     assertEquals(
         REVOCABLE_TIER,
         manager.getTier(ITaskConfig.build(new TaskConfig().setTier("revocable"))));
   }
 
-  @Test
+  @Test(expected = IllegalArgumentException.class)
   public void testNameMismatch() {
     TierManager manager = new TierManagerImpl(
-        parseTierConfig(Optional.of("{\"tiers\":{\"revocable\": {\"revocable\": true}}}")));
-    assertEquals(
-        DEFAULT,
-        manager.getTier(ITaskConfig.build(new TaskConfig().setTier("Revocable"))));
+        parseTierConfig("{\"tiers\":{\"revocable\": {\"revocable\": true}}}"));
+    manager.getTier(ITaskConfig.build(new TaskConfig().setTier("Revocable")));
   }
 
   @Test
-  public void testDefaultTier() {
-    TierManager manager = new TierManagerImpl(TierConfig.EMPTY);
-    assertEquals(
-        DEFAULT,
-        manager.getTier(ITaskConfig.build(new TaskConfig().setTier("revocable"))));
-  }
-
-  @Test
-  public void testNoTier() {
-    TierManager manager = new TierManagerImpl(TierConfig.EMPTY);
-    assertEquals(
-        DEFAULT,
-        manager.getTier(ITaskConfig.build(new TaskConfig())));
+  public void testNoTierInTaskConfig() {
+    TierManager manager = new TierManagerImpl(
+        parseTierConfig("{\"tiers\":{\"revocable\": {\"revocable\": true}}}"));
+    assertEquals(TierInfo.DEFAULT, manager.getTier(ITaskConfig.build(new TaskConfig())));
   }
 }
