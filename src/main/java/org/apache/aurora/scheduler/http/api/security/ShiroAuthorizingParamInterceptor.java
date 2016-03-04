@@ -343,7 +343,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
         return Responses.addMessage(
             Responses.empty(),
             ResponseCode.AUTH_FAILED,
-            "Subject " + subject + " is not permitted to " + targetPermission + ".");
+            "Subject " + subject.getPrincipal() + " is not permitted to " + targetPermission + ".");
       }
     } else {
       badRequests.incrementAndGet();

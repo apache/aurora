@@ -145,6 +145,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
         .andReturn(false);
     expect(subject.isPermitted(interceptor.makeTargetPermission("killTasks", JOB_KEY)))
         .andReturn(false);
+    expect(subject.getPrincipal()).andReturn("zmanji");
 
     replayAndInitialize();
 
