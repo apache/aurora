@@ -381,4 +381,10 @@ class WriteAheadStorage extends WriteAheadStorageForwarder implements
   public JobUpdateStore.Mutable getJobUpdateStore() {
     return this;
   }
+
+  @Override
+  public <T> T getUnsafeStoreAccess() {
+    throw new UnsupportedOperationException(
+        "Unsupported since casual storage users should never be doing this.");
+  }
 }

@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -32,19 +33,66 @@ import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
+import org.apache.aurora.gen.Lock;
+import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.storage.JobUpdateStore;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
+import org.apache.aurora.scheduler.storage.entities.ILock;
 
 /**
  * Job update factory.
  */
 final class JobUpdates {
+  private JobUpdates() {
+    // Utility class.
+  }
+
+  /**
+   * Saves job updates into provided storage.
+   *
+   * @param storage {@link Storage} instance.
+   * @param updates updates to save.
+   * @return update keys.
+   */
+  static Set<IJobUpdateKey> saveUpdates(Storage storage, Iterable<IJobUpdateDetails> updates) {
+    ImmutableSet.Builder<IJobUpdateKey> keyBuilder = ImmutableSet.builder();
+    storage.write((Storage.MutateWork.NoResult.Quiet) store -> {
+      JobUpdateStore.Mutable updateStore = store.getJobUpdateStore();
+      updateStore.deleteAllUpdatesAndEvents();
+      for (IJobUpdateDetails details : updates) {
+        IJobUpdateKey key = details.getUpdate().getSummary().getKey();
+        keyBuilder.add(key);
+        String lockToken = UUID.randomUUID().toString();
+        store.getLockStore().saveLock(ILock.build(new Lock()
+            .setKey(LockKey.job(key.getJob().newBuilder()))
+            .setToken(lockToken)
+            .setUser(Builder.USER)
+            .setTimestampMs(0L)));
+
+        updateStore.saveJobUpdate(details.getUpdate(), Optional.of(lockToken));
+
+        for (IJobUpdateEvent updateEvent : details.getUpdateEvents()) {
+          updateStore.saveJobUpdateEvent(key, updateEvent);
+        }
+
+        for (IJobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
+          updateStore.saveJobInstanceUpdateEvent(key, instanceEvent);
+        }
+      }
+    });
+    return keyBuilder.build();
+  }
 
   static final class Builder {
-    private static final String USER = "user";
+    static final String USER = "user";
     private int numEvents = 1;
     private int numInstanceEvents = 5000;
     private int numInstanceOverrides = 1;

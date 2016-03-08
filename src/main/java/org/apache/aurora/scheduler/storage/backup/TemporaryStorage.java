@@ -73,7 +73,10 @@ interface TemporaryStorage {
       final SnapshotStore<Snapshot> snapshotStore = new SnapshotStoreImpl(
           buildInfo,
           clock,
-          storage);
+          storage,
+          // Safe to pass false here to default to the non-experimental task store
+          // during restore from backup procedure.
+          false /** useDbSnapshotForTaskStore */);
       snapshotStore.applySnapshot(snapshot);
 
       return new TemporaryStorage() {

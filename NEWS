@@ -14,6 +14,8 @@ Deprecations and removals:
   - `TaskConfig.jobName`
   - `TaskQuery.owner`
 - Task ID strings are no longer prefixed by a timestamp.
+- Scheduler H2 in-memory database is now using MVStore: http://www.h2database.com/html/mvstore.html.
+  In addition, scheduler thrift snapshots are now supporting full DB dumps for faster restarts.
 
 0.12.0
 ------

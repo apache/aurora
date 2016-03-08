@@ -13,13 +13,28 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
+import javax.sql.DataSource;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.util.BuildInfo;
@@ -40,7 +55,6 @@ import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -64,17 +78,94 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
   private static final Logger LOG = LoggerFactory.getLogger(SnapshotStoreImpl.class);
 
-  private static final Iterable<SnapshotField> SNAPSHOT_FIELDS = Arrays.asList(
+  /**
+   * Number of rows to run in a single batch during dbsnapshot restore.
+   */
+  private static final int DB_BATCH_SIZE = 20;
+
+  private static boolean hasDbSnapshot(Snapshot snapshot) {
+    return snapshot.isSetDbScript();
+  }
+
+  private boolean hasDbTaskStore(Snapshot snapshot) {
+    return useDbSnapshotForTaskStore
+        && hasDbSnapshot(snapshot)
+        && snapshot.isExperimentalTaskStore();
+  }
+
+  private final Iterable<SnapshotField> snapshotFields = Arrays.asList(
+      // Order is critical here. The DB snapshot should always be tried first to ensure
+      // graceful migration to DBTaskStore. Otherwise, there is a direct risk of losing the cluster.
+      // The following scenario illustrates how that can happen:
+      // - Dbsnapshot:ON, DBTaskStore:OFF
+      // - Scheduler is updated with DBTaskStore:ON, restarts and populates all tasks from snapshot
+      // - Should the dbsnapshot get applied last, all tables would be dropped and recreated BUT
+      //   since there was no task data stored in dbsnapshot (DBTaskStore was OFF last time
+      //   snapshot was cut), all tasks would be erased
+      // - If the above is not detected before a new snapshot is cut all tasks will be dropped the
+      //   moment a new snapshot is created
+      new SnapshotField() {
+        @Override
+        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          LOG.info("Saving dbsnapshot");
+          // Note: we don't use mybatis mapped statements for performance reasons and to avoid
+          // mapping/unmapping hassle as snapshot commands should never be used upstream.
+          try (Connection c = ((DataSource) store.getUnsafeStoreAccess()).getConnection()) {
+            try (PreparedStatement ps = c.prepareStatement("SCRIPT")) {
+              try (ResultSet rs = ps.executeQuery()) {
+                ImmutableList.Builder<String> builder = ImmutableList.builder();
+                while (rs.next()) {
+                  String columnValue = rs.getString("SCRIPT");
+                  builder.add(columnValue + "\n");
+                }
+                snapshot.setDbScript(builder.build());
+              }
+            }
+          } catch (SQLException e) {
+            Throwables.propagate(e);
+          }
+        }
+
+        @Override
+        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+
+          if (snapshot.isSetDbScript()) {
+            try (Connection c = ((DataSource) store.getUnsafeStoreAccess()).getConnection()) {
+              LOG.info("Dropping all tables");
+              try (PreparedStatement drop = c.prepareStatement("DROP ALL OBJECTS")) {
+                drop.executeUpdate();
+              }
+
+              LOG.info("Restoring dbsnapshot. Row count: " + snapshot.getDbScript().size());
+              // Partition the restore script into manageable size batches to avoid possible OOM
+              // due to large size DML statement.
+              List<List<String>> batches = Lists.partition(snapshot.getDbScript(), DB_BATCH_SIZE);
+              for (List<String> batch : batches) {
+                try (PreparedStatement restore = c.prepareStatement(Joiner.on("").join(batch))) {
+                  restore.executeUpdate();
+                }
+              }
+            } catch (SQLException e) {
+              Throwables.propagate(e);
+            }
+          }
+        }
+      },
       new SnapshotField() {
         // It's important for locks to be replayed first, since there are relations that expect
         // references to be valid on insertion.
         @Override
-        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           snapshot.setLocks(ILock.toBuildersSet(store.getLockStore().fetchLocks()));
         }
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          if (hasDbSnapshot(snapshot)) {
+            LOG.info("Deferring lock restore to dbsnapshot");
+            return;
+          }
+
           store.getLockStore().deleteLocks();
 
           if (snapshot.isSetLocks()) {
@@ -86,38 +177,42 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       },
       new SnapshotField() {
         @Override
-        public void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
+        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           snapshot.setHostAttributes(
-              IHostAttributes.toBuildersSet(storeProvider.getAttributeStore().getHostAttributes()));
+              IHostAttributes.toBuildersSet(store.getAttributeStore().getHostAttributes()));
         }
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          if (hasDbSnapshot(snapshot)) {
+            LOG.info("Deferring attribute restore to dbsnapshot");
+            return;
+          }
+
           store.getAttributeStore().deleteHostAttributes();
 
           if (snapshot.isSetHostAttributes()) {
             for (HostAttributes attributes : snapshot.getHostAttributes()) {
-              // Prior to commit 5cf760b, the store would persist maintenance mode changes for
-              // unknown hosts.  5cf760b began rejecting these, but the replicated log may still
-              // contain entries with a null slave ID.
-              if (attributes.isSetSlaveId()) {
-                store.getAttributeStore().saveHostAttributes(IHostAttributes.build(attributes));
-              } else {
-                LOG.info("Dropping host attributes with no slave ID: " + attributes);
-              }
+              store.getAttributeStore().saveHostAttributes(IHostAttributes.build(attributes));
             }
           }
         }
       },
       new SnapshotField() {
         @Override
-        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           snapshot.setTasks(
               IScheduledTask.toBuildersSet(store.getTaskStore().fetchTasks(Query.unscoped())));
+          snapshot.setExperimentalTaskStore(useDbSnapshotForTaskStore);
         }
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          if (hasDbTaskStore(snapshot)) {
+            LOG.info("Deferring task restore to dbsnapshot");
+            return;
+          }
+
           store.getUnsafeTaskStore().deleteAllTasks();
 
           if (snapshot.isSetTasks()) {
@@ -128,17 +223,23 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       },
       new SnapshotField() {
         @Override
-        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<StoredCronJob> jobs = ImmutableSet.builder();
 
           for (IJobConfiguration config : store.getCronJobStore().fetchJobs()) {
             jobs.add(new StoredCronJob(config.newBuilder()));
           }
           snapshot.setCronJobs(jobs.build());
+          snapshot.setExperimentalTaskStore(useDbSnapshotForTaskStore);
         }
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          if (hasDbTaskStore(snapshot)) {
+            LOG.info("Deferring cron job restore to dbsnapshot");
+            return;
+          }
+
           store.getCronJobStore().deleteJobs();
 
           if (snapshot.isSetCronJobs()) {
@@ -151,12 +252,17 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       },
       new SnapshotField() {
         @Override
-        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           // SchedulerMetadata is updated outside of the static list of SnapshotFields
         }
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          if (hasDbSnapshot(snapshot)) {
+            LOG.info("Deferring metadata restore to dbsnapshot");
+            return;
+          }
+
           if (snapshot.isSetSchedulerMetadata()
               && snapshot.getSchedulerMetadata().isSetFrameworkId()) {
             // No delete necessary here since this is a single value.
@@ -168,7 +274,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       },
       new SnapshotField() {
         @Override
-        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<QuotaConfiguration> quotas = ImmutableSet.builder();
           for (Map.Entry<String, IResourceAggregate> entry
               : store.getQuotaStore().fetchQuotas().entrySet()) {
@@ -181,6 +287,11 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          if (hasDbSnapshot(snapshot)) {
+            LOG.info("Deferring quota restore to dbsnapshot");
+            return;
+          }
+
           store.getQuotaStore().deleteQuotas();
 
           if (snapshot.isSetQuotaConfigurations()) {
@@ -193,12 +304,17 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       },
       new SnapshotField() {
         @Override
-        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           snapshot.setJobUpdateDetails(store.getJobUpdateStore().fetchAllJobUpdateDetails());
         }
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          if (hasDbSnapshot(snapshot)) {
+            LOG.info("Deferring job update restore to dbsnapshot");
+            return;
+          }
+
           JobUpdateStore.Mutable updateStore = store.getJobUpdateStore();
           updateStore.deleteAllUpdatesAndEvents();
 
@@ -233,12 +349,27 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   private final BuildInfo buildInfo;
   private final Clock clock;
   private final Storage storage;
+  private final boolean useDbSnapshotForTaskStore;
+
+  /**
+   * Identifies if experimental task store is in use.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ ElementType.PARAMETER, ElementType.METHOD })
+  @Qualifier
+  public @interface ExperimentalTaskStore { }
 
   @Inject
-  public SnapshotStoreImpl(BuildInfo buildInfo, Clock clock, @Volatile Storage storage) {
+  public SnapshotStoreImpl(
+      BuildInfo buildInfo,
+      Clock clock,
+      @Volatile Storage storage,
+      @ExperimentalTaskStore boolean useDbSnapshotForTaskStore) {
+
     this.buildInfo = requireNonNull(buildInfo);
     this.clock = requireNonNull(clock);
     this.storage = requireNonNull(storage);
+    this.useDbSnapshotForTaskStore = useDbSnapshotForTaskStore;
   }
 
   @Timed("snapshot_create")
@@ -252,7 +383,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       // Capture timestamp to signify the beginning of a snapshot operation, apply after in case
       // one of the field closures is mean and tries to apply a timestamp.
       long timestamp = clock.nowMillis();
-      for (SnapshotField field : SNAPSHOT_FIELDS) {
+      for (SnapshotField field : snapshotFields) {
         field.saveToSnapshot(storeProvider, snapshot);
       }
 
@@ -274,14 +405,14 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
     storage.write((NoResult.Quiet) storeProvider -> {
       LOG.info("Restoring snapshot.");
 
-      for (SnapshotField field : SNAPSHOT_FIELDS) {
+      for (SnapshotField field : snapshotFields) {
         field.restoreFromSnapshot(storeProvider, snapshot);
       }
     });
   }
 
   private interface SnapshotField {
-    void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot);
+    void saveToSnapshot(MutableStoreProvider storeProvider, Snapshot snapshot);
 
     void restoreFromSnapshot(MutableStoreProvider storeProvider, Snapshot snapshot);
   }

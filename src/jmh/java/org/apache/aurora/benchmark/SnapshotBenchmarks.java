@@ -13,32 +13,26 @@
  */
 package org.apache.aurora.benchmark;
 
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
+import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.common.inject.Bindings;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.storage.Snapshot;
-import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.db.DbModule;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.ExperimentalTaskStore;
 import org.apache.thrift.TException;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -68,6 +62,7 @@ public class SnapshotBenchmarks {
   public static class RestoreSnapshotWithUpdatesBenchmark {
     private SnapshotStoreImpl snapshotStore;
     private Snapshot snapshot;
+    private Storage storage;
 
     @Param({"1", "5", "10"})
     private int updateCount;
@@ -88,44 +83,34 @@ public class SnapshotBenchmarks {
       // Return non-guessable result to satisfy "blackhole" requirement.
       return System.currentTimeMillis() % 5 == 0;
     }
-  }
 
-  private static SnapshotStoreImpl getSnapshotStore() {
-    Bindings.KeyFactory keyFactory = Bindings.annotatedKeyFactory(Storage.Volatile.class);
-    Injector injector = Guice.createInjector(
-        new AbstractModule() {
-          @Override
-          protected void configure() {
-            bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
-            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
-            bind(SnapshotStoreImpl.class).in(Singleton.class);
-          }
-        },
-        DbModule.testModule(keyFactory, Optional.of(new DbModule.TaskStoreModule(keyFactory))));
+    private SnapshotStoreImpl getSnapshotStore() {
+      Bindings.KeyFactory keyFactory = Bindings.annotatedKeyFactory(Storage.Volatile.class);
+      Injector injector = Guice.createInjector(
+          new AbstractModule() {
+            @Override
+            protected void configure() {
+              bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
+              bind(StatsProvider.class).toInstance(new FakeStatsProvider());
+              bind(SnapshotStoreImpl.class).in(Singleton.class);
+              bind(new TypeLiteral<Boolean>() { }).annotatedWith(ExperimentalTaskStore.class)
+                  .toInstance(true);
+            }
+          },
+          DbModule.testModule(keyFactory, Optional.of(new DbModule.TaskStoreModule(keyFactory))));
 
-    Storage storage = injector.getInstance(Key.get(Storage.class, Storage.Volatile.class));
-    storage.prepare();
-    return injector.getInstance(SnapshotStoreImpl.class);
-  }
-
-  private static Snapshot createSnapshot(int updates, int events, int instanceEvents) {
-    Set<IJobUpdateDetails> updateDetails = new JobUpdates.Builder()
-        .setNumEvents(events)
-        .setNumInstanceEvents(instanceEvents)
-        .build(updates);
-
-    ImmutableSet.Builder<Lock> lockBuilder = ImmutableSet.builder();
-    ImmutableSet.Builder<StoredJobUpdateDetails> detailsBuilder = ImmutableSet.builder();
-    for (IJobUpdateDetails details : updateDetails) {
-      IJobUpdateKey key = details.getUpdate().getSummary().getKey();
-      String lockToken = UUID.randomUUID().toString();
-
-      lockBuilder.add(new Lock(LockKey.job(key.getJob().newBuilder()), lockToken, "user", 0L));
-      detailsBuilder.add(new StoredJobUpdateDetails(details.newBuilder(), lockToken));
+      storage = injector.getInstance(Key.get(Storage.class, Storage.Volatile.class));
+      storage.prepare();
+      return injector.getInstance(SnapshotStoreImpl.class);
     }
 
-    return new Snapshot()
-        .setLocks(lockBuilder.build())
-        .setJobUpdateDetails(detailsBuilder.build());
+    private Snapshot createSnapshot(int updates, int events, int instanceEvents) {
+      JobUpdates.saveUpdates(storage, new JobUpdates.Builder()
+          .setNumEvents(events)
+          .setNumInstanceEvents(instanceEvents)
+          .build(updates));
+
+      return snapshotStore.createSnapshot();
+    }
   }
 }

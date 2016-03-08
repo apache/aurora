@@ -14,24 +14,15 @@
 package org.apache.aurora.benchmark;
 
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.LockKey;
-import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
-import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.thrift.TException;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -48,8 +39,6 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
 public class UpdateStoreBenchmarks {
-  private static final String USER = "user";
-
   @BenchmarkMode(Mode.Throughput)
   @OutputTimeUnit(TimeUnit.SECONDS)
   @Warmup(iterations = 1, time = 10, timeUnit = TimeUnit.SECONDS)
@@ -70,12 +59,9 @@ public class UpdateStoreBenchmarks {
 
     @Setup(Level.Iteration)
     public void setUpIteration() {
-      storage.write((NoResult.Quiet) storeProvider -> {
-        Set<IJobUpdateDetails> updates =
-            new JobUpdates.Builder().setNumInstanceEvents(instances).build(1);
-
-        keys = saveToStore(updates, storeProvider);
-      });
+      keys = JobUpdates.saveUpdates(
+          storage,
+          new JobUpdates.Builder().setNumInstanceEvents(instances).build(1));
     }
 
     @TearDown(Level.Iteration)
@@ -113,12 +99,9 @@ public class UpdateStoreBenchmarks {
 
     @Setup(Level.Iteration)
     public void setUpIteration() {
-      storage.write((NoResult.Quiet) storeProvider -> {
-        Set<IJobUpdateDetails> updates =
-            new JobUpdates.Builder().setNumInstanceOverrides(instanceOverrides).build(1);
-
-        keys = saveToStore(updates, storeProvider);
-      });
+      keys = JobUpdates.saveUpdates(
+          storage,
+          new JobUpdates.Builder().setNumInstanceOverrides(instanceOverrides).build(1));
     }
 
     @TearDown(Level.Iteration)
@@ -134,31 +117,5 @@ public class UpdateStoreBenchmarks {
       return storage.read(store -> store.getJobUpdateStore().fetchJobUpdateDetails(
           Iterables.getOnlyElement(keys)).get());
     }
-  }
-
-  private static Set<IJobUpdateKey> saveToStore(
-      Set<IJobUpdateDetails> updates,
-      Storage.MutableStoreProvider storeProvider) {
-
-    JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
-    ImmutableSet.Builder<IJobUpdateKey> keyBuilder = ImmutableSet.builder();
-    for (IJobUpdateDetails details : updates) {
-      IJobUpdateKey key = details.getUpdate().getSummary().getKey();
-      keyBuilder.add(key);
-      String lockToken = UUID.randomUUID().toString();
-      storeProvider.getLockStore().saveLock(
-          ILock.build(new Lock(LockKey.job(key.getJob().newBuilder()), lockToken, USER, 0L)));
-
-      updateStore.saveJobUpdate(details.getUpdate(), Optional.of(lockToken));
-
-      for (IJobUpdateEvent updateEvent : details.getUpdateEvents()) {
-        updateStore.saveJobUpdateEvent(key, updateEvent);
-      }
-
-      for (IJobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
-        updateStore.saveJobInstanceUpdateEvent(key, instanceEvent);
-      }
-    }
-    return keyBuilder.build();
   }
 }

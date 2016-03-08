@@ -150,6 +150,7 @@ test_update() {
   assert_update_state $_jobkey 'ROLLING_FORWARD'
   local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
       | tail -n +2 | awk '{print $2}')
+  aurora_admin scheduler_snapshot devcluster
   sudo restart aurora-scheduler
   assert_update_state $_jobkey 'ROLLING_FORWARD'
   aurora update pause $_jobkey --message='hello'

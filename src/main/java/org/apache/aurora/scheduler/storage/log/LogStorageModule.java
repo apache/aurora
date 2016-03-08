@@ -31,8 +31,10 @@ import org.apache.aurora.scheduler.storage.CallOrderEnforcingStorage;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
+import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
 import org.apache.aurora.scheduler.storage.log.LogStorage.Settings;
+import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.ExperimentalTaskStore;
 
 import static org.apache.aurora.scheduler.storage.log.EntrySerializer.EntrySerializerImpl;
 import static org.apache.aurora.scheduler.storage.log.LogManager.LogEntryHashFunction;
@@ -67,6 +69,9 @@ public class LogStorageModule extends PrivateModule {
     bind(Settings.class)
         .toInstance(new Settings(SHUTDOWN_GRACE_PERIOD.get(), SNAPSHOT_INTERVAL.get()));
 
+    bind(new TypeLiteral<Boolean>() { }).annotatedWith(ExperimentalTaskStore.class)
+        .toInstance(DbModule.USE_DB_TASK_STORE.get());
+
     bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
         .toInstance(MAX_LOG_ENTRY_SIZE.get());
     bind(LogManager.class).in(Singleton.class);
@@ -77,6 +82,7 @@ public class LogStorageModule extends PrivateModule {
     expose(Storage.class);
     expose(NonVolatileStorage.class);
     expose(DistributedSnapshotStore.class);
+    expose(new TypeLiteral<Boolean>() { }).annotatedWith(ExperimentalTaskStore.class);
 
     bind(EntrySerializer.class).to(EntrySerializerImpl.class);
     // TODO(ksweeney): We don't need a cryptographic checksum here - assess performance of MD5

@@ -134,6 +134,12 @@ class DbStorage extends AbstractIdleService implements Storage {
       public JobUpdateStore.Mutable getJobUpdateStore() {
         return jobUpdateStore;
       }
+
+      @Override
+      @SuppressWarnings("unchecked")
+      public <T> T getUnsafeStoreAccess() {
+        return (T) sessionFactory.getConfiguration().getEnvironment().getDataSource();
+      }
     };
     this.statsProvider = requireNonNull(statsProvider);
   }

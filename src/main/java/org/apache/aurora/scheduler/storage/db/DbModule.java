@@ -68,7 +68,7 @@ public final class DbModule extends PrivateModule {
 
   @CmdLine(name = "use_beta_db_task_store",
       help = "Whether to use the experimental database-backed task store.")
-  private static final Arg<Boolean> USE_DB_TASK_STORE = Arg.create(false);
+  public static final Arg<Boolean> USE_DB_TASK_STORE = Arg.create(false);
 
   @CmdLine(name = "slow_query_log_threshold",
       help = "Log all queries that take at least this long to execute.")
@@ -115,8 +115,6 @@ public final class DbModule extends PrivateModule {
 
     Map<String, String> args = ImmutableMap.<String, String>builder()
         .putAll(jdbcUriArgs)
-        // We always disable the MvStore, as it is in beta as of this writing.
-        .put("MV_STORE", "false")
         // READ COMMITTED transaction isolation.  More details here
         // http://www.h2database.com/html/advanced.html?#transaction_isolation
         .put("LOCK_MODE", "3")

@@ -149,6 +149,9 @@ struct Snapshot {
   8: set<QuotaConfiguration> quotaConfigurations
   9: set<api.Lock> locks
   10: set<StoredJobUpdateDetails> jobUpdateDetails
+  11: list<string> dbScript
+  // Indicates if experimental DB store for tasks and cron jobs was enabled when snapshot was cut.
+  12: bool experimentalTaskStore
 }
 
 // A message header that calls out the number of expected FrameChunks to follow to form a complete

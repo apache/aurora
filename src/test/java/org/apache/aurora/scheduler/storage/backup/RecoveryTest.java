@@ -96,7 +96,8 @@ public class RecoveryTest extends EasyMockTest {
     expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT1);
     Capture<MutateWork<Object, Exception>> transaction = createCapture();
     expect(primaryStorage.write(capture(transaction))).andReturn(null);
-    distributedStore.persist(SNAPSHOT1);
+    Capture<Snapshot> snapshot = createCapture();
+    distributedStore.persist(capture(snapshot));
     shutDownNow.execute();
 
     control.replay();
@@ -114,6 +115,9 @@ public class RecoveryTest extends EasyMockTest {
         recovery.query(Query.unscoped()));
     recovery.commit();
     transaction.getValue().apply(storeProvider);
+
+    snapshot.getValue().unsetDbScript();
+    assertEquals(SNAPSHOT1, snapshot.getValue());
   }
 
   @Test
@@ -122,7 +126,8 @@ public class RecoveryTest extends EasyMockTest {
     Snapshot modified = SNAPSHOT1.deepCopy().setTasks(ImmutableSet.of(TASK1.newBuilder()));
     Capture<MutateWork<Object, Exception>> transaction = createCapture();
     expect(primaryStorage.write(capture(transaction))).andReturn(null);
-    distributedStore.persist(modified);
+    Capture<Snapshot> snapshot = createCapture();
+    distributedStore.persist(capture(snapshot));
     shutDownNow.execute();
 
     control.replay();
@@ -140,6 +145,9 @@ public class RecoveryTest extends EasyMockTest {
         recovery.query(Query.unscoped()));
     recovery.commit();
     transaction.getValue().apply(storeProvider);
+
+    snapshot.getValue().unsetDbScript();
+    assertEquals(modified, snapshot.getValue());
   }
 
   @Test(expected = RecoveryException.class)
