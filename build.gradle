@@ -92,9 +92,7 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.slf4jRev = '1.7.12'
   ext.stringTemplateRev = '3.2.1'
   ext.thriftRev = '0.9.1'
-  // Avoiding 3.4.7 due to this deadlock bug that we appear to run into in zk tests:
-  //   https://issues.apache.org/jira/browse/ZOOKEEPER-2347
-  ext.zookeeperRev = '3.4.6'
+  ext.zookeeperRev = '3.4.8'
 
   configurations {
     compile {
