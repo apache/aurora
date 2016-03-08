@@ -24,8 +24,10 @@ import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.Module;
+import com.google.inject.TypeLiteral;
 import com.google.inject.util.Modules;
 
+import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.app.local.simulator.ClusterSimulatorModule;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
@@ -33,6 +35,7 @@ import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
+import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.shiro.io.ResourceUtils;
@@ -70,8 +73,6 @@ public final class LocalSchedulerMain {
         .add("-shiro_ini_path="
             + ResourceUtils.CLASSPATH_PREFIX
             + "org/apache/aurora/scheduler/http/api/security/shiro-example.ini")
-        .add("-tier_config="
-            + ResourceUtils.CLASSPATH_PREFIX + "org/apache/aurora/scheduler/tiers.json")
         .add("-enable_h2_console=true")
         .build();
     SchedulerMain.applyStaticArgumentValues(arguments.toArray(new String[] {}));
@@ -79,6 +80,9 @@ public final class LocalSchedulerMain {
     Module persistentStorage = new AbstractModule() {
       @Override
       protected void configure() {
+        bind(new TypeLiteral<Boolean>() { })
+            .annotatedWith(SnapshotStoreImpl.ExperimentalTaskStore.class)
+            .toInstance(false);
         bind(Storage.class).to(Key.get(Storage.class, Storage.Volatile.class));
         bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
         bind(DistributedSnapshotStore.class).toInstance(snapshot -> { });
@@ -96,6 +100,7 @@ public final class LocalSchedulerMain {
       }
     };
 
-    SchedulerMain.flagConfiguredMain(Modules.combine(fakeMesos, persistentStorage));
+    SchedulerMain.flagConfiguredMain(
+        Modules.combine(fakeMesos, persistentStorage, new TierModule()));
   }
 }
