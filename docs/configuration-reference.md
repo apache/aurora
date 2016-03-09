@@ -513,7 +513,7 @@ Describes the container the job's processes will run inside.
 
 ### Docker Parameter Object
 
-Docker CLI parameters. This needs to be enabled by the scheduler `enable_docker_parameters` option.
+Docker CLI parameters. This needs to be enabled by the scheduler `allow_docker_parameters` option.
 See [Docker Command Line Reference](https://docs.docker.com/reference/commandline/run/) for valid parameters.
 
   param            | type            | description
