@@ -176,3 +176,27 @@ def test_auth_type_invalid():
   with pytest.raises(TypeError) as e:
     TRequestsTransport('http://localhost:1', auth="auth")
   assert e.value.message == 'Invalid auth type. Expected: AuthBase but got str'
+
+
+def test_requests_transport_session_reuse():
+  handler = ReadOnlySchedulerHandler()
+  processor = ReadOnlyScheduler.Processor(handler)
+  pfactory = TJSONProtocol.TJSONProtocolFactory()
+  server = THttpServer.THttpServer(processor, ('localhost', 0), pfactory)
+  server_thread = Thread(target=server.serve)
+  server_thread.start()
+  _, server_port = server.httpd.socket.getsockname()
+
+  try:
+    transport = TRequestsTransport('http://localhost:%d' % server_port)
+    protocol = TJSONProtocol.TJSONProtocol(transport)
+    client = ReadOnlyScheduler.Client(protocol)
+    client.getRoleSummary()
+    old_session = transport._session
+    client.getRoleSummary()
+  finally:
+    server.httpd.shutdown()
+
+  assert old_session == transport._session
+
+  transport.close()

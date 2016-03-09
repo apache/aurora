@@ -111,10 +111,8 @@ class TRequestsTransport(TTransportBase):
     self.__wbuf.write(buf)
 
   def flush(self):
-    if self.isOpen():
-      self.close()
-
-    self.open()
+    if not self.isOpen():
+      self.open()
 
     data = self.__wbuf.getvalue()
     self.__wbuf = BytesIO()
