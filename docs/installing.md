@@ -261,6 +261,11 @@ If you haven't already, read the section on [how to get Aurora RPMs](#rpms).
     # Note: for older Aurora RPM versions, this may be called 'aurora-client'.
     sudo yum install -y aurora-tools
 
+### Mac OS X
+
+    brew upgrade
+    brew install aurora-cli
+
 ### Configuration
 Client configuration lives in a json file that describes the clusters available and how to reach
 them.  By default this file is at `/etc/aurora/clusters.json`.
