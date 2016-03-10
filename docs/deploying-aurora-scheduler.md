@@ -279,7 +279,16 @@ The dedicated attribute has semantic meaning. The format is `$role(/.*)?`. When 
 the scheduler requires that the `$role` component matches the `role` field in the job
 configuration, and will reject the job creation otherwise.  The remainder of the attribute is
 free-form. We've developed the idiom of formatting this attribute as `$role/$job`, but do not
-enforce this.
+enforce this. For example: a job `devcluster/www-data/prod/hello` with a dedicated constraint set as
+`www-data/web.multi` will have its tasks scheduled only on Mesos slaves configured with:
+`--attributes=dedicated:www-data/web.multi`.
+
+A wildcard (`*`) may be used for the role portion of the dedicated attribute, which will allow any
+owner to elect for a job to run on the host(s). For example: tasks from both
+`devcluster/www-data/prod/hello` and `devcluster/vagrant/test/hello` with a dedicated constraint
+formatted as `*/web.multi` will be scheduled only on Mesos slaves configured with
+`--attributes=dedicated:*/web.multi`. This may be useful when assembling a virtual cluster of
+machines sharing the same set of traits or requirements.
 
 ##### Example
 Consider the following slave command line:

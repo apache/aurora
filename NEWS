@@ -6,6 +6,9 @@ New/updated:
 - Upgraded Mesos to 0.26.0
 - Added a new `aurora job add` client command to scale out an existing job.
 - Upgraded the scheduler ZooKeeper client from 3.4.6 to 3.4.8.
+- Added support for dedicated constraints not exclusive to a particular role.
+  See https://github.com/apache/aurora/blob/master/docs/deploying-aurora-scheduler.md#dedicated-attribute
+  for more details.
 
 Deprecations and removals:
 

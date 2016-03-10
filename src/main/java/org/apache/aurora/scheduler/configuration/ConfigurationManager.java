@@ -224,7 +224,7 @@ public class ConfigurationManager {
       }
 
       String dedicatedRole = getRole(valueConstraint);
-      if (!config.getJob().getRole().equals(dedicatedRole)) {
+      if (!("*".equals(dedicatedRole) || config.getJob().getRole().equals(dedicatedRole))) {
         throw new TaskDescriptionException(
             "Only " + dedicatedRole + " may use hosts dedicated for that role.");
       }

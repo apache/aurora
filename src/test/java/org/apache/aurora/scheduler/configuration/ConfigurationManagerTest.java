@@ -60,13 +60,15 @@ public class ConfigurationManagerTest {
   private static final ImmutableSet<Container._Fields> ALL_CONTAINER_TYPES =
       ImmutableSet.of(Container._Fields.DOCKER, Container._Fields.MESOS);
 
+  private static final JobKey JOB_KEY = new JobKey("owner-role", "devel", "email_stats");
   private static final JobConfiguration UNSANITIZED_JOB_CONFIGURATION = new JobConfiguration()
-      .setKey(new JobKey("owner-role", "devel", "email_stats"))
+      .setKey(JOB_KEY)
       .setCronSchedule("0 2 * * *")
       .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING)
       .setInstanceCount(1)
       .setTaskConfig(
           new TaskConfig()
+              .setJob(JOB_KEY)
               .setIsService(false)
               .setTaskLinks(ImmutableMap.of())
               .setExecutorConfig(new ExecutorConfig("aurora", "config"))
@@ -178,6 +180,38 @@ public class ConfigurationManagerTest {
     // The resulting task config should contain parameters supplied from user config.
     List<IDockerParameter> params = result.getContainer().getDocker().getParameters();
     assertThat(params, is(ImmutableList.of(IDockerParameter.build(userParameter))));
+  }
+
+  @Test
+  public void testExclusiveDedicatedRoleAllowed() throws Exception {
+    TaskConfig builder = UNSANITIZED_JOB_CONFIGURATION.deepCopy().getTaskConfig();
+    builder.setConstraints(ImmutableSet.of(new Constraint()
+        .setName(DEDICATED_ATTRIBUTE)
+        .setConstraint(TaskConstraint.value(
+            new ValueConstraint(false, ImmutableSet.of(JOB_KEY.getRole() + "/f"))))));
+
+    configurationManager.validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testNonExclusiveDedicatedAllowed() throws Exception {
+    TaskConfig builder = UNSANITIZED_JOB_CONFIGURATION.deepCopy().getTaskConfig();
+    builder.setConstraints(ImmutableSet.of(new Constraint()
+        .setName(DEDICATED_ATTRIBUTE)
+        .setConstraint(TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("*/f"))))));
+
+    configurationManager.validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testExclusiveDedicatedRoleMismatch() throws Exception {
+    TaskConfig builder = UNSANITIZED_JOB_CONFIGURATION.deepCopy().getTaskConfig();
+    builder.setConstraints(ImmutableSet.of(new Constraint()
+        .setName(DEDICATED_ATTRIBUTE)
+        .setConstraint(TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("r/f"))))));
+
+    expectTaskDescriptionException("Only r may use hosts dedicated for that role.");
+    configurationManager.validateAndPopulate(ITaskConfig.build(builder));
   }
 
   private void expectTaskDescriptionException(String message) {
