@@ -34,6 +34,8 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
+import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stats;
@@ -149,6 +151,7 @@ public class JobUpdaterIT extends EasyMockTest {
   private LockManager lockManager;
   private StateManager stateManager;
   private JobUpdateEventSubscriber subscriber;
+  private Command shutdownCommand;
 
   private static ITaskConfig setExecutorData(ITaskConfig task, String executorData) {
     TaskConfig builder = task.newBuilder();
@@ -163,6 +166,7 @@ public class JobUpdaterIT extends EasyMockTest {
     ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
     clock = FakeScheduledExecutor.scheduleExecutor(executor);
     driver = createMock(Driver.class);
+    shutdownCommand = createMock(Command.class);
     eventBus = new EventBus();
 
     Injector injector = Guice.createInjector(
@@ -186,6 +190,7 @@ public class JobUpdaterIT extends EasyMockTest {
             bind(EventSink.class).toInstance(eventBus::post);
             bind(LockManager.class).to(LockManagerImpl.class);
             bind(UUIDGenerator.class).to(UUIDGeneratorImpl.class);
+            bind(Lifecycle.class).toInstance(new Lifecycle(shutdownCommand));
           }
         });
     updater = injector.getInstance(JobUpdateController.class);
@@ -666,6 +671,42 @@ public class JobUpdaterIT extends EasyMockTest {
     assertEquals(
         JobUpdatePulseStatus.FINISHED,
         updater.pulse(IJobUpdateKey.build(new JobUpdateKey(JOB.newBuilder(), "invalid"))));
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void testShutdownOnFailedPulse() throws Exception {
+    // Missing kill expectation will trigger failure.
+    shutdownCommand.execute();
+    expectLastCall().andAnswer(() -> {
+      storage.write((NoResult.Quiet) storeProvider -> releaseAllLocks());
+      throw new IllegalStateException("Expected shutdown triggered.");
+    });
+
+    control.replay();
+
+    JobUpdate builder = makeJobUpdate(
+        // No-op - task is already matching the new config.
+        makeInstanceConfig(0, 0, NEW_CONFIG),
+        // Tasks needing update.
+        makeInstanceConfig(1, 2, OLD_CONFIG)).newBuilder();
+
+    builder.getInstructions().getSettings().setBlockIfNoPulsesAfterMs((int) PULSE_TIMEOUT_MS);
+    insertInitialTasks(IJobUpdate.build(builder));
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+    updater.start(IJobUpdate.build(builder), AUDIT);
+
+    // The update is blocked initially waiting for a pulse.
+    assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
+
+    // Pulse arrives and update starts.
+    assertEquals(JobUpdatePulseStatus.OK, updater.pulse(UPDATE_ID));
+    changeState(JOB, 1, KILLED, ASSIGNED, STARTING, RUNNING);
   }
 
   @Test

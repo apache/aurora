@@ -14,29 +14,30 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Binding module for scheduling logic and higher-level state management.
  */
 public class UpdaterModule extends AbstractModule {
+  private static final Logger LOG = LoggerFactory.getLogger(UpdaterModule.class);
 
   private final ScheduledExecutorService executor;
 
   public UpdaterModule() {
-    this(Executors.newSingleThreadScheduledExecutor(
-        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("updater-%d").build()));
+    this(AsyncUtil.singleThreadLoggingScheduledExecutor("updater-%d", LOG));
   }
 
   @VisibleForTesting

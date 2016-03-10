@@ -31,6 +31,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 
+import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -81,6 +82,7 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE;
+import static org.apache.aurora.scheduler.base.AsyncUtil.shutdownOnError;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.ACTIVE_QUERY;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.AUTO_RESUME_STATES;
@@ -107,6 +109,8 @@ import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatu
  */
 class JobUpdateControllerImpl implements JobUpdateController {
   private static final Logger LOG = LoggerFactory.getLogger(JobUpdateControllerImpl.class);
+  private static final String FATAL_ERROR_FORMAT =
+      "Unexpected problem running asynchronous updater for: %s. Triggering shutdown";
 
   private final UpdateFactory updateFactory;
   private final LockManager lockManager;
@@ -115,6 +119,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   private final StateManager stateManager;
   private final Clock clock;
   private final PulseHandler pulseHandler;
+  private final Lifecycle lifecycle;
 
   // Currently-active updaters. An active updater is one that is rolling forward or back. Paused
   // and completed updates are represented only in storage, not here.
@@ -128,7 +133,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
       Storage storage,
       ScheduledExecutorService executor,
       StateManager stateManager,
-      Clock clock) {
+      Clock clock,
+      Lifecycle lifecycle) {
 
     this.updateFactory = requireNonNull(updateFactory);
     this.lockManager = requireNonNull(lockManager);
@@ -136,6 +142,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     this.executor = requireNonNull(executor);
     this.stateManager = requireNonNull(stateManager);
     this.clock = requireNonNull(clock);
+    this.lifecycle = requireNonNull(lifecycle);
     this.pulseHandler = new PulseHandler(clock);
   }
 
@@ -289,15 +296,19 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     if (JobUpdateStateMachine.isAwaitingPulse(state.getStatus())) {
       // Attempt to unblock a job update previously blocked on expired pulse.
-      executor.execute(() -> {
-        try {
-          unscopedChangeUpdateStatus(
-              key,
-              status -> new JobUpdateEvent().setStatus(GET_UNBLOCKED_STATE.apply(status)));
-        } catch (UpdateStateException e) {
-          LOG.error("Error while processing job update pulse: " + e);
-        }
-      });
+      executor.execute(shutdownOnError(
+          lifecycle,
+          LOG,
+          String.format(FATAL_ERROR_FORMAT, key),
+          () -> {
+            try {
+              unscopedChangeUpdateStatus(
+                  key,
+                  status -> new JobUpdateEvent().setStatus(GET_UNBLOCKED_STATE.apply(status)));
+            } catch (UpdateStateException e) {
+              LOG.error(String.format("Error processing job update pulse for %s: %s", key, e));
+            }
+          }));
     }
 
     return JobUpdatePulseStatus.OK;
@@ -694,29 +705,34 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   private Runnable getDeferredEvaluator(final IInstanceKey instance, final IJobUpdateKey key) {
-    return () -> storage.write((NoResult.Quiet) storeProvider -> {
-      IJobUpdateSummary summary =
-          getOnlyMatch(storeProvider.getJobUpdateStore(), queryByUpdate(key));
-      JobUpdateStatus status = summary.getState().getStatus();
-      // Suppress this evaluation if the updater is not currently active.
-      if (JobUpdateStateMachine.isActive(status)) {
-        UpdateFactory.Update update = updates.get(instance.getJobKey());
-        try {
-          evaluateUpdater(
-              storeProvider,
-              update,
-              summary,
-              ImmutableMap.of(
-                  instance.getInstanceId(),
-                  getActiveInstance(
-                      storeProvider.getTaskStore(),
-                      instance.getJobKey(),
-                      instance.getInstanceId())));
-        } catch (UpdateStateException e) {
-          throw Throwables.propagate(e);
-        }
-      }
-    });
+    return shutdownOnError(
+        lifecycle,
+        LOG,
+        String.format(FATAL_ERROR_FORMAT, "Key: " + key + " Instance key: " + instance),
+        () -> storage.write((NoResult.Quiet) storeProvider -> {
+          IJobUpdateSummary summary =
+              getOnlyMatch(storeProvider.getJobUpdateStore(), queryByUpdate(key));
+          JobUpdateStatus status = summary.getState().getStatus();
+          // Suppress this evaluation if the updater is not currently active.
+          if (JobUpdateStateMachine.isActive(status)) {
+            UpdateFactory.Update update = updates.get(instance.getJobKey());
+            try {
+              evaluateUpdater(
+                  storeProvider,
+                  update,
+                  summary,
+                  ImmutableMap.of(
+                      instance.getInstanceId(),
+                      getActiveInstance(
+                          storeProvider.getTaskStore(),
+                          instance.getJobKey(),
+                          instance.getInstanceId())));
+            } catch (UpdateStateException e) {
+              LOG.error(String.format("Error running deferred evaluation for %s: %s", instance, e));
+              Throwables.propagate(e);
+            }
+          }
+        }));
   }
 
   private static class PulseHandler {

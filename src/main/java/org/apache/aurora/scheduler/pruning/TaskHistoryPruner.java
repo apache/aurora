@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.base.AsyncUtil.shutdownOnError;
 import static org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 
@@ -52,6 +53,8 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
  */
 public class TaskHistoryPruner implements EventSubscriber {
   private static final Logger LOG = LoggerFactory.getLogger(TaskHistoryPruner.class);
+  private static final String FATAL_ERROR_FORMAT =
+      "Unexpected problem pruning task history for %s. Triggering shutdown";
 
   private final DelayExecutor executor;
   private final StateManager stateManager;
@@ -137,19 +140,6 @@ public class TaskHistoryPruner implements EventSubscriber {
     return Query.jobScoped(jobKey).byStatus(apiConstants.TERMINAL_STATES);
   }
 
-  private Runnable shutdownOnError(String subject, Runnable runnable) {
-    return () -> {
-      try {
-        runnable.run();
-      } catch (Throwable t) {
-        LOG.error(
-            "Unexpected problem pruning task history for " + subject + ". Triggering shutdown",
-            t);
-        lifecycle.shutdown();
-      }
-    };
-  }
-
   private void registerInactiveTask(
       final IJobKey jobKey,
       final String taskId,
@@ -158,28 +148,37 @@ public class TaskHistoryPruner implements EventSubscriber {
     LOG.debug("Prune task " + taskId + " in " + timeRemaining + " ms.");
 
     executor.execute(
-        shutdownOnError("task: " + taskId, () -> {
-          LOG.info("Pruning expired inactive task " + taskId);
-          deleteTasks(ImmutableSet.of(taskId));
-        }),
+        shutdownOnError(
+            lifecycle,
+            LOG,
+            String.format(FATAL_ERROR_FORMAT, "task: " + taskId),
+            () -> {
+              LOG.info("Pruning expired inactive task " + taskId);
+              deleteTasks(ImmutableSet.of(taskId));
+            }),
         Amount.of(timeRemaining, Time.MILLISECONDS));
 
-    executor.execute(shutdownOnError("job: " + jobKey, () -> {
-      Iterable<IScheduledTask> inactiveTasks =
-          Storage.Util.fetchTasks(storage, jobHistoryQuery(jobKey));
-      int numInactiveTasks = Iterables.size(inactiveTasks);
-      int tasksToPrune = numInactiveTasks - settings.perJobHistoryGoal;
-      if (tasksToPrune > 0 && numInactiveTasks > settings.perJobHistoryGoal) {
-        Set<String> toPrune = FluentIterable
-            .from(Tasks.LATEST_ACTIVITY.sortedCopy(inactiveTasks))
-            .filter(safeToDelete)
-            .limit(tasksToPrune)
-            .transform(Tasks::id)
-            .toSet();
-        if (!toPrune.isEmpty()) {
-          deleteTasks(toPrune);
-        }
-      }
-    }));
+    executor.execute(
+        shutdownOnError(
+            lifecycle,
+            LOG,
+            String.format(FATAL_ERROR_FORMAT, "job: " + jobKey),
+            () -> {
+              Iterable<IScheduledTask> inactiveTasks =
+                  Storage.Util.fetchTasks(storage, jobHistoryQuery(jobKey));
+              int numInactiveTasks = Iterables.size(inactiveTasks);
+              int tasksToPrune = numInactiveTasks - settings.perJobHistoryGoal;
+              if (tasksToPrune > 0 && numInactiveTasks > settings.perJobHistoryGoal) {
+                Set<String> toPrune = FluentIterable
+                    .from(Tasks.LATEST_ACTIVITY.sortedCopy(inactiveTasks))
+                    .filter(safeToDelete)
+                    .limit(tasksToPrune)
+                    .transform(Tasks::id)
+                    .toSet();
+                if (!toPrune.isEmpty()) {
+                  deleteTasks(toPrune);
+                }
+              }
+            }));
   }
 }

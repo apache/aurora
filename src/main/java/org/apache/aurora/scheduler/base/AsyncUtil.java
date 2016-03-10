@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.stats.Stats;
 import org.slf4j.Logger;
 
@@ -110,6 +111,36 @@ public final class AsyncUtil {
             evaluateResult(runnable, throwable, logger);
           }
         };
+  }
+
+  /**
+   * Helper wrapper to call the provided {@link Lifecycle} on unhandled error.
+   *
+   * @param lifecycle {@link Lifecycle} instance.
+   * @param logger Logger instance.
+   * @param message message to log.
+   * @param runnable {@link Runnable} to wrap.
+   * @return A new {@link Runnable} logging an error and calling {@link Lifecycle#shutdown()}.
+   */
+  public static Runnable shutdownOnError(
+      Lifecycle lifecycle,
+      Logger logger,
+      String message,
+      Runnable runnable) {
+
+    requireNonNull(lifecycle);
+    requireNonNull(logger);
+    requireNonNull(message);
+    requireNonNull(runnable);
+
+    return () -> {
+      try {
+        runnable.run();
+      } catch (Throwable t) {
+        logger.error(message, t);
+        lifecycle.shutdown();
+      }
+    };
   }
 
   private static void evaluateResult(Runnable runnable, Throwable throwable, Logger logger) {
