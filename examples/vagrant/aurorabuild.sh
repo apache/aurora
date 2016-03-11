@@ -45,7 +45,16 @@ function build_admin_client {
 function build_scheduler {
   # This CLASSPATH_PREFIX is inserted at the front of the CLASSPATH to enable "hot" reloads of the
   # UI code (c.f. the startScripts task in build.gradle).
-  CLASSPATH_PREFIX=/vagrant/dist/resources/main ./gradlew installDist
+  # NB: We limit the scope of the hot-reloadable resources to the UI resources in the /schedulder
+  # top-level resource dir; ie we do not support hot-loading of other resources like /logback.xml
+  # or /org/apache/aurora/scheduler/storage/db/schema.sql
+  local hot_resources_dir=/vagrant/dist/.hot_resources
+  if [ ! -L $hot_resources_dir/scheduler ]
+  then
+    rm -rf $hot_resources_dir && mkdir -p $hot_resources_dir
+    ln -s /vagrant/dist/resources/main/scheduler $hot_resources_dir/scheduler
+  fi
+  CLASSPATH_PREFIX=$hot_resources_dir ./gradlew installDist
 
   export LD_LIBRARY_PATH=/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server
   sudo mkdir -p /var/db/aurora

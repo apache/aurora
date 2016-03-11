@@ -126,10 +126,10 @@ Faster Iteration in Vagrant
 ---------------------------
 The scheduler serves UI assets from the classpath. For production deployments this means the assets
 are served from within a jar. However, for faster development iteration, the vagrant image is
-configured to add `/vagrant/dist/resources/main` to the head of CLASSPATH. This path is configured
-as a shared filesystem to the path on the host system where your Aurora repository lives. This means
-that any updates to dist/resources/main in your checkout will be reflected immediately in the UI
-served from within the vagrant image.
+configured to add the `scheduler` subtree of `/vagrant/dist/resources/main` to the head of
+`CLASSPATH`. This path is configured as a shared filesystem to the path on the host system where
+your Aurora repository lives. This means that any updates under `dist/resources/main/scheduler` in
+your checkout will be reflected immediately in the UI served from within the vagrant image.
 
 The one caveat to this is that this path is under `dist` not `src`. This is because the assets must
 be processed by gradle before they can be served. So, unfortunately, you cannot just save your local
