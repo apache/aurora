@@ -47,7 +47,7 @@ class ShellHealthCheck(object):
     """
     cmd = shlex.split(self.cmd)
     try:
-      subprocess.check_call(cmd, timeout=self.timeout_secs)
+      subprocess.check_call(cmd, timeout=self.timeout_secs, shell=True)
       return True, None
     except subprocess.CalledProcessError as reason:
       # The command didn't return a 0 so provide reason for failure.

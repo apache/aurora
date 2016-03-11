@@ -18,12 +18,15 @@ import time
 import traceback
 
 from mesos.interface.mesos_pb2 import TaskState
+from pystachio import Environment, String
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import LambdaGauge
 
 from apache.aurora.common.health_check.http_signaler import HttpSignaler
 from apache.aurora.common.health_check.shell import ShellHealthCheck
+from apache.aurora.config.schema.base import MesosContext
+from apache.thermos.config.schema import ThermosContext
 
 from .status_checker import StatusChecker, StatusCheckerProvider, StatusResult
 from .task_info import mesos_task_instance_from_assigned_task, resolve_ports
@@ -203,6 +206,25 @@ class HealthChecker(StatusChecker):
 
 
 class HealthCheckerProvider(StatusCheckerProvider):
+
+  @staticmethod
+  def interpolate_cmd(task, cmd):
+    """
+    :param task: Assigned task passed from Mesos Agent
+    :param cmd: Command defined inside shell_command inside config.
+    :return: Interpolated cmd with filled in values, for example ports.
+    """
+    thermos_namespace = ThermosContext(
+        task_id=task.taskId,
+        ports=task.assignedPorts)
+    mesos_namespace = MesosContext(instance=task.instanceId)
+    command = String(cmd) % Environment(
+        thermos=thermos_namespace,
+        mesos=mesos_namespace
+    )
+
+    return command.get()
+
   def from_assigned_task(self, assigned_task, sandbox):
     """
     :param assigned_task:
@@ -215,9 +237,15 @@ class HealthCheckerProvider(StatusCheckerProvider):
     timeout_secs = health_check_config.get('timeout_secs')
     if SHELL_HEALTH_CHECK in health_checker:
       shell_command = health_checker.get(SHELL_HEALTH_CHECK, {}).get('shell_command')
+      # Filling in variables eg thermos.ports[http] that could have been passed in as part of
+      # shell_command.
+      interpolated_command = HealthCheckerProvider.interpolate_cmd(
+        task=assigned_task,
+        cmd=shell_command
+      )
       shell_signaler = ShellHealthCheck(
-        cmd=shell_command,
-        timeout_secs=timeout_secs
+        cmd=interpolated_command,
+        timeout_secs=timeout_secs,
       )
       a_health_checker = lambda: shell_signaler()
     else:

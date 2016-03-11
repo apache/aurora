@@ -41,7 +41,8 @@ class TestHealthChecker(unittest.TestCase):
     self.assertIsNone(msg)
     mock_sub.assert_called_once_with(
       ['success', 'cmd'],
-      timeout=30
+      timeout=30,
+      shell=True,
     )
 
   @mock.patch('subprocess32.check_call')
@@ -54,7 +55,8 @@ class TestHealthChecker(unittest.TestCase):
     success, msg = shell()
     mock_sub.assert_called_once_with(
       ['cmd', 'to', 'fail'],
-      timeout=30
+      timeout=30,
+      shell=True,
     )
     self.assertFalse(success)
     self.assertEqual(msg, "Command 'failed' returned non-zero exit status 1")
@@ -69,7 +71,8 @@ class TestHealthChecker(unittest.TestCase):
     success, msg = shell()
     mock_sub.assert_called_once_with(
       ['cmd', 'to', 'not', 'exist'],
-      timeout=30
+      timeout=30,
+      shell=True,
     )
     self.assertFalse(success)
     self.assertEqual(msg, 'OSError: failed')
@@ -85,7 +88,8 @@ class TestHealthChecker(unittest.TestCase):
     success, msg = shell()
     mock_sub.assert_called_once_with(
       ['defensive', 'cmd'],
-      timeout=10
+      timeout=10,
+      shell=True,
     )
     self.assertFalse(success)
     self.assertEqual(msg, 'Invalid commmand.')

@@ -267,7 +267,7 @@ class TestHealthCheckerProvider(unittest.TestCase):
             ).json_dumps()
         )
     )
-    assigned_task = AssignedTask(task=task_config, instanceId=1)
+    assigned_task = AssignedTask(task=task_config, instanceId=1, assignedPorts={'foo': 9001})
     execconfig_data = json.loads(assigned_task.task.executorConfig.data)
     assert execconfig_data[
              'health_check_config']['health_checker']['shell']['shell_command'] == 'failed command'
@@ -276,6 +276,36 @@ class TestHealthCheckerProvider(unittest.TestCase):
     assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs
     hct_max_fail = health_checker.threaded_health_checker.max_consecutive_failures
     assert hct_max_fail == max_consecutive_failures
+
+  def test_interpolate_cmd(self):
+    """Making sure thermos.ports[foo] gets correctly substituted with assignedPorts info."""
+    interval_secs = 17
+    initial_interval_secs = 3
+    max_consecutive_failures = 2
+    timeout_secs = 5
+    shell_cmd = 'FOO_PORT={{thermos.ports[foo]}} failed command'
+    shell_config = ShellHealthChecker(shell_command=shell_cmd)
+    task_config = TaskConfig(
+        executorConfig=ExecutorConfig(
+            name='thermos-generic',
+            data=MESOS_JOB(
+                task=HELLO_WORLD,
+                health_check_config=HealthCheckConfig(
+                    health_checker=HealthCheckerConfig(shell=shell_config),
+                    interval_secs=interval_secs,
+                    initial_interval_secs=initial_interval_secs,
+                    max_consecutive_failures=max_consecutive_failures,
+                    timeout_secs=timeout_secs,
+                )
+            ).json_dumps()
+        )
+    )
+    assigned_task = AssignedTask(task=task_config, instanceId=1, assignedPorts={'foo': 9001})
+    interpolated_cmd = HealthCheckerProvider.interpolate_cmd(
+      assigned_task,
+      cmd=shell_cmd
+    )
+    assert interpolated_cmd == 'FOO_PORT=9001 failed command'
 
   def test_from_assigned_task_no_health_port(self):
     interval_secs = 17
