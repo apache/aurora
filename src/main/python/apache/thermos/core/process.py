@@ -285,6 +285,9 @@ class ProcessBase(object):
       self._wait_for_control()  # can raise CheckpointError
       try:
         self.execute()
+      except Exception as e:
+        self._log('Error trying to execute %s: %s' % (self._name, e))
+        raise e
       finally:
         self._ckpt.close()
         self.finish()
