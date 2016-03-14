@@ -95,8 +95,8 @@ CREATE TABLE task_configs(
   max_task_failures INTEGER NOT NULL,
   production BOOLEAN NOT NULL,
   contact_email VARCHAR,
-  executor_name VARCHAR NOT NULL,
-  executor_data VARCHAR NOT NULL,
+  executor_name VARCHAR,
+  executor_data VARCHAR,
   tier VARCHAR
 );
 

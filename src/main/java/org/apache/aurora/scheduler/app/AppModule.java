@@ -17,6 +17,7 @@ import java.util.Set;
 
 import javax.inject.Singleton;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
@@ -54,6 +55,8 @@ import org.apache.aurora.scheduler.thrift.Thresholds;
 import org.apache.aurora.scheduler.updater.UpdaterModule;
 import org.apache.mesos.Scheduler;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Binding module for the aurora scheduler application.
  */
@@ -64,8 +67,7 @@ public class AppModule extends AbstractModule {
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
   public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(DEFAULT_MAX_TASKS_PER_JOB);
 
-  private static final int DEFAULT_MAX_UPDATE_INSTANCE_FAILURES =
-      DEFAULT_MAX_TASKS_PER_JOB * 5;
+  private static final int DEFAULT_MAX_UPDATE_INSTANCE_FAILURES = DEFAULT_MAX_TASKS_PER_JOB * 5;
 
   @Positive
   @CmdLine(name = "max_update_instance_failures", help = "Upper limit on the number of "
@@ -88,13 +90,28 @@ public class AppModule extends AbstractModule {
   private static final Arg<Multimap<String, String>> DEFAULT_DOCKER_PARAMETERS =
       Arg.create(ImmutableMultimap.of());
 
+  @CmdLine(name = "require_docker_use_executor",
+      help = "If false, Docker tasks may run without an executor (EXPERIMENTAL)")
+  private static final Arg<Boolean> REQUIRE_DOCKER_USE_EXECUTOR = Arg.create(true);
+
+  private final ConfigurationManager configurationManager;
+
+  @VisibleForTesting
+  public AppModule(ConfigurationManager configurationManager) {
+    this.configurationManager = requireNonNull(configurationManager);
+  }
+
+  public AppModule() {
+    this(new ConfigurationManager(
+        ImmutableSet.copyOf(ALLOWED_CONTAINER_TYPES.get()),
+        ENABLE_DOCKER_PARAMETERS.get(),
+        DEFAULT_DOCKER_PARAMETERS.get(),
+        REQUIRE_DOCKER_USE_EXECUTOR.get()));
+  }
+
   @Override
   protected void configure() {
-    bind(ConfigurationManager.class).toInstance(
-        new ConfigurationManager(
-            ImmutableSet.copyOf(ALLOWED_CONTAINER_TYPES.get()),
-            ENABLE_DOCKER_PARAMETERS.get(),
-            DEFAULT_DOCKER_PARAMETERS.get()));
+    bind(ConfigurationManager.class).toInstance(configurationManager);
     bind(Thresholds.class)
         .toInstance(new Thresholds(MAX_TASKS_PER_JOB.get(), MAX_UPDATE_INSTANCE_FAILURES.get()));
 

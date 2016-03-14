@@ -27,7 +27,7 @@ public class DbTaskStoreTest extends AbstractTaskStoreTest {
   @Override
   protected Module getStorageModule() {
     return Modules.combine(
-        DbModule.testModule(),
+        DbModule.testModuleWithWorkQueue(),
         new AbstractModule() {
           @Override
           protected void configure() {

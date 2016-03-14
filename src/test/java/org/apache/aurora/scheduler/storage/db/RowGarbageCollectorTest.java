@@ -51,7 +51,7 @@ public class RowGarbageCollectorTest {
   @Before
   public void setUp() {
     Injector injector = Guice.createInjector(
-        DbModule.testModule(),
+        DbModule.testModuleWithWorkQueue(),
         new DbModule.GarbageCollectorModule(),
         new AbstractModule() {
           @Override

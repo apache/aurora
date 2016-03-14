@@ -53,8 +53,11 @@ public final class TaskTestUtil {
   public static final TierInfo REVOCABLE_TIER = new TierInfo(true);
   public static final TierConfig DEV_TIER_CONFIG =
       new TierConfig(ImmutableMap.of("tier-dev", new TierInfo(false)));
-  public static final ConfigurationManager CONFIGURATION_MANAGER =
-      new ConfigurationManager(ImmutableSet.of(_Fields.MESOS), false, ImmutableMultimap.of());
+  public static final ConfigurationManager CONFIGURATION_MANAGER = new ConfigurationManager(
+      ImmutableSet.of(_Fields.MESOS),
+      false,
+      ImmutableMultimap.of(),
+      true);
 
   private TaskTestUtil() {
     // Utility class.

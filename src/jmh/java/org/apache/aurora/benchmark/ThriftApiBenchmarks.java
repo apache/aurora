@@ -17,7 +17,6 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import com.google.inject.AbstractModule;
@@ -28,12 +27,12 @@ import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
 import org.apache.aurora.common.inject.Bindings;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
-import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.async.AsyncModule;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.quota.QuotaManager;
@@ -152,11 +151,7 @@ public class ThriftApiBenchmarks {
             bind(QuotaManager.class).toInstance(createThrowingFake(QuotaManager.class));
             bind(LockManager.class).toInstance(createThrowingFake(LockManager.class));
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
-            bind(ConfigurationManager.class).toInstance(
-                new ConfigurationManager(
-                    ImmutableSet.of(Container._Fields.MESOS),
-                    /* allowDockerParameters */ false,
-                    /* defaultDockerParameters */ ImmutableMultimap.of()));
+            bind(ConfigurationManager.class).toInstance(TaskTestUtil.CONFIGURATION_MANAGER);
           }
         },
         new AsyncModule(),

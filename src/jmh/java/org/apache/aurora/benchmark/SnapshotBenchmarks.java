@@ -97,7 +97,9 @@ public class SnapshotBenchmarks {
                   .toInstance(true);
             }
           },
-          DbModule.testModule(keyFactory, Optional.of(new DbModule.TaskStoreModule(keyFactory))));
+          DbModule.testModuleWithWorkQueue(
+              keyFactory,
+              Optional.of(new DbModule.TaskStoreModule(keyFactory))));
 
       storage = injector.getInstance(Key.get(Storage.class, Storage.Volatile.class));
       storage.prepare();

@@ -83,7 +83,7 @@ public class TaskStoreBenchmarks {
     public void setUp() {
       storage = Guice.createInjector(
           Modules.combine(
-              DbModule.testModule(PLAIN, Optional.of(new InMemStoresModule(PLAIN))),
+              DbModule.testModuleWithWorkQueue(PLAIN, Optional.of(new InMemStoresModule(PLAIN))),
               new AbstractModule() {
                 @Override
                 protected void configure() {

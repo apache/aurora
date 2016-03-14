@@ -54,6 +54,7 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -69,7 +70,6 @@ import org.junit.Test;
 import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
 import static org.apache.aurora.common.util.testing.FakeBuildInfo.generateBuildInfo;
 import static org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import static org.apache.aurora.scheduler.storage.db.DbModule.testModule;
 import static org.apache.aurora.scheduler.storage.db.DbUtil.createStorage;
 import static org.apache.aurora.scheduler.storage.db.DbUtil.createStorageInjector;
 import static org.junit.Assert.assertEquals;
@@ -88,7 +88,8 @@ public class SnapshotStoreImplIT {
     storage = dbTaskStore
         ? createStorage()
         : createStorageInjector(
-        testModule(PLAIN, Optional.of(new InMemStoresModule(PLAIN)))).getInstance(Storage.class);
+        DbModule.testModuleWithWorkQueue(PLAIN, Optional.of(new InMemStoresModule(PLAIN))))
+        .getInstance(Storage.class);
 
     FakeClock clock = new FakeClock();
     clock.setNowMillis(NOW);

@@ -22,7 +22,7 @@ import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 /**
  * A storage system that implements non-volatile storage operations, but is actually volatile.
  */
-class FakeNonVolatileStorage implements NonVolatileStorage {
+public class FakeNonVolatileStorage implements NonVolatileStorage {
   private final Storage delegate;
 
   @Inject

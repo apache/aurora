@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.mesos;
 
 import java.util.List;
+import java.util.Set;
 
 import javax.inject.Inject;
 
@@ -36,8 +37,10 @@ import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
@@ -45,7 +48,6 @@ import org.apache.mesos.Protos.Label;
 import org.apache.mesos.Protos.Labels;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.slf4j.Logger;
@@ -103,20 +105,19 @@ public interface MesosTaskFactory {
       return String.format("%s.%s", getJobSourceName(task), instanceId);
     }
 
-    @Override
-    public TaskInfo createFrom(IAssignedTask task, Offer offer) throws SchedulerException {
-      requireNonNull(task);
-      requireNonNull(offer);
-
-      SlaveID slaveId = offer.getSlaveId();
-
-      byte[] taskInBytes;
+    private static byte[] serializeTask(IAssignedTask task) throws SchedulerException {
       try {
-        taskInBytes = ThriftBinaryCodec.encode(task.newBuilder());
+        return ThriftBinaryCodec.encode(task.newBuilder());
       } catch (ThriftBinaryCodec.CodingException e) {
         LOG.error("Unable to serialize task.", e);
         throw new SchedulerException("Internal error.", e);
       }
+    }
+
+    @Override
+    public TaskInfo createFrom(IAssignedTask task, Offer offer) throws SchedulerException {
+      requireNonNull(task);
+      requireNonNull(offer);
 
       ITaskConfig config = task.getTask();
       AcceptedOffer acceptedOffer;
@@ -138,69 +139,69 @@ public interface MesosTaskFactory {
       LOG.debug(
           "Setting task resources to {}",
           Iterables.transform(resources, Protobufs::toString));
-      TaskInfo.Builder taskBuilder =
-          TaskInfo.newBuilder()
-              .setName(JobKeys.canonicalString(Tasks.getJob(task)))
-              .setTaskId(TaskID.newBuilder().setValue(task.getTaskId()))
-              .setSlaveId(slaveId)
-              .addAllResources(resources)
-              .setData(ByteString.copyFrom(taskInBytes));
 
-      configureTaskLabels(config, taskBuilder);
+      TaskInfo.Builder taskBuilder = TaskInfo.newBuilder()
+          .setName(JobKeys.canonicalString(Tasks.getJob(task)))
+          .setTaskId(TaskID.newBuilder().setValue(task.getTaskId()))
+          .setSlaveId(offer.getSlaveId())
+          .addAllResources(resources);
+
+      configureTaskLabels(config.getMetadata(), taskBuilder);
 
       if (config.getContainer().isSetMesos()) {
-        configureTaskForNoContainer(task, config, taskBuilder, acceptedOffer);
+        configureTaskForNoContainer(task, taskBuilder, acceptedOffer);
       } else if (config.getContainer().isSetDocker()) {
-        configureTaskForDockerContainer(task, config, taskBuilder, acceptedOffer);
+        IDockerContainer dockerContainer = config.getContainer().getDocker();
+        if (config.isSetExecutorConfig()) {
+          ExecutorInfo.Builder execBuilder = configureTaskForExecutor(task, acceptedOffer)
+              .setContainer(getDockerContainerInfo(dockerContainer));
+          taskBuilder.setExecutor(execBuilder.build());
+        } else {
+          LOG.warn("Running Docker-based task without an executor.");
+          taskBuilder.setContainer(getDockerContainerInfo(dockerContainer))
+              .setCommand(CommandInfo.newBuilder().setShell(false));
+        }
       } else {
         throw new SchedulerException("Task had no supported container set.");
       }
 
-      return ResourceSlot.matchResourceTypes(taskBuilder.build());
+      if (taskBuilder.hasExecutor()) {
+        taskBuilder.setData(ByteString.copyFrom(serializeTask(task)));
+        return ResourceSlot.matchResourceTypes(taskBuilder.build());
+      } else {
+        return taskBuilder.build();
+      }
     }
 
     private void configureTaskForNoContainer(
         IAssignedTask task,
-        ITaskConfig config,
         TaskInfo.Builder taskBuilder,
         AcceptedOffer acceptedOffer) {
 
-      taskBuilder.setExecutor(configureTaskForExecutor(task, config, acceptedOffer).build());
+      taskBuilder.setExecutor(configureTaskForExecutor(task, acceptedOffer).build());
     }
 
-    private void configureTaskForDockerContainer(
-        IAssignedTask task,
-        ITaskConfig taskConfig,
-        TaskInfo.Builder taskBuilder,
-        AcceptedOffer acceptedOffer) {
-
-      IDockerContainer config = taskConfig.getContainer().getDocker();
+    private ContainerInfo getDockerContainerInfo(IDockerContainer config) {
       Iterable<Protos.Parameter> parameters = Iterables.transform(config.getParameters(),
           item -> Protos.Parameter.newBuilder().setKey(item.getName())
             .setValue(item.getValue()).build());
 
       ContainerInfo.DockerInfo.Builder dockerBuilder = ContainerInfo.DockerInfo.newBuilder()
           .setImage(config.getImage()).addAllParameters(parameters);
-      ContainerInfo.Builder containerBuilder = ContainerInfo.newBuilder()
+      return ContainerInfo.newBuilder()
           .setType(ContainerInfo.Type.DOCKER)
-          .setDocker(dockerBuilder.build());
-
-      configureContainerVolumes(containerBuilder);
-
-      ExecutorInfo.Builder execBuilder = configureTaskForExecutor(task, taskConfig, acceptedOffer)
-          .setContainer(containerBuilder.build());
-
-      taskBuilder.setExecutor(execBuilder.build());
+          .setDocker(dockerBuilder.build())
+          .addAllVolumes(executorSettings.getExecutorConfig().getVolumeMounts())
+          .build();
     }
 
     private ExecutorInfo.Builder configureTaskForExecutor(
         IAssignedTask task,
-        ITaskConfig config,
         AcceptedOffer acceptedOffer) {
 
       ExecutorInfo.Builder builder = executorSettings.getExecutorConfig().getExecutor().toBuilder()
           .setExecutorId(getExecutorId(task.getTaskId()))
-          .setSource(getInstanceSourceName(config, task.getInstanceId()));
+          .setSource(getInstanceSourceName(task.getTask(), task.getInstanceId()));
       List<Resource> executorResources = acceptedOffer.getExecutorResources();
       LOG.debug(
           "Setting executor resources to {}",
@@ -209,12 +210,8 @@ public interface MesosTaskFactory {
       return builder;
     }
 
-    private void configureContainerVolumes(ContainerInfo.Builder containerBuilder) {
-      containerBuilder.addAllVolumes(executorSettings.getExecutorConfig().getVolumeMounts());
-    }
-
-    private void configureTaskLabels(ITaskConfig taskConfig, TaskInfo.Builder taskBuilder) {
-      ImmutableSet<Label> labels = taskConfig.getMetadata().stream()
+    private void configureTaskLabels(Set<IMetadata> metadata, TaskInfo.Builder taskBuilder) {
+      ImmutableSet<Label> labels = metadata.stream()
           .map(m -> Label.newBuilder()
               .setKey(METADATA_LABEL_PREFIX + m.getKey())
               .setValue(m.getValue())

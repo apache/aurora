@@ -144,6 +144,30 @@ public final class DbModule extends PrivateModule {
         ImmutableMap.of("DB_CLOSE_DELAY", "-1"));
   }
 
+  @VisibleForTesting
+  public static Module testModule(KeyFactory keyFactory, Optional<Module> taskStoreModule) {
+    return new DbModule(
+        keyFactory,
+        taskStoreModule.isPresent() ? taskStoreModule.get() : getTaskStoreModule(keyFactory),
+        "testdb-" + UUID.randomUUID().toString(),
+        // A non-zero close delay is used here to avoid eager database cleanup in tests that
+        // make use of multiple threads.  Since all test databases are separately scoped by the
+        // included UUID, multiple DB instances will overlap in time but they should be distinct
+        // in content.
+        ImmutableMap.of("DB_CLOSE_DELAY", "5"));
+  }
+
+  /**
+   * Same as {@link #testModuleWithWorkQueue(KeyFactory, Optional)} but with default task store and
+   * key factory.
+   *
+   * @return A new database module for testing.
+   */
+  @VisibleForTesting
+  public static Module testModule() {
+    return testModule(KeyFactory.PLAIN, Optional.of(new TaskStoreModule(KeyFactory.PLAIN)));
+  }
+
   /**
    * Creates a module that will prepare a private in-memory database, using a specific task store
    * implementation bound within the key factory and provided module.
@@ -153,7 +177,10 @@ public final class DbModule extends PrivateModule {
    * @return A new database module for testing.
    */
   @VisibleForTesting
-  public static Module testModule(KeyFactory keyFactory, Optional<Module> taskStoreModule) {
+  public static Module testModuleWithWorkQueue(
+      KeyFactory keyFactory,
+      Optional<Module> taskStoreModule) {
+
     return Modules.combine(
         new AbstractModule() {
           @Override
@@ -169,26 +196,21 @@ public final class DbModule extends PrivateModule {
                 });
           }
         },
-        new DbModule(
-            keyFactory,
-            taskStoreModule.isPresent() ? taskStoreModule.get() : getTaskStoreModule(keyFactory),
-            "testdb-" + UUID.randomUUID().toString(),
-            // A non-zero close delay is used here to avoid eager database cleanup in tests that
-            // make use of multiple threads.  Since all test databases are separately scoped by the
-            // included UUID, multiple DB instances will overlap in time but they should be distinct
-            // in content.
-            ImmutableMap.of("DB_CLOSE_DELAY", "5"))
+        testModule(keyFactory, taskStoreModule)
     );
   }
 
   /**
-   * Same as {@link #testModule(KeyFactory, Optional)} but with default task store and key factory.
+   * Same as {@link #testModuleWithWorkQueue(KeyFactory, Optional)} but with default task store and
+   * key factory.
    *
    * @return A new database module for testing.
    */
   @VisibleForTesting
-  public static Module testModule() {
-    return testModule(KeyFactory.PLAIN, Optional.of(new TaskStoreModule(KeyFactory.PLAIN)));
+  public static Module testModuleWithWorkQueue() {
+    return testModuleWithWorkQueue(
+        KeyFactory.PLAIN,
+        Optional.of(new TaskStoreModule(KeyFactory.PLAIN)));
   }
 
   private static Module getTaskStoreModule(KeyFactory keyFactory) {

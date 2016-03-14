@@ -37,7 +37,6 @@ import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.storage.entities.IDockerParameter;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -58,7 +57,7 @@ public class ConfigurationManagerTest {
   public ExpectedException expectedException = ExpectedException.none();
 
   private static final ImmutableSet<Container._Fields> ALL_CONTAINER_TYPES =
-      ImmutableSet.of(Container._Fields.DOCKER, Container._Fields.MESOS);
+      ImmutableSet.copyOf(Container._Fields.values());
 
   private static final JobKey JOB_KEY = new JobKey("owner-role", "devel", "email_stats");
   private static final JobConfiguration UNSANITIZED_JOB_CONFIGURATION = new JobConfiguration()
@@ -102,17 +101,16 @@ public class ConfigurationManagerTest {
   private static final ITaskConfig CONFIG_WITH_CONTAINER =
       TaskTestUtil.makeConfig(JobKeys.from("role", "env", "job"));
 
-  private ConfigurationManager configurationManager;
-  private ConfigurationManager dockerConfigurationManager;
-
-  @Before
-  public void setUp() {
-    configurationManager = new ConfigurationManager(
-        ALL_CONTAINER_TYPES, false, ImmutableMultimap.of());
-
-    dockerConfigurationManager = new ConfigurationManager(
-        ALL_CONTAINER_TYPES, true, ImmutableMultimap.of("foo", "bar"));
-  }
+  private static final ConfigurationManager CONFIGURATION_MANAGER = new ConfigurationManager(
+      ALL_CONTAINER_TYPES,
+      false,
+      ImmutableMultimap.of(),
+      true);
+  private static final ConfigurationManager DOCKER_CONFIGURATION_MANAGER = new ConfigurationManager(
+      ALL_CONTAINER_TYPES,
+      true,
+      ImmutableMultimap.of("foo", "bar"),
+      false);
 
   @Test
   public void testIsGoodIdentifier() {
@@ -130,7 +128,7 @@ public class ConfigurationManagerTest {
     taskConfig.getContainer().getDocker().setImage(null);
 
     expectTaskDescriptionException("A container must specify an image");
-    configurationManager.validateAndPopulate(ITaskConfig.build(taskConfig));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(taskConfig));
   }
 
   @Test
@@ -138,11 +136,26 @@ public class ConfigurationManagerTest {
     TaskConfig taskConfig = CONFIG_WITH_CONTAINER.newBuilder();
     taskConfig.getContainer().getDocker().addToParameters(new DockerParameter("foo", "bar"));
 
-    ConfigurationManager noParamsManager = new ConfigurationManager(
-        ALL_CONTAINER_TYPES, false, ImmutableMultimap.of());
+    expectTaskDescriptionException(ConfigurationManager.NO_DOCKER_PARAMETERS);
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(taskConfig));
+  }
 
-    expectTaskDescriptionException("Docker parameters not allowed");
-    noParamsManager.validateAndPopulate(ITaskConfig.build(taskConfig));
+  @Test
+  public void testDisallowNoExecutorDockerTask() throws TaskDescriptionException {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.getContainer().getDocker().unsetParameters();
+    builder.unsetExecutorConfig();
+
+    expectTaskDescriptionException(ConfigurationManager.EXECUTOR_REQUIRED_WITH_DOCKER);
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testAllowNoExecutorDockerTask() throws TaskDescriptionException {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.unsetExecutorConfig();
+
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
   }
 
   @Test
@@ -151,7 +164,7 @@ public class ConfigurationManagerTest {
         .setTier("pr/d"));
 
     expectTaskDescriptionException("Tier contains illegal characters");
-    configurationManager.validateAndPopulate(config);
+    CONFIGURATION_MANAGER.validateAndPopulate(config);
   }
 
   @Test
@@ -159,7 +172,8 @@ public class ConfigurationManagerTest {
     TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
     builder.getContainer().getDocker().setParameters(ImmutableList.of());
 
-    ITaskConfig result = dockerConfigurationManager.validateAndPopulate(ITaskConfig.build(builder));
+    ITaskConfig result =
+        DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
 
     // The resulting task config should contain parameters supplied to the ConfigurationManager.
     List<IDockerParameter> params = result.getContainer().getDocker().getParameters();
@@ -174,7 +188,7 @@ public class ConfigurationManagerTest {
     taskConfig.getContainer().getDocker().getParameters().clear();
     taskConfig.getContainer().getDocker().addToParameters(userParameter);
 
-    ITaskConfig result = dockerConfigurationManager.validateAndPopulate(
+    ITaskConfig result = DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(
         ITaskConfig.build(taskConfig));
 
     // The resulting task config should contain parameters supplied from user config.
@@ -190,7 +204,7 @@ public class ConfigurationManagerTest {
         .setConstraint(TaskConstraint.value(
             new ValueConstraint(false, ImmutableSet.of(JOB_KEY.getRole() + "/f"))))));
 
-    configurationManager.validateAndPopulate(ITaskConfig.build(builder));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
   }
 
   @Test
@@ -200,7 +214,7 @@ public class ConfigurationManagerTest {
         .setName(DEDICATED_ATTRIBUTE)
         .setConstraint(TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("*/f"))))));
 
-    configurationManager.validateAndPopulate(ITaskConfig.build(builder));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
   }
 
   @Test
@@ -211,7 +225,7 @@ public class ConfigurationManagerTest {
         .setConstraint(TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("r/f"))))));
 
     expectTaskDescriptionException("Only r may use hosts dedicated for that role.");
-    configurationManager.validateAndPopulate(ITaskConfig.build(builder));
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
   }
 
   private void expectTaskDescriptionException(String message) {

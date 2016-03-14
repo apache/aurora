@@ -26,7 +26,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 
 import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
-import static org.apache.aurora.scheduler.storage.db.DbModule.testModule;
+import static org.apache.aurora.scheduler.storage.db.DbModule.testModuleWithWorkQueue;
 
 /**
  * Utility class for creating ad-hoc storage instances.
@@ -68,7 +68,7 @@ public final class DbUtil {
    * @return A new storage instance.
    */
   public static Storage createStorage() {
-    return createStorageInjector(testModule()).getInstance(Storage.class);
+    return createStorageInjector(testModuleWithWorkQueue()).getInstance(Storage.class);
   }
 
   /**
@@ -77,6 +77,7 @@ public final class DbUtil {
    * @return A new storage instance.
    */
   public static Storage createFlaggedStorage() {
-    return createStorageInjector(testModule(PLAIN, Optional.absent())).getInstance(Storage.class);
+    return createStorageInjector(testModuleWithWorkQueue(PLAIN, Optional.absent()))
+        .getInstance(Storage.class);
   }
 }

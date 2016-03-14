@@ -18,6 +18,7 @@ import java.util.Objects;
 
 import javax.annotation.Nullable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
@@ -101,15 +102,18 @@ public class ConfigurationManager {
   private final ImmutableSet<Container._Fields> allowedContainerTypes;
   private final boolean allowDockerParameters;
   private final Multimap<String, String> defaultDockerParameters;
+  private final boolean requireDockerUseExecutor;
 
   public ConfigurationManager(
       ImmutableSet<Container._Fields> allowedContainerTypes,
       boolean allowDockerParameters,
-      Multimap<String, String> defaultDockerParameters) {
+      Multimap<String, String> defaultDockerParameters,
+      boolean requireDockerUseExecutor) {
 
     this.allowedContainerTypes = Objects.requireNonNull(allowedContainerTypes);
     this.allowDockerParameters = allowDockerParameters;
     this.defaultDockerParameters = Objects.requireNonNull(defaultDockerParameters);
+    this.requireDockerUseExecutor = requireDockerUseExecutor;
   }
 
   private static String getRole(IValueConstraint constraint) {
@@ -174,6 +178,14 @@ public class ConfigurationManager {
     return IJobConfiguration.build(builder);
   }
 
+  @VisibleForTesting
+  static final String NO_DOCKER_PARAMETERS =
+      "This scheduler is configured to disallow Docker parameters.";
+
+  @VisibleForTesting
+  static final String EXECUTOR_REQUIRED_WITH_DOCKER =
+      "This scheduler is configured to require an executor for Docker-based tasks.";
+
   /**
    * Check validity of and populates defaults in a task configuration.  This will return a deep copy
    * of the provided task configuration with default configuration values applied, and configuration
@@ -202,7 +214,10 @@ public class ConfigurationManager {
       throw new TaskDescriptionException("Job key " + config.getJob() + " is invalid.");
     }
 
-    if (!builder.isSetExecutorConfig()) {
+    // A task must either have an executor configuration or specify a Docker container.
+    if (!builder.isSetExecutorConfig()
+        && !(builder.isSetContainer() && builder.getContainer().isSetDocker())) {
+
       throw new TaskDescriptionException("Configuration may not be null");
     }
 
@@ -246,8 +261,12 @@ public class ConfigurationManager {
           }
         } else {
           if (!allowDockerParameters) {
-            throw new TaskDescriptionException("Docker parameters not allowed.");
+            throw new TaskDescriptionException(NO_DOCKER_PARAMETERS);
           }
+        }
+
+        if (requireDockerUseExecutor && !config.isSetExecutorConfig()) {
+          throw new TaskDescriptionException(EXECUTOR_REQUIRED_WITH_DOCKER);
         }
       }
     } else {
@@ -259,7 +278,8 @@ public class ConfigurationManager {
     }
     if (!allowedContainerTypes.contains(containerType.get())) {
       throw new TaskDescriptionException(
-          "The container type " + containerType.get().toString() + " is not allowed");
+          "This scheduler is not configured to allow the container type "
+              + containerType.get().toString());
     }
 
     return ITaskConfig.build(builder);

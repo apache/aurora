@@ -171,7 +171,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     Injector injector = Guice.createInjector(
         new UpdaterModule(executor),
-        DbModule.testModule(),
+        DbModule.testModuleWithWorkQueue(),
         new AbstractModule() {
           @Override
           protected void configure() {

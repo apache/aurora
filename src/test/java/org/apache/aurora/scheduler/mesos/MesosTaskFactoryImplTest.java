@@ -38,7 +38,9 @@ import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo;
+import org.apache.mesos.Protos.ContainerInfo.Type;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Parameter;
@@ -60,6 +62,7 @@ import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_CON
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_EXECUTOR;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class MesosTaskFactoryImplTest extends EasyMockTest {
@@ -279,8 +282,27 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         .map(m -> METADATA_LABEL_PREFIX + m.getKey() + m.getValue())
         .collect(GuavaUtils.toImmutableSet());
 
-    assertTrue(labels.size() > 0);
     assertEquals(labels, metadata);
+  }
+
+  @Test
+  public void testDockerTaskWithoutExecutor() {
+    AssignedTask builder = TASK.newBuilder();
+    builder.getTask()
+        .setContainer(Container.docker(new DockerContainer()
+            .setImage("hello-world")))
+        .unsetExecutorConfig();
+
+    TaskInfo task = getDockerTaskInfo(IAssignedTask.build(builder));
+    assertTrue(task.hasCommand());
+    assertFalse(task.getCommand().getShell());
+    assertFalse(task.hasData());
+    ContainerInfo expectedContainer = ContainerInfo.newBuilder()
+        .setType(Type.DOCKER)
+        .setDocker(DockerInfo.newBuilder()
+            .setImage("hello-world"))
+        .build();
+    assertEquals(expectedContainer, task.getContainer());
   }
 
   private static ResourceSlot getTotalTaskResources(TaskInfo task) {

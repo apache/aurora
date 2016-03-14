@@ -15,37 +15,57 @@ package org.apache.aurora.scheduler.thrift;
 
 import java.util.Optional;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.google.inject.Provides;
+import com.google.inject.TypeLiteral;
 
-import org.apache.aurora.common.application.ShutdownRegistry;
+import org.apache.aurora.common.application.ShutdownStage;
+import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.net.pool.DynamicHostSet;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.Container;
+import org.apache.aurora.gen.Container._Fields;
+import org.apache.aurora.gen.DockerContainer;
+import org.apache.aurora.gen.DockerParameter;
+import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.ServerInfo;
-import org.apache.aurora.scheduler.TaskIdGenerator;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.TierModule;
+import org.apache.aurora.scheduler.app.AppModule;
+import org.apache.aurora.scheduler.app.LifecycleModule;
+import org.apache.aurora.scheduler.app.local.FakeNonVolatileStorage;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
-import org.apache.aurora.scheduler.cron.CronJobManager;
-import org.apache.aurora.scheduler.cron.CronPredictor;
-import org.apache.aurora.scheduler.quota.QuotaManager;
-import org.apache.aurora.scheduler.state.LockManager;
-import org.apache.aurora.scheduler.state.MaintenanceController;
-import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.state.UUIDGenerator;
+import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
+import org.apache.aurora.scheduler.cron.quartz.CronModule;
+import org.apache.aurora.scheduler.mesos.DriverFactory;
+import org.apache.aurora.scheduler.mesos.DriverSettings;
+import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
+import org.apache.aurora.scheduler.quota.QuotaModule;
+import org.apache.aurora.scheduler.stats.StatsModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
+import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
-import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
-import org.apache.aurora.scheduler.updater.JobUpdateController;
+import org.apache.mesos.Protos.FrameworkInfo;
 import org.apache.shiro.subject.Subject;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ResponseCode.OK;
@@ -56,18 +76,11 @@ public class ThriftIT extends EasyMockTest {
   private static final String USER = "someuser";
   private static final IResourceAggregate QUOTA =
       IResourceAggregate.build(new ResourceAggregate(1, 1, 1));
+  private static final IServerInfo SERVER_INFO = IServerInfo.build(new ServerInfo());
 
   private AuroraAdmin.Iface thrift;
-  private StorageTestUtil storageTestUtil;
-  private QuotaManager quotaManager;
 
-  @Before
-  public void setUp() {
-    quotaManager = createMock(QuotaManager.class);
-    createThrift();
-  }
-
-  private void createThrift() {
+  private void createThrift(ConfigurationManager configurationManager) {
     Injector injector = Guice.createInjector(
         new ThriftModule(),
         new AbstractModule() {
@@ -79,24 +92,32 @@ public class ThriftIT extends EasyMockTest {
 
           @Override
           protected void configure() {
-            bindMock(CronJobManager.class);
-            bindMock(MaintenanceController.class);
+            install(new LifecycleModule());
+            install(new StatsModule());
+            install(DbModule.testModule());
+            install(new QuotaModule());
+            install(new CronModule());
+            install(new TierModule(TaskTestUtil.DEV_TIER_CONFIG));
+            bind(ExecutorSettings.class).toInstance(TestExecutorSettings.THERMOS_EXECUTOR);
+
+            install(new AppModule(configurationManager));
+
+            bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
+
+            DynamicHostSet<ServiceInstance> schedulers =
+                createMock(new Clazz<DynamicHostSet<ServiceInstance>>() { });
+            bind(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }).toInstance(schedulers);
+            bindMock(DriverFactory.class);
+            bind(DriverSettings.class).toInstance(new DriverSettings(
+                "fakemaster",
+                com.google.common.base.Optional.absent(),
+                FrameworkInfo.newBuilder()
+                    .setUser("framework user")
+                    .setName("test framework")
+                    .build()));
             bindMock(Recovery.class);
-            bindMock(LockManager.class);
-            bindMock(ShutdownRegistry.class);
-            bindMock(StateManager.class);
-            bindMock(TaskIdGenerator.class);
-            bindMock(UUIDGenerator.class);
-            bindMock(JobUpdateController.class);
-            bind(ConfigurationManager.class).toInstance(TaskTestUtil.CONFIGURATION_MANAGER);
-            bind(Thresholds.class).toInstance(new Thresholds(1000, 2000));
-            storageTestUtil = new StorageTestUtil(ThriftIT.this);
-            bind(Storage.class).toInstance(storageTestUtil.storage);
-            bind(NonVolatileStorage.class).toInstance(storageTestUtil.storage);
             bindMock(StorageBackup.class);
-            bind(QuotaManager.class).toInstance(quotaManager);
-            bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo()));
-            bindMock(CronPredictor.class);
+            bind(IServerInfo.class).toInstance(SERVER_INFO);
           }
 
           @Provides
@@ -105,21 +126,59 @@ public class ThriftIT extends EasyMockTest {
           }
         }
     );
+
+    Command shutdownCommand =
+        injector.getInstance(Key.get(Command.class, ShutdownStage.class));
+    addTearDown(shutdownCommand::execute);
+
     thrift = injector.getInstance(AnnotatedAuroraAdmin.class);
+    Storage storage = injector.getInstance(Storage.class);
+    storage.prepare();
   }
 
   @Test
   public void testSetQuota() throws Exception {
-    storageTestUtil.expectOperations();
-    quotaManager.saveQuota(
-        USER,
-        QUOTA,
-        storageTestUtil.mutableStoreProvider);
+    createThrift(TaskTestUtil.CONFIGURATION_MANAGER);
 
     control.replay();
 
     assertEquals(
         OK,
         thrift.setQuota(USER, QUOTA.newBuilder()).getResponseCode());
+
+    assertEquals(
+        QUOTA.newBuilder(),
+        thrift.getQuota(USER).getResult().getGetQuotaResult().getQuota());
+  }
+
+  @Test
+  public void testSubmitNoExecutorDockerTask() throws Exception {
+    ConfigurationManager configurationManager = new ConfigurationManager(
+        ImmutableSet.of(_Fields.DOCKER),
+        true,
+        ImmutableMultimap.of(),
+        false);
+
+    createThrift(configurationManager);
+
+    control.replay();
+
+    TaskConfig task = TaskTestUtil.makeConfig(TaskTestUtil.JOB).newBuilder();
+    task.unsetExecutorConfig();
+    task.setProduction(false)
+        .setContainer(Container.docker(new DockerContainer()
+            .setImage("image")
+            .setParameters(
+                ImmutableList.of(new DockerParameter("a", "b"), new DockerParameter("c", "d")))));
+    JobConfiguration job = new JobConfiguration()
+        .setKey(task.getJob())
+        .setTaskConfig(task)
+        .setInstanceCount(1);
+
+    assertEquals(OK, thrift.createJob(job, null).getResponseCode());
+    ScheduledTask scheduledTask = Iterables.getOnlyElement(
+        thrift.getTasksStatus(new TaskQuery()).getResult().getScheduleStatusResult().getTasks());
+    assertEquals(ScheduleStatus.PENDING, scheduledTask.getStatus());
+    assertEquals(task, scheduledTask.getAssignedTask().getTask());
   }
 }
