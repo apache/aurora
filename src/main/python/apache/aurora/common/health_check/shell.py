@@ -13,7 +13,6 @@
 #
 
 import os
-import shlex
 import sys
 
 # Recommended pattern for Python 2 and 3 support from https://github.com/google/python-subprocess32
@@ -45,9 +44,8 @@ class ShellHealthCheck(object):
     :return: A tuple of (bool, str)
     :rtype tuple:
     """
-    cmd = shlex.split(self.cmd)
     try:
-      subprocess.check_call(cmd, timeout=self.timeout_secs, shell=True)
+      subprocess.check_call(self.cmd, timeout=self.timeout_secs, shell=True)
       return True, None
     except subprocess.CalledProcessError as reason:
       # The command didn't return a 0 so provide reason for failure.

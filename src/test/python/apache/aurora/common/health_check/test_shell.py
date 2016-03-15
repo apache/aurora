@@ -40,7 +40,7 @@ class TestHealthChecker(unittest.TestCase):
     self.assertTrue(success)
     self.assertIsNone(msg)
     mock_sub.assert_called_once_with(
-      ['success', 'cmd'],
+      'success cmd',
       timeout=30,
       shell=True,
     )
@@ -54,7 +54,7 @@ class TestHealthChecker(unittest.TestCase):
     shell = ShellHealthCheck(cmd, timeout_secs=timeout)
     success, msg = shell()
     mock_sub.assert_called_once_with(
-      ['cmd', 'to', 'fail'],
+      'cmd to fail',
       timeout=30,
       shell=True,
     )
@@ -70,7 +70,7 @@ class TestHealthChecker(unittest.TestCase):
     shell = ShellHealthCheck(cmd, timeout_secs=timeout)
     success, msg = shell()
     mock_sub.assert_called_once_with(
-      ['cmd', 'to', 'not', 'exist'],
+      'cmd to not exist',
       timeout=30,
       shell=True,
     )
@@ -87,7 +87,7 @@ class TestHealthChecker(unittest.TestCase):
     shell = ShellHealthCheck(cmd, timeout_secs=timeout)
     success, msg = shell()
     mock_sub.assert_called_once_with(
-      ['defensive', 'cmd'],
+      'defensive cmd',
       timeout=10,
       shell=True,
     )
