@@ -1,16 +1,15 @@
 0.13.0
 ------
 
-New/updated:
+### New/updated:
 
 - Upgraded Mesos to 0.26.0
 - Added a new `aurora job add` client command to scale out an existing job.
 - Upgraded the scheduler ZooKeeper client from 3.4.6 to 3.4.8.
 - Added support for dedicated constraints not exclusive to a particular role.
-  See https://github.com/apache/aurora/blob/master/docs/deploying-aurora-scheduler.md#dedicated-attribute
-  for more details.
+  See [here](docs/deploying-aurora-scheduler.md#dedicated-attribute) for more details.
 
-Deprecations and removals:
+### Deprecations and removals:
 
 - Removed deprecated (now redundant) fields:
   - `Identity.role`
@@ -18,7 +17,8 @@ Deprecations and removals:
   - `TaskConfig.jobName`
   - `TaskQuery.owner`
 - Task ID strings are no longer prefixed by a timestamp.
-- Scheduler H2 in-memory database is now using MVStore: http://www.h2database.com/html/mvstore.html.
+- Scheduler H2 in-memory database is now using
+  [MVStore](http://www.h2database.com/html/mvstore.html)
   In addition, scheduler thrift snapshots are now supporting full DB dumps for faster restarts.
 - Added scheduler argument `-require_docker_use_executor` that indicates whether the scheduler
   should accept tasks that use the Docker containerizer without an executor (experimental).
@@ -26,7 +26,7 @@ Deprecations and removals:
 0.12.0
 ------
 
-New/updated:
+### New/updated:
 
 - Upgraded Mesos to 0.25.0.
 - Upgraded the scheduler ZooKeeper client from 3.3.4 to 3.4.6.
@@ -37,18 +37,17 @@ New/updated:
 - Added new scheduler flag `-default_docker_parameters` to allow a cluster operator to specify a
   universal set of parameters that should be used for every container that does not have parameters
   explicitly configured at the job level.
-- Added support for jobs to specify arbitrary ZooKeeper paths for service registration.  See
-  https://github.com/apache/aurora/blob/master/docs/configuration-reference.md#announcer-objects
-  for details.
+- Added support for jobs to specify arbitrary ZooKeeper paths for service registration.
+  See [here](docs/configuration-reference.md#announcer-objects) for details.
 - Log destination is configurable for the thermos runner. See the configuration reference for details
   on how to configure destination per-process. Command line options may also be passed through the
   scheduler in order to configure the global default behavior.
 - Env variables can be passed through to task processes by passing `--preserve_env`
   to thermos.
 - Changed scheduler logging to use logback.
-  Operators wishing to customize logging may do so with standard logback configuration as described
-  at http://logback.qos.ch/manual/configuration.html
-- When using --read-json, aurora can now load multiple jobs from one json file,
+  Operators wishing to customize logging may do so with standard
+  [logback configuration](http://logback.qos.ch/manual/configuration.html)
+- When using `--read-json`, aurora can now load multiple jobs from one json file,
   similar to the usual pystachio structure: `{"jobs": [job1, job2, ...]}`. The
   older single-job json format is also still supported.
 - `aurora config list` command now supports `--read-json`
@@ -58,7 +57,7 @@ New/updated:
 - The `addInstances` thrift RPC does now increase job instance count (scale out) based on the
   task template pointed by instance `key`.
 
-Deprecations and removals:
+### Deprecations and removals:
 
 - Deprecated `AddInstancesConfig` argument in `addInstances` thrift RPC.
 - Deprecated `TaskQuery` argument in `killTasks` thrift RPC to disallow killing tasks across
@@ -86,7 +85,7 @@ Deprecations and removals:
 0.11.0
 ------
 
-New/updated:
+### New/updated:
 
 - Upgraded Mesos to 0.24.1.
 - Added a new scheduler flag 'framework_announce_principal' to support use of authorization and
@@ -101,7 +100,7 @@ New/updated:
   on how configure rotation per-process. Command line options may also be passed through the
   scheduler in order to configure the global default behavior.
 
-Deprecations and removals:
+### Deprecations and removals:
 
 - The client-side updater has been removed, along with the CLI commands that used it:
   'aurora job update' and 'aurora job cancel-update'.  Users are encouraged to take
@@ -118,29 +117,30 @@ Deprecations and removals:
 0.10.0
 ------
 
-New/updated:
+### New/updated:
 
 - Upgraded Mesos to 0.23.0. NOTE: Aurora executor now requires openssl runtime dependencies that
   were not previously enforced. You will need libcurl available on every Mesos slave (or Docker
-  container) to successfully launch Aurora executor. See
-  https://github.com/apache/mesos/blob/ebcf8cc2f2f6c236f6e9315447c247e6348141e1/docs/getting-started.md
-  for more details on Mesos runtime dependencies.
+  container) to successfully launch Aurora executor.  See [here](docs/getting-started.md) for more
+  details on Mesos runtime dependencies.
 - Resource quota is no longer consumed by production jobs with a dedicated constraint (AURORA-1457).
 - The Python build layout has changed:
-  * The apache.thermos package has been removed.
-  * The apache.gen.aurora package has been renamed to apache.aurora.thrift.
-  * The apache.gen.thermos package has been renamed to apache.thermos.thrift.
-  * A new apache.thermos.runner package has been introduced, providing the thermos_runner binary.
-  * A new apache.aurora.kerberos package has been introduced, containing the Kerberos-supporting
-    versions of aurora and aurora_admin (kaurora and kaurora_admin).
-  * Most BUILD targets under src/main have been removed, see http://s.apache.org/b8z for details.
+  * The `apache.thermos` package has been removed.
+  * The `apache.gen.aurora` package has been renamed to `apache.aurora.thrift`.
+  * The `apache.gen.thermos` package has been renamed to `apache.thermos.thrift`.
+  * A new `apache.thermos.runner` package has been introduced, providing the `thermos_runner`
+    binary.
+  * A new `apache.aurora.kerberos` package has been introduced, containing the Kerberos-supporting
+    versions of `aurora` and `aurora_admin` (`kaurora` and `kaurora_admin`).
+  * Most BUILD targets under `src/main` have been removed, see [here](http://s.apache.org/b8z) for
+    details.
 
-Deprecations and removals:
+### Deprecations and removals:
 
 - Removed the `--root` option from the observer.
-- Thrift ConfigGroup.instanceIds field has been deprecated. Use ConfigGroup.instances instead.
-- Deprecated SessionValidator and CapabilityValidator interfaces have been removed. All
-  SessionKey-typed arguments are now nullable and ignored by the scheduler Thrift API.
+- Thrift `ConfigGroup.instanceIds` field has been deprecated. Use ConfigGroup.instances instead.
+- Deprecated `SessionValidator` and `CapabilityValidator` interfaces have been removed. All
+  `SessionKey`-typed arguments are now nullable and ignored by the scheduler Thrift API.
 
 
 0.9.0
@@ -148,19 +148,19 @@ Deprecations and removals:
 
 - Now requires JRE 8 or greater.
 - GC executor is fully replaced by the task state reconciliation (AURORA-1047).
-- The scheduler command line argument 'enable_legacy_constraints' has been
-  removed, and the scheduler no longer automatically injects 'host' and 'rack'
+- The scheduler command line argument `-enable_legacy_constraints` has been
+  removed, and the scheduler no longer automatically injects `host` and `rack`
   constraints for production services. (AURORA-1074)
 - SLA metrics for non-production jobs have been disabled by default. They can
   be enabled via the scheduler command line. Metric names have changed from
-  '...nonprod_ms' to "...ms_nonprod" (AURORA-1350).
+  `...nonprod_ms` to `...ms_nonprod` (AURORA-1350).
 
 
 0.8.0
 -----
 
-- A new command line argument was added to the observer: --mesos-root
-  This must point to the same path as --work_dir on the mesos slave.
+- A new command line argument was added to the observer: `--mesos-root`
+  This must point to the same path as `--work_dir` on the mesos slave.
 - Build targets for thermos and observer have changed, they are now:
-  * src/main/python/apache/aurora/tools:thermos
-  * src/main/python/apache/aurora/tools:thermos_observer
+  * `src/main/python/apache/aurora/tools:thermos`
+  * `src/main/python/apache/aurora/tools:thermos_observer`
