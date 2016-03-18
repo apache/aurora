@@ -34,6 +34,7 @@ Aurora + Thermos Configuration Reference
     - [Container Objects](#container)
     - [LifecycleConfig Objects](#lifecycleconfig-objects)
 - [Specifying Scheduling Constraints](#specifying-scheduling-constraints)
+- [Executor Wrapper](#executor-wrapper)
 - [Template Namespaces](#template-namespaces)
     - [mesos Namespace](#mesos-namespace)
     - [thermos Namespace](#thermos-namespace)
@@ -461,6 +462,15 @@ zookeeper ensemble configured by the executor (which can be optionally overriden
 zk_path parameter).  If no Announcer object is specified,
 no announcement will take place.  For more information about ServerSets, see the [User Guide](user-guide.md).
 
+By default, the hostname in the registered endpoints will be the `--hostname` parameter
+that is passed to the mesos slave. To override the hostname value, the executor can be started
+with `--announcer-hostname=<overriden_value>`. If you decide to use `--announcer-hostname` and if
+the overriden value needs to change for every executor, then the executor has to be started inside a wrapper, see [Executor Wrapper](#executor-wrapper).
+
+For example, if you want the hostname in the endpoint to be an IP address instead of the hostname,
+the `--hostname` parameter to the mesos slave can be set to the machine IP or the executor can
+be started with `--announcer-hostname=<host_ip>` while wrapping the executor inside a script.
+
 | object                         | type      | description
 | -------                        | :-------: | --------
 | ```primary_port```             | String    | Which named port to register as the primary endpoint in the ServerSet (Default: `http`)
@@ -590,6 +600,20 @@ most one task per rack:
     }
 
 Use these constraints sparingly as they can dramatically reduce Tasks' schedulability.
+
+
+Executor Wrapper
+================
+
+If you need to do computation before starting the thermos executor (for example, setting a different
+`--announcer-hostname` parameter for every executor), then the thermos executor should be invoked
+ inside a wrapper script. In such a case, the aurora scheduler should be started with
+ `-thermos_executor_path` pointing to the wrapper script and `-thermos_executor_resources`
+ set to a comma separated string of all the resources that should be copied into
+ the sandbox (including the original thermos executor).
+
+For example, to wrap the executor inside a simple wrapper, the scheduler will be started like this
+`-thermos_executor_path=/path/to/wrapper.sh -thermos_executor_resources=/usr/share/aurora/bin/thermos_executor.pex`
 
 Template Namespaces
 ===================

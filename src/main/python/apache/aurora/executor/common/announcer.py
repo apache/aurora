@@ -54,9 +54,10 @@ def make_endpoints(hostname, portmap, primary_port):
 
 
 class AnnouncerCheckerProvider(StatusCheckerProvider):
-  def __init__(self, allow_custom_serverset_path=False, name=None):
+  def __init__(self, allow_custom_serverset_path=False, hostname=None, name=None):
     self.name = name
-    self.__allow_custom_serverset_path = allow_custom_serverset_path
+    self._allow_custom_serverset_path = allow_custom_serverset_path
+    self._override_hostname = hostname
     super(AnnouncerCheckerProvider, self).__init__()
 
   @abstractmethod
@@ -75,17 +76,23 @@ class AnnouncerCheckerProvider(StatusCheckerProvider):
 
     portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)
 
+    # Overriding hostname can be done either by explicitly specifying a value or
+    # by changing the value of assigned_task.slaveHost.
     # assigned_task.slaveHost is the --hostname argument passed into the mesos slave.
-    # Using this allows overriding the hostname published into ZK when announcing.
-    # If no argument was passed to the mesos-slave, the slave falls back to gethostname().
+    # If no argument was passed to the mesos-slave, the slave falls back to gethostname()
+    if self._override_hostname:
+      hostname = self._override_hostname
+    else:
+      hostname = assigned_task.slaveHost
+
     endpoint, additional = make_endpoints(
-      assigned_task.slaveHost,
+      hostname,
       portmap,
       mesos_task.announce().primary_port().get())
 
     client = self.make_zk_client()
     if mesos_task.announce().has_zk_path():
-      if self.__allow_custom_serverset_path:
+      if self._allow_custom_serverset_path:
         path = mesos_task.announce().zk_path().get()
       else:
         app.error('Executor must be started with --announcer-allow-custom-serverset-path in order '
@@ -111,10 +118,11 @@ class DefaultAnnouncerCheckerProvider(AnnouncerCheckerProvider):
       max_delay=DEFAULT_RETRY_MAX_DELAY.as_(Time.SECONDS),
   )
 
-  def __init__(self, ensemble, root='/aurora', allow_custom_serverset_path=False):
+  def __init__(self, ensemble, root='/aurora', allow_custom_serverset_path=False, hostname=None):
     self.__ensemble = ensemble
     self.__root = root
-    super(DefaultAnnouncerCheckerProvider, self).__init__(allow_custom_serverset_path)
+    super(DefaultAnnouncerCheckerProvider, self).__init__(
+          allow_custom_serverset_path, hostname)
 
   def make_zk_client(self):
     return KazooClient(self.__ensemble, connection_retry=self.DEFAULT_RETRY_POLICY)

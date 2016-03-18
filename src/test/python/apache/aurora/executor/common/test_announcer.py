@@ -17,7 +17,7 @@ import threading
 import pytest
 from kazoo.client import KazooClient
 from kazoo.exceptions import KazooException
-from mock import MagicMock, create_autospec, patch
+from mock import MagicMock, call, create_autospec, patch
 from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 from twitter.common.zookeeper.serverset import Endpoint, ServerSet
@@ -321,3 +321,21 @@ def test_announcer_provider_with_zkpath(mock_client_provider, mock_serverset_pro
   mock_serverset_provider.assert_called_once_with(mock_client, '/uns/v1/sjc1-prod/us1/service/prod')
   assert checker.name() == 'announcer'
   assert checker.status is None
+
+
+@patch('apache.aurora.executor.common.announcer.ServerSet')
+@patch('apache.aurora.executor.common.announcer.KazooClient')
+@patch('apache.aurora.executor.common.announcer.Endpoint')
+def test_announcer_provider_with_hostcmd(endpoint_mock_provider,
+                                         mock_client_provider, mock_serverset_provider):
+  mock_client = create_autospec(spec=KazooClient, instance=True)
+  mock_client_provider.return_value = mock_client
+  mock_serverset = create_autospec(spec=ServerSet, instance=True)
+  mock_serverset_provider.return_value = mock_serverset
+
+  dap = DefaultAnnouncerCheckerProvider('zookeeper.example.com', '/aurora', False, '10.2.3.4')
+  job = make_job('aurora', 'prod', 'proxy', 'primary', portmap={})
+  assigned_task = make_assigned_task(job, assigned_ports={'primary': 12345})
+  dap.from_assigned_task(assigned_task, None)
+
+  assert endpoint_mock_provider.mock_calls == [call('10.2.3.4', 12345), call('10.2.3.4', 12345)]

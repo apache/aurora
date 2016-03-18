@@ -8,6 +8,8 @@
 - Upgraded the scheduler ZooKeeper client from 3.4.6 to 3.4.8.
 - Added support for dedicated constraints not exclusive to a particular role.
   See [here](docs/deploying-aurora-scheduler.md#dedicated-attribute) for more details.
+- Added a new argument `--announcer-hostname` to thermos executor to override hostname in service
+  registry endpoint. See [here](docs/configuration-reference.md#announcer-objects) for details.
 
 ### Deprecations and removals:
 

@@ -91,6 +91,14 @@ app.add_option(
     default=False,
     help='Allows setting arbitrary serverset path through the Announcer configuration.')
 
+app.add_option(
+    '--announcer-hostname',
+    dest='announcer_hostname',
+    type=str,
+    default=None,
+    help='Set hostname to be announced. By default it is'
+         'the --hostname argument passed into the mesos slave'
+)
 
 app.add_option(
     '--execute-as-user',
@@ -186,7 +194,8 @@ def initialize(options):
     status_providers.append(DefaultAnnouncerCheckerProvider(
       options.announcer_ensemble,
       options.announcer_serverset_path,
-      options.announcer_allow_custom_serverset_path
+      options.announcer_allow_custom_serverset_path,
+      options.announcer_hostname
     ))
 
   # Create executor stub
