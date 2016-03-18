@@ -23,7 +23,8 @@ Vagrant.require_version ">= 1.5.0"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.hostname = "aurora.local"
-  config.vm.box = "ubuntu/trusty64"
+  # See build-support/packer/README.md for instructions on updating this box.
+  config.vm.box = "apache-aurora/dev-environment"
 
   config.vm.define "devcluster" do |dev|
     dev.vm.network :private_network, ip: "192.168.33.7"

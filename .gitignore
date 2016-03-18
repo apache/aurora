@@ -1,4 +1,4 @@
-# SYNTAX NOTE: dist/ will ignore any directory named dist. Use dist/* to ignore dist in project root.
+*.box
 *.iml
 *.ipr
 *.iws

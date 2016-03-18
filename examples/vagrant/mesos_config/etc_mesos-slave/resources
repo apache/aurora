@@ -1,0 +1,1 @@
+cpus(aurora-role):0.5;cpus(*):3.5;mem(aurora-role):1024;disk:20000

@@ -13,56 +13,18 @@
 # limitations under the License.
 #
 
-apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9
-echo deb https://get.docker.com/ubuntu docker main > /etc/apt/sources.list.d/docker.list
-add-apt-repository ppa:openjdk-r/ppa -y
-apt-get update
-apt-get -y install \
-    bison \
-    curl \
-    git \
-    libapr1-dev \
-    libcurl4-nss-dev \
-    libsasl2-dev \
-    libsvn-dev \
-    lxc-docker \
-    openjdk-8-jdk \
-    python-dev \
-    zookeeperd
-
-update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+####################################################################################################
+# NOTE: When making changes to this file (especially if you are installing new packages), consider
+#       instead making changes to the base vagrant box (see build-support/packer/README.md).
+####################################################################################################
 
 readonly IP_ADDRESS=192.168.33.7
 
-readonly MESOS_VERSION=0.26.0
-
 function prepare_extras() {
   pushd aurora
-    # Fetch the mesos egg, needed to build python components.
-    # The mesos.native target in 3rdparty/python/BUILD expects to find the native egg in third_party.
-    mkdir -p third_party
-    pushd third_party
-      wget -c https://svn.apache.org/repos/asf/aurora/3rdparty/ubuntu/trusty64/python/mesos.native-${MESOS_VERSION}-py2.7-linux-x86_64.egg
-    popd
-
-    # Install thrift, needed for code generation in the scheduler build.
-    curl -sSL http://apache.org/dist/thrift/KEYS | gpg --import -
-    gpg --export --armor 66B778F9 | sudo apt-key add -
-    echo 'deb http://www.apache.org/dist/thrift/debian 0.9.1 main' > /etc/apt/sources.list.d/thrift.list
-    apt-get update
-    apt-get install thrift-compiler=0.9.1
-
     # Include build script in default PATH.
     ln -sf /home/vagrant/aurora/examples/vagrant/aurorabuild.sh /usr/local/bin/aurorabuild
   popd
-
-  sudo chown -R vagrant:vagrant aurora
-}
-
-function install_mesos {
-  deb=mesos_${MESOS_VERSION}-0.2.145.ubuntu1404_amd64.deb
-  wget -c http://downloads.mesosphere.io/master/ubuntu/14.04/$deb
-  dpkg --install $deb
 }
 
 function install_cluster_config {
@@ -103,27 +65,34 @@ function sudoless_docker_setup {
 }
 
 function start_services {
-  #Executing true on failure to please bash -e in case services are already running
+  # Executing true on failure to please bash -e in case services are already running
   start zookeeper    || true
-  start mesos-master || true
-  start mesos-slave  || true
 }
 
 function prepare_sources {
+  # Assign mesos command line arguments.
+  cp /vagrant/examples/vagrant/mesos_config/etc_mesos-slave/* /etc/mesos-slave
+  cp /vagrant/examples/vagrant/mesos_config/etc_mesos-master/* /etc/mesos-master
+  stop mesos-master || true
+  stop mesos-slave || true
+  start mesos-master
+  start mesos-slave
+
   cat > /usr/local/bin/update-sources <<EOF
 #!/bin/bash
 rsync -urzvhl /vagrant/ /home/vagrant/aurora \
     --filter=':- /vagrant/.gitignore' \
     --exclude=.git \
+    --exclude=/third_party \
     --delete
 # Install/update the upstart configurations.
 sudo cp /vagrant/examples/vagrant/upstart/*.conf /etc/init
 EOF
   chmod +x /usr/local/bin/update-sources
-  update-sources
+  update-sources > /dev/null
+  chown -R vagrant:vagrant /home/vagrant
 }
 
-install_mesos
 prepare_sources
 prepare_extras
 install_cluster_config
