@@ -24,6 +24,7 @@ We encourage you to ask questions on the [Aurora user list](http://aurora.apache
  * [Security](security.md)
  * [Monitoring](monitoring.md)
  * [Hooks for Aurora Client API](hooks.md)
+ * [Scheduler Configuration](scheduler-configuration.md)
  * [Scheduler Storage](storage.md)
  * [Scheduler Storage and Maintenance](storage-config.md)
  * [SLA Measurement](sla.md)

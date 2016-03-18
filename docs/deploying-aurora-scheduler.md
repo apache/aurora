@@ -90,9 +90,7 @@ Like Mesos, Aurora uses command-line flags for runtime configuration. As such th
 That way Aurora's current flags are visible in `ps` and in the `/vars` admin endpoint.
 
 Examples are available under `examples/scheduler/`. For a list of available Aurora flags and their
-documentation run
-
-    /usr/local/aurora-scheduler/bin/aurora-scheduler -help
+documentation, see [this document](scheduler-configuration.md).
 
 ### Replicated Log Configuration
 All Aurora state is persisted to a replicated log. This includes all jobs Aurora is running
