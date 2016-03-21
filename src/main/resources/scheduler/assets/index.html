@@ -1,3 +1,4 @@
+<!doctype html>
 <!--
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -11,23 +12,85 @@
  See the License for the specific language governing permissions and
  limitations under the License.
  -->
-<html>
-  <a href='/apiclient/api.html'>/apiclient/api.html</a><br />
-  <a href='/contention'>/contention</a><br />
-  <a href='/cron'>/cron</a><br />
-  <a href='/graphview'>/graphview</a><br />
-  <a href='/locks'>/locks</a><br />
-  <a href='/logconfig'>/logconfig</a><br />
-  <a href='/maintenance'>/maintenance</a><br />
-  <a href='/mname'>/mname</a><br />
-  <a href='/offers'>/offers</a><br />
-  <a href='/pendingtasks'>/pendingtasks</a><br />
-  <a href='/quotas'>/quotas</a><br />
-  <a href='/scheduler'>/scheduler</a><br />
-  <a href='/services'>/services</a><br />
-  <a href='/slaves'>/slaves</a><br />
-  <a href='/structdump'>/structdump</a><br />
-  <a href='/threads'>/threads</a><br />
-  <a href='/utilization'>/utilization</a><br />
-  <a href='/vars'>/vars</a><br />
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <meta name='google' value='notranslate'>
+  <link rel='icon' href='/assets/images/aurora.png' type='image/png'/>
+  <title>Aurora</title>
+
+  <!-- Bootstrap -->
+  <link href='/assets/bower_components/bootstrap/dist/css/bootstrap.min.css' rel='stylesheet'>
+
+  <!-- Load our css at the end so we can override bootstrap css properties as needed -->
+  <link rel='stylesheet' href='/assets/css/app.css'/>
+
+</head>
+<body>
+
+<nav class="navbar navbar-static-top header" role="navigation">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <img class="logo" src="/assets/images/aurora_logo.png"/>
+    </div>
+  </div>
+</nav>
+
+<div class='container-fluid'>
+  <div class='container-fluid'>
+
+    <div class='row'>
+      <div class='col-md-12'>
+      <ul class='breadcrumb'>
+        <li><a href='#'></a>Administration</li>
+      </ul>
+      </div>
+    </div>
+
+  <div class='container-fluid'>
+
+    <h4>Enduser Interface</h4>
+    <ul class="list-unstyled group-summary">
+      <li><a href='/mname'>/mname</a></li>
+      <li><a href='/scheduler'>/scheduler</a></li>
+      <li><a href='/updates'>/updates</a></li>
+    </ul>
+
+    <h4>Cluster Overview</h4>
+    <ul class="list-unstyled group-summary" >
+      <li><a href='/cron'>/cron</a></li>
+      <li><a href='/maintenance'>/maintenance</a></li>
+      <li><a href='/offers'>/offers</a></li>
+      <li><a href='/pendingtasks'>/pendingtasks</a></li>
+      <li><a href='/quotas'>/quotas</a></li>
+      <li><a href='/slaves'>/slaves</a></li>
+      <li><a href='/utilization'>/utilization</a></li>
+    </ul>
+
+   <h4> Scheduler API</h4>
+    <ul class="list-unstyled group-summary">
+      <li><a href='/apiclient/api.html'>/apiclient/api.html</a></li>
+    </ul>
+
+
+   <h4> Scheduler Internals</h4>
+    <ul class="list-unstyled group-summary">
+      <li><a href='/contention'>/contention</a></li>
+      <li><a href='/locks'>/locks</a></li>
+      <li><a href='/logconfig'>/logconfig</a></li>
+      <li><a href='/services'>/services</a></li>
+      <li><a href='/structdump'>/structdump</a></li>
+      <li><a href='/threads'>/threads</a></li>
+    </ul>
+
+    <h4>Statistics</h4>
+    <ul class="list-unstyled group-summary">
+      <li><a href='/graphview'>/graphview</a></li>
+      <li><a href='/vars'>/vars</a></li>
+    </div>
+
+  </div>
+</div>
+
+</body>
 </html>
