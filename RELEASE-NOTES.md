@@ -10,6 +10,7 @@
   See [here](docs/deploying-aurora-scheduler.md#dedicated-attribute) for more details.
 - Added a new argument `--announcer-hostname` to thermos executor to override hostname in service
   registry endpoint. See [here](docs/configuration-reference.md#announcer-objects) for details.
+- Descheduling a cron job that was not actually scheduled will no longer return an error.
 
 ### Deprecations and removals:
 

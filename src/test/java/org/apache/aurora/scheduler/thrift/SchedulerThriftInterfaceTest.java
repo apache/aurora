@@ -1020,7 +1020,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        invalidResponse(notScheduledCronMessage(JOB_KEY)),
+        okEmptyResponse(notScheduledCronMessage(JOB_KEY)),
         thrift.descheduleCronJob(JOB_KEY.newBuilder(), null));
   }
 
@@ -1252,6 +1252,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static Response okEmptyResponse() {
     return response(OK, Optional.absent());
+  }
+
+  private static Response okEmptyResponse(String message) {
+    return Responses.empty()
+        .setResponseCode(OK)
+        .setDetails(ImmutableList.of(new ResponseDetail(message)));
   }
 
   private static Response invalidResponse(String message) {

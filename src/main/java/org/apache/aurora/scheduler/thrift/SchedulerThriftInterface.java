@@ -342,10 +342,11 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
           java.util.Optional.ofNullable(mutableLock).map(ILock::build));
 
-      if (!cronJobManager.deleteJob(jobKey)) {
-        return invalidRequest(notScheduledCronMessage(jobKey));
+      if (cronJobManager.deleteJob(jobKey)) {
+        return ok();
+      } else {
+        return addMessage(empty(), OK, notScheduledCronMessage(jobKey));
       }
-      return ok();
     } catch (LockException e) {
       return error(LOCK_ERROR, e);
     }
