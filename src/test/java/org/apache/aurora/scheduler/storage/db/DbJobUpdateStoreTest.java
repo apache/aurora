@@ -60,7 +60,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.After;
@@ -147,8 +146,7 @@ public class DbJobUpdateStoreTest {
         StorageEntityUtil.getField(JobUpdateSummary.class, "state"),
         StorageEntityUtil.getField(IJobUpdateSummary.class, "state"),
         StorageEntityUtil.getField(Range.class, "first"),
-        StorageEntityUtil.getField(Range.class, "last"),
-        StorageEntityUtil.getField(ITaskConfig.class, "image"));
+        StorageEntityUtil.getField(Range.class, "last"));
     saveUpdate(update1, Optional.of("lock1"));
     assertUpdate(update1);
 
@@ -184,8 +182,7 @@ public class DbJobUpdateStoreTest {
         StorageEntityUtil.getField(JobUpdateSummary.class, "state"),
         StorageEntityUtil.getField(IJobUpdateSummary.class, "state"),
         StorageEntityUtil.getField(Range.class, "first"),
-        StorageEntityUtil.getField(Range.class, "last"),
-        StorageEntityUtil.getField(ITaskConfig.class, "image"));
+        StorageEntityUtil.getField(Range.class, "last"));
     saveUpdate(update, Optional.of("lock1"));
     assertUpdate(update);
   }

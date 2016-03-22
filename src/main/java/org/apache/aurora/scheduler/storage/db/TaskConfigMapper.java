@@ -152,28 +152,4 @@ interface TaskConfigMapper extends GarbageCollectedTableMapper {
    * @param configIds Configs to delete.
    */
   void delete(@Param("configIds") Set<Long> configIds);
-
-  /**
-   * Inserts an AppC image association with an {@link ITaskConfig}.
-   *
-   * @param configId Task config ID.
-   * @param name The name of the image.
-   * @param imageId The image's identifier.
-   */
-  void insertAppcImage(
-      @Param("configId") long configId,
-      @Param("name") String name,
-      @Param("imageId") String imageId);
-
-  /**
-   * Inserts a Docker image association with an {@link ITaskConfig}.
-   *
-   * @param configId Task config ID.
-   * @param name The name of the image.
-   * @param tag The image's tag.
-   */
-  void insertDockerImage(
-      @Param("configId") long configId,
-      @Param("name") String name,
-      @Param("tag") String tag);
 }

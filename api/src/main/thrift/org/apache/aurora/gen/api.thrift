@@ -210,28 +210,6 @@ union Container {
   2: DockerContainer docker
 }
 
-/** Describes an image for use with the Mesos unified containerizer in the Docker format */
-struct DockerImage {
-  /** The name of the image to run */
-  1: string name
-  /** The Docker tag identifying the image */
-  2: string tag
-}
-
-/** Describes an image for use with the Mesos unified containerizer in the AppC format */
-struct AppcImage {
-  /** The name of the image to run */
-  1: string name
-  /** The appc image id identifying the image */
-  2: string imageId
-}
-
-/** Describes an image to be used with the Mesos unified containerizer */
-union Image {
-  1: DockerImage docker
-  2: AppcImage appc
-}
-
 /** Description of the tasks contained within a job. */
 struct TaskConfig {
  /** Job task belongs to. */
@@ -249,11 +227,6 @@ struct TaskConfig {
  18: optional bool production
  /** Task tier type. */
  30: optional string tier
- /**
-  * If using the Mesos unified containerizer, the image to run (N.B. mutually exlusive with
-  * specifying a container)
-  */
- 31: optional Image image
 
  20: set<Constraint> constraints
  /** a list of named ports this task requests */

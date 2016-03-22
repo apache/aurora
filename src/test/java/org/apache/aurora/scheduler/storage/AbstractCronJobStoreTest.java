@@ -142,8 +142,7 @@ public abstract class AbstractCronJobStoreTest {
                 .setCronSchedule("schedule")
                 .setCronCollisionPolicy(CronCollisionPolicy.CANCEL_NEW)
                 .setTaskConfig(config.newBuilder())
-                .setInstanceCount(5)),
-        StorageEntityUtil.getField(ITaskConfig.class, "image"));
+                .setInstanceCount(5)));
   }
 
   private Set<IJobConfiguration> fetchJobs() {

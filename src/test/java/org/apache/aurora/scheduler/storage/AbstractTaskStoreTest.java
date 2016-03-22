@@ -40,18 +40,14 @@ import com.google.inject.Injector;
 import com.google.inject.Module;
 
 import org.apache.aurora.common.testing.TearDownTestCase;
-import org.apache.aurora.gen.AppcImage;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.Container;
-import org.apache.aurora.gen.DockerImage;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.Image;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
@@ -153,9 +149,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   @Test
   public void testSave() {
     IScheduledTask aWithHost = setHost(TASK_A, HOST_A);
-    StorageEntityUtil.assertFullyPopulated(
-        aWithHost.newBuilder(),
-        StorageEntityUtil.getField(TaskConfig.class, "image"));
+    StorageEntityUtil.assertFullyPopulated(aWithHost.newBuilder());
 
     saveTasks(aWithHost, TASK_B);
     assertStoreContents(aWithHost, TASK_B);
@@ -176,32 +170,6 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
         ImmutableSet.of(
             new Metadata("package", "a"),
             new Metadata("package", "b")));
-    IScheduledTask task = IScheduledTask.build(builder);
-    saveTasks(task);
-    assertStoreContents(task);
-  }
-
-  @Test
-  public void testSaveWithDockerImage() {
-    ScheduledTask builder = TASK_A.newBuilder();
-
-    Image image = new Image();
-    image.setDocker(new DockerImage().setName("some-name").setTag("some-tag"));
-    builder.getAssignedTask().getTask().setImage(image);
-
-    IScheduledTask task = IScheduledTask.build(builder);
-    saveTasks(task);
-    assertStoreContents(task);
-  }
-
-  @Test
-  public void testSaveWithAppcImage() {
-    ScheduledTask builder = TASK_A.newBuilder();
-
-    Image image = new Image();
-    image.setAppc(new AppcImage().setName("some-name").setImageId("some-tag"));
-    builder.getAssignedTask().getTask().setImage(image);
-
     IScheduledTask task = IScheduledTask.build(builder);
     saveTasks(task);
     assertStoreContents(task);
