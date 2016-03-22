@@ -23,9 +23,11 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.CronCollisionPolicy;
+import org.apache.aurora.gen.DockerImage;
 import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.Image;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.LimitConstraint;
@@ -225,6 +227,31 @@ public class ConfigurationManagerTest {
         .setConstraint(TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("r/f"))))));
 
     expectTaskDescriptionException("Only r may use hosts dedicated for that role.");
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testImageAndDockerContainerConfigurationAreMutuallyExclusive() throws Exception {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.getContainer().getDocker().unsetParameters();
+
+    Image image = new Image();
+    image.setDocker(new DockerImage().setName("my-container").setTag("tag"));
+    builder.setImage(image);
+
+    expectTaskDescriptionException(ConfigurationManager.CONTAINER_AND_IMAGE_ARE_MUTUALLY_EXCLUSIVE);
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testImageWithoutContainerIsAllowed() throws Exception {
+    TaskConfig builder = UNSANITIZED_JOB_CONFIGURATION.deepCopy().getTaskConfig();
+    builder.unsetConstraints();
+
+    Image image = new Image();
+    image.setDocker(new DockerImage().setName("my-container").setTag("tag"));
+    builder.setImage(image);
+
     CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
   }
 
