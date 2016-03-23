@@ -533,13 +533,13 @@ See [Docker Command Line Reference](https://docs.docker.com/reference/commandlin
 
 ### LifecycleConfig Objects
 
-*Note: The only lifecycle configuration supported is the HTTP lifecycle via the HTTPLifecycleConfig.*
+*Note: The only lifecycle configuration supported is the HTTP lifecycle via the HttpLifecycleConfig.*
 
   param          | type                | description
   -----          | :----:              | -----------
-  ```http```     | HTTPLifecycleConfig | Configure the lifecycle manager to send lifecycle commands to the task via HTTP.
+  ```http```     | HttpLifecycleConfig | Configure the lifecycle manager to send lifecycle commands to the task via HTTP.
 
-### HTTPLifecycleConfig Objects
+### HttpLifecycleConfig Objects
 
   param          | type            | description
   -----          | :----:          | -----------
@@ -549,7 +549,7 @@ See [Docker Command Line Reference](https://docs.docker.com/reference/commandlin
 
 #### graceful_shutdown_endpoint
 
-If the Job is listening on the port as specified by the HTTPLifecycleConfig
+If the Job is listening on the port as specified by the HttpLifecycleConfig
 (default: `health`), a HTTP POST request will be sent over localhost to this
 endpoint to request that the task gracefully shut itself down.  This is a
 courtesy call before the `shutdown_endpoint` is invoked a fixed amount of
@@ -557,7 +557,7 @@ time later.
 
 #### shutdown_endpoint
 
-If the Job is listening on the port as specified by the HTTPLifecycleConfig
+If the Job is listening on the port as specified by the HttpLifecycleConfig
 (default: `health`), a HTTP POST request will be sent over localhost to this
 endpoint to request as a final warning before being shut down.  If the task
 does not shut down on its own after this, it will be forcefully killed

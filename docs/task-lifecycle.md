@@ -78,7 +78,7 @@ an identical replacement for it.
 In any case, the responsible executor on the slave follows an escalation
 sequence when killing a running task:
 
-  1. If a `HTTPLifecycleConfig` is not present, skip to (4).
+  1. If a `HttpLifecycleConfig` is not present, skip to (4).
   2. Send a POST to the `graceful_shutdown_endpoint` and wait 5 seconds.
   3. Send a POST to the `shutdown_endpoint` and wait 5 seconds.
   4. Send SIGTERM (`kill`) and wait at most `finalization_wait` seconds.
