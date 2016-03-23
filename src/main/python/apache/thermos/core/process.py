@@ -417,8 +417,13 @@ class Process(ProcessBase):
                                                        mode=self._logger_mode,
                                                        rotate_log_size=self._rotate_log_size,
                                                        rotate_log_backups=self._rotate_log_backups)
-    stdout, stderr = log_destination_resolver.get_handlers()
-    executor = PipedSubprocessExecutor(stdout=stdout,
+    stdout, stderr, handlers_are_files = log_destination_resolver.get_handlers()
+    if handlers_are_files:
+      executor = SubprocessExecutor(stdout=stdout,
+                                    stderr=stderr,
+                                    **subprocess_args)
+    else:
+      executor = PipedSubprocessExecutor(stdout=stdout,
                                        stderr=stderr,
                                        **subprocess_args)
 
@@ -486,9 +491,35 @@ class SubprocessExecutorBase(object):
     raise NotImplementedError()
 
 
+class SubprocessExecutor(SubprocessExecutorBase):
+  """
+  Basic implementation of a SubprocessExecutor that writes stderr/stdout to specified output files.
+  """
+
+  def __init__(self, args, close_fds, cwd, env, pathspec, stdout=None, stderr=None):
+    """
+    See SubprocessExecutorBase.__init__
+
+    Takes additional arguments:
+      stdout = Destination handler for stdout output. Default is /dev/null.
+      stderr = Destination handler for stderr output. Default is /dev/null.
+    """
+    super(SubprocessExecutor, self).__init__(args, close_fds, cwd, env, pathspec)
+    self._stderr = stderr
+    self._stdout = stdout
+
+  def start(self):
+    self._popen = self._start_subprocess(self._stderr, self._stdout)
+    return self._popen.pid
+
+  def wait(self):
+    return self._popen.wait()
+
+
 class PipedSubprocessExecutor(SubprocessExecutorBase):
   """
-  Implementation of SubprocessExecutorBase that passes logs to provided destinations
+  Implementation of SubprocessExecutorBase that uses pipes to poll the pipes to output streams and
+  copies them to the specified destinations.
   """
 
   READ_BUFFER_SIZE = 2 ** 16
@@ -537,7 +568,7 @@ class PipedSubprocessExecutor(SubprocessExecutorBase):
 
 class LogDestinationResolver(object):
   """
-  Resolves correct stdout/stderr destinations based on process configuration
+  Resolves correct stdout/stderr destinations based on process configuration.
   """
 
   STDOUT = 'stdout'
@@ -568,11 +599,20 @@ class LogDestinationResolver(object):
     """
     Creates stdout/stderr handler by provided configuration
     """
-    return self._get_handler(self.STDOUT), self._get_handler(self.STDERR)
+    return (self._get_handler(self.STDOUT),
+            self._get_handler(self.STDERR),
+            self._handlers_are_files())
+
+  def _handlers_are_files(self):
+    """
+    Returns True if both the handlers are standard file objects.
+    """
+    return (self._destination == LoggerDestination.CONSOLE or
+        (self._destination == LoggerDestination.FILE and self._mode == LoggerMode.STANDARD))
 
   def _get_handler(self, name):
     """
-    Constructs correct handler by provided configuration
+    Constructs correct handler or file object based on the provided configuration.
     """
 
     # On no destination write logs to /dev/null
@@ -581,7 +621,7 @@ class LogDestinationResolver(object):
 
     # Streamed logs to predefined outputs
     if self._destination == LoggerDestination.CONSOLE:
-      return self._get_stream(name)
+      return sys.stdout if name == self.STDOUT else sys.stderr
 
     # Streaming AND file logs are required
     if self._destination == LoggerDestination.BOTH:
@@ -592,7 +632,7 @@ class LogDestinationResolver(object):
 
   def _get_file(self, name):
     if self._mode == LoggerMode.STANDARD:
-      return FileHandler(self._get_log_path(name))
+      return safe_open(self._get_log_path(name), mode='a')
     if self._mode == LoggerMode.ROTATE:
       log_size = int(self._rotate_log_size.as_(Data.BYTES))
       return RotatingFileHandler(self._get_log_path(name),
@@ -612,35 +652,7 @@ class LogDestinationResolver(object):
     return self._pathspec.with_filename(log_name).getpath('process_logdir')
 
 
-class FileHandler(object):
-  """
-  Base file handler.
-  """
-
-  def __init__(self, filename, mode='w'):
-    """
-      required:
-        filename = The file name.
-
-      optional:
-        mode = Mode to open the file in.
-    """
-    self.file = safe_open(filename, mode=mode)
-    self.filename = filename
-    self.mode = mode
-    self.closed = False
-
-  def close(self):
-    if not self.closed:
-      self.file.close()
-      self.closed = True
-
-  def write(self, b):
-    self.file.write(b)
-    self.file.flush()
-
-
-class RotatingFileHandler(FileHandler):
+class RotatingFileHandler(object):
   """
   File handler that implements max size/rotation.
   """
@@ -659,10 +671,19 @@ class RotatingFileHandler(FileHandler):
       raise ValueError('A positive value for max_backups must be specified if max_bytes > 0.')
     self._max_bytes = max_bytes
     self._max_backups = max_backups
-    super(RotatingFileHandler, self).__init__(filename, mode)
+    self.file = safe_open(filename, mode=mode)
+    self.filename = filename
+    self.mode = mode
+    self.closed = False
+
+  def close(self):
+    if not self.closed:
+      self.file.close()
+      self.closed = True
 
   def write(self, b):
-    super(RotatingFileHandler, self).write(b)
+    self.file.write(b)
+    self.file.flush()
     if self.should_rollover():
       self.rollover()
 

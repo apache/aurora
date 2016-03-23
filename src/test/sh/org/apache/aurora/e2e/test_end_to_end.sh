@@ -55,6 +55,23 @@ check_url_live() {
   [[ $(curl -sL -w '%{http_code}' $1 -o /dev/null) == 200 ]]
 }
 
+test_file_removed() {
+  local _file=$1
+  local _success=0
+  for i in $(seq 1 10); do
+    if [[ ! -e $_file ]]; then
+      _success=1
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ "$_success" -ne "1" ]]; then
+    echo "File was not removed."
+    exit 1
+  fi
+}
+
 test_version() {
   # The version number is written to stderr, making it necessary to redirect the output.
   [[ $(aurora --version 2>&1) = $(cat /vagrant/.auroraversion) ]]
@@ -79,8 +96,10 @@ test_inspect() {
 
 test_create() {
   local _jobkey=$1 _config=$2
+  shift; shift
+  local _extra_args="${@}"
 
-  aurora job create $_jobkey $_config
+  aurora job create $_jobkey $_config $_extra_args
 }
 
 test_job_status() {
@@ -288,6 +307,20 @@ test_admin() {
   aurora_admin get_scheduler $_cluster | grep ":8081"
 }
 
+test_ephemeral_daemon_with_final() {
+  local _cluster=$1 _role=$2 _env=$3 _job=$4 _config=$5
+  local _jobkey="$_cluster/$_role/$_env/$_job"
+  local _stop_file=$(mktemp)
+  local _extra_args="--bind stop_file=$_stop_file"
+  rm $_stop_file
+
+  test_create $_jobkey $_config $_extra_args
+  test_observer_ui $_cluster $_role $_job
+  test_job_status $_cluster $_role $_env $_job
+  touch $_stop_file  # Stops 'main_process'.
+  test_file_removed $_stop_file  # Removed by 'final_process'.
+}
+
 restore_netrc() {
   mv ~/.netrc.bak ~/.netrc >/dev/null 2>&1 || true
 }
@@ -323,6 +356,8 @@ TEST_JOB_DOCKER=http_example_docker
 TEST_CONFIG_FILE=$EXAMPLE_DIR/http_example.aurora
 TEST_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_updated.aurora
 TEST_BAD_HEALTHCHECK_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_bad_healthcheck.aurora
+TEST_EPHEMERAL_DAEMON_WITH_FINAL_JOB=ephemeral_daemon_with_final
+TEST_EPHEMERAL_DAEMON_WITH_FINAL_CONFIG_FILE=$TEST_ROOT/ephemeral_daemon_with_final.aurora
 
 BASE_ARGS=(
   $TEST_CLUSTER
@@ -341,6 +376,14 @@ TEST_JOB_DOCKER_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_DOCKER")
 
 TEST_ADMIN_ARGS=($TEST_CLUSTER)
 
+TEST_JOB_EPHEMERAL_DAEMON_WITH_FINAL_ARGS=(
+  $TEST_CLUSTER
+  $TEST_ROLE
+  $TEST_ENV
+  $TEST_EPHEMERAL_DAEMON_WITH_FINAL_JOB
+  $TEST_EPHEMERAL_DAEMON_WITH_FINAL_CONFIG_FILE
+)
+
 trap collect_result EXIT
 
 aurorabuild all
@@ -356,6 +399,8 @@ test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
 
 test_admin "${TEST_ADMIN_ARGS[@]}"
 test_basic_auth_unauthenticated  "${TEST_JOB_ARGS[@]}"
+
+test_ephemeral_daemon_with_final "${TEST_JOB_EPHEMERAL_DAEMON_WITH_FINAL_ARGS[@]}"
 
 /vagrant/src/test/sh/org/apache/aurora/e2e/test_kerberos_end_to_end.sh
 /vagrant/src/test/sh/org/apache/aurora/e2e/test_bypass_leader_redirect_end_to_end.sh

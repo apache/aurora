@@ -29,7 +29,6 @@ from twitter.common.recordio import ThriftRecordReader
 
 from apache.thermos.common.path import TaskPath
 from apache.thermos.core.process import (
-    FileHandler,
     LogDestinationResolver,
     LoggerDestination,
     LoggerMode,
@@ -326,29 +325,30 @@ def test_resolver_none_output():
   with temporary_dir() as td:
     taskpath = make_taskpath(td)
     r = LogDestinationResolver(taskpath, destination=LoggerDestination.NONE)
-    stdout, stderr = r.get_handlers()
+    stdout, stderr, handlers_are_files = r.get_handlers()
     assert type(stdout) == StreamHandler
     assert type(stderr) == StreamHandler
+    assert not handlers_are_files
 
 
 def test_resolver_console_output():
   with temporary_dir() as td:
     taskpath = make_taskpath(td)
     r = LogDestinationResolver(taskpath, destination=LoggerDestination.CONSOLE)
-    stdout, stderr = r.get_handlers()
-    assert type(stdout) == StreamHandler
-    assert type(stderr) == StreamHandler
-    assert stdout._stream == sys.stdout
-    assert stderr._stream == sys.stderr
+    stdout, stderr, handlers_are_files = r.get_handlers()
+    assert stdout == sys.stdout
+    assert stderr == sys.stderr
+    assert handlers_are_files
 
 
 def test_resolver_file_output():
   with temporary_dir() as td:
     taskpath = make_taskpath(td)
     r = LogDestinationResolver(taskpath, destination=LoggerDestination.FILE)
-    stdout, stderr = r.get_handlers()
-    assert type(stdout) == FileHandler
-    assert type(stderr) == FileHandler
+    stdout, stderr, handlers_are_files = r.get_handlers()
+    assert type(stdout) == file
+    assert type(stderr) == file
+    assert handlers_are_files
     assert_log_file_exists(taskpath, 'stdout')
     assert_log_file_exists(taskpath, 'stderr')
 
@@ -357,9 +357,10 @@ def test_resolver_both_output():
   with temporary_dir() as td:
     taskpath = make_taskpath(td)
     r = LogDestinationResolver(taskpath, destination=LoggerDestination.BOTH)
-    stdout, stderr = r.get_handlers()
+    stdout, stderr, handlers_are_files = r.get_handlers()
     assert type(stdout) == TeeHandler
     assert type(stderr) == TeeHandler
+    assert not handlers_are_files
     assert_log_file_exists(taskpath, 'stdout')
     assert_log_file_exists(taskpath, 'stderr')
 
@@ -371,9 +372,10 @@ def test_resolver_both_with_rotation_output():
                                mode=LoggerMode.ROTATE,
                                rotate_log_size=Amount(70, Data.BYTES),
                                rotate_log_backups=2)
-    stdout, stderr = r.get_handlers()
+    stdout, stderr, handlers_are_files = r.get_handlers()
     assert type(stdout) == TeeHandler
     assert type(stderr) == TeeHandler
+    assert not handlers_are_files
     assert_log_file_exists(taskpath, 'stdout')
     assert_log_file_exists(taskpath, 'stderr')
 
