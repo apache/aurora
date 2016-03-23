@@ -106,20 +106,6 @@ recommended for most.
 Our package build toolchain makes it easy to build your own packages if you would like.  See the
 [instructions](https://github.com/apache/aurora-packaging) to learn how.
 
-### RPMs
-We currently have work in progress to provide official RPMs.  As of this writing, the suggested way
-to get RPMs is to [build them](#building-your-own-binary-packages).
-
-We do have unofficial experimental RPMs available for testing purposes.
-
-**Use these RPMs at your own risk, they are not officially released under the ASF guidelines.**
-
-    echo '[apache-aurora-wfarner]
-    name=Apache Aurora distribution maintained by wfarner
-    baseurl=http://people.apache.org/~wfarner/aurora/distributions/0.9.0/rpm/centos-7/x86_64/
-    gpgcheck = 0' | sudo tee /etc/yum.repos.d/apache-aurora-wfarner.repo > /dev/null
-
-
 ## Installing the scheduler
 ### Ubuntu Trusty
 
@@ -134,8 +120,14 @@ We do have unofficial experimental RPMs available for testing purposes.
 
 3. Install the Aurora scheduler
 
-        wget -c https://apache.bintray.com/aurora/aurora-scheduler_0.10.0-1_amd64.deb
-        sudo dpkg -i aurora-scheduler_0.10.0-1_amd64.deb
+        sudo add-apt-repository -y ppa:openjdk-r/ppa
+        sudo apt-get update
+        sudo apt-get install -y openjdk-8-jre-headless wget
+
+        sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+
+        wget -c https://apache.bintray.com/aurora/ubuntu-trusty/aurora-scheduler_0.12.0_amd64.deb
+        sudo dpkg -i aurora-scheduler_0.12.0_amd64.deb
 
 ### CentOS 7
 
@@ -152,21 +144,12 @@ We do have unofficial experimental RPMs available for testing purposes.
         sudo service zookeeper-server init
         sudo systemctl start zookeeper-server
 
-3. Install the Aurora scheduler  
-   If you haven't already, read the section on [how to get Aurora RPMs](#rpms).
+3. Install the Aurora scheduler
 
-        # Note: for older Aurora RPM versions, this may be called 'aurora'.
-        sudo yum install -y aurora-scheduler
+        sudo yum install -y wget
 
-Note: if you are using the unreleased 0.9.0 RPM, you will need to edit `/etc/sysconfig/aurora`:  
-Change  
-`-mesos_master_address='zk://127.0.0.1:2181/mesos/master'`  
-To  
-`-mesos_master_address='zk://127.0.0.1:2181/mesos'`  
-And  
-`-native_log_file_path='/var/lib/aurora/db'`  
-To  
-`-native_log_file_path='/var/lib/aurora/scheduler/db'`
+        wget -c https://apache.bintray.com/aurora/centos-7/aurora-scheduler-0.12.0-1.el7.centos.aurora.x86_64.rpm
+        sudo yum install -y aurora-scheduler-0.12.0-1.el7.centos.aurora.x86_64.rpm
 
 ### Finalizing
 By default, the scheduler will start in an uninitialized mode.  This is because external
@@ -199,12 +182,18 @@ For more detail on this topic, see the dedicated page on
 1. Install Mesos  
    Skip down to [install mesos](#mesos-on-ubuntu-trusty), then run:
 
-        sudo start mesos-slave
+        start mesos-slave
 
 2. Install Aurora executor and observer
 
-        wget -c https://apache.bintray.com/aurora/aurora-executor_0.10.0-1_amd64.deb
-        sudo dpkg -i aurora-executor_0.10.0-1_amd64.deb
+        sudo apt-get install -y python2.7 wget
+
+        # NOTE: This appears to be a missing dependency of the mesos deb package and is needed
+        # for the python mesos native bindings.
+        sudo apt-get -y install libcurl4-nss-dev
+
+        wget -c https://apache.bintray.com/aurora/ubuntu-trusty/aurora-executor_0.12.0_amd64.deb
+        sudo dpkg -i aurora-executor_0.12.0_amd64.deb
 
 ### CentOS 7
 
@@ -213,22 +202,33 @@ For more detail on this topic, see the dedicated page on
 
         sudo systemctl start mesos-slave
 
-2. Install Aurora executor and observer  
-   If you haven't already, read the section on [how to get Aurora RPMs](#rpms).
+2. Install Aurora executor and observer
 
-        # Note: for older Aurora RPM versions, this may be called 'aurora-thermos'.
-        sudo yum install -y aurora-executor
+        sudo yum install -y python2 wget
+
+        wget -c https://apache.bintray.com/aurora/centos-7/aurora-executor-0.12.0-1.el7.centos.aurora.x86_64.rpm
+        sudo yum install -y aurora-executor-0.12.0-1.el7.centos.aurora.x86_64.rpm
 
 ### Configuration
 The executor typically does not require configuration.  Command line arguments can
 be passed to the executor using a command line argument on the scheduler.
 
 The observer needs to be configured to look at the correct mesos directory in order to find task
-sandboxes. You should 1st find the Mesos working directory by looking for the Mesos master
+sandboxes. You should 1st find the Mesos working directory by looking for the Mesos slave
 `--work_dir` flag. You should see something like:
 
-        ps -eocmd | grep "mesos-master" | grep -v grep | tr ' ' '\n' | grep "\--work_dir"
+        ps -eocmd | grep "mesos-slave" | grep -v grep | tr ' ' '\n' | grep "\--work_dir"
         --work_dir=/var/lib/mesos
+
+If the flag is not set, you can view the default value like so:
+
+        mesos-slave --help
+        Usage: mesos-slave [options]
+
+          ...
+          --work_dir=VALUE      Directory path to place framework work directories
+                                (default: /tmp/mesos)
+          ...
 
 The value you find for `--work_dir`, `/var/lib/mesos` in this example, should match the Aurora
 observer value for `--mesos-root`.  You can look for that setting in a similar way on a worker
@@ -245,21 +245,50 @@ the default value like so:
 
 In this case the default is `/var/lib/mesos` and we have a match. If there is no match, you can
 either adjust the mesos-master start script(s) and restart the master(s) or else adjust the
-Aurora observer start scripts and restart the observers.
+Aurora observer start scripts and restart the observers.  To adjust the Aurora observer:
+
+#### Ubuntu Trusty
+
+    sudo sh -c 'echo "MESOS_ROOT=/tmp/mesos" >> /etc/default/thermos'
+
+NB: In Aurora releases up through 0.12.0, you'll also need to edit /etc/init/thermos.conf like so:
+
+    diff -C 1 /etc/init/thermos.conf.orig /etc/init/thermos.conf
+    *** /etc/init/thermos.conf.orig 2016-03-22 22:34:46.286199718 +0000
+    --- /etc/init/thermos.conf  2016-03-22 17:09:49.357689038 +0000
+    ***************
+    *** 24,25 ****
+    --- 24,26 ----
+          --port=${OBSERVER_PORT:-1338} \
+    +     --mesos-root=${MESOS_ROOT:-/var/lib/mesos} \
+          --log_to_disk=NONE \
+
+#### CentOS 7
+
+Make an edit to add the `--mesos-root` flag resulting in something like:
+
+    grep -A5 OBSERVER_ARGS /etc/sysconfig/thermos-observer
+    OBSERVER_ARGS=(
+      --port=1338
+      --mesos-root=/tmp/mesos
+      --log_to_disk=NONE
+      --log_to_stderr=google:INFO
+    )
 
 ## Installing the client
 ### Ubuntu Trusty
 
     sudo apt-get install -y python2.7 wget
 
-    wget https://apache.bintray.com/aurora/aurora-tools_0.10.0-1_amd64.deb
-    sudo dpkg -i aurora-tools_0.10.0-1_amd64.deb
+    wget -c https://apache.bintray.com/aurora/ubuntu-trusty/aurora-tools_0.12.0_amd64.deb
+    sudo dpkg -i aurora-tools_0.12.0_amd64.deb
 
 ### CentOS 7
-If you haven't already, read the section on [how to get Aurora RPMs](#rpms).
 
-    # Note: for older Aurora RPM versions, this may be called 'aurora-client'.
-    sudo yum install -y aurora-tools
+    sudo yum install -y python2 wget
+
+    wget -c https://apache.bintray.com/aurora/centos-7/aurora-tools-0.12.0-1.el7.centos.aurora.x86_64.rpm
+    sudo yum install -y aurora-tools-0.12.0-1.el7.centos.aurora.x86_64.rpm
 
 ### Mac OS X
 
@@ -289,20 +318,18 @@ are identical for both.
 
 ### Mesos on Ubuntu Trusty
 
-    sudo apt-get update
-    sudo apt-get install -y software-properties-common
-    sudo add-apt-repository ppa:openjdk-r/ppa -y
-    sudo apt-get update
+    sudo apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF
+    DISTRO=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
+    CODENAME=$(lsb_release -cs)
 
-    sudo apt-get install -y wget libsvn1 libcurl3 openjdk-8-jre-headless
+    echo "deb http://repos.mesosphere.io/${DISTRO} ${CODENAME} main" | \
+      sudo tee /etc/apt/sources.list.d/mesosphere.list
+    sudo apt-get -y update
 
-    # NOTE: This appears to be a missing dependency of the mesos deb package.
-    sudo apt-get install -y libcurl4-nss-dev
-
-    wget -c http://downloads.mesosphere.io/master/ubuntu/14.04/mesos_0.23.0-1.0.ubuntu1404_amd64.deb
-    sudo dpkg -i mesos_0.23.0-1.0.ubuntu1404_amd64.deb
+    # Use `apt-cache showpkg mesos | grep [version]` to find the exact version.
+    sudo apt-get -y install mesos=0.25.0-0.2.70.ubuntu1404
 
 ### Mesos on CentOS 7
 
-    sudo rpm -Uvh http://repos.mesosphere.io/el/7/noarch/RPMS/mesosphere-el-repo-7-1.noarch.rpm
-    sudo yum install -y mesos-0.22.0
+    sudo rpm -Uvh https://repos.mesosphere.io/el/7/noarch/RPMS/mesosphere-el-repo-7-1.noarch.rpm
+    sudo yum -y install mesos-0.25.0
