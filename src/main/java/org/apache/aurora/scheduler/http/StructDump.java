@@ -50,7 +50,8 @@ public class StructDump extends JerseyTemplateServlet {
   }
 
   private static final String USAGE =
-      "<html>Usage: /structdump/task/{task_id} or /structdump/cron/{role}/{env}/{job}</html>";
+      "<html>Print the internal thrift structure of task or cronjob. "
+      + "<p>Usage: /structdump/task/{task_id} or /structdump/cron/{role}/{env}/{job}</p></html>";
 
   @GET
   @Produces(MediaType.TEXT_HTML)

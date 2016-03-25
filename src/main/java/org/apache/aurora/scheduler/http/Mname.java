@@ -50,13 +50,16 @@ import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 
 /**
- * Simple redirector from the canonical name of a task to its configured HTTP port.
- *
- * <p>Forwards for GET, PUT, POST and DELETE requests using HTTP 307 allowing compliant clients to
- * seamlessly perform re-directed mutations.
+ * Servlet implementing HTTP redirects to task endpoints.
  */
 @Path("/mname")
 public class Mname {
+
+  private static final String USAGE =
+      "<html>HTTP redirector from the canonical name of a task to its current HTTP endpoint. "
+      + "<p>Forwards GET, PUT, POST and DELETE requests using HTTP status code 307. "
+      + "This allows compliant clients to seamlessly perform re-directed mutations.</p>"
+      + "Usage: /mname/{role}/{env}/{job}/{instance}</html>";
 
   private static final Set<String> HTTP_PORT_NAMES = ImmutableSet.of(
       "health", "http", "HTTP", "web", "admin");
@@ -72,7 +75,7 @@ public class Mname {
   public Response getUsage() {
     return Response
         .status(Status.BAD_REQUEST)
-        .entity("<html>Usage: /mname/{role}/{env}/{job}/{instance}</html>")
+        .entity(USAGE)
         .build();
   }
 
