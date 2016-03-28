@@ -81,7 +81,9 @@ class MemTaskStore implements TaskStore.Mutable {
   private static final Function<Query.Builder, Optional<Set<IJobKey>>> QUERY_TO_JOB_KEY =
       JobKeys::from;
   private static final Function<Query.Builder, Optional<Set<String>>> QUERY_TO_SLAVE_HOST =
-      query -> Optional.fromNullable(query.get().getSlaveHosts());
+      query -> query.get().getSlaveHosts().isEmpty()
+          ? Optional.absent()
+          : Optional.of(query.get().getSlaveHosts());
 
   // Since this class operates under the API and umbrella of {@link Storage}, it is expected to be
   // thread-safe but not necessarily strongly-consistent unless the externally-controlled storage
@@ -263,10 +265,7 @@ class MemTaskStore implements TaskStore.Mutable {
   private FluentIterable<IScheduledTask> matches(Query.Builder query) {
     // Apply the query against the working set.
     Optional<? extends Iterable<Task>> from = Optional.absent();
-    if (query.get().isSetTaskIds()) {
-      taskQueriesById.incrementAndGet();
-      from = Optional.of(fromIdIndex(query.get().getTaskIds()));
-    } else {
+    if (query.get().getTaskIds().isEmpty()) {
       for (SecondaryIndex<?> index : secondaryIndices) {
         Optional<Iterable<String>> indexMatch = index.getMatches(query);
         if (indexMatch.isPresent()) {
@@ -283,6 +282,9 @@ class MemTaskStore implements TaskStore.Mutable {
         taskQueriesAll.incrementAndGet();
         from = Optional.of(tasks.values());
       }
+    } else {
+      taskQueriesById.incrementAndGet();
+      from = Optional.of(fromIdIndex(query.get().getTaskIds()));
     }
 
     return FluentIterable.from(from.get())

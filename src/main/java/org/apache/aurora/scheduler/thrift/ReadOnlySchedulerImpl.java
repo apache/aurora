@@ -178,9 +178,13 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   public Response getPendingReason(TaskQuery query) throws TException {
     requireNonNull(query);
 
-    if (query.isSetSlaveHosts() || query.isSetStatuses()) {
+    if (query.isSetSlaveHosts() && !query.getSlaveHosts().isEmpty()) {
       return invalidRequest(
-          "Statuses or slaveHosts are not supported in " + query.toString());
+          "SlaveHosts are not supported in " + query.toString());
+    }
+    if (query.isSetStatuses() && !query.getStatuses().isEmpty()) {
+      return invalidRequest(
+          "Statuses is not supported in " + query.toString());
     }
 
     // Only PENDING tasks should be considered.
@@ -383,10 +387,10 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
     requireNonNull(query);
 
     Iterable<IScheduledTask> tasks = Storage.Util.fetchTasks(storage, Query.arbitrary(query));
-    if (query.isSetOffset()) {
+    if (query.getOffset() > 0) {
       tasks = Iterables.skip(tasks, query.getOffset());
     }
-    if (query.isSetLimit()) {
+    if (query.getLimit() > 0) {
       tasks = Iterables.limit(tasks, query.getLimit());
     }
 

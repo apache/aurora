@@ -124,35 +124,35 @@
       <if test="jobName != null">
         AND j.name = #{jobName}
       </if>
-      <if test="taskIds != null">
+      <if test="!taskIds.isEmpty()">
         AND t.task_id IN (
         <foreach item="task_id" collection="taskIds" separator=",">
           #{task_id}
         </foreach>
         )
       </if>
-      <if test="statuses != null and !statuses.isEmpty()">
+      <if test="!statuses.isEmpty()">
         AND t.status IN (
         <foreach item="element" collection="statuses" separator=",">
           #{element, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.ScheduleStatusTypeHandler}
         </foreach>
         )
       </if>
-      <if test="instanceIds != null and !instanceIds.isEmpty()">
+      <if test="!instanceIds.isEmpty()">
         AND t.instance_id IN (
         <foreach item="instance_id" collection="instanceIds" separator=",">
           #{instance_id}
         </foreach>
         )
       </if>
-      <if test="slaveHosts != null">
+      <if test="!slaveHosts.isEmpty()">
         AND h.host IN (
         <foreach item="host" collection="slaveHosts" separator=",">
           #{host}
         </foreach>
         )
       </if>
-      <if test="jobKeys != null">
+      <if test="!jobKeys.isEmpty()">
         AND (
         <foreach item="jobKey" collection="jobKeys" open="(" separator=") OR (" close=")">
           j.role = #{jobKey.role}

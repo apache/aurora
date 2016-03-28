@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.http.api.security;
 
 import java.io.IOException;
 import java.util.Set;
+
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
@@ -37,13 +38,13 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
-import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.http.AbstractJettyTest;
 import org.apache.aurora.scheduler.http.H2ConsoleModule;
 import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.ITaskQuery;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.aurora.scheduler.thrift.aop.MockDecoratedThrift;
 import org.apache.http.HttpResponse;
@@ -240,9 +241,9 @@ public class HttpSecurityIT extends AbstractJettyTest {
     expect(auroraAdmin.killTasks(null, new Lock().setMessage("2"), null, null)).andReturn(OK);
 
     JobKey job = JobKeys.from("role", "env", "name").newBuilder();
-    TaskQuery jobScopedQuery = Query.jobScoped(IJobKey.build(job)).get();
-    TaskQuery adsScopedQuery = Query.jobScoped(ADS_STAGING_JOB).get();
-    expect(auroraAdmin.killTasks(adsScopedQuery, null, null, null)).andReturn(OK);
+    ITaskQuery jobScopedQuery = Query.jobScoped(IJobKey.build(job)).get();
+    ITaskQuery adsScopedQuery = Query.jobScoped(ADS_STAGING_JOB).get();
+    expect(auroraAdmin.killTasks(adsScopedQuery.newBuilder(), null, null, null)).andReturn(OK);
     expect(auroraAdmin.killTasks(null, null, ADS_STAGING_JOB.newBuilder(), null)).andReturn(OK);
 
     expectShiroAfterAuthFilter().times(24);
@@ -262,7 +263,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(UNPRIVILEGED)
-            .killTasks(jobScopedQuery, null, null, null)
+            .killTasks(jobScopedQuery.newBuilder(), null, null, null)
             .getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
@@ -275,7 +276,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(BACKUP_SERVICE)
-            .killTasks(jobScopedQuery, null, null, null)
+            .killTasks(jobScopedQuery.newBuilder(), null, null, null)
             .getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
@@ -285,7 +286,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(DEPLOY_SERVICE)
-            .killTasks(jobScopedQuery, null, null, null)
+            .killTasks(jobScopedQuery.newBuilder(), null, null, null)
             .getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
@@ -294,7 +295,8 @@ public class HttpSecurityIT extends AbstractJettyTest {
             .getResponseCode());
     assertEquals(
         OK,
-        getAuthenticatedClient(DEPLOY_SERVICE).killTasks(adsScopedQuery, null, null, null));
+        getAuthenticatedClient(DEPLOY_SERVICE)
+            .killTasks(adsScopedQuery.newBuilder(), null, null, null));
     assertEquals(
         OK,
         getAuthenticatedClient(DEPLOY_SERVICE).killTasks(

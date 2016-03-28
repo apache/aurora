@@ -599,22 +599,22 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testKillByJobName() throws Exception {
-    TaskQuery query = new TaskQuery().setJobName("job");
-    storageUtil.expectTaskFetch(Query.arbitrary(query).active(), buildScheduledTask());
+    Query.Builder query = Query.arbitrary(new TaskQuery().setJobName("job")).active();
+    storageUtil.expectTaskFetch(query, buildScheduledTask());
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
     expectTransitionsToKilling();
 
     control.replay();
 
-    Response response = thrift.killTasks(query, null, null, null);
+    Response response = thrift.killTasks(query.get().newBuilder(), null, null, null);
     assertOkResponse(response);
     assertMessageMatches(response, "The TaskQuery field is deprecated.");
   }
 
   @Test
   public void testJobScopedKillsActive() throws Exception {
-    Query.Builder query = Query.unscoped().byJob(JOB_KEY);
-    storageUtil.expectTaskFetch(query.active(), buildScheduledTask());
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
+    storageUtil.expectTaskFetch(query, buildScheduledTask());
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
     expectTransitionsToKilling();
 
@@ -656,16 +656,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testKillByTaskId() throws Exception {
     // A non-admin user may kill their own tasks when specified by task IDs.
-    Query.Builder query = Query.taskScoped("taskid");
+    Query.Builder query = Query.taskScoped("taskid").active();
     // This query happens twice - once for authentication (without consistency) and once again
     // to perform the state change (within a write transaction).
-    storageUtil.expectTaskFetch(query.active(), buildScheduledTask());
+    storageUtil.expectTaskFetch(query, buildScheduledTask());
     lockManager.validateIfLocked(LOCK_KEY, java.util.Optional.empty());
     expectTransitionsToKilling();
 
     control.replay();
 
-    assertOkResponse(thrift.killTasks(query.get(), null, null, null));
+    assertOkResponse(thrift.killTasks(query.get().newBuilder(), null, null, null));
   }
 
   @Test
@@ -774,9 +774,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(
         okResponse(Result.queryRecoveryResult(
             new QueryRecoveryResult().setTasks(IScheduledTask.toBuildersSet(queryResult)))),
-        thrift.queryRecovery(query.get()));
+        thrift.queryRecovery(query.get().newBuilder()));
 
-    assertEquals(okEmptyResponse(), thrift.deleteRecoveryTasks(query.get()));
+    assertEquals(okEmptyResponse(), thrift.deleteRecoveryTasks(query.get().newBuilder()));
 
     assertEquals(okEmptyResponse(), thrift.commitRecovery());
 

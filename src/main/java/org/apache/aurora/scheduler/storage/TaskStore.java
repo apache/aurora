@@ -19,12 +19,12 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 
-import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.entities.ITaskQuery;
 
 import static com.google.common.base.CharMatcher.WHITESPACE;
 
@@ -124,7 +124,7 @@ public interface TaskStore {
 
     public static Predicate<IScheduledTask> queryFilter(final Query.Builder queryBuilder) {
       return task -> {
-        TaskQuery query = queryBuilder.get();
+        ITaskQuery query = queryBuilder.get();
         ITaskConfig config = task.getAssignedTask().getTask();
         // TODO(wfarner): Investigate why blank inputs are treated specially for the role field.
         if (query.getRole() != null
@@ -140,22 +140,21 @@ public interface TaskStore {
           return false;
         }
 
-        if (query.getJobKeysSize() > 0
-            && !query.getJobKeys().contains(config.getJob().newBuilder())) {
+        if (!query.getJobKeys().isEmpty() && !query.getJobKeys().contains(config.getJob())) {
           return false;
         }
-        if (query.getTaskIds() != null && !query.getTaskIds().contains(Tasks.id(task))) {
+        if (!query.getTaskIds().isEmpty() && !query.getTaskIds().contains(Tasks.id(task))) {
           return false;
         }
 
-        if (query.getStatusesSize() > 0 && !query.getStatuses().contains(task.getStatus())) {
+        if (!query.getStatuses().isEmpty() && !query.getStatuses().contains(task.getStatus())) {
           return false;
         }
-        if (query.getSlaveHostsSize() > 0
+        if (!query.getSlaveHosts().isEmpty()
             && !query.getSlaveHosts().contains(task.getAssignedTask().getSlaveHost())) {
           return false;
         }
-        if (query.getInstanceIdsSize() > 0
+        if (!query.getInstanceIds().isEmpty()
             && !query.getInstanceIds().contains(task.getAssignedTask().getInstanceId())) {
           return false;
         }

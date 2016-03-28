@@ -20,10 +20,10 @@ import javax.annotation.Nullable;
 
 import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.gen.JobKey;
-import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.storage.db.views.DbScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
+import org.apache.aurora.scheduler.storage.entities.ITaskQuery;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -47,7 +47,7 @@ interface TaskMapper {
    * @param query Query to use as a filter for tasks.
    * @return Tasks matching the query.
    */
-  List<DbScheduledTask> select(TaskQuery query);
+  List<DbScheduledTask> select(ITaskQuery query);
 
   /**
    * Gets a task by ID.

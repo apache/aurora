@@ -193,15 +193,29 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
     assertQueryResults(Query.jobScoped(JobKeys.from("role-b", "env-b", "job-b")).active(), TASK_B);
     assertQueryResults(Query.jobScoped(JobKeys.from("role-b", "devel", "job-b")).active());
 
-    // Explicitly call out the current differing behaviors for types of empty query conditions.
-    // Specifically - null task IDs and empty task IDs are different than other 'IN' conditions..
+    // Explicitly call out the matching behaviors for different means of expressing empty query
+    // conditions. Specifically - neither null collections nor empty collections should trigger
+    // query restrictions and thus they should yield the same results.
     assertQueryResults(new TaskQuery().setTaskIds(null), TASK_A, TASK_B, TASK_C, TASK_D);
-    assertQueryResults(new TaskQuery().setTaskIds(ImmutableSet.of()));
+    assertQueryResults(new TaskQuery().setTaskIds(ImmutableSet.of()),
+        TASK_A, TASK_B, TASK_C, TASK_D);
+
+    assertQueryResults(new TaskQuery().setInstanceIds(null),  TASK_A, TASK_B, TASK_C, TASK_D);
     assertQueryResults(
         new TaskQuery().setInstanceIds(ImmutableSet.of()),
         TASK_A, TASK_B, TASK_C, TASK_D);
+
+    assertQueryResults(new TaskQuery().setStatuses(null), TASK_A, TASK_B, TASK_C, TASK_D);
     assertQueryResults(
         new TaskQuery().setStatuses(ImmutableSet.of()),
+        TASK_A, TASK_B, TASK_C, TASK_D);
+
+    assertQueryResults(new TaskQuery().setSlaveHosts(null), TASK_A, TASK_B, TASK_C, TASK_D);
+    assertQueryResults(new TaskQuery().setSlaveHosts(ImmutableSet.of()),
+        TASK_A, TASK_B, TASK_C, TASK_D);
+
+    assertQueryResults(new TaskQuery().setJobKeys(null), TASK_A, TASK_B, TASK_C, TASK_D);
+    assertQueryResults(new TaskQuery().setJobKeys(ImmutableSet.of()),
         TASK_A, TASK_B, TASK_C, TASK_D);
   }
 

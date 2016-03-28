@@ -25,6 +25,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.ITaskQuery;
 
 import static java.util.Objects.requireNonNull;
 
@@ -50,8 +51,8 @@ public final class Query {
    * @return {@code true} if the query specifies at least one job key, otherwise {@code false}.
    */
   public static boolean isJobScoped(Builder taskQuery) {
-    TaskQuery q = taskQuery.get();
-    return q.isSetRole() && q.isSetEnvironment() && q.isSetJobName() || q.isSetJobKeys();
+    ITaskQuery q = taskQuery.get();
+    return q.isSetRole() && q.isSetEnvironment() && q.isSetJobName() || !q.getJobKeys().isEmpty();
   }
 
   public static Builder arbitrary(TaskQuery query) {
@@ -123,11 +124,11 @@ public final class Query {
    *
    * TODO(ksweeney): Add an environment scope.
    */
-  public static final class Builder implements Supplier<TaskQuery> {
+  public static final class Builder implements Supplier<ITaskQuery> {
     private final TaskQuery query;
 
     Builder() {
-      this.query = new TaskQuery();
+      this(new TaskQuery());
     }
 
     Builder(TaskQuery query) {
@@ -143,20 +144,18 @@ public final class Query {
      * @return A new TaskQuery satisfying this builder's constraints.
      */
     @Override
-    public TaskQuery get() {
-      return query.deepCopy();
+    public ITaskQuery get() {
+      return ITaskQuery.build(query);
     }
 
     @Override
     public boolean equals(Object that) {
-      return that != null
-          && that instanceof Builder
-          && Objects.equals(query, ((Builder) that).query);
+      return that instanceof Builder && get().equals(((Builder) that).get());
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(query);
+      return Objects.hash(get());
     }
 
     @Override

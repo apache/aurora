@@ -290,7 +290,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         new PendingReason().setTaskId(taskId1).setReason(reason),
         new PendingReason().setTaskId(taskId2).setReason(reason));
 
-    Response response = assertOkResponse(thrift.getPendingReason(query.get()));
+    Response response = assertOkResponse(thrift.getPendingReason(query.get().newBuilder()));
     assertEquals(expected, response.getResult().getGetPendingReasonResult().getReasons());
   }
 
@@ -371,7 +371,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.getPendingReason(query.get()));
+    assertResponse(INVALID_REQUEST, thrift.getPendingReason(query.get().newBuilder()));
   }
 
   @Test
@@ -586,7 +586,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.getPendingReason(query.get()));
+    assertResponse(INVALID_REQUEST, thrift.getPendingReason(query.get().newBuilder()));
   }
 
   @Test

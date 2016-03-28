@@ -23,9 +23,9 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.JobKey;
-import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.ITaskQuery;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -123,7 +123,7 @@ public final class JobKeys {
    */
   public static Optional<Set<IJobKey>> from(Query.Builder query) {
     if (Query.isJobScoped(query)) {
-      TaskQuery taskQuery = query.get();
+      ITaskQuery taskQuery = query.get();
       ImmutableSet.Builder<IJobKey> builder = ImmutableSet.builder();
 
       if (taskQuery.isSetJobName()) {
@@ -133,9 +133,7 @@ public final class JobKeys {
             taskQuery.getJobName()));
       }
 
-      if (taskQuery.isSetJobKeys()) {
-        builder.addAll(IJobKey.setFromBuilders(taskQuery.getJobKeys()));
-      }
+      builder.addAll(taskQuery.getJobKeys());
       return Optional.of(assertValid(builder.build()));
     } else {
       return Optional.absent();

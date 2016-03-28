@@ -209,7 +209,7 @@ class DbTaskStore implements TaskStore.Mutable {
   private FluentIterable<IScheduledTask> matches(Query.Builder query) {
     Iterable<DbScheduledTask> results;
     Predicate<IScheduledTask> filter;
-    if (query.get().getTaskIdsSize() == 1) {
+    if (query.get().getTaskIds().size() == 1) {
       // Optimize queries that are scoped to a single task, as the dynamic SQL used for arbitrary
       // queries comes with a performance penalty.
       results = Optional.fromNullable(
