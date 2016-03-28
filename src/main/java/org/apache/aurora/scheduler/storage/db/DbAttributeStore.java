@@ -51,7 +51,6 @@ class DbAttributeStore implements AttributeStore.Mutable {
   @Override
   public boolean saveHostAttributes(IHostAttributes hostAttributes) {
     checkNotBlank(hostAttributes.getHost());
-    checkArgument(hostAttributes.isSetAttributes());
     checkArgument(hostAttributes.isSetMode());
 
     if (Iterables.any(hostAttributes.getAttributes(), EMPTY_VALUES)) {

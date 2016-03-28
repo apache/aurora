@@ -127,9 +127,7 @@ public interface MesosTaskFactory {
             offer,
             ResourceSlot.from(config),
             executorSettings.getExecutorOverhead(),
-            task.isSetAssignedPorts()
-                ? ImmutableSet.copyOf(task.getAssignedPorts().values())
-                : ImmutableSet.of(),
+            ImmutableSet.copyOf(task.getAssignedPorts().values()),
             tierManager.getTier(task.getTask()));
       } catch (Resources.InsufficientResourcesException e) {
         throw new SchedulerException(e);

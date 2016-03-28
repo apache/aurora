@@ -547,7 +547,7 @@ def generate_struct_field(code, struct, field, builder_calls):
 
   code.add_field(FIELD_DECLARATION % {'field': field.name, 'type': field_type })
 
-  nullable = field.ttype.name == 'String' or not isinstance(field.ttype, PrimitiveType)
+  nullable = field.ttype.name == 'String' or not isinstance(field.ttype, (PrimitiveType, ParameterizedType))
   if nullable:
     code.add_accessor(FIELD_TEMPLATE % {'type': 'boolean',
                                         'fn_name': field.isset_method(),

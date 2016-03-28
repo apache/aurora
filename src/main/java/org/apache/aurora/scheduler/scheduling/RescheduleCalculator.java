@@ -85,7 +85,7 @@ public interface RescheduleCalculator {
     private final Predicate<IScheduledTask> flapped = new Predicate<IScheduledTask>() {
       @Override
       public boolean apply(IScheduledTask task) {
-        if (!task.isSetTaskEvents()) {
+        if (task.getTaskEvents().isEmpty()) {
           return false;
         }
 

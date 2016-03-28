@@ -253,8 +253,7 @@ public class ConfigurationManager {
         if (!containerConfig.getDocker().isSetImage()) {
           throw new TaskDescriptionException("A container must specify an image.");
         }
-        if (!containerConfig.getDocker().isSetParameters()
-            || containerConfig.getDocker().getParameters().isEmpty()) {
+        if (containerConfig.getDocker().getParameters().isEmpty()) {
           for (Map.Entry<String, String> e : this.defaultDockerParameters.entries()) {
             builder.getContainer().getDocker().addToParameters(
                 new DockerParameter(e.getKey(), e.getValue()));
