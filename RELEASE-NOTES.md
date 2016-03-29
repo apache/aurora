@@ -7,9 +7,9 @@
 - Added a new `aurora job add` client command to scale out an existing job.
 - Upgraded the scheduler ZooKeeper client from 3.4.6 to 3.4.8.
 - Added support for dedicated constraints not exclusive to a particular role.
-  See [here](docs/deploying-aurora-scheduler.md#dedicated-attribute) for more details.
+  See [here](docs/features/constraints.md#dedicated-attribute) for more details.
 - Added a new argument `--announcer-hostname` to thermos executor to override hostname in service
-  registry endpoint. See [here](docs/configuration-reference.md#announcer-objects) for details.
+  registry endpoint. See [here](docs/reference/configuration.md#announcer-objects) for details.
 - Descheduling a cron job that was not actually scheduled will no longer return an error.
 - Added a new argument `-thermos_home_in_sandbox` to the scheduler for optionally changing
   HOME to the sandbox during thermos executor/runner execution. This is useful in cases
@@ -46,7 +46,7 @@
   universal set of parameters that should be used for every container that does not have parameters
   explicitly configured at the job level.
 - Added support for jobs to specify arbitrary ZooKeeper paths for service registration.
-  See [here](docs/configuration-reference.md#announcer-objects) for details.
+  See [here](docs/reference/configuration.md#announcer-objects) for details.
 - Log destination is configurable for the thermos runner. See the configuration reference for details
   on how to configure destination per-process. Command line options may also be passed through the
   scheduler in order to configure the global default behavior.
