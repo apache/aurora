@@ -11,6 +11,11 @@
 - Added a new argument `--announcer-hostname` to thermos executor to override hostname in service
   registry endpoint. See [here](docs/configuration-reference.md#announcer-objects) for details.
 - Descheduling a cron job that was not actually scheduled will no longer return an error.
+- Added a new argument `-thermos_home_in_sandbox` to the scheduler for optionally changing
+  HOME to the sandbox during thermos executor/runner execution. This is useful in cases
+  where the root filesystem inside of the container is read-only, as it moves PEX extraction into
+  the sandbox. See [here](docs/operations/configuration.md#docker-containers)
+  for more detail.
 
 ### Deprecations and removals:
 

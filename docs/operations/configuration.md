@@ -163,6 +163,11 @@ into all containers on that host. The format is a comma separated list of host_p
 tuples. For example `-global_container_mounts=/opt/secret_keys_dir:/mnt/secret_keys_dir:ro` mounts
 `/opt/secret_keys_dir` from the slaves into all launched containers. Valid modes are `ro` and `rw`.
 
+If you would like to run a container with a read-only filesystem, it may also be necessary to
+pass to use the scheduler flag `-thermos_home_in_sandbox` in order to set HOME to the sandbox
+before the executor runs. This will make sure that the executor/runner PEX extractions happens
+inside of the sandbox instead of the container filesystem root.
+
 If you would like to supply your own parameters to `docker run` when launching jobs in docker
 containers, you may use the following flags:
 

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
@@ -62,7 +63,7 @@ public class ExecutorModule extends AbstractModule {
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
 
   @CmdLine(name = "thermos_executor_resources",
-      help = "A comma seperated list of additional resources to copy into the sandbox."
+      help = "A comma separated list of additional resources to copy into the sandbox."
           + "Note: if thermos_executor_path is not the thermos_executor.pex file itself, "
           + "this must include it.")
   private static final Arg<List<String>> THERMOS_EXECUTOR_RESOURCES =
@@ -75,6 +76,12 @@ public class ExecutorModule extends AbstractModule {
   @CmdLine(name = "thermos_observer_root",
       help = "Path to the thermos observer root (by default /var/run/thermos.)")
   private static final Arg<String> THERMOS_OBSERVER_ROOT = Arg.create("/var/run/thermos");
+
+  @CmdLine(name = "thermos_home_in_sandbox",
+      help = "If true, changes HOME to the sandbox before running the executor. "
+             + "This primarily has the effect of causing the executor and runner "
+             + "to extract themselves into the sandbox.")
+  private static final Arg<Boolean> THERMOS_HOME_IN_SANDBOX = Arg.create(false);
 
   /**
    * Extra CPU allocated for each executor.
@@ -92,20 +99,34 @@ public class ExecutorModule extends AbstractModule {
       Arg.create(Amount.of(128L, Data.MB));
 
   @CmdLine(name = "global_container_mounts",
-      help = "A comma seperated list of mount points (in host:container form) to mount "
+      help = "A comma separated list of mount points (in host:container form) to mount "
           + "into all (non-mesos) containers.")
   private static final Arg<List<Volume>> GLOBAL_CONTAINER_MOUNTS = Arg.create(ImmutableList.of());
 
-  private static CommandInfo makeExecutorCommand() {
+  @VisibleForTesting
+  static CommandInfo makeExecutorCommand(
+      String thermosExecutorPath,
+      List<String> thermosExecutorResources,
+      boolean thermosHomeInSandbox,
+      String thermosExecutorFlags) {
+
     Stream<String> resourcesToFetch = Stream.concat(
-        ImmutableList.of(THERMOS_EXECUTOR_PATH.get()).stream(),
-        THERMOS_EXECUTOR_RESOURCES.get().stream());
+        ImmutableList.of(thermosExecutorPath).stream(),
+        thermosExecutorResources.stream());
+
+    StringBuilder sb = new StringBuilder();
+    if (thermosHomeInSandbox) {
+      sb.append("HOME=${MESOS_SANDBOX=.} ");
+    }
+    // Default to the value of $MESOS_SANDBOX if present.  This is necessary for docker tasks,
+    // in which case the mesos agent is responsible for setting $MESOS_SANDBOX.
+    sb.append("${MESOS_SANDBOX=.}/");
+    sb.append(uriBasename(thermosExecutorPath));
+    sb.append(" ");
+    sb.append(Optional.ofNullable(thermosExecutorFlags).orElse(""));
 
     return CommandInfo.newBuilder()
-        // Default to the value of $MESOS_SANDBOX if present.  This is necessary for docker tasks,
-        // in which case the mesos agent is responsible for setting $MESOS_SANDBOX.
-        .setValue("${MESOS_SANDBOX=.}/" + uriBasename(THERMOS_EXECUTOR_PATH.get())
-            + " " + Optional.ofNullable(THERMOS_EXECUTOR_FLAGS.get()).orElse(""))
+        .setValue(sb.toString().trim())
         .addAllUris(resourcesToFetch
             .map(r -> URI.newBuilder().setValue(r).setExecutable(true).build())
             .collect(GuavaUtils.toImmutableList()))
@@ -135,7 +156,12 @@ public class ExecutorModule extends AbstractModule {
                 .setName("aurora.task")
                 // Necessary as executorId is a required field.
                 .setExecutorId(Executors.PLACEHOLDER_EXECUTOR_ID)
-                .setCommand(makeExecutorCommand())
+                .setCommand(
+                    makeExecutorCommand(
+                        THERMOS_EXECUTOR_PATH.get(),
+                        THERMOS_EXECUTOR_RESOURCES.get(),
+                        THERMOS_HOME_IN_SANDBOX.get(),
+                        THERMOS_EXECUTOR_FLAGS.get()))
                 .addResources(makeResource(CPUS, EXECUTOR_OVERHEAD_CPUS.get()))
                 .addResources(makeResource(RAM_MB, EXECUTOR_OVERHEAD_RAM.get().as(Data.MB)))
                 .build(),
