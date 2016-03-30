@@ -1,0 +1,28 @@
+{
+  "auth": [
+    {
+      "scheme": "digest",
+      "credential": "user:pass"
+    }
+  ],
+  "acl": [
+    {
+      "scheme": "digest",
+      "credential": "user:pass",
+      "permissions": {
+        "read": true,
+        "create": true,
+        "delete": true,
+        "write": true
+      }
+    },
+    {
+      "scheme": "world",
+      "credential": "anyone",
+      "permissions": {
+        "read": true,
+        "delete": true
+      }
+    }
+  ]
+}

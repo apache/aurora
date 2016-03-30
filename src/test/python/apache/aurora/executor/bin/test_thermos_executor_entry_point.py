@@ -33,6 +33,7 @@ class ThermosExecutorMainTest(unittest.TestCase):
     mock_options = Mock()
     mock_options.execute_as_user = False
     mock_options.nosetuid = False
+    mock_options.announcer_ensemble = None
     with patch(
         'apache.aurora.executor.bin.thermos_executor_main.dump_runner_pex',
         return_value=mock_dump_runner_pex):

@@ -16,6 +16,8 @@
   where the root filesystem inside of the container is read-only, as it moves PEX extraction into
   the sandbox. See [here](docs/operations/configuration.md#docker-containers)
   for more detail.
+- Support for ZooKeeper authentication in the executor announcer. See
+  [here](docs/operations/security.md#announcer-authentication) for details.
 
 ### Deprecations and removals:
 

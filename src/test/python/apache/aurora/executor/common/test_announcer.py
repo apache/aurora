@@ -12,12 +12,16 @@
 # limitations under the License.
 #
 
+import json
 import threading
 
 import pytest
 from kazoo.client import KazooClient
 from kazoo.exceptions import KazooException
+from kazoo.security import Permissions as KazooPermissions
+from kazoo.security import ACL, Id
 from mock import MagicMock, call, create_autospec, patch
+from twitter.common.contextutil import temporary_file
 from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 from twitter.common.zookeeper.serverset import Endpoint, ServerSet
@@ -27,8 +31,10 @@ from apache.aurora.executor.common.announcer import (
     Announcer,
     DefaultAnnouncerCheckerProvider,
     ServerSetJoinThread,
-    make_endpoints
+    make_endpoints,
+    make_zk_auth
 )
+from apache.aurora.executor.common.announcer_zkauth_schema import Access, Auth, Permissions, ZkAuth
 
 
 def test_serverset_join_thread():
@@ -326,7 +332,7 @@ def test_announcer_provider_with_zkpath(mock_client_provider, mock_serverset_pro
 @patch('apache.aurora.executor.common.announcer.ServerSet')
 @patch('apache.aurora.executor.common.announcer.KazooClient')
 @patch('apache.aurora.executor.common.announcer.Endpoint')
-def test_announcer_provider_with_hostcmd(endpoint_mock_provider,
+def test_announcer_provider_with_hostname(endpoint_mock_provider,
                                          mock_client_provider, mock_serverset_provider):
   mock_client = create_autospec(spec=KazooClient, instance=True)
   mock_client_provider.return_value = mock_client
@@ -339,3 +345,111 @@ def test_announcer_provider_with_hostcmd(endpoint_mock_provider,
   dap.from_assigned_task(assigned_task, None)
 
   assert endpoint_mock_provider.mock_calls == [call('10.2.3.4', 12345), call('10.2.3.4', 12345)]
+
+
+def generate_zk_auth_json():
+  auth = {
+    'auth': [
+      {
+        'scheme': 'digest',
+        'credential': 'user:pass'
+      }
+    ],
+    'acl': [
+      {
+        'scheme': 'digest',
+        'credential': 'user:pass',
+        'permissions': {
+          'read': True,
+          'write': True,
+          'create': True,
+          'delete': True,
+          'admin': False
+        }
+      }
+    ]
+  }
+  return json.dumps(auth)
+
+
+def test_make_zk_auth_with_good_config():
+  with temporary_file() as fp:
+    fp.write(generate_zk_auth_json())
+    fp.flush()
+
+    zk_auth = make_zk_auth(fp.name)
+    perms = Permissions(read=True, write=True, delete=True, create=True, admin=False)
+    assert zk_auth.acl()[0] == Access(scheme='digest',
+                                      credential='user:pass',
+                                      permissions=perms)
+    assert zk_auth.auth()[0] == Auth(scheme='digest', credential='user:pass')
+
+
+def test_make_zk_auth_with_no_config():
+  auth = make_zk_auth(None)
+  assert auth is None
+
+
+def test_make_zk_auth_with_bad_config():
+  with pytest.raises(SystemExit):
+    make_zk_auth('file-not-present')
+
+  with temporary_file() as fp:
+    fp.write('Bad json')
+    fp.flush()
+
+    with pytest.raises(SystemExit):
+      make_zk_auth(fp.name)
+
+
+def test_make_zk_auth_config_validation():
+  invalid_configs = [
+    # No credential in auth
+    {'auth': [{'scheme': 's'}],
+     'acl': [{'scheme': 's', 'credential': 'c', 'permissions': {'read': True}}]},
+    # Acl is not a list
+    {'auth': [{'scheme': 's', 'credential': 'c'}],
+     'acl': {'scheme': 's', 'credential': 'c', 'permissions': {'read': True}}},
+    # No credential in acl
+    {'auth': [{'scheme': 's', 'credential': 'c'}],
+     'acl': [{'scheme': 's', 'permissions': {'read': True}}]},
+    # permissions is not an object
+    {'auth': [{'scheme': 's', 'credential': 'c'}],
+     'acl': [{'scheme': 's', 'credential': 'c', 'permissions': 'non-object'}]},
+    # permissions object has unrecognized property
+    {'auth': [{'scheme': 's', 'credential': 'c'}],
+     'acl': [{'scheme': 's', 'credential': 'c', 'permissions': {'extraprop': True}}]},
+    # non boolean property in permissions object
+    {'auth': [{'scheme': 's', 'credential': 'c'}],
+     'acl': [{'scheme': 's', 'credential': 'c', 'permissions': {'read': 'non-bool'}}]},
+  ]
+  for invalid_config in invalid_configs:
+    with temporary_file() as fp:
+      fp.write(json.dumps(invalid_config))
+      fp.flush()
+
+      with pytest.raises(SystemExit):
+        make_zk_auth(fp.name)
+
+
+@patch('apache.aurora.executor.common.announcer.ServerSet')
+@patch('apache.aurora.executor.common.announcer.KazooClient')
+def test_announcer_provider_with_acl(mock_client_provider, mock_serverset_provider):
+  mock_client = create_autospec(spec=KazooClient, instance=True)
+  mock_client_provider.return_value = mock_client
+  mock_serverset = create_autospec(spec=ServerSet, instance=True)
+  mock_serverset_provider.return_value = mock_serverset
+
+  zk_auth = ZkAuth(auth=[Auth(scheme='s', credential='ca')],
+                   acl=[Access(scheme='s', credential='cl', permissions=Permissions(create=True))])
+
+  dap = DefaultAnnouncerCheckerProvider('zookeeper.example.com', '', False, None, zk_auth)
+  job = make_job('aurora', 'prod', 'proxy', 'primary', portmap={})
+  assigned_task = make_assigned_task(job, assigned_ports={'primary': 12345})
+  dap.from_assigned_task(assigned_task, None)
+
+  mock_client_provider.assert_called_once_with('zookeeper.example.com',
+                                               connection_retry=dap.DEFAULT_RETRY_POLICY,
+                                               auth_data=[('s', 'ca')],
+                                               default_acl=[ACL(KazooPermissions.CREATE,
+                                                                Id('s', 'cl'))])

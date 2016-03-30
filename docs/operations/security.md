@@ -4,7 +4,9 @@ Securing your Aurora Cluster
 Aurora integrates with [Apache Shiro](http://shiro.apache.org/) to provide security
 controls for its API. In addition to providing some useful features out of the box, Shiro
 also allows Aurora cluster administrators to adapt the security system to their organization’s
-existing infrastructure.
+existing infrastructure. The announcer in the Aurora thermos executor also supports security
+controls for talking to ZooKeeper.
+
 
 - [Enabling Security](#enabling-security)
 - [Authentication](#authentication)
@@ -20,13 +22,18 @@ existing infrastructure.
 - [Implementing a Custom Realm](#implementing-a-custom-realm)
 	- [Packaging a realm module](#packaging-a-realm-module)
 - [Known Issues](#known-issues)
+- [Announcer Authentication](#announcer-authentication)
+    - [ZooKeeper authentication configuration](#zookeeper-authentication-configuration)
+    - [Executor settings](#executor-settings)
 
 # Enabling Security
 
 There are two major components of security:
 [authentication and authorization](http://en.wikipedia.org/wiki/Authentication#Authorization).  A
 cluster administrator may choose the approach used for each, and may also implement custom
-mechanisms for either.  Later sections describe the options available.
+mechanisms for either.  Later sections describe the options available. To enable authentication
+ for the announcer, see [Announcer Authentication](#announcer-authentication)
+
 
 # Authentication
 
@@ -280,3 +287,54 @@ Relevant tickets:
 * [AURORA-1293](https://issues.apache.org/jira/browse/AURORA-1291): Consider defining a JSON format in place of INI
 * [AURORA-1179](https://issues.apache.org/jira/browse/AURORA-1179): Supported hashed passwords in security.ini
 * [AURORA-1295](https://issues.apache.org/jira/browse/AURORA-1295): Support security for the ReadOnlyScheduler service
+
+# Announcer Authentication
+The Thermos executor can be configured to authenticate with ZooKeeper and include
+an [ACL](https://zookeeper.apache.org/doc/current/zookeeperProgrammers.html#sc_ZooKeeperAccessControl)
+on the nodes it creates, which will specify
+the privileges of clients to perform different actions on these nodes.  This
+feature is enabled by specifying an ACL configuration file to the executor with the
+`--announcer-zookeeper-auth-config` command line argument.
+
+When this feature is _not_ enabled, nodes created by the executor will have 'world/all' permission
+(`ZOO_OPEN_ACL_UNSAFE`).  In most production environments, operators should specify an ACL and
+limit access.
+
+## ZooKeeper Authentication Configuration
+The configuration file must be formatted as JSON with the following schema:
+
+```json
+{
+  "auth": [
+    {
+      "scheme": "<scheme>",
+      "credential": "<plain_credential>"
+    }
+  ],
+  "acl": [
+    {
+      "scheme": "<scheme>",
+      "credential": "<plain_credential>",
+      "permissions": {
+        "read": <bool>,
+        "write": <bool>,
+        "create": <bool>,
+        "delete": <bool>,
+        "admin": <bool>
+      }
+    }
+  ]
+}
+```
+
+The `scheme`
+defines the encoding of the credential field.  Note that these fields are passed directly to
+ZooKeeper (except in the case of _digest_ scheme, where the executor will hash and encode
+the credential appropriately before passing it to ZooKeeper). In addition to `acl`, a list of
+authentication credentials must be provided in `auth` to use for the connection.
+
+All properties of the `permissions` object will default to False if not provided.
+
+## Executor settings
+To enable the executor to authenticate against ZK, `--announcer-zookeeper-auth-config` should be
+set to the configuration file.

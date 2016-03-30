@@ -30,7 +30,7 @@ from twitter.common.log.options import LogOptions
 
 from apache.aurora.config.schema.base import LoggerDestination, LoggerMode
 from apache.aurora.executor.aurora_executor import AuroraExecutor
-from apache.aurora.executor.common.announcer import DefaultAnnouncerCheckerProvider
+from apache.aurora.executor.common.announcer import DefaultAnnouncerCheckerProvider, make_zk_auth
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
 from apache.aurora.executor.common.health_checker import HealthCheckerProvider
 from apache.aurora.executor.common.path_detector import MesosPathDetector
@@ -99,6 +99,13 @@ app.add_option(
     help='Set hostname to be announced. By default it is'
          'the --hostname argument passed into the mesos slave'
 )
+
+app.add_option(
+    '--announcer-zookeeper-auth-config',
+    dest='announcer_zookeeper_auth_config',
+    type=str,
+    default=None,
+    help='Path to ZooKeeper authentication to use for announcer nodes.')
 
 app.add_option(
     '--execute-as-user',
@@ -195,7 +202,8 @@ def initialize(options):
       options.announcer_ensemble,
       options.announcer_serverset_path,
       options.announcer_allow_custom_serverset_path,
-      options.announcer_hostname
+      options.announcer_hostname,
+      make_zk_auth(options.announcer_zookeeper_auth_config)
     ))
 
   # Create executor stub

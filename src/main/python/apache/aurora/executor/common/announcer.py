@@ -19,6 +19,7 @@ from abc import abstractmethod
 
 from kazoo.client import KazooClient
 from kazoo.retry import KazooRetry
+from kazoo.security import make_acl, make_digest_acl_credential
 from mesos.interface import mesos_pb2
 from twitter.common import app, log
 from twitter.common.concurrent.deferred import defer
@@ -27,6 +28,7 @@ from twitter.common.metrics import LambdaGauge, Observable
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.serverset import Endpoint, ServerSet
 
+from apache.aurora.executor.common.announcer_zkauth_schema import ZkAuth
 from apache.aurora.executor.common.status_checker import (
     StatusChecker,
     StatusCheckerProvider,
@@ -51,6 +53,39 @@ def make_endpoints(hostname, portmap, primary_port):
   # It's possible for the primary port to not have been allocated if this task
   # is using autoregistration, so register with a port of 0.
   return Endpoint(hostname, portmap.get(primary_port, 0)), additional_endpoints
+
+
+def make_zk_auth(zk_auth_config):
+  if zk_auth_config is None:
+    return None
+
+  try:
+    with open(zk_auth_config) as fp:
+      try:
+        zk_auth = ZkAuth.json_load(fp, strict=True)
+        if not zk_auth.check().ok():
+          app.error('ZK authentication config is invalid %s' % zk_auth.check().message())
+        return zk_auth
+      except (TypeError, ValueError, AttributeError) as ex:
+        app.error('Problem parsing ZK authentication config %s' % ex)
+  except IOError as ie:
+    app.error('Failed to open config file %s' % ie)
+
+
+def to_acl(access):
+  cred = access.credential().get()
+  if access.scheme().get() == 'digest':
+    cred_parts = access.credential().get().split(':')
+    if len(cred_parts) != 2:
+      app.error('Digest credential should be of the form <user>:<password>')
+    cred = make_digest_acl_credential(cred_parts[0], cred_parts[1])
+  return make_acl(access.scheme().get(),
+                  cred,
+                  read=access.permissions().read().get(),
+                  write=access.permissions().write().get(),
+                  create=access.permissions().create().get(),
+                  delete=access.permissions().delete().get(),
+                  admin=access.permissions().admin().get())
 
 
 class AnnouncerCheckerProvider(StatusCheckerProvider):
@@ -118,19 +153,29 @@ class DefaultAnnouncerCheckerProvider(AnnouncerCheckerProvider):
       max_delay=DEFAULT_RETRY_MAX_DELAY.as_(Time.SECONDS),
   )
 
-  def __init__(self, ensemble, root='/aurora', allow_custom_serverset_path=False, hostname=None):
-    self.__ensemble = ensemble
-    self.__root = root
-    super(DefaultAnnouncerCheckerProvider, self).__init__(
-          allow_custom_serverset_path, hostname)
+  def __init__(self, ensemble, root='/aurora', allow_custom_serverset_path=False,
+               hostname=None, zk_auth=None):
+    self._ensemble = ensemble
+    self._root = root
+    self._zk_auth = zk_auth
+    super(DefaultAnnouncerCheckerProvider, self).__init__(allow_custom_serverset_path, hostname)
 
   def make_zk_client(self):
-    return KazooClient(self.__ensemble, connection_retry=self.DEFAULT_RETRY_POLICY)
+    if self._zk_auth is None:
+      auth_data = None
+      default_acl = None
+    else:
+      auth_data = [(a.scheme().get(), a.credential().get()) for a in self._zk_auth.auth()]
+      default_acl = [to_acl(a) for a in self._zk_auth.acl()]
+    return KazooClient(self._ensemble,
+                       connection_retry=self.DEFAULT_RETRY_POLICY,
+                       default_acl=default_acl or None,
+                       auth_data=auth_data or None)
 
   def make_zk_path(self, assigned_task):
     config = assigned_task.task
     role, environment, name = (config.job.role, config.job.environment, config.job.name)
-    return posixpath.join(self.__root, role, environment, name)
+    return posixpath.join(self._root, role, environment, name)
 
 
 class ServerSetJoinThread(ExceptionalThread):
@@ -238,34 +283,34 @@ class AnnouncerChecker(StatusChecker):
   DEFAULT_NAME = 'announcer'
 
   def __init__(self, client, path, timeout_secs, endpoint, additional=None, shard=None, name=None):
-    self.__client = client
-    self.__connect_event = client.start_async()
-    self.__timeout_secs = timeout_secs
-    self.__announcer = Announcer(ServerSet(client, path), endpoint, additional=additional,
+    self._client = client
+    self._connect_event = client.start_async()
+    self._timeout_secs = timeout_secs
+    self._announcer = Announcer(ServerSet(client, path), endpoint, additional=additional,
         shard=shard)
-    self.__name = name or self.DEFAULT_NAME
-    self.__status = None
+    self._name = name or self.DEFAULT_NAME
+    self._status = None
     self.start_event = threading.Event()
-    self.metrics.register(LambdaGauge('disconnected_time', self.__announcer.disconnected_time))
+    self.metrics.register(LambdaGauge('disconnected_time', self._announcer.disconnected_time))
 
   @property
   def status(self):
-    return self.__status
+    return self._status
 
   def name(self):
-    return self.__name
+    return self._name
 
-  def __start(self):
-    self.__connect_event.wait(timeout=self.__timeout_secs)
-    if not self.__connect_event.is_set():
-      self.__status = StatusResult("Creating Announcer Serverset timed out.", mesos_pb2.TASK_FAILED)
+  def _start(self):
+    self._connect_event.wait(timeout=self._timeout_secs)
+    if not self._connect_event.is_set():
+      self._status = StatusResult("Creating Announcer Serverset timed out.", mesos_pb2.TASK_FAILED)
     else:
-      self.__announcer.start()
+      self._announcer.start()
 
     self.start_event.set()
 
   def start(self):
-    defer(self.__start)
+    defer(self._start)
 
   def stop(self):
-    defer(self.__announcer.stop)
+    defer(self._announcer.stop)
