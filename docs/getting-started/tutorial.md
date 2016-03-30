@@ -106,8 +106,8 @@ local sandbox in which it will run. It then specifies how the code is
 actually run once the second Process starts.
 
 For more about Aurora configuration files, see the [Configuration
-Tutorial](configuration-tutorial.md) and the [Aurora + Thermos
-Reference](configuration-reference.md) (preferably after finishing this
+Tutorial](../reference/configuration-tutorial.md) and the [Configuration
+Reference](../reference/configuration.md) (preferably after finishing this
 tutorial).
 
 

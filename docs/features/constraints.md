@@ -50,7 +50,7 @@ most one task per rack:
 
 Use these constraints sparingly as they can dramatically reduce Tasks' schedulability.
 Further details are available in the reference documentation on
-[Scheduling Constraints](#specifying-scheduling-constraints).
+[Scheduling Constraints](../reference/configuration.md#specifying-scheduling-constraints).
 
 
 
@@ -72,7 +72,7 @@ scheduled on nodes that claim to have an `SSD` as their disk.
 
 
 Further details are available in the reference documentation on
-[Scheduling Constraints](#specifying-scheduling-constraints).
+[Scheduling Constraints](../reference/configuration.md#specifying-scheduling-constraints).
 
 
 Running stateful services

@@ -58,7 +58,7 @@ grow faster than they can process it.
 
 Unlike with services, which aurora will always re-execute regardless of exit status, instances of
 cron jobs retry according to the `max_task_failures` attribute of the
-[Task](../reference/configuration.md#task-objects) object. To get "run-until-success" semantics,
+[Task](../reference/configuration.md#task-object) object. To get "run-until-success" semantics,
 set `max_task_failures` to `-1`.
 
 ## Interacting with cron jobs via the Aurora CLI

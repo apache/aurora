@@ -8,11 +8,11 @@ Setting up your email account
 Once your Apache ID has been set up you can configure your account and add ssh keys and setup an
 email forwarding address at
 
-  http://id.apache.org
+    http://id.apache.org
 
 Additional instructions for setting up your new committer email can be found at
 
-  http://www.apache.org/dev/user-email.html
+    http://www.apache.org/dev/user-email.html
 
 The recommended setup is to configure all services (mailing lists, JIRA, ReviewBoard) to send
 emails to your @apache.org email address.

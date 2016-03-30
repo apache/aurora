@@ -52,8 +52,8 @@ configuration specification and reuse. Pystachio objects are tailored
 via {{}} surrounded templates.
 
 When writing your `.aurora` file, you may use any Pystachio datatypes, as
-well as any objects shown in the [*Aurora+Thermos Configuration
-Reference*](configuration-reference.md), without `import` statements - the
+well as any objects shown in the [*Aurora Configuration
+Reference*](configuration.md), without `import` statements - the
 Aurora config loader injects them automatically. Other than that, an `.aurora`
 file works like any other Python script.
 

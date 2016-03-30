@@ -45,7 +45,7 @@ The complete reference of commands, configuration options, and scheduler interna
  * Configuration (`.aurora` files)
     - [Configuration Reference](reference/configuration.md)
     - [Configuration Tutorial](reference/configuration-tutorial.md)
-    - [Configuration Best Practices](reference/configuration-best-bractices.md)
+    - [Configuration Best Practices](reference/configuration-best-practices.md)
     - [Configuration Templating](reference/configuration-templating.md)
  * Aurora Client
     - [Client Commands](reference/client-commands.md)
@@ -62,7 +62,7 @@ All the information you need to start modifying Aurora and contributing back to 
 
  * [Contributing to the project](../CONTRIBUTING.md)
  * [Committer's Guide](development/committers-guide.md)
- * [Design Documents](design-documents.md)
+ * [Design Documents](development/design-documents.md)
  * Developing the Aurora components:
      - [Client](development/client.md)
      - [Scheduler](development/scheduler.md)

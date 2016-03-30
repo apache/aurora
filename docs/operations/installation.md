@@ -279,7 +279,7 @@ stumbling blocks and solutions here to help get you moving.
 
 #### Solution
 When you create a new cluster, you need to inform a quorum of schedulers that they are safe to
-consider their database to be empty by [initializing](#initializing-the-replicated-log) the
+consider their database to be empty by [initializing](#finalizing) the
 replicated log. This is done to prevent the scheduler from modifying the cluster state in the event
 of multiple simultaneous disk failures or, more likely, misconfiguration of the replicated log path.
 

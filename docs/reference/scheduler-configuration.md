@@ -1,4 +1,4 @@
-# Scheduler Configuration
+# Scheduler Configuration Reference
 
 The Aurora scheduler can take a variety of configuration options through command-line arguments.
 A list of the available options can be seen by running `aurora-scheduler -help`.

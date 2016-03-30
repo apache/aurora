@@ -40,4 +40,4 @@ Example (available in the [Vagrant environment](../getting-started/vagrant.md)):
 
 In order to correctly execute processes inside a job, the docker container must have Python 2.7
 installed. Further details of how to use Docker can be found in the
-[Reference Documentation](..reference/configuration.md#docker-object).
+[Reference Documentation](../reference/configuration.md#docker-object).
