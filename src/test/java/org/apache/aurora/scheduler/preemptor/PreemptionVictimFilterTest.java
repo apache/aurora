@@ -35,6 +35,7 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
@@ -55,7 +56,8 @@ import org.junit.Test;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.ResourceType.CPUS;
-import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.PREFERRED_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
 import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.MISSING_ATTRIBUTES_NAME;
@@ -123,11 +125,12 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     schedulingFilter = createMock(SchedulingFilter.class);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT);
     ScheduledTask lowPriority = makeTask(USER_A, JOB_A, TASK_ID_A);
     assignToHost(lowPriority);
+    expectGetTier(lowPriority, DEV_TIER).times(2);
 
     ScheduledTask highPriority = makeTask(USER_A, JOB_A, TASK_ID_B, 100);
+    expectGetTier(highPriority, DEV_TIER);
 
     expectFiltering();
 
@@ -140,14 +143,15 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     schedulingFilter = createMock(SchedulingFilter.class);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT);
     ScheduledTask lowPriority = makeTask(USER_A, JOB_A, TASK_ID_A, 10);
     assignToHost(lowPriority);
 
     ScheduledTask lowerPriority = makeTask(USER_A, JOB_A, TASK_ID_B, 1);
     assignToHost(lowerPriority);
+    expectGetTier(lowerPriority, DEV_TIER).atLeastOnce();
 
     ScheduledTask highPriority = makeTask(USER_A, JOB_A, TASK_ID_C, 100);
+    expectGetTier(highPriority, DEV_TIER);
 
     expectFiltering();
 
@@ -160,17 +164,20 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     schedulingFilter = createMock(SchedulingFilter.class);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT);
     ScheduledTask highPriority = makeTask(USER_A, JOB_A, TASK_ID_A, 100);
     assignToHost(highPriority);
+    expectGetTier(highPriority, DEV_TIER);
 
     ScheduledTask lowerPriority = makeTask(USER_A, JOB_A, TASK_ID_B, 99);
     assignToHost(lowerPriority);
+    expectGetTier(lowerPriority, DEV_TIER);
 
     ScheduledTask lowestPriority = makeTask(USER_A, JOB_A, TASK_ID_C, 1);
     assignToHost(lowestPriority);
+    expectGetTier(lowestPriority, DEV_TIER).times(2);
 
     ScheduledTask pendingPriority = makeTask(USER_A, JOB_A, TASK_ID_D, 98);
+    expectGetTier(pendingPriority, DEV_TIER).times(3);
 
     expectFiltering();
 
@@ -185,8 +192,10 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     schedulingFilter = createMock(SchedulingFilter.class);
     ScheduledTask highPriority = makeTask(USER_A, JOB_A, TASK_ID_B, 100);
     assignToHost(highPriority);
+    expectGetTier(highPriority, DEV_TIER);
 
     ScheduledTask task = makeTask(USER_A, JOB_A, TASK_ID_A);
+    expectGetTier(task, DEV_TIER);
 
     control.replay();
     assertNoVictims(runFilter(task, NO_OFFER, highPriority));
@@ -197,10 +206,11 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     schedulingFilter = createMock(SchedulingFilter.class);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT);
     // Use a very low priority for the production task to show that priority is irrelevant.
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1", -1000);
+    expectGetTier(p1, PREFERRED_TIER);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_B + "_a1", 100);
+    expectGetTier(a1, DEV_TIER).times(2);
     assignToHost(a1);
 
     expectFiltering();
@@ -214,11 +224,12 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     schedulingFilter = createMock(SchedulingFilter.class);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT);
     // Use a very low priority for the production task to show that priority is irrelevant.
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1", -1000);
+    expectGetTier(p1, PREFERRED_TIER);
     ScheduledTask a1 = makeTask(USER_B, JOB_A, TASK_ID_B + "_a1", 100);
     assignToHost(a1);
+    expectGetTier(a1, DEV_TIER).times(2);
 
     expectFiltering();
 
@@ -230,7 +241,9 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   public void testProductionUsersDoNotPreemptEachOther() throws Exception {
     schedulingFilter = createMock(SchedulingFilter.class);
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1", 1000);
+    expectGetTier(p1, PREFERRED_TIER);
     ScheduledTask a1 = makeProductionTask(USER_B, JOB_A, TASK_ID_B + "_a1", 0);
+    expectGetTier(a1, PREFERRED_TIER);
     assignToHost(a1);
 
     control.replay();
@@ -241,12 +254,13 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   @Test
   public void testProductionPreemptingManyNonProduction() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT).times(5);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    expectGetTier(a1, DEV_TIER).atLeastOnce();
 
     ScheduledTask b1 = makeTask(USER_B, JOB_B, TASK_ID_B + "_b1");
     b1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    expectGetTier(b1, DEV_TIER).atLeastOnce();
 
     setUpHost();
 
@@ -255,6 +269,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    expectGetTier(p1, PREFERRED_TIER).times(2);
 
     control.replay();
     assertVictims(runFilter(p1, NO_OFFER, a1, b1), a1, b1);
@@ -264,15 +279,17 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   @Test
   public void testMinimalSetPreempted() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT).atLeastOnce();
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(4).setRamMb(4096);
+    expectGetTier(a1, DEV_TIER).atLeastOnce();
 
     ScheduledTask b1 = makeTask(USER_B, JOB_B, TASK_ID_B + "_b1");
     b1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    expectGetTier(b1, DEV_TIER).anyTimes();
 
     ScheduledTask b2 = makeTask(USER_B, JOB_B, TASK_ID_B + "_b2");
     b2.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    expectGetTier(b2, DEV_TIER).anyTimes();
 
     setUpHost();
 
@@ -282,6 +299,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
 
     ScheduledTask p1 = makeProductionTask(USER_C, JOB_C, TASK_ID_C + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    expectGetTier(p1, PREFERRED_TIER).times(3);
 
     control.replay();
     assertVictims(runFilter(p1, NO_OFFER, b1, b2, a1), a1);
@@ -293,6 +311,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    expectGetTier(p1, PREFERRED_TIER);
 
     setUpHost();
 
@@ -300,6 +319,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
 
     ScheduledTask p2 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p2");
     p2.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    expectGetTier(p2, PREFERRED_TIER);
 
     control.replay();
     assertNoVictims(runFilter(p2, NO_OFFER, p1));
@@ -309,16 +329,17 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   @Test
   public void testPreemptWithOfferAndTask() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT);
 
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a1);
+    expectGetTier(a1, DEV_TIER).times(2);
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    expectGetTier(p1, PREFERRED_TIER);
 
     control.replay();
     assertVictims(
@@ -333,16 +354,17 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   @Test
   public void testRevocableOfferFiltered() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT);
 
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a1);
+    expectGetTier(a1, DEV_TIER).times(2);
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    expectGetTier(p1, PREFERRED_TIER);
 
     control.replay();
     assertNoVictims(runFilter(
@@ -355,16 +377,17 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   @Test
   public void testRevocableVictimsFiltered() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(REVOCABLE_TIER);
 
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a1);
+    expectGetTier(a1, REVOCABLE_TIER).times(2);
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    expectGetTier(p1, PREFERRED_TIER);
 
     control.replay();
     assertNoVictims(runFilter(
@@ -377,16 +400,17 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   @Test
   public void testRevocableVictimRamUsed() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(REVOCABLE_TIER);
 
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a1);
+    expectGetTier(a1, REVOCABLE_TIER).times(2);
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    expectGetTier(p1, PREFERRED_TIER);
 
     control.replay();
     assertVictims(
@@ -401,20 +425,22 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   @Test
   public void testPreemptWithOfferAndMultipleTasks() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT).times(5);
 
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a1);
+    expectGetTier(a1, DEV_TIER).atLeastOnce();
 
     ScheduledTask a2 = makeTask(USER_A, JOB_B, TASK_ID_A + "_a2");
     a2.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a2);
+    expectGetTier(a2, DEV_TIER).atLeastOnce();
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(4).setRamMb(2048);
+    expectGetTier(p1, PREFERRED_TIER).times(2);
 
     control.replay();
     Optional<HostOffer> offer =
@@ -437,10 +463,12 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     schedulingFilter = createMock(SchedulingFilter.class);
     ScheduledTask task = makeProductionTask(USER_A, JOB_A, TASK_ID_A);
     assignToHost(task);
+    expectGetTier(task, PREFERRED_TIER);
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a1);
+    expectGetTier(a1, DEV_TIER);
 
     expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.absent());
 
@@ -453,13 +481,14 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   @Test
   public void testAllVictimsVetoed() {
     schedulingFilter = createMock(SchedulingFilter.class);
-    expect(tierManager.getTier(EasyMock.anyObject())).andReturn(DEFAULT);
     ScheduledTask task = makeProductionTask(USER_A, JOB_A, TASK_ID_A);
     assignToHost(task);
+    expectGetTier(task, PREFERRED_TIER);
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
     assignToHost(a1);
+    expectGetTier(a1, DEV_TIER).times(2);
 
     setUpHost();
     expectFiltering(Optional.of(Veto.constraintMismatch("ban")));
@@ -495,7 +524,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
       boolean revocable) {
 
     List<Resource> resources =
-        new ResourceSlot(cpu, ram, disk, numPorts).toResourceList(DEFAULT);
+        new ResourceSlot(cpu, ram, disk, numPorts).toResourceList(DEV_TIER);
     if (revocable) {
       resources = ImmutableList.<Resource>builder()
           .addAll(FluentIterable.from(resources)
@@ -533,6 +562,11 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
         EasyMock.anyObject()))
         .andAnswer(
             veto::asSet);
+  }
+
+  private IExpectationSetters<TierInfo> expectGetTier(ScheduledTask task, TierInfo tier) {
+    return expect(tierManager.getTier(ITaskConfig.build(task.getAssignedTask().getTask())))
+        .andReturn(tier);
   }
 
   static ScheduledTask makeTask(

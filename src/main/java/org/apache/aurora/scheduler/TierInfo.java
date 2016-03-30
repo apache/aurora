@@ -17,20 +17,34 @@ import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
 
+import org.codehaus.jackson.annotate.JsonCreator;
+import org.codehaus.jackson.annotate.JsonProperty;
+
 /**
  * Defines common task tier traits and behaviors.
  */
 public final class TierInfo {
-  public static final TierInfo DEFAULT = new TierInfo();
 
+  private final boolean preemptible;
   private final boolean revocable;
 
-  private TierInfo() {
-    this(false);
+  @JsonCreator
+  public TierInfo(
+      @JsonProperty("preemptible") boolean preemptible,
+      @JsonProperty("revocable") boolean revocable) {
+
+    this.preemptible = preemptible;
+    this.revocable = revocable;
   }
 
-  public TierInfo(boolean revocable) {
-    this.revocable = revocable;
+  /**
+   * Checks if this tier intends to run tasks as preemptible.
+   *
+   * @return {@code true} if this tier will result in tasks being run as preemptible, {@code false}
+   * otherwise.
+   */
+  public boolean isPreemptible() {
+    return preemptible;
   }
 
   /**
@@ -44,7 +58,7 @@ public final class TierInfo {
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(revocable);
+    return Objects.hash(preemptible, revocable);
   }
 
   @Override
@@ -54,12 +68,14 @@ public final class TierInfo {
     }
 
     TierInfo other = (TierInfo) obj;
-    return Objects.equals(revocable, other.revocable);
+    return Objects.equals(preemptible, other.preemptible)
+        && Objects.equals(revocable, other.revocable);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
+        .add("preemptible", preemptible)
         .add("revocable", revocable)
         .toString();
   }

@@ -48,7 +48,7 @@ import org.apache.aurora.scheduler.app.AppModule;
 import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.app.local.FakeNonVolatileStorage;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
@@ -80,7 +80,7 @@ public class ThriftIT extends EasyMockTest {
 
   private AuroraAdmin.Iface thrift;
 
-  private void createThrift(ConfigurationManager configurationManager) {
+  private void createThrift(ConfigurationManagerSettings configurationManagerSettings) {
     Injector injector = Guice.createInjector(
         new ThriftModule(),
         new AbstractModule() {
@@ -100,7 +100,7 @@ public class ThriftIT extends EasyMockTest {
             install(new TierModule(TaskTestUtil.DEV_TIER_CONFIG));
             bind(ExecutorSettings.class).toInstance(TestExecutorSettings.THERMOS_EXECUTOR);
 
-            install(new AppModule(configurationManager));
+            install(new AppModule(configurationManagerSettings));
 
             bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
 
@@ -138,7 +138,7 @@ public class ThriftIT extends EasyMockTest {
 
   @Test
   public void testSetQuota() throws Exception {
-    createThrift(TaskTestUtil.CONFIGURATION_MANAGER);
+    createThrift(TaskTestUtil.CONFIGURATION_MANAGER_SETTINGS);
 
     control.replay();
 
@@ -153,13 +153,13 @@ public class ThriftIT extends EasyMockTest {
 
   @Test
   public void testSubmitNoExecutorDockerTask() throws Exception {
-    ConfigurationManager configurationManager = new ConfigurationManager(
+    ConfigurationManagerSettings configurationManagerSettings = new ConfigurationManagerSettings(
         ImmutableSet.of(_Fields.DOCKER),
         true,
         ImmutableMultimap.of(),
         false);
 
-    createThrift(configurationManager);
+    createThrift(configurationManagerSettings);
 
     control.replay();
 

@@ -17,7 +17,7 @@ import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.ResourceType;
-import org.apache.aurora.scheduler.TierInfo;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.configuration.executor.Executors;
@@ -71,7 +71,7 @@ public final class TestExecutorSettings {
   public static ExecutorSettings thermosOnlyWithOverhead(ResourceSlot overhead) {
     ExecutorConfig config = THERMOS_EXECUTOR.getExecutorConfig();
     ExecutorInfo.Builder executor = config.getExecutor().toBuilder();
-    executor.clearResources().addAllResources(overhead.toResourceList(TierInfo.DEFAULT));
+    executor.clearResources().addAllResources(overhead.toResourceList(TaskTestUtil.DEV_TIER));
     return new ExecutorSettings(new ExecutorConfig(executor.build(), config.getVolumeMounts()));
   }
 }

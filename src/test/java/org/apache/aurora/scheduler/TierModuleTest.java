@@ -51,7 +51,11 @@ public class TierModuleTest {
   public void testTierConfigFile() {
     assertEquals(
         ImmutableMap.of("revocable", REVOCABLE_TIER),
-        parseTierConfig("{\"tiers\":{\"revocable\": {\"revocable\": true}}}").getTiers());
+        parseTierConfig(
+            "{\"tiers\":{"
+            + "\"revocable\": {\"revocable\": true, \"preemptible\": true}"
+            + "}}")
+            .getTiers());
   }
 
   @Test(expected = RuntimeException.class)

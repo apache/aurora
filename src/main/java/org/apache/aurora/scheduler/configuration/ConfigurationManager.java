@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.configuration;
 
 import java.util.Map;
-import java.util.Objects;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -34,6 +34,7 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConfig._Fields;
 import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.UserProvidedStrings;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
@@ -42,6 +43,8 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -99,21 +102,32 @@ public class ConfigurationManager {
           new RequiredFieldValidator<>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")),
           new RequiredFieldValidator<>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")));
 
-  private final ImmutableSet<Container._Fields> allowedContainerTypes;
-  private final boolean allowDockerParameters;
-  private final Multimap<String, String> defaultDockerParameters;
-  private final boolean requireDockerUseExecutor;
+  public static class ConfigurationManagerSettings {
+    private final ImmutableSet<Container._Fields> allowedContainerTypes;
+    private final boolean allowDockerParameters;
+    private final Multimap<String, String> defaultDockerParameters;
+    private final boolean requireDockerUseExecutor;
 
-  public ConfigurationManager(
-      ImmutableSet<Container._Fields> allowedContainerTypes,
-      boolean allowDockerParameters,
-      Multimap<String, String> defaultDockerParameters,
-      boolean requireDockerUseExecutor) {
+    public ConfigurationManagerSettings(
+        ImmutableSet<Container._Fields> allowedContainerTypes,
+        boolean allowDockerParameters,
+        Multimap<String, String> defaultDockerParameters,
+        boolean requireDockerUseExecutor) {
 
-    this.allowedContainerTypes = Objects.requireNonNull(allowedContainerTypes);
-    this.allowDockerParameters = allowDockerParameters;
-    this.defaultDockerParameters = Objects.requireNonNull(defaultDockerParameters);
-    this.requireDockerUseExecutor = requireDockerUseExecutor;
+      this.allowedContainerTypes = requireNonNull(allowedContainerTypes);
+      this.allowDockerParameters = allowDockerParameters;
+      this.defaultDockerParameters = requireNonNull(defaultDockerParameters);
+      this.requireDockerUseExecutor = requireDockerUseExecutor;
+    }
+  }
+
+  private final ConfigurationManagerSettings settings;
+  private final TierManager tierManager;
+
+  @Inject
+  public ConfigurationManager(ConfigurationManagerSettings settings, TierManager tierManager) {
+    this.settings = requireNonNull(settings);
+    this.tierManager = requireNonNull(tierManager);
   }
 
   private static String getRole(IValueConstraint constraint) {
@@ -145,7 +159,7 @@ public class ConfigurationManager {
   public IJobConfiguration validateAndPopulate(IJobConfiguration job)
       throws TaskDescriptionException {
 
-    Objects.requireNonNull(job);
+    requireNonNull(job);
 
     if (!job.isSetTaskConfig()) {
       throw new TaskDescriptionException("Job configuration must have taskConfig set.");
@@ -209,6 +223,12 @@ public class ConfigurationManager {
       throw new TaskDescriptionException("Tier contains illegal characters: " + config.getTier());
     }
 
+    try {
+      tierManager.getTier(config);
+    } catch (IllegalArgumentException e) {
+      throw new TaskDescriptionException(e.getMessage(), e);
+    }
+
     if (!JobKeys.isValid(config.getJob())) {
       // Job key is set but invalid
       throw new TaskDescriptionException("Job key " + config.getJob() + " is invalid.");
@@ -254,17 +274,17 @@ public class ConfigurationManager {
           throw new TaskDescriptionException("A container must specify an image.");
         }
         if (containerConfig.getDocker().getParameters().isEmpty()) {
-          for (Map.Entry<String, String> e : this.defaultDockerParameters.entries()) {
+          for (Map.Entry<String, String> e : settings.defaultDockerParameters.entries()) {
             builder.getContainer().getDocker().addToParameters(
                 new DockerParameter(e.getKey(), e.getValue()));
           }
         } else {
-          if (!allowDockerParameters) {
+          if (!settings.allowDockerParameters) {
             throw new TaskDescriptionException(NO_DOCKER_PARAMETERS);
           }
         }
 
-        if (requireDockerUseExecutor && !config.isSetExecutorConfig()) {
+        if (settings.requireDockerUseExecutor && !config.isSetExecutorConfig()) {
           throw new TaskDescriptionException(EXECUTOR_REQUIRED_WITH_DOCKER);
         }
       }
@@ -275,7 +295,7 @@ public class ConfigurationManager {
     if (!containerType.isPresent()) {
       throw new TaskDescriptionException("A job must have a container type.");
     }
-    if (!allowedContainerTypes.contains(containerType.get())) {
+    if (!settings.allowedContainerTypes.contains(containerType.get())) {
       throw new TaskDescriptionException(
           "This scheduler is not configured to allow the container type "
               + containerType.get().toString());
@@ -311,6 +331,10 @@ public class ConfigurationManager {
    * Thrown when an invalid task or job configuration is encountered.
    */
   public static class TaskDescriptionException extends Exception {
+    public TaskDescriptionException(String msg, Exception e) {
+      super(msg, e);
+    }
+
     public TaskDescriptionException(String msg) {
       super(msg);
     }

@@ -35,8 +35,10 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.TierInfo;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.TierManager.TierManagerImpl.TierConfig;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -49,15 +51,25 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
  */
 public final class TaskTestUtil {
 
-  public static final IJobKey JOB = JobKeys.from("role", "env", "job");
-  public static final TierInfo REVOCABLE_TIER = new TierInfo(true);
+  public static final IJobKey JOB = JobKeys.from("role", "dev", "job");
+  public static final TierInfo REVOCABLE_TIER =
+      new TierInfo(true /* preemptible */, true /* revocable */);
+  public static final TierInfo DEV_TIER =
+      new TierInfo(true /* preemptible */, false /* revocable */);
+  public static final TierInfo PREFERRED_TIER =
+      new TierInfo(false /* preemptible */, false /* revocable */);
+  public static final String DEV_TIER_NAME = "tier-dev";
   public static final TierConfig DEV_TIER_CONFIG =
-      new TierConfig(ImmutableMap.of("tier-dev", new TierInfo(false)));
-  public static final ConfigurationManager CONFIGURATION_MANAGER = new ConfigurationManager(
-      ImmutableSet.of(_Fields.MESOS),
-      false,
-      ImmutableMultimap.of(),
-      true);
+      new TierConfig(ImmutableMap.of(DEV_TIER_NAME, DEV_TIER));
+  public static final TierManager DEV_TIER_MANAGER = taskConfig -> DEV_TIER;
+  public static final ConfigurationManagerSettings CONFIGURATION_MANAGER_SETTINGS =
+      new ConfigurationManagerSettings(
+          ImmutableSet.of(_Fields.MESOS),
+          false,
+          ImmutableMultimap.of(),
+          true);
+  public static final ConfigurationManager CONFIGURATION_MANAGER =
+      new ConfigurationManager(CONFIGURATION_MANAGER_SETTINGS, DEV_TIER_MANAGER);
 
   private TaskTestUtil() {
     // Utility class.
@@ -74,7 +86,7 @@ public final class TaskTestUtil {
         .setPriority(1)
         .setMaxTaskFailures(-1)
         .setProduction(true)
-        .setTier("tier-" + job.getEnvironment())
+        .setTier(DEV_TIER_NAME)
         .setConstraints(ImmutableSet.of(
             new Constraint(
                 "valueConstraint",

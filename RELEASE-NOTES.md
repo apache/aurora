@@ -18,6 +18,7 @@
   for more detail.
 - Support for ZooKeeper authentication in the executor announcer. See
   [here](docs/operations/security.md#announcer-authentication) for details.
+- Jobs referencing invalid tier name will be rejected by the scheduler.
 
 ### Deprecations and removals:
 

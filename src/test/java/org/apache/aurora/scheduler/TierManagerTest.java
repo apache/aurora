@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler;
 
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.TierManager.TierManagerImpl;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Test;
 
@@ -23,29 +24,27 @@ import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.junit.Assert.assertEquals;
 
 public class TierManagerTest {
+  private static final TierManager TIER_MANAGER = new TierManagerImpl(
+      parseTierConfig("{\"tiers\":{"
+          + "\"preferred\": {\"revocable\": false, \"preemptible\": false},"
+          + "\"preemptible\": {\"revocable\": false, \"preemptible\": true},"
+          + "\"revocable\": {\"revocable\": true, \"preemptible\": true}"
+          + "}}"));
+
   @Test
   public void testRevocable() {
-    TierManager manager = new TierManagerImpl(
-        parseTierConfig("{\"tiers\":{"
-            + "\"revocable\": {\"revocable\": true},"
-            + "\"preferred\": {\"revocable\": false}"
-            + "}}"));
     assertEquals(
         REVOCABLE_TIER,
-        manager.getTier(ITaskConfig.build(new TaskConfig().setTier("revocable"))));
+        TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig().setTier("revocable"))));
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testNameMismatch() {
-    TierManager manager = new TierManagerImpl(
-        parseTierConfig("{\"tiers\":{\"revocable\": {\"revocable\": true}}}"));
-    manager.getTier(ITaskConfig.build(new TaskConfig().setTier("Revocable")));
+    TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig().setTier("Revocable")));
   }
 
   @Test
   public void testNoTierInTaskConfig() {
-    TierManager manager = new TierManagerImpl(
-        parseTierConfig("{\"tiers\":{\"revocable\": {\"revocable\": true}}}"));
-    assertEquals(TierInfo.DEFAULT, manager.getTier(ITaskConfig.build(new TaskConfig())));
+    assertEquals(TaskTestUtil.DEV_TIER, TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig())));
   }
 }

@@ -34,7 +34,7 @@ import static org.apache.aurora.scheduler.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
-import static org.apache.aurora.scheduler.TierInfo.DEFAULT;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -95,7 +95,7 @@ public class ResourceSlotTest {
             makeMesosResource(CPUS, TASK.getNumCpus(), false),
             makeMesosResource(RAM_MB, TASK.getRamMb(), false),
             makeMesosResource(DISK_MB, TASK.getDiskMb(), false)),
-        ImmutableSet.copyOf(resources.toResourceList(DEFAULT)));
+        ImmutableSet.copyOf(resources.toResourceList(DEV_TIER)));
   }
 
   @Test

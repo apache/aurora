@@ -36,7 +36,7 @@ import org.apache.aurora.gen.Container._Fields;
 import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.AsyncModule;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.http.JettyServerModule;
@@ -94,15 +94,15 @@ public class AppModule extends AbstractModule {
       help = "If false, Docker tasks may run without an executor (EXPERIMENTAL)")
   private static final Arg<Boolean> REQUIRE_DOCKER_USE_EXECUTOR = Arg.create(true);
 
-  private final ConfigurationManager configurationManager;
+  private final ConfigurationManagerSettings configurationManagerSettings;
 
   @VisibleForTesting
-  public AppModule(ConfigurationManager configurationManager) {
-    this.configurationManager = requireNonNull(configurationManager);
+  public AppModule(ConfigurationManagerSettings configurationManagerSettings) {
+    this.configurationManagerSettings = requireNonNull(configurationManagerSettings);
   }
 
   public AppModule() {
-    this(new ConfigurationManager(
+    this(new ConfigurationManagerSettings(
         ImmutableSet.copyOf(ALLOWED_CONTAINER_TYPES.get()),
         ENABLE_DOCKER_PARAMETERS.get(),
         DEFAULT_DOCKER_PARAMETERS.get(),
@@ -111,7 +111,7 @@ public class AppModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(ConfigurationManager.class).toInstance(configurationManager);
+    bind(ConfigurationManagerSettings.class).toInstance(configurationManagerSettings);
     bind(Thresholds.class)
         .toInstance(new Thresholds(MAX_TASKS_PER_JOB.get(), MAX_UPDATE_INSTANCE_FAILURES.get()));
 

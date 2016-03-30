@@ -73,8 +73,14 @@ public interface TierManager {
           !taskConfig.isSetTier() || tierConfig.tiers.containsKey(taskConfig.getTier()),
           format("Invalid tier '%s' in TaskConfig.", taskConfig.getTier()));
 
-      // Backward compatibility mode until tier is required in TaskConfig (AURORA-1624).
-      return taskConfig.isSetTier() ? tierConfig.tiers.get(taskConfig.getTier()) : TierInfo.DEFAULT;
+      return taskConfig.isSetTier()
+          ? tierConfig.tiers.get(taskConfig.getTier())
+          : tierConfig.getTiers().values().stream()
+              // Backward compatibility mode until tier is required in TaskConfig (AURORA-1624).
+              .filter(v -> v.isPreemptible() == !taskConfig.isProduction() && !v.isRevocable())
+              .findFirst()
+              .orElseThrow(() -> new IllegalStateException(
+                  format("No matching implicit tier for task of job %s", taskConfig.getJob())));
     }
   }
 }

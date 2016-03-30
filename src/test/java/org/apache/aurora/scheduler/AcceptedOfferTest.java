@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Resource;
 import org.junit.Test;
@@ -60,7 +61,7 @@ public class AcceptedOfferTest {
         ResourceSlot.NONE,
         ResourceSlot.NONE,
         ImmutableSet.of(),
-        TierInfo.DEFAULT);
+        TaskTestUtil.DEV_TIER);
     assertEquals(Collections.emptyList(), acceptedOffer.getTaskResources());
     assertEquals(Collections.emptyList(), acceptedOffer.getExecutorResources());
   }
@@ -76,7 +77,7 @@ public class AcceptedOfferTest {
         ResourceSlot.NONE,
         ResourceSlot.NONE,
         ImmutableSet.of(80, 90, 100),
-        TierInfo.DEFAULT);
+        TaskTestUtil.DEV_TIER);
 
     List<Resource> expected = ImmutableList.<Resource>builder()
         // Because we prefer reserved resources and handle them before non-reserved resources,
@@ -98,7 +99,7 @@ public class AcceptedOfferTest {
         ResourceSlot.NONE,
         ResourceSlot.NONE,
         ImmutableSet.of(80, 90, 100),
-        TierInfo.DEFAULT);
+        TaskTestUtil.DEV_TIER);
   }
 
   @Test
@@ -122,7 +123,7 @@ public class AcceptedOfferTest {
     Protos.Offer offer = fakeOffer(resources);
 
     AcceptedOffer offerAllocation = AcceptedOffer.create(
-        offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(cpuRevocable));
+        offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false, cpuRevocable));
 
     List<Resource> taskList = ImmutableList.<Resource>builder()
         .add(makeScalar(ResourceType.CPUS.getName(), role, cpuRevocable, TASK_SLOT.getNumCpus()))
@@ -158,7 +159,7 @@ public class AcceptedOfferTest {
     Protos.Offer offer = fakeOffer(resources);
 
     AcceptedOffer.create(
-        offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false));
+        offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false, false));
   }
 
   @Test
@@ -199,7 +200,7 @@ public class AcceptedOfferTest {
     Protos.Offer offer = fakeOffer(resources);
 
     AcceptedOffer offerAllocation = AcceptedOffer.create(
-        offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(cpuRevocable));
+        offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false, cpuRevocable));
 
     List<Resource> taskList = ImmutableList.<Resource>builder()
         // We intentionally sliced the offer resource to not align with TASK_SLOT's num cpus.
@@ -263,7 +264,7 @@ public class AcceptedOfferTest {
     Protos.Offer offer = fakeOffer(resources);
     // We don't have enough resource to satisfy a non-revocable request.
     AcceptedOffer.create(
-        offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false));
+        offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false, false));
   }
 
   private static Resource makePortResource(Optional<String> role, Integer... values) {

@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
+import java.util.List;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -143,14 +144,12 @@ public interface PreemptionVictimFilter {
       FluentIterable<PreemptionVictim> preemptableTasks = FluentIterable.from(possibleVictims)
           .filter(preemptionFilter(pendingTask));
 
-      if (preemptableTasks.isEmpty()) {
+      List<PreemptionVictim> sortedVictims = resourceOrder.immutableSortedCopy(preemptableTasks);
+      if (sortedVictims.isEmpty()) {
         return Optional.absent();
       }
 
       Set<PreemptionVictim> toPreemptTasks = Sets.newHashSet();
-
-      Iterable<PreemptionVictim> sortedVictims =
-          resourceOrder.immutableSortedCopy(preemptableTasks);
 
       Optional<IHostAttributes> attributes =
           storeProvider.getAttributeStore().getHostAttributes(Iterables.getOnlyElement(hosts));
@@ -160,12 +159,10 @@ public interface PreemptionVictimFilter {
         return Optional.absent();
       }
 
+      ResourceSlot totalResource = slackResources;
       for (PreemptionVictim victim : sortedVictims) {
         toPreemptTasks.add(victim);
-
-        ResourceSlot totalResource =
-            sum(Iterables.transform(toPreemptTasks, victimToResources)).add(slackResources);
-
+        totalResource = totalResource.add(victimToResources.apply(victim));
         Set<Veto> vetoes = schedulingFilter.filter(
             new UnusedResource(totalResource, attributes.get()),
             new ResourceRequest(pendingTask, jobState));
@@ -184,15 +181,16 @@ public interface PreemptionVictimFilter {
      * @return A filter that will compare the priorities and resources required by other tasks
      *     with {@code preemptableTask}.
      */
-    private static Predicate<PreemptionVictim> preemptionFilter(final ITaskConfig pendingTask) {
+    private Predicate<PreemptionVictim> preemptionFilter(final ITaskConfig pendingTask) {
       return possibleVictim -> {
-        boolean pendingIsProduction = pendingTask.isProduction();
-        boolean victimIsProduction = possibleVictim.isProduction();
+        boolean pendingIsPreemptible = tierManager.getTier(pendingTask).isPreemptible();
+        boolean victimIsPreemptible =
+            tierManager.getTier(possibleVictim.getConfig()).isPreemptible();
 
-        if (pendingIsProduction && !victimIsProduction) {
+        if (!pendingIsPreemptible && victimIsPreemptible) {
           return true;
-        } else if (pendingIsProduction == victimIsProduction) {
-          // If production flags are equal, preemption is based on priority within the same role.
+        } else if (pendingIsPreemptible == victimIsPreemptible) {
+          // If preemptible flags are equal, preemption is based on priority within the same role.
           if (pendingTask.getJob().getRole().equals(possibleVictim.getRole())) {
             return pendingTask.getPriority() > possibleVictim.getPriority();
           } else {

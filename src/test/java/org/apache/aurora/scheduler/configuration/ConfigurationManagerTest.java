@@ -34,6 +34,7 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.storage.entities.IDockerParameter;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -102,15 +103,19 @@ public class ConfigurationManagerTest {
       TaskTestUtil.makeConfig(JobKeys.from("role", "env", "job"));
 
   private static final ConfigurationManager CONFIGURATION_MANAGER = new ConfigurationManager(
+      new ConfigurationManagerSettings(
       ALL_CONTAINER_TYPES,
       false,
       ImmutableMultimap.of(),
-      true);
+      true),
+      TaskTestUtil.DEV_TIER_MANAGER);
   private static final ConfigurationManager DOCKER_CONFIGURATION_MANAGER = new ConfigurationManager(
-      ALL_CONTAINER_TYPES,
-      true,
-      ImmutableMultimap.of("foo", "bar"),
-      false);
+      new ConfigurationManagerSettings(
+        ALL_CONTAINER_TYPES,
+        true,
+        ImmutableMultimap.of("foo", "bar"),
+        false),
+      TaskTestUtil.DEV_TIER_MANAGER);
 
   @Test
   public void testIsGoodIdentifier() {
