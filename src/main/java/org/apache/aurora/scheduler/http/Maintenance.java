@@ -23,9 +23,10 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import com.google.common.base.Function;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 
@@ -62,24 +63,26 @@ public class Maintenance {
             Multimaps.index(
                 storeProvider.getAttributeStore().getHostAttributes(),
                 IHostAttributes::getMode),
-            HOST_NAME);
+              IHostAttributes::getHost);
 
-      Map<MaintenanceMode, Object> hosts = Maps.newHashMap();
-      hosts.put(DRAINED, ImmutableSet.copyOf(hostsByMode.get(DRAINED)));
-      hosts.put(SCHEDULED, ImmutableSet.copyOf(hostsByMode.get(SCHEDULED)));
-      hosts.put(DRAINING, getTasksByHosts(storeProvider, hostsByMode.get(DRAINING)).asMap());
+      Map<MaintenanceMode, Object> hosts = ImmutableMap.of(
+          DRAINED, ImmutableSet.copyOf(hostsByMode.get(DRAINED)),
+          SCHEDULED, ImmutableSet.copyOf(hostsByMode.get(SCHEDULED)),
+          DRAINING, getTasksByHosts(storeProvider, hostsByMode.get(DRAINING)).asMap());
       return Response.ok(hosts).build();
     });
   }
 
   private Multimap<String, String> getTasksByHosts(StoreProvider provider, Iterable<String> hosts) {
+    if (Iterables.isEmpty(hosts)) {
+      return ImmutableMultimap.of();
+    }
+
     ImmutableSet.Builder<IScheduledTask> drainingTasks = ImmutableSet.builder();
-    drainingTasks.addAll(provider.getTaskStore().fetchTasks(Query.slaveScoped(hosts).active()));
+    drainingTasks.addAll(provider.getTaskStore()
+        .fetchTasks(Query.slaveScoped(hosts).byStatus(Tasks.SLAVE_ASSIGNED_STATES)));
     return Multimaps.transformValues(
         Multimaps.index(drainingTasks.build(), Tasks::scheduledToSlaveHost),
         Tasks::id);
   }
-
-  private static final Function<IHostAttributes, String> HOST_NAME =
-      IHostAttributes::getHost;
 }
