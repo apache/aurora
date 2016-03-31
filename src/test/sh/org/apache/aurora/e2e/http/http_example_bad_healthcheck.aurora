@@ -18,7 +18,8 @@ DEFAULT_CMD = 'cp /vagrant/src/test/sh/org/apache/aurora/e2e/http_example.py .'
 
 run_server = Process(
   name = 'run_server',
-  cmdline = 'python http_example.py {{thermos.ports[http]}}')
+  cmdline = 'python http_example.py {{thermos.ports[http]}}'
+)
 
 stage_server = Process(
   name = 'stage_server',
@@ -29,18 +30,22 @@ test_task = Task(
   name = 'http_example',
   resources = Resources(cpu=0.5, ram=32*MB, disk=64*MB),
   processes = [stage_server, run_server],
-  constraints = order(stage_server, run_server))
+  constraints = order(stage_server, run_server)
+)
 
 update_config = UpdateConfig(watch_secs=10, batch_size=2)
 # "I am going to fail" config.
 shell_config = ShellHealthChecker(
-    shell_command='grep foo'
-    )
+  # This shell validates two things:
+  # 1. the shell command is not run as a privileged user
+  # 2. a failed shell command results in a health check failure
+  shell_command='rm -f /etc/passwd'
+)
 health_check_config = HealthCheckConfig(
-    health_checker=HealthCheckerConfig(shell=shell_config),
-    initial_interval_secs=5,
-    interval_secs=1,
-    )
+  health_checker=HealthCheckerConfig(shell=shell_config),
+  initial_interval_secs=5,
+  interval_secs=1,
+)
 
 job = Service(
   cluster = 'devcluster',

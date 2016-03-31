@@ -26,16 +26,19 @@ else:
 
 class ShellHealthCheck(object):
 
-  def __init__(self, cmd, timeout_secs=None):
+  def __init__(self, cmd, preexec_fn=None, timeout_secs=None):
     """
     Initialize with the commmand we would like to call.
     :param cmd: Command to execute that is expected to have a 0 return code on success.
     :type cmd: str
+    :param preexec_fn: Callable to invoke just before the child shell process is executed.
+    :type preexec_fn: callable
     :param timeout_secs: Timeout in seconds.
     :type timeout_secs: int
     """
-    self.cmd = cmd
-    self.timeout_secs = timeout_secs
+    self._cmd = cmd
+    self._preexec_fn = preexec_fn
+    self._timeout_secs = timeout_secs
 
   def __call__(self):
     """
@@ -45,14 +48,18 @@ class ShellHealthCheck(object):
     :rtype tuple:
     """
     try:
-      subprocess.check_call(self.cmd, timeout=self.timeout_secs, shell=True)
+      subprocess.check_call(
+          self._cmd,
+          timeout=self._timeout_secs,
+          shell=True,
+          preexec_fn=self._preexec_fn)
       return True, None
     except subprocess.CalledProcessError as reason:
       # The command didn't return a 0 so provide reason for failure.
       return False, str(reason)
+    except subprocess.TimeoutExpired:
+      return False, 'Health check timed out.'
     except OSError as e:
-      reason = 'OSError: {error}'.format(error=e.strerror)
-      return False, reason
+      return False, 'OSError: %s' % e.strerror
     except ValueError:
-      reason = 'Invalid commmand.'
-      return False, reason
+      return False, 'Invalid commmand.'

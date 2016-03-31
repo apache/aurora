@@ -202,7 +202,7 @@ test_update_fail() {
       | tail -n +2 | awk '{print $2}')
   # || is so that we don't return an EXIT so that `trap collect_result` doesn't get triggered.
   aurora update wait $_jobkey $_update_id || echo $?
-  # MAKING SURE WE ROLLED BACK.
+  # Making sure we rolled back.
   local status=$(aurora update info $_jobkey $_update_id | grep 'Current status' | awk '{print $NF}')
   if [[ $status != "ROLLED_BACK" ]]; then
     echo "Update should have completed in ROLLED_BACK state due to failed healthcheck."

@@ -13,6 +13,7 @@
 #
 
 import os.path
+import pwd
 import threading
 import time
 import traceback
@@ -243,10 +244,15 @@ class HealthCheckerProvider(StatusCheckerProvider):
         task=assigned_task,
         cmd=shell_command
       )
-      shell_signaler = ShellHealthCheck(
-        cmd=interpolated_command,
-        timeout_secs=timeout_secs,
-      )
+
+      pw_entry = pwd.getpwnam(assigned_task.task.job.role)
+      def demote_to_user():
+        os.setgid(pw_entry.pw_gid)
+        os.setuid(pw_entry.pw_uid)
+
+      shell_signaler = ShellHealthCheck(cmd=interpolated_command,
+        preexec_fn=demote_to_user,
+        timeout_secs=timeout_secs)
       a_health_checker = lambda: shell_signaler()
     else:
       portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)

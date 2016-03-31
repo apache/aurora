@@ -39,7 +39,7 @@ from apache.aurora.executor.common.sandbox import SandboxInterface
 
 from .fixtures import HELLO_WORLD, MESOS_JOB
 
-from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, TaskConfig
+from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, JobKey, TaskConfig
 
 
 class TestHealthChecker(unittest.TestCase):
@@ -246,13 +246,15 @@ class TestHealthCheckerProvider(unittest.TestCase):
     assert health_checker.threaded_health_checker.interval == interval_secs
     assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs
 
-  def test_from_assigned_task_shell(self):
+  @mock.patch('pwd.getpwnam')
+  def test_from_assigned_task_shell(self, mock_getpwnam):
     interval_secs = 17
     initial_interval_secs = 3
     max_consecutive_failures = 2
     timeout_secs = 5
     shell_config = ShellHealthChecker(shell_command='failed command')
     task_config = TaskConfig(
+        job=JobKey(role='role', environment='env', name='name'),
         executorConfig=ExecutorConfig(
             name='thermos-generic',
             data=MESOS_JOB(
@@ -276,6 +278,7 @@ class TestHealthCheckerProvider(unittest.TestCase):
     assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs
     hct_max_fail = health_checker.threaded_health_checker.max_consecutive_failures
     assert hct_max_fail == max_consecutive_failures
+    mock_getpwnam.assert_called_once_with(task_config.job.role)
 
   def test_interpolate_cmd(self):
     """Making sure thermos.ports[foo] gets correctly substituted with assignedPorts info."""
