@@ -18,6 +18,11 @@
   for more detail.
 - Support for ZooKeeper authentication in the executor announcer. See
   [here](docs/operations/security.md#announcer-authentication) for details.
+- Scheduler H2 in-memory database is now using
+  [MVStore](http://www.h2database.com/html/mvstore.html)
+  In addition, scheduler thrift snapshots are now supporting full DB dumps for faster restarts.
+- Added scheduler argument `-require_docker_use_executor` that indicates whether the scheduler
+  should accept tasks that use the Docker containerizer without an executor (experimental).
 - Jobs referencing invalid tier name will be rejected by the scheduler.
 
 ### Deprecations and removals:
@@ -27,12 +32,8 @@
   - `TaskConfig.environment`
   - `TaskConfig.jobName`
   - `TaskQuery.owner`
+- Removed deprecated executor argument `-announcer-enable`, which was a no-op in 0.12.0.
 - Task ID strings are no longer prefixed by a timestamp.
-- Scheduler H2 in-memory database is now using
-  [MVStore](http://www.h2database.com/html/mvstore.html)
-  In addition, scheduler thrift snapshots are now supporting full DB dumps for faster restarts.
-- Added scheduler argument `-require_docker_use_executor` that indicates whether the scheduler
-  should accept tasks that use the Docker containerizer without an executor (experimental).
 
 0.12.0
 ------
