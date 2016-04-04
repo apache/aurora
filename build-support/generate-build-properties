@@ -23,6 +23,12 @@ time=$(date -u +'%Y-%m-%d %H:%M:%S %Z')
 date=$(date +'%a %Y-%m-%d')
 EOF
 
+if [ -e .auroraversion ]; then
+cat >> ${properties_file} <<EOF
+version=$(cat .auroraversion)
+EOF
+fi
+
 if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
 cat >> ${properties_file} <<EOF
 git.revision=$(git rev-parse HEAD)
