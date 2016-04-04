@@ -9,8 +9,8 @@ Various tools integrate with Aurora. Is there a tool missing? Let us know, or su
 
 * RPC libraries that integrate with the Aurora's [service discovery mechanism](../features/service-discovery.md):
   - [linkerd](https://linkerd.io/) RPC proxy
-  - [finagle](https://twitter.github.io/finagle) (Python)
-  - [scales](https://github.com/steveniemitz/scales) (Scala)
+  - [finagle](https://twitter.github.io/finagle) (Scala)
+  - [scales](https://github.com/steveniemitz/scales) (Python)
 
 * Monitoring:
   - [collectd-aurora](https://github.com/zircote/collectd-aurora) for cluster monitoring using collectd
