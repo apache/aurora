@@ -24,9 +24,6 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateRequest;
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.LockKey;
-import org.apache.aurora.gen.LockValidation;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.http.api.security.AuthorizingParam;
@@ -45,19 +42,14 @@ import org.apache.thrift.TException;
  */
 public interface AnnotatedAuroraAdmin extends AuroraAdmin.Iface {
   @Override
-  Response createJob(
-      @AuthorizingParam @Nullable JobConfiguration description,
-      @Nullable Lock lock) throws TException;
+  Response createJob(@AuthorizingParam @Nullable JobConfiguration description) throws TException;
 
   @Override
   Response scheduleCronJob(
-      @AuthorizingParam @Nullable JobConfiguration description,
-      @Nullable Lock lock) throws TException;
+      @AuthorizingParam @Nullable JobConfiguration description) throws TException;
 
   @Override
-  Response descheduleCronJob(
-      @AuthorizingParam @Nullable JobKey job,
-      @Nullable Lock lock) throws TException;
+  Response descheduleCronJob(@AuthorizingParam @Nullable JobKey job) throws TException;
 
   @Override
   Response startCronJob(
@@ -66,36 +58,23 @@ public interface AnnotatedAuroraAdmin extends AuroraAdmin.Iface {
   @Override
   Response restartShards(
       @AuthorizingParam @Nullable JobKey job,
-      @Nullable Set<Integer> shardIds,
-      @Nullable Lock lock) throws TException;
+      @Nullable Set<Integer> shardIds) throws TException;
 
   @Override
   Response killTasks(
       @AuthorizingParam @Nullable TaskQuery query,
-      @Nullable Lock lock,
       @AuthorizingParam @Nullable JobKey job,
       @Nullable Set<Integer> instances) throws TException;
 
   @Override
   Response addInstances(
       @AuthorizingParam @Nullable AddInstancesConfig config,
-      @Nullable Lock lock,
       @AuthorizingParam @Nullable InstanceKey key,
       int count) throws TException;
 
   @Override
-  Response acquireLock(
-      @AuthorizingParam @Nullable LockKey lockKey) throws TException;
-
-  @Override
-  Response releaseLock(
-      @AuthorizingParam @Nullable Lock lock,
-      @Nullable LockValidation validation) throws TException;
-
-  @Override
   Response replaceCronTemplate(
-      @AuthorizingParam @Nullable JobConfiguration config,
-      @Nullable Lock lock) throws TException;
+      @AuthorizingParam @Nullable JobConfiguration config) throws TException;
 
   @Override
   Response startJobUpdate(

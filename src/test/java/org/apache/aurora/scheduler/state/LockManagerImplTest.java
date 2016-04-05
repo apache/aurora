@@ -106,51 +106,6 @@ public class LockManagerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testValidateLockStoredEqualHeld() throws Exception {
-    control.replay();
-
-    ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.of(lock));
-  }
-
-  @Test
-  public void testValidateLockNotStoredNotHeld() throws Exception {
-    control.replay();
-
-    lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
-  }
-
-  @Test
-  public void testValidateLockStoredNotEqualHeld() throws Exception {
-    control.replay();
-
-    expectLockException(JOB_KEY);
-    ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
-    lock = ILock.build(lock.newBuilder().setUser("bob"));
-    lockManager.validateIfLocked(LOCK_KEY, Optional.of(lock));
-  }
-
-  @Test
-  public void testValidateLockStoredNotEqualHeldWithHeldNull() throws Exception {
-    control.replay();
-
-    expectLockException(JOB_KEY);
-    lockManager.acquireLock(LOCK_KEY, USER);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
-  }
-
-  @Test
-  public void testValidateLockNotStoredHeld() throws Exception {
-    control.replay();
-
-    IJobKey jobKey = JobKeys.from("r", "e", "n");
-    expectLockException(jobKey);
-    ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
-    ILockKey key = ILockKey.build(LockKey.job(jobKey.newBuilder()));
-    lockManager.validateIfLocked(key, Optional.of(lock));
-  }
-
-  @Test
   public void testGetLocks() throws Exception {
     control.replay();
 
@@ -190,14 +145,14 @@ public class LockManagerImplTest extends EasyMockTest {
         .build()
         .newThread(() -> {
           try {
-            lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
+            lockManager.assertNotLocked(LOCK_KEY);
           } catch (LockException e) {
             throw Throwables.propagate(e);
           }
         })
         .start();
 
-    lockManager.validateIfLocked(LOCK_KEY, Optional.empty());
+    lockManager.assertNotLocked(LOCK_KEY);
   }
 
   private void expectLockException(IJobKey key) {

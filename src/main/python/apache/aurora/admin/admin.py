@@ -16,7 +16,6 @@ from __future__ import print_function
 
 import json
 import optparse
-import pprint
 import sys
 
 from twitter.common import app, log
@@ -325,23 +324,6 @@ def scheduler_snapshot(cluster):
   Request that the scheduler perform a storage snapshot and block until complete.
   """
   check_and_log_response(make_admin_client(cluster).snapshot())
-
-
-@app.command
-@requires.exactly('cluster')
-def get_locks(cluster):
-  """usage: get_locks cluster
-
-  Prints all context/operation locks in the scheduler.
-  """
-  resp = make_admin_client(cluster).get_locks()
-  check_and_log_response(resp)
-
-  pp = pprint.PrettyPrinter(indent=2)
-  def pretty_print_lock(lock):
-    return pp.pformat(vars(lock))
-
-  print_results([',\n'.join(pretty_print_lock(t) for t in resp.result.getLocksResult.locks)])
 
 
 @app.command

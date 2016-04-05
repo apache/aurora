@@ -61,7 +61,6 @@ class TestRestarter(MoxTestBase):
 
     self.mock_scheduler = self.mox.CreateMock(scheduler_client)
     self.mock_instance_watcher = self.mox.CreateMock(InstanceWatcher)
-    self.lock = None
 
     self.restarter = Restarter(
         JOB,
@@ -69,11 +68,8 @@ class TestRestarter(MoxTestBase):
         FakeSchedulerProxy(Cluster(name=CLUSTER), self.mock_scheduler),
         self.mock_instance_watcher)
 
-  def mock_restart_instances(self, instances, lock=None):
-    self.mock_scheduler.restartShards(
-        JOB.to_thrift(),
-        instances,
-        lock).AndReturn(make_response())
+  def mock_restart_instances(self, instances):
+    self.mock_scheduler.restartShards(JOB.to_thrift(), instances).AndReturn(make_response())
     self.mock_instance_watcher.watch(instances).AndReturn([])
 
   def test_restart_one_iteration(self):
@@ -128,10 +124,7 @@ class TestRestarter(MoxTestBase):
 
   def mock_restart_fails(self):
     response = make_response(code=ResponseCode.ERROR, message='test error')
-    self.mock_scheduler.restartShards(
-        JOB.to_thrift(),
-        IgnoreArg(),
-        self.lock).AndReturn(response)
+    self.mock_scheduler.restartShards(JOB.to_thrift(), IgnoreArg()).AndReturn(response)
 
   def test_restart_instance_fails(self):
     self.mock_status_active_tasks([0, 1])
@@ -142,10 +135,7 @@ class TestRestarter(MoxTestBase):
     assert self.restarter.restart(None).responseCode == ResponseCode.ERROR
 
   def mock_restart_watch_fails(self, instances):
-    self.mock_scheduler.restartShards(
-        JOB.to_thrift(),
-        instances,
-        self.lock).AndReturn(make_response())
+    self.mock_scheduler.restartShards(JOB.to_thrift(), instances).AndReturn(make_response())
     self.mock_instance_watcher.watch(instances).AndReturn(instances)
 
   def test_restart_instances_watch_fails(self):

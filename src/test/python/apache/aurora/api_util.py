@@ -70,34 +70,28 @@ class SchedulerThriftApiSpec(ReadOnlyScheduler.Iface):
   def rewriteConfigs(self, request):
     pass
 
-  def createJob(self, description, lock):
+  def createJob(self, description):
     pass
 
-  def scheduleCronJob(self, description, lock):
+  def scheduleCronJob(self, description):
     pass
 
-  def descheduleCronJob(self, job, lock):
+  def descheduleCronJob(self, job):
     pass
 
   def startCronJob(self, job):
     pass
 
-  def restartShards(self, job, shardIds, lock):
+  def restartShards(self, job, shardIds):
     pass
 
-  def killTasks(self, query, lock, jobKey, instances):
+  def killTasks(self, query, jobKey, instances):
     pass
 
-  def addInstances(self, config, lock, key, count):
+  def addInstances(self, config, key, count):
     pass
 
-  def acquireLock(self, lockKey):
-    pass
-
-  def releaseLock(self, lock, validation):
-    pass
-
-  def replaceCronTemplate(self, config, lock):
+  def replaceCronTemplate(self, config):
     pass
 
   def startJobUpdate(self, request, message):

@@ -48,7 +48,6 @@ import org.apache.aurora.gen.GetJobUpdateDetailsResult;
 import org.apache.aurora.gen.GetJobUpdateDiffResult;
 import org.apache.aurora.gen.GetJobUpdateSummariesResult;
 import org.apache.aurora.gen.GetJobsResult;
-import org.apache.aurora.gen.GetLocksResult;
 import org.apache.aurora.gen.GetPendingReasonResult;
 import org.apache.aurora.gen.GetQuotaResult;
 import org.apache.aurora.gen.JobConfiguration;
@@ -84,7 +83,6 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.metadata.NearestFit;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
-import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -94,7 +92,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
-import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -121,7 +118,6 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   private final NearestFit nearestFit;
   private final CronPredictor cronPredictor;
   private final QuotaManager quotaManager;
-  private final LockManager lockManager;
 
   @Inject
   ReadOnlySchedulerImpl(
@@ -129,15 +125,13 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
       Storage storage,
       NearestFit nearestFit,
       CronPredictor cronPredictor,
-      QuotaManager quotaManager,
-      LockManager lockManager) {
+      QuotaManager quotaManager) {
 
     this.configurationManager = requireNonNull(configurationManager);
     this.storage = requireNonNull(storage);
     this.nearestFit = requireNonNull(nearestFit);
     this.cronPredictor = requireNonNull(cronPredictor);
     this.quotaManager = requireNonNull(quotaManager);
-    this.lockManager = requireNonNull(lockManager);
   }
 
   @Override
@@ -296,12 +290,6 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
 
       return ok(Result.getQuotaResult(result));
     });
-  }
-
-  @Override
-  public Response getLocks() {
-    return ok(Result.getLocksResult(
-        new GetLocksResult().setLocks(ILock.toBuildersSet(lockManager.getLocks()))));
   }
 
   @Override

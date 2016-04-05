@@ -33,8 +33,6 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.RoleSummary;
@@ -54,7 +52,6 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.easymock.EasyMock.anyObject;
-import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
@@ -88,20 +85,17 @@ public class ApiBetaTest extends AbstractJettyTest {
 
   @Test
   public void testCreateJob() throws Exception {
-    Lock lock = new Lock()
-        .setKey(LockKey.job(new JobKey("role", "env", "name")))
-        .setToken("token");
     Response response = new Response()
         .setResponseCode(OK);
 
     JobConfiguration job = JOB_CONFIG.newBuilder();
-    expect(thrift.createJob(anyObject(), eq(lock))).andReturn(response);
+    expect(thrift.createJob(anyObject())).andReturn(response);
 
     replayAndStart();
 
     Response actualResponse = getRequestBuilder("/apibeta/createJob")
         .entity(
-            ImmutableMap.of("description", job, "lock", lock),
+            ImmutableMap.of("description", job),
             MediaType.APPLICATION_JSON)
         .post(Response.class);
     assertEquals(IResponse.build(response), IResponse.build(actualResponse));

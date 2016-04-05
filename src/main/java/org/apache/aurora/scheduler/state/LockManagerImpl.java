@@ -82,29 +82,13 @@ public class LockManagerImpl implements LockManager {
   }
 
   @Override
-  public void validateIfLocked(final ILockKey context, Optional<ILock> heldLock)
-      throws LockException {
-
+  public void assertNotLocked(final ILockKey context) throws LockException {
     Optional<ILock> stored = storage.read(
         storeProvider -> storeProvider.getLockStore().fetchLock(context));
-
-    // The implementation below assumes the following use cases:
-    // +-----------+-----------------+----------+
-    // |   eq      |     held        | not held |
-    // +-----------+-----------------+----------+
-    // |stored     |(stored == held)?| invalid  |
-    // +-----------+-----------------+----------+
-    // |not stored |    invalid      |  valid   |
-    // +-----------+-----------------+----------+
-    if (!stored.equals(heldLock)) {
-      if (stored.isPresent()) {
-        throw new LockException(String.format(
-            "Unable to perform operation for %s due to active lock held",
-            formatLockKey(context)));
-      } else if (heldLock.isPresent()) {
-        throw new LockException(
-            String.format("Invalid operation context: %s", formatLockKey(context)));
-      }
+    if (stored.isPresent()) {
+      throw new LockException(String.format(
+          "Unable to perform operation for %s due to active lock held",
+          formatLockKey(context)));
     }
   }
 

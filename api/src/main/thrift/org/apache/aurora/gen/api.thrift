@@ -143,14 +143,6 @@ struct Lock {
   5: optional string message
 }
 
-/** Defines the required lock validation level. */
-enum LockValidation {
-  /** The lock must be valid in order to be released. */
-  CHECKED   = 0
-  /** The lock will be released without validation (aka "force release"). */
-  UNCHECKED = 1
-}
-
 /** A unique identifier for the active task within a job. */
 struct InstanceKey {
   /** Key identifying the job. */
@@ -345,12 +337,6 @@ struct GetQuotaResult {
   4: optional ResourceAggregate prodDedicatedConsumption
   /** Resources consumed by non-production jobs from a dedicated resource pool. */
   5: optional ResourceAggregate nonProdDedicatedConsumption
-}
-
-/** Wraps return results for the acquireLock API. */
-struct AcquireLockResult {
-  /** Acquired Lock instance. */
-  1: Lock lock
 }
 
 /** States that a task may be in. */
@@ -840,10 +826,6 @@ struct JobSummaryResult {
   1: set<JobSummary> summaries
 }
 
-struct GetLocksResult {
-  1: set<Lock> locks
-}
-
 struct ConfigSummaryResult {
   1: ConfigSummary summary
 }
@@ -905,10 +887,8 @@ union Result {
   9: QueryRecoveryResult queryRecoveryResult
   10: MaintenanceStatusResult maintenanceStatusResult
   11: EndMaintenanceResult endMaintenanceResult
-  16: AcquireLockResult acquireLockResult
   17: RoleSummaryResult roleSummaryResult
   18: JobSummaryResult jobSummaryResult
-  19: GetLocksResult getLocksResult
   20: ConfigSummaryResult configSummaryResult
   21: GetPendingReasonResult getPendingReasonResult
   22: StartJobUpdateResult startJobUpdateResult
@@ -972,9 +952,6 @@ service ReadOnlyScheduler {
    */
   Response populateJobConfig(1: JobConfiguration description)
 
-  /** Returns all stored context specific resource/operation locks. */
-  Response getLocks()
-
   /** Gets job update summaries. */
   Response getJobUpdateSummaries(1: JobUpdateQuery jobUpdateQuery)
 
@@ -990,20 +967,20 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
    * Creates a new job.  The request will be denied if a job with the provided name already exists
    * in the cluster.
    */
-  Response createJob(1: JobConfiguration description, 3: Lock lock)
+  Response createJob(1: JobConfiguration description)
 
   /**
    * Enters a job into the cron schedule, without actually starting the job.
    * If the job is already present in the schedule, this will update the schedule entry with the new
    * configuration.
    */
-  Response scheduleCronJob(1: JobConfiguration description, 3: Lock lock)
+  Response scheduleCronJob(1: JobConfiguration description)
 
   /**
    * Removes a job from the cron schedule. The request will be denied if the job was not previously
    * scheduled with scheduleCronJob.
    */
-  Response descheduleCronJob(4: JobKey job, 3: Lock lock)
+  Response descheduleCronJob(4: JobKey job)
 
   /**
    * Starts a cron job immediately.  The request will be denied if the specified job does not
@@ -1012,10 +989,10 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   Response startCronJob(4: JobKey job)
 
   /** Restarts a batch of shards. */
-  Response restartShards(5: JobKey job, 3: set<i32> shardIds, 6: Lock lock)
+  Response restartShards(5: JobKey job, 3: set<i32> shardIds)
 
   /** Initiates a kill on tasks. TODO(maxim): remove TaskQuery in AURORA-1591. */
-  Response killTasks(1: TaskQuery query, 3: Lock lock, 4: JobKey job, 5: set<i32> instances)
+  Response killTasks(1: TaskQuery query, 4: JobKey job, 5: set<i32> instances)
 
   /**
    * Adds new instances with the TaskConfig of the existing instance pointed by the key.
@@ -1023,25 +1000,15 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
    */
   Response addInstances(
       1: AddInstancesConfig config,
-      2: Lock lock,
       3: InstanceKey key,
       4: i32 count)
-
-  /**
-   * Creates and saves a new Lock instance guarding against multiple mutating operations within the
-   * context defined by LockKey.
-   */
-  Response acquireLock(1: LockKey lockKey)
-
-  /** Releases the lock acquired earlier in acquireLock call. */
-  Response releaseLock(1: Lock lock, 2: LockValidation validation)
 
   // TODO(maxim): reevaluate if it's still needed when client updater is gone (AURORA-785).
   /**
    * Replaces the template (configuration) for the existing cron job.
    * The cron job template (configuration) must exist for the call to succeed.
    */
-  Response replaceCronTemplate(1: JobConfiguration config, 2: Lock lock)
+  Response replaceCronTemplate(1: JobConfiguration config)
 
   /** Starts update of the existing service job. */
   Response startJobUpdate(

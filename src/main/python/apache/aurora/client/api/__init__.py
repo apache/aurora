@@ -31,7 +31,6 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateKey,
     JobUpdateQuery,
     JobUpdateRequest,
-    Lock,
     ResourceAggregate,
     TaskQuery
 )
@@ -71,21 +70,19 @@ class AuroraClientAPI(object):
   def scheduler_proxy(self):
     return self._scheduler_proxy
 
-  def create_job(self, config, lock=None):
+  def create_job(self, config):
     log.info('Creating job %s' % config.name())
     log.debug('Full configuration: %s' % config.job())
-    log.debug('Lock %s' % lock)
-    return self._scheduler_proxy.createJob(config.job(), lock)
+    return self._scheduler_proxy.createJob(config.job())
 
-  def schedule_cron(self, config, lock=None):
+  def schedule_cron(self, config):
     log.info("Registering job %s with cron" % config.name())
     log.debug('Full configuration: %s' % config.job())
-    log.debug('Lock %s' % lock)
-    return self._scheduler_proxy.scheduleCronJob(config.job(), lock)
+    return self._scheduler_proxy.scheduleCronJob(config.job())
 
-  def deschedule_cron(self, jobkey, lock=None):
+  def deschedule_cron(self, jobkey):
     log.info("Removing cron schedule for job %s" % jobkey)
-    return self._scheduler_proxy.descheduleCronJob(jobkey.to_thrift(), lock)
+    return self._scheduler_proxy.descheduleCronJob(jobkey.to_thrift())
 
   def populate_job_config(self, config):
     return self._scheduler_proxy.populateJobConfig(config.job())
@@ -104,9 +101,9 @@ class AuroraClientAPI(object):
     key = InstanceKey(jobKey=job_key.to_thrift(), instanceId=instance_id)
     log.info("Adding %s instances to %s using the task config of instance %s"
              % (count, job_key, instance_id))
-    return self._scheduler_proxy.addInstances(None, None, key, count)
+    return self._scheduler_proxy.addInstances(None, key, count)
 
-  def kill_job(self, job_key, instances=None, lock=None):
+  def kill_job(self, job_key, instances=None):
     log.info("Killing tasks for job: %s" % job_key)
     self._assert_valid_job_key(job_key)
 
@@ -114,7 +111,7 @@ class AuroraClientAPI(object):
       log.info("Instances to be killed: %s" % instances)
       instances = frozenset([int(s) for s in instances])
 
-    return self._scheduler_proxy.killTasks(None, lock, job_key.to_thrift(), instances)
+    return self._scheduler_proxy.killTasks(None, job_key.to_thrift(), instances)
 
   def check_status(self, job_key):
     self._assert_valid_job_key(job_key)
@@ -322,9 +319,6 @@ class AuroraClientAPI(object):
   def unsafe_rewrite_config(self, rewrite_request):
     return self._scheduler_proxy.rewriteConfigs(rewrite_request)
 
-  def get_locks(self):
-    return self._scheduler_proxy.getLocks()
-
   def sla_get_job_uptime_vector(self, job_key):
     self._assert_valid_job_key(job_key)
     return Sla(self._scheduler_proxy).get_job_uptime_vector(job_key)
@@ -334,11 +328,6 @@ class AuroraClientAPI(object):
         self._cluster,
         min_instance_count,
         hosts)
-
-  def _assert_valid_lock(self, lock):
-    if not isinstance(lock, Lock):
-      raise TypeError('Invalid lock %r: expected %s but got %s'
-          % (lock, AuroraJobKey.__name__, lock.__class__.__name__))
 
   def _assert_valid_job_key(self, job_key):
     if not isinstance(job_key, AuroraJobKey):

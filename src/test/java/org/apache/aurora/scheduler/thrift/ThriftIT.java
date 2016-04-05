@@ -175,7 +175,7 @@ public class ThriftIT extends EasyMockTest {
         .setTaskConfig(task)
         .setInstanceCount(1);
 
-    assertEquals(OK, thrift.createJob(job, null).getResponseCode());
+    assertEquals(OK, thrift.createJob(job).getResponseCode());
     ScheduledTask scheduledTask = Iterables.getOnlyElement(
         thrift.getTasksStatus(new TaskQuery()).getResult().getScheduleStatusResult().getTasks());
     assertEquals(ScheduleStatus.PENDING, scheduledTask.getStatus());

@@ -41,8 +41,8 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
 
     class FakeAuroraClientAPI(object):
 
-      def kill_job(self, job_key, instances=None, lock=None):
-        test_obj.API_CALL = functools.partial(self.kill_job, job_key, instances, lock)
+      def kill_job(self, job_key, instances=None):
+        test_obj.API_CALL = functools.partial(self.kill_job, job_key, instances)
         return test_obj.RETURN_VALUE
 
       def restart(self, job_key, shards, restart_settings):
@@ -60,7 +60,6 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
     self.test_job_key = AuroraJobKey.from_path('a/b/c/d')
     self.test_config = 'bar'
     self.test_shards = 'baz'
-    self.test_lock = 'lock'
     self.health_check_interval_seconds = 'baa'
 
   def tearDown(self):
@@ -82,9 +81,8 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
     return_value = self.api.kill_job(
       self.test_job_key,
       self.test_shards,
-      self.test_lock,
       config=self.test_config)
-    self._verify_api_call(return_value, self.test_job_key, self.test_shards, self.test_lock)
+    self._verify_api_call(return_value, self.test_job_key, self.test_shards)
 
   def test_restart_discards_config(self):
     return_value = self.api.restart(

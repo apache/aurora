@@ -74,7 +74,6 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.metadata.NearestFit;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
-import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.storage.entities.IConfigSummaryResult;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -100,7 +99,6 @@ import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_JOB;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_SCHEDULE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.IDENTITY;
 import static org.apache.aurora.scheduler.thrift.Fixtures.JOB_KEY;
-import static org.apache.aurora.scheduler.thrift.Fixtures.LOCK;
 import static org.apache.aurora.scheduler.thrift.Fixtures.QUOTA;
 import static org.apache.aurora.scheduler.thrift.Fixtures.ROLE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.UPDATE_KEY;
@@ -123,7 +121,6 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   private NearestFit nearestFit;
   private CronPredictor cronPredictor;
   private QuotaManager quotaManager;
-  private LockManager lockManager;
 
   private ReadOnlyScheduler.Iface thrift;
 
@@ -134,15 +131,13 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     nearestFit = createMock(NearestFit.class);
     cronPredictor = createMock(CronPredictor.class);
     quotaManager = createMock(QuotaManager.class);
-    lockManager = createMock(LockManager.class);
 
     thrift = new ReadOnlySchedulerImpl(
         TaskTestUtil.CONFIGURATION_MANAGER,
         storageUtil.storage,
         nearestFit,
         cronPredictor,
-        quotaManager,
-        lockManager);
+        quotaManager);
   }
 
   @Test
@@ -314,18 +309,6 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     control.replay();
 
     assertResponse(INVALID_REQUEST, thrift.populateJobConfig(job.newBuilder()));
-  }
-
-  @Test
-  public void testGetLocks() throws Exception {
-    expect(lockManager.getLocks()).andReturn(ImmutableSet.of(LOCK));
-
-    control.replay();
-
-    Response response = thrift.getLocks();
-    assertEquals(
-        LOCK.newBuilder(),
-        Iterables.getOnlyElement(response.getResult().getGetLocksResult().getLocks()));
   }
 
   @Test

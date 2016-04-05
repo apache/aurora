@@ -35,7 +35,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Range;
 
-import org.apache.aurora.gen.AcquireLockResult;
 import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.DrainHostsResult;
@@ -54,9 +53,7 @@ import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.ListBackupsResult;
-import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
-import org.apache.aurora.gen.LockValidation;
 import org.apache.aurora.gen.MaintenanceStatusResult;
 import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
@@ -108,7 +105,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
-import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -212,7 +208,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response createJob(JobConfiguration mutableJob, @Nullable Lock mutableLock) {
+  public Response createJob(JobConfiguration mutableJob) {
     SanitizedConfiguration sanitized;
     try {
       sanitized = SanitizedConfiguration.fromUnsanitized(
@@ -230,9 +226,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       IJobConfiguration job = sanitized.getJobConfig();
 
       try {
-        lockManager.validateIfLocked(
-            ILockKey.build(LockKey.job(job.getKey().newBuilder())),
-            java.util.Optional.ofNullable(mutableLock).map(ILock::build));
+        lockManager.assertNotLocked(ILockKey.build(LockKey.job(job.getKey().newBuilder())));
 
         checkJobExists(storeProvider, job.getKey());
 
@@ -275,7 +269,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
   private Response createOrUpdateCronTemplate(
       JobConfiguration mutableJob,
-      @Nullable Lock mutableLock,
       boolean updateOnly) {
 
     IJobConfiguration job = IJobConfiguration.build(mutableJob);
@@ -294,9 +287,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
     return storage.write(storeProvider -> {
       try {
-        lockManager.validateIfLocked(
-            ILockKey.build(LockKey.job(jobKey.newBuilder())),
-            java.util.Optional.ofNullable(mutableLock).map(ILock::build));
+        lockManager.assertNotLocked(ILockKey.build(LockKey.job(jobKey.newBuilder())));
 
         ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
         int count = sanitized.getJobConfig().getInstanceCount();
@@ -325,22 +316,20 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response scheduleCronJob(JobConfiguration mutableJob, @Nullable Lock mutableLock) {
-    return createOrUpdateCronTemplate(mutableJob, mutableLock, false);
+  public Response scheduleCronJob(JobConfiguration mutableJob) {
+    return createOrUpdateCronTemplate(mutableJob, false);
   }
 
   @Override
-  public Response replaceCronTemplate(JobConfiguration mutableJob, @Nullable Lock mutableLock) {
-    return createOrUpdateCronTemplate(mutableJob, mutableLock, true);
+  public Response replaceCronTemplate(JobConfiguration mutableJob) {
+    return createOrUpdateCronTemplate(mutableJob, true);
   }
 
   @Override
-  public Response descheduleCronJob(JobKey mutableJobKey, @Nullable Lock mutableLock) {
+  public Response descheduleCronJob(JobKey mutableJobKey) {
     try {
       IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
-      lockManager.validateIfLocked(
-          ILockKey.build(LockKey.job(jobKey.newBuilder())),
-          java.util.Optional.ofNullable(mutableLock).map(ILock::build));
+      lockManager.assertNotLocked(ILockKey.build(LockKey.job(jobKey.newBuilder())));
 
       if (cronJobManager.deleteJob(jobKey)) {
         return ok();
@@ -410,16 +399,14 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return readOnlyScheduler.getJobUpdateDiff(request);
   }
 
-  private void validateLockForTasks(java.util.Optional<ILock> lock, Iterable<IScheduledTask> tasks)
-      throws LockException {
-
+  private void validateLockForTasks(Iterable<IScheduledTask> tasks) throws LockException {
     ImmutableSet<IJobKey> uniqueKeys = FluentIterable.from(tasks)
         .transform(Tasks::getJob)
         .toSet();
 
     // Validate lock against every unique job key derived from the tasks.
     for (IJobKey key : uniqueKeys) {
-      lockManager.validateIfLocked(ILockKey.build(LockKey.job(key.newBuilder())), lock);
+      lockManager.assertNotLocked(ILockKey.build(LockKey.job(key.newBuilder())));
     }
   }
 
@@ -431,7 +418,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   @Override
   public Response killTasks(
       @Nullable TaskQuery mutableQuery,
-      @Nullable Lock mutableLock,
       @Nullable JobKey mutableJob,
       @Nullable Set<Integer> instances) {
 
@@ -458,9 +444,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return storage.write(storeProvider -> {
       Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(query);
       try {
-        validateLockForTasks(
-            java.util.Optional.ofNullable(mutableLock).map(ILock::build),
-            tasks);
+        validateLockForTasks(tasks);
       } catch (LockException e) {
         return error(LOCK_ERROR, e);
       }
@@ -484,19 +468,13 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response restartShards(
-      JobKey mutableJobKey,
-      Set<Integer> shardIds,
-      @Nullable Lock mutableLock) {
-
+  public Response restartShards(JobKey mutableJobKey, Set<Integer> shardIds) {
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
     checkNotBlank(shardIds);
 
     return storage.write(storeProvider -> {
       try {
-        lockManager.validateIfLocked(
-            ILockKey.build(LockKey.job(jobKey.newBuilder())),
-            java.util.Optional.ofNullable(mutableLock).map(ILock::build));
+        lockManager.assertNotLocked(ILockKey.build(LockKey.job(jobKey.newBuilder())));
       } catch (LockException e) {
         return error(LOCK_ERROR, e);
       }
@@ -751,7 +729,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   @Override
   public Response addInstances(
       @Nullable AddInstancesConfig config,
-      @Nullable Lock mutableLock,
       @Nullable InstanceKey key,
       int count) {
 
@@ -765,9 +742,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
           return invalidRequest("Instances may not be added to cron jobs.");
         }
 
-        lockManager.validateIfLocked(
-            ILockKey.build(LockKey.job(jobKey.newBuilder())),
-            java.util.Optional.ofNullable(mutableLock).map(ILock::build));
+        lockManager.assertNotLocked(ILockKey.build(LockKey.job(jobKey.newBuilder())));
 
         FluentIterable<IScheduledTask> currentTasks = FluentIterable.from(
             storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()));
@@ -824,44 +799,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   public Optional<IJobConfiguration> getCronJob(StoreProvider storeProvider, IJobKey jobKey) {
     requireNonNull(jobKey);
     return storeProvider.getCronJobStore().fetchJob(jobKey);
-  }
-
-  @Override
-  public Response acquireLock(LockKey mutableLockKey) {
-    requireNonNull(mutableLockKey);
-
-    ILockKey lockKey = ILockKey.build(mutableLockKey);
-
-    try {
-      ILock lock = lockManager.acquireLock(lockKey, auditMessages.getRemoteUserName());
-      return ok(Result.acquireLockResult(
-          new AcquireLockResult().setLock(lock.newBuilder())));
-    } catch (LockException e) {
-      return error(LOCK_ERROR, e);
-    }
-  }
-
-  @Override
-  public Response releaseLock(Lock mutableLock, LockValidation validation) {
-    requireNonNull(mutableLock);
-    requireNonNull(validation);
-
-    ILock lock = ILock.build(mutableLock);
-
-    try {
-      if (validation == LockValidation.CHECKED) {
-        lockManager.validateIfLocked(lock.getKey(), java.util.Optional.of(lock));
-      }
-      lockManager.releaseLock(lock);
-      return ok();
-    } catch (LockException e) {
-      return error(LOCK_ERROR, e);
-    }
-  }
-
-  @Override
-  public Response getLocks() throws TException {
-    return readOnlyScheduler.getLocks();
   }
 
   private static class TaskValidationException extends Exception {

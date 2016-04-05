@@ -35,6 +35,19 @@
   - `TaskConfig.jobName`
   - `TaskQuery.owner`
 - Removed deprecated executor argument `-announcer-enable`, which was a no-op in 0.12.0.
+- Removed deprecated API constructs related to Locks:
+  - removed RPCs that managed locks
+    - `acquireLock`
+    - `releaseLock`
+    - `getLocks`
+  - removed `Lock` parameters to RPCs
+    - `createJob`
+    - `scheduleCronJob`
+    - `descheduleCronJob`
+    - `restartShards`
+    - `killTasks`
+    - `addInstances`
+    - `replaceCronTemplate`
 - Task ID strings are no longer prefixed by a timestamp.
 
 0.12.0

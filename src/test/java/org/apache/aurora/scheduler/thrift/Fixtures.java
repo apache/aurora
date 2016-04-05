@@ -34,7 +34,6 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.JobUpdateKey;
-import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.ResourceAggregate;
@@ -48,7 +47,6 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IResult;
@@ -66,8 +64,6 @@ final class Fixtures {
   static final String JOB_NAME = "job_foo";
   static final IJobKey JOB_KEY = JobKeys.from(ROLE, "devel", JOB_NAME);
   static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
-  static final ILock LOCK =
-      ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()).setToken("token"));
   static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("* * * * *");
   static final String TASK_ID = "task_id";
   static final String UPDATE_ID = "82d6d790-3212-11e3-aa6e-0800200c9a74";

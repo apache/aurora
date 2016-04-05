@@ -40,7 +40,6 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateQuery,
     JobUpdateRequest,
     Lock,
-    LockValidation,
     ResourceAggregate,
     Response,
     ResponseCode,
@@ -123,11 +122,9 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.make_scheduler_proxy().populateJobConfig(JobConfiguration())
 
   def test_restartShards(self):
-    self.mock_thrift_client.restartShards(
-        IsA(JobKey),
-        IgnoreArg()).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.restartShards(IsA(JobKey), IgnoreArg()).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().restartShards(JOB_KEY, set([0]))
+    self.make_scheduler_proxy().restartShards(JOB_KEY, {0})
 
   def test_getTasksStatus(self):
     self.mock_thrift_client.getTasksStatus(IsA(TaskQuery)).AndReturn(DEFAULT_RESPONSE)
@@ -142,11 +139,10 @@ class TestSchedulerProxyInjection(unittest.TestCase):
   def test_killTasks(self):
     self.mock_thrift_client.killTasks(
         IgnoreArg(),
-        IgnoreArg(),
         IsA(JobKey),
         IgnoreArg()).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().killTasks(None, None, JobKey(), set([0]))
+    self.make_scheduler_proxy().killTasks(None, JobKey(), {0})
 
   def test_getQuota(self):
     self.mock_thrift_client.getQuota(IgnoreArg()).AndReturn(DEFAULT_RESPONSE)
@@ -160,18 +156,6 @@ class TestSchedulerProxyInjection(unittest.TestCase):
       IsA(Lock)).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().addInstances(JobKey(), {}, Lock())
-
-  def test_acquireLock(self):
-    self.mock_thrift_client.acquireLock(IsA(Lock)).AndReturn(DEFAULT_RESPONSE)
-    self.mox.ReplayAll()
-    self.make_scheduler_proxy().acquireLock(Lock())
-
-  def test_releaseLock(self):
-    self.mock_thrift_client.releaseLock(
-        IsA(Lock),
-        IsA(LockValidation)).AndReturn(DEFAULT_RESPONSE)
-    self.mox.ReplayAll()
-    self.make_scheduler_proxy().releaseLock(Lock(), LockValidation())
 
   def test_getJobUpdateSummaries(self):
     self.mock_thrift_client.getJobUpdateSummaries(IsA(JobUpdateQuery)).AndReturn(DEFAULT_RESPONSE)
@@ -476,7 +460,7 @@ class TestSchedulerClient(unittest.TestCase):
     client.get.return_value = mock_scheduler_client
 
     proxy = scheduler_client.SchedulerProxy(Cluster(name='local'))
-    proxy.killTasks(None, None, JobKey(), None)
+    proxy.killTasks(None, JobKey(), None)
 
     assert mock_thrift_client.killTasks.call_count == 3
 

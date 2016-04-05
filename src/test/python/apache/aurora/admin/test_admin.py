@@ -16,7 +16,7 @@ import contextlib
 
 from mock import PropertyMock, create_autospec, patch
 
-from apache.aurora.admin.admin import get_locks, get_scheduler, increase_quota, query, set_quota
+from apache.aurora.admin.admin import get_scheduler, increase_quota, query, set_quota
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.scheduler_client import SchedulerClient, SchedulerProxy
 
@@ -24,11 +24,8 @@ from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
-    GetLocksResult,
     GetQuotaResult,
     JobKey,
-    Lock,
-    LockKey,
     ResourceAggregate,
     Response,
     ResponseCode,
@@ -190,46 +187,6 @@ class TestSetQuotaCommand(AuroraClientCommandTest):
       assert isinstance(api.set_quota.call_args[0][1], float)
       assert isinstance(api.set_quota.call_args[0][2], int)
       assert isinstance(api.set_quota.call_args[0][3], int)
-
-
-class TestGetLocksCommand(AuroraClientCommandTest):
-
-  MESSAGE = 'test message'
-  USER = 'test user'
-  LOCKS = [Lock(
-    key=LockKey(job=JobKey('role', 'env', 'name')),
-    token='test token',
-    user=USER,
-    timestampMs='300',
-    message=MESSAGE)]
-
-  @classmethod
-  def create_response(cls, locks, response_code=None):
-    response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, details=[ResponseDetail(message='test')])
-    resp.result = Result(getLocksResult=GetLocksResult(locks=locks))
-    return resp
-
-  def test_get_locks(self):
-    """Tests successful execution of the get_locks command."""
-    mock_options = self.setup_mock_options()
-    with contextlib.nested(
-        patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.admin.admin.make_admin_client',
-              return_value=create_autospec(spec=AuroraClientAPI)),
-        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.admin.admin.print_results'),
-    ) as (_, mock_make_admin_client, _, mock_print_results):
-
-      api = mock_make_admin_client.return_value
-      api.get_locks.return_value = self.create_response(self.LOCKS)
-
-      get_locks([self.TEST_CLUSTER])
-
-      assert api.get_locks.call_count == 1
-      assert mock_print_results.call_count == 1
-      assert "'message': '%s'" % self.MESSAGE in mock_print_results.call_args[0][0][0]
-      assert "'user': '%s'" % self.USER in mock_print_results.call_args[0][0][0]
 
 
 class TestGetSchedulerCommand(AuroraClientCommandTest):

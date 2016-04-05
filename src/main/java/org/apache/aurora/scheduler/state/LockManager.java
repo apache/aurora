@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import java.util.Optional;
-
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 
@@ -42,16 +40,12 @@ public interface LockManager {
   void releaseLock(ILock lock);
 
   /**
-   * Verifies if the provided lock instance is identical to the one stored in the scheduler
-   * ONLY if the operation context represented by the {@link ILockKey} is in fact locked.
-   * No validation will be performed in case there is no correspondent scheduler lock
-   * found for the provided context.
+   * Asserts that an entity is not locked.
    *
    * @param context Operation context to validate with the provided lock.
-   * @param heldLock Lock to validate.
-   * @throws LockException If provided lock does not exist or not identical to the stored one.
+   * @throws LockException If provided context is locked.
    */
-  void validateIfLocked(ILockKey context, Optional<ILock> heldLock) throws LockException;
+  void assertNotLocked(ILockKey context) throws LockException;
 
   /**
    * Returns all available locks stored.
