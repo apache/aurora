@@ -5,6 +5,7 @@
 *.pyc
 *~
 .gradle
+/.cache/
 /.coverage
 /.idea/
 /.pants.*
