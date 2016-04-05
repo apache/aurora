@@ -15,56 +15,38 @@ package org.apache.aurora.common.zookeeper;
 
 import java.net.InetSocketAddress;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.annotation.Nullable;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-
-import org.apache.aurora.common.base.ExceptionalCommand;
-import org.apache.aurora.common.zookeeper.Candidate.Leader;
-import org.apache.aurora.common.zookeeper.Group.JoinException;
-import org.apache.zookeeper.data.ACL;
 
 /**
- * A service that uses master election to only allow a single instance of the server to join
- * the {@link ServerSet} at a time.
+ * A service that uses master election to only allow a single service instance to be active amongst
+ * a set of potential servers at a time.
  */
-public class SingletonService {
-  @VisibleForTesting
-  static final String LEADER_ELECT_NODE_PREFIX = "singleton_candidate_";
+public interface SingletonService {
 
   /**
-   * Creates a candidate that can be combined with an existing server set to form a singleton
-   * service using {@link #SingletonService(ServerSet, Candidate)}.
-   *
-   * @param zkClient The ZooKeeper client to use.
-   * @param servicePath The path where service nodes live.
-   * @param acl The acl to apply to newly created candidate nodes and serverset nodes.
-   * @return A candidate that can be housed with a standard server set under a single zk path.
+   * Indicates an error attempting to lead a group of servers.
    */
-  public static Candidate createSingletonCandidate(
-      ZooKeeperClient zkClient,
-      String servicePath,
-      Iterable<ACL> acl) {
-
-    return new CandidateImpl(new Group(zkClient, acl, servicePath, LEADER_ELECT_NODE_PREFIX));
+  class LeadException extends Exception {
+    public LeadException(String message, Throwable cause) {
+      super(message, cause);
+    }
   }
 
-  private final ServerSet serverSet;
-  private final Candidate candidate;
+  /**
+   * Indicates an error attempting to advertise leadership of a group of servers.
+   */
+  class AdvertiseException extends Exception {
+    public AdvertiseException(String message, Throwable cause) {
+      super(message, cause);
+    }
+  }
 
   /**
-   * Creates a new singleton service that uses the supplied candidate to vie for leadership and then
-   * advertises itself in the given server set once elected.
-   *
-   * @param serverSet The server set to advertise in on election.
-   * @param candidate The candidacy to use to vie for election.
+   * Indicates an error attempting to leave a group of servers, abdicating leadership of the group.
    */
-  public SingletonService(ServerSet serverSet, Candidate candidate) {
-    this.serverSet = Preconditions.checkNotNull(serverSet);
-    this.candidate = Preconditions.checkNotNull(candidate);
+  class LeaveException extends Exception {
+    public LeaveException(String message, Throwable cause) {
+      super(message, cause);
+    }
   }
 
   /**
@@ -73,55 +55,20 @@ public class SingletonService {
    * @param endpoint The primary endpoint to register as a leader candidate in the service.
    * @param additionalEndpoints Additional endpoints that are available on the host.
    * @param listener Handler to call when the candidate is elected or defeated.
-   * @throws Group.WatchException If there was a problem watching the ZooKeeper group.
-   * @throws Group.JoinException If there was a problem joining the ZooKeeper group.
+   * @throws LeadException If there was a problem joining or watching the ZooKeeper group.
    * @throws InterruptedException If the thread watching/joining the group was interrupted.
    */
-  public void lead(final InetSocketAddress endpoint,
-                   final Map<String, InetSocketAddress> additionalEndpoints,
-                   final LeadershipListener listener)
-                   throws Group.WatchException, Group.JoinException, InterruptedException {
-
-    Preconditions.checkNotNull(listener);
-
-    candidate.offerLeadership(new Leader() {
-      private ServerSet.EndpointStatus endpointStatus = null;
-      @Override public void onElected(final ExceptionalCommand<JoinException> abdicate) {
-        listener.onLeading(new LeaderControl() {
-          ServerSet.EndpointStatus endpointStatus = null;
-          final AtomicBoolean left = new AtomicBoolean(false);
-
-          // Methods are synchronized to prevent simultaneous invocations.
-          @Override public synchronized void advertise()
-              throws JoinException, InterruptedException {
-
-            Preconditions.checkState(!left.get(), "Cannot advertise after leaving.");
-            Preconditions.checkState(endpointStatus == null, "Cannot advertise more than once.");
-            endpointStatus = serverSet.join(endpoint, additionalEndpoints);
-          }
-
-          @Override public synchronized void leave() throws ServerSet.UpdateException, JoinException {
-            Preconditions.checkState(left.compareAndSet(false, true),
-                "Cannot leave more than once.");
-            if (endpointStatus != null) {
-              endpointStatus.leave();
-            }
-            abdicate.execute();
-          }
-        });
-      }
-
-      @Override public void onDefeated() {
-        listener.onDefeated(endpointStatus);
-      }
-    });
-  }
+  void lead(
+      InetSocketAddress endpoint,
+      Map<String, InetSocketAddress> additionalEndpoints,
+      LeadershipListener listener)
+      throws LeadException, InterruptedException;
 
   /**
    * A listener to be notified of changes in the leadership status.
    * Implementers should be careful to avoid blocking operations in these callbacks.
    */
-  public interface LeadershipListener {
+  interface LeadershipListener {
 
     /**
      * Notifies the listener that is is current leader.
@@ -131,35 +78,33 @@ public class SingletonService {
     void onLeading(LeaderControl control);
 
     /**
-     * Notifies the listener that it is no longer leader.  The leader should take this opportunity
-     * to remove its advertisement gracefully.
-     *
-     * @param status A handle on the endpoint status for the advertised leader.
+     * Notifies the listener that it is no longer leader.
      */
-    void onDefeated(@Nullable ServerSet.EndpointStatus status);
+    void onDefeated();
   }
 
   /**
    * A controller for the state of the leader.  This will be provided to the leader upon election,
-   * which allows the leader to decide when to advertise in the underlying {@link ServerSet} and
-   * terminate leadership at will.
+   * which allows the leader to decide when to advertise as leader of the server set and terminate
+   * leadership at will.
    */
-  public interface LeaderControl {
+  interface LeaderControl {
 
     /**
      * Advertises the leader's server presence to clients.
      *
-     * @throws JoinException If there was an error advertising.
+     * @throws AdvertiseException If there was an error advertising the singleton leader to clients
+     *     of the server set.
      * @throws InterruptedException If interrupted while advertising.
      */
-    void advertise() throws JoinException, InterruptedException;
+    void advertise() throws AdvertiseException, InterruptedException;
 
     /**
      * Leaves candidacy for leadership, removing advertised server presence if applicable.
      *
-     * @throws ServerSet.UpdateException If the leader's status could not be updated.
-     * @throws JoinException If there was an error abdicating from leader election.
+     * @throws LeaveException If the leader's status could not be updated or there was an error
+     *     abdicating server set leadership.
      */
-    void leave() throws ServerSet.UpdateException, JoinException;
+    void leave() throws LeaveException;
   }
 }

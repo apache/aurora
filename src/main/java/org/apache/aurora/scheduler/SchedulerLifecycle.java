@@ -23,7 +23,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
@@ -48,8 +47,7 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.StateMachine;
 import org.apache.aurora.common.util.StateMachine.Transition;
-import org.apache.aurora.common.zookeeper.Group.JoinException;
-import org.apache.aurora.common.zookeeper.ServerSet;
+import org.apache.aurora.common.zookeeper.SingletonService;
 import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -83,7 +81,7 @@ import static org.apache.aurora.common.zookeeper.SingletonService.LeadershipList
  * {@link java.lang.IllegalStateException}.
  * <p>
  * At any point in the lifecycle, the scheduler will respond to
- * {@link LeadershipListener#onDefeated(ServerSet.EndpointStatus)
+ * {@link LeadershipListener#onDefeated()
  * onDefeated()} by initiating a clean shutdown using {@link Lifecycle#shutdown() shutdown()}.
  * A clean shutdown will also be initiated if control actions fail during normal state transitions.
  */
@@ -274,7 +272,7 @@ public class SchedulerLifecycle implements EventSubscriber {
         schedulerActiveServiceManager.startAsync().awaitHealthy();
         try {
           leaderControl.get().advertise();
-        } catch (JoinException | InterruptedException e) {
+        } catch (SingletonService.AdvertiseException | InterruptedException e) {
           LOG.error("Failed to advertise leader, shutting down.");
           throw Throwables.propagate(e);
         }
@@ -297,10 +295,8 @@ public class SchedulerLifecycle implements EventSubscriber {
           if (control != null) {
             try {
               control.leave();
-            } catch (JoinException e) {
+            } catch (SingletonService.LeaveException e) {
               LOG.warn("Failed to leave leadership: " + e, e);
-            } catch (ServerSet.UpdateException e) {
-              LOG.warn("Failed to leave server set: " + e, e);
             }
           }
 
@@ -395,7 +391,7 @@ public class SchedulerLifecycle implements EventSubscriber {
     }
 
     @Override
-    public void onDefeated(@Nullable ServerSet.EndpointStatus status) {
+    public void onDefeated() {
       LOG.error("Lost leadership, committing suicide.");
       stateMachine.transition(State.DEAD);
     }

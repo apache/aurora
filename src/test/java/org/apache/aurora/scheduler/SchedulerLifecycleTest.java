@@ -179,7 +179,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
 
     LeadershipListener leaderListener = schedulerLifecycle.prepare();
     leaderListener.onLeading(leaderControl);
-    leaderListener.onDefeated(null);
+    leaderListener.onDefeated();
   }
 
   @Test

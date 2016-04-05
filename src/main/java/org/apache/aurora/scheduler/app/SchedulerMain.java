@@ -42,7 +42,6 @@ import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.args.constraints.NotNull;
 import org.apache.aurora.common.inject.Bindings;
 import org.apache.aurora.common.stats.Stats;
-import org.apache.aurora.common.zookeeper.Group;
 import org.apache.aurora.common.zookeeper.SingletonService;
 import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
 import org.apache.aurora.gen.ServerInfo;
@@ -120,10 +119,8 @@ public class SchedulerMain {
           httpSocketAddress,
           ImmutableMap.of("http", httpSocketAddress),
           leaderListener);
-    } catch (Group.WatchException e) {
-      throw new IllegalStateException("Failed to watch group and lead service.", e);
-    } catch (Group.JoinException e) {
-      throw new IllegalStateException("Failed to join scheduler service group.", e);
+    } catch (SingletonService.LeadException e) {
+      throw new IllegalStateException("Failed to lead service.", e);
     } catch (InterruptedException e) {
       throw new IllegalStateException("Interrupted while joining scheduler service group.", e);
     }

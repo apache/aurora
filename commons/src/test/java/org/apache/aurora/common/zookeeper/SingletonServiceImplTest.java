@@ -23,7 +23,6 @@ import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.common.zookeeper.Candidate.Leader;
-import org.apache.aurora.common.zookeeper.Group.JoinException;
 import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
 import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
@@ -39,7 +38,7 @@ import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.fail;
 
-public class SingletonServiceTest extends BaseZooKeeperTest {
+public class SingletonServiceImplTest extends BaseZooKeeperTest {
   private static final int PORT_A = 1234;
   private static final int PORT_B = 8080;
   private static final InetSocketAddress PRIMARY_ENDPOINT =
@@ -48,7 +47,7 @@ public class SingletonServiceTest extends BaseZooKeeperTest {
       ImmutableMap.of("http-admin", InetSocketAddress.createUnresolved("foo", PORT_B));
 
   private IMocksControl control;
-  private SingletonService.LeadershipListener listener;
+  private SingletonServiceImpl.LeadershipListener listener;
   private ServerSet serverSet;
   private ServerSet.EndpointStatus endpointStatus;
   private Candidate candidate;
@@ -61,13 +60,13 @@ public class SingletonServiceTest extends BaseZooKeeperTest {
   public void mySetUp() throws IOException {
     control = createControl();
     addTearDown(control::verify);
-    listener = control.createMock(SingletonService.LeadershipListener.class);
+    listener = control.createMock(SingletonServiceImpl.LeadershipListener.class);
     serverSet = control.createMock(ServerSet.class);
     candidate = control.createMock(Candidate.class);
     endpointStatus = control.createMock(ServerSet.EndpointStatus.class);
     abdicate = control.createMock(ExceptionalCommand.class);
 
-    service = new SingletonService(serverSet, candidate);
+    service = new SingletonServiceImpl(serverSet, candidate);
   }
 
   private void newLeader(
@@ -144,7 +143,7 @@ public class SingletonServiceTest extends BaseZooKeeperTest {
     try {
       controlCapture.getValue().advertise();
       fail("Join should have failed.");
-    } catch (JoinException e) {
+    } catch (SingletonService.AdvertiseException e) {
       // Expected.
     }
 

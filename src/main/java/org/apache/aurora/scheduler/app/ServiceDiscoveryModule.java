@@ -25,6 +25,7 @@ import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.zookeeper.ServerSet;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
 import org.apache.aurora.common.zookeeper.SingletonService;
+import org.apache.aurora.common.zookeeper.SingletonServiceImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
@@ -85,8 +86,8 @@ public class ServiceDiscoveryModule extends AbstractModule {
       ServerSet serverSet,
       List<ACL> zookeeperAcls) {
 
-    return new SingletonService(
+    return new SingletonServiceImpl(
         serverSet,
-        SingletonService.createSingletonCandidate(client, serverSetPath, zookeeperAcls));
+        SingletonServiceImpl.createSingletonCandidate(client, serverSetPath, zookeeperAcls));
   }
 }
