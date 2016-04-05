@@ -192,12 +192,16 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
       switch (status.getReason()) {
         case REASON_CONTAINER_LIMITATION_MEMORY:
           // Add a failure explanation to the user
-          message = Optional.of(MEMORY_LIMIT_DISPLAY);
+          if (!message.isPresent()) {
+            message = Optional.of(MEMORY_LIMIT_DISPLAY);
+          }
           break;
 
         case REASON_CONTAINER_LIMITATION_DISK:
           // Add a failure explanation to the user
-          message = Optional.of(DISK_LIMIT_DISPLAY);
+          if (!message.isPresent()) {
+            message = Optional.of(DISK_LIMIT_DISPLAY);
+          }
           break;
 
         case REASON_EXECUTOR_UNREGISTERED:

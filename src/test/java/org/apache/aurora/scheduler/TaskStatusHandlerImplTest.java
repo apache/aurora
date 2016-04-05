@@ -142,23 +142,30 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     assertTrue(latch.await(5L, TimeUnit.SECONDS));
   }
 
-  @Test
-  public void testMemoryLimitTranslation() throws Exception {
+  private void assertResourceLimitBehavior(
+      TaskStatus.Reason reason,
+      Optional<String> mesosMessage,
+      Optional<String> expectedMessage) throws Exception {
+
     storageUtil.expectWrite();
 
-    TaskStatus status = TaskStatus.newBuilder()
+    TaskStatus.Builder taskStatusBuilder = TaskStatus.newBuilder()
         .setState(TaskState.TASK_FAILED)
         .setTaskId(TaskID.newBuilder().setValue(TASK_ID_A))
-        .setReason(TaskStatus.Reason.REASON_CONTAINER_LIMITATION_MEMORY)
-        .setMessage("Some Message")
-        .build();
+        .setReason(reason);
+
+    if (mesosMessage.isPresent()) {
+      taskStatusBuilder.setMessage(mesosMessage.get());
+    }
+
+    TaskStatus status = taskStatusBuilder.build();
 
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID_A,
         Optional.absent(),
         FAILED,
-        Optional.of(TaskStatusHandlerImpl.MEMORY_LIMIT_DISPLAY)))
+        expectedMessage))
         .andReturn(StateChangeResult.SUCCESS);
 
     CountDownLatch latch = new CountDownLatch(1);
@@ -174,34 +181,39 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testDiskLimitTranslation() throws Exception {
-    storageUtil.expectWrite();
+  public void testMemoryLimitTranslation() throws Exception {
+    Optional<String> message = Optional.of("Some message");
 
-    TaskStatus status = TaskStatus.newBuilder()
-        .setState(TaskState.TASK_FAILED)
-        .setTaskId(TaskID.newBuilder().setValue(TASK_ID_A))
-        .setReason(TaskStatus.Reason.REASON_CONTAINER_LIMITATION_DISK)
-        .setMessage("Some Message")
-        .build();
+    assertResourceLimitBehavior(
+        TaskStatus.Reason.REASON_CONTAINER_LIMITATION_MEMORY,
+        message,
+        message);
+  }
 
-    expect(stateManager.changeState(
-        storageUtil.mutableStoreProvider,
-        TASK_ID_A,
+  @Test
+  public void testMemoryLimitTranslationNoMessage() throws Exception {
+    assertResourceLimitBehavior(
+        TaskStatus.Reason.REASON_CONTAINER_LIMITATION_MEMORY,
         Optional.absent(),
-        FAILED,
-        Optional.of(TaskStatusHandlerImpl.DISK_LIMIT_DISPLAY)))
-        .andReturn(StateChangeResult.SUCCESS);
+        Optional.of(TaskStatusHandlerImpl.MEMORY_LIMIT_DISPLAY));
+  }
 
-    CountDownLatch latch = new CountDownLatch(1);
+  @Test
+  public void testDiskLimitTranslation() throws Exception {
+    Optional<String> message = Optional.of("Some message");
 
-    driver.acknowledgeStatusUpdate(status);
-    waitAndAnswer(latch);
+    assertResourceLimitBehavior(
+        TaskStatus.Reason.REASON_CONTAINER_LIMITATION_DISK,
+        message,
+        message);
+  }
 
-    control.replay();
-
-    statusHandler.statusUpdate(status);
-
-    assertTrue(latch.await(5L, TimeUnit.SECONDS));
+  @Test
+  public void testDiskLimitTranslationNoMessage() throws Exception {
+    assertResourceLimitBehavior(
+        TaskStatus.Reason.REASON_CONTAINER_LIMITATION_DISK,
+        Optional.absent(),
+        Optional.of(TaskStatusHandlerImpl.DISK_LIMIT_DISPLAY));
   }
 
   @Test
