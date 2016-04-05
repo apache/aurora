@@ -1,9 +1,11 @@
-0.13.0
+0.13.0 (Not yet released)
 ------
 
 ### New/updated:
 
 - Upgraded Mesos to 0.26.0
+- Added a new health endpoint (/leaderhealth) which can be used for load balancer health
+  checks to always forward requests to the leading scheduler.
 - Added a new `aurora job add` client command to scale out an existing job.
 - Upgraded the scheduler ZooKeeper client from 3.4.6 to 3.4.8.
 - Added support for dedicated constraints not exclusive to a particular role.

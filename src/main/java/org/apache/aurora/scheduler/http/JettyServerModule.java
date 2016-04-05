@@ -216,6 +216,7 @@ public class JettyServerModule extends AbstractModule {
           .put(ContentionPrinter.class, "contention")
           .put(Cron.class, "cron")
           .put(HealthHandler.class, "health")
+          .put(LeaderHealth.class, "leaderhealth")
           .put(Locks.class, "locks")
           .put(LogConfig.class, "logconfig")
           .put(Maintenance.class, "maintenance")

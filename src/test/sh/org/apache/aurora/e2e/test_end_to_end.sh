@@ -116,6 +116,7 @@ test_scheduler_ui() {
 
   # Check that scheduler UI pages shown
   base_url="localhost:8081"
+  check_url_live "$base_url/leaderhealth"
   check_url_live "$base_url/scheduler"
   check_url_live "$base_url/scheduler/$_role"
   check_url_live "$base_url/scheduler/$_role/$_env/$_job"
