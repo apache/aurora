@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.ServletContextListener;
 import javax.ws.rs.core.MediaType;
@@ -27,7 +28,6 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
-import com.google.inject.TypeLiteral;
 import com.google.inject.util.Modules;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.WebResource;
@@ -36,9 +36,6 @@ import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.api.json.JSONConfiguration;
 
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
-import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.net.pool.DynamicHostSet;
-import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
@@ -50,6 +47,7 @@ import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.app.LifecycleModule;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler;
@@ -63,12 +61,11 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
-import org.easymock.Capture;
 import org.junit.Before;
 
 import static org.apache.aurora.scheduler.http.JettyServerModule.makeServletContextListener;
-import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertNotNull;
 
 /**
@@ -81,7 +78,7 @@ public abstract class AbstractJettyTest extends EasyMockTest {
   private Injector injector;
   protected StorageTestUtil storage;
   protected HostAndPort httpServer;
-  private Capture<HostChangeMonitor<ServiceInstance>> schedulerWatcher;
+  private AtomicReference<ImmutableSet<ServiceInstance>> schedulers;
 
   /**
    * Subclasses should override with a module that configures the servlets they are testing.
@@ -95,8 +92,8 @@ public abstract class AbstractJettyTest extends EasyMockTest {
   @Before
   public void setUpBase() throws Exception {
     storage = new StorageTestUtil(this);
-    DynamicHostSet<ServiceInstance> schedulers =
-        createMock(new Clazz<DynamicHostSet<ServiceInstance>>() { });
+
+    ServiceGroupMonitor serviceGroupMonitor = createMock(ServiceGroupMonitor.class);
 
     injector = Guice.createInjector(
         new StatsModule(),
@@ -122,7 +119,7 @@ public abstract class AbstractJettyTest extends EasyMockTest {
                     Amount.of(1L, Time.MILLISECONDS),
                     bindMock(BackoffStrategy.class),
                     RateLimiter.create(1000)));
-            bind(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }).toInstance(schedulers);
+            bind(ServiceGroupMonitor.class).toInstance(serviceGroupMonitor);
             bindMock(CronJobManager.class);
             bindMock(LockManager.class);
             bindMock(OfferManager.class);
@@ -136,17 +133,22 @@ public abstract class AbstractJettyTest extends EasyMockTest {
           }
         },
         new JettyServerModule(false));
-    schedulerWatcher = createCapture();
-    expect(schedulers.watch(capture(schedulerWatcher))).andReturn(createMock(Command.class));
+
+    schedulers = new AtomicReference<>(ImmutableSet.of());
+
+    serviceGroupMonitor.start();
+    expectLastCall();
+
+    expect(serviceGroupMonitor.get()).andAnswer(schedulers::get).anyTimes();
   }
 
   protected void setLeadingScheduler(String host, int port) {
-    schedulerWatcher.getValue().onChange(
+    schedulers.set(
         ImmutableSet.of(new ServiceInstance().setServiceEndpoint(new Endpoint(host, port))));
   }
 
   protected void unsetLeadingSchduler() {
-    schedulerWatcher.getValue().onChange(ImmutableSet.of());
+    schedulers.set(ImmutableSet.of());
   }
 
   protected void replayAndStart() {

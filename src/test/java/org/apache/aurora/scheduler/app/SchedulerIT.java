@@ -44,7 +44,6 @@ import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.stats.Stats;
-import org.apache.aurora.common.zookeeper.ServerSet;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
@@ -229,7 +228,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
   private void awaitSchedulerReady() throws Exception {
     executor.submit(() -> {
-      ServerSet schedulerService = new ServerSetImpl(zkClient, SERVERSET_PATH);
+      ServerSetImpl schedulerService = new ServerSetImpl(zkClient, SERVERSET_PATH);
       final CountDownLatch schedulerReady = new CountDownLatch(1);
       schedulerService.watch(hostSet -> {
         if (!hostSet.isEmpty()) {

@@ -24,13 +24,10 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Provides;
-import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.common.application.ShutdownStage;
 import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.net.pool.DynamicHostSet;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.Container._Fields;
@@ -46,6 +43,7 @@ import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.app.AppModule;
 import org.apache.aurora.scheduler.app.LifecycleModule;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.app.local.FakeNonVolatileStorage;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
@@ -104,9 +102,9 @@ public class ThriftIT extends EasyMockTest {
 
             bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
 
-            DynamicHostSet<ServiceInstance> schedulers =
-                createMock(new Clazz<DynamicHostSet<ServiceInstance>>() { });
-            bind(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }).toInstance(schedulers);
+            ServiceGroupMonitor schedulers = createMock(ServiceGroupMonitor.class);
+            bind(ServiceGroupMonitor.class).toInstance(schedulers);
+
             bindMock(DriverFactory.class);
             bind(DriverSettings.class).toInstance(new DriverSettings(
                 "fakemaster",

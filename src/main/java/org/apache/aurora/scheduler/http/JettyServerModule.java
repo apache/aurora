@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.EnumSet;
@@ -64,8 +65,8 @@ import org.apache.aurora.common.net.http.handlers.ThreadStackPrinter;
 import org.apache.aurora.common.net.http.handlers.TimeSeriesDataSource;
 import org.apache.aurora.common.net.http.handlers.VarsHandler;
 import org.apache.aurora.common.net.http.handlers.VarsJsonHandler;
-import org.apache.aurora.common.net.pool.DynamicHostSet.MonitorException;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor.MonitorException;
 import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.aurora.scheduler.http.api.security.HttpSecurityModule;
 import org.apache.aurora.scheduler.thrift.ThriftModule;
@@ -295,8 +296,8 @@ public class JettyServerModule extends AbstractModule {
     }
 
     @Override
-    protected void shutDown() {
-      // Nothing to do here - we await VM shutdown.
+    protected void shutDown() throws IOException {
+      redirector.close();
     }
   }
 

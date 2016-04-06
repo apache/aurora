@@ -30,7 +30,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
@@ -50,6 +49,7 @@ import com.google.gson.Gson;
 
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.io.Codec;
+import org.apache.aurora.common.net.pool.DynamicHostSet;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
@@ -65,9 +65,9 @@ import org.slf4j.LoggerFactory;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * ZooKeeper-backed implementation of {@link ServerSet}.
+ * ZooKeeper-backed implementation of {@link ServerSet} and {@link DynamicHostSet}.
  */
-public class ServerSetImpl implements ServerSet {
+public class ServerSetImpl implements ServerSet, DynamicHostSet<ServiceInstance> {
   private static final Logger LOG = LoggerFactory.getLogger(ServerSetImpl.class);
 
   private final ZooKeeperClient zkClient;
@@ -134,31 +134,12 @@ public class ServerSetImpl implements ServerSet {
       Map<String, InetSocketAddress> additionalEndpoints)
       throws Group.JoinException, InterruptedException {
 
-    LOG.warn("Joining a ServerSet without a shard ID is deprecated and will soon break.");
-    return join(endpoint, additionalEndpoints, Optional.<Integer>absent());
-  }
-
-  @Override
-  public EndpointStatus join(
-      InetSocketAddress endpoint,
-      Map<String, InetSocketAddress> additionalEndpoints,
-      int shardId) throws Group.JoinException, InterruptedException {
-
-    return join(endpoint, additionalEndpoints, Optional.of(shardId));
-  }
-
-  private EndpointStatus join(
-      InetSocketAddress endpoint,
-      Map<String, InetSocketAddress> additionalEndpoints,
-      Optional<Integer> shardId) throws Group.JoinException, InterruptedException {
-
     checkNotNull(endpoint);
     checkNotNull(additionalEndpoints);
 
-    final MemberStatus memberStatus =
-        new MemberStatus(endpoint, additionalEndpoints, shardId);
+    MemberStatus memberStatus = new MemberStatus(endpoint, additionalEndpoints);
     Supplier<byte[]> serviceInstanceSupplier = memberStatus::serializeServiceInstance;
-    final Group.Membership membership = group.join(serviceInstanceSupplier);
+    Group.Membership membership = group.join(serviceInstanceSupplier);
 
     return () -> memberStatus.leave(membership);
   }
@@ -178,16 +159,13 @@ public class ServerSetImpl implements ServerSet {
   private class MemberStatus {
     private final InetSocketAddress endpoint;
     private final Map<String, InetSocketAddress> additionalEndpoints;
-    private final Optional<Integer> shardId;
 
     private MemberStatus(
         InetSocketAddress endpoint,
-        Map<String, InetSocketAddress> additionalEndpoints,
-        Optional<Integer> shardId) {
+        Map<String, InetSocketAddress> additionalEndpoints) {
 
       this.endpoint = endpoint;
       this.additionalEndpoints = additionalEndpoints;
-      this.shardId = shardId;
     }
 
     synchronized void leave(Group.Membership membership) throws UpdateException {
@@ -204,10 +182,6 @@ public class ServerSetImpl implements ServerSet {
           ServerSets.toEndpoint(endpoint),
           Maps.transformValues(additionalEndpoints, ServerSets.TO_ENDPOINT),
           Status.ALIVE);
-
-      if (shardId.isPresent()) {
-        serviceInstance.setShard(shardId.get());
-      }
 
       LOG.debug("updating endpoint data to:\n\t" + serviceInstance);
       try {

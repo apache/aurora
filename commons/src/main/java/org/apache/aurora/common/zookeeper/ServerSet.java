@@ -16,17 +16,13 @@ package org.apache.aurora.common.zookeeper;
 import java.net.InetSocketAddress;
 import java.util.Map;
 
-import org.apache.aurora.common.net.pool.DynamicHostSet;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.zookeeper.Group.JoinException;
 
 /**
- * A logical set of servers registered in ZooKeeper.  Intended to be used by both servers in a
- * common service and their clients.
- *
- * TODO(William Farner): Explore decoupling this from thrift.
+ * A logical set of servers registered in ZooKeeper.  Intended to be used by servers in a
+ * common service to advertise their presence to server-set protocol-aware clients.
  */
-public interface ServerSet extends DynamicHostSet<ServiceInstance> {
+public interface ServerSet {
   /**
    * Attempts to join a server set for this logical service group.
    *
@@ -40,21 +36,6 @@ public interface ServerSet extends DynamicHostSet<ServiceInstance> {
       InetSocketAddress endpoint,
       Map<String, InetSocketAddress> additionalEndpoints)
       throws JoinException, InterruptedException;
-
-  /**
-   * Attempts to join a server set for this logical service group.
-   *
-   * @param endpoint the primary service endpoint
-   * @param additionalEndpoints and additional endpoints keyed by their logical name
-   * @param shardId Unique shard identifier for this member of the service.
-   * @return an EndpointStatus object that allows the endpoint to adjust its status
-   * @throws JoinException if there was a problem joining the server set
-   * @throws InterruptedException if interrupted while waiting to join the server set
-   */
-  EndpointStatus join(
-      InetSocketAddress endpoint,
-      Map<String, InetSocketAddress> additionalEndpoints,
-      int shardId) throws JoinException, InterruptedException;
 
   /**
    * A handle to a service endpoint's status data that allows updating it to track current events.
@@ -74,10 +55,6 @@ public interface ServerSet extends DynamicHostSet<ServiceInstance> {
   class UpdateException extends Exception {
     public UpdateException(String message, Throwable cause) {
       super(message, cause);
-    }
-
-    public UpdateException(String message) {
-      super(message);
     }
   }
 }

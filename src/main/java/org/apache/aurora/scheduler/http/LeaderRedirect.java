@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.http;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.io.Closeable;
+import java.io.IOException;
 
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -23,13 +24,11 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
-import com.google.common.util.concurrent.Atomics;
 
-import org.apache.aurora.common.net.pool.DynamicHostSet;
-import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
-import org.apache.aurora.common.net.pool.DynamicHostSet.MonitorException;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor.MonitorException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,8 +38,9 @@ import static java.util.Objects.requireNonNull;
  * Redirect logic for finding the leading scheduler in the event that this process is not the
  * leader.
  */
-public class LeaderRedirect {
-  public enum LeaderStatus {
+class LeaderRedirect implements Closeable {
+
+  enum LeaderStatus {
     /**
      * This instance is currently the leading scheduler.
      */
@@ -57,22 +57,15 @@ public class LeaderRedirect {
     NOT_LEADING,
   }
 
-  // TODO(wfarner): Should we tie this directly to the producer of the node (HttpModule?  It seems
-  // like the right thing to do, but would introduce an otherwise unnecessary dependency.
-  @VisibleForTesting
-  static final String HTTP_PORT_NAME = "http";
-
   private static final Logger LOG = LoggerFactory.getLogger(LeaderRedirect.class);
 
   private final HttpService httpService;
-  private final DynamicHostSet<ServiceInstance> schedulers;
-
-  private final AtomicReference<ServiceInstance> leader = Atomics.newReference();
+  private final ServiceGroupMonitor serviceGroupMonitor;
 
   @Inject
-  LeaderRedirect(HttpService httpService, DynamicHostSet<ServiceInstance> schedulers) {
+  LeaderRedirect(HttpService httpService, ServiceGroupMonitor serviceGroupMonitor) {
     this.httpService = requireNonNull(httpService);
-    this.schedulers = requireNonNull(schedulers);
+    this.serviceGroupMonitor = requireNonNull(serviceGroupMonitor);
   }
 
   /**
@@ -81,17 +74,19 @@ public class LeaderRedirect {
    * @throws MonitorException If monitoring failed to initialize.
    */
   public void monitor() throws MonitorException {
-    schedulers.watch(new SchedulerMonitor());
+    serviceGroupMonitor.start();
+  }
+
+  @Override
+  public void close() throws IOException {
+    serviceGroupMonitor.close();
   }
 
   private Optional<HostAndPort> getLeaderHttp() {
-    ServiceInstance leadingScheduler = leader.get();
-    if (leadingScheduler == null) {
-      return Optional.absent();
-    }
+    Optional<ServiceInstance> leadingScheduler = getLeader();
 
-    if (leadingScheduler.isSetServiceEndpoint()) {
-      Endpoint leaderHttp = leadingScheduler.getServiceEndpoint();
+    if (leadingScheduler.isPresent() && leadingScheduler.get().isSetServiceEndpoint()) {
+      Endpoint leaderHttp = leadingScheduler.get().getServiceEndpoint();
       if (leaderHttp != null && leaderHttp.isSetHost() && leaderHttp.isSetPort()) {
         return Optional.of(HostAndPort.fromParts(leaderHttp.getHost(), leaderHttp.getPort()));
       }
@@ -136,13 +131,13 @@ public class LeaderRedirect {
    * @return a {@code LeaderStatus} indicating whether there is an elected leader (and if so, if
    * this instance is the leader).
    */
-  public LeaderStatus getLeaderStatus() {
-    ServiceInstance leadingScheduler = leader.get();
-    if (leadingScheduler == null) {
+  LeaderStatus getLeaderStatus() {
+    Optional<ServiceInstance> leadingScheduler = getLeader();
+    if (!leadingScheduler.isPresent()) {
       return LeaderStatus.NO_LEADER;
     }
 
-    if (!leadingScheduler.isSetServiceEndpoint()) {
+    if (!leadingScheduler.get().isSetServiceEndpoint()) {
       LOG.warn("Leader service instance seems to be incomplete: " + leadingScheduler);
       return LeaderStatus.NO_LEADER;
     }
@@ -164,7 +159,7 @@ public class LeaderRedirect {
    * @param req HTTP request.
    * @return An optional redirect destination to route the request to the leading scheduler.
    */
-  public Optional<String> getRedirectTarget(HttpServletRequest req) {
+  Optional<String> getRedirectTarget(HttpServletRequest req) {
     Optional<HostAndPort> redirectTarget = getRedirect();
     if (redirectTarget.isPresent()) {
       HostAndPort target = redirectTarget.get();
@@ -192,28 +187,18 @@ public class LeaderRedirect {
     }
   }
 
-  /**
-   * Monitor to track scheduler leader changes.
-   */
-  private class SchedulerMonitor implements HostChangeMonitor<ServiceInstance> {
-    @Override
-    public void onChange(ImmutableSet<ServiceInstance> hostSet) {
-      switch (hostSet.size()) {
-        case 0:
-          LOG.warn("No schedulers in host set, will not redirect despite not being leader.");
-          leader.set(null);
-          break;
-
-        case 1:
-          LOG.info("Found leader scheduler at " + hostSet);
-          leader.set(Iterables.getOnlyElement(hostSet));
-          break;
-
-        default:
-          LOG.error("Multiple schedulers detected, will not redirect: " + hostSet);
-          leader.set(null);
-          break;
-      }
+  private Optional<ServiceInstance> getLeader() {
+    ImmutableSet<ServiceInstance> hostSet = serviceGroupMonitor.get();
+    switch (hostSet.size()) {
+      case 0:
+        LOG.warn("No serviceGroupMonitor in host set, will not redirect despite not being leader.");
+        return Optional.absent();
+      case 1:
+        LOG.info("Found leader scheduler at " + hostSet);
+        return Optional.of(Iterables.getOnlyElement(hostSet));
+      default:
+        LOG.error("Multiple serviceGroupMonitor detected, will not redirect: " + hostSet);
+        return Optional.absent();
     }
   }
 }

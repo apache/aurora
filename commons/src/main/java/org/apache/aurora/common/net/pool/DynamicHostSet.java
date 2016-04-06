@@ -34,7 +34,7 @@ public interface DynamicHostSet<T> {
    * @return A command which, when executed, will stop monitoring the host set.
    * @throws MonitorException if there is a problem monitoring the host set
    */
-  Command watch(final HostChangeMonitor<T> monitor) throws MonitorException;
+  Command watch(HostChangeMonitor<T> monitor) throws MonitorException;
 
   /**
    * An interface to an object that is interested in receiving notification whenever the host set
@@ -52,10 +52,6 @@ public interface DynamicHostSet<T> {
   }
 
   class MonitorException extends Exception {
-    public MonitorException(String msg) {
-      super(msg);
-    }
-
     public MonitorException(String msg, Throwable cause) {
       super(msg, cause);
     }

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -23,19 +24,17 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
 
-import org.apache.aurora.common.net.pool.DynamicHostSet;
-import org.apache.aurora.common.net.pool.DynamicHostSet.HostChangeMonitor;
-import org.apache.aurora.common.net.pool.DynamicHostSet.MonitorException;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
-import org.easymock.Capture;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor.MonitorException;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.http.LeaderRedirect.LeaderStatus;
-import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 
 public class LeaderRedirectTest extends EasyMockTest {
@@ -46,63 +45,74 @@ public class LeaderRedirectTest extends EasyMockTest {
       endpoint -> new ServiceInstance()
           .setServiceEndpoint(new Endpoint(endpoint.getHostText(), endpoint.getPort()));
 
-  private Capture<HostChangeMonitor<ServiceInstance>> monitorCapture;
-
+  private AtomicReference<ImmutableSet<ServiceInstance>> schedulers;
+  private ServiceGroupMonitor serviceGroupMonitor;
   private LeaderRedirect leaderRedirector;
 
   @Before
   public void setUp() throws MonitorException {
-    DynamicHostSet<ServiceInstance> schedulers =
-        createMock(new Clazz<DynamicHostSet<ServiceInstance>>() { });
+    schedulers = new AtomicReference<>(ImmutableSet.of());
+    serviceGroupMonitor = createMock(ServiceGroupMonitor.class);
 
     HttpService http = createMock(HttpService.class);
     expect(http.getAddress()).andStubReturn(HostAndPort.fromParts("localhost", HTTP_PORT));
 
-    leaderRedirector = new LeaderRedirect(http, schedulers);
-
-    monitorCapture = new Capture<>();
-    expect(schedulers.watch(capture(monitorCapture))).andReturn(null);
+    leaderRedirector = new LeaderRedirect(http, serviceGroupMonitor);
   }
 
-  private void replayAndMonitor() throws Exception {
+  private void replayAndMonitor(int expectedGetCalls) throws Exception {
+    serviceGroupMonitor.start();
+    expectLastCall();
+
+    expect(serviceGroupMonitor.get()).andAnswer(() -> schedulers.get()).times(expectedGetCalls);
+
     control.replay();
     leaderRedirector.monitor();
   }
 
   @Test
   public void testLeader() throws Exception {
-    replayAndMonitor();
+    replayAndMonitor(3);
     publishSchedulers(localPort(HTTP_PORT));
 
     assertEquals(Optional.absent(), leaderRedirector.getRedirect());
+
+    // NB: LEADING takes 2 tests of the server group membership to calculate; thus we expect 3
+    // server group get calls, 1 for the getRedirect() above and 2 here.
     assertEquals(LeaderStatus.LEADING, leaderRedirector.getLeaderStatus());
   }
 
   @Test
   public void testNotLeader() throws Exception {
-    replayAndMonitor();
+    replayAndMonitor(3);
 
     HostAndPort remote = HostAndPort.fromParts("foobar", HTTP_PORT);
     publishSchedulers(remote);
 
     assertEquals(Optional.of(remote), leaderRedirector.getRedirect());
+
+    // NB: NOT_LEADING takes 2 tests of the server group membership to calculate; thus we expect 3
+    // server group get calls, 1 for the getRedirect() above and 2 here.
     assertEquals(LeaderStatus.NOT_LEADING, leaderRedirector.getLeaderStatus());
   }
 
   @Test
   public void testLeaderOnSameHost() throws Exception {
-    replayAndMonitor();
+    replayAndMonitor(3);
 
     HostAndPort local = localPort(555);
     publishSchedulers(local);
 
     assertEquals(Optional.of(local), leaderRedirector.getRedirect());
+
+    // NB: NOT_LEADING takes 2 tests of the server group membership to calculate; thus we expect 3
+    // server group get calls, 1 for the getRedirect() above and 2 here.
     assertEquals(LeaderStatus.NOT_LEADING, leaderRedirector.getLeaderStatus());
   }
 
   @Test
   public void testNoLeaders() throws Exception {
-    replayAndMonitor();
+    replayAndMonitor(2);
 
     assertEquals(Optional.absent(), leaderRedirector.getRedirect());
     assertEquals(LeaderStatus.NO_LEADER, leaderRedirector.getLeaderStatus());
@@ -110,7 +120,7 @@ public class LeaderRedirectTest extends EasyMockTest {
 
   @Test
   public void testMultipleLeaders() throws Exception {
-    replayAndMonitor();
+    replayAndMonitor(2);
 
     publishSchedulers(HostAndPort.fromParts("foobar", 500), HostAndPort.fromParts("baz", 800));
 
@@ -120,7 +130,7 @@ public class LeaderRedirectTest extends EasyMockTest {
 
   @Test
   public void testBadServiceInstance() throws Exception {
-    replayAndMonitor();
+    replayAndMonitor(2);
 
     publishSchedulers(ImmutableSet.of(new ServiceInstance()));
 
@@ -143,7 +153,7 @@ public class LeaderRedirectTest extends EasyMockTest {
   public void testRedirectTargetNoAttribute() throws Exception {
     HttpServletRequest mockRequest = mockRequest(null, null);
 
-    replayAndMonitor();
+    replayAndMonitor(1);
 
     HostAndPort remote = HostAndPort.fromParts("foobar", HTTP_PORT);
     publishSchedulers(remote);
@@ -157,7 +167,7 @@ public class LeaderRedirectTest extends EasyMockTest {
   public void testRedirectTargetWithAttribute() throws Exception {
     HttpServletRequest mockRequest = mockRequest("/the/original/path", null);
 
-    replayAndMonitor();
+    replayAndMonitor(1);
 
     HostAndPort remote = HostAndPort.fromParts("foobar", HTTP_PORT);
     publishSchedulers(remote);
@@ -171,7 +181,7 @@ public class LeaderRedirectTest extends EasyMockTest {
   public void testRedirectTargetQueryString() throws Exception {
     HttpServletRequest mockRequest = mockRequest(null, "bar=baz");
 
-    replayAndMonitor();
+    replayAndMonitor(1);
 
     HostAndPort remote = HostAndPort.fromParts("foobar", HTTP_PORT);
     publishSchedulers(remote);
@@ -187,7 +197,7 @@ public class LeaderRedirectTest extends EasyMockTest {
   }
 
   private void publishSchedulers(ImmutableSet<ServiceInstance> instances) {
-    monitorCapture.getValue().onChange(instances);
+    schedulers.set(instances);
   }
 
   private static HostAndPort localPort(int port) {

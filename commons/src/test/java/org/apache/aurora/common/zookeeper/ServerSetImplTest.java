@@ -77,13 +77,12 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
 
     ServerSetImpl server = createServerSet();
     ServerSet.EndpointStatus status = server.join(
-        InetSocketAddress.createUnresolved("foo", 1234), makePortMap("http-admin", 8080), 0);
+        InetSocketAddress.createUnresolved("foo", 1234), makePortMap("http-admin", 8080));
 
     ServiceInstance serviceInstance = new ServiceInstance(
         new Endpoint("foo", 1234),
         ImmutableMap.of("http-admin", new Endpoint("foo", 8080)),
-        Status.ALIVE)
-        .setShard(0);
+        Status.ALIVE);
 
     assertChangeFired(serviceInstance);
 
@@ -166,34 +165,26 @@ public class ServerSetImplTest extends BaseZooKeeperTest {
     ServiceInstance instance1 = new ServiceInstance(
         new Endpoint("foo", 1000),
         ImmutableMap.of("http-admin1", new Endpoint("foo", 8080)),
-        Status.ALIVE)
-        .setShard(0);
+        Status.ALIVE);
     ServiceInstance instance2 = new ServiceInstance(
         new Endpoint("foo", 1001),
         ImmutableMap.of("http-admin2", new Endpoint("foo", 8081)),
-        Status.ALIVE)
-        .setShard(1);
+        Status.ALIVE);
     ServiceInstance instance3 = new ServiceInstance(
         new Endpoint("foo", 1002),
         ImmutableMap.of("http-admin3", new Endpoint("foo", 8082)),
-        Status.ALIVE)
-        .setShard(2);
+        Status.ALIVE);
 
-    server1.join(
-        InetSocketAddress.createUnresolved("foo", 1000),
-        server1Ports,
-        0);
+    server1.join(InetSocketAddress.createUnresolved("foo", 1000), server1Ports);
     assertEquals(ImmutableList.of(instance1), ImmutableList.copyOf(serverSetBuffer.take()));
 
     ServerSet.EndpointStatus status2 = server2.join(
         InetSocketAddress.createUnresolved("foo", 1001),
-        server2Ports,
-        1);
+        server2Ports);
     assertEquals(ImmutableList.of(instance1, instance2),
         ImmutableList.copyOf(serverSetBuffer.take()));
 
-    server3.join(
-        InetSocketAddress.createUnresolved("foo", 1002), server3Ports, 2);
+    server3.join(InetSocketAddress.createUnresolved("foo", 1002), server3Ports);
     assertEquals(ImmutableList.of(instance1, instance2, instance3),
         ImmutableList.copyOf(serverSetBuffer.take()));
 
