@@ -49,13 +49,9 @@ import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.http.api.security.FieldGetter.AbstractFieldGetter;
 import org.apache.aurora.scheduler.http.api.security.FieldGetter.IdentityFieldGetter;
 import org.apache.aurora.scheduler.spi.Permissions;
-import org.apache.aurora.scheduler.spi.Permissions.Domain;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.shiro.authz.Permission;
@@ -88,20 +84,6 @@ import static com.google.common.base.Preconditions.checkState;
  * is invoked, otherwise this interceptor will not allow the invocation to proceed.
  */
 class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
-  @VisibleForTesting
-  static final FieldGetter<TaskQuery, JobKey> QUERY_TO_JOB_KEY =
-      new AbstractFieldGetter<TaskQuery, JobKey>(TaskQuery.class, JobKey.class) {
-        @Override
-        public Optional<JobKey> apply(TaskQuery input) {
-          Optional<Set<IJobKey>> targetJobs = JobKeys.from(Query.arbitrary(input));
-          if (targetJobs.isPresent() && targetJobs.get().size() == 1) {
-            return Optional.of(Iterables.getOnlyElement(targetJobs.get()))
-                .transform(IJobKey::newBuilder);
-          } else {
-            return Optional.absent();
-          }
-        }
-      };
 
   private static class JobKeyGetter {
     private final int index;
@@ -153,7 +135,6 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
           LOCK_KEY_GETTER,
           JOB_UPDATE_KEY_GETTER,
           ADD_INSTANCES_CONFIG_GETTER,
-          QUERY_TO_JOB_KEY,
           INSTANCE_KEY_GETTER,
           new IdentityFieldGetter<>(JobKey.class));
 
@@ -285,17 +266,11 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
   private final LoadingCache<Method, Function<Object[], Optional<JobKey>>> authorizingParamGetters =
       CacheBuilder.newBuilder().build(LOADER);
 
-  private final Domain domain;
-
   private volatile boolean initialized;
 
   private Provider<Subject> subjectProvider;
   private AtomicLong authorizationFailures;
   private AtomicLong badRequests;
-
-  ShiroAuthorizingParamInterceptor(Domain domain) {
-    this.domain = requireNonNull(domain);
-  }
 
   @Inject
   void initialize(Provider<Subject> newSubjectProvider, StatsProvider statsProvider) {
@@ -309,11 +284,6 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
   }
 
   @VisibleForTesting
-  Permission makeWildcardPermission(String methodName) {
-    return Permissions.createUnscopedPermission(domain, methodName);
-  }
-
-  @VisibleForTesting
   Permission makeTargetPermission(String methodName, IJobKey jobKey) {
     return Permissions.createJobScopedPermission(methodName, jobKey);
   }
@@ -323,12 +293,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
     checkState(initialized);
 
     Method method = invocation.getMethod();
-    // Short-circuit request processing restrictions if the caller would be allowed to
-    // operate on every possible job key. This allows a broadly-scoped TaskQuery.
     Subject subject = subjectProvider.get();
-    if (subject.isPermitted(makeWildcardPermission(method.getName()))) {
-      return invocation.proceed();
-    }
 
     Optional<IJobKey> jobKey = authorizingParamGetters
         .getUnchecked(invocation.getMethod())

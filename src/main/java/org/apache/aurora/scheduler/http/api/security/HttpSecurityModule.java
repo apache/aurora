@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.http.api.security;
 import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.Set;
+
 import javax.servlet.Filter;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -53,7 +54,6 @@ import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PATH;
 import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PERM;
 import static org.apache.aurora.scheduler.http.api.ApiModule.API_PATH;
 import static org.apache.aurora.scheduler.spi.Permissions.Domain.THRIFT_AURORA_ADMIN;
-import static org.apache.aurora.scheduler.spi.Permissions.Domain.THRIFT_AURORA_SCHEDULER_MANAGER;
 import static org.apache.shiro.guice.web.ShiroWebModule.guiceFilterModule;
 import static org.apache.shiro.web.filter.authc.AuthenticatingFilter.PERMISSIVE;
 
@@ -242,8 +242,7 @@ public class HttpSecurityModule extends ServletModule {
         AURORA_SCHEDULER_MANAGER_SERVICE.or(AURORA_ADMIN_SERVICE),
         authenticatingInterceptor);
 
-    MethodInterceptor apiInterceptor = new ShiroAuthorizingParamInterceptor(
-        THRIFT_AURORA_SCHEDULER_MANAGER);
+    MethodInterceptor apiInterceptor = new ShiroAuthorizingParamInterceptor();
     requestInjection(apiInterceptor);
     bindInterceptor(
         Matchers.subclassesOf(AuroraSchedulerManager.Iface.class),

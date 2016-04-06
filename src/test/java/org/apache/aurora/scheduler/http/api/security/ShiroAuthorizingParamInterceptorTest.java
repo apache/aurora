@@ -18,7 +18,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -33,7 +32,6 @@ import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.spi.Permissions.Domain;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.Responses;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
@@ -43,17 +41,13 @@ import org.apache.thrift.TException;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.http.api.security.ShiroAuthorizingParamInterceptor.QUERY_TO_JOB_KEY;
 import static org.apache.aurora.scheduler.http.api.security.ShiroAuthorizingParamInterceptor.SHIRO_AUTHORIZATION_FAILURES;
 import static org.apache.aurora.scheduler.http.api.security.ShiroAuthorizingParamInterceptor.SHIRO_BAD_REQUESTS;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
 public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
-  private static final Domain DOMAIN = Domain.THRIFT_AURORA_SCHEDULER_MANAGER;
-
   private ShiroAuthorizingParamInterceptor interceptor;
 
   private Subject subject;
@@ -66,7 +60,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    interceptor = new ShiroAuthorizingParamInterceptor(DOMAIN);
+    interceptor = new ShiroAuthorizingParamInterceptor();
     subject = createMock(Subject.class);
     statsProvider = createMock(StatsProvider.class);
     thrift = createMock(AnnotatedAuroraAdmin.class);
@@ -110,8 +104,6 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
     JobConfiguration jobConfiguration = new JobConfiguration().setKey(JOB_KEY.newBuilder());
     Response response = Responses.ok();
 
-    expect(subject.isPermitted(interceptor.makeWildcardPermission("createJob")))
-        .andReturn(false);
     expect(subject
         .isPermitted(interceptor.makeTargetPermission("createJob", JOB_KEY)))
         .andReturn(true);
@@ -123,25 +115,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
   }
 
   @Test
-  public void testKillTasksWithWildcardPermission() throws TException {
-    Response response = Responses.ok();
-
-    // TODO(maxim): Remove wildcard (unscoped) permissions when TaskQuery is gone from killTasks
-    // AURORA-1592.
-    expect(subject.isPermitted(interceptor.makeWildcardPermission("killTasks")))
-        .andReturn(true);
-    expect(thrift.killTasks(new TaskQuery(), null, null))
-        .andReturn(response);
-
-    replayAndInitialize();
-
-    assertSame(response, decoratedThrift.killTasks(new TaskQuery(), null, null));
-  }
-
-  @Test
   public void testKillTasksWithTargetedPermission() throws TException {
-    expect(subject.isPermitted(interceptor.makeWildcardPermission("killTasks")))
-        .andReturn(false);
     expect(subject.isPermitted(interceptor.makeTargetPermission("killTasks", JOB_KEY)))
         .andReturn(false);
     expect(subject.getPrincipal()).andReturn("zmanji");
@@ -150,62 +124,18 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
 
     assertEquals(
         ResponseCode.AUTH_FAILED,
-        decoratedThrift.killTasks(null, JOB_KEY.newBuilder(), null).getResponseCode());
+        decoratedThrift.killTasks(JOB_KEY.newBuilder(), null).getResponseCode());
   }
 
   @Test
   public void testKillTasksInvalidJobKey() throws TException {
-    expect(subject.isPermitted(interceptor.makeWildcardPermission("killTasks")))
-        .andReturn(false);
-
     replayAndInitialize();
 
     assertEquals(
         ResponseCode.INVALID_REQUEST,
         decoratedThrift.killTasks(
-            null,
             JOB_KEY.newBuilder().setName(null),
             null).getResponseCode());
-  }
-
-  @Test
-  public void testExtractTaskQuerySingleJobKey() {
-    replayAndInitialize();
-
-    assertEquals(
-        JOB_KEY.newBuilder(),
-        QUERY_TO_JOB_KEY
-            .apply(new TaskQuery()
-                .setRole(JOB_KEY.getRole())
-                .setEnvironment(JOB_KEY.getEnvironment())
-                .setJobName(JOB_KEY.getName()))
-            .orNull());
-
-    assertEquals(
-        JOB_KEY.newBuilder(),
-        QUERY_TO_JOB_KEY.apply(new TaskQuery().setJobKeys(ImmutableSet.of(JOB_KEY.newBuilder())))
-            .orNull());
-  }
-
-  @Test
-  public void testExtractTaskQueryBroadlyScoped() {
-    control.replay();
-
-    assertNull(QUERY_TO_JOB_KEY.apply(new TaskQuery().setRole("role")).orNull());
-  }
-
-  @Test
-  public void testExtractTaskQueryMultiScoped() {
-    // TODO(ksweeney): Reconsider behavior here, this is possibly too restrictive as it
-    // will mean that only admins are authorized to operate on multiple jobs at once regardless
-    // of whether they share a common role.
-    control.replay();
-
-    assertNull(QUERY_TO_JOB_KEY
-        .apply(
-            new TaskQuery().setJobKeys(
-                ImmutableSet.of(JOB_KEY.newBuilder(), JOB_KEY.newBuilder().setName("other"))))
-        .orNull());
   }
 
   @Test
@@ -215,7 +145,6 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
     Function<Object[], Optional<JobKey>> func =
         interceptor.getAuthorizingParamGetters().getUnchecked(Params.class.getMethods()[0]);
 
-    func.apply(new Object[]{new TaskQuery(), null, null});
     func.apply(new Object[]{null, new JobKey(), null});
     func.apply(new Object[]{null, null, new JobUpdateRequest()});
   }
@@ -227,7 +156,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
     Function<Object[], Optional<JobKey>> func =
         interceptor.getAuthorizingParamGetters().getUnchecked(Params.class.getMethods()[0]);
 
-    func.apply(new Object[]{new TaskQuery(), new JobKey(), null});
+    func.apply(new Object[]{new JobConfiguration(), new JobKey(), null});
   }
 
   @Test(expected = UncheckedExecutionException.class)
@@ -254,7 +183,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
 
   private interface Params {
     Response test(
-        @AuthorizingParam TaskQuery query,
+        @AuthorizingParam JobConfiguration jobConfig,
         @AuthorizingParam JobKey job,
         @AuthorizingParam JobUpdateRequest request);
   }

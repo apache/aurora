@@ -25,7 +25,6 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.Response;
-import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.http.api.security.AuthorizingParam;
 import org.apache.thrift.TException;
 
@@ -62,7 +61,6 @@ public interface AnnotatedAuroraAdmin extends AuroraAdmin.Iface {
 
   @Override
   Response killTasks(
-      @AuthorizingParam @Nullable TaskQuery query,
       @AuthorizingParam @Nullable JobKey job,
       @Nullable Set<Integer> instances) throws TException;
 

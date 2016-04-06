@@ -122,8 +122,6 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.google.common.base.CharMatcher.WHITESPACE;
-
 import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
@@ -416,29 +414,14 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response killTasks(
-      @Nullable TaskQuery mutableQuery,
-      @Nullable JobKey mutableJob,
-      @Nullable Set<Integer> instances) {
-
-    final Query.Builder query;
+  public Response killTasks(@Nullable JobKey mutableJob, @Nullable Set<Integer> instances) {
     Response response = empty();
-    if (mutableQuery == null) {
-      IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJob));
-      if (instances == null || Iterables.isEmpty(instances)) {
-        query = implicitKillQuery(Query.jobScoped(jobKey));
-      } else {
-        query = implicitKillQuery(Query.instanceScoped(jobKey, instances));
-      }
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJob));
+    Query.Builder query;
+    if (instances == null || Iterables.isEmpty(instances)) {
+      query = implicitKillQuery(Query.jobScoped(jobKey));
     } else {
-      requireNonNull(mutableQuery);
-      addMessage(response, "The TaskQuery field is deprecated.");
-
-      if (mutableQuery.getJobName() != null && WHITESPACE.matchesAllOf(mutableQuery.getJobName())) {
-        return invalidRequest(String.format("Invalid job name: '%s'", mutableQuery.getJobName()));
-      }
-
-      query = implicitKillQuery(Query.arbitrary(mutableQuery));
+      query = implicitKillQuery(Query.instanceScoped(jobKey, instances));
     }
 
     return storage.write(storeProvider -> {

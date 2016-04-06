@@ -70,7 +70,6 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
-import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.JobKeys;
@@ -590,20 +589,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testKillByJobName() throws Exception {
-    Query.Builder query = Query.arbitrary(new TaskQuery().setJobName("job")).active();
-    storageUtil.expectTaskFetch(query, buildScheduledTask());
-    lockManager.assertNotLocked(LOCK_KEY);
-    expectTransitionsToKilling();
-
-    control.replay();
-
-    Response response = thrift.killTasks(query.get().newBuilder(), null, null);
-    assertOkResponse(response);
-    assertMessageMatches(response, "The TaskQuery field is deprecated.");
-  }
-
-  @Test
   public void testJobScopedKillsActive() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     storageUtil.expectTaskFetch(query, buildScheduledTask());
@@ -612,7 +597,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertOkResponse(thrift.killTasks(null, JOB_KEY.newBuilder(), null));
+    assertOkResponse(thrift.killTasks(JOB_KEY.newBuilder(), null));
   }
 
   @Test
@@ -624,7 +609,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertOkResponse(thrift.killTasks(null, JOB_KEY.newBuilder(), ImmutableSet.of(1)));
+    assertOkResponse(thrift.killTasks(JOB_KEY.newBuilder(), ImmutableSet.of(1)));
   }
 
   @Test
@@ -642,31 +627,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertResponse(
         LOCK_ERROR,
-        thrift.killTasks(null, JOB_KEY.newBuilder(), null));
-  }
-
-  @Test
-  public void testKillByTaskId() throws Exception {
-    // A non-admin user may kill their own tasks when specified by task IDs.
-    Query.Builder query = Query.taskScoped("taskid").active();
-    // This query happens twice - once for authentication (without consistency) and once again
-    // to perform the state change (within a write transaction).
-    storageUtil.expectTaskFetch(query, buildScheduledTask());
-    lockManager.assertNotLocked(LOCK_KEY);
-    expectTransitionsToKilling();
-
-    control.replay();
-
-    assertOkResponse(thrift.killTasks(query.get().newBuilder(), null, null));
-  }
-
-  @Test
-  public void testKillTasksInvalidJobName() throws Exception {
-    TaskQuery query = new TaskQuery().setJobName("");
-
-    control.replay();
-
-    assertResponse(INVALID_REQUEST, thrift.killTasks(query, null, null));
+        thrift.killTasks(JOB_KEY.newBuilder(), null));
   }
 
   @Test
@@ -676,7 +637,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    Response response = thrift.killTasks(null, JOB_KEY.newBuilder(), null);
+    Response response = thrift.killTasks(JOB_KEY.newBuilder(), null);
     assertOkResponse(response);
     assertMessageMatches(response, SchedulerThriftInterface.NO_TASKS_TO_KILL_MESSAGE);
   }
