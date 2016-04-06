@@ -18,7 +18,6 @@ import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
@@ -33,12 +32,10 @@ public class ServerSetsTest {
     Map<String, Endpoint > additionalEndpoints = ImmutableMap.of();
     Status status = Status.ALIVE;
 
-    Codec<ServiceInstance> codec = ServerSetImpl.createCodec();
-
     byte[] data = ServerSets.serializeServiceInstance(
-        endpoint, additionalEndpoints, status, codec);
+        endpoint, additionalEndpoints, status, ServerSet.JSON_CODEC);
 
-    ServiceInstance instance = ServerSets.deserializeServiceInstance(data, codec);
+    ServiceInstance instance = ServerSets.deserializeServiceInstance(data, ServerSet.JSON_CODEC);
 
     assertEquals(endpoint.getPort(), instance.getServiceEndpoint().getPort());
     assertEquals(additionalEndpoints, instance.getAdditionalEndpoints());
