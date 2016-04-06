@@ -50,7 +50,7 @@ Ports
 -----
 
 In order to be useful, most services have to bind to one or more ports. Aurora enables this
-usecase via the [`thermos.ports` namespace](..reference/configuration.md#thermos-namespace) that
+usecase via the [`thermos.ports` namespace](../reference/configuration.md#thermos-namespace) that
 allows to request arbitrarily named ports:
 
 

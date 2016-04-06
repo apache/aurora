@@ -13,7 +13,7 @@ However, you need to manually install them when using the source release
 downloads:
 
 1. Install Gradle following the instructions on the [Gradle web site](http://gradle.org)
-2. From the root directory of the Apache Aurora project generate the gradle
+2. From the root directory of the Apache Aurora project generate the Gradle
 wrapper by running:
 
     gradle wrapper
@@ -93,7 +93,7 @@ For example, to add a dependency on `com.example`'s `example-lib` 1.0 add this b
 
     compile 'com.example:example-lib:1.0'
 
-NOTE: Anyone thinking about adding a new dependency should first familiarize themself with the
+NOTE: Anyone thinking about adding a new dependency should first familiarize themselves with the
 Apache Foundation's third-party licensing
 [policy](http://www.apache.org/legal/resolved.html#category-x).
 

@@ -5,7 +5,7 @@ Various tools integrate with Aurora. Is there a tool missing? Let us know, or su
 * Load-balancing technology used to direct traffic to services running on Aurora:
   - [synapse](https://github.com/airbnb/synapse) based on HAProxy
   - [aurproxy](https://github.com/tellapart/aurproxy) based on nginx
-  - [jobhopper](https://github.com/benley/aurora-jobhopper) performing HTTP redirects for easy developers and administor access
+  - [jobhopper](https://github.com/benley/aurora-jobhopper) performs HTTP redirects for easy developer and administrator access
 
 * RPC libraries that integrate with the Aurora's [service discovery mechanism](../features/service-discovery.md):
   - [linkerd](https://linkerd.io/) RPC proxy
@@ -18,4 +18,4 @@ Various tools integrate with Aurora. Is there a tool missing? Let us know, or su
   - [Prometheus service discovery integration](http://prometheus.io/docs/operating/configuration/#zookeeper-serverset-sd-configurations-serverset_sd_config) for discovering and monitoring services running on Aurora
 
 * Packaging and deployment:
-  - [aurora-packaging](https://github.com/apache/aurora-packaging), the source of the official Aurora packaes
+  - [aurora-packaging](https://github.com/apache/aurora-packaging), the source of the official Aurora packages

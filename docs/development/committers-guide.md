@@ -55,7 +55,7 @@ official Apache Aurora release. Before starting your gpg key should be in the KE
 must have access to commit to the dist.a.o repositories.
 
 1. Ensure that all issues resolved for this release candidate are tagged with the correct Fix
-Version in Jira, the changelog script will use this to generate the CHANGELOG in step #2.
+Version in JIRA, the changelog script will use this to generate the CHANGELOG in step #2.
 
 2. Create a release candidate. This will automatically update the CHANGELOG and commit it, create a
 branch and update the current version within the trunk. To create a minor version update and publish

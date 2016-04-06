@@ -23,7 +23,7 @@ Running/Debugging
 For manually testing client changes against a cluster, we use [Vagrant](https://www.vagrantup.com/).
 To start a virtual cluster, you need to install Vagrant, and then run `vagrant up` for the root of
 the aurora workspace. This will create a vagrant host named "devcluster", with a mesos master, a set
-of mesos slaves, and an aurora scheduler.
+of mesos agents, and an aurora scheduler.
 
 If you have a change you would like to test in your local cluster, you'll rebuild the client:
 

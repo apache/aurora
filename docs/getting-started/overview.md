@@ -40,7 +40,8 @@ a functioning Aurora cluster.
 
 * **ZooKeeper**
   [ZooKeeper](http://zookeeper.apache.org) is a distributed consensus system.  In an Aurora cluster
-  it is used for reliable election of the leading Aurora scheduler and Mesos master.
+  it is used for reliable election of the leading Aurora scheduler and Mesos master.  It is also
+  used as a vehicle for service discovery, see [Service Discovery](../features/service-discovery.md)
 
 * **Mesos master**
   The master is responsible for tracking worker machines and performing accounting of their
@@ -65,7 +66,7 @@ things like "instance id" or specific port numbers which may differ from
 machine to machine).
 
 How many tasks make up a Job is complicated. On a basic level, a Job consists of
-one task template and instructions for creating near-idential replicas of that task
+one task template and instructions for creating near-identical replicas of that task
 (otherwise referred to as "instances" or "shards").
 
 A task can merely be a single *process* corresponding to a single
@@ -73,17 +74,18 @@ command line, such as `python2.7 my_script.py`. However, a task can also
 consist of many separate processes, which all run within a single
 sandbox. For example, running multiple cooperating agents together,
 such as `logrotate`, `installer`, master, or slave processes. This is
-where Thermos  comes in. While Aurora provides a `Job` abstraction on
+where Thermos comes in. While Aurora provides a `Job` abstraction on
 top of Mesos `Tasks`, Thermos provides a `Process` abstraction
 underneath Mesos `Task`s and serves as part of the Aurora framework's
 executor.
 
 You define `Job`s,` Task`s, and `Process`es in a configuration file.
-Configuration files are written in Python, and make use of the Pystachio
-templating language, along with specific Aurora, Mesos, and Thermos
-commands and methods. They end in a `.aurora` extension.
+Configuration files are written in Python, and make use of the
+[Pystachio](https://github.com/wickman/pystachio) templating language,
+along with specific Aurora, Mesos, and Thermos commands and methods.
+The configuration files typically end with a `.aurora` extension.
 
-This can be summarized as:
+Summary:
 
 * Aurora manages jobs made of tasks.
 * Mesos manages tasks made of processes.
