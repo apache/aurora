@@ -17,7 +17,9 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.TaskMapper">
-  <cache size="10000" readOnly="true" />
+  <cache type="org.apache.aurora.scheduler.storage.db.MyBatisCacheImpl">
+    <property name="size" value="10000"/>
+  </cache>
   <insert id="insertScheduledTask" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
     INSERT INTO tasks (
       task_id,
