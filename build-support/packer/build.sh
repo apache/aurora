@@ -33,6 +33,7 @@ function install_base_packages {
       bison \
       curl \
       git \
+      jq \
       libapr1-dev \
       libcurl4-nss-dev \
       libsasl2-dev \
