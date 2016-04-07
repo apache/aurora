@@ -38,7 +38,6 @@ import com.google.common.collect.Maps;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
@@ -116,12 +115,6 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
   private static final FieldGetter<JobUpdateKey, JobKey> JOB_UPDATE_KEY_GETTER =
       new ThriftFieldGetter<>(JobUpdateKey.class, JobUpdateKey._Fields.JOB, JobKey.class);
 
-  private static final FieldGetter<AddInstancesConfig, JobKey> ADD_INSTANCES_CONFIG_GETTER =
-      new ThriftFieldGetter<>(
-          AddInstancesConfig.class,
-          AddInstancesConfig._Fields.KEY,
-          JobKey.class);
-
   private static final FieldGetter<InstanceKey, JobKey> INSTANCE_KEY_GETTER =
       new ThriftFieldGetter<>(InstanceKey.class, InstanceKey._Fields.JOB_KEY, JobKey.class);
 
@@ -134,7 +127,6 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
           FieldGetters.compose(LOCK_GETTER, LOCK_KEY_GETTER),
           LOCK_KEY_GETTER,
           JOB_UPDATE_KEY_GETTER,
-          ADD_INSTANCES_CONFIG_GETTER,
           INSTANCE_KEY_GETTER,
           new IdentityFieldGetter<>(JobKey.class));
 

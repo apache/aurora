@@ -28,7 +28,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ConfigRewrite;
@@ -1237,55 +1236,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     }
   }
 
-  private static AddInstancesConfig createInstanceConfig(TaskConfig task) {
-    return new AddInstancesConfig()
-        .setTaskConfig(task)
-        .setInstanceIds(ImmutableSet.of(0))
-        .setKey(JOB_KEY.newBuilder());
-  }
-
-  @Test
-  public void testAddInstances() throws Exception {
-    ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
-    expectNoCronJob();
-    lockManager.assertNotLocked(LOCK_KEY);
-    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(taskIdGenerator.generate(populatedTask, 1))
-        .andReturn(TASK_ID);
-    expectInstanceQuotaCheck(populatedTask, ENOUGH_QUOTA);
-    stateManager.insertPendingTasks(
-        storageUtil.mutableStoreProvider,
-        populatedTask,
-        ImmutableSet.of(0));
-
-    control.replay();
-
-    AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
-    assertOkResponse(deprecatedAddInstances(config));
-  }
-
-  @Test
-  public void testAddInstancesWithNullLock() throws Exception {
-    ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
-    AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
-    expectNoCronJob();
-    lockManager.assertNotLocked(LOCK_KEY);
-    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(taskIdGenerator.generate(populatedTask, 1))
-        .andReturn(TASK_ID);
-    expectInstanceQuotaCheck(populatedTask, ENOUGH_QUOTA);
-    stateManager.insertPendingTasks(
-        storageUtil.mutableStoreProvider,
-        populatedTask,
-        ImmutableSet.of(0));
-
-    control.replay();
-
-    Response response = deprecatedAddInstances(config);
-    assertOkResponse(response);
-    assertMessageMatches(response, "The AddInstancesConfig field is deprecated.");
-  }
-
   @Test
   public void testAddInstancesWithInstanceKey() throws Exception {
     expectNoCronJob();
@@ -1305,7 +1255,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertOkResponse(newAddInstances(INSTANCE_KEY, 2));
+    assertOkResponse(thrift.addInstances(INSTANCE_KEY, 2));
   }
 
   @Test
@@ -1318,7 +1268,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertEquals(
         invalidResponse(SchedulerThriftInterface.INVALID_INSTANCE_ID),
-        newAddInstances(INSTANCE_KEY, 2));
+        thrift.addInstances(INSTANCE_KEY, 2));
   }
 
   @Test
@@ -1331,19 +1281,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertEquals(
         invalidResponse(SchedulerThriftInterface.INVALID_INSTANCE_COUNT),
-        newAddInstances(INSTANCE_KEY, 0));
-  }
-
-  @Test
-  public void testAddInstancesFailsConfigCheck() throws Exception {
-    AddInstancesConfig config = createInstanceConfig(INVALID_TASK_CONFIG);
-    expectNoCronJob();
-    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    lockManager.assertNotLocked(LOCK_KEY);
-
-    control.replay();
-
-    assertResponse(INVALID_REQUEST, deprecatedAddInstances(config));
+        thrift.addInstances(INSTANCE_KEY, 0));
   }
 
   @Test
@@ -1352,7 +1290,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, newAddInstances(INSTANCE_KEY, 1));
+    assertResponse(INVALID_REQUEST, thrift.addInstances(INSTANCE_KEY, 1));
   }
 
   @Test(expected = StorageException.class)
@@ -1361,7 +1299,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    newAddInstances(INSTANCE_KEY, 1);
+    thrift.addInstances(INSTANCE_KEY, 1);
   }
 
   @Test
@@ -1372,7 +1310,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(LOCK_ERROR, newAddInstances(INSTANCE_KEY, 1));
+    assertResponse(LOCK_ERROR, thrift.addInstances(INSTANCE_KEY, 1));
   }
 
   @Test
@@ -1391,7 +1329,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, newAddInstances(INSTANCE_KEY, 1));
+    assertResponse(INVALID_REQUEST, thrift.addInstances(INSTANCE_KEY, 1));
   }
 
   @Test
@@ -1407,7 +1345,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, newAddInstances(INSTANCE_KEY, 1));
+    assertResponse(INVALID_REQUEST, thrift.addInstances(INSTANCE_KEY, 1));
   }
 
   @Test
@@ -1428,15 +1366,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, newAddInstances(INSTANCE_KEY, 1));
-  }
-
-  private Response newAddInstances(InstanceKey key, int count) throws Exception {
-    return thrift.addInstances(null, key, count);
-  }
-
-  private Response deprecatedAddInstances(AddInstancesConfig config) throws Exception {
-    return thrift.addInstances(config, null, 0);
+    assertResponse(INVALID_REQUEST, thrift.addInstances(INSTANCE_KEY, 1));
   }
 
   @Test

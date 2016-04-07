@@ -147,12 +147,9 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.make_scheduler_proxy().getQuota(ROLE)
 
   def test_addInstances(self):
-    self.mock_thrift_client.addInstances(
-      IsA(JobKey),
-      IgnoreArg(),
-      IsA(Lock)).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.addInstances(IsA(JobKey), 1).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().addInstances(JobKey(), {}, Lock())
+    self.make_scheduler_proxy().addInstances(JobKey(), 1)
 
   def test_getJobUpdateSummaries(self):
     self.mock_thrift_client.getJobUpdateSummaries(IsA(JobUpdateQuery)).AndReturn(DEFAULT_RESPONSE)

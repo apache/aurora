@@ -88,7 +88,7 @@ class SchedulerThriftApiSpec(ReadOnlyScheduler.Iface):
   def killTasks(self, jobKey, instances):
     pass
 
-  def addInstances(self, config, key, count):
+  def addInstances(self, key, count):
     pass
 
   def replaceCronTemplate(self, config):

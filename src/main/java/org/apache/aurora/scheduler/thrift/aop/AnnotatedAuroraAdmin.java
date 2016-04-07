@@ -17,7 +17,6 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfiguration;
@@ -66,7 +65,6 @@ public interface AnnotatedAuroraAdmin extends AuroraAdmin.Iface {
 
   @Override
   Response addInstances(
-      @AuthorizingParam @Nullable AddInstancesConfig config,
       @AuthorizingParam @Nullable InstanceKey key,
       int count) throws TException;
 

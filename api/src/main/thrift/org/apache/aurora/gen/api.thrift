@@ -299,13 +299,6 @@ struct JobSummary {
   3: optional i64 nextCronRunMs
 }
 
-/** A request to add the following instances to an existing job. Used by addInstances. */
-struct AddInstancesConfig {
-  1: JobKey key
-  2: TaskConfig taskConfig
-  3: set<i32> instanceIds
-}
-
 /** Closed range of integers. */
 struct Range {
   1: i32 first
@@ -996,12 +989,8 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
 
   /**
    * Adds new instances with the TaskConfig of the existing instance pointed by the key.
-   * TODO(maxim): remove AddInstancesConfig in AURORA-1595.
    */
-  Response addInstances(
-      1: AddInstancesConfig config,
-      3: InstanceKey key,
-      4: i32 count)
+  Response addInstances(3: InstanceKey key, 4: i32 count)
 
   // TODO(maxim): reevaluate if it's still needed when client updater is gone (AURORA-785).
   /**

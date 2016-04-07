@@ -101,7 +101,7 @@ class AuroraClientAPI(object):
     key = InstanceKey(jobKey=job_key.to_thrift(), instanceId=instance_id)
     log.info("Adding %s instances to %s using the task config of instance %s"
              % (count, job_key, instance_id))
-    return self._scheduler_proxy.addInstances(None, key, count)
+    return self._scheduler_proxy.addInstances(key, count)
 
   def kill_job(self, job_key, instances=None):
     log.info("Killing tasks for job: %s" % job_key)

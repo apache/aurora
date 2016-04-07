@@ -34,6 +34,7 @@
   - `TaskConfig.environment`
   - `TaskConfig.jobName`
   - `TaskQuery.owner`
+- Removed deprecated `AddInstancesConfig` parameter to `addInstances` RPC.
 - Removed deprecated executor argument `-announcer-enable`, which was a no-op in 0.12.0.
 - Removed deprecated API constructs related to Locks:
   - removed RPCs that managed locks

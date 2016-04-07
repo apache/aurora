@@ -35,7 +35,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Range;
 
-import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
@@ -710,13 +709,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response addInstances(
-      @Nullable AddInstancesConfig config,
-      @Nullable InstanceKey key,
-      int count) {
-
-    IJobKey jobKey =
-        JobKeys.assertValid(IJobKey.build(config == null ? key.getJobKey() : config.getKey()));
+  public Response addInstances(InstanceKey key, int count) {
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(key.getJobKey()));
 
     Response response = empty();
     return storage.write(storeProvider -> {
@@ -730,39 +724,28 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         FluentIterable<IScheduledTask> currentTasks = FluentIterable.from(
             storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()));
 
-        ITaskConfig task;
-        Set<Integer> instanceIds;
-        if (config == null) {
-          if (count <= 0) {
-            return invalidRequest(INVALID_INSTANCE_COUNT);
-          }
-
-          Optional<IScheduledTask> templateTask = Iterables.tryFind(
-              currentTasks,
-              e -> e.getAssignedTask().getInstanceId() == key.getInstanceId());
-          if (!templateTask.isPresent()) {
-            return invalidRequest(INVALID_INSTANCE_ID);
-          }
-
-          task = templateTask.get().getAssignedTask().getTask();
-          int lastId = currentTasks
-              .transform(e -> e.getAssignedTask().getInstanceId())
-              .toList()
-              .stream()
-              .max(Comparator.naturalOrder()).get();
-
-          instanceIds = ContiguousSet.create(
-              Range.openClosed(lastId, lastId + count),
-              DiscreteDomain.integers());
-        } else {
-          checkNotBlank(config.getInstanceIds());
-          addMessage(response, "The AddInstancesConfig field is deprecated.");
-
-          task = configurationManager.validateAndPopulate(
-              ITaskConfig.build(config.getTaskConfig()));
-          instanceIds = ImmutableSet.copyOf(config.getInstanceIds());
+        if (count <= 0) {
+          return invalidRequest(INVALID_INSTANCE_COUNT);
         }
 
+        Optional<IScheduledTask> templateTask = Iterables.tryFind(
+            currentTasks,
+            e -> e.getAssignedTask().getInstanceId() == key.getInstanceId());
+        if (!templateTask.isPresent()) {
+          return invalidRequest(INVALID_INSTANCE_ID);
+        }
+
+        int lastId = currentTasks
+            .transform(e -> e.getAssignedTask().getInstanceId())
+            .toList()
+            .stream()
+            .max(Comparator.naturalOrder()).get();
+
+        Set<Integer> instanceIds = ContiguousSet.create(
+            Range.openClosed(lastId, lastId + count),
+            DiscreteDomain.integers());
+
+        ITaskConfig task = templateTask.get().getAssignedTask().getTask();
         validateTaskLimits(
             task,
             Iterables.size(currentTasks) + instanceIds.size(),
@@ -773,7 +756,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         return response.setResponseCode(OK);
       } catch (LockException e) {
         return error(LOCK_ERROR, e);
-      } catch (TaskDescriptionException | TaskValidationException | IllegalArgumentException e) {
+      } catch (TaskValidationException | IllegalArgumentException e) {
         return error(INVALID_REQUEST, e);
       }
     });

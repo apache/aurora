@@ -118,7 +118,6 @@ class TestJobUpdateApis(unittest.TestCase):
     api.add_instances(job_key, 1, 10)
 
     mock_proxy.addInstances.assert_called_once_with(
-        None,
         InstanceKey(jobKey=job_key.to_thrift(), instanceId=1),
         10)
 
