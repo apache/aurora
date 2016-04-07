@@ -73,15 +73,7 @@ public class ZooKeeperClientModule extends AbstractModule {
     Key<ZooKeeperClient> clientKey = keyFactory.create(ZooKeeperClient.class);
     if (config.inProcess) {
       File tempDir = Files.createTempDir();
-      try {
-        bind(ZooKeeperTestServer.class).toInstance(
-            new ZooKeeperTestServer(
-                ZooKeeperTestServer.DEFAULT_SESSION_TIMEOUT,
-                tempDir,
-                tempDir));
-      } catch (IOException e) {
-        throw Throwables.propagate(e);
-      }
+      bind(ZooKeeperTestServer.class).toInstance(new ZooKeeperTestServer(tempDir, tempDir));
 
       install(new PrivateModule() {
         @Override
@@ -144,7 +136,10 @@ public class ZooKeeperClientModule extends AbstractModule {
       } catch (IOException | InterruptedException e) {
         throw Throwables.propagate(e);
       }
-      return testServer.createClient(config.sessionTimeout, config.credentials);
+      return new ZooKeeperClient(
+          config.sessionTimeout,
+          config.credentials,
+          InetSocketAddress.createUnresolved("localhost", testServer.getPort()));
     }
   }
 

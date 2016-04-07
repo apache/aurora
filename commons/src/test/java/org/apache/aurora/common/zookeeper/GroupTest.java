@@ -30,7 +30,7 @@ import org.apache.aurora.common.zookeeper.Group.JoinException;
 import org.apache.aurora.common.zookeeper.Group.Membership;
 import org.apache.aurora.common.zookeeper.Group.NodeScheme;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.junit.Before;
 import org.junit.Test;
@@ -45,7 +45,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 
-public class GroupTest extends BaseZooKeeperTest {
+public class GroupTest extends BaseZooKeeperClientTest {
 
   private ZooKeeperClient zkClient;
   private Group joinGroup;

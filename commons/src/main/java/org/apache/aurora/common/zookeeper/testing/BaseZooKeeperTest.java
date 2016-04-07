@@ -13,130 +13,34 @@
  */
 package org.apache.aurora.common.zookeeper.testing;
 
-import java.io.IOException;
-
-import com.google.common.base.Preconditions;
-
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.TearDownTestCase;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
 /**
- * A baseclass for in-process zookeeper tests.
- * Uses ZooKeeperTestHelper to start the server and create clients: new tests should directly use
- * that helper class instead of extending this class.
+ * A base-class for in-process zookeeper tests.
  */
 public abstract class BaseZooKeeperTest extends TearDownTestCase {
 
-  private final Amount<Integer, Time> defaultSessionTimeout;
   private ZooKeeperTestServer zkTestServer;
+
   @Rule
   public TemporaryFolder tmpFolder = new TemporaryFolder();
 
-  /**
-   * Creates a test case where the test server uses its
-   * {@link ZooKeeperTestServer#DEFAULT_SESSION_TIMEOUT} for clients created without an explicit
-   * session timeout.
-   */
-  public BaseZooKeeperTest() {
-    this(ZooKeeperTestServer.DEFAULT_SESSION_TIMEOUT);
-  }
-
-  /**
-   * Creates a test case where the test server uses the given {@code defaultSessionTimeout} for
-   * clients created without an explicit session timeout.
-   */
-  public BaseZooKeeperTest(Amount<Integer, Time> defaultSessionTimeout) {
-    this.defaultSessionTimeout = Preconditions.checkNotNull(defaultSessionTimeout);
-  }
-
   @Before
   public final void setUp() throws Exception {
-    zkTestServer = new ZooKeeperTestServer(
-        defaultSessionTimeout,
-        tmpFolder.newFolder(),
-        tmpFolder.newFolder());
+    zkTestServer = new ZooKeeperTestServer(tmpFolder.newFolder(), tmpFolder.newFolder());
     addTearDown(zkTestServer::stop);
     zkTestServer.startNetwork();
   }
 
   /**
-   * Starts zookeeper back up on the last used port.
-   */
-  protected final void restartNetwork() throws IOException, InterruptedException {
-    zkTestServer.restartNetwork();
-  }
-
-  /**
-   * Shuts down the in-process zookeeper network server.
-   */
-  protected final void shutdownNetwork() {
-    zkTestServer.shutdownNetwork();
-  }
-
-  /**
-   * Expires the active session for the given client.  The client should be one returned from
-   * {@link #createZkClient}.
+   * Returns the running in-process ZooKeeper server.
    *
-   * @param zkClient the client to expire
-   * @throws ZooKeeperClient.ZooKeeperConnectionException if a problem is encountered connecting to
-   *    the local zk server while trying to expire the session
-   * @throws InterruptedException if interrupted while requesting expiration
+   * @return The in-process ZooKeeper server.
    */
-  protected final void expireSession(ZooKeeperClient zkClient)
-      throws ZooKeeperClient.ZooKeeperConnectionException, InterruptedException {
-    zkTestServer.expireClientSession(zkClient);
-  }
-
-  /**
-   * Returns the current port to connect to the in-process zookeeper instance.
-   */
-  protected final int getPort() {
-    return zkTestServer.getPort();
-  }
-
-  /**
-   * Returns a new unauthenticated zookeeper client connected to the in-process zookeeper server
-   * with the default session timeout.
-   */
-  protected final ZooKeeperClient createZkClient() {
-    return zkTestServer.createClient();
-  }
-
-  /**
-   * Returns a new authenticated zookeeper client connected to the in-process zookeeper server with
-   * the default session timeout.
-   */
-  protected final ZooKeeperClient createZkClient(ZooKeeperClient.Credentials credentials) {
-    return zkTestServer.createClient(credentials);
-  }
-
-  /**
-   * Returns a new authenticated zookeeper client connected to the in-process zookeeper server with
-   * the default session timeout.  The client is authenticated in the digest authentication scheme
-   * with the given {@code username} and {@code password}.
-   */
-  protected final ZooKeeperClient createZkClient(String username, String password) {
-    return createZkClient(ZooKeeperClient.digestCredentials(username, password));
-  }
-
-  /**
-   * Returns a new unauthenticated zookeeper client connected to the in-process zookeeper server
-   * with a custom {@code sessionTimeout}.
-   */
-  protected final ZooKeeperClient createZkClient(Amount<Integer, Time> sessionTimeout) {
-    return zkTestServer.createClient(sessionTimeout);
-  }
-
-  /**
-   * Returns a new authenticated zookeeper client connected to the in-process zookeeper server with
-   * the default session timeout and the custom chroot path.
-   */
-  protected final ZooKeeperClient createZkClient(String chrootPath) {
-    return zkTestServer.createClient(chrootPath);
+  protected final ZooKeeperTestServer getServer() {
+    return zkTestServer;
   }
 }

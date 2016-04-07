@@ -22,7 +22,7 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionException;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException.ConnectionLossException;
 import org.apache.zookeeper.KeeperException.NoAuthException;
@@ -42,7 +42,7 @@ import static org.junit.Assert.fail;
 /**
  * @author John Sirois
  */
-public class ZooKeeperClientTest extends BaseZooKeeperTest {
+public class ZooKeeperClientTest extends BaseZooKeeperClientTest {
 
   public ZooKeeperClientTest() {
     super(Amount.of(1, Time.DAYS));

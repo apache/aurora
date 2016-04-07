@@ -15,7 +15,7 @@ package org.apache.aurora.common.zookeeper;
 
 import com.google.common.base.Charsets;
 
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException.BadVersionException;
 import org.apache.zookeeper.KeeperException.NoAuthException;
@@ -34,7 +34,7 @@ import static org.junit.Assert.fail;
 /**
  * @author John Sirois
  */
-public class ZooKeeperUtilsTest extends BaseZooKeeperTest {
+public class ZooKeeperUtilsTest extends BaseZooKeeperClientTest {
   @Test
   public void testEnsurePath() throws Exception {
     ZooKeeperClient zkClient = createZkClient();

@@ -25,7 +25,7 @@ import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.common.zookeeper.Candidate.Leader;
 import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
 import org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.easymock.Capture;
 import org.easymock.IExpectationSetters;
 import org.easymock.IMocksControl;
@@ -38,7 +38,7 @@ import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.fail;
 
-public class SingletonServiceImplTest extends BaseZooKeeperTest {
+public class SingletonServiceImplTest extends BaseZooKeeperClientTest {
   private static final int PORT_A = 1234;
   private static final int PORT_B = 8080;
   private static final InetSocketAddress PRIMARY_ENDPOINT =

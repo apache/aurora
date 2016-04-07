@@ -30,7 +30,7 @@ import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
 import org.apache.aurora.common.zookeeper.Group.JoinException;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
@@ -49,7 +49,7 @@ import static org.junit.Assert.fail;
  *
  * TODO(William Farner): Change this to remove thrift dependency.
  */
-public class ServerSetImplTest extends BaseZooKeeperTest {
+public class ServerSetImplTest extends BaseZooKeeperClientTest {
   private static final List<ACL> ACL = ZooDefs.Ids.OPEN_ACL_UNSAFE;
   private static final String SERVICE = "/twitter/services/puffin_hosebird";
 

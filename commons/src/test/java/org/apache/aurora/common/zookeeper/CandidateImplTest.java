@@ -24,7 +24,7 @@ import com.google.common.base.Supplier;
 import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.junit.Before;
@@ -34,7 +34,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-public class CandidateImplTest extends BaseZooKeeperTest {
+public class CandidateImplTest extends BaseZooKeeperClientTest {
   private static final List<ACL> ACL = ZooDefs.Ids.OPEN_ACL_UNSAFE;
   private static final String SERVICE = "/twitter/services/puffin_linkhose/leader";
   private static final Amount<Integer, Time> TIMEOUT = Amount.of(1, Time.MINUTES);
