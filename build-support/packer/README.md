@@ -29,7 +29,7 @@ will be helpful to update this box and keep this cost low.
 4. Build the new box
     Using the path from the previous step, run the following command to start the build.
 
-        $ packer build -var 'base_box_ovf=$UBUNTU_OVF' aurora.json
+        $ packer build -var "base_box_ovf=$UBUNTU_OVF" aurora.json
 
     This takes a while, approximately 20 minutes.  When finished, your working directory will
     contain a file named `packer_virtualbox-ovf_virtualbox.box`.
