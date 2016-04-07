@@ -19,6 +19,7 @@ import time
 import unittest
 
 import mock
+import pytest
 from mesos.interface.mesos_pb2 import TaskState
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.testing.clock import ThreadedClock
@@ -146,6 +147,7 @@ class TestHealthChecker(unittest.TestCase):
     hct.stop()
     assert self._checker.health.call_count == 6
 
+  @pytest.mark.skipif('True', reason='Flaky test (AURORA-1182)')
   def test_health_checker_metrics(self):
     def slow_check():
       self._clock.sleep(0.5)
