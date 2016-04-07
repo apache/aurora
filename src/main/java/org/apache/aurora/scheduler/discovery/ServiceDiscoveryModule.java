@@ -11,20 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.app;
+package org.apache.aurora.scheduler.discovery;
 
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import com.google.common.collect.ImmutableSet;
-import com.google.inject.AbstractModule;
+import com.google.inject.Exposed;
+import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 
-import org.apache.aurora.common.base.Command;
 import org.apache.aurora.common.net.pool.DynamicHostSet;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
@@ -33,6 +29,7 @@ import org.apache.aurora.common.zookeeper.SingletonServiceImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,54 +39,24 @@ import static java.util.Objects.requireNonNull;
 /**
  * Binding module for utilities to advertise the network presence of the scheduler.
  */
-class ServiceDiscoveryModule extends AbstractModule {
-
-  private static class ServerSetMonitor implements ServiceGroupMonitor {
-    private Optional<Command> closeCommand = Optional.empty();
-    private final DynamicHostSet<ServiceInstance> serverSet;
-    private final AtomicReference<ImmutableSet<ServiceInstance>> services =
-        new AtomicReference<>(ImmutableSet.of());
-
-    // NB: We only take a ServerSetImpl instead of a DynamicHostSet<ServiceInstance> here to
-    // simplify binding.
-    @Inject
-    ServerSetMonitor(ServerSetImpl serverSet) {
-      this.serverSet = requireNonNull(serverSet);
-    }
-
-    @Override
-    public void start() throws MonitorException {
-      try {
-        closeCommand = Optional.of(serverSet.watch(services::set));
-      } catch (DynamicHostSet.MonitorException e) {
-        throw new MonitorException("Unable to watch scheduler host set.", e);
-      }
-    }
-
-    @Override
-    public void close() {
-      closeCommand.ifPresent(Command::execute);
-    }
-
-    @Override
-    public ImmutableSet<ServiceInstance> get() {
-      return services.get();
-    }
-  }
+public class ServiceDiscoveryModule extends PrivateModule {
 
   private static final Logger LOG = LoggerFactory.getLogger(ServiceDiscoveryModule.class);
 
   private final String serverSetPath;
   private final Credentials zkCredentials;
 
-  ServiceDiscoveryModule(String serverSetPath, Credentials zkCredentials) {
+  public ServiceDiscoveryModule(String serverSetPath, Credentials zkCredentials) {
     this.serverSetPath = requireNonNull(serverSetPath);
     this.zkCredentials = requireNonNull(zkCredentials);
   }
 
   @Override
   protected void configure() {
-    bind(ServiceGroupMonitor.class).to(ServerSetMonitor.class).in(Singleton.class);
+    requireBinding(ZooKeeperClient.class);
+
+    bind(ServiceGroupMonitor.class).to(CommonsServerGroupMonitor.class).in(Singleton.class);
+    expose(ServiceGroupMonitor.class);
   }
 
   @Provides
@@ -109,9 +76,17 @@ class ServiceDiscoveryModule extends AbstractModule {
     return new ServerSetImpl(client, zooKeeperAcls, serverSetPath);
   }
 
+  @Provides
+  @Singleton
+  DynamicHostSet<ServiceInstance> provideServerSet(ServerSetImpl serverSet) {
+    // Used for a type re-binding of the server set.
+    return serverSet;
+  }
+
   // NB: We only take a ServerSetImpl instead of a ServerSet here to simplify binding.
   @Provides
   @Singleton
+  @Exposed
   SingletonService provideSingletonService(
       ZooKeeperClient client,
       ServerSetImpl serverSet,
