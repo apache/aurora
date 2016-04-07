@@ -103,6 +103,10 @@ public class ExecutorModule extends AbstractModule {
           + "into all (non-mesos) containers.")
   private static final Arg<List<Volume>> GLOBAL_CONTAINER_MOUNTS = Arg.create(ImmutableList.of());
 
+  @CmdLine(name = "populate_discovery_info",
+      help = "If true, Aurora populates DiscoveryInfo field of Mesos TaskInfo.")
+  private static final Arg<Boolean> POPULATE_DISCOVERY_INFO = Arg.create(false);
+
   @VisibleForTesting
   static CommandInfo makeExecutorCommand(
       String thermosExecutorPath,
@@ -165,7 +169,8 @@ public class ExecutorModule extends AbstractModule {
                 .addResources(makeResource(CPUS, EXECUTOR_OVERHEAD_CPUS.get()))
                 .addResources(makeResource(RAM_MB, EXECUTOR_OVERHEAD_RAM.get().as(Data.MB)))
                 .build(),
-            volumeMounts));
+            volumeMounts),
+        POPULATE_DISCOVERY_INFO.get());
   }
 
   private static ExecutorSettings makeCustomExecutorSettings() {
@@ -175,7 +180,8 @@ public class ExecutorModule extends AbstractModule {
               ExecutorSettingsLoader.read(
                   Files.newBufferedReader(
                       CUSTOM_EXECUTOR_CONFIG.get().toPath(),
-                      StandardCharsets.UTF_8)));
+                      StandardCharsets.UTF_8)),
+              POPULATE_DISCOVERY_INFO.get());
     } catch (ExecutorSettingsLoader.ExecutorConfigException | IOException e) {
       throw new IllegalArgumentException("Failed to read executor settings: " + e, e);
     }

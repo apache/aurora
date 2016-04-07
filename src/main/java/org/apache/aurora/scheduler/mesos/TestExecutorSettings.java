@@ -66,12 +66,14 @@ public final class TestExecutorSettings {
   public static final ExecutorConfig THERMOS_CONFIG =
       new ExecutorConfig(THERMOS_EXECUTOR_INFO, ImmutableList.of());
 
-  public static final ExecutorSettings THERMOS_EXECUTOR = new ExecutorSettings(THERMOS_CONFIG);
+  public static final ExecutorSettings THERMOS_EXECUTOR = new ExecutorSettings(
+      THERMOS_CONFIG, false);
 
   public static ExecutorSettings thermosOnlyWithOverhead(ResourceSlot overhead) {
     ExecutorConfig config = THERMOS_EXECUTOR.getExecutorConfig();
     ExecutorInfo.Builder executor = config.getExecutor().toBuilder();
     executor.clearResources().addAllResources(overhead.toResourceList(TaskTestUtil.DEV_TIER));
-    return new ExecutorSettings(new ExecutorConfig(executor.build(), config.getVolumeMounts()));
+    return new ExecutorSettings(
+        new ExecutorConfig(executor.build(), config.getVolumeMounts()), false);
   }
 }

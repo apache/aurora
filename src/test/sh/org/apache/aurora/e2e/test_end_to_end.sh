@@ -266,12 +266,55 @@ test_quota() {
   aurora quota get $_cluster/$_role
 }
 
+test_discovery_info() {
+  local _task_id_prefix=$1
+  local _discovery_name=$2
+
+  if ! [[ -x "$(command -v jq)" ]]; then
+    echo "jq is not installed, skipping discovery info test"
+    return 0
+  fi
+
+  framework_info=$(curl --silent '192.168.33.7:5050/state' | jq '.frameworks | map(select(.name == "TwitterScheduler"))')
+  if [[ -z $framework_info ]]; then
+    echo "Cannot get framework info for $framework"
+    exit 1
+  fi
+
+  task_info=$(echo $framework_info | jq --arg task_id_prefix "${_task_id_prefix}" '.[0]["tasks"] | map(select(.id | contains($task_id_prefix)))')
+  if [[ -z $task_info ]]; then
+    echo "Cannot get task blob json for task id prefix ${_task_id_prefix}"
+    exit 1
+  fi
+
+  discovery_info=$(echo $task_info | jq '.[0]["discovery"]')
+  if [[ -z $discovery_info ]]; then
+    echo "Cannot get discovery info json from task blob ${task_blob}"
+    exit 1
+  fi
+
+  name=$(echo $discovery_info | jq '.["name"]')
+  if [[ "$name" -ne "\"$_discovery_name\"" ]]; then
+    echo "discovery info name $name does not equal to expected \"$_discovery_name\""
+    exit 1
+  fi
+
+  num_ports=$(echo $discovery_info | jq '.["ports"]["ports"] | length')
+
+  if ! [[ "$num_ports" -gt 0 ]]; then
+    echo "num of ports in discovery info is $num_ports which is not greater than zero"
+    exit 1
+  fi
+}
+
 test_http_example() {
   local _cluster=$1 _role=$2 _env=$3
   local _base_config=$4 _updated_config=$5
   local _bad_healthcheck_config=$6
   local _job=$7
   local _jobkey="$_cluster/$_role/$_env/$_job"
+  local _task_id_prefix="${_role}-${_env}-${_job}-0"
+  local _discovery_name="${_job}.${_env}.${_role}"
 
   test_config $_base_config $_jobkey
   test_inspect $_jobkey $_base_config
@@ -279,6 +322,7 @@ test_http_example() {
   test_job_status $_cluster $_role $_env $_job
   test_scheduler_ui $_role $_env $_job
   test_observer_ui $_cluster $_role $_job
+  test_discovery_info $_task_id_prefix $_discovery_name
   test_restart $_jobkey
   test_update $_jobkey $_updated_config $_cluster
   test_update_fail $_jobkey $_base_config  $_cluster $_bad_healthcheck_config

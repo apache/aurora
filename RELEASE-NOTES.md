@@ -26,6 +26,9 @@
 - Added scheduler argument `-require_docker_use_executor` that indicates whether the scheduler
   should accept tasks that use the Docker containerizer without an executor (experimental).
 - Jobs referencing invalid tier name will be rejected by the scheduler.
+- Added a new scheduler argument `--populate_discovery_info`. If set to true, Aurora will start
+  to populate DiscoveryInfo field on TaskInfo of Mesos. This could be used for alternative
+  service discovery solution like Mesos-DNS.
 
 ### Deprecations and removals:
 

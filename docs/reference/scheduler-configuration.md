@@ -230,6 +230,9 @@ Optional flags:
 -offer_reservation_duration=(3, mins)
 	Time to reserve a slave's offers while trying to satisfy a task preempting another.
 	(org.apache.aurora.scheduler.scheduling.SchedulingModule.offer_reservation_duration)
+-populate_discovery_info=false
+    If true, Aurora populates DiscoveryInfo field of Mesos TaskInfo.
+    (org.apache.aurora.scheduler.configuration.executor.ExecutorModule.populate_discovery_info)
 -preemption_delay=(3, mins)
 	Time interval after which a pending task becomes eligible to preempt other tasks
 	(org.apache.aurora.scheduler.preemptor.PreemptorModule.preemption_delay)

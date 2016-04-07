@@ -16,6 +16,11 @@ import getpass
 
 DEFAULT_CMD = 'cp /vagrant/src/test/sh/org/apache/aurora/e2e/http_example.py .'
 
+echo_ports = Process(
+  name = 'echo_ports',
+  cmdline = 'echo "tcp port: {{thermos.ports[tcp]}}; http port: {{thermos.ports[http]}}; alias: {{thermos.ports[alias]}}"'
+)
+
 run_server = Process(
   name = 'run_server',
   cmdline = 'python http_example.py {{thermos.ports[http]}}')
@@ -28,8 +33,8 @@ stage_server = Process(
 test_task = Task(
   name = 'http_example',
   resources = Resources(cpu=0.4, ram=32*MB, disk=64*MB),
-  processes = [stage_server, run_server],
-  constraints = order(stage_server, run_server))
+  processes = [echo_ports, stage_server, run_server],
+  constraints = order(echo_ports, stage_server, run_server))
 
 update_config = UpdateConfig(watch_secs=10, batch_size=2)
 health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)
@@ -43,7 +48,9 @@ job = Service(
   role = getpass.getuser(),
   environment = 'test',
   contact = '{{role}}@localhost',
-  announce = Announcer(),
+  announce = Announcer(
+    portmap={'alias': 'http'},
+  ),
 )
 
 jobs = [

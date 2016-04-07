@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
@@ -26,6 +27,7 @@ import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.MesosContainer;
+import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.ResourceType;
@@ -36,6 +38,8 @@ import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ContainerInfo;
@@ -55,7 +59,9 @@ import org.junit.Test;
 import static org.apache.aurora.scheduler.ResourceSlot.makeMesosRangeResource;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
+import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.DEFAULT_PORT_PROTOCOL;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.METADATA_LABEL_PREFIX;
+import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.getInverseJobSourceName;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.NO_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.SOME_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_CONFIG;
@@ -107,6 +113,10 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
       .addResources(makeMesosRangeResource(ResourceType.PORTS, ImmutableSet.of(80)))
       .build();
 
+  private static final String CLUSTER_NAME = "cluster_name";
+  private static final IServerInfo SERVER_INFO = IServerInfo.build(
+      new ServerInfo(CLUSTER_NAME, ""));
+
   private MesosTaskFactory taskFactory;
   private ExecutorSettings config;
   private TierManager tierManager;
@@ -142,7 +152,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
   @Test
   public void testExecutorInfoUnchanged() {
     expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEV_TIER);
-    taskFactory = new MesosTaskFactoryImpl(config, tierManager);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
     control.replay();
 
@@ -150,12 +160,13 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
     assertEquals(populateDynamicFields(DEFAULT_EXECUTOR, TASK), task.getExecutor());
     checkTaskResources(TASK.getTask(), task);
+    checkDiscoveryInfoUnset(task);
   }
 
   @Test
   public void testTaskInfoRevocable() {
     expect(tierManager.getTier(TASK_CONFIG)).andReturn(REVOCABLE_TIER);
-    taskFactory = new MesosTaskFactoryImpl(config, tierManager);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
     Resource revocableCPU = OFFER_THERMOS_EXECUTOR.getResources(0).toBuilder()
         .setRevocable(Resource.RevocableInfo.getDefaultInstance())
@@ -170,6 +181,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     TaskInfo task = taskFactory.createFrom(TASK, withRevocable);
     checkTaskResources(TASK.getTask(), task);
     assertTrue(task.getResourcesList().stream().anyMatch(Resource::hasRevocable));
+    checkDiscoveryInfoUnset(task);
   }
 
   @Test
@@ -179,12 +191,13 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     builder.unsetAssignedPorts();
     IAssignedTask assignedTask = IAssignedTask.build(builder);
     expect(tierManager.getTier(assignedTask.getTask())).andReturn(DEV_TIER);
-    taskFactory = new MesosTaskFactoryImpl(config, tierManager);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
     control.replay();
 
     TaskInfo task = taskFactory.createFrom(IAssignedTask.build(builder), OFFER_THERMOS_EXECUTOR);
     checkTaskResources(ITaskConfig.build(builder.getTask()), task);
+    checkDiscoveryInfoUnset(task);
   }
 
   @Test
@@ -193,7 +206,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     // + executor overhead. We need to ensure we allocate a non-zero amount of ram in this case.
     config = NO_OVERHEAD_EXECUTOR;
     expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEV_TIER);
-    taskFactory = new MesosTaskFactoryImpl(config, tierManager);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
     control.replay();
 
@@ -206,12 +219,39 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     // Simulate the upsizing needed for the task to meet the minimum thermos requirements.
     TaskConfig dummyTask = TASK.getTask().newBuilder();
     checkTaskResources(ITaskConfig.build(dummyTask), task);
+    checkDiscoveryInfoUnset(task);
   }
 
   private void checkTaskResources(ITaskConfig task, TaskInfo taskInfo) {
     assertEquals(
         ResourceSlot.from(task).add(config.getExecutorOverhead()),
         getTotalTaskResources(taskInfo));
+  }
+
+  private void checkDiscoveryInfoUnset(TaskInfo taskInfo) {
+    assertFalse(taskInfo.hasDiscovery());
+  }
+
+  private void checkDiscoveryInfo(
+      TaskInfo taskInfo,
+      Map<String, Integer> assignedPorts,
+      IJobKey job) {
+
+    assertTrue(taskInfo.hasDiscovery());
+    Protos.DiscoveryInfo.Builder expectedDiscoveryInfo = Protos.DiscoveryInfo.newBuilder()
+        .setVisibility(Protos.DiscoveryInfo.Visibility.CLUSTER)
+        .setLocation(CLUSTER_NAME)
+        .setEnvironment(job.getEnvironment())
+        .setName(getInverseJobSourceName(job));
+    for (Map.Entry<String, Integer> entry : assignedPorts.entrySet()) {
+      expectedDiscoveryInfo.getPortsBuilder().addPorts(
+          Protos.Port.newBuilder()
+              .setName(entry.getKey())
+              .setProtocol(DEFAULT_PORT_PROTOCOL)
+              .setNumber(entry.getValue()));
+    }
+
+    assertEquals(expectedDiscoveryInfo.build(), taskInfo.getDiscovery());
   }
 
   private TaskInfo getDockerTaskInfo() {
@@ -222,7 +262,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     config = SOME_OVERHEAD_EXECUTOR;
 
     expect(tierManager.getTier(task.getTask())).andReturn(DEV_TIER);
-    taskFactory = new MesosTaskFactoryImpl(config, tierManager);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
     control.replay();
 
@@ -246,17 +286,19 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   @Test
   public void testGlobalMounts() {
-    config = new ExecutorSettings(new ExecutorConfig(
-        TestExecutorSettings.THERMOS_EXECUTOR_INFO,
-        ImmutableList.of(
-            Volume.newBuilder()
-                .setHostPath("/host")
-                .setContainerPath("/container")
-                .setMode(Mode.RO)
-                .build())));
+    config = new ExecutorSettings(
+        new ExecutorConfig(
+            TestExecutorSettings.THERMOS_EXECUTOR_INFO,
+            ImmutableList.of(
+                Volume.newBuilder()
+                    .setHostPath("/host")
+                    .setContainerPath("/container")
+                    .setMode(Mode.RO)
+                    .build())),
+        false);
 
     expect(tierManager.getTier(TASK_WITH_DOCKER.getTask())).andReturn(DEV_TIER);
-    taskFactory = new MesosTaskFactoryImpl(config, tierManager);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
     control.replay();
 
@@ -269,7 +311,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
   @Test
   public void testMetadataLabelMapping() {
     expect(tierManager.getTier(TASK.getTask())).andReturn(DEV_TIER);
-    taskFactory = new MesosTaskFactoryImpl(config, tierManager);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
     control.replay();
 
@@ -283,6 +325,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         .collect(GuavaUtils.toImmutableSet());
 
     assertEquals(labels, metadata);
+    checkDiscoveryInfoUnset(task);
   }
 
   @Test
@@ -303,6 +346,36 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
             .setImage("hello-world"))
         .build();
     assertEquals(expectedContainer, task.getContainer());
+    checkDiscoveryInfoUnset(task);
+  }
+
+  @Test
+  public void testPopulateDiscoveryInfoNoPort() {
+    config = new ExecutorSettings(THERMOS_CONFIG, true);
+    AssignedTask builder = TASK.newBuilder();
+    builder.getTask().unsetRequestedPorts();
+    builder.unsetAssignedPorts();
+    IAssignedTask assignedTask = IAssignedTask.build(builder);
+    expect(tierManager.getTier(assignedTask.getTask())).andReturn(DEV_TIER);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
+
+    control.replay();
+
+    TaskInfo task = taskFactory.createFrom(IAssignedTask.build(builder), OFFER_THERMOS_EXECUTOR);
+    checkTaskResources(ITaskConfig.build(builder.getTask()), task);
+    checkDiscoveryInfo(task, ImmutableMap.of(), assignedTask.getTask().getJob());
+  }
+
+  @Test
+  public void testPopulateDiscoveryInfo() {
+    config = new ExecutorSettings(THERMOS_CONFIG, true);
+    expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEV_TIER);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
+
+    control.replay();
+    TaskInfo task = taskFactory.createFrom(TASK, OFFER_THERMOS_EXECUTOR);
+    checkTaskResources(TASK.getTask(), task);
+    checkDiscoveryInfo(task, ImmutableMap.of("http", 80), TASK.getTask().getJob());
   }
 
   private static ResourceSlot getTotalTaskResources(TaskInfo task) {

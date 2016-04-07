@@ -27,15 +27,21 @@ import static java.util.Objects.requireNonNull;
  */
 public class ExecutorSettings {
   private final ExecutorConfig config;
+  private final boolean populateDiscoveryInfo;
 
-  public ExecutorSettings(ExecutorConfig config) {
+  public ExecutorSettings(ExecutorConfig config, boolean populateDiscoveryInfo) {
     this.config = requireNonNull(config);
+    this.populateDiscoveryInfo = populateDiscoveryInfo;
   }
 
   public ExecutorConfig getExecutorConfig() {
     // TODO(wfarner): Replace this with a generic name-based accessor once tasks can specify the
     // executor they wish to use.
     return config;
+  }
+
+  public boolean shouldPopulateDiscoverInfo() {
+    return populateDiscoveryInfo;
   }
 
   private double getExecutorResourceValue(ResourceType resource) {

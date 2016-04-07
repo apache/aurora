@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.mesos;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -38,15 +39,18 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IMetadata;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.ContainerInfo;
+import org.apache.mesos.Protos.DiscoveryInfo;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Label;
 import org.apache.mesos.Protos.Labels;
 import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.Port;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
@@ -78,13 +82,22 @@ public interface MesosTaskFactory {
     @VisibleForTesting
     static final String METADATA_LABEL_PREFIX = "org.apache.aurora.metadata.";
 
+    @VisibleForTesting
+    static final String DEFAULT_PORT_PROTOCOL = "TCP";
+
     private final ExecutorSettings executorSettings;
     private final TierManager tierManager;
+    private final IServerInfo serverInfo;
 
     @Inject
-    MesosTaskFactoryImpl(ExecutorSettings executorSettings, TierManager tierManager) {
+    MesosTaskFactoryImpl(
+        ExecutorSettings executorSettings,
+        TierManager tierManager,
+        IServerInfo serverInfo) {
+
       this.executorSettings = requireNonNull(executorSettings);
       this.tierManager = requireNonNull(tierManager);
+      this.serverInfo = requireNonNull(serverInfo);
     }
 
     @VisibleForTesting
@@ -103,6 +116,11 @@ public interface MesosTaskFactory {
     @VisibleForTesting
     static String getInstanceSourceName(ITaskConfig task, int instanceId) {
       return String.format("%s.%s", getJobSourceName(task), instanceId);
+    }
+
+    @VisibleForTesting
+    static String getInverseJobSourceName(IJobKey job) {
+      return String.format("%s.%s.%s", job.getName(), job.getEnvironment(), job.getRole());
     }
 
     private static byte[] serializeTask(IAssignedTask task) throws SchedulerException {
@@ -145,6 +163,10 @@ public interface MesosTaskFactory {
           .addAllResources(resources);
 
       configureTaskLabels(config.getMetadata(), taskBuilder);
+
+      if (executorSettings.shouldPopulateDiscoverInfo()) {
+        configureDiscoveryInfos(task, taskBuilder);
+      }
 
       if (config.getContainer().isSetMesos()) {
         configureTaskForNoContainer(task, taskBuilder, acceptedOffer);
@@ -218,6 +240,23 @@ public interface MesosTaskFactory {
 
       if (!labels.isEmpty()) {
         taskBuilder.setLabels(Labels.newBuilder().addAllLabels(labels));
+      }
+    }
+
+    private void configureDiscoveryInfos(IAssignedTask task, TaskInfo.Builder taskBuilder) {
+      DiscoveryInfo.Builder builder = taskBuilder.getDiscoveryBuilder();
+      builder.setVisibility(DiscoveryInfo.Visibility.CLUSTER);
+      builder.setName(getInverseJobSourceName(task.getTask().getJob()));
+      builder.setEnvironment(task.getTask().getJob().getEnvironment());
+      // A good sane choice for default location is current Aurora cluster name.
+      builder.setLocation(serverInfo.getClusterName());
+      for (Map.Entry<String, Integer> entry : task.getAssignedPorts().entrySet()) {
+        builder.getPortsBuilder().addPorts(
+            Port.newBuilder()
+                .setName(entry.getKey())
+                .setNumber(entry.getValue())
+                .setProtocol(DEFAULT_PORT_PROTOCOL)
+        );
       }
     }
   }
