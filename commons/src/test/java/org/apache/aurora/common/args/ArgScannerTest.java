@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.common.args;
 
-import java.io.File;
 import java.io.PrintStream;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
@@ -117,9 +116,6 @@ public class ArgScannerTest {
     @CmdLine(name = "range", help = "help")
     static final Arg<com.google.common.collect.Range<Integer>> RANGE =
         Arg.create(com.google.common.collect.Range.closed(1, 5));
-    @Positional(help = "help")
-    static final Arg<List<Amount<Long, Time>>> POSITIONAL =
-        Arg.<List<Amount<Long, Time>>>create(ImmutableList.<Amount<Long, Time>>of());
   }
 
   @Test
@@ -174,12 +170,6 @@ public class ArgScannerTest {
     test(StandardArgs.class,
         () -> assertThat(StandardArgs.RANGE.get(), is(com.google.common.collect.Range.closed(1, 5))),
         "range", "1-5");
-
-    resetArgs(StandardArgs.class);
-    assertTrue(parse(StandardArgs.class, "1mins", "2secs"));
-    assertEquals(ImmutableList.builder()
-        .add(Amount.of(60L, Time.SECONDS))
-        .add(Amount.of(2L, Time.SECONDS)).build(), StandardArgs.POSITIONAL.get());
   }
 
   public static class Name {
@@ -563,67 +553,6 @@ public class ArgScannerTest {
   @Test(expected = IllegalArgumentException.class)
   public void testUnrecognizedUnitType() {
     parse(ImmutableList.of(AmountContainer.class), "-time_amount=1abcd");
-  }
-
-  static class Main1 {
-    @Positional(help = "halp")
-    static final Arg<List<String>> NAMES = Arg.create(null);
-  }
-
-  static class Main2 {
-    @Positional(help = "halp")
-    static final Arg<List<List<String>>> ROSTERS = Arg.create(null);
-  }
-
-  static class Main3 {
-    @Positional(help = "halp")
-    static final Arg<List<Double>> PERCENTILES = Arg.create(null);
-
-    @Positional(help = "halp")
-    static final Arg<List<File>> FILES = Arg.create(null);
-  }
-
-  private void resetMainArgs() {
-    resetArgs(Main1.class);
-    resetArgs(Main2.class);
-    resetArgs(Main3.class);
-  }
-
-  @Test
-  public void testMultiplePositionalsFails() {
-    // Indivdually these should work.
-
-    resetMainArgs();
-    assertTrue(parse(Main1.class, "jack,jill", "laurel,hardy"));
-    assertEquals(ImmutableList.of("jack,jill", "laurel,hardy"),
-        ImmutableList.copyOf(Main1.NAMES.get()));
-
-    resetMainArgs();
-    assertTrue(parse(Main2.class, "jack,jill", "laurel,hardy"));
-    assertEquals(
-        ImmutableList.of(
-            ImmutableList.of("jack", "jill"),
-            ImmutableList.of("laurel", "hardy")),
-        ImmutableList.copyOf(Main2.ROSTERS.get()));
-
-    // But if combined in the same class or across classes the @Positional is ambiguous and we
-    // should fail fast.
-
-    resetMainArgs();
-    try {
-      parse(ImmutableList.of(Main1.class, Main2.class), "jack,jill", "laurel,hardy");
-      fail("Expected more than 1 in-scope @Positional Arg List to trigger a failure.");
-    } catch (IllegalArgumentException e) {
-      // expected
-    }
-
-    resetMainArgs();
-    try {
-      parse(Main3.class, "50", "90", "99", "99.9");
-      fail("Expected more than 1 in-scope @Positional Arg List to trigger a failure.");
-    } catch (IllegalArgumentException e) {
-      // expected
-    }
   }
 
   // TODO(William Farner): Do we want to support nested parameterized args?  If so, need to define a

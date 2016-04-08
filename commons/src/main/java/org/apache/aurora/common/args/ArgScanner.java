@@ -331,10 +331,6 @@ public final class ArgScanner {
       return false;
     }
 
-    Optional<? extends PositionalInfo<?>> positionalInfoOptional = argsInfo.getPositionalInfo();
-    checkArgument(positionalInfoOptional.isPresent() || positionalArgs.isEmpty(),
-        "Positional arguments have been supplied but there is no Arg annotated to received them.");
-
     Iterable<? extends OptionInfo<?>> optionInfos = argsInfo.getOptionInfos();
 
     final Set<String> argsFailedToParse = Sets.newHashSet();
@@ -375,19 +371,9 @@ public final class ArgScanner {
       }
     }
 
-    if (positionalInfoOptional.isPresent()) {
-      PositionalInfo<?> positionalInfo = positionalInfoOptional.get();
-      positionalInfo.load(parserOracle, positionalArgs);
-    }
-
     Set<String> commandLineArgumentInfos = Sets.newTreeSet();
 
     Iterable<? extends ArgumentInfo<?>> allArguments = argsInfo.getOptionInfos();
-
-    if (positionalInfoOptional.isPresent()) {
-      PositionalInfo<?> positionalInfo = positionalInfoOptional.get();
-      allArguments = Iterables.concat(optionInfos, ImmutableList.of(positionalInfo));
-    }
 
     for (ArgumentInfo<?> anArgumentInfo : allArguments) {
       Arg<?> arg = anArgumentInfo.getArg();
@@ -447,23 +433,6 @@ public final class ArgScanner {
     infoLog("-------------------------------------------------------------------------");
     infoLog(String.format("%s to print this help message",
         Joiner.on(" or ").join(Iterables.transform(ArgumentInfo.HELP_ARGS, ARG_NAME_TO_FLAG))));
-    Optional<? extends PositionalInfo<?>> positionalInfoOptional = argsInfo.getPositionalInfo();
-    if (positionalInfoOptional.isPresent()) {
-      infoLog("\nPositional args:");
-      PositionalInfo<?> positionalInfo = positionalInfoOptional.get();
-      Arg<?> arg = positionalInfo.getArg();
-      Object defaultValue = arg.uncheckedGet();
-      ImmutableList<String> constraints = positionalInfo.collectConstraints(verifiers);
-      infoLog(String.format("%s%s\n\t%s",
-                            defaultValue != null ? "default " + defaultValue : "",
-                            Iterables.isEmpty(constraints)
-                                ? ""
-                                : " [" + Joiner.on(", ").join(constraints) + "]",
-                            positionalInfo.getHelp()));
-      // TODO: https://github.com/twitter/commons/issues/353, in the future we may
-      // want to support @argfile format for positional arguments. We should check
-      // to update firstArgFileArgumentName for them as well.
-    }
     ImmutableList<String> required = requiredHelps.build();
     if (!required.isEmpty()) {
       infoLog("\nRequired flags:"); // yes - this should actually throw!

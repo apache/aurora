@@ -82,16 +82,17 @@ public final class Configuration {
   private static final String DEFAULT_RESOURCE_NAME = "cmdline.arg.info.txt";
 
   private int nextResourceIndex;
-  private final ImmutableSet<ArgInfo> positionalInfos;
   private final ImmutableSet<ArgInfo> cmdLineInfos;
   private final ImmutableSet<ParserInfo> parserInfos;
   private final ImmutableSet<VerifierInfo> verifierInfos;
 
-  private Configuration(int nextResourceIndex,
-      Iterable<ArgInfo> positionalInfos, Iterable<ArgInfo> cmdLineInfos,
-      Iterable<ParserInfo> parserInfos, Iterable<VerifierInfo> verifierInfos) {
+  private Configuration(
+      int nextResourceIndex,
+      Iterable<ArgInfo> cmdLineInfos,
+      Iterable<ParserInfo> parserInfos,
+      Iterable<VerifierInfo> verifierInfos) {
+
     this.nextResourceIndex = nextResourceIndex;
-    this.positionalInfos = ImmutableSet.copyOf(positionalInfos);
     this.cmdLineInfos = ImmutableSet.copyOf(cmdLineInfos);
     this.parserInfos = ImmutableSet.copyOf(parserInfos);
     this.verifierInfos = ImmutableSet.copyOf(verifierInfos);
@@ -248,20 +249,14 @@ public final class Configuration {
   }
 
   static class Builder {
-    private final Set<ArgInfo> positionalInfos = Sets.newHashSet();
     private final Set<ArgInfo> argInfos = Sets.newHashSet();
     private final Set<ParserInfo> parserInfos = Sets.newHashSet();
     private final Set<VerifierInfo> verifierInfos = Sets.newHashSet();
 
     public boolean isEmpty() {
-      return positionalInfos.isEmpty()
-          && argInfos.isEmpty()
+      return argInfos.isEmpty()
           && parserInfos.isEmpty()
           && verifierInfos.isEmpty();
-    }
-
-    void addPositionalInfo(ArgInfo positionalInfo) {
-      positionalInfos.add(positionalInfo);
     }
 
     void addCmdLineArg(ArgInfo argInfo) {
@@ -285,8 +280,11 @@ public final class Configuration {
     }
 
     public Configuration build(Configuration configuration) {
-      return new Configuration(configuration.nextResourceIndex + 1,
-          positionalInfos, argInfos, parserInfos, verifierInfos);
+      return new Configuration(
+          configuration.nextResourceIndex + 1,
+          argInfos,
+          parserInfos,
+          verifierInfos);
     }
   }
 
@@ -352,7 +350,6 @@ public final class Configuration {
     private final int nextIndex;
     private int lineNumber = 0;
 
-    private final ImmutableList.Builder<ArgInfo> positionalInfo = ImmutableList.builder();
     private final ImmutableList.Builder<ArgInfo> fieldInfoBuilder = ImmutableList.builder();
     private final ImmutableList.Builder<ParserInfo> parserInfoBuilder = ImmutableList.builder();
     private final ImmutableList.Builder<VerifierInfo> verifierInfoBuilder = ImmutableList.builder();
@@ -372,13 +369,7 @@ public final class Configuration {
         }
 
         String type = parts.remove(0);
-        if ("positional".equals(type)) {
-          if (parts.size() != 2) {
-            throw new ConfigurationException(
-                "Invalid positional line: %s @%d", trimmed, lineNumber);
-          }
-          positionalInfo.add(new ArgInfo(parts.get(0), parts.get(1)));
-        } else if ("field".equals(type)) {
+        if ("field".equals(type)) {
           if (parts.size() != 2) {
             throw new ConfigurationException("Invalid field line: %s @%d", trimmed, lineNumber);
           }
@@ -403,8 +394,11 @@ public final class Configuration {
 
     @Override
     public Configuration getResult() {
-      return new Configuration(nextIndex, positionalInfo.build(),
-          fieldInfoBuilder.build(), parserInfoBuilder.build(), verifierInfoBuilder.build());
+      return new Configuration(
+          nextIndex,
+          fieldInfoBuilder.build(),
+          parserInfoBuilder.build(),
+          verifierInfoBuilder.build());
     }
   }
 
@@ -417,20 +411,9 @@ public final class Configuration {
   }
 
   public boolean isEmpty() {
-    return positionalInfos.isEmpty()
-        && cmdLineInfos.isEmpty()
+    return cmdLineInfos.isEmpty()
         && parserInfos.isEmpty()
         && verifierInfos.isEmpty();
-  }
-
-  /**
-   * Returns the field info for the sole {@literal @Positional} annotated field on the classpath,
-   * if any.
-   *
-   * @return The field info for the {@literal @Positional} annotated field if any.
-   */
-  public Iterable<ArgInfo> positionalInfo() {
-    return positionalInfos;
   }
 
   /**
@@ -473,11 +456,6 @@ public final class Configuration {
     PrintWriter writer = new PrintWriter(output);
     writer.printf("# %s\n", new Date());
     writer.printf("# %s\n ", message);
-
-    writer.println();
-    for (ArgInfo info : positionalInfos) {
-      writer.printf("positional %s %s\n", info.className, info.fieldName);
-    }
 
     writer.println();
     for (ArgInfo info : cmdLineInfos) {

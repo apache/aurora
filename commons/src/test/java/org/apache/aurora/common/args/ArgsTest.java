@@ -15,7 +15,6 @@ package org.apache.aurora.common.args;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 
 import com.google.common.collect.ImmutableList;
 
@@ -33,9 +32,6 @@ public class ArgsTest {
     @NotEmpty
     @CmdLine(name = "name", help = "help")
     private final Arg<String> name = Arg.create();
-
-    @Positional(help = "help")
-    private final Arg<List<Integer>> values = Arg.create();
   }
 
   @Test
@@ -47,7 +43,6 @@ public class ArgsTest {
 
     assertEquals(new File("fred"), App.DB.get());
     assertEquals("bob", app.name.get());
-    assertEquals(ImmutableList.of(1, 137), app.values.get());
   }
 
   @Test

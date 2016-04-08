@@ -57,13 +57,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.ArgParser;
 import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.Parser;
-import org.apache.aurora.common.args.Positional;
 import org.apache.aurora.common.args.Verifier;
 import org.apache.aurora.common.args.VerifierFor;
 import org.apache.aurora.common.args.apt.Configuration.ParserInfo;
@@ -103,9 +101,6 @@ public class CmdLineProcessor extends AbstractProcessor {
         @Override public Configuration get() {
           try {
             Configuration configuration = Configuration.load();
-            for (ArgInfo argInfo : configuration.positionalInfo()) {
-              configBuilder.addPositionalInfo(argInfo);
-            }
             for (ArgInfo argInfo : configuration.optionInfo()) {
               configBuilder.addCmdLineArg(argInfo);
             }
@@ -169,7 +164,7 @@ public class CmdLineProcessor extends AbstractProcessor {
   @Override
   public Set<String> getSupportedAnnotationTypes() {
     return ImmutableSet.copyOf(Iterables.transform(
-        ImmutableList.of(Positional.class, CmdLine.class, ArgParser.class, VerifierFor.class),
+        ImmutableList.of(CmdLine.class, ArgParser.class, VerifierFor.class),
         GET_NAME));
   }
 
@@ -184,26 +179,10 @@ public class CmdLineProcessor extends AbstractProcessor {
 
       Set<? extends Element> cmdlineArgs = getAnnotatedElements(roundEnv, CmdLine.class);
       contributingClassNamesBuilder.addAll(extractEnclosingClassNames(cmdlineArgs));
-      Set<? extends Element> positionalArgs = getAnnotatedElements(roundEnv, Positional.class);
-      contributingClassNamesBuilder.addAll(extractEnclosingClassNames(positionalArgs));
-
-      ImmutableSet<? extends Element> invalidArgs =
-          Sets.intersection(cmdlineArgs, positionalArgs).immutableCopy();
-      if (!invalidArgs.isEmpty()) {
-        error("An Arg cannot be annotated with both @CmdLine and @Positional, found bad Arg "
-            + "fields: %s", invalidArgs);
-      }
 
       for (ArgInfo cmdLineInfo : processAnnotatedArgs(parsedTypes, cmdlineArgs, CmdLine.class)) {
         configBuilder.addCmdLineArg(cmdLineInfo);
       }
-
-      for (ArgInfo positionalInfo
-          : processAnnotatedArgs(parsedTypes, positionalArgs, Positional.class)) {
-
-        configBuilder.addPositionalInfo(positionalInfo);
-      }
-      checkPositionalArgsAreLists(roundEnv);
 
       processParsers(parsers);
 
@@ -289,18 +268,6 @@ public class CmdLineProcessor extends AbstractProcessor {
       closeable.close();
     } catch (IOException e) {
       log(Kind.MANDATORY_WARNING, "Failed to close %s: %s", closeable, e);
-    }
-  }
-
-  private void checkPositionalArgsAreLists(RoundEnvironment roundEnv) {
-    for (Element positionalArg : getAnnotatedElements(roundEnv, Positional.class)) {
-      @Nullable TypeMirror typeArgument =
-          getTypeArgument(positionalArg.asType(), typeElement(Arg.class));
-      if ((typeArgument == null)
-          || !typeUtils.isSubtype(typeElement(List.class).asType(), typeArgument)) {
-        error("Found @Positional %s %s.%s that is not a List",
-            positionalArg.asType(), positionalArg.getEnclosingElement(), positionalArg);
-      }
     }
   }
 

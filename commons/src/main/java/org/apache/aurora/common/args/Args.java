@@ -20,7 +20,6 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -71,39 +70,21 @@ public final class Args {
         return OptionInfo.createFromField(field);
       };
 
-  private static final Function<Field, PositionalInfo<?>> TO_POSITIONAL_INFO =
-      field -> {
-        @Nullable Positional positional = field.getAnnotation(Positional.class);
-        if (positional == null) {
-          throw new ConfigurationException("No @Positional Arg annotation for field " + field);
-        }
-        return PositionalInfo.createFromField(field);
-      };
-
   /**
    * An opaque container for all the positional and optional {@link Arg} metadata in-play for a
    * command line parse.
    */
   public static final class ArgsInfo {
     private final Configuration configuration;
-    private final Optional<? extends PositionalInfo<?>> positionalInfo;
     private final ImmutableList<? extends OptionInfo<?>> optionInfos;
 
-    ArgsInfo(Configuration configuration,
-             Optional<? extends PositionalInfo<?>> positionalInfo,
-             Iterable<? extends OptionInfo<?>> optionInfos) {
-
+    ArgsInfo(Configuration configuration, Iterable<? extends OptionInfo<?>> optionInfos) {
       this.configuration = Preconditions.checkNotNull(configuration);
-      this.positionalInfo = Preconditions.checkNotNull(positionalInfo);
       this.optionInfos = ImmutableList.copyOf(optionInfos);
     }
 
     Configuration getConfiguration() {
       return configuration;
-    }
-
-    Optional<? extends PositionalInfo<?>> getPositionalInfo() {
-      return positionalInfo;
     }
 
     ImmutableList<? extends OptionInfo<?>> getOptionInfos() {
@@ -121,25 +102,10 @@ public final class Args {
    *     arg field.
    */
   static ArgsInfo fromConfiguration(Configuration configuration, Predicate<Field> filter) {
-    ImmutableSet<Field> positionalFields =
-        ImmutableSet.copyOf(filterFields(configuration.positionalInfo(), filter));
-
-    if (positionalFields.size() > 1) {
-      throw new IllegalArgumentException(
-          String.format("Found %d fields marked for @Positional Args after applying filter - "
-              + "only 1 is allowed:\n\t%s", positionalFields.size(),
-              Joiner.on("\n\t").join(positionalFields)));
-    }
-
-    Optional<? extends PositionalInfo<?>> positionalInfo =
-        Optional.fromNullable(
-            Iterables.getOnlyElement(
-                Iterables.transform(positionalFields, TO_POSITIONAL_INFO), null));
-
     Iterable<? extends OptionInfo<?>> optionInfos = Iterables.transform(
         filterFields(configuration.optionInfo(), filter), TO_OPTION_INFO);
 
-    return new ArgsInfo(configuration, positionalInfo, optionInfos);
+    return new ArgsInfo(configuration, optionInfos);
   }
 
   private static Iterable<Field> filterFields(Iterable<ArgInfo> infos, Predicate<Field> filter) {
@@ -184,33 +150,19 @@ public final class Args {
     Configuration configuration = Configuration.load();
     ArgsInfo staticInfo = Args.fromConfiguration(configuration, filter);
 
-    final ImmutableSet.Builder<PositionalInfo<?>> positionalInfos =
-        ImmutableSet.<PositionalInfo<?>>builder().addAll(staticInfo.getPositionalInfo().asSet());
     final ImmutableSet.Builder<OptionInfo<?>> optionInfos =
         ImmutableSet.<OptionInfo<?>>builder().addAll(staticInfo.getOptionInfos());
 
     for (Object source : sources) {
       Class<?> clazz = source instanceof Class ? (Class) source : source.getClass();
       for (Field field : clazz.getDeclaredFields()) {
-        if (filter.apply(field)) {
-          boolean cmdLine = field.isAnnotationPresent(CmdLine.class);
-          boolean positional = field.isAnnotationPresent(Positional.class);
-          if (cmdLine && positional) {
-            throw new IllegalArgumentException(
-                "An Arg cannot be annotated with both @CmdLine and @Positional, found bad Arg "
-                 + "field: " + field);
-          } else if (cmdLine) {
-            optionInfos.add(OptionInfo.createFromField(field, source));
-          } else if (positional) {
-            positionalInfos.add(PositionalInfo.createFromField(field, source));
-          }
+        if (filter.apply(field) && field.isAnnotationPresent(CmdLine.class)) {
+          optionInfos.add(OptionInfo.createFromField(field, source));
         }
       }
     }
 
-    @Nullable PositionalInfo<?> positionalInfo =
-        Iterables.getOnlyElement(positionalInfos.build(), null);
-    return new ArgsInfo(configuration, Optional.fromNullable(positionalInfo), optionInfos.build());
+    return new ArgsInfo(configuration, optionInfos.build());
   }
 
   private Args() {
