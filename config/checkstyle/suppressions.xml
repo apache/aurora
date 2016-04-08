@@ -21,6 +21,6 @@ limitations under the License.
   <!-- Allow use of System.exit() in main. -->
   <suppress files="org/apache/aurora/scheduler/app/SchedulerMain.java"
             checks="RegexpSinglelineJava"/>
-  <suppress files="org/apache/aurora/scheduler/storage/db/testmigration/V001_TestMigration.java"
+  <suppress files="org/apache/aurora/scheduler/storage/db/testmigration/.*"
             checks="TypeName" />
 </suppressions>

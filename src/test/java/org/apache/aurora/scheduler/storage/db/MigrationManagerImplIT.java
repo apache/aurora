@@ -19,6 +19,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
 import com.google.inject.Injector;
 
@@ -42,8 +43,58 @@ public class MigrationManagerImplIT {
         new DbModule.MigrationManagerModule(migrationLoader));
   }
 
+  /**
+   * Ensure all changes have been applied and their downgrade scripts stored appropriately.
+   *
+   * @param sqlSessionFactory The sql session factory.
+   * @param loader A migration loader.
+   * @throws Exception If the changes were not applied properly.
+   */
+  private void assertMigrationComplete(
+      SqlSessionFactory sqlSessionFactory,
+      MigrationLoader loader) throws Exception {
+
+    try (SqlSession session = sqlSessionFactory.openSession()) {
+      MigrationMapper mapper = session.getMapper(MigrationMapper.class);
+
+      List<MigrationChangelogEntry> appliedChanges = mapper.selectAll();
+
+      for (Change change : loader.getMigrations()) {
+        Optional<MigrationChangelogEntry> appliedChange = appliedChanges
+            .stream()
+            .filter(c -> c.getId().equals(change.getId()))
+            .findFirst();
+
+        assertTrue(appliedChange.isPresent());
+        assertEquals(
+            CharStreams.toString(loader.getScriptReader(change, true /* undo */)),
+            appliedChange.get().getDowngradeScript());
+      }
+
+      // As long as the tables exist, neither of these statements should fail.
+      try (Connection c = session.getConnection()) {
+        try (PreparedStatement select = c.prepareStatement("SELECT * FROM V001_test_table")) {
+          select.execute();
+        }
+        try (PreparedStatement select = c.prepareStatement("SELECT * FROM V002_test_table2")) {
+          select.execute();
+        }
+      }
+    }
+  }
+
   @Test
   public void testMigrate() throws Exception {
+    MigrationLoader loader = new JavaMigrationLoader(
+        "org.apache.aurora.scheduler.storage.db.testmigration");
+    Injector injector = createMigrationInjector(loader);
+
+    injector.getInstance(MigrationManager.class).migrate();
+    assertMigrationComplete(injector.getInstance(SqlSessionFactory.class), loader);
+  }
+
+  @Test
+  public void testNoMigrationNecessary() throws Exception {
     MigrationLoader loader = new JavaMigrationLoader(
         "org.apache.aurora.scheduler.storage.db.testmigration");
     Injector injector = createMigrationInjector(loader);
@@ -53,22 +104,30 @@ public class MigrationManagerImplIT {
     migrationManager.migrate();
 
     SqlSessionFactory sqlSessionFactory = injector.getInstance(SqlSessionFactory.class);
+    assertMigrationComplete(sqlSessionFactory, loader);
 
+    // Run the migration a second time, no changes should be made.
+    migrationManager.migrate();
+    assertMigrationComplete(sqlSessionFactory, loader);
+  }
+
+  private void assertRollbackComplete(SqlSessionFactory sqlSessionFactory) throws Exception {
     try (SqlSession session = sqlSessionFactory.openSession()) {
       MigrationMapper mapper = session.getMapper(MigrationMapper.class);
-      List<MigrationChangelogEntry> appliedChanges = mapper.selectAll();
 
-      // Ensure all changes have been applied and their downgrade scripts stored appropriately.
-      for (Change change : loader.getMigrations()) {
-        Optional<MigrationChangelogEntry> appliedChange = appliedChanges
-            .stream()
-            .findFirst()
-            .filter(c -> c.getId().equals(change.getId()));
-
-        assertTrue(appliedChange.isPresent());
-        assertEquals(
-            CharStreams.toString(loader.getScriptReader(change, true /* undo */)),
-            appliedChange.get().getDowngradeScript());
+      assertTrue(mapper.selectAll().isEmpty());
+      try (Connection c = session.getConnection()) {
+        for (String table : ImmutableList.of("V001_test_table", "V002_test_table2")) {
+          try (PreparedStatement select = c.prepareStatement("SELECT * FROM " + table)) {
+            select.execute();
+            fail("Select from " + table + " should have failed, the table should have been "
+                + "dropped.");
+          } catch (SQLException e) {
+            // This exception is expected.
+            assertTrue(
+                e.getMessage().startsWith("Table \"" + table.toUpperCase() + "\" not found"));
+          }
+        }
       }
     }
   }
@@ -93,22 +152,6 @@ public class MigrationManagerImplIT {
 
     rollbackManager.migrate();
 
-    SqlSessionFactory sqlSessionFactory = rollbackInjector.getInstance(SqlSessionFactory.class);
-
-    try (SqlSession session = sqlSessionFactory.openSession()) {
-      MigrationMapper mapper = session.getMapper(MigrationMapper.class);
-
-      assertTrue(mapper.selectAll().isEmpty());
-      try (Connection c = session.getConnection()) {
-        try (PreparedStatement select = c.prepareStatement("SELECT * FROM V001_test_table")) {
-          select.execute();
-          fail("Select from V001_test_table should have failed, the table should have been "
-              + "dropped.");
-        } catch (SQLException e) {
-          // This exception is expected.
-          assertTrue(e.getMessage().startsWith("Table \"V001_TEST_TABLE\" not found"));
-        }
-      }
-    }
+    assertRollbackComplete(rollbackInjector.getInstance(SqlSessionFactory.class));
   }
 }

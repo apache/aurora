@@ -94,7 +94,7 @@ public class MigrationManagerImpl implements MigrationManager {
       // which includes class in its equality check rather than checking instanceof. Instead we just
       // find the first element in changes whose id matches our applied change. If it does not exist
       // then this must be a rollback.
-      if (changes.stream().findFirst().filter(c -> c.getId().equals(change.getId())).isPresent()) {
+      if (changes.stream().anyMatch(c -> c.getId().equals(change.getId()))) {
         LOG.info("Change " + change.getId() + " has been applied, no other downgrades are "
             + "necessary");
         break;
