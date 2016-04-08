@@ -87,6 +87,7 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.jerseyRev = '1.19'
   ext.jsrRev = '3.0.1'
   ext.junitRev = '4.12'
+  ext.mybatisRev = '3.3.1'
   ext.protobufRev = '2.6.1'
   ext.servletRev = '3.1.0'
   ext.slf4jRev = '1.7.12'
@@ -116,6 +117,7 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
         force "org.apache.thrift:libthrift:${thriftRev}"
         force "org.hamcrest:hamcrest-core:1.3"
         force "org.slf4j:slf4j-api:${slf4jRev}"
+        force "org.mybatis:mybatis:${mybatisRev}"
       }
     }
   }
@@ -364,8 +366,9 @@ dependencies {
   compile "org.eclipse.jetty:jetty-server:${jettyDep}"
   compile "org.eclipse.jetty:jetty-servlet:${jettyDep}"
   compile "org.eclipse.jetty:jetty-servlets:${jettyDep}"
-  compile 'org.mybatis:mybatis:3.3.1'
+  compile "org.mybatis:mybatis:${mybatisRev}"
   compile 'org.mybatis:mybatis-guice:3.7'
+  compile 'org.mybatis:mybatis-migrations:3.2.0'
   compile 'org.quartz-scheduler:quartz:2.2.2'
   compile "uno.perk:forward:1.0.0"
 

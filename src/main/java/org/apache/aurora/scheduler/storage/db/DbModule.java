@@ -50,6 +50,8 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.db.typehandlers.TypeHandlers;
 import org.apache.aurora.scheduler.storage.mem.InMemStoresModule;
+import org.apache.ibatis.migration.JavaMigrationLoader;
+import org.apache.ibatis.migration.MigrationLoader;
 import org.apache.ibatis.session.AutoMappingBehavior;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
@@ -95,6 +97,7 @@ public final class DbModule extends PrivateModule {
       .add(JobUpdateEventMapper.class)
       .add(JobUpdateDetailsMapper.class)
       .add(LockMapper.class)
+      .add(MigrationMapper.class)
       .add(QuotaMapper.class)
       .add(TaskConfigMapper.class)
       .add(TaskMapper.class)
@@ -338,6 +341,29 @@ public final class DbModule extends PrivateModule {
       });
       SchedulerServicesModule.addSchedulerActiveServiceBinding(binder())
           .to(RowGarbageCollector.class);
+    }
+  }
+
+  public static class MigrationManagerModule extends PrivateModule {
+    private static final String MIGRATION_PACKAGE =
+        "org.apache.aurora.scheduler.storage.db.migration";
+
+    private final MigrationLoader migrationLoader;
+
+    public MigrationManagerModule() {
+      this.migrationLoader = new JavaMigrationLoader(MIGRATION_PACKAGE);
+    }
+
+    public MigrationManagerModule(MigrationLoader migrationLoader) {
+      this.migrationLoader = requireNonNull(migrationLoader);
+    }
+
+    @Override
+    protected void configure() {
+      bind(MigrationLoader.class).toInstance(migrationLoader);
+
+      bind(MigrationManager.class).to(MigrationManagerImpl.class);
+      expose(MigrationManager.class);
     }
   }
 }

@@ -33,12 +33,9 @@ communicate with scheduler/client from vCurrent-1.
 * Add a new field as an eventual replacement of the old one and implement a dual read/write
 anywhere the old field is used. If a thrift struct is mapped in the DB store make sure both columns
 are marked as `NOT NULL`
-* Check [storage.thrift](../../api/src/main/thrift/org/apache/aurora/gen/storage.thrift) to see if the
-affected struct is stored in Aurora scheduler storage. If so, you most likely need to backfill
-existing data to ensure both fields are populated eagerly on startup. See
-[this patch](https://reviews.apache.org/r/43172) as a real-life example of thrift-struct
-backfilling. IMPORTANT: backfilling implementation needs to ensure both fields are populated. This
-is critical to enable graceful scheduler upgrade as well as rollback to the old version if needed.
+* Check [storage.thrift](../../api/src/main/thrift/org/apache/aurora/gen/storage.thrift) to see if
+the affected struct is stored in Aurora scheduler storage. If so, it's almost certainly also
+necessary to perform a [DB migration](db-migration.md).
 * Add a deprecation jira ticket into the vCurrent+1 release candidate
 * Add a TODO for the deprecated field mentioning the jira ticket
 

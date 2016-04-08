@@ -44,7 +44,12 @@ public final class DbUtil {
    * @return An injector with bindings necessary for a storage system.
    */
   public static Injector createStorageInjector(Module dbModule) {
+    return createStorageInjector(dbModule, new DbModule.MigrationManagerModule());
+  }
+
+  public static Injector createStorageInjector(Module dbModule, Module migrationModule) {
     Injector injector = Guice.createInjector(
+        migrationModule,
         dbModule,
         new AbstractModule() {
           @Override
@@ -74,7 +79,7 @@ public final class DbUtil {
   /**
    * Creates a new, empty storage system with a task store defined by the command line flag.
    *
-   * @return A new storage instance.
+   * @return An new storage instance.
    */
   public static Storage createFlaggedStorage() {
     return createStorageInjector(testModuleWithWorkQueue(PLAIN, Optional.absent()))

@@ -56,6 +56,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
+import org.apache.aurora.scheduler.storage.db.MigrationManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -128,7 +129,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-
           if (snapshot.isSetDbScript()) {
             try (Connection c = ((DataSource) store.getUnsafeStoreAccess()).getConnection()) {
               LOG.info("Dropping all tables");
@@ -145,6 +145,12 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
                   restore.executeUpdate();
                 }
               }
+            } catch (SQLException e) {
+              Throwables.propagate(e);
+            }
+
+            try {
+              migrationManager.migrate();
             } catch (SQLException e) {
               Throwables.propagate(e);
             }
@@ -350,6 +356,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   private final Clock clock;
   private final Storage storage;
   private final boolean useDbSnapshotForTaskStore;
+  private final MigrationManager migrationManager;
 
   /**
    * Identifies if experimental task store is in use.
@@ -364,12 +371,14 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       BuildInfo buildInfo,
       Clock clock,
       @Volatile Storage storage,
-      @ExperimentalTaskStore boolean useDbSnapshotForTaskStore) {
+      @ExperimentalTaskStore boolean useDbSnapshotForTaskStore,
+      MigrationManager migrationManager) {
 
     this.buildInfo = requireNonNull(buildInfo);
     this.clock = requireNonNull(clock);
     this.storage = requireNonNull(storage);
     this.useDbSnapshotForTaskStore = useDbSnapshotForTaskStore;
+    this.migrationManager = requireNonNull(migrationManager);
   }
 
   @Timed("snapshot_create")

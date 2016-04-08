@@ -137,6 +137,7 @@ public class SchedulerMain {
         new StatsModule(),
         new AppModule(),
         new CronModule(),
+        new DbModule.MigrationManagerModule(),
         DbModule.productionModule(Bindings.annotatedKeyFactory(Storage.Volatile.class)),
         new DbModule.GarbageCollectorModule());
   }

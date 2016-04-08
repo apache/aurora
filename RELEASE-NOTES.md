@@ -29,6 +29,8 @@
 - Added a new scheduler argument `--populate_discovery_info`. If set to true, Aurora will start
   to populate DiscoveryInfo field on TaskInfo of Mesos. This could be used for alternative
   service discovery solution like Mesos-DNS.
+- Added support for automatic schema upgrades and downgrades when restoring a snapshot that contains
+  a DB dump.
 
 ### Deprecations and removals:
 
