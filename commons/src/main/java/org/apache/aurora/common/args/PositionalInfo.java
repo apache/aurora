@@ -92,7 +92,7 @@ public final class PositionalInfo<T> extends ArgumentInfo<List<T>> {
 
     // TODO: https://github.com/twitter/commons/issues/353, consider future support of
     // argFile for Positional arguments.
-    super(name, help, false, arg, type, verifierAnnotations, parser);
+    super(name, help, arg, type, verifierAnnotations, parser);
     this.elementType = elementType;
   }
 

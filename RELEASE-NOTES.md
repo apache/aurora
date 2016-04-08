@@ -1,4 +1,3 @@
-
 0.13.0 (Not yet released)
 ------
 
@@ -56,8 +55,9 @@
     - `addInstances`
     - `replaceCronTemplate`
 - Task ID strings are no longer prefixed by a timestamp.
-- The scheduler previously supported specification of command line arguments by fully-qualified
-  class names.  This support has been removed.
+- Changes to the way the scheduler reads command line arguments
+  - Removed support for reading command line argument values from files.
+  - Removed support for specifying command line argument names with fully-qualified class names.
 
 0.12.0
 ------

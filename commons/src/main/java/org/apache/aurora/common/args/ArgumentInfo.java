@@ -62,7 +62,6 @@ public abstract class ArgumentInfo<T> {
 
   private final String name;
   private final String help;
-  private final boolean argFile;
   private final Arg<T> arg;
   private final TypeToken<T> type;
   private final List<Annotation> verifierAnnotations;
@@ -73,7 +72,6 @@ public abstract class ArgumentInfo<T> {
    *
    * @param name The simple name for the argument.
    * @param help Help string.
-   * @param argFile If argument file is allowed.
    * @param arg Argument object.
    * @param type Concrete argument type.
    * @param verifierAnnotations {@link Verifier} annotations for this
@@ -83,7 +81,6 @@ public abstract class ArgumentInfo<T> {
   protected ArgumentInfo(
       String name,
       String help,
-      boolean argFile,
       Arg<T> arg,
       TypeToken<T> type,
       List<Annotation> verifierAnnotations,
@@ -91,7 +88,6 @@ public abstract class ArgumentInfo<T> {
 
     this.name = MorePreconditions.checkNotBlank(name);
     this.help = MorePreconditions.checkNotBlank(help);
-    this.argFile = argFile;
     this.arg = Preconditions.checkNotNull(arg);
     this.type = Preconditions.checkNotNull(type);
     this.verifierAnnotations = ImmutableList.copyOf(verifierAnnotations);
@@ -113,13 +109,6 @@ public abstract class ArgumentInfo<T> {
    */
   public String getHelp() {
     return help;
-  }
-
-  /**
-   * Returns whether an argument file is allowed for this argument.
-   */
-  public boolean argFile() {
-    return argFile;
   }
 
   /**

@@ -431,7 +431,6 @@ public final class ArgScanner {
   private void printHelp(Verifiers verifiers, ArgsInfo argsInfo) {
     ImmutableList.Builder<String> requiredHelps = ImmutableList.builder();
     ImmutableList.Builder<String> optionalHelps = ImmutableList.builder();
-    Optional<String> firstArgFileArgumentName = Optional.absent();
     for (OptionInfo<?> optionInfo
         : ORDER_BY_NAME.immutableSortedCopy(argsInfo.getOptionInfos())) {
       Arg<?> arg = optionInfo.getArg();
@@ -442,9 +441,6 @@ public final class ArgScanner {
         requiredHelps.add(help);
       } else {
         optionalHelps.add(help);
-      }
-      if (optionInfo.argFile() && !firstArgFileArgumentName.isPresent()) {
-        firstArgFileArgumentName = Optional.of(optionInfo.getName());
       }
     }
 
@@ -477,13 +473,6 @@ public final class ArgScanner {
     if (!optional.isEmpty()) {
       infoLog("\nOptional flags:");
       infoLog(Joiner.on('\n').join(optional));
-    }
-    if (firstArgFileArgumentName.isPresent()) {
-      infoLog(String.format("\n"
-          + "For arguments that support @argfile format: @argfile is a text file that contains "
-          + "cmdline argument values. For example: -%s=@/tmp/%s_value.txt. The format "
-          + "of the argfile content should be exactly the same as it would be specified on the "
-          + "cmdline.", firstArgFileArgumentName.get(), firstArgFileArgumentName.get()));
     }
     infoLog("-------------------------------------------------------------------------");
   }
