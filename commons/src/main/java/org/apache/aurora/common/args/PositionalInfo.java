@@ -68,7 +68,6 @@ public final class PositionalInfo<T> extends ArgumentInfo<List<T>> {
 
     @SuppressWarnings({"unchecked", "rawtypes"}) // we have no way to know the type here
     PositionalInfo<?> positionalInfo = new PositionalInfo(
-        field.getDeclaringClass().getCanonicalName() + "." + field.getName(),
         "[positional args]",
         positional.help(),
         ArgumentInfo.getArgForField(field, Optional.fromNullable(instance)),
@@ -83,7 +82,6 @@ public final class PositionalInfo<T> extends ArgumentInfo<List<T>> {
   private final TypeToken<T> elementType;
 
   private PositionalInfo(
-      String canonicalName,
       String name,
       String help,
       Arg<List<T>> arg,
@@ -94,7 +92,7 @@ public final class PositionalInfo<T> extends ArgumentInfo<List<T>> {
 
     // TODO: https://github.com/twitter/commons/issues/353, consider future support of
     // argFile for Positional arguments.
-    super(canonicalName, name, help, false, arg, type, verifierAnnotations, parser);
+    super(name, help, false, arg, type, verifierAnnotations, parser);
     this.elementType = elementType;
   }
 

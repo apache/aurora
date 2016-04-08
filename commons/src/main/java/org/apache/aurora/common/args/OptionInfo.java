@@ -24,10 +24,8 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Charsets;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
 import com.google.common.io.Files;
 import com.google.common.reflect.TypeToken;
@@ -81,11 +79,8 @@ public final class OptionInfo<T> extends ArgumentInfo<T> {
         String.format("Argument name '%s' does not match required pattern %s",
             name, ARG_NAME_RE));
 
-    Function<String, String> canonicalizer = name1 -> field.getDeclaringClass().getCanonicalName() + "." + name1;
-
     @SuppressWarnings({"unchecked", "rawtypes"}) // we have no way to know the type here
     OptionInfo<?> optionInfo = new OptionInfo(
-        canonicalizer,
         name,
         getCmdLineHelp(cmdLine),
         cmdLine.argFile(),
@@ -107,10 +102,7 @@ public final class OptionInfo<T> extends ArgumentInfo<T> {
     return help;
   }
 
-  private final Function<String, String> canonicalizer;
-
   private OptionInfo(
-      Function<String, String> canonicalizer,
       String name,
       String help,
       boolean argFile,
@@ -119,9 +111,7 @@ public final class OptionInfo<T> extends ArgumentInfo<T> {
       List<Annotation> verifierAnnotations,
       @Nullable Class<? extends Parser<T>> parser) {
 
-    super(canonicalizer.apply(name), name, help, argFile, arg, type,
-        verifierAnnotations, parser);
-    this.canonicalizer = canonicalizer;
+    super(name, help, argFile, arg, type, verifierAnnotations, parser);
   }
 
   /**
@@ -144,8 +134,7 @@ public final class OptionInfo<T> extends ArgumentInfo<T> {
 
     // If the arg type is boolean, check if the command line uses the negated boolean form.
     if (isBoolean()) {
-      if (Predicates.in(Arrays.asList(getNegatedName(), getCanonicalNegatedName()))
-          .apply(optionName)) {
+      if (optionName.equals(getNegatedName())) {
         result = !(Boolean) result; // [B]
       }
     }
@@ -168,14 +157,6 @@ public final class OptionInfo<T> extends ArgumentInfo<T> {
    */
   String getNegatedName() {
     return NEGATE_BOOLEAN + getName();
-  }
-
-  /**
-   * Similar to the canonical name, but with boolean arguments appends "no_", as in:
-   * {@code -com.twitter.common.MyApp.no_fire=false}
-   */
-  String getCanonicalNegatedName() {
-    return canonicalizer.apply(getNegatedName());
   }
 
   private String getArgFileContent(String optionName, String argFilePath)

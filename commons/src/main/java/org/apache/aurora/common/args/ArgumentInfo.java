@@ -60,7 +60,6 @@ public abstract class ArgumentInfo<T> {
     }
   }
 
-  private final String canonicalName;
   private final String name;
   private final String help;
   private final boolean argFile;
@@ -72,7 +71,6 @@ public abstract class ArgumentInfo<T> {
   /**
    * Creates a new {@code ArgsInfo}.
    *
-   * @param canonicalName A fully qualified name for the argument.
    * @param name The simple name for the argument.
    * @param help Help string.
    * @param argFile If argument file is allowed.
@@ -83,7 +81,6 @@ public abstract class ArgumentInfo<T> {
    * @param parser Parser for the argument type.
    */
   protected ArgumentInfo(
-      String canonicalName,
       String name,
       String help,
       boolean argFile,
@@ -92,7 +89,6 @@ public abstract class ArgumentInfo<T> {
       List<Annotation> verifierAnnotations,
       @Nullable Class<? extends Parser<? extends T>> parser) {
 
-    this.canonicalName = MorePreconditions.checkNotBlank(canonicalName);
     this.name = MorePreconditions.checkNotBlank(name);
     this.help = MorePreconditions.checkNotBlank(help);
     this.argFile = argFile;
@@ -109,16 +105,6 @@ public abstract class ArgumentInfo<T> {
    */
   public final String getName() {
     return name;
-  }
-
-  /**
-   * Return the fully-qualified name of the command line argument. This is used as a command-line
-   * optional argument, as in: -prefix.name=value. Prefix is typically a java package and class like
-   * "com.twitter.myapp.MyClass". The difference between a canonical name and a regular name is that
-   * it is in some circumstances for two names to collide; the canonical name, then, disambiguates.
-   */
-  public final String getCanonicalName() {
-    return canonicalName;
   }
 
   /**

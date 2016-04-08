@@ -55,8 +55,6 @@ public class OptionInfoTest {
         String.format(OptionInfo.ARG_FILE_HELP_TEMPLATE, "help.", "files", "files"),
         optionInfo.getHelp());
     assertTrue(optionInfo.argFile());
-    assertEquals("org.apache.aurora.common.args.OptionInfoTest.App.files",
-        optionInfo.getCanonicalName());
   }
 
   @Test
@@ -99,8 +97,6 @@ public class OptionInfoTest {
     assertEquals("flag", optionInfo.getName());
     assertEquals("help.", optionInfo.getHelp());
     assertFalse(optionInfo.argFile());
-    assertEquals("org.apache.aurora.common.args.OptionInfoTest.App.flag", optionInfo.getCanonicalName());
     assertEquals("no_flag", optionInfo.getNegatedName());
-    assertEquals("org.apache.aurora.common.args.OptionInfoTest.App.no_flag", optionInfo.getCanonicalNegatedName());
   }
 }

@@ -550,19 +550,6 @@ public class ArgScannerTest {
     parse(ImmutableList.of(NameClashA.class, NameClashB.class), "-no_boolean");
   }
 
-  @Test
-  public void testAllowsCanonicalNameOnArgCollision() {
-    // TODO(William Farner): Fix.
-    parse(ImmutableList.of(NameClashA.class, NameClashB.class),
-        "-" + NameClashB.class.getCanonicalName() + ".string=blah");
-  }
-
-  @Test
-  public void testAllowsCanonicalNegNameOnArgCollision() {
-    parse(ImmutableList.of(NameClashA.class, NameClashB.class),
-        "-" + NameClashB.class.getCanonicalName() + ".no_boolean");
-  }
-
   public static class AmountContainer {
     @CmdLine(name = "time_amount", help = "help")
     static final Arg<Amount<Integer, Time>> TIME_AMOUNT = Arg.create(null);
@@ -653,30 +640,19 @@ public class ArgScannerTest {
 
   private static void test(Class<?> scope, Command validate, boolean expectFails, String arg,
       String value) {
-    String canonicalName = scope.getCanonicalName() + "." + arg;
 
     if (value.isEmpty()) {
       testValidate(scope, validate, expectFails, String.format("-%s", arg));
-      testValidate(scope, validate, expectFails, String.format("-%s", canonicalName));
     } else {
       testValidate(scope, validate, expectFails, String.format("-%s=%s", arg, value));
-      testValidate(scope, validate, expectFails, String.format("-%s=%s", canonicalName, value));
       testValidate(scope, validate, expectFails, String.format("-%s='%s'", arg, value));
-      testValidate(scope, validate, expectFails, String.format("-%s='%s'", canonicalName, value));
       testValidate(scope, validate, expectFails, String.format("-%s=\"%s\"", arg, value));
-      testValidate(scope, validate, expectFails, String.format("-%s=\"%s\"", canonicalName, value));
       testValidate(scope, validate, expectFails, String.format("-%s", arg), value);
-      testValidate(scope, validate, expectFails, String.format("-%s", canonicalName), value);
       testValidate(scope, validate, expectFails,
           String.format("-%s", arg), String.format("'%s'", value));
-      testValidate(scope, validate, expectFails,
-          String.format("-%s", canonicalName), String.format("'%s'", value));
       testValidate(scope, validate, expectFails, String.format("-%s \"%s\"", arg, value));
-      testValidate(scope, validate, expectFails, String.format("-%s \"%s\"", canonicalName, value));
       testValidate(scope, validate, expectFails,
           String.format("-%s", arg), String.format("%s", value));
-      testValidate(scope, validate, expectFails,
-          String.format("-%s", canonicalName), String.format("%s", value));
     }
   }
 

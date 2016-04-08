@@ -82,7 +82,7 @@ public final class ArgScanner {
 
   private static final Function<OptionInfo<?>, String> GET_OPTION_INFO_NAME = ArgumentInfo::getName;
 
-  public static final Ordering<OptionInfo<?>> ORDER_BY_NAME =
+  private static final Ordering<OptionInfo<?>> ORDER_BY_NAME =
       Ordering.natural().onResultOf(GET_OPTION_INFO_NAME);
 
   private static final Function<String, String> ARG_NAME_TO_FLAG = argName -> "-" + argName;
@@ -110,18 +110,6 @@ public final class ArgScanner {
    */
   private static final Function<OptionInfo<?>, String> GET_OPTION_INFO_NEGATED_NAME =
       OptionInfo::getNegatedName;
-
-  /**
-   * Gets the canonical name for an @Arg, based on the class containing the field it annotates.
-   */
-  private static final Function<OptionInfo<?>, String> GET_CANONICAL_ARG_NAME =
-      ArgumentInfo::getCanonicalName;
-
-  /**
-   * Gets the canonical negated name for an @Arg.
-   */
-  private static final Function<OptionInfo<?>, String> GET_CANONICAL_NEGATED_ARG_NAME =
-      OptionInfo::getCanonicalNegatedName;
 
   private static final Logger LOG = LoggerFactory.getLogger(ArgScanner.class);
 
@@ -360,17 +348,12 @@ public final class ArgScanner {
         .putAll(Maps.uniqueIndex(Iterables.filter(optionInfos,
             Predicates.compose(Predicates.in(argAllShortNamesNoCollisions), GET_OPTION_INFO_NAME)),
             GET_OPTION_INFO_NAME))
-        // Map by canonical arg name -> arg def.
-        .putAll(Maps.uniqueIndex(optionInfos, GET_CANONICAL_ARG_NAME))
         // Map by negated short arg name (for booleans)
         .putAll(Maps.uniqueIndex(
             Iterables.filter(Iterables.filter(optionInfos, IS_BOOLEAN),
                 Predicates.compose(Predicates.in(argAllShortNamesNoCollisions),
                     GET_OPTION_INFO_NEGATED_NAME)),
             GET_OPTION_INFO_NEGATED_NAME))
-        // Map by negated canonical arg name (for booleans)
-        .putAll(Maps.uniqueIndex(Iterables.filter(optionInfos, IS_BOOLEAN),
-            GET_CANONICAL_NEGATED_ARG_NAME))
         .build();
 
     // TODO(William Farner): Make sure to disallow duplicate arg specification by short and
@@ -409,9 +392,8 @@ public final class ArgScanner {
     for (ArgumentInfo<?> anArgumentInfo : allArguments) {
       Arg<?> arg = anArgumentInfo.getArg();
 
-      commandLineArgumentInfos.add(String.format("%s (%s): %s",
-          anArgumentInfo.getName(), anArgumentInfo.getCanonicalName(),
-          arg.uncheckedGet()));
+      commandLineArgumentInfos.add(
+          String.format("%s: %s", anArgumentInfo.getName(), arg.uncheckedGet()));
 
       try {
         anArgumentInfo.verify(verifiers);
@@ -476,13 +458,12 @@ public final class ArgScanner {
       Arg<?> arg = positionalInfo.getArg();
       Object defaultValue = arg.uncheckedGet();
       ImmutableList<String> constraints = positionalInfo.collectConstraints(verifiers);
-      infoLog(String.format("%s%s\n\t%s\n\t(%s)",
+      infoLog(String.format("%s%s\n\t%s",
                             defaultValue != null ? "default " + defaultValue : "",
                             Iterables.isEmpty(constraints)
                                 ? ""
                                 : " [" + Joiner.on(", ").join(constraints) + "]",
-                            positionalInfo.getHelp(),
-                            positionalInfo.getCanonicalName()));
+                            positionalInfo.getHelp()));
       // TODO: https://github.com/twitter/commons/issues/353, in the future we may
       // want to support @argfile format for positional arguments. We should check
       // to update firstArgFileArgumentName for them as well.
@@ -510,14 +491,13 @@ public final class ArgScanner {
   private String formatHelp(ArgumentInfo<?> argumentInfo, Iterable<String> constraints,
                             @Nullable Object defaultValue) {
 
-    return String.format("-%s%s%s\n\t%s\n\t(%s)",
+    return String.format("-%s%s%s\n\t%s",
                          argumentInfo.getName(),
-                         defaultValue != null ? "=" + defaultValue : "",
+                         defaultValue == null ? "" : String.format(" (default %s)", defaultValue),
                          Iterables.isEmpty(constraints)
                              ? ""
                              : " [" + Joiner.on(", ").join(constraints) + "]",
-                         argumentInfo.getHelp(),
-                         argumentInfo.getCanonicalName());
+                         argumentInfo.getHelp());
   }
 
   private void infoLog(String msg) {
