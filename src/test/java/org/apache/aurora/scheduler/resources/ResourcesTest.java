@@ -155,7 +155,7 @@ public class ResourcesTest {
     }
 
     return Resource.newBuilder()
-        .setName(PORTS.getName())
+        .setName(PORTS.getMesosName())
         .setType(RANGES)
         .setRanges(ranges)
         .build();

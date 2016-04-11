@@ -197,7 +197,7 @@ public class ExecutorModule extends AbstractModule {
   private static Resource makeResource(ResourceType type, double value) {
     return Resource.newBuilder()
         .setType(Type.SCALAR)
-        .setName(type.getName())
+        .setName(type.getMesosName())
         .setScalar(Scalar.newBuilder().setValue(value))
         .build();
   }

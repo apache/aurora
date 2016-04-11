@@ -18,7 +18,7 @@ import com.google.common.annotations.VisibleForTesting;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Defines Mesos resource types.
+ * Describes Mesos resource types.
  */
 @VisibleForTesting
 public enum ResourceType {
@@ -48,7 +48,7 @@ public enum ResourceType {
     this.resourceName = requireNonNull(resourceName);
   }
 
-  public String getName() {
+  public String getMesosName() {
     return resourceName;
   }
 }

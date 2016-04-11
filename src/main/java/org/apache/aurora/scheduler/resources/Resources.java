@@ -50,7 +50,7 @@ public final class Resources {
   /**
    * CPU resource filter.
    */
-  private static final Predicate<Resource> CPU = e -> e.getName().equals(CPUS.getName());
+  private static final Predicate<Resource> CPU = e -> e.getName().equals(CPUS.getMesosName());
 
   /**
    * Revocable resource filter.
@@ -113,9 +113,9 @@ public final class Resources {
    * @return {@code ResourceSlot} instance.
    */
   public ResourceSlot slot() {
-    return new ResourceSlot(getScalarValue(CPUS.getName()),
-        Amount.of((long) getScalarValue(RAM_MB.getName()), Data.MB),
-        Amount.of((long) getScalarValue(DISK_MB.getName()), Data.MB),
+    return new ResourceSlot(getScalarValue(CPUS.getMesosName()),
+        Amount.of((long) getScalarValue(RAM_MB.getMesosName()), Data.MB),
+        Amount.of((long) getScalarValue(DISK_MB.getMesosName()), Data.MB),
         getNumAvailablePorts());
   }
 
@@ -168,7 +168,7 @@ public final class Resources {
 
   private Iterable<Range> getPortRanges() {
     ImmutableList.Builder<Range> ranges = ImmutableList.builder();
-    for (Resource r : getResources(PORTS.getName())) {
+    for (Resource r : getResources(PORTS.getMesosName())) {
       ranges.addAll(r.getRanges().getRangeList().iterator());
     }
 

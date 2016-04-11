@@ -528,10 +528,10 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     if (revocable) {
       resources = ImmutableList.<Resource>builder()
           .addAll(FluentIterable.from(resources)
-              .filter(e -> !e.getName().equals(CPUS.getName()))
+              .filter(e -> !e.getName().equals(CPUS.getMesosName()))
               .toList())
           .add(Protos.Resource.newBuilder()
-              .setName(CPUS.getName())
+              .setName(CPUS.getMesosName())
               .setType(Protos.Value.Type.SCALAR)
               .setScalar(Protos.Value.Scalar.newBuilder().setValue(cpu))
               .setRevocable(Resource.RevocableInfo.newBuilder())

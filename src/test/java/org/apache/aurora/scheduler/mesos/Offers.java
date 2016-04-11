@@ -46,13 +46,13 @@ public final class Offers {
         .build();
 
     return Offer.newBuilder()
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(CPUS.getName())
+        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(CPUS.getMesosName())
             .setScalar(Scalar.newBuilder().setValue(cpu)))
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(RAM_MB.getName())
+        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(RAM_MB.getMesosName())
             .setScalar(Scalar.newBuilder().setValue(ramMb)))
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(DISK_MB.getName())
+        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(DISK_MB.getMesosName())
             .setScalar(Scalar.newBuilder().setValue(diskMb)))
-        .addResources(Resource.newBuilder().setType(Type.RANGES).setName(PORTS.getName())
+        .addResources(Resource.newBuilder().setType(Type.RANGES).setName(PORTS.getMesosName())
             .setRanges(portRanges))
         .addAttributes(Protos.Attribute.newBuilder().setType(Type.TEXT)
             .setName("host")

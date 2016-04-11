@@ -160,7 +160,7 @@ public class ResourceSlotTest {
   private void expectRanges(Set<Pair<Long, Long>> expected, Set<Integer> values) {
     Protos.Resource resource = makeMesosRangeResource(PORTS, values);
     assertEquals(Protos.Value.Type.RANGES, resource.getType());
-    assertEquals(PORTS.getName(), resource.getName());
+    assertEquals(PORTS.getMesosName(), resource.getName());
 
     Set<Pair<Long, Long>> actual = ImmutableSet.copyOf(Iterables.transform(
         resource.getRanges().getRangeList(),

@@ -94,13 +94,13 @@ public class ClusterSimulatorModule extends AbstractModule {
 
     String host = slaveId + "-hostname";
     return Offer.newBuilder()
-        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(CPUS.getName())
+        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(CPUS.getMesosName())
             .setScalar(Protos.Value.Scalar.newBuilder().setValue(cpu)))
-        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(RAM_MB.getName())
+        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(RAM_MB.getMesosName())
             .setScalar(Protos.Value.Scalar.newBuilder().setValue(ramMb)))
-        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(DISK_MB.getName())
+        .addResources(Protos.Resource.newBuilder().setType(SCALAR).setName(DISK_MB.getMesosName())
             .setScalar(Protos.Value.Scalar.newBuilder().setValue(diskMb)))
-        .addResources(Protos.Resource.newBuilder().setType(RANGES).setName(PORTS.getName())
+        .addResources(Protos.Resource.newBuilder().setType(RANGES).setName(PORTS.getMesosName())
             .setRanges(portRanges))
         .addAttributes(Protos.Attribute.newBuilder().setType(Protos.Value.Type.TEXT)
             .setName("host")

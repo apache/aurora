@@ -46,7 +46,7 @@ public class ExecutorSettings {
 
   private double getExecutorResourceValue(ResourceType resource) {
     return config.getExecutor().getResourcesList().stream()
-        .filter(r -> r.getName().equals(resource.getName()))
+        .filter(r -> r.getName().equals(resource.getMesosName()))
         .findFirst()
         .map(r -> r.getScalar().getValue())
         .orElse(0D);

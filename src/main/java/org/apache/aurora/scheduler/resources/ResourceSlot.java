@@ -107,7 +107,7 @@ public final class ResourceSlot {
     TaskInfo.Builder taskBuilder = task.toBuilder();
 
     Optional<Resource> revocableTaskCpu = taskBuilder.getResourcesList().stream()
-        .filter(r -> r.getName().equals(CPUS.getName()))
+        .filter(r -> r.getName().equals(CPUS.getMesosName()))
         .filter(Resource::hasRevocable)
         .findFirst();
     ExecutorInfo.Builder executorBuilder = taskBuilder.getExecutorBuilder();
@@ -121,7 +121,7 @@ public final class ResourceSlot {
     };
 
     executorBuilder.getResourcesBuilderList().stream()
-        .filter(r -> r.getName().equals(CPUS.getName()))
+        .filter(r -> r.getName().equals(CPUS.getMesosName()))
         .forEach(matchRevocable);
 
     return taskBuilder.build();
@@ -154,7 +154,7 @@ public final class ResourceSlot {
       Set<Integer> values) {
 
     return Protos.Resource.newBuilder()
-        .setName(resourceType.getName())
+        .setName(resourceType.getMesosName())
         .setType(Protos.Value.Type.RANGES)
         .setRanges(Protos.Value.Ranges.newBuilder()
             .addAllRange(Iterables.transform(Numbers.toRanges(values), RANGE_TRANSFORM)))
@@ -176,7 +176,7 @@ public final class ResourceSlot {
       boolean revocable) {
 
     Protos.Resource.Builder builder = Protos.Resource.newBuilder()
-        .setName(resourceType.getName())
+        .setName(resourceType.getMesosName())
         .setType(Protos.Value.Type.SCALAR)
         .setScalar(Protos.Value.Scalar.newBuilder().setValue(value));
 

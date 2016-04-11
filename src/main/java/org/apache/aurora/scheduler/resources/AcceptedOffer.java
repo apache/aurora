@@ -96,14 +96,14 @@ public final class AcceptedOffer {
     boolean revocable = tierInfo.isRevocable();
     List<Resource.Builder> cpuResources = filterToBuilders(
         reservedFirst,
-        ResourceType.CPUS.getName(),
+        ResourceType.CPUS.getMesosName(),
         revocable ? Resources.REVOCABLE : Resources.NON_REVOCABLE);
     List<Resource.Builder> memResources = filterToBuilderNonRevocable(
-        reservedFirst, ResourceType.RAM_MB.getName());
+        reservedFirst, ResourceType.RAM_MB.getMesosName());
     List<Resource.Builder> diskResources = filterToBuilderNonRevocable(
-        reservedFirst, ResourceType.DISK_MB.getName());
+        reservedFirst, ResourceType.DISK_MB.getMesosName());
     List<Resource.Builder> portsResources = filterToBuilderNonRevocable(
-        reservedFirst, ResourceType.PORTS.getName());
+        reservedFirst, ResourceType.PORTS.getMesosName());
 
     List<Resource> taskResources = ImmutableList.<Resource>builder()
         .addAll(allocateScalarType(cpuResources, taskSlot.getNumCpus(), revocable))

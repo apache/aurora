@@ -60,7 +60,7 @@ public class AsyncStatsModuleTest extends EasyMockTest {
 
   private static Protos.Resource getCpuResource(boolean revocable, double value) {
     Protos.Resource.Builder builder = Protos.Resource.newBuilder()
-        .setName(ResourceType.CPUS.getName())
+        .setName(ResourceType.CPUS.getMesosName())
         .setType(Protos.Value.Type.SCALAR)
         .setScalar(Protos.Value.Scalar.newBuilder().setValue(value));
 
