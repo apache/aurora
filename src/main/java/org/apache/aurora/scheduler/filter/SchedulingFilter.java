@@ -18,7 +18,7 @@ import java.util.Set;
 
 import com.google.common.base.MoreObjects;
 
-import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceSlot;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;

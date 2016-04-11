@@ -29,20 +29,20 @@ import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.Resources;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.offers.OfferManager;
+import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.ResourceSlot.NONE;
-import static org.apache.aurora.scheduler.Resources.NON_REVOCABLE;
-import static org.apache.aurora.scheduler.Resources.REVOCABLE;
+import static org.apache.aurora.scheduler.resources.ResourceSlot.NONE;
+import static org.apache.aurora.scheduler.resources.Resources.NON_REVOCABLE;
+import static org.apache.aurora.scheduler.resources.Resources.REVOCABLE;
 
 /**
  * Module to configure export of cluster-wide resource allocation and consumption statistics.

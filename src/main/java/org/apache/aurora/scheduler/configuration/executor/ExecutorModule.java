@@ -35,7 +35,7 @@ import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.gen.Volume;
-import org.apache.aurora.scheduler.ResourceType;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;
@@ -44,8 +44,8 @@ import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Type;
 
-import static org.apache.aurora.scheduler.ResourceType.CPUS;
-import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
  * Binding module for {@link ExecutorSettings}.

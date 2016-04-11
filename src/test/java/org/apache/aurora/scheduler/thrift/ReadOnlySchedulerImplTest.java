@@ -89,12 +89,12 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
-import static org.apache.aurora.scheduler.ResourceAggregates.LARGE;
-import static org.apache.aurora.scheduler.ResourceAggregates.MEDIUM;
-import static org.apache.aurora.scheduler.ResourceAggregates.SMALL;
-import static org.apache.aurora.scheduler.ResourceAggregates.XLARGE;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
+import static org.apache.aurora.scheduler.resources.ResourceAggregates.LARGE;
+import static org.apache.aurora.scheduler.resources.ResourceAggregates.MEDIUM;
+import static org.apache.aurora.scheduler.resources.ResourceAggregates.SMALL;
+import static org.apache.aurora.scheduler.resources.ResourceAggregates.XLARGE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_JOB;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_SCHEDULE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.IDENTITY;

@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler;
+package org.apache.aurora.scheduler.resources;
 
 import java.util.Collections;
 import java.util.List;
@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
+import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Resource;

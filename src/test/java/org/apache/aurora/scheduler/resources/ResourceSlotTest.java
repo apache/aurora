@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler;
+package org.apache.aurora.scheduler.resources;
 
 import java.util.Set;
 
@@ -27,15 +27,15 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.ResourceSlot.makeMesosRangeResource;
-import static org.apache.aurora.scheduler.ResourceSlot.makeMesosResource;
-import static org.apache.aurora.scheduler.ResourceSlot.sum;
-import static org.apache.aurora.scheduler.ResourceType.CPUS;
-import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
-import static org.apache.aurora.scheduler.ResourceType.PORTS;
-import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
+import static org.apache.aurora.scheduler.resources.ResourceSlot.makeMesosRangeResource;
+import static org.apache.aurora.scheduler.resources.ResourceSlot.makeMesosResource;
+import static org.apache.aurora.scheduler.resources.ResourceSlot.sum;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 

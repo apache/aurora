@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler;
+package org.apache.aurora.scheduler.resources;
 
 import java.util.List;
 import java.util.Objects;
@@ -29,6 +29,7 @@ import com.google.common.collect.Range;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
+import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
@@ -40,9 +41,9 @@ import org.apache.mesos.Protos.TaskInfo;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.quantity.Data.BYTES;
-import static org.apache.aurora.scheduler.ResourceType.CPUS;
-import static org.apache.aurora.scheduler.ResourceType.DISK_MB;
-import static org.apache.aurora.scheduler.ResourceType.RAM_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
  * Represents a single task/host aggregate resource vector unaware of any Mesos resource traits.

@@ -15,12 +15,12 @@ package org.apache.aurora.scheduler.mesos;
 
 import com.google.common.collect.ImmutableList;
 
-import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.ResourceType;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.configuration.executor.Executors;
+import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;
 import org.apache.mesos.Protos.ExecutorInfo;

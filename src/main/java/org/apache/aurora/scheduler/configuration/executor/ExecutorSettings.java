@@ -17,8 +17,8 @@ import java.util.Objects;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
-import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.ResourceType;
+import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceType;
 
 import static java.util.Objects.requireNonNull;
 
