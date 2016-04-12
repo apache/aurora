@@ -41,6 +41,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType;
 import org.apache.aurora.scheduler.mesos.Offers;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -51,10 +52,10 @@ import org.junit.Test;
 
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
-import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
-import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
-import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
-import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.junit.Assert.assertEquals;
 
 public class SchedulingFilterImplTest extends EasyMockTest {
@@ -133,7 +134,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
             new UnusedResource(twoPorts, hostA),
             new ResourceRequest(twoPortTask, EMPTY)));
     assertEquals(
-        ImmutableSet.of(PORTS.veto(1)),
+        ImmutableSet.of(veto(PORTS, 1)),
         defaultFilter.filter(
             new UnusedResource(twoPorts, hostA),
             new ResourceRequest(threePortTask, EMPTY)));
@@ -147,10 +148,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertVetoes(
         makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1),
         hostA,
-        CPU.veto(1), DISK.veto(1), RAM.veto(1));
-    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), hostA, CPU.veto(1));
-    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), hostA, RAM.veto(1));
-    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), hostA, DISK.veto(1));
+        veto(CPUS, 1), veto(DISK_MB, 1), veto(RAM_MB, 1));
+    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), hostA, veto(CPUS, 1));
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), hostA, veto(RAM_MB, 1));
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), hostA, veto(DISK_MB, 1));
   }
 
   @Test
@@ -419,10 +420,12 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     control.replay();
 
     int maxScore = VetoType.INSUFFICIENT_RESOURCES.getScore();
-    assertEquals((int) (maxScore * 1.0 / CPU.getRange()), CPU.veto(1).getScore());
-    assertEquals(maxScore, CPU.veto(CPU.getRange() * 10).getScore());
-    assertEquals((int) (maxScore * 2.0 / RAM.getRange()), RAM.veto(2).getScore());
-    assertEquals((int) (maxScore * 200.0 / DISK.getRange()), DISK.veto(200).getScore());
+    assertEquals((int) (maxScore * 1.0 / CPUS.getScalingRange()), veto(CPUS, 1).getScore());
+    assertEquals(maxScore, veto(CPUS, CPUS.getScalingRange() * 10).getScore());
+    assertEquals((int) (maxScore * 2.0 / RAM_MB.getScalingRange()), veto(RAM_MB, 2).getScore());
+    assertEquals(
+        (int) (maxScore * 200.0 / DISK_MB.getScalingRange()),
+        veto(DISK_MB, 200).getScore());
   }
 
   @Test
@@ -462,6 +465,12 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         Veto.identifyGroup(ImmutableSet.of(
             Veto.insufficientResources("ram", 100),
             Veto.unsatisfiedLimit("denied"))));
+  }
+
+  private static Veto veto(ResourceType resourceType, int excess) {
+    return Veto.insufficientResources(
+        resourceType.getAuroraName(),
+        SchedulingFilterImpl.scale(excess, resourceType.getScalingRange()));
   }
 
   private ITaskConfig checkConstraint(

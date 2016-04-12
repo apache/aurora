@@ -25,13 +25,13 @@ import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -41,80 +41,44 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
-import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
-import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
-import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
  * Implementation of the scheduling filter that ensures resource requirements of tasks are
  * fulfilled, and that tasks are allowed to run on the given machine.
  */
 public class SchedulingFilterImpl implements SchedulingFilter {
-  private static final Optional<Veto> NO_VETO = Optional.absent();
-
   private static final Set<MaintenanceMode> VETO_MODES = EnumSet.of(DRAINING, DRAINED);
 
-  // Scaling ranges to use for comparison of vetos.  This has no real bearing besides trying to
-  // determine if a veto along one resource vector is a 'stronger' veto than that of another vector.
-  // The values below represent the maximum resources on a typical slave machine.
   @VisibleForTesting
-  enum ResourceVector {
-    CPU("CPU", 16),
-    RAM("RAM", Amount.of(24, Data.GB).as(Data.MB)),
-    DISK("disk", Amount.of(450, Data.GB).as(Data.MB)),
-    PORTS("ports", 1000);
-
-    private final String name;
-    private final int range;
-    @VisibleForTesting
-    int getRange() {
-      return range;
-    }
-
-    ResourceVector(String name, int range) {
-      this.name = name;
-      this.range = range;
-    }
-
-    Optional<Veto> maybeVeto(double available, double requested) {
-      double tooLarge = requested - available;
-      if (tooLarge <= 0) {
-        return NO_VETO;
-      } else {
-        return Optional.of(veto(tooLarge));
-      }
-    }
-
-    private static int scale(double value, int range) {
-      return Math.min(
-          VetoType.INSUFFICIENT_RESOURCES.getScore(),
-          (int) (VetoType.INSUFFICIENT_RESOURCES.getScore() * value) / range);
-    }
-
-    @VisibleForTesting
-    Veto veto(double excess) {
-      return Veto.insufficientResources(name, scale(excess, range));
-    }
+  static int scale(double value, int range) {
+    return Math.min(
+        VetoType.INSUFFICIENT_RESOURCES.getScore(),
+        (int) (VetoType.INSUFFICIENT_RESOURCES.getScore() * value) / range);
   }
 
   private static void maybeAddVeto(
       ImmutableSet.Builder<Veto> vetoes,
-      ResourceVector vector,
+      ResourceType resourceType,
       double available,
       double requested) {
 
-    Optional<Veto> veto = vector.maybeVeto(available, requested);
-    if (veto.isPresent()) {
-      vetoes.add(veto.get());
+    double tooLarge = requested - available;
+    if (tooLarge > 0) {
+      vetoes.add(Veto.insufficientResources(
+          resourceType.getAuroraName(),
+          scale(tooLarge, resourceType.getScalingRange())));
     }
   }
 
   private static Set<Veto> getResourceVetoes(ResourceSlot available, ResourceSlot required) {
     ImmutableSet.Builder<Veto> vetoes = ImmutableSet.builder();
-    maybeAddVeto(vetoes, CPU, available.getNumCpus(), required.getNumCpus());
-    maybeAddVeto(vetoes, RAM, available.getRam().as(Data.MB), required.getRam().as(Data.MB));
-    maybeAddVeto(vetoes, DISK, available.getDisk().as(Data.MB), required.getDisk().as(Data.MB));
+    maybeAddVeto(vetoes, CPUS, available.getNumCpus(), required.getNumCpus());
+    maybeAddVeto(vetoes, RAM_MB, available.getRam().as(Data.MB), required.getRam().as(Data.MB));
+    maybeAddVeto(vetoes, DISK_MB, available.getDisk().as(Data.MB), required.getDisk().as(Data.MB));
     maybeAddVeto(vetoes, PORTS, available.getNumPorts(), required.getNumPorts());
     return vetoes.build();
   }
@@ -161,7 +125,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private Optional<Veto> getMaintenanceVeto(MaintenanceMode mode) {
     return VETO_MODES.contains(mode)
         ? Optional.of(Veto.maintenance(mode.toString().toLowerCase()))
-        : NO_VETO;
+        : Optional.absent();
   }
 
   private boolean isDedicated(IHostAttributes attributes) {

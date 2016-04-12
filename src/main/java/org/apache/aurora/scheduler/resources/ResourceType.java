@@ -15,40 +15,93 @@ package org.apache.aurora.scheduler.resources;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
+
 import static java.util.Objects.requireNonNull;
 
 /**
- * Describes Mesos resource types.
+ * Describes Mesos resource types and their Aurora traits.
  */
 @VisibleForTesting
 public enum ResourceType {
   /**
    * CPU resource.
    */
-  CPUS("cpus"),
+  CPUS("cpus", "CPU", 16),
 
   /**
    * RAM resource.
    */
-  RAM_MB("mem"),
+  RAM_MB("mem", "RAM", Amount.of(24, Data.GB).as(Data.MB)),
 
   /**
    * DISK resource.
    */
-  DISK_MB("disk"),
+  DISK_MB("disk", "disk", Amount.of(450, Data.GB).as(Data.MB)),
 
   /**
    * Port resource.
    */
-  PORTS("ports");
+  PORTS("ports", "ports", 1000);
 
-  private final String resourceName;
+  /**
+   * Mesos resource name.
+   */
+  private final String mesosName;
 
-  ResourceType(String resourceName) {
-    this.resourceName = requireNonNull(resourceName);
+  /**
+   * Aurora resource name.
+   */
+  private final String auroraName;
+
+  /**
+   * Scaling range to use for comparison of scheduling vetoes. This has no real bearing besides
+   * trying to determine if a veto along one resource vector is a 'stronger' veto than that of
+   * another vector. The value represents the typical slave machine resources.
+   */
+  private final int scalingRange;
+
+  /**
+   * Describes a Resource type.
+   *
+   * @param mesosName See {@link #getMesosName()} for more details.
+   * @param auroraName See {@link #getAuroraName()} for more details.
+   * @param scalingRange See {@link #getScalingRange()} for more details.
+   */
+  ResourceType(String mesosName, String auroraName, int scalingRange) {
+    this.mesosName = requireNonNull(mesosName);
+    this.auroraName = requireNonNull(auroraName);
+    this.scalingRange = scalingRange;
   }
 
+  /**
+   * Gets Mesos resource name.
+   * <p>
+   * @see <a href="https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto/">Mesos
+   * protobuf for more details</a>
+   *
+   * @return Mesos resource name.
+   */
   public String getMesosName() {
-    return resourceName;
+    return mesosName;
+  }
+
+  /**
+   * Gets resource name for internal Aurora representation (e.g. in the UI).
+   *
+   * @return Aurora resource name.
+   */
+  public String getAuroraName() {
+    return auroraName;
+  }
+
+  /**
+   * Returns scaling range for comparing scheduling vetoes.
+   *
+   * @return Resource scaling range.
+   */
+  public int getScalingRange() {
+    return scalingRange;
   }
 }
