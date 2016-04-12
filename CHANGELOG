@@ -1,3 +1,12 @@
+Aurora 0.13.0
+--------------------------------------------------------------------------------
+## Story
+    * [AURORA-1653] - Add a way to get the running version of aurora in the UI
+
+## Task
+    * [AURORA-1493] - create ELB-friendly endpoint to detect leading scheduler
+
+
 Aurora 0.12.0
 --------------------------------------------------------------------------------
 ## Bug
