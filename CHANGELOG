@@ -1,10 +1,61 @@
 Aurora 0.13.0
 --------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1615] - Preemptor crashes scheduler during host maintenance
+    * [AURORA-1604] - Identity.role is still used in the UI leading to duplicate instances on job page
+    * [AURORA-1630] - Updater is using non-logging executor and does not kill scheduler on error
+    * [AURORA-1614] - Failed sandbox initialization can cause tasks to go LOST
+    * [AURORA-1625] - ConcurrentModificationException in TaskHistoryPruner with DbTaskStore
+    * [AURORA-1650] - I* entity objects have incorrect isSet* methods for collection types
+    * [AURORA-1628] - ShiroAuthorizingParamInterceptor failure messages are not descriptive
+    * [AURORA-1642] - Thermos runner finalization is broken
+    * [AURORA-1641] - Shell health checker is running as root
+    * [AURORA-1647] - The install docs are inaccurate.
+    * [AURORA-1633] - Cannot pass in environment variables into shell health check command
+
+## Epic
+    * [AURORA-1424] - Improve build process
+    * [AURORA-1343] - Aurora support for Mesos revocable offers
+
 ## Story
     * [AURORA-1653] - Add a way to get the running version of aurora in the UI
+    * [AURORA-1643] - Support authentication between announcer and ZK
+    * [AURORA-1627] - Implement DB snapshotting
+    * [AURORA-1114] - Upgrade virtualenv to fix SSL incompatibility on certain systems
+    * [AURORA-1629] - Populate DiscoveryInfo in TaskInfo/ExecutorInfo
+    * [AURORA-1611] - Add support for IP addresses instead of just hostnames in Announcer
+    * [AURORA-1258] - Improve procedure for adding instances to a job
+    * [AURORA-604] - use scaled aurora logo rather than scaling with browser
+    * [AURORA-1626] - Update Thrift binary to point at new repository location for builds
+    * [AURORA-1652] - /maintenance endpoint can result in 500
+    * [AURORA-1648] - Use of `dbScript` field and schema changes can cause crashes
+    * [AURORA-1598] - Remove fields made redundant by JobKey fields
+    * [AURORA-1262] - Improve documentation of at-least-one semantics for instance ID
 
 ## Task
     * [AURORA-1493] - create ELB-friendly endpoint to detect leading scheduler
+    * [AURORA-1619] - Generate documentation for command line args for all Aurora binaries
+    * [AURORA-1324] - Reevaluate the effectiveness of DBStorage.bulkLoad()
+    * [AURORA-1622] - Add ability to pass in environment variables into shell health checker
+    * [AURORA-1613] - Publish documentation for 0.12.0
+    * [AURORA-1591] - Remove TaskQuery argument in killTasks RPC.
+    * [AURORA-1585] - Aurora 0.13.0 deprecations
+    * [AURORA-1645] - Deschedule cron should not fail if the job is not scheduled
+    * [AURORA-1612] - Publish RPMs and debs for 0.12.0
+    * [AURORA-1004] - Document setQuota
+    * [AURORA-1586] - Aurora 0.13.0 backwards incompatible changes
+    * [AURORA-1606] - Remove deprecated executor flag announcer-enable
+    * [AURORA-1617] - Install instructions should point out the critical step of matching mesos slave --work_dir to the observer --mesos-root
+    * [AURORA-734] - document the behavior of finalization_wait in thermos
+    * [AURORA-1605] - Update recovery docs to reflect changes
+    * [AURORA-1635] - Update Scheduler storage to support storing images
+    * [AURORA-1581] - Consider removing unused client updater RPCs
+    * [AURORA-1068] - Document task throttling algorithm
+    * [AURORA-1592] - Remove unscoped shiro permissions when TaskQuery is gone from killTasks
+    * [AURORA-1595] - Remove AddInstancesConfig in addInstances RPC
+    * [AURORA-1558] - Aurora 0.12.0 release candidate
+    * [AURORA-955] - more minimal http url to determine aurora leader
+    * [AURORA-869] - Document all available scheduler command line options
 
 
 Aurora 0.12.0
