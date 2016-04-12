@@ -47,6 +47,7 @@ public final class DbTaskConfig {
   private List<Metadata> metadata;
   private DbContainer container;
   private String tier;
+  private DbImage image;
 
   private DbTaskConfig() {
   }
@@ -67,6 +68,7 @@ public final class DbTaskConfig {
         .setMaxTaskFailures(maxTaskFailures)
         .setProduction(production)
         .setTier(tier)
+        .setImage(image == null ? null : image.toThrift())
         .setConstraints(constraints.stream()
             .map(DbConstraint::toThrift)
             .collect(GuavaUtils.toImmutableSet()))

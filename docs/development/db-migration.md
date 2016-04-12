@@ -10,9 +10,10 @@ a snapshot is restored, no manual interaction is required by cluster operators.
 
 Upgrades
 --------
-When adding or altering tables or changing data, a new migration class should be created under the
-org.apache.aurora.scheduler.storage.db.migration package. The class should implement the
-[MigrationScript](https://github.com/mybatis/migrations/blob/master/src/main/java/org/apache/ibatis/migration/MigrationScript.java)
+When adding or altering tables or changing data, in addition to making to change in
+[schema.sql](../../src/main/resources/org/apache/aurora/scheduler/storage/db/schema.sql), a new
+migration class should be created under the org.apache.aurora.scheduler.storage.db.migration
+package. The class should implement the [MigrationScript](https://github.com/mybatis/migrations/blob/master/src/main/java/org/apache/ibatis/migration/MigrationScript.java)
 interface (see [V001_TestMigration](../../src/test/java/org/apache/aurora/scheduler/storage/db/testmigration/V001_TestMigration.java)
 as an example). The upgrade and downgrade scripts are defined in this class. When restoring a
 snapshot the list of migrations on the classpath is compared to the list of applied changes in the
@@ -28,6 +29,6 @@ applied.
 Baselines
 ---------
 After enough time has passed (at least 1 official release), it should be safe to baseline migrations
-if desired. This can be accomplished by adding the changes from migrations directly to
-[schema.sql](../../src/main/resources/org/apache/aurora/scheduler/storage/db/schema.sql), removing
-the corresponding migration classes and adding a migration to remove the changelog entries.
+if desired. This can be accomplished by ensuring the changes from migrations have been applied to
+[schema.sql](../../src/main/resources/org/apache/aurora/scheduler/storage/db/schema.sql) and then
+removing the corresponding migration classes and adding a migration to remove the changelog entries.

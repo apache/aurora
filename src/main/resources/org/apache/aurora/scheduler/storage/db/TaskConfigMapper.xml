@@ -108,6 +108,19 @@
     <association property="docker" resultMap="dockerContainerMap"/>
   </resultMap>
 
+  <resultMap id="dockerImageMap" type="org.apache.aurora.gen.DockerImage">
+    <id column="id" />
+  </resultMap>
+
+  <resultMap id="appcImageMap" type="org.apache.aurora.gen.AppcImage">
+    <id column="id" />
+  </resultMap>
+
+  <resultMap id="imageMap" type="org.apache.aurora.scheduler.storage.db.views.DbImage">
+    <association property="appc" columnPrefix="appc_" resultMap="appcImageMap" />
+    <association property="docker" columnPrefix="docker_" resultMap="dockerImageMap" />
+  </resultMap>
+
   <resultMap id="metadataMap" type="org.apache.aurora.gen.Metadata">
     <id column="id" />
   </resultMap>
@@ -122,6 +135,7 @@
         resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
         columnPrefix="j_"/>
     <association property="container" resultMap="containerMap" columnPrefix="c_"/>
+    <association property="image" resultMap="imageMap" columnPrefix="image_" />
     <collection
         property="constraints"
         columnPrefix="constraint_"
@@ -161,6 +175,10 @@
       m.id AS m_id,
       m.key AS m_key,
       m.value AS m_value,
+      di.name as image_docker_name,
+      di.tag as image_docker_tag,
+      ai.name as image_appc_name,
+      ai.image_id as image_appc_image_id,
       tc.id AS constraint_id,
       tc.name AS constraint_name,
       tlc.id AS constraint_l_id,
@@ -173,6 +191,8 @@
     LEFT OUTER JOIN task_config_requested_ports AS p ON p.task_config_id = c.id
     LEFT OUTER JOIN task_config_docker_containers AS d ON d.task_config_id = c.id
     LEFT OUTER JOIN task_config_metadata AS m ON m.task_config_id = c.id
+    LEFT OUTER JOIN task_config_docker_images AS di ON di.task_config_id = c.id
+    LEFT OUTER JOIN task_config_appc_images AS ai ON ai.task_config_id = c.id
     LEFT OUTER JOIN task_constraints AS tc ON tc.task_config_id = c.id
     LEFT OUTER JOIN limit_constraints as tlc ON tlc.constraint_id = tc.id
     LEFT OUTER JOIN value_constraints as tvc ON tvc.constraint_id = tc.id
@@ -296,6 +316,30 @@
       #{parameter.name},
       #{parameter.value}
     </foreach>
+    )
+  </insert>
+
+  <insert id="insertDockerImage">
+    INSERT INTO task_config_docker_images (
+      task_config_id,
+      name,
+      tag
+    ) VALUES (
+      #{configId},
+      #{name},
+      #{tag}
+    )
+  </insert>
+
+  <insert id="insertAppcImage">
+    INSERT INTO task_config_appc_images (
+      task_config_id,
+      name,
+      image_id
+    ) VALUES (
+      #{configId},
+      #{name},
+      #{imageId}
     )
   </insert>
 

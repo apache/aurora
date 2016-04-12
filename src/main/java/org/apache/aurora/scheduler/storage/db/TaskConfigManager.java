@@ -22,8 +22,11 @@ import com.google.common.collect.Maps;
 
 import org.apache.aurora.scheduler.storage.db.views.DbTaskConfig;
 import org.apache.aurora.scheduler.storage.db.views.Pairs;
+import org.apache.aurora.scheduler.storage.entities.IAppcImage;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
+import org.apache.aurora.scheduler.storage.entities.IDockerImage;
+import org.apache.aurora.scheduler.storage.entities.IImage;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 
@@ -107,13 +110,35 @@ class TaskConfigManager {
       configMapper.insertMetadata(configInsert.getId(), config.getMetadata());
     }
 
-    // TODO(wfarner): It would be nice if this generalized to different Container types.
     if (config.getContainer().isSetDocker()) {
       IDockerContainer container = config.getContainer().getDocker();
       InsertResult containerInsert = new InsertResult();
       configMapper.insertContainer(configInsert.getId(), container, containerInsert);
       if (!container.getParameters().isEmpty()) {
         configMapper.insertDockerParameters(containerInsert.getId(), container.getParameters());
+      }
+    }
+
+    if (config.isSetImage()) {
+      IImage image = config.getImage();
+
+      switch (image.getSetField()) {
+        case DOCKER:
+          IDockerImage dockerImage = image.getDocker();
+          configMapper.insertDockerImage(
+              configInsert.getId(),
+              dockerImage.getName(),
+              dockerImage.getTag());
+          break;
+        case APPC:
+          IAppcImage appcImage = image.getAppc();
+          configMapper.insertAppcImage(
+              configInsert.getId(),
+              appcImage.getName(),
+              appcImage.getImageId());
+          break;
+        default:
+          throw new IllegalStateException("Unexpected image type: " + image.getSetField());
       }
     }
 

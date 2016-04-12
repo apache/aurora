@@ -79,7 +79,7 @@ public final class DbUtil {
   /**
    * Creates a new, empty storage system with a task store defined by the command line flag.
    *
-   * @return An new storage instance.
+   * @return A new storage instance.
    */
   public static Storage createFlaggedStorage() {
     return createStorageInjector(testModuleWithWorkQueue(PLAIN, Optional.absent()))
