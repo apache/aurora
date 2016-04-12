@@ -256,8 +256,8 @@ Apache Aurora ${current_version} release.
 
 Aurora ${rc_version} includes the following:
 ---
-The NEWS for the release is available at:
-${aurora_git_web_url}&f=NEWS&hb=${rc_version_tag}
+The RELEASE NOTES for the release are available at:
+${aurora_git_web_url}&f=RELEASE-NOTES.md&hb=${rc_version_tag}
 
 The CHANGELOG for the release is available at:
 ${aurora_git_web_url}&f=CHANGELOG&hb=${rc_version_tag}
