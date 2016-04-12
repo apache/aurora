@@ -178,6 +178,8 @@ project(':commons') {
     compile "junit:junit:${junitRev}"
 
     testCompile "junit:junit:${junitRev}"
+    testCompile "org.powermock:powermock-module-junit4:1.6.4"
+    testCompile "org.powermock:powermock-api-easymock:1.6.4"
   }
 }
 

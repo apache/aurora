@@ -13,26 +13,11 @@
  */
 package org.apache.aurora.common.zookeeper;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.net.InetSocketAddress;
-import java.nio.charset.Charset;
 import java.util.Map;
 
-import javax.annotation.Nullable;
-
-import com.google.common.base.Charsets;
-import com.google.common.collect.Maps;
-import com.google.gson.Gson;
-
 import org.apache.aurora.common.io.Codec;
-import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.common.thrift.Status;
 import org.apache.aurora.common.zookeeper.Group.JoinException;
 
 /**
@@ -49,68 +34,7 @@ public interface ServerSet {
    *
    * This is the default encoding for service instance data in ZooKeeper.
    */
-  Codec<ServiceInstance> JSON_CODEC = new Codec<ServiceInstance>() {
-    class EndpointSchema {
-      private final String host;
-      private final int port;
-
-      EndpointSchema(Endpoint endpoint) {
-        host = endpoint.getHost();
-        port = endpoint.getPort();
-      }
-
-      Endpoint asEndpoint() {
-        return new Endpoint(host, port);
-      }
-    }
-
-    class ServiceInstanceSchema {
-      private final EndpointSchema serviceEndpoint;
-      private final Map<String, EndpointSchema> additionalEndpoints;
-      private final Status status;
-      private final @Nullable Integer shard;
-
-      ServiceInstanceSchema(ServiceInstance instance) {
-        serviceEndpoint = new EndpointSchema(instance.getServiceEndpoint());
-        if (instance.getAdditionalEndpoints() != null) {
-          additionalEndpoints =
-              Maps.transformValues(instance.getAdditionalEndpoints(), EndpointSchema::new);
-        } else {
-          additionalEndpoints = Maps.newHashMap();
-        }
-        status  = instance.getStatus();
-        shard = instance.isSetShard() ? instance.getShard() : null;
-      }
-
-      ServiceInstance asServiceInstance() {
-        ServiceInstance instance =
-            new ServiceInstance(
-                serviceEndpoint.asEndpoint(),
-                Maps.transformValues(additionalEndpoints, EndpointSchema::asEndpoint),
-                status);
-        if (shard != null) {
-          instance.setShard(shard);
-        }
-        return instance;
-      }
-    }
-
-    private final Charset encoding = Charsets.UTF_8;
-    private final Gson gson = new Gson();
-
-    @Override
-    public void serialize(ServiceInstance instance, OutputStream sink) throws IOException {
-      Writer writer = new OutputStreamWriter(sink, encoding);
-      gson.toJson(new ServiceInstanceSchema(instance), writer);
-      writer.flush();
-    }
-
-    @Override
-    public ServiceInstance deserialize(InputStream source) throws IOException {
-      InputStreamReader reader = new InputStreamReader(source, encoding);
-      return gson.fromJson(reader, ServiceInstanceSchema.class).asServiceInstance();
-    }
-  };
+  Codec<ServiceInstance> JSON_CODEC = new JsonCodec();
 
   /**
    * Attempts to join a server set for this logical service group.

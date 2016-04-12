@@ -13,26 +13,40 @@
  */
 package org.apache.aurora.common.zookeeper;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
+import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
 
 import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
+import org.easymock.EasyMock;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.powermock.api.easymock.PowerMock;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunner;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-public class ServerSetTest {
+@RunWith(PowerMockRunner.class)
+@PrepareForTest(Gson.class)
+public class JsonCodecTest {
+
+  private static final Codec<ServiceInstance> STANDARD_JSON_CODEC = new JsonCodec();
 
   @Test
   public void testJsonCodecRoundtrip() throws Exception {
-    Codec<ServiceInstance> codec = ServerSet.JSON_CODEC;
+    Codec<ServiceInstance> codec = STANDARD_JSON_CODEC;
     ServiceInstance instance1 = new ServiceInstance(
         new Endpoint("foo", 1000),
         ImmutableMap.of("http", new Endpoint("foo", 8080)),
@@ -67,12 +81,71 @@ public class ServerSetTest {
         Status.ALIVE).setShard(42);
 
     ByteArrayOutputStream results = new ByteArrayOutputStream();
-    ServerSet.JSON_CODEC.serialize(instance, results);
+    STANDARD_JSON_CODEC.serialize(instance, results);
     assertEquals(
         "{\"serviceEndpoint\":{\"host\":\"foo\",\"port\":1000},"
             + "\"additionalEndpoints\":{\"http\":{\"host\":\"foo\",\"port\":8080}},"
             + "\"status\":\"ALIVE\","
             + "\"shard\":42}",
         results.toString());
+  }
+
+  @Test
+  public void testInvalidSerialize() {
+    // Gson is final so we need to call on PowerMock here.
+    Gson gson = PowerMock.createMock(Gson.class);
+    gson.toJson(EasyMock.isA(Object.class), EasyMock.isA(Appendable.class));
+    EasyMock.expectLastCall().andThrow(new JsonIOException("error"));
+    PowerMock.replay(gson);
+
+    ServiceInstance instance =
+        new ServiceInstance(new Endpoint("foo", 1000), ImmutableMap.of(), Status.ALIVE);
+
+    try {
+      new JsonCodec(gson).serialize(instance, new ByteArrayOutputStream());
+      fail();
+    } catch (IOException e) {
+      // Expected.
+    }
+
+    PowerMock.verify(gson);
+  }
+
+  @Test
+  public void testDeserializeMinimal() throws IOException {
+    String minimal = "{\"serviceEndpoint\":{\"host\":\"foo\",\"port\":1000},\"status\":\"ALIVE\"}";
+    ByteArrayInputStream source = new ByteArrayInputStream(minimal.getBytes(Charsets.UTF_8));
+    ServiceInstance actual = STANDARD_JSON_CODEC.deserialize(source);
+    ServiceInstance expected =
+        new ServiceInstance(new Endpoint("foo", 1000), ImmutableMap.of(), Status.ALIVE);
+    assertEquals(expected, actual);
+  }
+
+  @Test
+  public void testInvalidDeserialize() {
+    // Not JSON.
+    assertInvalidDeserialize(new byte[] {0xC, 0xA, 0xF, 0xE});
+
+    // No JSON object.
+    assertInvalidDeserialize("");
+    assertInvalidDeserialize("[]");
+
+    // Missing required fields.
+    assertInvalidDeserialize("{}");
+    assertInvalidDeserialize("{\"serviceEndpoint\":{\"host\":\"foo\",\"port\":1000}}");
+    assertInvalidDeserialize("{\"status\":\"ALIVE\"}");
+  }
+
+  private void assertInvalidDeserialize(String data) {
+    assertInvalidDeserialize(data.getBytes(Charsets.UTF_8));
+  }
+
+  private void assertInvalidDeserialize(byte[] data) {
+    try {
+      STANDARD_JSON_CODEC.deserialize(new ByteArrayInputStream(data));
+      fail();
+    } catch (IOException e) {
+      // Expected.
+    }
   }
 }
