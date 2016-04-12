@@ -22,6 +22,7 @@ import java.util.function.Predicate;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
@@ -146,6 +147,19 @@ public class CuratorServiceGroupMonitorTest extends BaseZooKeeperTest {
   }
 
   @Test
+  public void testInvalidMemberNode() throws Exception {
+    startGroupMonitor();
+
+    createMember(ThriftBinaryCodec.encode(serviceInstance("invalid")));
+
+    ServiceInstance member = serviceInstance("member");
+    createMember(member);
+
+    // Invalid member should be ignored.
+    assertEquals(ImmutableSet.of(member), groupMonitor.get());
+  }
+
+  @Test
   public void testStartBlocksOnInitialMembership() throws Exception {
     ServiceInstance one = serviceInstance("one");
     createMember(one, false /* waitForGroupEvent */);
@@ -172,10 +186,18 @@ public class CuratorServiceGroupMonitorTest extends BaseZooKeeperTest {
   private String createMember(ServiceInstance serviceInstance, boolean waitForGroupEvent)
       throws Exception {
 
+    return createMember(serialize(serviceInstance), waitForGroupEvent);
+  }
+
+  private String createMember(byte[] nodeData) throws Exception {
+    return createMember(nodeData, true /* waitForGroupEvent */);
+  }
+
+  private String createMember(byte[] nodeData, boolean waitForGroupEvent) throws Exception {
     String path = client.create()
         .creatingParentsIfNeeded()
         .withMode(CreateMode.EPHEMERAL_SEQUENTIAL)
-        .forPath(ZKPaths.makePath(GROUP_PATH, MEMBER_TOKEN), serialize(serviceInstance));
+        .forPath(ZKPaths.makePath(GROUP_PATH, MEMBER_TOKEN), nodeData);
     if (waitForGroupEvent) {
       expectGroupEvent(PathChildrenCacheEvent.Type.CHILD_ADDED);
     }
