@@ -70,6 +70,16 @@ This command uses the configuration scripts in the Aurora distribution to:
 
 This process takes several minutes to complete.
 
+You may notice a warning that guest additions in the VM don't match your version of VirtualBox.
+This should generally be harmless, but you may wish to install a vagrant plugin to take care of
+mismatches like this for you:
+
+     vagrant plugin install vagrant-vbguest
+
+With this plugin installed, whenever you `vagrant up` the plugin will upgrade the guest additions
+for you when a version mis-match is detected. You can read more about the plugin
+[here](https://github.com/dotless-de/vagrant-vbguest).
+
 To verify that Aurora is running on the cluster, visit the following URLs:
 
 * Scheduler - http://192.168.33.7:8081
