@@ -19,6 +19,7 @@ import java.net.InetSocketAddress;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
@@ -32,8 +33,8 @@ import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.inject.Bindings.KeyFactory;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 import org.apache.aurora.common.zookeeper.testing.ZooKeeperTestServer;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
@@ -139,7 +140,8 @@ public class ZooKeeperClientModule extends AbstractModule {
       return new ZooKeeperClient(
           config.sessionTimeout,
           config.credentials,
-          InetSocketAddress.createUnresolved("localhost", testServer.getPort()));
+          Optional.absent(), // chrootPath
+          ImmutableList.of(InetSocketAddress.createUnresolved("localhost", testServer.getPort())));
     }
   }
 
@@ -153,7 +155,7 @@ public class ZooKeeperClientModule extends AbstractModule {
     public final boolean inProcess;
     public final Amount<Integer, Time> sessionTimeout;
     public final Optional<String> chrootPath;
-    public final Credentials credentials;
+    public final Optional<Credentials> credentials;
 
     /**
      * Creates a new client configuration.
@@ -169,7 +171,7 @@ public class ZooKeeperClientModule extends AbstractModule {
         Optional<String> chrootPath,
         boolean inProcess,
         Amount<Integer, Time> sessionTimeout,
-        Credentials credentials) {
+        Optional<Credentials> credentials) {
 
       this.servers = servers;
       this.chrootPath = chrootPath;
@@ -187,10 +189,10 @@ public class ZooKeeperClientModule extends AbstractModule {
     public static ClientConfig create(Iterable<InetSocketAddress> servers) {
       return new ClientConfig(
           servers,
-          Optional.<String> absent(),
+          Optional.absent(), // chrootPath
           false,
           ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT,
-          Credentials.NONE);
+          Optional.absent()); // credentials
     }
 
     /**
@@ -201,7 +203,12 @@ public class ZooKeeperClientModule extends AbstractModule {
      * @return A modified clone of this configuration.
      */
     public ClientConfig withCredentials(Credentials newCredentials) {
-      return new ClientConfig(servers, chrootPath, inProcess, sessionTimeout, newCredentials);
+      return new ClientConfig(
+          servers,
+          chrootPath,
+          inProcess,
+          sessionTimeout,
+          Optional.of(newCredentials));
     }
   }
 }

@@ -44,9 +44,9 @@ import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.stats.Stats;
+import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
@@ -193,7 +193,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
                     .setStatsUrlPrefix(STATS_URL_PREFIX)));
       }
     };
-    Credentials credentials = ZooKeeperClient.digestCredentials("mesos", "mesos");
+    Credentials credentials = Credentials.digestCredentials("mesos", "mesos");
     ClientConfig zkClientConfig = ClientConfig
         .create(ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
         .withCredentials(credentials);
@@ -204,7 +204,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
             .add(new TierModule(TaskTestUtil.DEV_TIER_CONFIG))
             .add(new LogStorageModule())
             .add(new ZooKeeperClientModule(zkClientConfig))
-            .add(new ServiceDiscoveryModule(SERVERSET_PATH, credentials))
+            .add(new ServiceDiscoveryModule(SERVERSET_PATH, Optional.of(credentials)))
             .add(testModule)
             .build()
     );

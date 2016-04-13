@@ -16,6 +16,8 @@ package org.apache.aurora.scheduler.zookeeper.guice.client.flagged;
 import java.net.InetSocketAddress;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
@@ -25,8 +27,7 @@ import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
+import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 
@@ -52,7 +53,7 @@ public final class FlaggedClientConfig {
 
   @CmdLine(name = "zk_digest_credentials",
            help = "user:password to use when authenticating with ZooKeeper.")
-  private static final Arg<String> DIGEST_CREDENTIALS = Arg.create();
+  private static final Arg<String> DIGEST_CREDENTIALS = Arg.create(null);
 
   private FlaggedClientConfig() {
     // Utility class.
@@ -69,18 +70,19 @@ public final class FlaggedClientConfig {
         Optional.fromNullable(CHROOT_PATH.get()),
         IN_PROCESS.get(),
         SESSION_TIMEOUT.get(),
-        DIGEST_CREDENTIALS.hasAppliedValue()
-            ? getCredentials(DIGEST_CREDENTIALS.get())
-            : Credentials.NONE
-    );
+        getCredentials(DIGEST_CREDENTIALS.get()));
   }
 
-  private static Credentials getCredentials(String userAndPass) {
+  private static Optional<Credentials> getCredentials(@Nullable String userAndPass) {
+    if (userAndPass == null) {
+      return Optional.absent();
+    }
+
     List<String> parts = ImmutableList.copyOf(Splitter.on(":").split(userAndPass));
     if (parts.size() != 2) {
       throw new IllegalArgumentException(
           "zk_digest_credentials must be formatted as user:pass");
     }
-    return ZooKeeperClient.digestCredentials(parts.get(0), parts.get(1));
+    return Optional.of(Credentials.digestCredentials(parts.get(0), parts.get(1)));
   }
 }

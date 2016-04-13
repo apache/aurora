@@ -20,7 +20,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient.ZooKeeperConnectionException;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.zookeeper.CreateMode;
@@ -31,7 +30,6 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -163,7 +161,7 @@ public class ZooKeeperClientTest extends BaseZooKeeperClientTest {
         authenticatedClient.get().create(path, "42".getBytes(),
             ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL, CreateMode.PERSISTENT));
 
-    ZooKeeperClient unauthenticatedClient = createZkClient(Credentials.NONE);
+    ZooKeeperClient unauthenticatedClient = createZkClient();
     assertEquals("42", getData(unauthenticatedClient, path));
     try {
       setData(unauthenticatedClient, path, "37");
@@ -184,39 +182,6 @@ public class ZooKeeperClientTest extends BaseZooKeeperClientTest {
     ZooKeeperClient authenticatedClient2 = createZkClient("creator", "creator");
     setData(authenticatedClient2, path, "37");
     assertEquals("37", getData(authenticatedClient2, path));
-  }
-
-  @Test
-  public void testHasCredentials() {
-    assertFalse(createZkClient().hasCredentials());
-    assertFalse(createZkClient(Credentials.NONE).hasCredentials());
-    assertFalse(createZkClient(new Credentials() {
-      @Override
-      public void authenticate(ZooKeeper zooKeeper) {
-        // noop
-      }
-      @Override public String scheme() {
-        return "";
-      }
-      @Override public byte[] authToken() {
-        return new byte[0];
-      }
-    }).hasCredentials());
-
-    assertTrue(createZkClient("creator", "creator").hasCredentials());
-    assertTrue(createZkClient(new Credentials() {
-      @Override public void authenticate(ZooKeeper zooKeeper) {
-        // noop
-      }
-      @Override public String scheme() {
-        return "custom";
-      }
-      @Override public byte[] authToken() {
-        // a zero-length token should be ok - ZooKeeper says nothing about the validity of token
-        // data a scheme can accept.
-        return new byte[0];
-      }
-    }).hasCredentials());
   }
 
   @Test

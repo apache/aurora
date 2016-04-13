@@ -33,6 +33,7 @@ import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.net.InetSocketAddressHelper;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
@@ -142,15 +143,26 @@ public class MesosLogStreamModule extends PrivateModule {
     String zkConnectString = Joiner.on(',').join(
         Iterables.transform(zkClientConfig.servers, InetSocketAddressHelper::toString));
 
-    return new Log(
-        QUORUM_SIZE.get(),
-        logPath.getAbsolutePath(),
-        zkConnectString,
-        zkClientConfig.sessionTimeout.getValue(),
-        zkClientConfig.sessionTimeout.getUnit().getTimeUnit(),
-        zkLogGroupPath,
-        zkClientConfig.credentials.scheme(),
-        zkClientConfig.credentials.authToken());
+    if (zkClientConfig.credentials.isPresent()) {
+      Credentials zkCredentials = zkClientConfig.credentials.get();
+      return new Log(
+          QUORUM_SIZE.get(),
+          logPath.getAbsolutePath(),
+          zkConnectString,
+          zkClientConfig.sessionTimeout.getValue(),
+          zkClientConfig.sessionTimeout.getUnit().getTimeUnit(),
+          zkLogGroupPath,
+          zkCredentials.scheme(),
+          zkCredentials.authToken());
+    } else {
+      return new Log(
+          QUORUM_SIZE.get(),
+          logPath.getAbsolutePath(),
+          zkConnectString,
+          zkClientConfig.sessionTimeout.getValue(),
+          zkClientConfig.sessionTimeout.getUnit().getTimeUnit(),
+          zkLogGroupPath);
+    }
   }
 
   @Provides

@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 
 /**
@@ -89,15 +90,15 @@ public abstract class BaseZooKeeperClientTest extends BaseZooKeeperTest {
    * with the default session timeout.
    */
   protected final ZooKeeperClient createZkClient() {
-    return createZkClient(ZooKeeperClient.Credentials.NONE);
+    return createZkClient(defaultSessionTimeout, Optional.absent(), Optional.absent());
   }
 
   /**
    * Returns a new authenticated zookeeper client connected to the in-process zookeeper server with
    * the default session timeout.
    */
-  protected final ZooKeeperClient createZkClient(ZooKeeperClient.Credentials credentials) {
-    return createZkClient(defaultSessionTimeout, credentials, Optional.absent());
+  protected final ZooKeeperClient createZkClient(Credentials credentials) {
+    return createZkClient(defaultSessionTimeout, Optional.of(credentials), Optional.absent());
   }
 
   /**
@@ -106,7 +107,7 @@ public abstract class BaseZooKeeperClientTest extends BaseZooKeeperTest {
    * with the given {@code username} and {@code password}.
    */
   protected final ZooKeeperClient createZkClient(String username, String password) {
-    return createZkClient(ZooKeeperClient.digestCredentials(username, password));
+    return createZkClient(Credentials.digestCredentials(username, password));
   }
 
   /**
@@ -114,7 +115,7 @@ public abstract class BaseZooKeeperClientTest extends BaseZooKeeperTest {
    * with a custom {@code sessionTimeout}.
    */
   protected final ZooKeeperClient createZkClient(Amount<Integer, Time> sessionTimeout) {
-    return createZkClient(sessionTimeout, ZooKeeperClient.Credentials.NONE, Optional.absent());
+    return createZkClient(sessionTimeout, Optional.absent(), Optional.absent());
   }
 
   /**
@@ -122,13 +123,13 @@ public abstract class BaseZooKeeperClientTest extends BaseZooKeeperTest {
    * the default session timeout and the custom chroot path.
    */
   protected final ZooKeeperClient createZkClient(String chrootPath) {
-    return createZkClient(defaultSessionTimeout, ZooKeeperClient.Credentials.NONE,
+    return createZkClient(defaultSessionTimeout, Optional.absent(),
         Optional.of(chrootPath));
   }
 
   private ZooKeeperClient createZkClient(
       Amount<Integer, Time> sessionTimeout,
-      ZooKeeperClient.Credentials credentials,
+      Optional<Credentials> credentials,
       Optional<String> chrootPath) {
 
     ZooKeeperClient client = new ZooKeeperClient(sessionTimeout, credentials, chrootPath,

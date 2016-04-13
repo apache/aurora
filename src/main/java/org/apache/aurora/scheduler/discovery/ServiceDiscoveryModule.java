@@ -17,17 +17,18 @@ import java.util.List;
 
 import javax.inject.Singleton;
 
+import com.google.common.base.Optional;
 import com.google.inject.Exposed;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 
 import org.apache.aurora.common.net.pool.DynamicHostSet;
 import org.apache.aurora.common.thrift.ServiceInstance;
+import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
 import org.apache.aurora.common.zookeeper.SingletonService;
 import org.apache.aurora.common.zookeeper.SingletonServiceImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.zookeeper.data.ACL;
@@ -44,9 +45,9 @@ public class ServiceDiscoveryModule extends PrivateModule {
   private static final Logger LOG = LoggerFactory.getLogger(ServiceDiscoveryModule.class);
 
   private final String serverSetPath;
-  private final Credentials zkCredentials;
+  private final Optional<Credentials> zkCredentials;
 
-  public ServiceDiscoveryModule(String serverSetPath, Credentials zkCredentials) {
+  public ServiceDiscoveryModule(String serverSetPath, Optional<Credentials> zkCredentials) {
     this.serverSetPath = requireNonNull(serverSetPath);
     this.zkCredentials = requireNonNull(zkCredentials);
   }
@@ -62,11 +63,11 @@ public class ServiceDiscoveryModule extends PrivateModule {
   @Provides
   @Singleton
   List<ACL> provideAcls() {
-    if (zkCredentials == Credentials.NONE) {
+    if (zkCredentials.isPresent()) {
+      return ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL;
+    } else {
       LOG.warn("Running without ZooKeeper digest credentials. ZooKeeper ACLs are disabled.");
       return ZooKeeperUtils.OPEN_ACL_UNSAFE;
-    } else {
-      return ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL;
     }
   }
 

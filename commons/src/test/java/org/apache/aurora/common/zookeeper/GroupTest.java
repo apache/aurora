@@ -29,7 +29,6 @@ import org.apache.aurora.common.zookeeper.Group.GroupChangeListener;
 import org.apache.aurora.common.zookeeper.Group.JoinException;
 import org.apache.aurora.common.zookeeper.Group.Membership;
 import org.apache.aurora.common.zookeeper.Group.NodeScheme;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient.Credentials;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.junit.Before;
@@ -250,7 +249,7 @@ public class GroupTest extends BaseZooKeeperClientTest {
     String memberId = securedMembership.join().getMemberId();
 
     Group unauthenticatedObserver =
-        new Group(createZkClient(Credentials.NONE),
+        new Group(createZkClient(),
             Ids.READ_ACL_UNSAFE,
             "/secured/group/membership");
     RecordingListener unauthenticatedListener = new RecordingListener();

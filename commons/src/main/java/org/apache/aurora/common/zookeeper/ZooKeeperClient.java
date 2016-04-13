@@ -23,23 +23,17 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import javax.annotation.Nullable;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.net.InetSocketAddressHelper;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.WatchedEvent;
@@ -60,117 +54,9 @@ public class ZooKeeperClient {
    * Indicates an error connecting to a zookeeper cluster.
    */
   public class ZooKeeperConnectionException extends Exception {
-    public ZooKeeperConnectionException(String message, Throwable cause) {
+    ZooKeeperConnectionException(String message, Throwable cause) {
       super(message, cause);
     }
-  }
-
-  /**
-   * Encapsulates a user's credentials and has the ability to authenticate them through a
-   * {@link ZooKeeper} client.
-   */
-  public interface Credentials {
-
-    /**
-     * A set of {@code Credentials} that performs no authentication.
-     */
-    Credentials NONE = new Credentials() {
-      @Override public void authenticate(ZooKeeper zooKeeper) {
-        // noop
-      }
-
-      @Override public String scheme() {
-        return null;
-      }
-
-      @Override public byte[] authToken() {
-        return null;
-      }
-    };
-
-    /**
-     * Authenticates these credentials against the given {@code ZooKeeper} client.
-     *
-     * @param zooKeeper the client to authenticate
-     */
-    void authenticate(ZooKeeper zooKeeper);
-
-    /**
-     * Returns the authentication scheme these credentials are for.
-     *
-     * @return the scheme these credentials are for or {@code null} if no authentication is
-     *     intended.
-     */
-    @Nullable
-    String scheme();
-
-    /**
-     * Returns the authentication token.
-     *
-     * @return the authentication token or {@code null} if no authentication is intended.
-     */
-    @Nullable
-    byte[] authToken();
-  }
-
-  /**
-   * Creates a set of credentials for the zoo keeper digest authentication mechanism.
-   *
-   * @param username the username to authenticate with
-   * @param password the password to authenticate with
-   * @return a set of credentials that can be used to authenticate the zoo keeper client
-   */
-  public static Credentials digestCredentials(String username, String password) {
-    MorePreconditions.checkNotBlank(username);
-    Preconditions.checkNotNull(password);
-
-    // TODO(John Sirois): DigestAuthenticationProvider is broken - uses platform default charset
-    // (on server) and so we just have to hope here that clients are deployed in compatible jvms.
-    // Consider writing and installing a version of DigestAuthenticationProvider that controls its
-    // Charset explicitly.
-    return credentials("digest", (username + ":" + password).getBytes());
-  }
-
-  /**
-   * Creates a set of credentials for the given authentication {@code scheme}.
-   *
-   * @param scheme the scheme to authenticate with
-   * @param authToken the authentication token
-   * @return a set of credentials that can be used to authenticate the zoo keeper client
-   */
-  public static Credentials credentials(final String scheme, final byte[] authToken) {
-    MorePreconditions.checkNotBlank(scheme);
-    Preconditions.checkNotNull(authToken);
-
-    return new Credentials() {
-      @Override public void authenticate(ZooKeeper zooKeeper) {
-        zooKeeper.addAuthInfo(scheme, authToken);
-      }
-
-      @Override public String scheme() {
-        return scheme;
-      }
-
-      @Override public byte[] authToken() {
-        return authToken;
-      }
-
-      @Override public boolean equals(Object o) {
-        if (!(o instanceof Credentials)) {
-          return false;
-        }
-
-        Credentials other = (Credentials) o;
-        return new EqualsBuilder()
-            .append(scheme, other.scheme())
-            .append(authToken, other.authToken())
-            .isEquals();
-      }
-
-      @Override public int hashCode() {
-        return Objects.hashCode(scheme, authToken);
-      }
-    };
   }
 
   private final class SessionState {
@@ -188,7 +74,7 @@ public class ZooKeeperClient {
   private static final Amount<Long,Time> WAIT_FOREVER = Amount.of(0L, Time.MILLISECONDS);
 
   private final int sessionTimeoutMs;
-  private final Credentials credentials;
+  private final Optional<Credentials> credentials;
   private final String zooKeeperServers;
   // GuardedBy "this", but still volatile for tests, where we want to be able to see writes
   // made from within long synchronized blocks.
@@ -225,7 +111,7 @@ public class ZooKeeperClient {
    */
   public ZooKeeperClient(Amount<Integer, Time> sessionTimeout,
       Iterable<InetSocketAddress> zooKeeperServers) {
-    this(sessionTimeout, Credentials.NONE, Optional.<String> absent(), zooKeeperServers);
+    this(sessionTimeout, Optional.absent(), Optional.absent(), zooKeeperServers);
   }
 
   /**
@@ -240,7 +126,10 @@ public class ZooKeeperClient {
    */
   public ZooKeeperClient(Amount<Integer, Time> sessionTimeout, Credentials credentials,
       InetSocketAddress zooKeeperServer, InetSocketAddress... zooKeeperServers) {
-    this(sessionTimeout, credentials, Optional.<String> absent(), combine(zooKeeperServer, zooKeeperServers));
+    this(sessionTimeout,
+        Optional.of(credentials),
+        Optional.absent(),
+        combine(zooKeeperServer, zooKeeperServers));
   }
 
   /**
@@ -254,7 +143,10 @@ public class ZooKeeperClient {
    */
   public ZooKeeperClient(Amount<Integer, Time> sessionTimeout, Credentials credentials,
       Iterable<InetSocketAddress> zooKeeperServers) {
-        this(sessionTimeout, credentials, Optional.<String> absent(), zooKeeperServers);
+        this(sessionTimeout,
+            Optional.of(credentials),
+            Optional.absent(),
+            zooKeeperServers);
       }
 
   /**
@@ -267,7 +159,7 @@ public class ZooKeeperClient {
    * @param chrootPath an optional chroot path
    * @param zooKeeperServers the set of servers forming the ZK cluster
    */
-  public ZooKeeperClient(Amount<Integer, Time> sessionTimeout, Credentials credentials,
+  public ZooKeeperClient(Amount<Integer, Time> sessionTimeout, Optional<Credentials> credentials,
       Optional<String> chrootPath, Iterable<InetSocketAddress> zooKeeperServers) {
     this.sessionTimeoutMs = Preconditions.checkNotNull(sessionTimeout).as(Time.MILLISECONDS);
     this.credentials = Preconditions.checkNotNull(credentials);
@@ -300,16 +192,6 @@ public class ZooKeeperClient {
         Iterables.transform(ImmutableSet.copyOf(zooKeeperServers),
             InetSocketAddressHelper::toString);
     this.zooKeeperServers = Joiner.on(',').join(servers).concat(chrootPath.or(""));
-  }
-
-  /**
-   * Returns true if this client has non-empty credentials set.  For example, returns {@code false}
-   * if this client was constructed with {@link Credentials#NONE}.
-   *
-   * @return {@code true} if this client is configured with non-empty credentials.
-   */
-  public boolean hasCredentials() {
-    return !Strings.isNullOrEmpty(credentials.scheme()) && (credentials.authToken() != null);
   }
 
   /**
@@ -395,7 +277,10 @@ public class ZooKeeperClient {
           throw ex;
         }
       }
-      credentials.authenticate(zooKeeper);
+      if (credentials.isPresent()) {
+        Credentials zkCredentials = credentials.get();
+        zooKeeper.addAuthInfo(zkCredentials.scheme(), zkCredentials.authToken());
+      }
 
       sessionState = new SessionState(zooKeeper.getSessionId(), zooKeeper.getSessionPasswd());
     }
