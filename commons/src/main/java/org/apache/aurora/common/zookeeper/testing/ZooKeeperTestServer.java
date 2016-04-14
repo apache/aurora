@@ -103,7 +103,7 @@ public class ZooKeeperTestServer {
    *
    * @param sessionId The id of the client session to expire.
    */
-  void expireClientSession(long sessionId) {
+  public final void expireClientSession(long sessionId) {
     zooKeeperServer.closeSession(sessionId);
   }
 

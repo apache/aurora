@@ -13,97 +13,37 @@
  */
 package org.apache.aurora.scheduler.discovery;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.function.Predicate;
-
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.common.thrift.Status;
-import org.apache.aurora.common.zookeeper.ServerSet;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
-import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
-import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.recipes.cache.PathChildrenCache;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.apache.curator.utils.ZKPaths;
 import org.apache.zookeeper.CreateMode;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class CuratorServiceGroupMonitorTest extends BaseZooKeeperTest {
-
-  private static final String GROUP_PATH = "/group/root";
-  private static final String MEMBER_TOKEN = "member_";
-
-  private CuratorFramework client;
-  private BlockingQueue<PathChildrenCacheEvent> groupEvents;
-  private CuratorServiceGroupMonitor groupMonitor;
-
-  @Before
-  public void setUpCurator() {
-    client = CuratorFrameworkFactory.builder()
-        .dontUseContainerParents() // Container nodes are only available in ZK 3.5+.
-        .retryPolicy((retryCount, elapsedTimeMs, sleeper) -> false) // Don't retry.
-        .connectString(String.format("localhost:%d", getServer().getPort()))
-        .build();
-    client.start();
-    addTearDown(client::close);
-
-    PathChildrenCache groupCache =
-        new PathChildrenCache(client, GROUP_PATH, true /* cacheData */);
-    groupEvents = new LinkedBlockingQueue<>();
-    groupCache.getListenable().addListener((c, event) -> groupEvents.put(event));
-
-    Predicate<String> memberSelector = name -> name.contains(MEMBER_TOKEN);
-    groupMonitor = new CuratorServiceGroupMonitor(groupCache, memberSelector, ServerSet.JSON_CODEC);
-  }
-
-  private void startGroupMonitor() throws ServiceGroupMonitor.MonitorException {
-    groupMonitor.start();
-    addTearDown(groupMonitor::close);
-  }
-
-  private void expectGroupEvent(PathChildrenCacheEvent.Type eventType) {
-    while (true) {
-      try {
-        PathChildrenCacheEvent event = groupEvents.take();
-        if (event.getType() == eventType) {
-          break;
-        }
-      } catch (InterruptedException ex) {
-        throw new RuntimeException(ex);
-      }
-    }
-  }
+public class CuratorServiceGroupMonitorTest extends BaseCuratorDiscoveryTest {
 
   @Test
   public void testNominalLifecycle() throws Exception {
     startGroupMonitor();
-    groupMonitor.close();
+    getGroupMonitor().close();
   }
 
   @Test
   public void testExceptionalLifecycle() throws Exception {
     // Close on a non-started or failed-to-start monitor should be allowed.
-    groupMonitor.close();
+    getGroupMonitor().close();
   }
 
   @Test
   public void testNoHosts() throws Exception {
-    assertEquals(ImmutableSet.of(), groupMonitor.get());
+    assertEquals(ImmutableSet.of(), getGroupMonitor().get());
 
     startGroupMonitor();
-    assertEquals(ImmutableSet.of(), groupMonitor.get());
+    assertEquals(ImmutableSet.of(), getGroupMonitor().get());
   }
 
   @Test
@@ -114,18 +54,18 @@ public class CuratorServiceGroupMonitorTest extends BaseZooKeeperTest {
     String onePath = createMember(one);
     ServiceInstance two = serviceInstance("two");
     String twoPath = createMember(two);
-    assertEquals(ImmutableSet.of(one, two), groupMonitor.get());
+    assertEquals(ImmutableSet.of(one, two), getGroupMonitor().get());
 
     deleteChild(twoPath);
-    assertEquals(ImmutableSet.of(one), groupMonitor.get());
+    assertEquals(ImmutableSet.of(one), getGroupMonitor().get());
 
     deleteChild(onePath);
     ServiceInstance three = serviceInstance("three");
     String threePath = createMember(three);
-    assertEquals(ImmutableSet.of(three), groupMonitor.get());
+    assertEquals(ImmutableSet.of(three), getGroupMonitor().get());
 
     deleteChild(threePath);
-    assertEquals(ImmutableSet.of(), groupMonitor.get());
+    assertEquals(ImmutableSet.of(), getGroupMonitor().get());
   }
 
   @Test
@@ -133,17 +73,17 @@ public class CuratorServiceGroupMonitorTest extends BaseZooKeeperTest {
     startGroupMonitor();
 
     String nonMemberPath = createNonMember();
-    assertEquals(ImmutableSet.of(), groupMonitor.get());
+    assertEquals(ImmutableSet.of(), getGroupMonitor().get());
 
     ServiceInstance member = serviceInstance("member");
     String memberPath = createMember(member);
-    assertEquals(ImmutableSet.of(member), groupMonitor.get());
+    assertEquals(ImmutableSet.of(member), getGroupMonitor().get());
 
     deleteChild(memberPath);
-    assertEquals(ImmutableSet.of(), groupMonitor.get());
+    assertEquals(ImmutableSet.of(), getGroupMonitor().get());
 
     deleteChild(nonMemberPath);
-    assertEquals(ImmutableSet.of(), groupMonitor.get());
+    assertEquals(ImmutableSet.of(), getGroupMonitor().get());
   }
 
   @Test
@@ -156,7 +96,7 @@ public class CuratorServiceGroupMonitorTest extends BaseZooKeeperTest {
     createMember(member);
 
     // Invalid member should be ignored.
-    assertEquals(ImmutableSet.of(member), groupMonitor.get());
+    assertEquals(ImmutableSet.of(member), getGroupMonitor().get());
   }
 
   @Test
@@ -168,14 +108,14 @@ public class CuratorServiceGroupMonitorTest extends BaseZooKeeperTest {
     createMember(two, false /* waitForGroupEvent */);
 
     // Not started yet, should see no group members.
-    assertEquals(ImmutableSet.of(), groupMonitor.get());
+    assertEquals(ImmutableSet.of(), getGroupMonitor().get());
 
     startGroupMonitor();
-    assertEquals(ImmutableSet.of(one, two), groupMonitor.get());
+    assertEquals(ImmutableSet.of(one, two), getGroupMonitor().get());
   }
 
   private void deleteChild(String twoPath) throws Exception {
-    client.delete().forPath(twoPath);
+    getClient().delete().forPath(twoPath);
     expectGroupEvent(PathChildrenCacheEvent.Type.CHILD_REMOVED);
   }
 
@@ -194,7 +134,7 @@ public class CuratorServiceGroupMonitorTest extends BaseZooKeeperTest {
   }
 
   private String createMember(byte[] nodeData, boolean waitForGroupEvent) throws Exception {
-    String path = client.create()
+    String path = getClient().create()
         .creatingParentsIfNeeded()
         .withMode(CreateMode.EPHEMERAL_SEQUENTIAL)
         .forPath(ZKPaths.makePath(GROUP_PATH, MEMBER_TOKEN), nodeData);
@@ -205,21 +145,11 @@ public class CuratorServiceGroupMonitorTest extends BaseZooKeeperTest {
   }
 
   private String createNonMember() throws Exception {
-    String path = client.create()
+    String path = getClient().create()
         .creatingParentsIfNeeded()
         .withMode(CreateMode.EPHEMERAL_SEQUENTIAL)
         .forPath(ZKPaths.makePath(GROUP_PATH, "not-a-member"));
     expectGroupEvent(PathChildrenCacheEvent.Type.CHILD_ADDED);
     return path;
-  }
-
-  private byte[] serialize(ServiceInstance serviceInstance) throws IOException {
-    ByteArrayOutputStream sink = new ByteArrayOutputStream();
-    ServerSet.JSON_CODEC.serialize(serviceInstance, sink);
-    return sink.toByteArray();
-  }
-
-  private ServiceInstance serviceInstance(String hostName) {
-    return new ServiceInstance(new Endpoint(hostName, 42), ImmutableMap.of(), Status.ALIVE);
   }
 }

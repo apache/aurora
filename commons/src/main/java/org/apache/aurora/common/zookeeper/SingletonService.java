@@ -35,6 +35,10 @@ public interface SingletonService {
    * Indicates an error attempting to advertise leadership of a group of servers.
    */
   class AdvertiseException extends Exception {
+    public AdvertiseException(String message) {
+      super(message);
+    }
+
     public AdvertiseException(String message, Throwable cause) {
       super(message, cause);
     }
