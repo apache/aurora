@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.zookeeper.guice.client.flagged;
+package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -29,12 +29,12 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
-import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 
 /**
- * A factory that creates a {@link ClientConfig} instance based on command line argument values.
+ * A factory that creates a {@link ZooKeeperConfig} instance based on command line argument
+ * values.
  */
-public final class FlaggedClientConfig {
+public final class FlaggedZooKeeperConfig {
   @CmdLine(name = "zk_in_proc",
       help = "Launches an embedded zookeeper server for local testing causing -zk_endpoints "
           + "to be ignored if specified.")
@@ -55,7 +55,7 @@ public final class FlaggedClientConfig {
            help = "user:password to use when authenticating with ZooKeeper.")
   private static final Arg<String> DIGEST_CREDENTIALS = Arg.create(null);
 
-  private FlaggedClientConfig() {
+  private FlaggedZooKeeperConfig() {
     // Utility class.
   }
 
@@ -64,8 +64,8 @@ public final class FlaggedClientConfig {
    *
    * @return Configuration instance.
    */
-  public static ClientConfig create() {
-    return new ClientConfig(
+  public static ZooKeeperConfig create() {
+    return new ZooKeeperConfig(
         ZK_ENDPOINTS.get(),
         Optional.fromNullable(CHROOT_PATH.get()),
         IN_PROCESS.get(),

@@ -1,9 +1,9 @@
-org/apache/aurora/Protobufs$1
 org/apache/aurora/auth/CapabilityValidator$AuditCheck
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$1
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$2
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureSessionValidator
+org/apache/aurora/Protobufs$1
 org/apache/aurora/scheduler/app/SchedulerMain$1
 org/apache/aurora/scheduler/app/SchedulerMain$2
 org/apache/aurora/scheduler/app/SchedulerMain$2$1
@@ -15,7 +15,12 @@ org/apache/aurora/scheduler/base/Conversions$3
 org/apache/aurora/scheduler/configuration/executor/ExecutorModule$1
 org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl
 org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl$1
+org/apache/aurora/scheduler/discovery/FlaggedZooKeeperConfig
+org/apache/aurora/scheduler/discovery/ZooKeeperClientModule$1
+org/apache/aurora/scheduler/discovery/ZooKeeperClientModule$LocalClientProvider
+org/apache/aurora/scheduler/discovery/ZooKeeperClientModule$TestServerService
 org/apache/aurora/scheduler/http/AbortCallback
+org/apache/aurora/scheduler/http/api/security/Kerberos5Realm
 org/apache/aurora/scheduler/http/JerseyTemplateServlet
 org/apache/aurora/scheduler/http/LogConfig
 org/apache/aurora/scheduler/http/LogConfig$LoggerConfig
@@ -49,7 +54,6 @@ org/apache/aurora/scheduler/http/Utilization$4
 org/apache/aurora/scheduler/http/Utilization$5
 org/apache/aurora/scheduler/http/Utilization$Display
 org/apache/aurora/scheduler/http/Utilization$DisplayMetric
-org/apache/aurora/scheduler/http/api/security/Kerberos5Realm
 org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule
 org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$3
 org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$4
@@ -58,14 +62,10 @@ org/apache/aurora/scheduler/mesos/DriverFactoryImpl
 org/apache/aurora/scheduler/mesos/LibMesosLoadingModule
 org/apache/aurora/scheduler/stats/AsyncStatsModule$OfferAdapter$1
 org/apache/aurora/scheduler/stats/TaskStatCalculator
-org/apache/aurora/scheduler/storage/CallOrderEnforcingStorage$State
 org/apache/aurora/scheduler/storage/backup/BackupModule$LifecycleHook
+org/apache/aurora/scheduler/storage/CallOrderEnforcingStorage$State
 org/apache/aurora/scheduler/storage/mem/MemTaskStore$Task
 org/apache/aurora/scheduler/storage/mem/Util
 org/apache/aurora/scheduler/storage/mem/Util$1
 org/apache/aurora/scheduler/testing/FakeStatsProvider$1
 org/apache/aurora/scheduler/testing/FakeStatsProvider$3
-org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$1
-org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$LocalClientProvider
-org/apache/aurora/scheduler/zookeeper/guice/client/ZooKeeperClientModule$TestServerService
-org/apache/aurora/scheduler/zookeeper/guice/client/flagged/FlaggedClientConfig

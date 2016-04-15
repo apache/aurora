@@ -63,6 +63,8 @@ import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryModule;
+import org.apache.aurora.scheduler.discovery.ZooKeeperClientModule;
+import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
@@ -79,8 +81,6 @@ import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
-import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule;
-import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Status;
@@ -194,7 +194,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
       }
     };
     Credentials credentials = Credentials.digestCredentials("mesos", "mesos");
-    ClientConfig zkClientConfig = ClientConfig
+    ZooKeeperConfig zkClientConfig = ZooKeeperConfig
         .create(ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
         .withCredentials(credentials);
     SchedulerMain main = SchedulerMain.class.newInstance();

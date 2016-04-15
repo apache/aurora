@@ -35,9 +35,9 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.gen.storage.LogEntry;
+import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
-import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import org.apache.mesos.Log;
 import org.apache.zookeeper.common.PathUtils;
 
@@ -102,17 +102,21 @@ public class MesosLogStreamModule extends PrivateModule {
     return arg.get();
   }
 
-  private final ClientConfig zkClientConfig;
+  private final ZooKeeperConfig zkClientConfig;
   private final File logPath;
   private final String zkLogGroupPath;
 
-  public MesosLogStreamModule(ClientConfig zkClientConfig) {
+  public MesosLogStreamModule(ZooKeeperConfig zkClientConfig) {
     this(zkClientConfig,
         getRequiredArg(LOG_PATH, "native_log_file_path"),
         getRequiredArg(ZK_LOG_GROUP_PATH, "native_log_zk_group_path"));
   }
 
-  public MesosLogStreamModule(ClientConfig zkClientConfig, File logPath, String zkLogGroupPath) {
+  public MesosLogStreamModule(
+      ZooKeeperConfig zkClientConfig,
+      File logPath,
+      String zkLogGroupPath) {
+
     this.zkClientConfig = Objects.requireNonNull(zkClientConfig);
     this.logPath = Objects.requireNonNull(logPath);
 

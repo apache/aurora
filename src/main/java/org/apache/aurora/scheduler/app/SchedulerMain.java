@@ -50,7 +50,10 @@ import org.apache.aurora.scheduler.SchedulerLifecycle;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorModule;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
+import org.apache.aurora.scheduler.discovery.FlaggedZooKeeperConfig;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryModule;
+import org.apache.aurora.scheduler.discovery.ZooKeeperClientModule;
+import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
 import org.apache.aurora.scheduler.http.HttpService;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
@@ -62,9 +65,6 @@ import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
-import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule;
-import org.apache.aurora.scheduler.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
-import org.apache.aurora.scheduler.zookeeper.guice.client.flagged.FlaggedClientConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,7 +156,7 @@ public class SchedulerMain {
       LOG.error("Uncaught exception from " + t + ":" + e, e);
     });
 
-    ClientConfig zkClientConfig = FlaggedClientConfig.create();
+    ZooKeeperConfig zkClientConfig = FlaggedZooKeeperConfig.create();
     Module module = Modules.combine(
         appEnvironmentModule,
         getUniversalModule(),
@@ -200,7 +200,7 @@ public class SchedulerMain {
         .add(
             new CommandLineDriverSettingsModule(),
             new LibMesosLoadingModule(),
-            new MesosLogStreamModule(FlaggedClientConfig.create()),
+            new MesosLogStreamModule(FlaggedZooKeeperConfig.create()),
             new LogStorageModule(),
             new TierModule())
         .build();

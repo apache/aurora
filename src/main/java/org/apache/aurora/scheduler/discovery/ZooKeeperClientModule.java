@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.zookeeper.guice.client;
+package org.apache.aurora.scheduler.discovery;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,11 +31,7 @@ import com.google.inject.Singleton;
 
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.inject.Bindings.KeyFactory;
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 import org.apache.aurora.common.zookeeper.testing.ZooKeeperTestServer;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 
@@ -46,14 +42,14 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class ZooKeeperClientModule extends AbstractModule {
   private final KeyFactory keyFactory;
-  private final ClientConfig config;
+  private final ZooKeeperConfig config;
 
   /**
    * Creates a new ZK client module from the provided configuration.
    *
    * @param config Configuration parameters for the client.
    */
-  public ZooKeeperClientModule(ClientConfig config) {
+  public ZooKeeperClientModule(ZooKeeperConfig config) {
     this(KeyFactory.PLAIN, config);
   }
 
@@ -64,7 +60,7 @@ public class ZooKeeperClientModule extends AbstractModule {
    * @param keyFactory Factory to use when creating any exposed bindings.
    * @param config Configuration parameters for the client.
    */
-  public ZooKeeperClientModule(KeyFactory keyFactory, ClientConfig config) {
+  public ZooKeeperClientModule(KeyFactory keyFactory, ZooKeeperConfig config) {
     this.keyFactory = checkNotNull(keyFactory);
     this.config = checkNotNull(config);
   }
@@ -81,7 +77,7 @@ public class ZooKeeperClientModule extends AbstractModule {
         protected void configure() {
           requireBinding(ShutdownRegistry.class);
           // Bound privately to give the local provider access to configuration settings.
-          bind(ClientConfig.class).toInstance(config);
+          bind(ZooKeeperConfig.class).toInstance(config);
           bind(clientKey).toProvider(LocalClientProvider.class).in(Singleton.class);
           expose(clientKey);
         }
@@ -121,11 +117,11 @@ public class ZooKeeperClientModule extends AbstractModule {
   }
 
   private static class LocalClientProvider implements Provider<ZooKeeperClient> {
-    private final ClientConfig config;
+    private final ZooKeeperConfig config;
     private final ZooKeeperTestServer testServer;
 
     @Inject
-    LocalClientProvider(ClientConfig config, ZooKeeperTestServer testServer) {
+    LocalClientProvider(ZooKeeperConfig config, ZooKeeperTestServer testServer) {
       this.config = checkNotNull(config);
       this.testServer = checkNotNull(testServer);
     }
@@ -145,70 +141,4 @@ public class ZooKeeperClientModule extends AbstractModule {
     }
   }
 
-  /**
-   * Composite type that contains configuration parameters used when creating a client.
-   * <p>
-   * Instances of this class are immutable, but builder-style chained calls are supported.
-   */
-  public static class ClientConfig {
-    public final Iterable<InetSocketAddress> servers;
-    public final boolean inProcess;
-    public final Amount<Integer, Time> sessionTimeout;
-    public final Optional<String> chrootPath;
-    public final Optional<Credentials> credentials;
-
-    /**
-     * Creates a new client configuration.
-     *
-     * @param servers ZooKeeper server addresses.
-     * @param inProcess Whether to run and create clients for an in-process ZooKeeper server.
-     * @param chrootPath an optional chroot path
-     * @param sessionTimeout Timeout duration for established sessions.
-     * @param credentials ZooKeeper authentication credentials.
-     */
-    public ClientConfig(
-        Iterable<InetSocketAddress> servers,
-        Optional<String> chrootPath,
-        boolean inProcess,
-        Amount<Integer, Time> sessionTimeout,
-        Optional<Credentials> credentials) {
-
-      this.servers = servers;
-      this.chrootPath = chrootPath;
-      this.inProcess = inProcess;
-      this.sessionTimeout = sessionTimeout;
-      this.credentials = credentials;
-    }
-
-    /**
-     * Creates a new client configuration with defaults for the session timeout and credentials.
-     *
-     * @param servers ZooKeeper server addresses.
-     * @return A new configuration.
-     */
-    public static ClientConfig create(Iterable<InetSocketAddress> servers) {
-      return new ClientConfig(
-          servers,
-          Optional.absent(), // chrootPath
-          false,
-          ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT,
-          Optional.absent()); // credentials
-    }
-
-    /**
-     * Creates a new configuration identical to this configuration, but with the provided
-     * credentials.
-     *
-     * @param newCredentials ZooKeeper authentication credentials.
-     * @return A modified clone of this configuration.
-     */
-    public ClientConfig withCredentials(Credentials newCredentials) {
-      return new ClientConfig(
-          servers,
-          chrootPath,
-          inProcess,
-          sessionTimeout,
-          Optional.of(newCredentials));
-    }
-  }
 }
