@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -32,7 +33,6 @@ import com.google.common.hash.Hasher;
 import com.google.common.primitives.Bytes;
 import com.google.inject.assistedinject.Assisted;
 
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.storage.Frame;
@@ -95,7 +95,7 @@ class StreamManagerImpl implements StreamManager {
   }
 
   @Override
-  public void readFromBeginning(Closure<LogEntry> reader)
+  public void readFromBeginning(Consumer<LogEntry> reader)
       throws CodingException, InvalidPositionException, StreamAccessException {
 
     Iterator<Log.Entry> entries = stream.readAll();
@@ -116,7 +116,7 @@ class StreamManagerImpl implements StreamManager {
               snapshotDeduplicator.reduplicate(logEntry.getDeduplicatedSnapshot()));
         }
 
-        reader.execute(logEntry);
+        reader.accept(logEntry);
         vars.entriesRead.incrementAndGet();
       }
     }

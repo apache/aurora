@@ -20,6 +20,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.function.Consumer;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
@@ -32,7 +33,6 @@ import com.google.common.hash.Hashing;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
@@ -111,7 +111,7 @@ public class LogManagerTest extends EasyMockTest {
   public void testStreamManagerReadFromUnknownNone() throws CodingException {
     expect(stream.readAll()).andReturn(Iterators.emptyIterator());
 
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() { });
+    Consumer<LogEntry> reader = createMock(new Clazz<Consumer<LogEntry>>() { });
 
     control.replay();
 
@@ -126,8 +126,8 @@ public class LogManagerTest extends EasyMockTest {
     expect(entry1.contents()).andReturn(encode(transaction1));
     expect(stream.readAll()).andReturn(Iterators.singletonIterator(entry1));
 
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() { });
-    reader.execute(transaction1);
+    Consumer<LogEntry> reader = createMock(new Clazz<Consumer<LogEntry>>() { });
+    reader.accept(transaction1);
 
     control.replay();
 
@@ -468,9 +468,9 @@ public class LogManagerTest extends EasyMockTest {
 
     expect(stream.readAll()).andReturn(entries.iterator());
 
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() { });
-    reader.execute(transaction1);
-    reader.execute(transaction2);
+    Consumer<LogEntry> reader = createMock(new Clazz<Consumer<LogEntry>>() { });
+    reader.accept(transaction1);
+    reader.accept(transaction2);
 
     StreamManager streamManager = createStreamManager(message.chunkSize);
     control.replay();
@@ -493,8 +493,8 @@ public class LogManagerTest extends EasyMockTest {
 
     expect(stream.readAll()).andReturn(ImmutableList.of(snapshotEntry).iterator());
 
-    Closure<LogEntry> reader = createMock(new Clazz<Closure<LogEntry>>() { });
-    reader.execute(snapshotLogEntry);
+    Consumer<LogEntry> reader = createMock(new Clazz<Consumer<LogEntry>>() { });
+    reader.accept(snapshotLogEntry);
 
     control.replay();
 

@@ -15,13 +15,13 @@ package org.apache.aurora.common.util.templating;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.function.Consumer;
 
 import com.google.common.base.Preconditions;
 
 import org.antlr.stringtemplate.AutoIndentWriter;
 import org.antlr.stringtemplate.StringTemplate;
 import org.antlr.stringtemplate.StringTemplateGroup;
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.base.MorePreconditions;
 
 /**
@@ -74,19 +74,19 @@ public class StringTemplateHelper {
    * the unpopulated template object.
    *
    * @param out Template output writer.
-   * @param parameterSetter Closure to populate the template.
+   * @param parameterSetter Consumer to populate the template.
    * @throws TemplateException If an exception was encountered while populating the template.
    */
   public void writeTemplate(
       Writer out,
-      Closure<StringTemplate> parameterSetter) throws TemplateException {
+      Consumer<StringTemplate> parameterSetter) throws TemplateException {
 
     Preconditions.checkNotNull(out);
     Preconditions.checkNotNull(parameterSetter);
 
     StringTemplate stringTemplate = group.getInstanceOf(templatePath);
     try {
-      parameterSetter.execute(stringTemplate);
+      parameterSetter.accept(stringTemplate);
       stringTemplate.write(new AutoIndentWriter(out));
     } catch (IOException e) {
       throw new TemplateException("Failed to write template: " + e, e);

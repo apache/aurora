@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import org.apache.aurora.common.base.Closure;
+import java.util.function.Consumer;
+
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.log.Log;
@@ -24,7 +25,7 @@ import static org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 
 /**
  * Manages interaction with the log stream.  Log entries can be
- * {@link #readFromBeginning(Closure) read from} the beginning,
+ * {@link #readFromBeginning(Consumer) read from} the beginning,
  * a {@link #startTransaction() transaction} consisting of one or more local storage
  * operations can be committed atomically, or the log can be compacted by
  * {@link #snapshot(org.apache.aurora.gen.storage.Snapshot) snapshotting}.
@@ -39,7 +40,7 @@ public interface StreamManager {
    * @throws InvalidPositionException if the given position is not found in the log.
    * @throws StreamAccessException if there is a problem reading from the log.
    */
-  void readFromBeginning(Closure<LogEntry> reader)
+  void readFromBeginning(Consumer<LogEntry> reader)
       throws CodingException, InvalidPositionException, StreamAccessException;
 
   /**

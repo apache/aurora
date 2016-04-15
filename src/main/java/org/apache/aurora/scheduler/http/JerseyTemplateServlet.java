@@ -14,12 +14,12 @@
 package org.apache.aurora.scheduler.http;
 
 import java.io.StringWriter;
+import java.util.function.Consumer;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
 import org.antlr.stringtemplate.StringTemplate;
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.util.templating.StringTemplateHelper;
 import org.apache.aurora.common.util.templating.StringTemplateHelper.TemplateException;
 
@@ -36,7 +36,7 @@ class JerseyTemplateServlet {
     templateHelper = new StringTemplateHelper(getClass(), templatePath, true);
   }
 
-  protected final Response fillTemplate(Closure<StringTemplate> populator) {
+  protected final Response fillTemplate(Consumer<StringTemplate> populator) {
     StringWriter output = new StringWriter();
     try {
       templateHelper.writeTemplate(output, populator);

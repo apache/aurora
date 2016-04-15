@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -39,8 +40,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.application.ShutdownRegistry;
-import org.apache.aurora.common.base.Closure;
-import org.apache.aurora.common.base.Closures;
+import org.apache.aurora.common.base.Consumers;
 import org.apache.aurora.common.base.ExceptionalCommand;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -222,17 +222,17 @@ public class SchedulerLifecycle implements EventSubscriber {
       }
     });
 
-    final Closure<Transition<State>> prepareStorage = new Closure<Transition<State>>() {
+    final Consumer<Transition<State>> prepareStorage = new Consumer<Transition<State>>() {
       @Override
-      public void execute(Transition<State> transition) {
+      public void accept(Transition<State> transition) {
         storage.prepare();
         stateMachine.transition(State.STORAGE_PREPARED);
       }
     };
 
-    final Closure<Transition<State>> handleLeading = new Closure<Transition<State>>() {
+    final Consumer<Transition<State>> handleLeading = new Consumer<Transition<State>>() {
       @Override
-      public void execute(Transition<State> transition) {
+      public void accept(Transition<State> transition) {
         LOG.info("Elected as leading scheduler!");
 
         storage.start(stores -> {
@@ -258,9 +258,9 @@ public class SchedulerLifecycle implements EventSubscriber {
       }
     };
 
-    final Closure<Transition<State>> handleRegistered = new Closure<Transition<State>>() {
+    final Consumer<Transition<State>> handleRegistered = new Consumer<Transition<State>>() {
       @Override
-      public void execute(Transition<State> transition) {
+      public void accept(Transition<State> transition) {
         registrationAcked.set(true);
         delayedActions.blockingDriverJoin(() -> {
           driver.blockUntilStopped();
@@ -279,10 +279,10 @@ public class SchedulerLifecycle implements EventSubscriber {
       }
     };
 
-    final Closure<Transition<State>> shutDown = new Closure<Transition<State>>() {
+    final Consumer<Transition<State>> shutDown = new Consumer<Transition<State>>() {
       private final AtomicBoolean invoked = new AtomicBoolean(false);
       @Override
-      public void execute(Transition<State> transition) {
+      public void accept(Transition<State> transition) {
         if (!invoked.compareAndSet(false, true)) {
           LOG.info("Shutdown already invoked, ignoring extra call.");
           return;
@@ -314,18 +314,18 @@ public class SchedulerLifecycle implements EventSubscriber {
         .initialState(State.IDLE)
         .logTransitions()
         .addState(
-            dieOnError(Closures.filter(NOT_DEAD, prepareStorage)),
+            dieOnError(Consumers.filter(NOT_DEAD, prepareStorage)),
             State.IDLE,
             State.PREPARING_STORAGE, State.DEAD)
         .addState(
             State.PREPARING_STORAGE,
             State.STORAGE_PREPARED, State.DEAD)
         .addState(
-            dieOnError(Closures.filter(NOT_DEAD, handleLeading)),
+            dieOnError(Consumers.filter(NOT_DEAD, handleLeading)),
             State.STORAGE_PREPARED,
             State.LEADER_AWAITING_REGISTRATION, State.DEAD)
         .addState(
-            dieOnError(Closures.filter(NOT_DEAD, handleRegistered)),
+            dieOnError(Consumers.filter(NOT_DEAD, handleRegistered)),
             State.LEADER_AWAITING_REGISTRATION,
             State.ACTIVE, State.DEAD)
         .addState(
@@ -337,16 +337,16 @@ public class SchedulerLifecycle implements EventSubscriber {
             State.DEAD
         )
         .onAnyTransition(
-            Closures.filter(IS_DEAD, shutDown))
+            Consumers.filter(IS_DEAD, shutDown))
         .build();
 
     this.leadershipListener = new SchedulerCandidateImpl(stateMachine, leaderControl);
   }
 
-  private Closure<Transition<State>> dieOnError(final Closure<Transition<State>> closure) {
+  private Consumer<Transition<State>> dieOnError(final Consumer<Transition<State>> closure) {
     return transition -> {
       try {
-        closure.execute(transition);
+        closure.accept(transition);
       } catch (RuntimeException e) {
         LOG.error("Caught unchecked exception: " + e, e);
         stateMachine.transition(State.DEAD);

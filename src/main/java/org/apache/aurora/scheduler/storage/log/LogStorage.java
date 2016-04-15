@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 import javax.inject.Inject;
 
@@ -29,7 +30,6 @@ import com.google.common.util.concurrent.MoreExecutors;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.ShutdownRegistry;
-import org.apache.aurora.common.base.Closure;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -204,8 +204,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   private final SlidingStats writerWaitStats =
       new SlidingStats("log_storage_write_lock_wait", "ns");
 
-  private final Map<LogEntry._Fields, Closure<LogEntry>> logEntryReplayActions;
-  private final Map<Op._Fields, Closure<Op>> transactionReplayActions;
+  private final Map<LogEntry._Fields, Consumer<LogEntry>> logEntryReplayActions;
+  private final Map<Op._Fields, Consumer<Op>> transactionReplayActions;
 
   @Inject
   LogStorage(
@@ -303,8 +303,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   }
 
   @VisibleForTesting
-  final Map<LogEntry._Fields, Closure<LogEntry>> buildLogEntryReplayActions() {
-    return ImmutableMap.<LogEntry._Fields, Closure<LogEntry>>builder()
+  final Map<LogEntry._Fields, Consumer<LogEntry>> buildLogEntryReplayActions() {
+    return ImmutableMap.<LogEntry._Fields, Consumer<LogEntry>>builder()
         .put(LogEntry._Fields.SNAPSHOT, logEntry -> {
           Snapshot snapshot = logEntry.getSnapshot();
           LOG.info("Applying snapshot taken on " + new Date(snapshot.getTimestamp()));
@@ -322,8 +322,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   }
 
   @VisibleForTesting
-  final Map<Op._Fields, Closure<Op>> buildTransactionReplayActions() {
-    return ImmutableMap.<Op._Fields, Closure<Op>>builder()
+  final Map<Op._Fields, Consumer<Op>> buildTransactionReplayActions() {
+    return ImmutableMap.<Op._Fields, Consumer<Op>>builder()
         .put(
             Op._Fields.SAVE_FRAMEWORK_ID,
             op -> writeBehindSchedulerStore.saveFrameworkId(op.getSaveFrameworkId().getId()))
@@ -451,7 +451,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       throw new IllegalStateException("Unknown log entry type: " + entryField);
     }
 
-    logEntryReplayActions.get(entryField).execute(logEntry);
+    logEntryReplayActions.get(entryField).accept(logEntry);
   }
 
   private void replayOp(Op op) {
@@ -460,7 +460,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       throw new IllegalStateException("Unknown transaction op: " + opField);
     }
 
-    transactionReplayActions.get(opField).execute(op);
+    transactionReplayActions.get(opField).accept(op);
   }
 
   private void scheduleSnapshots() {

@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -30,8 +31,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 
-import org.apache.aurora.common.base.Closure;
-import org.apache.aurora.common.base.Closures;
+import org.apache.aurora.common.base.Consumers;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +58,7 @@ public class StateMachine<T> {
   // Stores mapping from states to the states that the machine is allowed to transition into.
   private final Multimap<T, T> stateTransitions;
 
-  private final Closure<Transition<T>> transitionCallback;
+  private final Consumer<Transition<T>> transitionCallback;
   private final boolean throwOnBadTransition;
 
   private volatile T currentState;
@@ -69,7 +69,7 @@ public class StateMachine<T> {
   private StateMachine(String name,
       T initialState,
       Multimap<T, T> stateTransitions,
-      Closure<Transition<T>> transitionCallback,
+      Consumer<Transition<T>> transitionCallback,
       boolean throwOnBadTransition) {
     this.name = name;
     this.currentState = initialState;
@@ -157,7 +157,7 @@ public class StateMachine<T> {
       writeLock.unlock();
     }
 
-    transitionCallback.execute(new Transition<T>(currentCopy, nextState, transitionAllowed));
+    transitionCallback.accept(new Transition<T>(currentCopy, nextState, transitionAllowed));
     return transitionAllowed;
   }
 
@@ -186,17 +186,17 @@ public class StateMachine<T> {
   public static class Rule<T> {
     private final T from;
     private final Set<T> to;
-    private final Closure<Transition<T>> callback;
+    private final Consumer<Transition<T>> callback;
 
     private Rule(T from) {
       this(from, ImmutableSet.<T>of());
     }
 
     private Rule(T from, Set<T> to) {
-      this(from, to, Closures.<Transition<T>>noop());
+      this(from, to, Consumers.<Transition<T>>noop());
     }
 
-    private Rule(T from, Set<T> to, Closure<Transition<T>> callback) {
+    private Rule(T from, Set<T> to, Consumer<Transition<T>> callback) {
       this.from = checkNotNull(from);
       this.to = checkNotNull(to);
       this.callback = checkNotNull(callback);
@@ -210,7 +210,7 @@ public class StateMachine<T> {
      * @return A new rule that is identical to this rule, but with the provided
      *     callback
      */
-    public Rule<T> withCallback(Closure<Transition<T>> callback) {
+    public Rule<T> withCallback(Consumer<Transition<T>> callback) {
       return new Rule<T>(from, to, callback);
     }
 
@@ -280,7 +280,7 @@ public class StateMachine<T> {
     private final String name;
     private T initialState;
     private final Multimap<T, T> stateTransitions = HashMultimap.create();
-    private final List<Closure<Transition<T>>> transitionCallbacks = Lists.newArrayList();
+    private final List<Consumer<Transition<T>>> transitionCallbacks = Lists.newArrayList();
     private boolean throwOnBadTransition = true;
 
     public Builder(String name) {
@@ -319,8 +319,8 @@ public class StateMachine<T> {
      * @param transitionStates Allowed transitions from {@code state}.
      * @return A reference to the builder.
      */
-    public Builder<T> addState(Closure<Transition<T>> callback, T state,
-        Set<T> transitionStates) {
+    public Builder<T> addState(Consumer<Transition<T>> callback, T state,
+                               Set<T> transitionStates) {
       checkNotNull(callback);
       checkNotNull(state);
 
@@ -335,15 +335,15 @@ public class StateMachine<T> {
     }
 
     /**
-     * Varargs version of {@link #addState(Closure, Object, java.util.Set)}.
+     * Varargs version of {@link #addState(Consumer, Object, java.util.Set)}.
      *
      * @param callback Callback to notify of any transition attempted from the state.
      * @param state State to add.
      * @param transitionStates Allowed transitions from {@code state}.
      * @return A reference to the builder.
      */
-    public Builder<T> addState(Closure<Transition<T>> callback, T state,
-        T... transitionStates) {
+    public Builder<T> addState(Consumer<Transition<T>> callback, T state,
+                               T... transitionStates) {
       Set<T> states = ImmutableSet.copyOf(transitionStates);
       Preconditions.checkArgument(Iterables.all(states, Predicates.notNull()));
 
@@ -360,12 +360,12 @@ public class StateMachine<T> {
      * @return A reference to the builder.
      */
     public Builder<T> addState(T state, T... transitionStates) {
-      return addState(Closures.<Transition<T>>noop(), state, transitionStates);
+      return addState(Consumers.<Transition<T>>noop(), state, transitionStates);
     }
 
     private void onTransition(Predicate<Transition<T>> transitionFilter,
-        Closure<Transition<T>> handler) {
-      onAnyTransition(Closures.filter(transitionFilter, handler));
+        Consumer<Transition<T>> handler) {
+      onAnyTransition(Consumers.filter(transitionFilter, handler));
     }
 
     /**
@@ -375,7 +375,7 @@ public class StateMachine<T> {
      * @param handler Callback to notify of transition attempts.
      * @return A reference to the builder.
      */
-    public Builder<T> onAnyTransition(Closure<Transition<T>> handler) {
+    public Builder<T> onAnyTransition(Consumer<Transition<T>> handler) {
       transitionCallbacks.add(handler);
       return this;
     }
@@ -413,7 +413,7 @@ public class StateMachine<T> {
       return new StateMachine<T>(name,
           initialState,
           stateTransitions,
-          Closures.combine(transitionCallbacks),
+          Consumers.combine(transitionCallbacks),
           throwOnBadTransition);
     }
   }

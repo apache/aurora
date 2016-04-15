@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.common.base;
 
+import java.util.function.Consumer;
+
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 
@@ -26,70 +28,70 @@ import static org.junit.Assert.fail;
 /**
  * @author John Sirois
  */
-public class ClosuresTest extends EasyMockTest {
+public class ConsumersTest extends EasyMockTest {
 
-  private static final Clazz<Closure<Integer>> INT_CLOSURE_CLZ = new Clazz<Closure<Integer>>() { };
+  private static final Clazz<Consumer<Integer>> INT_CLOSURE_CLZ = new Clazz<Consumer<Integer>>() { };
   static class Thrown extends RuntimeException { }
 
   @Test
   public void testCombine() {
-    Closure<Integer> work1 = createMock(INT_CLOSURE_CLZ);
-    Closure<Integer> work2 = createMock(INT_CLOSURE_CLZ);
+    Consumer<Integer> work1 = createMock(INT_CLOSURE_CLZ);
+    Consumer<Integer> work2 = createMock(INT_CLOSURE_CLZ);
 
     @SuppressWarnings("unchecked") // Needed because type information lost in vargs.
-    Closure<Integer> wrapper = Closures.combine(ImmutableList.of(work1, work2));
+        Consumer<Integer> wrapper = Consumers.combine(ImmutableList.of(work1, work2));
 
-    work1.execute(1);
-    work2.execute(1);
+    work1.accept(1);
+    work2.accept(1);
 
-    work1.execute(2);
-    work2.execute(2);
+    work1.accept(2);
+    work2.accept(2);
 
     control.replay();
 
-    wrapper.execute(1);
-    wrapper.execute(2);
+    wrapper.accept(1);
+    wrapper.accept(2);
   }
 
   @Test
   public void testCombineOneThrows() {
-    Closure<Integer> work1 = createMock(INT_CLOSURE_CLZ);
-    Closure<Integer> work2 = createMock(INT_CLOSURE_CLZ);
-    Closure<Integer> work3 = createMock(INT_CLOSURE_CLZ);
+    Consumer<Integer> work1 = createMock(INT_CLOSURE_CLZ);
+    Consumer<Integer> work2 = createMock(INT_CLOSURE_CLZ);
+    Consumer<Integer> work3 = createMock(INT_CLOSURE_CLZ);
 
     @SuppressWarnings("unchecked") // Needed because type information lost in vargs.
-    Closure<Integer> wrapper = Closures.combine(ImmutableList.of(work1, work2, work3));
+        Consumer<Integer> wrapper = Consumers.combine(ImmutableList.of(work1, work2, work3));
 
-    work1.execute(1);
+    work1.accept(1);
     expectLastCall().andThrow(new Thrown());
 
-    work1.execute(2);
-    work2.execute(2);
+    work1.accept(2);
+    work2.accept(2);
     expectLastCall().andThrow(new Thrown());
 
-    work1.execute(3);
-    work2.execute(3);
-    work3.execute(3);
+    work1.accept(3);
+    work2.accept(3);
+    work3.accept(3);
     expectLastCall().andThrow(new Thrown());
 
     control.replay();
 
     try {
-      wrapper.execute(1);
+      wrapper.accept(1);
       fail("Should have thrown.");
     } catch (Thrown e) {
       // Expected.
     }
 
     try {
-      wrapper.execute(2);
+      wrapper.accept(2);
       fail("Should have thrown.");
     } catch (Thrown e) {
       // Expected.
     }
 
     try {
-      wrapper.execute(3);
+      wrapper.accept(3);
       fail("Should have thrown.");
     } catch (Thrown e) {
       // Expected.
@@ -99,18 +101,18 @@ public class ClosuresTest extends EasyMockTest {
   @Test
   public void testFilter() {
     Predicate<Integer> filter = createMock(new Clazz<Predicate<Integer>>() { });
-    Closure<Integer> work = createMock(INT_CLOSURE_CLZ);
+    Consumer<Integer> work = createMock(INT_CLOSURE_CLZ);
 
     expect(filter.apply(1)).andReturn(true);
-    work.execute(1);
+    work.accept(1);
 
     expect(filter.apply(2)).andReturn(false);
 
-    Closure<Integer> filtered = Closures.filter(filter, work);
+    Consumer<Integer> filtered = Consumers.filter(filter, work);
 
     control.replay();
 
-    filtered.execute(1);
-    filtered.execute(2);
+    filtered.accept(1);
+    filtered.accept(2);
   }
 }

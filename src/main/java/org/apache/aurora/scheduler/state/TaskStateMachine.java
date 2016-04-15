@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.state;
 
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
@@ -27,9 +28,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
-import org.apache.aurora.common.base.Closure;
-import org.apache.aurora.common.base.Closures;
 import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.base.Consumers;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.util.StateMachine;
@@ -168,17 +168,17 @@ class TaskStateMachine {
           "A task that does not exist must start in DELETED state.");
     }
 
-    Closure<Transition<TaskState>> manageTerminatedTasks = Closures.combine(
-        ImmutableList.<Closure<Transition<TaskState>>>builder()
+    Consumer<Transition<TaskState>> manageTerminatedTasks = Consumers.combine(
+        ImmutableList.<Consumer<Transition<TaskState>>>builder()
             // Kill a task that we believe to be terminated when an attempt is made to revive.
             .add(
-                Closures.filter(Transition.to(ASSIGNED, STARTING, RUNNING),
+                Consumers.filter(Transition.to(ASSIGNED, STARTING, RUNNING),
                     addFollowupClosure(KILL)))
             // Remove a terminated task that is requested to be deleted.
-            .add(Closures.filter(Transition.to(DELETED), addFollowupClosure(DELETE)))
+            .add(Consumers.filter(Transition.to(DELETED), addFollowupClosure(DELETE)))
             .build());
 
-    final Closure<Transition<TaskState>> manageRestartingTask =
+    final Consumer<Transition<TaskState>> manageRestartingTask =
         transition -> {
           switch (transition.getTo()) {
             case ASSIGNED:
@@ -243,8 +243,8 @@ class TaskStateMachine {
       }
     };
 
-    final Closure<Transition<TaskState>> deleteIfKilling =
-        Closures.filter(Transition.to(KILLING), addFollowupClosure(DELETE));
+    final Consumer<Transition<TaskState>> deleteIfKilling =
+        Consumers.filter(Transition.to(KILLING), addFollowupClosure(DELETE));
 
     stateMachine = StateMachine.<TaskState>builder(name)
         .logTransitions()
@@ -432,9 +432,9 @@ class TaskStateMachine {
         // Since we want this action to be performed last in the transition sequence, the callback
         // must be the last chained transition callback.
         .onAnyTransition(
-            new Closure<Transition<TaskState>>() {
+            new Consumer<Transition<TaskState>>() {
               @Override
-              public void execute(final Transition<TaskState> transition) {
+              public void accept(final Transition<TaskState> transition) {
                 if (transition.isValidStateChange()) {
                   TaskState from = transition.getFrom();
                   TaskState to = transition.getTo();
@@ -475,7 +475,7 @@ class TaskStateMachine {
     sideEffects.add(sideEffect);
   }
 
-  private Closure<Transition<TaskState>> addFollowupClosure(final Action action) {
+  private Consumer<Transition<TaskState>> addFollowupClosure(final Action action) {
     return item -> addFollowup(action);
   }
 

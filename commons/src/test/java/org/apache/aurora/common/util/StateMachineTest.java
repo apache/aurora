@@ -13,8 +13,9 @@
  */
 package org.apache.aurora.common.util;
 
-import org.apache.aurora.common.base.Closure;
-import org.apache.aurora.common.base.Closures;
+import java.util.function.Consumer;
+
+import org.apache.aurora.common.base.Consumers;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.StateMachine.Rule;
 import org.apache.aurora.common.util.StateMachine.Transition;
@@ -199,32 +200,32 @@ public class StateMachineTest extends EasyMockTest {
     assertThat(machine.getState(), is(A));
   }
 
-  private static final Clazz<Closure<Transition<String>>> TRANSITION_CLOSURE_CLZ =
-      new Clazz<Closure<Transition<String>>>() {};
+  private static final Clazz<Consumer<Transition<String>>> TRANSITION_CLOSURE_CLZ =
+      new Clazz<Consumer<Transition<String>>>() {};
 
   @Test
   public void testTransitionCallbacks() {
-    Closure<Transition<String>> anyTransition = createMock(TRANSITION_CLOSURE_CLZ);
-    Closure<Transition<String>> fromA = createMock(TRANSITION_CLOSURE_CLZ);
-    Closure<Transition<String>> fromB = createMock(TRANSITION_CLOSURE_CLZ);
+    Consumer<Transition<String>> anyTransition = createMock(TRANSITION_CLOSURE_CLZ);
+    Consumer<Transition<String>> fromA = createMock(TRANSITION_CLOSURE_CLZ);
+    Consumer<Transition<String>> fromB = createMock(TRANSITION_CLOSURE_CLZ);
 
     Transition<String> aToB = new Transition<>(A, B, true);
-    anyTransition.execute(aToB);
-    fromA.execute(aToB);
+    anyTransition.accept(aToB);
+    fromA.accept(aToB);
 
     Transition<String> bToB = new Transition<>(B, B, false);
-    anyTransition.execute(bToB);
-    fromB.execute(bToB);
+    anyTransition.accept(bToB);
+    fromB.accept(bToB);
 
     Transition<String> bToC = new Transition<>(B, C, true);
-    anyTransition.execute(bToC);
-    fromB.execute(bToC);
+    anyTransition.accept(bToC);
+    fromB.accept(bToC);
 
-    anyTransition.execute(new Transition<>(C, B, true));
+    anyTransition.accept(new Transition<>(C, B, true));
 
     Transition<String> bToD = new Transition<>(B, D, true);
-    anyTransition.execute(bToD);
-    fromB.execute(bToD);
+    anyTransition.accept(bToD);
+    fromB.accept(bToD);
 
     control.replay();
 
@@ -247,10 +248,10 @@ public class StateMachineTest extends EasyMockTest {
 
   @Test
   public void testFilteredTransitionCallbacks() {
-    Closure<Transition<String>> aToBHandler = createMock(TRANSITION_CLOSURE_CLZ);
-    Closure<Transition<String>> impossibleHandler = createMock(TRANSITION_CLOSURE_CLZ);
+    Consumer<Transition<String>> aToBHandler = createMock(TRANSITION_CLOSURE_CLZ);
+    Consumer<Transition<String>> impossibleHandler = createMock(TRANSITION_CLOSURE_CLZ);
 
-    aToBHandler.execute(new Transition<>(A, B, true));
+    aToBHandler.accept(new Transition<>(A, B, true));
 
     control.replay();
 
@@ -258,9 +259,9 @@ public class StateMachineTest extends EasyMockTest {
         .initialState(A)
         .addState(Rule
             .from(A).to(B, C)
-            .withCallback(Closures.filter(Transition.to(B), aToBHandler)))
+            .withCallback(Consumers.filter(Transition.to(B), aToBHandler)))
         .addState(Rule.from(B).to(A)
-            .withCallback(Closures.filter(Transition.to(B), impossibleHandler)))
+            .withCallback(Consumers.filter(Transition.to(B), impossibleHandler)))
         .addState(Rule.from(C).noTransitions())
         .build();
 
