@@ -17,7 +17,7 @@ set -o errexit
 set -o nounset
 set -o verbose
 
-readonly MESOS_VERSION=0.27.2
+readonly MESOS_VERSION=0.26.0
 
 function remove_unused {
   # The default ubuntu/trusty64 image includes juju-core, which adds ~300 MB to our image.
@@ -60,8 +60,8 @@ function install_docker {
 }
 
 function install_mesos {
-  URL_BASE='http://repos.mesosphere.com/ubuntu/pool/main/m/mesos'
-  DEB_URL="$URL_BASE/mesos_${MESOS_VERSION}-2.0.15.ubuntu1404_amd64.deb"
+  URL_BASE='http://downloads.mesosphere.io/master/ubuntu/14.04'
+  DEB_URL="$URL_BASE/mesos_${MESOS_VERSION}-0.2.145.ubuntu1404_amd64.deb"
   deb=$(basename $DEB_URL)
   wget -c "$DEB_URL"
   dpkg --install $deb

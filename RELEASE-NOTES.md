@@ -1,7 +1,3 @@
-0.14.0
-------
-- Upgraded Mesos to 0.27.2
-
 0.13.0 (Not yet released)
 ------
 
