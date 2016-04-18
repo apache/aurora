@@ -19,6 +19,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -30,27 +31,32 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 class MemCronJobStore implements CronJobStore.Mutable {
   private final Map<IJobKey, IJobConfiguration> jobs = Maps.newConcurrentMap();
 
+  @Timed("mem_storage_cron_save_accepted_job")
   @Override
   public void saveAcceptedJob(IJobConfiguration jobConfig) {
     IJobKey key = JobKeys.assertValid(jobConfig.getKey());
     jobs.put(key, jobConfig);
   }
 
+  @Timed("mem_storage_cron_remove_job")
   @Override
   public void removeJob(IJobKey jobKey) {
     jobs.remove(jobKey);
   }
 
+  @Timed("mem_storage_cron_delete_jobs")
   @Override
   public void deleteJobs() {
     jobs.clear();
   }
 
+  @Timed("mem_storage_cron_fetch_jobs")
   @Override
   public Iterable<IJobConfiguration> fetchJobs() {
     return ImmutableSet.copyOf(jobs.values());
   }
 
+  @Timed("mem_storage_cron_fetch_job")
   @Override
   public Optional<IJobConfiguration> fetchJob(IJobKey jobKey) {
     return Optional.fromNullable(jobs.get(jobKey));
