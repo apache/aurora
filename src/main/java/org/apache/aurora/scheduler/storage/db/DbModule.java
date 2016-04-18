@@ -34,6 +34,7 @@ import com.google.inject.util.Modules;
 
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.common.inject.Bindings.KeyFactory;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -86,6 +87,17 @@ public final class DbModule extends PrivateModule {
   @CmdLine(name = "db_lock_timeout", help = "H2 table lock timeout")
   private static final Arg<Amount<Long, Time>> H2_LOCK_TIMEOUT =
       Arg.create(Amount.of(1L, Time.MINUTES));
+
+  // Flags to configure the PooledDataSource from mybatis.
+  @Positive
+  @CmdLine(name = "db_max_active_connection_count",
+      help = "Max number of connections to use with database via MyBatis")
+  private static final Arg<Integer> MYBATIS_MAX_ACTIVE_CONNECTION_COUNT = Arg.create();
+
+  @Positive
+  @CmdLine(name = "db_max_idle_connection_count",
+      help = "Max number of idle connections to the database via MyBatis")
+  private static final Arg<Integer> MYBATIS_MAX_IDLE_CONNECTION_COUNT = Arg.create();
 
   private static final Set<Class<?>> MAPPER_CLASSES = ImmutableSet.<Class<?>>builder()
       .add(AttributeMapper.class)
@@ -259,6 +271,16 @@ public final class DbModule extends PrivateModule {
         // connection pool.
         bindProperties(binder(), ImmutableMap.of("mybatis.pooled.pingEnabled", "true"));
         bindProperties(binder(), ImmutableMap.of("mybatis.pooled.pingQuery", "SELECT 1;"));
+
+        if (MYBATIS_MAX_ACTIVE_CONNECTION_COUNT.hasAppliedValue()) {
+          String val = MYBATIS_MAX_ACTIVE_CONNECTION_COUNT.get().toString();
+          bindProperties(binder(), ImmutableMap.of("mybatis.pooled.maximumActiveConnections", val));
+        }
+
+        if (MYBATIS_MAX_IDLE_CONNECTION_COUNT.hasAppliedValue()) {
+          String val = MYBATIS_MAX_IDLE_CONNECTION_COUNT.get().toString();
+          bindProperties(binder(), ImmutableMap.of("mybatis.pooled.maximumIdleConnections", val));
+        }
 
         // Exposed for unit tests.
         bind(TaskConfigManager.class);
