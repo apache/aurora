@@ -145,6 +145,15 @@ app.add_option(
 
 
 app.add_option(
+    '--setuid-health-checks',
+    dest='setuid_health_checks',
+    action="store_true",
+    help='If False, does not run shell health checks as job\'s role\'s user',
+    default=True
+)
+
+
+app.add_option(
      "--preserve_env",
      dest="preserve_env",
      default=False,
@@ -181,7 +190,7 @@ def initialize(options):
 
   # status providers:
   status_providers = [
-      HealthCheckerProvider(),
+      HealthCheckerProvider(setuid_health_checks=options.setuid_health_checks),
       ResourceManagerProvider(checkpoint_root=checkpoint_root)
   ]
 

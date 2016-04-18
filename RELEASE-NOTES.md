@@ -5,6 +5,9 @@
 
 - Added a new optional [Apache Curator](https://curator.apache.org/) backend for performing
   scheduler leader election. You can enable this with the new `-zk_use_curator` scheduler argument.
+- Adding --setuid-health-checks flag to control whether the executor runs health checks as the job's
+  role's user.
+
 
 0.13.0
 ------
