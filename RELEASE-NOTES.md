@@ -1,4 +1,12 @@
-0.13.0 (Not yet released)
+0.14.0 (Not yet released)
+------
+
+### New/updated:
+
+- Added a new optional [Apache Curator](https://curator.apache.org/) backend for performing
+  scheduler leader election. You can enable this with the new `-zk_use_curator` scheduler argument.
+
+0.13.0
 ------
 
 ### New/updated:

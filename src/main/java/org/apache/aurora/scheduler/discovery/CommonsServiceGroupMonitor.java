@@ -27,14 +27,14 @@ import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 
 import static java.util.Objects.requireNonNull;
 
-class CommonsServerGroupMonitor implements ServiceGroupMonitor {
+class CommonsServiceGroupMonitor implements ServiceGroupMonitor {
   private Optional<Command> closeCommand = Optional.empty();
   private final DynamicHostSet<ServiceInstance> serverSet;
   private final AtomicReference<ImmutableSet<ServiceInstance>> services =
       new AtomicReference<>(ImmutableSet.of());
 
   @Inject
-  CommonsServerGroupMonitor(DynamicHostSet<ServiceInstance> serverSet) {
+  CommonsServiceGroupMonitor(DynamicHostSet<ServiceInstance> serverSet) {
     this.serverSet = requireNonNull(serverSet);
   }
 

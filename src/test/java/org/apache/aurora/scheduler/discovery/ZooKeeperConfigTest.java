@@ -37,6 +37,7 @@ public class ZooKeeperConfigTest {
   @Test(expected = IllegalArgumentException.class)
   public void testEmptyServers() {
     new ZooKeeperConfig(
+        false,
         ImmutableList.of(),
         Optional.absent(),
         false,
@@ -48,32 +49,34 @@ public class ZooKeeperConfigTest {
   public void testWithCredentials() {
     ZooKeeperConfig config =
         new ZooKeeperConfig(
+            false,
             SERVERS,
             Optional.absent(),
             false,
             Amount.of(1, Time.HOURS),
             Optional.absent()); // credentials
-    assertFalse(config.credentials.isPresent());
+    assertFalse(config.getCredentials().isPresent());
 
     Credentials joeCreds = Credentials.digestCredentials("Joe", "Schmoe");
     ZooKeeperConfig joeConfig = config.withCredentials(joeCreds);
 
     // Should not mutate the original.
     assertNotSame(config, joeConfig);
-    assertFalse(config.credentials.isPresent());
+    assertFalse(config.getCredentials().isPresent());
 
-    assertTrue(joeConfig.credentials.isPresent());
-    assertEquals(joeCreds, joeConfig.credentials.get());
+    assertTrue(joeConfig.getCredentials().isPresent());
+    assertEquals(joeCreds, joeConfig.getCredentials().get());
   }
 
   @Test
   public void testCreateFactory() {
-    ZooKeeperConfig config = ZooKeeperConfig.create(SERVERS);
+    ZooKeeperConfig config = ZooKeeperConfig.create(true, SERVERS);
 
-    assertEquals(SERVERS, ImmutableList.copyOf(config.servers));
-    assertFalse(config.chrootPath.isPresent());
-    assertFalse(config.inProcess);
-    assertEquals(ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT, config.sessionTimeout);
-    assertFalse(config.credentials.isPresent());
+    assertTrue(config.isUseCurator());
+    assertEquals(SERVERS, ImmutableList.copyOf(config.getServers()));
+    assertFalse(config.getChrootPath().isPresent());
+    assertFalse(config.isInProcess());
+    assertEquals(ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT, config.getSessionTimeout());
+    assertFalse(config.getCredentials().isPresent());
   }
 }

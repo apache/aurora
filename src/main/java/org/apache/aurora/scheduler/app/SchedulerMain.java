@@ -52,8 +52,6 @@ import org.apache.aurora.scheduler.configuration.executor.ExecutorModule;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.discovery.FlaggedZooKeeperConfig;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryModule;
-import org.apache.aurora.scheduler.discovery.ZooKeeperClientModule;
-import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
 import org.apache.aurora.scheduler.http.HttpService;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
@@ -156,12 +154,10 @@ public class SchedulerMain {
       LOG.error("Uncaught exception from " + t + ":" + e, e);
     });
 
-    ZooKeeperConfig zkClientConfig = FlaggedZooKeeperConfig.create();
     Module module = Modules.combine(
         appEnvironmentModule,
         getUniversalModule(),
-        new ZooKeeperClientModule(zkClientConfig),
-        new ServiceDiscoveryModule(SERVERSET_PATH.get(), zkClientConfig.credentials),
+        new ServiceDiscoveryModule(FlaggedZooKeeperConfig.create(), SERVERSET_PATH.get()),
         new BackupModule(SnapshotStoreImpl.class),
         new ExecutorModule(),
         new AbstractModule() {

@@ -16,9 +16,8 @@ org/apache/aurora/scheduler/configuration/executor/ExecutorModule$1
 org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl
 org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl$1
 org/apache/aurora/scheduler/discovery/FlaggedZooKeeperConfig
-org/apache/aurora/scheduler/discovery/ZooKeeperClientModule$1
-org/apache/aurora/scheduler/discovery/ZooKeeperClientModule$LocalClientProvider
-org/apache/aurora/scheduler/discovery/ZooKeeperClientModule$TestServerService
+org/apache/aurora/scheduler/discovery/ServiceDiscoveryModule$TestServerService
+org/apache/aurora/scheduler/discovery/ServiceDiscoveryModule$LocalZooKeeperClusterProvider
 org/apache/aurora/scheduler/http/AbortCallback
 org/apache/aurora/scheduler/http/api/security/Kerberos5Realm
 org/apache/aurora/scheduler/http/JerseyTemplateServlet

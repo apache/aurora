@@ -63,7 +63,6 @@ import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryModule;
-import org.apache.aurora.scheduler.discovery.ZooKeeperClientModule;
 import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
@@ -193,18 +192,18 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
                     .setStatsUrlPrefix(STATS_URL_PREFIX)));
       }
     };
-    Credentials credentials = Credentials.digestCredentials("mesos", "mesos");
-    ZooKeeperConfig zkClientConfig = ZooKeeperConfig
-        .create(ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
-        .withCredentials(credentials);
+    ZooKeeperConfig zkClientConfig =
+        ZooKeeperConfig.create(
+            true, // useCurator
+            ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
+            .withCredentials(Credentials.digestCredentials("mesos", "mesos"));
     SchedulerMain main = SchedulerMain.class.newInstance();
     Injector injector = Guice.createInjector(
         ImmutableList.<Module>builder()
             .add(SchedulerMain.getUniversalModule())
             .add(new TierModule(TaskTestUtil.DEV_TIER_CONFIG))
             .add(new LogStorageModule())
-            .add(new ZooKeeperClientModule(zkClientConfig))
-            .add(new ServiceDiscoveryModule(SERVERSET_PATH, Optional.of(credentials)))
+            .add(new ServiceDiscoveryModule(zkClientConfig, SERVERSET_PATH))
             .add(testModule)
             .build()
     );

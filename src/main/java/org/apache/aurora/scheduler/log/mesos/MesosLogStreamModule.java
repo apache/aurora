@@ -145,16 +145,16 @@ public class MesosLogStreamModule extends PrivateModule {
     }
 
     String zkConnectString = Joiner.on(',').join(
-        Iterables.transform(zkClientConfig.servers, InetSocketAddressHelper::toString));
+        Iterables.transform(zkClientConfig.getServers(), InetSocketAddressHelper::toString));
 
-    if (zkClientConfig.credentials.isPresent()) {
-      Credentials zkCredentials = zkClientConfig.credentials.get();
+    if (zkClientConfig.getCredentials().isPresent()) {
+      Credentials zkCredentials = zkClientConfig.getCredentials().get();
       return new Log(
           QUORUM_SIZE.get(),
           logPath.getAbsolutePath(),
           zkConnectString,
-          zkClientConfig.sessionTimeout.getValue(),
-          zkClientConfig.sessionTimeout.getUnit().getTimeUnit(),
+          zkClientConfig.getSessionTimeout().getValue(),
+          zkClientConfig.getSessionTimeout().getUnit().getTimeUnit(),
           zkLogGroupPath,
           zkCredentials.scheme(),
           zkCredentials.authToken());
@@ -163,8 +163,8 @@ public class MesosLogStreamModule extends PrivateModule {
           QUORUM_SIZE.get(),
           logPath.getAbsolutePath(),
           zkConnectString,
-          zkClientConfig.sessionTimeout.getValue(),
-          zkClientConfig.sessionTimeout.getUnit().getTimeUnit(),
+          zkClientConfig.getSessionTimeout().getValue(),
+          zkClientConfig.getSessionTimeout().getUnit().getTimeUnit(),
           zkLogGroupPath);
     }
   }

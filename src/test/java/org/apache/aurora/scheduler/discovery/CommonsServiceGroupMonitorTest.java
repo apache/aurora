@@ -34,7 +34,7 @@ import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class CommonsServerGroupMonitorTest extends EasyMockTest {
+public class CommonsServiceGroupMonitorTest extends EasyMockTest {
 
   private DynamicHostSet<ServiceInstance> serverSet;
   private Capture<HostChangeMonitor<ServiceInstance>> hostChangeMonitorCapture;
@@ -68,7 +68,7 @@ public class CommonsServerGroupMonitorTest extends EasyMockTest {
 
     control.replay();
 
-    CommonsServerGroupMonitor groupMonitor = new CommonsServerGroupMonitor(serverSet);
+    CommonsServiceGroupMonitor groupMonitor = new CommonsServiceGroupMonitor(serverSet);
     groupMonitor.start();
     groupMonitor.close();
   }
@@ -78,7 +78,7 @@ public class CommonsServerGroupMonitorTest extends EasyMockTest {
     expectFailedWatch();
     control.replay();
 
-    CommonsServerGroupMonitor groupMonitor = new CommonsServerGroupMonitor(serverSet);
+    CommonsServiceGroupMonitor groupMonitor = new CommonsServiceGroupMonitor(serverSet);
     try {
       groupMonitor.start();
       fail();
@@ -95,7 +95,7 @@ public class CommonsServerGroupMonitorTest extends EasyMockTest {
     expectSuccessfulWatch();
     control.replay();
 
-    CommonsServerGroupMonitor groupMonitor = new CommonsServerGroupMonitor(serverSet);
+    CommonsServiceGroupMonitor groupMonitor = new CommonsServiceGroupMonitor(serverSet);
     assertEquals(ImmutableSet.of(), groupMonitor.get());
 
     groupMonitor.start();
@@ -110,7 +110,7 @@ public class CommonsServerGroupMonitorTest extends EasyMockTest {
     expectSuccessfulWatch();
     control.replay();
 
-    CommonsServerGroupMonitor groupMonitor = new CommonsServerGroupMonitor(serverSet);
+    CommonsServiceGroupMonitor groupMonitor = new CommonsServiceGroupMonitor(serverSet);
     groupMonitor.start();
 
     ImmutableSet<ServiceInstance> twoHosts =

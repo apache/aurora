@@ -35,6 +35,11 @@ import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
  * values.
  */
 public final class FlaggedZooKeeperConfig {
+  @CmdLine(name = "zk_use_curator",
+      help = "Uses Apache Curator as the zookeeper client; otherwise a copy of Twitter "
+          + "commons/zookeeper (the legacy library) is used.")
+  private static final Arg<Boolean> USE_CURATOR = Arg.create(false);
+
   @CmdLine(name = "zk_in_proc",
       help = "Launches an embedded zookeeper server for local testing causing -zk_endpoints "
           + "to be ignored if specified.")
@@ -66,6 +71,7 @@ public final class FlaggedZooKeeperConfig {
    */
   public static ZooKeeperConfig create() {
     return new ZooKeeperConfig(
+        USE_CURATOR.get(),
         ZK_ENDPOINTS.get(),
         Optional.fromNullable(CHROOT_PATH.get()),
         IN_PROCESS.get(),
