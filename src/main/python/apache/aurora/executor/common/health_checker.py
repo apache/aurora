@@ -208,8 +208,8 @@ class HealthChecker(StatusChecker):
 
 class HealthCheckerProvider(StatusCheckerProvider):
 
-  def __init__(self, setuid_health_checks=True):
-    self.setuid_health_checks = setuid_health_checks
+  def __init__(self, nosetuid_health_checks=False):
+    self.nosetuid_health_checks = nosetuid_health_checks
 
   @staticmethod
   def interpolate_cmd(task, cmd):
@@ -247,14 +247,14 @@ class HealthCheckerProvider(StatusCheckerProvider):
         task=assigned_task,
         cmd=shell_command
       )
-      # If we do not want user which is job's role to execute the health shell check.
-      if self.setuid_health_checks:
+      # If we do not want user which is job's role to execute the health shell check
+      # --nosetuid-health-checks should be passed in as an argument to the executor.
+      demote_to_job_role_user = None
+      if not self.nosetuid_health_checks:
         pw_entry = pwd.getpwnam(assigned_task.task.job.role)
         def demote_to_job_role_user():
           os.setgid(pw_entry.pw_gid)
           os.setuid(pw_entry.pw_uid)
-      else:
-        demote_to_job_role_user = None
 
       shell_signaler = ShellHealthCheck(cmd=interpolated_command,
         preexec_fn=demote_to_job_role_user,

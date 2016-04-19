@@ -309,7 +309,7 @@ class TestHealthCheckerProvider(unittest.TestCase):
     execconfig_data = json.loads(assigned_task.task.executorConfig.data)
     assert execconfig_data[
              'health_check_config']['health_checker']['shell']['shell_command'] == 'failed command'
-    health_checker = HealthCheckerProvider(setuid_health_checks=False).from_assigned_task(
+    health_checker = HealthCheckerProvider(nosetuid_health_checks=True).from_assigned_task(
       assigned_task, None)
     assert health_checker.threaded_health_checker.interval == interval_secs
     assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs

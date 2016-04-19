@@ -114,6 +114,15 @@ app.add_option(
 
 
 app.add_option(
+    '--nosetuid-health-checks',
+    dest='nosetuid_health_checks',
+    action="store_true",
+    help='If set, the executor will not run shell health checks as job\'s role\'s user',
+    default=False
+)
+
+
+app.add_option(
     '--runner-logger-destination',
     dest='runner_logger_destination',
     type=str,
@@ -142,15 +151,6 @@ app.add_option(
     dest='runner_rotate_log_backups',
     type=int,
     help='Maximum number of rotated stdout/stderr logs emitted by the thermos runner.')
-
-
-app.add_option(
-    '--setuid-health-checks',
-    dest='setuid_health_checks',
-    action="store_true",
-    help='If False, does not run shell health checks as job\'s role\'s user',
-    default=True
-)
 
 
 app.add_option(
@@ -190,7 +190,7 @@ def initialize(options):
 
   # status providers:
   status_providers = [
-      HealthCheckerProvider(setuid_health_checks=options.setuid_health_checks),
+      HealthCheckerProvider(nosetuid_health_checks=options.nosetuid_health_checks),
       ResourceManagerProvider(checkpoint_root=checkpoint_root)
   ]
 
