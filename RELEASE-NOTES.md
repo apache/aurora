@@ -1,5 +1,5 @@
 0.14.0 (Not yet released)
-------
+=======
 
 ### New/updated:
 
@@ -7,7 +7,7 @@
   scheduler leader election. You can enable this with the new `-zk_use_curator` scheduler argument.
 - Adding --nosetuid-health-checks flag to control whether the executor runs health checks as the job's
   role's user.
-
+- Upgraded Mesos to 0.27.2
 
 0.13.0
 ------
