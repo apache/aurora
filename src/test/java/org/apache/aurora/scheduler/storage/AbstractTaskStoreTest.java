@@ -208,6 +208,19 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   }
 
   @Test
+  public void testSaveWithMultiplePorts() {
+    ScheduledTask builder = TASK_A.newBuilder();
+    builder.getAssignedTask().setAssignedPorts(ImmutableMap.of("http", 1000, "tcp", 2000));
+    IScheduledTask task = IScheduledTask.build(builder);
+    saveTasks(task);
+
+    Optional<IScheduledTask> maybeTask = fetchTask(task.getAssignedTask().getTaskId());
+    saveTasks(maybeTask.get());
+
+    assertStoreContents(task);
+  }
+
+  @Test
   public void testQuery() {
     assertStoreContents();
     saveTasks(TASK_A, TASK_B, TASK_C, TASK_D);

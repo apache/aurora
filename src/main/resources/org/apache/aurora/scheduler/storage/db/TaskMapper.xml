@@ -81,6 +81,11 @@
   </resultMap>
 
   <sql id="unscopedSelect">
+    <!--
+    N.B. For any one-to-many relationship, results from the joined table *must* include the id
+    otherwise mybatis will not be able to disambiguate identical rows leading to an explosion
+    of related rows on each save.
+    -->
     SELECT
       t.id AS row_id,
       t.task_config_row_id AS task_config_row_id,
@@ -94,8 +99,10 @@
       j.name AS c_j_name,
       h.slave_id AS slave_id,
       h.host AS slave_host,
+      tp.id as tp_id,
       tp.name as tp_name,
       tp.port as tp_port,
+      te.id as te_id,
       te.timestamp_ms as te_timestamp,
       te.status as te_status,
       te.message as te_message,
