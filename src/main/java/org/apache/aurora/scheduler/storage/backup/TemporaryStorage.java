@@ -76,7 +76,10 @@ interface TemporaryStorage {
           storage,
           // Safe to pass false here to default to the non-experimental task store
           // during restore from backup procedure.
-          false /** useDbSnapshotForTaskStore */);
+          false /** useDbSnapshotForTaskStore */,
+          // We can just pass an empty lambda for the MigrationManager as migration is a no-op
+          // when restoring from backup.
+          () -> { } /** migrationManager */);
       snapshotStore.applySnapshot(snapshot);
 
       return new TemporaryStorage() {

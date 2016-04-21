@@ -54,6 +54,7 @@ import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.resources.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.db.MigrationManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -97,7 +98,8 @@ public class SnapshotStoreImplIT {
         generateBuildInfo(),
         clock,
         storage,
-        dbTaskStore);
+        dbTaskStore,
+        createStorageInjector(testModuleWithWorkQueue()).getInstance(MigrationManager.class));
   }
 
   private static Snapshot makeComparable(Snapshot snapshot) {

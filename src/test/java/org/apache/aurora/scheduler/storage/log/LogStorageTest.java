@@ -92,7 +92,6 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
-import org.apache.aurora.scheduler.storage.db.MigrationManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -143,7 +142,7 @@ public class LogStorageTest extends EasyMockTest {
   private EventSink eventSink;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() {
     log = createMock(Log.class);
     deduplicator = createMock(SnapshotDeduplicator.class);
 
@@ -161,9 +160,6 @@ public class LogStorageTest extends EasyMockTest {
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
     storageUtil = new StorageTestUtil(this);
     eventSink = createMock(EventSink.class);
-    MigrationManager migrationManager = createMock(MigrationManager.class);
-    migrationManager.migrate();
-    expectLastCall().anyTimes();
 
     logStorage = new LogStorage(
         logManager,
@@ -179,8 +175,7 @@ public class LogStorageTest extends EasyMockTest {
         storageUtil.attributeStore,
         storageUtil.jobUpdateStore,
         eventSink,
-        new ReentrantLock(),
-        migrationManager);
+        new ReentrantLock());
 
     stream = createMock(Stream.class);
     streamMatcher = LogOpMatcher.matcherFor(stream);

@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
@@ -62,7 +61,6 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.db.MigrationManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -192,7 +190,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   private final AttributeStore.Mutable writeBehindAttributeStore;
   private final JobUpdateStore.Mutable writeBehindJobUpdateStore;
   private final ReentrantLock writeLock;
-  private final MigrationManager migrationManager;
 
   private StreamManager streamManager;
   private final WriteAheadStorage writeAheadStorage;
@@ -225,8 +222,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       @Volatile AttributeStore.Mutable attributeStore,
       @Volatile JobUpdateStore.Mutable jobUpdateStore,
       EventSink eventSink,
-      ReentrantLock writeLock,
-      MigrationManager migrationManager) {
+      ReentrantLock writeLock) {
 
     this(logManager,
         new ScheduledExecutorSchedulingService(shutdownRegistry, settings.getShutdownGracePeriod()),
@@ -241,8 +237,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         attributeStore,
         jobUpdateStore,
         eventSink,
-        writeLock,
-        migrationManager);
+        writeLock);
   }
 
   @VisibleForTesting
@@ -260,8 +255,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       AttributeStore.Mutable attributeStore,
       JobUpdateStore.Mutable jobUpdateStore,
       EventSink eventSink,
-      ReentrantLock writeLock,
-      MigrationManager migrationManager) {
+      ReentrantLock writeLock) {
 
     this.logManager = requireNonNull(logManager);
     this.schedulingService = requireNonNull(schedulingService);
@@ -281,7 +275,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     this.writeBehindAttributeStore = requireNonNull(attributeStore);
     this.writeBehindJobUpdateStore = requireNonNull(jobUpdateStore);
     this.writeLock = requireNonNull(writeLock);
-    this.migrationManager = requireNonNull(migrationManager);
     TransactionManager transactionManager = new TransactionManager() {
       @Override
       public boolean hasActiveTransaction() {
@@ -422,11 +415,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       // We replay these entries in the forwarded storage system's transactions but not ours - we
       // do not want to re-record these ops to the log.
       recover();
-
-      // Apply any schema/data migrations before 'activating' write-ahead (native log) writes.
-      migrate();
-
-      // Activate write-ahead writes now that the store is fully recovered and migrated.
       recovered = true;
 
       // Now that we're recovered we should let any mutations done in initializationLogic append
@@ -447,15 +435,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     try {
       streamManager.readFromBeginning(LogStorage.this::replay);
     } catch (CodingException | InvalidPositionException | StreamAccessException e) {
-      throw new RecoveryFailedException(e);
-    }
-  }
-
-  @Timed("scheduler_log_migrate")
-  void migrate() {
-    try {
-      migrationManager.migrate();
-    } catch (SQLException e) {
       throw new RecoveryFailedException(e);
     }
   }
