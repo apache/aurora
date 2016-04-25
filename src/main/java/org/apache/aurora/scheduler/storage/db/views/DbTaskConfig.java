@@ -17,7 +17,6 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ExecutorConfig;
@@ -27,6 +26,8 @@ import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
+import static org.apache.aurora.GuavaUtils.toImmutableSet;
 
 public final class DbTaskConfig {
   private long rowId;
@@ -48,6 +49,7 @@ public final class DbTaskConfig {
   private DbContainer container;
   private String tier;
   private DbImage image;
+  private List<DBResource> resources;
 
   private DbTaskConfig() {
   }
@@ -71,14 +73,15 @@ public final class DbTaskConfig {
         .setImage(image == null ? null : image.toThrift())
         .setConstraints(constraints.stream()
             .map(DbConstraint::toThrift)
-            .collect(GuavaUtils.toImmutableSet()))
+            .collect(toImmutableSet()))
         .setRequestedPorts(ImmutableSet.copyOf(requestedPorts))
         .setTaskLinks(Pairs.toMap(taskLinks))
         .setContactEmail(contactEmail)
         .setExecutorConfig(executorConfig)
         .setMetadata(ImmutableSet.copyOf(metadata))
         .setContainer(
-            container == null ? Container.mesos(new MesosContainer()) : container.toThrift());
+            container == null ? Container.mesos(new MesosContainer()) : container.toThrift())
+        .setResources(resources.stream().map(DBResource::toThrift).collect(toImmutableSet()));
   }
 
   public ITaskConfig toImmutable() {

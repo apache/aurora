@@ -60,7 +60,6 @@ import org.apache.aurora.scheduler.storage.db.MigrationManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -222,8 +221,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
           store.getUnsafeTaskStore().deleteAllTasks();
 
           if (snapshot.isSetTasks()) {
-            store.getUnsafeTaskStore().saveTasks(
-                IScheduledTask.setFromBuilders(snapshot.getTasks()));
+            store.getUnsafeTaskStore()
+                .saveTasks(ThriftBackfill.backfillTasks(snapshot.getTasks()));
           }
         }
       },
@@ -251,7 +250,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
           if (snapshot.isSetCronJobs()) {
             for (StoredCronJob job : snapshot.getCronJobs()) {
               store.getCronJobStore().saveAcceptedJob(
-                  IJobConfiguration.build(job.getJobConfiguration()));
+                  ThriftBackfill.backfillJobConfiguration(job.getJobConfiguration()));
             }
           }
         }
@@ -328,7 +327,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
             for (StoredJobUpdateDetails storedDetails : snapshot.getJobUpdateDetails()) {
               JobUpdateDetails details = storedDetails.getDetails();
               updateStore.saveJobUpdate(
-                  IJobUpdate.build(details.getUpdate()),
+                  ThriftBackfill.backFillJobUpdate(details.getUpdate()),
                   Optional.fromNullable(storedDetails.getLockToken()));
 
               if (details.getUpdateEventsSize() > 0) {

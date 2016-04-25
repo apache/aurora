@@ -28,6 +28,7 @@ import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.Metadata;
+import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -104,7 +105,12 @@ public final class TaskTestUtil {
             new DockerContainer("imagename")
                 .setParameters(ImmutableList.of(
                     new DockerParameter("a", "b"),
-                    new DockerParameter("c", "d"))))));
+                    new DockerParameter("c", "d")))))
+        .setResources(ImmutableSet.of(
+            Resource.numCpus(1.0),
+            Resource.ramMb(1024),
+            Resource.diskMb(1024),
+            Resource.namedPort("http"))));
   }
 
   public static IScheduledTask makeTask(String id, IJobKey job) {

@@ -705,11 +705,11 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testGetJobUpdateDiffWithUpdateAdd() throws Exception {
-    TaskConfig task1 = defaultTask(false).setNumCpus(1.0);
-    TaskConfig task2 = defaultTask(false).setNumCpus(2.0);
-    TaskConfig task3 = defaultTask(false).setNumCpus(3.0);
-    TaskConfig task4 = defaultTask(false).setNumCpus(4.0);
-    TaskConfig task5 = defaultTask(false).setNumCpus(5.0);
+    TaskConfig task1 = defaultTask(false).setMaxTaskFailures(1);
+    TaskConfig task2 = defaultTask(false).setMaxTaskFailures(2);
+    TaskConfig task3 = defaultTask(false).setMaxTaskFailures(3);
+    TaskConfig task4 = defaultTask(false).setMaxTaskFailures(4);
+    TaskConfig task5 = defaultTask(false).setMaxTaskFailures(5);
 
     ImmutableSet.Builder<IScheduledTask> tasks = ImmutableSet.builder();
     makeTasks(0, 10, task1, tasks);
@@ -723,7 +723,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    TaskConfig newTask = defaultTask(false).setNumCpus(6.0);
+    TaskConfig newTask = defaultTask(false).setMaxTaskFailures(6);
     JobUpdateRequest request = new JobUpdateRequest()
         .setTaskConfig(newTask)
         .setInstanceCount(60)
@@ -746,9 +746,9 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testGetJobUpdateDiffWithUpdateRemove() throws Exception {
-    TaskConfig task1 = defaultTask(false).setNumCpus(1.0);
-    TaskConfig task2 = defaultTask(false).setNumCpus(2.0);
-    TaskConfig task3 = defaultTask(false).setNumCpus(3.0);
+    TaskConfig task1 = defaultTask(false).setMaxTaskFailures(1);
+    TaskConfig task2 = defaultTask(false).setMaxTaskFailures(2);
+    TaskConfig task3 = defaultTask(false).setMaxTaskFailures(3);
 
     ImmutableSet.Builder<IScheduledTask> tasks = ImmutableSet.builder();
     makeTasks(0, 10, task1, tasks);
@@ -761,7 +761,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     control.replay();
 
     JobUpdateRequest request = new JobUpdateRequest()
-        .setTaskConfig(defaultTask(false).setNumCpus(6.0))
+        .setTaskConfig(defaultTask(false).setMaxTaskFailures(6))
         .setInstanceCount(20)
         .setSettings(new JobUpdateSettings());
 

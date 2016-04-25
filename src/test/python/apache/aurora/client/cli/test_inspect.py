@@ -89,7 +89,10 @@ Process 'process':
       cmd = AuroraCommandLine()
       assert cmd.execute(['job', 'inspect', '--raw', 'west/bozo/test/hello', 'config.aurora']) == 0
       output = '\n'.join(mock_stdout)
-      assert output == str(job_config.job())
+      # It's impossible to assert string equivalence of two objects with nested un-hashable types.
+      # Given that the only product of --raw flag is the thrift representation of AuroraConfig
+      # it's enough to do a spot check here and let thrift.py tests validate the structure.
+      assert 'TaskConfig' in output
 
   # AURORA-990: Prevent regression of client passing invalid arguments to print_out.
   # Since print_out is the final layer before print(), there's not much else we can do than

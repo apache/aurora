@@ -31,7 +31,7 @@ from apache.aurora.config.thrift import InvalidConfig, task_instance_from_job
 from apache.thermos.config.schema import Process, Resources, Task
 
 from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
-from gen.apache.aurora.api.ttypes import CronCollisionPolicy, Identity, JobKey
+from gen.apache.aurora.api.ttypes import CronCollisionPolicy, Identity, JobKey, Resource
 from gen.apache.aurora.test.constants import INVALID_IDENTIFIERS, VALID_IDENTIFIERS
 
 HELLO_WORLD = Job(
@@ -48,7 +48,7 @@ HELLO_WORLD = Job(
 
 
 def test_simple_config():
-  job = convert_pystachio_to_thrift(HELLO_WORLD)
+  job = convert_pystachio_to_thrift(HELLO_WORLD, ports=frozenset(['health']))
   expected_key = JobKey(
       role=HELLO_WORLD.role().get(),
       environment=HELLO_WORLD.environment().get(),
@@ -63,13 +63,17 @@ def test_simple_config():
   assert tti.numCpus == 0.1
   assert tti.ramMb == 64
   assert tti.diskMb == 64
-  assert tti.requestedPorts == set()
+  assert tti.requestedPorts == frozenset(['health'])
   assert tti.production is False
   assert tti.priority == 0
   assert tti.maxTaskFailures == 1
   assert tti.constraints == set()
   assert tti.metadata == set()
   assert tti.tier is None
+  assert Resource(numCpus=0.1) in list(tti.resources)
+  assert Resource(ramMb=64) in list(tti.resources)
+  assert Resource(diskMb=64) in list(tti.resources)
+  assert Resource(namedPort='health') in list(tti.resources)
 
 
 def test_config_with_tier():

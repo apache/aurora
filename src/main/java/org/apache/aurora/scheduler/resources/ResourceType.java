@@ -13,37 +13,62 @@
  */
 package org.apache.aurora.scheduler.resources;
 
+import java.util.EnumSet;
+
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 
 import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Data;
+import org.apache.aurora.gen.Resource._Fields;
+import org.apache.aurora.scheduler.storage.entities.IResource;
+import org.apache.mesos.Protos;
+import org.apache.thrift.TEnum;
 
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.common.quantity.Data.GB;
+import static org.apache.aurora.common.quantity.Data.MB;
+import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.DOUBLE;
+import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.LONG;
+import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.STRING;
+import static org.apache.mesos.Protos.Value.Type.RANGES;
+import static org.apache.mesos.Protos.Value.Type.SCALAR;
 
 /**
  * Describes Mesos resource types and their Aurora traits.
  */
 @VisibleForTesting
-public enum ResourceType {
+public enum ResourceType implements TEnum {
   /**
    * CPU resource.
    */
-  CPUS("cpus", "CPU", 16),
+  CPUS(_Fields.NUM_CPUS, SCALAR, "cpus", DOUBLE, "CPU", 16, false),
 
   /**
    * RAM resource.
    */
-  RAM_MB("mem", "RAM", Amount.of(24, Data.GB).as(Data.MB)),
+  RAM_MB(_Fields.RAM_MB, SCALAR, "mem", LONG, "RAM", Amount.of(24, GB).as(MB), false),
 
   /**
    * DISK resource.
    */
-  DISK_MB("disk", "disk", Amount.of(450, Data.GB).as(Data.MB)),
+  DISK_MB(_Fields.DISK_MB, SCALAR, "disk", LONG, "disk", Amount.of(450, GB).as(MB), false),
 
   /**
    * Port resource.
    */
-  PORTS("ports", "ports", 1000);
+  PORTS(_Fields.NAMED_PORT, RANGES, "ports", STRING, "ports", 1000, true);
+
+  /**
+   * Correspondent thrift {@link org.apache.aurora.gen.Resource} enum value.
+   */
+  private final _Fields value;
+
+  /**
+   * Mesos resource type.
+   */
+  private final Protos.Value.Type mesosType;
 
   /**
    * Mesos resource name.
@@ -51,28 +76,77 @@ public enum ResourceType {
   private final String mesosName;
 
   /**
+   * Type converter for resource values.
+   */
+  private final ResourceTypeConverter<?> typeConverter;
+
+  /**
    * Aurora resource name.
    */
   private final String auroraName;
 
   /**
-   * Scaling range to use for comparison of scheduling vetoes. This has no real bearing besides
-   * trying to determine if a veto along one resource vector is a 'stronger' veto than that of
-   * another vector. The value represents the typical slave machine resources.
+   * Scaling range for comparing scheduling vetoes.
    */
   private final int scalingRange;
 
   /**
+   * Indicates if multiple resource types are allowed in a task.
+   */
+  private final boolean isMultipleAllowed;
+
+  private static ImmutableMap<Integer, ResourceType> byField =
+      Maps.uniqueIndex(EnumSet.allOf(ResourceType.class),  ResourceType::getValue);
+
+  /**
    * Describes a Resource type.
    *
+   * @param value Correspondent {@link _Fields} value.
+   * @param mesosType See {@link #getMesosType()} for more details.
    * @param mesosName See {@link #getMesosName()} for more details.
+   * @param typeConverter See {@link #getTypeConverter()} for more details.
    * @param auroraName See {@link #getAuroraName()} for more details.
    * @param scalingRange See {@link #getScalingRange()} for more details.
+   * @param isMultipleAllowed See {@link #isMultipleAllowed()} for more details.
    */
-  ResourceType(String mesosName, String auroraName, int scalingRange) {
+  ResourceType(
+      _Fields value,
+      Protos.Value.Type mesosType,
+      String mesosName,
+      ResourceTypeConverter<?> typeConverter,
+      String auroraName,
+      int scalingRange,
+      boolean isMultipleAllowed) {
+
+    this.value = value;
+    this.mesosType = requireNonNull(mesosType);
     this.mesosName = requireNonNull(mesosName);
+    this.typeConverter = requireNonNull(typeConverter);
     this.auroraName = requireNonNull(auroraName);
     this.scalingRange = scalingRange;
+    this.isMultipleAllowed = isMultipleAllowed;
+  }
+
+  /**
+   * Get unique ID value.
+   *
+   * @return Enum ID.
+   */
+  @Override
+  public int getValue() {
+    return value.getThriftFieldId();
+  }
+
+  /**
+   * Gets Mesos resource type.
+   * <p>
+   * @see <a href="https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto/">Mesos
+   * protobuf for more details</a>
+   *
+   * @return Mesos resource type.
+   */
+  public Protos.Value.Type getMesosType() {
+    return mesosType;
   }
 
   /**
@@ -88,6 +162,15 @@ public enum ResourceType {
   }
 
   /**
+   * Gets {@link ResourceTypeConverter} to convert resource values.
+   *
+   * @return {@link ResourceTypeConverter} instance.
+   */
+  public ResourceTypeConverter<?> getTypeConverter() {
+    return typeConverter;
+  }
+
+  /**
    * Gets resource name for internal Aurora representation (e.g. in the UI).
    *
    * @return Aurora resource name.
@@ -97,11 +180,46 @@ public enum ResourceType {
   }
 
   /**
-   * Returns scaling range for comparing scheduling vetoes.
+   * Scaling range to use for comparison of scheduling vetoes.
+   * <p>
+   * This has no real bearing besides trying to determine if a veto along one resource vector
+   * is a 'stronger' veto than that of another vector. The value represents the typical slave
+   * machine resources.
    *
    * @return Resource scaling range.
    */
   public int getScalingRange() {
     return scalingRange;
+  }
+
+  /**
+   * Returns a flag indicating if multiple resource of the same type are allowed in a given task.
+   *
+   * @return True if multiple resources of the same type are allowed, false otherwise.
+   */
+  public boolean isMultipleAllowed() {
+    return isMultipleAllowed;
+  }
+
+  /**
+   * Returns a {@link ResourceType} for the given ID.
+   *
+   * @param value ID value to search by. See {@link #getValue()}.
+   * @return {@link ResourceType}.
+   */
+  public static ResourceType fromIdValue(int value) {
+    return requireNonNull(byField.get(value), "Unmapped value: " + value);
+  }
+
+  /**
+   * Returns a {@link ResourceType} for the given resource.
+   *
+   * @param resource {@link IResource} to search by.
+   * @return {@link ResourceType}.
+   */
+  public static ResourceType fromResource(IResource resource) {
+    return requireNonNull(
+        byField.get((int) resource.getSetField().getThriftFieldId()),
+        "Unknown resource: " + resource);
   }
 }

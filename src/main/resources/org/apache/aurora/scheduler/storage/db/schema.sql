@@ -100,6 +100,22 @@ CREATE TABLE task_configs(
   tier VARCHAR
 );
 
+CREATE TABLE resource_types(
+  id INT PRIMARY KEY,
+  name VARCHAR NOT NULL,
+
+  UNIQUE(name)
+);
+
+CREATE TABLE task_resource(
+  id IDENTITY,
+  task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
+  type_id INT NOT NULL REFERENCES resource_types(id),
+  value VARCHAR NOT NULL,
+
+  UNIQUE(task_config_id, type_id, value)
+);
+
 CREATE TABLE task_constraints(
   id IDENTITY,
   task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,

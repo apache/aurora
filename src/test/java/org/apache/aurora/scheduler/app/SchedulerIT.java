@@ -48,6 +48,8 @@ import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
 import org.apache.aurora.common.zookeeper.ZooKeeperClient;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
+import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.ServerInfo;
@@ -73,6 +75,7 @@ import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.resources.ResourceSlot;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.log.EntrySerializer;
@@ -113,6 +116,11 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
   private static final String SERVERSET_PATH = "/fake/service/path";
   private static final String STATS_URL_PREFIX = "fake_url";
   private static final String FRAMEWORK_ID = "integration_test_framework_id";
+  private static final IHostAttributes HOST_ATTRIBUTES = IHostAttributes.build(new HostAttributes()
+      .setHost("host")
+      .setSlaveId("slave-id")
+      .setMode(MaintenanceMode.NONE)
+      .setAttributes(ImmutableSet.of()));
 
   private static final DriverSettings SETTINGS = new DriverSettings(
       "fakemaster",
@@ -276,7 +284,9 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
         status,
         100)
         .newBuilder();
-    builder.getAssignedTask().setSlaveId("slave-id");
+    builder.getAssignedTask()
+        .setSlaveId(HOST_ATTRIBUTES.getSlaveId())
+        .setSlaveHost(HOST_ATTRIBUTES.getHost());
     return IScheduledTask.build(builder);
   }
 
@@ -293,7 +303,9 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     IScheduledTask snapshotTask = makeTask("snapshotTask", ScheduleStatus.ASSIGNED);
     IScheduledTask transactionTask = makeTask("transactionTask", ScheduleStatus.RUNNING);
     Iterable<Entry> recoveredEntries = toEntries(
-        LogEntry.snapshot(new Snapshot().setTasks(ImmutableSet.of(snapshotTask.newBuilder()))),
+        LogEntry.snapshot(new Snapshot()
+            .setTasks(ImmutableSet.of(snapshotTask.newBuilder()))
+            .setHostAttributes(ImmutableSet.of(HOST_ATTRIBUTES.newBuilder()))),
         LogEntry.transaction(new Transaction(
             ImmutableList.of(Op.saveTasks(
                 new SaveTasks(ImmutableSet.of(transactionTask.newBuilder())))),

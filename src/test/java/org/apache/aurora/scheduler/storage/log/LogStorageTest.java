@@ -113,6 +113,8 @@ import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.base.TaskTestUtil.makeConfig;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -224,8 +226,7 @@ public class LogStorageTest extends EasyMockTest {
     schedulingService.doEvery(eq(SNAPSHOT_INTERVAL), capture(snapshotAction));
     Snapshot snapshotContents = new Snapshot()
         .setTimestamp(NOW)
-        .setTasks(ImmutableSet.of(
-            TaskTestUtil.makeTask("task_id", TaskTestUtil.JOB).newBuilder()));
+        .setTasks(ImmutableSet.of(makeTask("task_id", TaskTestUtil.JOB).newBuilder()));
     expect(snapshotStore.createSnapshot()).andReturn(snapshotContents);
     DeduplicatedSnapshot deduplicated =
         new SnapshotDeduplicatorImpl().deduplicate(snapshotContents);
@@ -273,17 +274,23 @@ public class LogStorageTest extends EasyMockTest {
     builder.add(createTransaction(Op.saveFrameworkId(new SaveFrameworkId("bob"))));
     storageUtil.schedulerStore.saveFrameworkId("bob");
 
-    SaveCronJob cronJob = new SaveCronJob().setJobConfig(new JobConfiguration());
+    JobConfiguration actualJob = new JobConfiguration().setTaskConfig(nonBackfilledConfig());
+    JobConfiguration expectedJob =
+        new JobConfiguration().setTaskConfig(makeConfig(JOB_KEY).newBuilder());
+    SaveCronJob cronJob = new SaveCronJob().setJobConfig(actualJob);
     builder.add(createTransaction(Op.saveCronJob(cronJob)));
-    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(cronJob.getJobConfig()));
+    storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(expectedJob));
 
     RemoveJob removeJob = new RemoveJob(JOB_KEY.newBuilder());
     builder.add(createTransaction(Op.removeJob(removeJob)));
     storageUtil.jobStore.removeJob(JOB_KEY);
 
-    SaveTasks saveTasks = new SaveTasks(ImmutableSet.of(new ScheduledTask()));
+    ScheduledTask actualTask = makeTask("id", JOB_KEY).newBuilder();
+    actualTask.getAssignedTask().setTask(nonBackfilledConfig());
+    IScheduledTask expectedTask = makeTask("id", JOB_KEY);
+    SaveTasks saveTasks = new SaveTasks(ImmutableSet.of(actualTask));
     builder.add(createTransaction(Op.saveTasks(saveTasks)));
-    storageUtil.taskStore.saveTasks(IScheduledTask.setFromBuilders(saveTasks.getTasks()));
+    storageUtil.taskStore.saveTasks(ImmutableSet.of(expectedTask));
 
     RewriteTask rewriteTask = new RewriteTask("id1", new TaskConfig());
     builder.add(createTransaction(Op.rewriteTask(rewriteTask)));
@@ -326,12 +333,20 @@ public class LogStorageTest extends EasyMockTest {
     builder.add(createTransaction(Op.removeLock(removeLock)));
     storageUtil.lockStore.removeLock(ILockKey.build(removeLock.getLockKey()));
 
-    JobUpdate update = new JobUpdate().setSummary(
-        new JobUpdateSummary().setKey(UPDATE_ID.newBuilder()));
-    SaveJobUpdate saveUpdate = new SaveJobUpdate(update, "token");
+    JobUpdate actualUpdate = new JobUpdate()
+        .setSummary(new JobUpdateSummary().setKey(UPDATE_ID.newBuilder()))
+        .setInstructions(new JobUpdateInstructions()
+            .setInitialState(
+                ImmutableSet.of(new InstanceTaskConfig().setTask(nonBackfilledConfig())))
+            .setDesiredState(new InstanceTaskConfig().setTask(nonBackfilledConfig())));
+    JobUpdate expectedUpdate = actualUpdate.deepCopy();
+    expectedUpdate.getInstructions().getDesiredState().setTask(makeConfig(JOB_KEY).newBuilder());
+    expectedUpdate.getInstructions().getInitialState()
+        .forEach(e -> e.setTask(makeConfig(JOB_KEY).newBuilder()));
+    SaveJobUpdate saveUpdate = new SaveJobUpdate(actualUpdate, "token");
     builder.add(createTransaction(Op.saveJobUpdate(saveUpdate)));
     storageUtil.jobUpdateStore.saveJobUpdate(
-        IJobUpdate.build(saveUpdate.getJobUpdate()),
+        IJobUpdate.build(expectedUpdate),
         Optional.of(saveUpdate.getLockToken()));
 
     SaveJobUpdateEvent saveUpdateEvent =
@@ -369,6 +384,12 @@ public class LogStorageTest extends EasyMockTest {
     }
 
     expect(stream.readAll()).andReturn(entryBuilder.build().iterator());
+  }
+
+  private TaskConfig nonBackfilledConfig() {
+    TaskConfig config = makeConfig(JOB_KEY).newBuilder();
+    config.unsetResources();
+    return config;
   }
 
   abstract class AbstractStorageFixture {

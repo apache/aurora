@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.configuration;
 
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -37,12 +38,14 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.UserProvidedStrings;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IContainer;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
+import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
 
 import static java.util.Objects.requireNonNull;
 
@@ -308,6 +311,20 @@ public class ConfigurationManager {
 
     if (containerType.get() != Container._Fields.MESOS && config.isSetImage()) {
       throw new TaskDescriptionException(CONTAINER_AND_IMAGE_ARE_MUTUALLY_EXCLUSIVE);
+    }
+
+    ThriftBackfill.backfillTask(builder);
+
+    String types = config.getResources().stream()
+        .collect(Collectors.groupingBy(e -> ResourceType.fromResource(e)))
+        .entrySet().stream()
+            .filter(e -> !e.getKey().isMultipleAllowed() && e.getValue().size() > 1)
+            .map(r -> r.getKey().getAuroraName())
+            .sorted()
+            .collect(Collectors.joining(", "));
+
+    if (!Strings.isNullOrEmpty(types)) {
+      throw new TaskDescriptionException("Multiple resource values are not supported for " + types);
     }
 
     return ITaskConfig.build(builder);

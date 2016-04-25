@@ -20,6 +20,9 @@ import javax.inject.Inject;
 
 import com.google.common.collect.Maps;
 
+import org.apache.aurora.GuavaUtils;
+import org.apache.aurora.common.collections.Pair;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.db.views.DbTaskConfig;
 import org.apache.aurora.scheduler.storage.db.views.Pairs;
 import org.apache.aurora.scheduler.storage.entities.IAppcImage;
@@ -94,6 +97,16 @@ class TaskConfigManager {
           throw new IllegalStateException(
               "Unhandled constraint type " + constraint.getConstraint().getSetField());
       }
+    }
+
+    if (!config.getResources().isEmpty()) {
+      configMapper.insertResources(
+          configInsert.getId(),
+          config.getResources().stream()
+              .map(e -> Pair.of(
+                  ResourceType.fromResource(e).getValue(),
+                  ResourceType.fromResource(e).getTypeConverter().stringify(e.getRawValue())))
+              .collect(GuavaUtils.toImmutableList()));
     }
 
     if (!config.getRequestedPorts().isEmpty()) {

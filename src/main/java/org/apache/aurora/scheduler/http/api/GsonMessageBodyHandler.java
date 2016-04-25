@@ -52,7 +52,9 @@ import com.google.gson.JsonSerializer;
 import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.TUnion;
 import org.apache.thrift.meta_data.FieldMetaData;
+import org.apache.thrift.meta_data.FieldValueMetaData;
 import org.apache.thrift.meta_data.StructMetaData;
+import org.apache.thrift.protocol.TType;
 
 /**
  * A message body reader/writer that uses gson to translate JSON to and from java objects produced
@@ -200,8 +202,28 @@ public class GsonMessageBodyHandler
 
                 for (Entry<TFieldIdEnum, FieldMetaData> entry : metaDataMap.entrySet()) {
                   if (entry.getKey().getFieldName().equals(item.getKey())) {
-                    StructMetaData valueMetaData = (StructMetaData) entry.getValue().valueMetaData;
-                    Object result = context.deserialize(item.getValue(), valueMetaData.structClass);
+                    Object result;
+                    if (entry.getValue().valueMetaData.isStruct()) {
+                      StructMetaData valueMeta = (StructMetaData) entry.getValue().valueMetaData;
+                      result = context.deserialize(item.getValue(), valueMeta.structClass);
+                    } else {
+                      FieldValueMetaData valueMeta = entry.getValue().valueMetaData;
+                      Type type;
+                      switch (valueMeta.type) {
+                        case TType.DOUBLE:
+                          type = Double.TYPE;
+                          break;
+                        case TType.I64:
+                          type = Long.TYPE;
+                          break;
+                        case TType.STRING:
+                          type = String.class;
+                          break;
+                        default:
+                          throw new RuntimeException("Unmapped type: " + valueMeta.type);
+                      }
+                      result = context.deserialize(item.getValue(), type);
+                    }
                     return createUnion(clazz, entry.getKey(), result);
                   }
                 }

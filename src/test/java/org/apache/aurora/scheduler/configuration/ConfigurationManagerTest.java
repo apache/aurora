@@ -44,11 +44,16 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.namedPort;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
 import static org.apache.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
 import static org.apache.aurora.scheduler.base.UserProvidedStrings.isGoodIdentifier;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -100,7 +105,11 @@ public class ConfigurationManagerTest {
                           .setName(DEDICATED_ATTRIBUTE)
                           .setConstraint(TaskConstraint.value(new ValueConstraint(
                               false, ImmutableSet.of("foo"))))))
-              .setOwner(new Identity().setUser("owner-user")));
+              .setOwner(new Identity().setUser("owner-user"))
+              .setResources(ImmutableSet.of(
+                  numCpus(1.0),
+                  ramMb(1),
+                  diskMb(1))));
   private static final ITaskConfig CONFIG_WITH_CONTAINER =
       TaskTestUtil.makeConfig(JobKeys.from("role", "env", "job"));
 
@@ -258,6 +267,35 @@ public class ConfigurationManagerTest {
     builder.setImage(image);
 
     CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testTaskResourceBackfill() throws Exception {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.unsetResources();
+
+    assertFalse(builder.isSetResources());
+    ITaskConfig populated =
+        DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    assertEquals(CONFIG_WITH_CONTAINER.getResources(), populated.getResources());
+  }
+
+  @Test
+  public void testMultipleResourceValuesBlocked() throws Exception {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.addToResources(numCpus(3.0));
+    builder.addToResources(ramMb(72));
+
+    expectTaskDescriptionException("Multiple resource values are not supported for CPU, RAM");
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testMultipleResourceValuesAllowed() throws Exception {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.addToResources(namedPort("thrift"));
+
+    DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
   }
 
   private void expectTaskDescriptionException(String message) {

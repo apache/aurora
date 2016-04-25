@@ -36,6 +36,7 @@ import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.MesosContainer;
+import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
@@ -111,7 +112,11 @@ final class Fixtures {
         .setMaxTaskFailures(1)
         .setConstraints(ImmutableSet.of())
         .setMetadata(ImmutableSet.of())
-        .setContainer(Container.mesos(new MesosContainer()));
+        .setContainer(Container.mesos(new MesosContainer()))
+        .setResources(ImmutableSet.of(
+            Resource.numCpus(1),
+            Resource.ramMb(1024),
+            Resource.diskMb(1024)));
   }
 
   static TaskConfig nonProductionTask() {

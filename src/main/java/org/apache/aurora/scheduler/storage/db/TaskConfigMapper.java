@@ -176,4 +176,14 @@ interface TaskConfigMapper extends GarbageCollectedTableMapper {
       @Param("configId") long configId,
       @Param("name") String name,
       @Param("tag") String tag);
+
+  /**
+   * Inserts task resources.
+   *
+   * @param configId Task config ID.
+   * @param values Resources to insert.
+   */
+  void insertResources(
+      @Param("configId") long configId,
+      @Param("values") List<Pair<Integer, String>> values);
 }

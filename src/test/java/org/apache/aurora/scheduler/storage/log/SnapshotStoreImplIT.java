@@ -174,6 +174,15 @@ public class SnapshotStoreImplIT {
     assertEquals(makeComparable(snapshot1), makeComparable(snapshot2));
   }
 
+  @Test
+  public void testBackfill() {
+    setUpStore(false);
+    snapshotStore.applySnapshot(makeNonBackfilled());
+
+    Snapshot backfilled = snapshotStore.createSnapshot();
+    assertEquals(expected(), makeComparable(backfilled));
+  }
+
   private static final IScheduledTask TASK = TaskTestUtil.makeTask("id", JOB_KEY);
   private static final ITaskConfig TASK_CONFIG = TaskTestUtil.makeConfig(JOB_KEY);
   private static final IJobConfiguration CRON_JOB = IJobConfiguration.build(new JobConfiguration()
@@ -242,6 +251,21 @@ public class SnapshotStoreImplIT {
         .setLocks(ImmutableSet.of(LOCK.newBuilder()))
         .setJobUpdateDetails(ImmutableSet.of(
             new StoredJobUpdateDetails(UPDATE.newBuilder(), LOCK.getToken())));
+  }
+
+  private Snapshot makeNonBackfilled() {
+    Snapshot snapshot = expected();
+    snapshot.getTasks().forEach(e -> e.getAssignedTask().getTask().unsetResources());
+    snapshot.getCronJobs()
+        .forEach(e -> e.getJobConfiguration().getTaskConfig().unsetResources());
+    snapshot.getJobUpdateDetails()
+        .forEach(e -> e.getDetails().getUpdate().getInstructions()
+            .getDesiredState().getTask().unsetResources());
+    snapshot.getJobUpdateDetails()
+        .forEach(e -> e.getDetails().getUpdate().getInstructions()
+            .getInitialState().forEach(i -> i.getTask().unsetResources()));
+
+    return snapshot;
   }
 
   private void populateStore() {

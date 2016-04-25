@@ -35,7 +35,6 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.SlidingStats;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.RewriteTask;
@@ -62,16 +61,13 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -330,7 +326,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         .put(Op._Fields.SAVE_CRON_JOB, op -> {
           SaveCronJob cronJob = op.getSaveCronJob();
           writeBehindJobStore.saveAcceptedJob(
-              IJobConfiguration.build(cronJob.getJobConfig()));
+              ThriftBackfill.backfillJobConfiguration(cronJob.getJobConfig()));
         })
         .put(
             Op._Fields.REMOVE_JOB,
@@ -338,7 +334,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         .put(
             Op._Fields.SAVE_TASKS,
             op -> writeBehindTaskStore.saveTasks(
-                IScheduledTask.setFromBuilders(op.getSaveTasks().getTasks())))
+                ThriftBackfill.backfillTasks(op.getSaveTasks().getTasks())))
         .put(Op._Fields.REWRITE_TASK, op -> {
           RewriteTask rewriteTask = op.getRewriteTask();
           writeBehindTaskStore.unsafeModifyInPlace(
@@ -374,12 +370,10 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         .put(
             Op._Fields.REMOVE_LOCK,
             op -> writeBehindLockStore.removeLock(ILockKey.build(op.getRemoveLock().getLockKey())))
-        .put(Op._Fields.SAVE_JOB_UPDATE, op -> {
-          JobUpdate update = op.getSaveJobUpdate().getJobUpdate();
+        .put(Op._Fields.SAVE_JOB_UPDATE, op ->
           writeBehindJobUpdateStore.saveJobUpdate(
-              IJobUpdate.build(update),
-              Optional.fromNullable(op.getSaveJobUpdate().getLockToken()));
-        })
+              ThriftBackfill.backFillJobUpdate(op.getSaveJobUpdate().getJobUpdate()),
+              Optional.fromNullable(op.getSaveJobUpdate().getLockToken())))
         .put(Op._Fields.SAVE_JOB_UPDATE_EVENT, op -> {
           SaveJobUpdateEvent event = op.getSaveJobUpdateEvent();
           writeBehindJobUpdateStore.saveJobUpdateEvent(

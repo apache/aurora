@@ -59,6 +59,7 @@ import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ReadOnlyScheduler;
+import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseDetail;
@@ -504,7 +505,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setRequestedPorts(ImmutableSet.of())
         .setTaskLinks(ImmutableMap.of())
         .setConstraints(ImmutableSet.of())
-        .setMaxTaskFailures(0);
+        .setMaxTaskFailures(0)
+        .setResources(ImmutableSet.of(
+            Resource.numCpus(1.0),
+            Resource.ramMb(1024),
+            Resource.diskMb(1024)));
 
     lockManager.assertNotLocked(LOCK_KEY);
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
@@ -558,7 +563,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setAssignedTask(new AssignedTask()
             .setInstanceId(instanceId)
             .setTask(populatedTask()
-                .setRamMb(5)
                 .setIsService(true)
                 .setExecutorConfig(new ExecutorConfig().setData(executorData)))));
   }

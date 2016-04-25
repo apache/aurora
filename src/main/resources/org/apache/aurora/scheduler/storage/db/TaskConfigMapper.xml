@@ -125,6 +125,13 @@
     <id column="id" />
   </resultMap>
 
+  <resultMap id="resourceMap" type="org.apache.aurora.scheduler.storage.db.views.DBResource">
+    <id column="id" />
+    <result property="type"
+            column="type_id"
+            typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.ResourceTypeHandler" />
+  </resultMap>
+
   <resultMap id="taskConfigMap" type="org.apache.aurora.scheduler.storage.db.views.DbTaskConfig">
     <id column="id" property="rowId" />
     <result column="creator_user" property="owner.user"/>
@@ -149,6 +156,12 @@
         select="selectTaskLinks"
         column="id"
         foreignColumn="task_config_id"/>
+    <!-- TODO(maxim): move resources to a main join when task level fields are removed. -->
+    <collection
+        property="resources"
+        select="selectResources"
+        column="id"
+        foreignColumn="task_config_id" />
   </resultMap>
 
   <sql id="unscopedConfigSelect">
@@ -265,6 +278,20 @@
     )
   </insert>
 
+  <insert id="insertResources">
+    INSERT INTO task_resource (
+      task_config_id,
+      type_id,
+      value
+    ) VALUES (
+      <foreach item="value" collection="values" separator="),(">
+        #{configId},
+        #{value.first},
+        #{value.second}
+      </foreach>
+    )
+  </insert>
+
   <insert id="insertTaskLinks" >
     INSERT INTO task_config_task_links (
       task_config_id,
@@ -292,6 +319,15 @@
       label,
       url
     FROM task_config_task_links
+    WHERE task_config_id = #{id}
+  </select>
+
+  <select id="selectResources" resultMap="resourceMap">
+    SELECT
+      id,
+      type_id,
+      value
+    FROM task_resource
     WHERE task_config_id = #{id}
   </select>
 

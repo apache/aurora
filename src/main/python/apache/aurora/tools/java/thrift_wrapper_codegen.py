@@ -127,11 +127,20 @@ UNION_FIELD_TEMPLATE = '''  public %(type)s %(fn_name)s() {
 UNION_SWITCH_CASE = '''case %(case)s:
         %(body)s'''
 
-UNION_FIELD_SWITCH = '''switch (getSetField()) {
+UNION_DEFAULT_ERROR = 'throw new RuntimeException("Unrecognized field " + getSetField())';
+UNION_FIELD_SWITCH = '''switch (%(switch_by)s) {
       %(cases)s
       default:
-        throw new RuntimeException("Unrecognized field " + getSetField());
+        %(error)s;
     }'''
+
+UNION_COPY_CONSTRUCTOR_2 = '''  public static %(wrapped)s newBuilder(int id, Object value) {
+    %(body)s
+  }'''
+
+UNION_VALUE_ACCESSOR = '''  public Object getRawValue() {
+    return value;
+  }'''
 
 SIMPLE_ASSIGNMENT = 'this.%(field)s = wrapped.%(fn_name)s();'
 
@@ -142,7 +151,7 @@ STRUCT_ASSIGNMENT = '''this.%(field)s = wrapped.%(isset)s()
 
 
 IMMUTABLE_COLLECTION_DECLARATION = (
-    '''private final Immutable%(collection)s<%(params)s> %(field)s;''')
+  '''private final Immutable%(collection)s<%(params)s> %(field)s;''')
 IMMUTABLE_COLLECTION_ASSIGNMENT = '''this.%(field)s = wrapped.%(isset)s()
         ? Immutable%(collection)s.copyOf(wrapped.%(fn_name)s())
         : Immutable%(collection)s.of();'''
@@ -481,7 +490,7 @@ def generate_union_field(code, struct, field):
                                             'enum_value': field_enum_value})
 
 
-def generate_struct_field(code, struct, field, builder_calls):
+def generate_struct_field(code, field, builder_calls):
   field_type = field.ttype.codegen_name()
   assignment = SIMPLE_ASSIGNMENT
   assignment_args = {
@@ -574,18 +583,37 @@ def generate_java(struct):
   if struct.kind == 'union':
     assign_cases = []
     copy_cases = []
+    copy_2_cases = []
     for field in struct.fields:
       generate_union_field(code, struct, field)
 
-      assign_case_body = 'value = %(codegen_name)s.build(wrapped.%(accessor_method)s());\nbreak;' % {
+      assert field.ttype.immutable or isinstance(field.ttype, StructType), 'Unrecognized type %s' % field.ttype.name
+
+      if field.ttype.immutable:
+        assign_case_body = 'value = wrapped.%s();\nbreak;' % field.accessor_method()
+        copy_case_body = 'return new %s(setField, %s());' % (struct.name, field.accessor_method())
+        copy_2_case_cast = field.ttype.codegen_name()
+      else:
+        assign_case_body = 'value = %(codegen_name)s.build(wrapped.%(accessor_method)s());\nbreak;' % {
           'codegen_name': field.ttype.codegen_name(),
           'accessor_method': field.accessor_method()}
+        copy_case_body = 'return new %s(setField, %s().newBuilder());' % (struct.name, field.accessor_method())
+        code.add_import('org.apache.aurora.gen.%s' % field.ttype.name)
+        copy_2_case_cast = field.ttype.name
+
       assign_cases.append(UNION_SWITCH_CASE % {'case': to_upper_snake_case(field.name),
                                                'body': assign_case_body})
 
-      copy_case_body = 'return new %s(setField, %s().newBuilder());' % (struct.name, field.accessor_method())
       copy_cases.append(UNION_SWITCH_CASE % {'case': to_upper_snake_case(field.name),
                                              'body': copy_case_body})
+
+      copy_2_case_body = 'return %(wrapped)s.%(method)s((%(cast)s) value);' % {
+        'wrapped': struct.name,
+        'method': field.name,
+        'cast': copy_2_case_cast}
+
+      copy_2_cases.append(UNION_SWITCH_CASE % {'case': to_upper_snake_case(field.name),
+                                               'body': copy_2_case_body})
 
     set_field_type = '%s._Fields' % struct.name
     code.add_accessor(FIELD_TEMPLATE % {'type': set_field_type, 'fn_name': 'getSetField', 'field': 'setField'})
@@ -593,9 +621,20 @@ def generate_java(struct):
     code.add_assignment(SIMPLE_ASSIGNMENT % {'field': 'setField',
                                              'fn_name': 'getSetField'})
     code.add_field(FIELD_DECLARATION % {'field': 'value', 'type': 'Object'})
-    code.add_assignment(UNION_FIELD_SWITCH % {'cases': '\n      '.join(assign_cases)})
+    code.add_assignment(UNION_FIELD_SWITCH % {'cases': '\n      '.join(assign_cases),
+                                              'switch_by': 'getSetField()',
+                                              'error': UNION_DEFAULT_ERROR})
 
-    code.copy_constructor = UNION_FIELD_SWITCH % {'cases': '\n      '.join(copy_cases)}
+    code.copy_constructor = UNION_FIELD_SWITCH % {'cases': '\n      '.join(copy_cases),
+                                                  'switch_by': 'getSetField()',
+                                                  'error': UNION_DEFAULT_ERROR}
+
+    copy_2_switch = UNION_FIELD_SWITCH % {'cases': '\n      '.join(copy_2_cases),
+                                          'switch_by': '%s.findByThriftId(id)' % set_field_type,
+                                          'error': 'throw new RuntimeException("Unrecognized id " + id)'}
+
+    code.add_accessor(UNION_VALUE_ACCESSOR)
+    code.add_accessor(UNION_COPY_CONSTRUCTOR_2 % {'wrapped': struct.name, 'body': copy_2_switch})
 
     code.to_string = '.add("setField", setField).add("value", value)'
     code.equals = 'Objects.equals(setField, other.setField) && Objects.equals(value, other.value)'
@@ -603,7 +642,7 @@ def generate_java(struct):
   else:
     builder_calls = []
     for field in struct.fields:
-      generate_struct_field(code, struct, field, builder_calls)
+      generate_struct_field(code, field, builder_calls)
 
     field_names = [f.name for f in struct.fields]
     code.copy_constructor = 'return new %s()%s;' % (struct.name, '\n        ' + '\n        '.join(builder_calls))

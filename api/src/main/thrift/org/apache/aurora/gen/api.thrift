@@ -224,6 +224,14 @@ union Image {
   2: AppcImage appc
 }
 
+/** Describes resource value required to run a task. */
+union Resource {
+  1: double numCpus
+  2: i64 ramMb
+  3: i64 diskMb
+  4: string namedPort
+}
+
 /** Description of the tasks contained within a job. */
 struct TaskConfig {
  /** Job task belongs to. */
@@ -246,6 +254,8 @@ struct TaskConfig {
   * specifying a container)
   */
  31: optional Image image
+ /** All resources required to run a task. */
+ 32: set<Resource> resources
 
  20: set<Constraint> constraints
  /** a list of named ports this task requests */

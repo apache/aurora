@@ -112,7 +112,7 @@ public class RecoveryTest extends EasyMockTest {
     recovery.stage(backup1);
     assertEquals(
         IScheduledTask.setFromBuilders(SNAPSHOT1.getTasks()),
-        recovery.query(Query.unscoped()));
+        ImmutableSet.copyOf(recovery.query(Query.unscoped())));
     recovery.commit();
     transaction.getValue().apply(storeProvider);
 
@@ -138,11 +138,11 @@ public class RecoveryTest extends EasyMockTest {
     recovery.stage(backup1);
     assertEquals(
         IScheduledTask.setFromBuilders(SNAPSHOT1.getTasks()),
-        recovery.query(Query.unscoped()));
+        ImmutableSet.copyOf(recovery.query(Query.unscoped())));
     recovery.deleteTasks(Query.taskScoped(Tasks.id(TASK2)));
     assertEquals(
         IScheduledTask.setFromBuilders(modified.getTasks()),
-        recovery.query(Query.unscoped()));
+        ImmutableSet.copyOf(recovery.query(Query.unscoped())));
     recovery.commit();
     transaction.getValue().apply(storeProvider);
 

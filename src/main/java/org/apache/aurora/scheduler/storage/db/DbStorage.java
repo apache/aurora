@@ -34,6 +34,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.GatedWorkQueue;
 import org.apache.aurora.scheduler.async.GatedWorkQueue.GatedOperation;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -232,6 +233,10 @@ class DbStorage extends AbstractIdleService implements Storage {
 
     for (ScheduleStatus status : ScheduleStatus.values()) {
       enumValueMapper.addEnumValue("task_states", status.getValue(), status.name());
+    }
+
+    for (ResourceType resourceType : ResourceType.values()) {
+      enumValueMapper.addEnumValue("resource_types", resourceType.getValue(), resourceType.name());
     }
 
     createPoolMetrics();
