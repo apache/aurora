@@ -16,12 +16,7 @@ import unittest
 
 import mox
 
-from apache.aurora.client.api.health_check import (
-    HealthCheck,
-    NotRetriable,
-    Retriable,
-    StatusHealthCheck
-)
+from apache.aurora.client.api.health_check import HealthCheck, StatusHealthCheck
 
 from gen.apache.aurora.api.ttypes import AssignedTask, ScheduledTask, ScheduleStatus, TaskConfig
 
@@ -55,26 +50,19 @@ class HealthCheckTest(unittest.TestCase):
     """Verify that running instances are reported healthy"""
     task_a = self.create_task(0, 'a')
     task_b = self.create_task(1, 'b')
-    assert self._status_health_check.health(task_a) == Retriable.alive()
-    assert self._status_health_check.health(task_b) == Retriable.alive()
+    assert self._status_health_check.health(task_a)
+    assert self._status_health_check.health(task_b)
 
   def test_failed_status_health_check(self):
     """Verify that the health check fails for tasks in a state other than RUNNING"""
     pending_task = self.create_task(0, 'a', status=PENDING)
     failed_task = self.create_task(1, 'b', status=FAILED)
-    assert self._status_health_check.health(pending_task) == Retriable.dead()
-    assert self._status_health_check.health(failed_task) == Retriable.dead()
+    assert not self._status_health_check.health(pending_task)
+    assert not self._status_health_check.health(failed_task)
 
   def test_changed_task_id(self):
     """Verifes that an instance with a different task id causes the health check to fail"""
     task_a = self.create_task(0, 'a')
     task_b = self.create_task(0, 'b')
-    assert self._status_health_check.health(task_a) == Retriable.alive()
-    assert self._status_health_check.health(task_b) == NotRetriable.dead()
-
-  def test_health_statuses(self):
-    """Verfies that the health status tuple (health, retry_status) are as expected"""
-    assert Retriable.alive() == (True, True)
-    assert Retriable.dead() == (False, True)
-    assert NotRetriable.alive() == (True, False)
-    assert NotRetriable.dead() == (False, False)
+    assert self._status_health_check.health(task_a)
+    assert not self._status_health_check.health(task_b)

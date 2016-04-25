@@ -39,7 +39,6 @@ CLUSTER = 'east'
 JOB = AuroraJobKey(CLUSTER, 'johndoe', 'test', 'test_job')
 RESTART_SETTINGS = RestartSettings(
     batch_size=2,
-    restart_threshold=23,
     watch_secs=45,
     max_per_instance_failures=0,
     max_total_failures=0,

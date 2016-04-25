@@ -23,7 +23,7 @@ from gen.apache.aurora.api.ttypes import ScheduleStatus
 class HealthCheck(Interface):
   @abstractmethod
   def health(self, task):
-    """Checks health of the task and returns a (healthy, retriable) pair."""
+    """Checks health of the task and returns a True or False."""
 
 
 class HealthStatus(object):
@@ -35,22 +35,11 @@ class HealthStatus(object):
   def dead(cls):
     return cls(False).health()
 
-  def __init__(self, retry, health):
-    self._retry = retry
+  def __init__(self, health):
     self._health = health
 
   def health(self):
-    return (self._health, self._retry)
-
-
-class NotRetriable(HealthStatus):
-  def __init__(self, health):
-    super(NotRetriable, self).__init__(False, health)
-
-
-class Retriable(HealthStatus):
-  def __init__(self, health):
-    super(Retriable, self).__init__(True, health)
+    return self._health
 
 
 class StatusHealthCheck(HealthCheck):
@@ -70,12 +59,12 @@ class StatusHealthCheck(HealthCheck):
     if status == ScheduleStatus.RUNNING:
       if instance_id in self._task_ids:
         if task_id == self._task_ids.get(instance_id):
-          return Retriable.alive()
+          return HealthStatus.alive()
         else:
-          return NotRetriable.dead()
+          return HealthStatus.dead()
       else:
         log.info('Detected RUNNING instance %s' % instance_id)
         self._task_ids[instance_id] = task_id
-        return Retriable.alive()
+        return HealthStatus.alive()
     else:
-      return Retriable.dead()
+      return HealthStatus.dead()

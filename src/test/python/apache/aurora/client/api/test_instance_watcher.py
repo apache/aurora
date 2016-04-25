@@ -68,7 +68,7 @@ def find_expected_cycles(period, sleep_secs):
 
 class InstanceWatcherTest(unittest.TestCase):
   WATCH_INSTANCES = range(3)
-  RESTART_THRESHOLD = WATCH_SECS = 50
+  WATCH_SECS = 50
   EXPECTED_CYCLES = find_expected_cycles(WATCH_SECS, 3.0)
 
   def setUp(self):
@@ -79,7 +79,6 @@ class InstanceWatcherTest(unittest.TestCase):
     self._health_check = mox.MockObject(HealthCheck)
     self._watcher = InstanceWatcher(self._scheduler,
                                  self._job_key,
-                                 self.RESTART_THRESHOLD,
                                  self.WATCH_SECS,
                                  health_check_interval_seconds=3,
                                  clock=self._clock,
@@ -114,12 +113,13 @@ class InstanceWatcherTest(unittest.TestCase):
     for _ in range(int(num_calls)):
       self._scheduler.getTasksWithoutConfigs(query).AndRaise(IOError('oops'))
 
-  def mock_health_check(self, task, status, retry):
-    self._health_check.health(task).InAnyOrder().AndReturn((status, retry))
+  def mock_health_check(self, task, status):
+    self._health_check.health(task).InAnyOrder().AndReturn(status)
 
-  def expect_health_check(self, instance, status, retry=True, num_calls=EXPECTED_CYCLES):
+  def expect_health_check(self, instance, status, num_calls=EXPECTED_CYCLES):
+    num_calls = num_calls if status else 1
     for _ in range(int(num_calls)):
-      self.mock_health_check(self.create_task(instance), status, retry)
+      self.mock_health_check(self.create_task(instance), status)
 
   def assert_watch_result(self, expected_failed_instances, instances_to_watch=WATCH_INSTANCES):
     instances_returned = self._watcher.watch(instances_to_watch, self._health_check)
@@ -155,47 +155,14 @@ class InstanceWatcherTest(unittest.TestCase):
     self.assert_watch_result([0])
     self.verify_mocks()
 
-  def test_io_failure(self):
-    """Check that IO errors (socket errors) communicating with the scheduler get handled
-     correctly"""
-
-    self.expect_io_error_in_get_statuses()
-    self.replay_mocks()
-    self.assert_watch_result([0, 1, 2])
-    self.verify_mocks()
-
   def test_all_instance_failure(self):
     """All failed instance in a batch of instances"""
-    self.expect_get_statuses()
+    self.expect_get_statuses(num_calls=1)
     self.expect_health_check(0, False)
     self.expect_health_check(1, False)
     self.expect_health_check(2, False)
     self.replay_mocks()
     self.assert_watch_result([0, 1, 2])
-    self.verify_mocks()
-
-  def test_restart_threshold_fail_fast(self):
-    """Instances are reported unhealthy with retry set to False"""
-    self.expect_get_statuses(num_calls=1)
-    self.expect_health_check(0, False, retry=False, num_calls=1)
-    self.expect_health_check(1, False, retry=False, num_calls=1)
-    self.expect_health_check(2, False, retry=False, num_calls=1)
-    self.replay_mocks()
-    self.assert_watch_result([0, 1, 2])
-    self.verify_mocks()
-
-  def test_restart_threshold(self):
-    """Instances are reported healthy at the end of the restart_threshold"""
-    self.expect_get_statuses(num_calls=self.EXPECTED_CYCLES - 1)
-    self.expect_health_check(0, False, num_calls=self.EXPECTED_CYCLES - 1)
-    self.expect_health_check(1, False, num_calls=self.EXPECTED_CYCLES - 1)
-    self.expect_health_check(2, False, num_calls=self.EXPECTED_CYCLES - 1)
-    self.expect_get_statuses()
-    self.expect_health_check(0, True)
-    self.expect_health_check(1, True)
-    self.expect_health_check(2, True)
-    self.replay_mocks()
-    self.assert_watch_result([])
     self.verify_mocks()
 
   def test_watch_period_failure(self):
@@ -204,9 +171,9 @@ class InstanceWatcherTest(unittest.TestCase):
     self.expect_health_check(0, True, num_calls=self.EXPECTED_CYCLES - 1)
     self.expect_health_check(1, True, num_calls=self.EXPECTED_CYCLES - 1)
     self.expect_health_check(2, True, num_calls=self.EXPECTED_CYCLES - 1)
-    self.expect_health_check(0, False, num_calls=1)
-    self.expect_health_check(1, False, num_calls=1)
-    self.expect_health_check(2, False, num_calls=1)
+    self.expect_health_check(0, False)
+    self.expect_health_check(1, False)
+    self.expect_health_check(2, False)
     self.replay_mocks()
     self.assert_watch_result([0, 1, 2])
     self.verify_mocks()
@@ -217,7 +184,7 @@ class InstanceWatcherTest(unittest.TestCase):
     self.expect_health_check(0, True)
     self.expect_health_check(1, True)
     self.expect_health_check(2, True, num_calls=self.EXPECTED_CYCLES - 1)
-    self.expect_health_check(2, False, num_calls=1)
+    self.expect_health_check(2, False)
     self.replay_mocks()
     self.assert_watch_result([2])
     self.verify_mocks()

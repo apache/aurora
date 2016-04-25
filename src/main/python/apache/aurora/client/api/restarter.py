@@ -26,14 +26,12 @@ from gen.apache.aurora.api.ttypes import ResponseCode
 class RestartSettings(object):
   def __init__(self,
                batch_size,
-               restart_threshold,
                max_per_instance_failures,
                max_total_failures,
                watch_secs,
                health_check_interval_seconds):
 
     self.batch_size = batch_size
-    self.restart_threshold = restart_threshold
     self.max_per_instance_failures = max_per_instance_failures
     self.max_total_failures = max_total_failures
     self.watch_secs = watch_secs
@@ -55,7 +53,6 @@ class Restarter(object):
     self._instance_watcher = instance_watcher or InstanceWatcher(
         scheduler,
         job_key.to_thrift(),
-        restart_settings.restart_threshold,
         restart_settings.watch_secs,
         restart_settings.health_check_interval_seconds)
 

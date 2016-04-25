@@ -18,7 +18,7 @@ from threading import Event
 from twitter.common import log
 
 from .health_check import StatusHealthCheck
-from .task_util import StatusMuxHelper
+from .task_util import StatusHelper
 
 from gen.apache.aurora.api.ttypes import ScheduleStatus, TaskQuery
 
@@ -41,21 +41,18 @@ class InstanceWatcher(object):
   def __init__(self,
                scheduler,
                job_key,
-               restart_threshold,
                watch_secs,
                health_check_interval_seconds,
                clock=time,
-               terminating_event=None,
-               scheduler_mux=None):
+               terminating_event=None):
 
     self._scheduler = scheduler
     self._job_key = job_key
-    self._restart_threshold = restart_threshold
     self._watch_secs = watch_secs
     self._health_check_interval_seconds = health_check_interval_seconds
     self._clock = clock
     self._terminating = terminating_event or Event()
-    self._status_helper = StatusMuxHelper(self._scheduler, self._create_query, scheduler_mux)
+    self._status_helper = StatusHelper(self._scheduler, self._create_query)
 
   def watch(self, instance_ids, health_check=None):
     """Watches a set of instances and detects failures based on a delegated health check.
@@ -68,9 +65,6 @@ class InstanceWatcher(object):
     log.info('Watching instances: %s' % instance_ids)
     instance_ids = set(instance_ids)
     health_check = health_check or StatusHealthCheck()
-    now = self._clock.time()
-    expected_healthy_by = now + self._restart_threshold
-    max_time = now + self._restart_threshold + self._watch_secs
 
     instance_states = {}
 
@@ -86,15 +80,13 @@ class InstanceWatcher(object):
           instance_id, self._watch_secs))
         instance.set_healthy(True)
 
-    def maybe_set_instance_unhealthy(instance_id, retriable):
-      # An instance that was previously healthy and currently unhealthy has failed.
+    def set_instance_unhealthy(instance_id):
+      log.info('Instance %s is unhealthy' % instance_id)
       if instance_id in instance_states:
-        log.info('Instance %s is unhealthy' % instance_id)
+        # An instance that was previously healthy and currently unhealthy has failed.
         instance_states[instance_id].set_healthy(False)
-      # If the restart threshold has expired or if the instance cannot be retried it is unhealthy.
-      elif now > expected_healthy_by or not retriable:
-        log.info('Instance %s was not reported healthy within %d seconds' % (
-          instance_id, self._restart_threshold))
+      else:
+        # An instance never passed a health check (e.g.: failed before the first health check).
         instance_states[instance_id] = Instance(finished=True)
 
     while not self._terminating.is_set():
@@ -105,25 +97,17 @@ class InstanceWatcher(object):
         if instance_id not in finished_instances():
           running_task = tasks_by_instance.get(instance_id)
           if running_task is not None:
-            task_healthy, retriable = health_check.health(running_task)
+            task_healthy = health_check.health(running_task)
             if task_healthy:
               set_instance_healthy(instance_id, now)
             else:
-              maybe_set_instance_unhealthy(instance_id, retriable)
-          else:
-            # Set retriable=True since an instance should be retried if it has not been healthy.
-            maybe_set_instance_unhealthy(instance_id, retriable=True)
+              set_instance_unhealthy(instance_id)
 
       log.debug('Instances health: %s' % ['%s: %s' % val for val in instance_states.items()])
 
       # Return if all tasks are finished.
       if set(finished_instances().keys()) == instance_ids:
         return set([s_id for s_id, s in instance_states.items() if not s.healthy])
-
-      # Return if time is up.
-      if now > max_time:
-        return set([s_id for s_id in instance_ids if s_id not in instance_states
-                                             or not instance_states[s_id].healthy])
 
       self._terminating.wait(self._health_check_interval_seconds)
 

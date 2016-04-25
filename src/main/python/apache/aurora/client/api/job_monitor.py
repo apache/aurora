@@ -16,7 +16,7 @@ from threading import Event
 
 from twitter.common.quantity import Amount, Time
 
-from .task_util import StatusMuxHelper
+from .task_util import StatusHelper
 
 from gen.apache.aurora.api.constants import LIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import JobKey, TaskQuery
@@ -35,14 +35,13 @@ class JobMonitor(object):
     return status in TERMINAL_STATES
 
   def __init__(self, scheduler, job_key, terminating_event=None,
-               min_poll_interval=MIN_POLL_INTERVAL, max_poll_interval=MAX_POLL_INTERVAL,
-               scheduler_mux=None):
+               min_poll_interval=MIN_POLL_INTERVAL, max_poll_interval=MAX_POLL_INTERVAL):
     self._scheduler = scheduler
     self._job_key = job_key
     self._min_poll_interval = min_poll_interval
     self._max_poll_interval = max_poll_interval
     self._terminating = terminating_event or Event()
-    self._status_helper = StatusMuxHelper(self._scheduler, self.create_query, scheduler_mux)
+    self._status_helper = StatusHelper(self._scheduler, self.create_query)
 
   def iter_tasks(self, instances):
     tasks = self._status_helper.get_tasks(instances)

@@ -14,10 +14,9 @@
 
 import unittest
 
-from mock import create_autospec
+from mock import call, create_autospec
 
-from apache.aurora.client.api.scheduler_mux import SchedulerMux
-from apache.aurora.client.api.task_util import StatusMuxHelper
+from apache.aurora.client.api.task_util import StatusHelper
 
 from ...api_util import SchedulerThriftApiSpec
 
@@ -43,18 +42,12 @@ class TaskUtilTest(unittest.TestCase):
     return query
 
   @classmethod
-  def create_mux_helper(cls, scheduler, query, scheduler_mux=None):
-    return StatusMuxHelper(scheduler, query, scheduler_mux=scheduler_mux)
+  def create_helper(cls, scheduler, query):
+    return StatusHelper(scheduler, query)
 
   @classmethod
   def create_tasks(cls):
     return [ScheduledTask(assignedTask=AssignedTask(instanceId=index)) for index in cls.INSTANCES]
-
-  @classmethod
-  def mock_mux(cls, tasks):
-    mux = create_autospec(spec=SchedulerMux, instance=True)
-    mux.enqueue_and_wait.return_value = tasks
-    return mux
 
   @classmethod
   def mock_scheduler(cls, response_code=None):
@@ -65,22 +58,10 @@ class TaskUtilTest(unittest.TestCase):
     scheduler.getTasksWithoutConfigs.return_value = resp
     return scheduler
 
-  def test_no_mux_run(self):
+  def test_run(self):
     scheduler = self.mock_scheduler()
-    helper = self.create_mux_helper(scheduler, self.create_query)
+    helper = self.create_helper(scheduler, self.create_query)
     tasks = helper.get_tasks(self.INSTANCES)
 
-    scheduler.getTasksWithoutConfigs.assert_called_once_with(self.create_query(self.INSTANCES))
-    assert 1 == len(tasks)
-
-  def test_mux_run(self):
-    expected_tasks = self.create_tasks()
-    mux = self.mock_mux(expected_tasks)
-    helper = self.create_mux_helper(None, self.create_query, scheduler_mux=mux)
-    tasks = helper.get_tasks(self.INSTANCES)
-
-    mux.enqueue_and_wait.assert_called_once_with(
-        helper._get_tasks,
-        self.INSTANCES,
-        helper._create_aggregated_query)
+    assert scheduler.getTasksWithoutConfigs.mock_calls == [call(self.create_query(self.INSTANCES))]
     assert 1 == len(tasks)

@@ -9,6 +9,11 @@
   role's user.
 - Upgraded Mesos to 0.27.2
 
+### Deprecations and removals:
+
+- Deprecated `--restart-threshold` option in the `aurora job restart` command to match the job
+  updater behavior. This option has no effect now and will be removed in the future release.
+
 0.13.0
 ------
 

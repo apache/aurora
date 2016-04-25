@@ -18,8 +18,7 @@ import pytest
 from mock import call, create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
-from apache.aurora.client.api.restarter import RestartSettings
+from apache.aurora.client.api.health_check import StatusHealthCheck
 from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER, Context
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.jobs import RestartCommand
@@ -28,43 +27,10 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock, mock_verb_options
 
-from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, ResponseCode, Result, TaskConfig
+from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, Result, TaskConfig
 
 
 class TestRestartJobCommand(AuroraClientCommandTest):
-
-  def test_restart_with_lock(self):
-    command = RestartCommand()
-
-    jobkey = AuroraJobKey("cluster", "role", "env", "job")
-    mock_options = mock_verb_options(command)
-    mock_options.instance_spec = TaskInstanceKey(jobkey, [])
-
-    fake_context = FakeAuroraCommandContext()
-    fake_context.set_options(mock_options)
-
-    mock_api = fake_context.get_api("test")
-    mock_api.restart.return_value = AuroraClientCommandTest.create_blank_response(
-      ResponseCode.LOCK_ERROR, "Error.")
-
-    with pytest.raises(Context.CommandError):
-      command.execute(fake_context)
-
-    restart_settings = RestartSettings(
-        batch_size=mock_options.batch_size,
-        restart_threshold=mock_options.restart_threshold,
-        max_per_instance_failures=mock_options.max_per_instance_failures,
-        max_total_failures=mock_options.max_total_failures,
-        watch_secs=mock_options.watch_secs,
-        health_check_interval_seconds=mock_options.healthcheck_interval_seconds)
-
-    mock_api.restart.assert_called_once_with(
-        jobkey,
-        mock_options.instance_spec.instance,
-        restart_settings,
-        config=None)
-    self.assert_lock_message(fake_context)
-
   def test_restart_inactive_instance_spec(self):
     command = RestartCommand()
 
@@ -122,15 +88,15 @@ class TestRestartCommand(AuroraClientCommandTest):
     return populate
 
   @classmethod
-  def setup_health_checks(cls, mock_api):
+  def setup_health_checks(cls):
     mock_health_check = create_autospec(spec=StatusHealthCheck, instance=True)
-    mock_health_check.health.return_value = Retriable.alive()
+    mock_health_check.health.return_value = True
     return mock_health_check
 
   def test_restart_simple(self):
     # Test the client-side restart logic in its simplest case: everything succeeds
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_health_check = self.setup_health_checks(mock_api)
+    mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
@@ -159,7 +125,7 @@ class TestRestartCommand(AuroraClientCommandTest):
   def test_restart_simple_no_config(self):
     # Test the client-side restart logic in its simplest case: everything succeeds
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_health_check = self.setup_health_checks(mock_api)
+    mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
@@ -180,7 +146,7 @@ class TestRestartCommand(AuroraClientCommandTest):
     # Test the client-side restart when a shard argument is too large, and it's
     # using strict mode.
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_health_check = self.setup_health_checks(mock_api)
+    mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
@@ -201,7 +167,7 @@ class TestRestartCommand(AuroraClientCommandTest):
 
   def test_restart_failed_status(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_health_check = self.setup_health_checks(mock_api)
+    mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_error_response()
     with contextlib.nested(
@@ -222,7 +188,7 @@ class TestRestartCommand(AuroraClientCommandTest):
 
   def test_restart_no_such_job_with_instances(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_health_check = self.setup_health_checks(mock_api)
+    mock_health_check = self.setup_health_checks()
     mock_io = IOMock()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     # Make getTasksWithoutConfigs return an error, which is what happens when a job is not found.
@@ -254,7 +220,7 @@ class TestRestartCommand(AuroraClientCommandTest):
 
   def test_restart_failed_restart(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_health_check = self.setup_health_checks(mock_api)
+    mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     mock_scheduler_proxy.restartShards.return_value = self.create_error_response()
     with contextlib.nested(
@@ -297,7 +263,7 @@ class TestRestartCommand(AuroraClientCommandTest):
     self.reset_mock_io()
     # Test the client-side restart logic in its simplest case: everything succeeds
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_health_check = self.setup_health_checks(mock_api)
+    mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
@@ -322,7 +288,7 @@ class TestRestartCommand(AuroraClientCommandTest):
   def test_restart_failed_restart_output(self):
     self.reset_mock_io()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_health_check = self.setup_health_checks(mock_api)
+    mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     mock_scheduler_proxy.restartShards.return_value = self.create_error_response()
     with contextlib.nested(
