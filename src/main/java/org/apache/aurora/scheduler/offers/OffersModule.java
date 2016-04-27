@@ -43,16 +43,25 @@ public class OffersModule extends AbstractModule {
   private static final Arg<Amount<Integer, Time>> OFFER_HOLD_JITTER_WINDOW =
       Arg.create(Amount.of(1, Time.MINUTES));
 
+  @CmdLine(name = "offer_filter_duration",
+      help = "Duration after which we expect Mesos to re-offer unused resources. A short duration "
+          + "improves scheduling performance in smaller clusters, but might lead to resource "
+          + "starvation for other frameworks if you run many frameworks in your cluster.")
+  private static final Arg<Amount<Long, Time>> OFFER_FILTER_DURATION =
+      Arg.create(Amount.of(5L, Time.SECONDS));
+
   @Override
   protected void configure() {
     install(new PrivateModule() {
       @Override
       protected void configure() {
-        bind(OfferManager.OfferReturnDelay.class).toInstance(
-            new RandomJitterReturnDelay(
-                MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS),
-                OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
-                Random.Util.newDefaultRandom()));
+        bind(OfferSettings.class).toInstance(
+            new OfferSettings(
+                OFFER_FILTER_DURATION.get(),
+                new RandomJitterReturnDelay(
+                    MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS),
+                    OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
+                    Random.Util.newDefaultRandom())));
         bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
         bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
         expose(OfferManager.class);

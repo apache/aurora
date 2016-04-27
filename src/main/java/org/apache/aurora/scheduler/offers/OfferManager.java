@@ -24,7 +24,6 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -35,7 +34,6 @@ import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.gen.MaintenanceMode;
@@ -130,14 +128,6 @@ public interface OfferManager extends EventSubscriber {
   Optional<HostOffer> getOffer(SlaveID slaveId);
 
   /**
-   * Calculates the amount of time before an offer should be 'returned' by declining it.
-   * The delay is calculated for each offer that is received, so the return delay may be
-   * fixed or variable.
-   */
-  interface OfferReturnDelay extends Supplier<Amount<Long, Time>> {
-  }
-
-  /**
    * Thrown when there was an unexpected failure trying to launch a task.
    */
   class LaunchException extends Exception {
@@ -159,18 +149,18 @@ public interface OfferManager extends EventSubscriber {
     private final AtomicLong offerRaces = Stats.exportLong("offer_accept_races");
 
     private final Driver driver;
-    private final OfferReturnDelay returnDelay;
+    private final OfferSettings offerSettings;
     private final DelayExecutor executor;
 
     @Inject
     @VisibleForTesting
     public OfferManagerImpl(
         Driver driver,
-        OfferReturnDelay returnDelay,
+        OfferSettings offerSettings,
         @AsyncExecutor DelayExecutor executor) {
 
       this.driver = requireNonNull(driver);
-      this.returnDelay = requireNonNull(returnDelay);
+      this.offerSettings = requireNonNull(offerSettings);
       this.executor = requireNonNull(executor);
     }
 
@@ -193,7 +183,7 @@ public interface OfferManager extends EventSubscriber {
         hostOffers.add(offer);
         executor.execute(
             () -> removeAndDecline(offer.getOffer().getId()),
-            returnDelay.get());
+            offerSettings.getOfferReturnDelay());
       }
     }
 
@@ -205,7 +195,13 @@ public interface OfferManager extends EventSubscriber {
 
     void decline(OfferID id) {
       LOG.debug("Declining offer " + id);
-      driver.declineOffer(id);
+      driver.declineOffer(id, getOfferFilter());
+    }
+
+    private Protos.Filters getOfferFilter() {
+      return Protos.Filters.newBuilder()
+          .setRefuseSeconds(offerSettings.getOfferFilterDuration().as(Time.SECONDS))
+          .build();
     }
 
     @Override
@@ -361,7 +357,7 @@ public interface OfferManager extends EventSubscriber {
       // which is a feature of ConcurrentSkipListSet.
       if (hostOffers.remove(offerId)) {
         try {
-          driver.launchTask(offerId, task);
+          driver.launchTask(offerId, task, getOfferFilter());
         } catch (IllegalStateException e) {
           // TODO(William Farner): Catch only the checked exception produced by Driver
           // once it changes from throwing IllegalStateException when the driver is not yet

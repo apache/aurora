@@ -46,6 +46,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.offers.OfferManager;
+import org.apache.aurora.scheduler.offers.OfferSettings;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
 import org.apache.aurora.scheduler.preemptor.PendingTaskProcessor;
@@ -130,7 +131,8 @@ public class SchedulingBenchmarks {
                   });
               bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
               bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
-              bind(OfferManager.OfferReturnDelay.class).toInstance(() -> DELAY_FOREVER);
+              bind(OfferSettings.class).toInstance(
+                  new OfferSettings(NO_DELAY, () -> DELAY_FOREVER));
               bind(BiCache.BiCacheSettings.class).toInstance(
                   new BiCache.BiCacheSettings(DELAY_FOREVER, ""));
               bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);

@@ -31,11 +31,11 @@ import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.HostAttributesChanged;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl;
-import org.apache.aurora.scheduler.offers.OfferManager.OfferReturnDelay;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.Filters;
 import org.apache.mesos.Protos.TaskInfo;
 import org.junit.Before;
 import org.junit.Test;
@@ -67,6 +67,10 @@ public class OfferManagerImplTest extends EasyMockTest {
   private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(
       ITaskConfig.build(new TaskConfig().setJob(new JobKey("role", "env", "name"))));
   private static final TaskInfo TASK_INFO = TaskInfo.getDefaultInstance();
+  private static final long OFFER_FILTER_SECONDS = 0L;
+  private static final Filters OFFER_FILTER = Filters.newBuilder()
+      .setRefuseSeconds(OFFER_FILTER_SECONDS)
+      .build();
 
   private Driver driver;
   private FakeScheduledExecutor clock;
@@ -78,8 +82,10 @@ public class OfferManagerImplTest extends EasyMockTest {
     DelayExecutor executorMock = createMock(DelayExecutor.class);
     clock = FakeScheduledExecutor.fromDelayExecutor(executorMock);
     addTearDown(clock::assertEmpty);
-    OfferReturnDelay returnDelay = () -> RETURN_DELAY;
-    offerManager = new OfferManagerImpl(driver, returnDelay, executorMock);
+    OfferSettings offerSettings = new OfferSettings(
+        Amount.of(OFFER_FILTER_SECONDS, Time.SECONDS),
+        () -> RETURN_DELAY);
+    offerManager = new OfferManagerImpl(driver, offerSettings, executorMock);
   }
 
   @Test
@@ -89,10 +95,10 @@ public class OfferManagerImplTest extends EasyMockTest {
     HostOffer offerA = setMode(OFFER_A, DRAINING);
     HostOffer offerC = setMode(OFFER_C, DRAINING);
 
-    driver.launchTask(OFFER_B.getOffer().getId(), TASK_INFO);
+    driver.launchTask(OFFER_B.getOffer().getId(), TASK_INFO, OFFER_FILTER);
 
-    driver.declineOffer(OFFER_A_ID);
-    driver.declineOffer(offerC.getOffer().getId());
+    driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
+    driver.declineOffer(offerC.getOffer().getId(), OFFER_FILTER);
 
     control.replay();
 
@@ -108,8 +114,8 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Test
   public void hostAttributeChangeUpdatesOfferSorting() throws Exception {
-    driver.declineOffer(OFFER_A_ID);
-    driver.declineOffer(OFFER_B.getOffer().getId());
+    driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
+    driver.declineOffer(OFFER_B.getOffer().getId(), OFFER_FILTER);
 
     control.replay();
 
@@ -134,7 +140,7 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Test
   public void testAddSameSlaveOffer() {
-    driver.declineOffer(OFFER_A_ID);
+    driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
     expectLastCall().times(2);
 
     control.replay();
@@ -160,7 +166,7 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Test
   public void testOfferFilteringDueToStaticBan() throws Exception {
-    driver.declineOffer(OFFER_A_ID);
+    driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
 
     control.replay();
 
@@ -181,7 +187,7 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Test
   public void testStaticBanIsClearedOnOfferReturn() throws Exception {
-    driver.declineOffer(OFFER_A_ID);
+    driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
     expectLastCall().times(2);
 
     control.replay();
@@ -201,7 +207,7 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Test
   public void testStaticBanIsClearedOnDriverDisconnect() throws Exception {
-    driver.declineOffer(OFFER_A_ID);
+    driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
 
     control.replay();
 
@@ -220,7 +226,7 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Test
   public void getOffer() {
-    driver.declineOffer(OFFER_A_ID);
+    driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
 
     control.replay();
 
@@ -231,7 +237,7 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Test(expected = OfferManager.LaunchException.class)
   public void testLaunchTaskDriverThrows() throws OfferManager.LaunchException {
-    driver.launchTask(OFFER_A_ID, TASK_INFO);
+    driver.launchTask(OFFER_A_ID, TASK_INFO, OFFER_FILTER);
     expectLastCall().andThrow(new IllegalStateException());
 
     control.replay();
@@ -263,7 +269,7 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Test
   public void testDeclineOffer() throws Exception {
-    driver.declineOffer(OFFER_A.getOffer().getId());
+    driver.declineOffer(OFFER_A.getOffer().getId(), OFFER_FILTER);
 
     control.replay();
 

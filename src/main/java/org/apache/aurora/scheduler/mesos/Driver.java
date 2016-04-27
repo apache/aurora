@@ -17,6 +17,7 @@ import java.util.Collection;
 
 import com.google.common.util.concurrent.Service;
 
+import org.apache.mesos.Protos.Filters;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
@@ -36,15 +37,17 @@ public interface Driver extends Service {
    *
    * @param offerId ID of the resource offer to accept with the task.
    * @param task Task to launch.
+   * @param filter offer filter applied to unused resources in this offer.
    */
-  void launchTask(OfferID offerId, TaskInfo task);
+  void launchTask(OfferID offerId, TaskInfo task, Filters filter);
 
   /**
    * Declines a resource offer.
    *
    * @param offerId ID of the offer to decline.
+   * @param filter offer filter applied to this declined offer.
    */
-  void declineOffer(OfferID offerId);
+  void declineOffer(OfferID offerId, Filters filter);
 
   /**
    * Sends a kill task request for the given {@code taskId} to the mesos master.

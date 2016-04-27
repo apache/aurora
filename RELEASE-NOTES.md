@@ -8,6 +8,10 @@
 - Adding --nosetuid-health-checks flag to control whether the executor runs health checks as the job's
   role's user.
 - Upgraded Mesos to 0.27.2
+- New scheduler command line argument `-offer_filter_duration` to control the time after which we
+  expect Mesos to re-offer unused resources. A short duration improves scheduling performance in
+  smaller clusters, but might lead to resource starvation for other frameworks if you run multiple
+  ones in your cluster. Uses the Mesos default of 5s.
 
 ### Deprecations and removals:
 

@@ -116,16 +116,16 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
   }
 
   @Override
-  public void launchTask(Protos.OfferID offerId, Protos.TaskInfo task) {
+  public void launchTask(Protos.OfferID offerId, Protos.TaskInfo task, Protos.Filters filter) {
     ensureRunning();
     Futures.getUnchecked(driverFuture)
-        .launchTasks(ImmutableList.of(offerId), ImmutableList.of(task));
+        .launchTasks(ImmutableList.of(offerId), ImmutableList.of(task), filter);
   }
 
   @Override
-  public void declineOffer(Protos.OfferID offerId) {
+  public void declineOffer(Protos.OfferID offerId, Protos.Filters filter) {
     ensureRunning();
-    Futures.getUnchecked(driverFuture).declineOffer(offerId);
+    Futures.getUnchecked(driverFuture).declineOffer(offerId, filter);
   }
 
   @Override

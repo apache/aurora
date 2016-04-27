@@ -16,19 +16,20 @@ package org.apache.aurora.scheduler.offers;
 import java.util.Objects;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Supplier;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Random;
-import org.apache.aurora.scheduler.offers.OfferManager.OfferReturnDelay;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * Returns offers after a random duration within a fixed window.
+ * Calculates the amount of time before an offer should be 'returned' by declining it.
+ * Uses a random duration within a fixed window.
  */
 @VisibleForTesting
-class RandomJitterReturnDelay implements OfferReturnDelay {
+class RandomJitterReturnDelay implements Supplier<Amount<Long, Time>>  {
   private final int minHoldTimeMs;
   private final int maxJitterWindowMs;
   private final Random random;
