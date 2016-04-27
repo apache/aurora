@@ -54,13 +54,13 @@ Are you using Aurora too?  Let us know, or submit a patch to join the list!
 - [Fitbit](https://fitbit.com)
 - [Foursquare](https://foursquare.com)
 - [Gutefrage.net](https://www.gutefrage.net)
+- [Kakao](https://kakao.com/)
 - [Magine TV](https://magine.com)
 - [Medallia](http://www.medallia.com)
 - [Oscar Health](https://www.hioscar.com)
 - [Sabre Labs](http://www.sabre.com)
 - [TellApart](https://www.tellapart.com)
 - [Twitter](https://twitter.com)
-
 
 ## Getting Help
 If you have questions that aren't answered in our [documentation](https://aurora.apache.org/documentation/latest/), you can reach out to one of our [mailing lists](https://aurora.apache.org/community/). We're also often available in IRC: #aurora on
