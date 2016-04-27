@@ -34,7 +34,6 @@ import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
-import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
@@ -49,6 +48,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.aggregate;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -179,7 +179,7 @@ public class StorageBackupTest extends EasyMockTest {
     snapshot.setCronJobs(ImmutableSet.of(
         new StoredCronJob(new JobConfiguration().setKey(new JobKey("owner", "env", "jobA")))));
     snapshot.setQuotaConfigurations(
-        ImmutableSet.of(new QuotaConfiguration("roleA", new ResourceAggregate(10, 1024, 1024))));
+        ImmutableSet.of(new QuotaConfiguration("roleA", aggregate(10, 1024, 1024).newBuilder())));
     snapshot.setSchedulerMetadata(new SchedulerMetadata().setFrameworkId("frameworkId"));
     snapshot.setTasks(ImmutableSet.of(new ScheduledTask()));
     return snapshot;

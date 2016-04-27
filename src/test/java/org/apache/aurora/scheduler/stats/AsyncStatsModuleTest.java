@@ -55,7 +55,9 @@ public class AsyncStatsModuleTest extends EasyMockTest {
 
   private static MachineResource resource(boolean revocable, double cpu) {
     return new MachineResource(
-        IResourceAggregate.build(new ResourceAggregate(cpu, 0, 0)), false, revocable);
+        IResourceAggregate.build(new ResourceAggregate().setNumCpus(cpu)),
+        false,
+        revocable);
   }
 
   private static Protos.Resource getCpuResource(boolean revocable, double value) {

@@ -24,19 +24,39 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 public final class ResourceAggregates {
 
   public static final IResourceAggregate EMPTY =
-      IResourceAggregate.build(new ResourceAggregate(0, 0, 0));
+      IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(0)
+          .setRamMb(0)
+          .setDiskMb(0)
+      );
 
   public static final IResourceAggregate SMALL =
-      IResourceAggregate.build(new ResourceAggregate(1.0, 1024, 4096));
+      IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(1.0)
+          .setRamMb(1024)
+          .setDiskMb(4096)
+      );
 
   public static final IResourceAggregate MEDIUM =
-      IResourceAggregate.build(new ResourceAggregate(4.0, 8192, 16384));
+      IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(4.0)
+          .setRamMb(8192)
+          .setDiskMb(16384)
+      );
 
   public static final IResourceAggregate LARGE =
-      IResourceAggregate.build(new ResourceAggregate(8.0, 16384, 32768));
+      IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(8.0)
+          .setRamMb(16384)
+          .setDiskMb(32768)
+      );
 
   public static final IResourceAggregate XLARGE =
-      IResourceAggregate.build(new ResourceAggregate(16.0, 32768, 65536));
+      IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(16.0)
+          .setRamMb(32768)
+          .setDiskMb(65536)
+      );
 
   private ResourceAggregates() {
     // Utility class.

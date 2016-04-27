@@ -32,6 +32,7 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateRequest,
     JobUpdateSettings,
     JobUpdateStatus,
+    Resource,
     Response,
     ResponseCode,
     ResponseDetail,
@@ -190,3 +191,12 @@ class TestJobUpdateApis(unittest.TestCase):
     key = JobUpdateKey(job=JobKey(role="role", environment="env", name="name"), id="id")
     api.get_job_update_details(key)
     mock_proxy.getJobUpdateDetails.assert_called_once_with(key)
+
+  def test_set_quota(self):
+    """Test setting quota."""
+    api, mock_proxy = self.mock_api()
+    api.set_quota("role", 1.0, 32, 64)
+    actual = list(mock_proxy.setQuota.mock_calls[0][1][1].resources)
+    assert Resource(numCpus=1.0) in actual
+    assert Resource(ramMb=32) in actual
+    assert Resource(diskMb=64) in actual

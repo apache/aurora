@@ -20,12 +20,14 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.Resource;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IResource;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
@@ -41,8 +43,8 @@ public final class ThriftBackfill {
     // Utility class.
   }
 
-  private static Resource getResource(TaskConfig config, ResourceType type) {
-    return config.getResources().stream()
+  private static Resource getResource(Set<Resource> resources, ResourceType type) {
+    return resources.stream()
         .filter(e -> ResourceType.fromResource(IResource.build(e)).equals(type))
         .findFirst()
         .orElseThrow(() -> new IllegalArgumentException("Missing resource definition for " + type));
@@ -65,9 +67,9 @@ public final class ThriftBackfill {
         }
       }
     } else {
-      config.setNumCpus(getResource(config, CPUS).getNumCpus());
-      config.setRamMb(getResource(config, RAM_MB).getRamMb());
-      config.setDiskMb(getResource(config, DISK_MB).getDiskMb());
+      config.setNumCpus(getResource(config.getResources(), CPUS).getNumCpus());
+      config.setRamMb(getResource(config.getResources(), RAM_MB).getRamMb());
+      config.setDiskMb(getResource(config.getResources(), DISK_MB).getDiskMb());
       Set<String> ports = config.getResources().stream()
           .filter(e -> ResourceType.fromResource(IResource.build(e)).equals(PORTS))
           .map(Resource::getNamedPort)
@@ -101,6 +103,25 @@ public final class ThriftBackfill {
         .map(ThriftBackfill::backfillScheduledTask)
         .map(IScheduledTask::build)
         .collect(GuavaUtils.toImmutableSet());
+  }
+
+  /**
+   * Ensures ResourceAggregate.resources and correspondent deprecated fields are all populated.
+   *
+   * @param aggregate ResourceAggregate to backfill.
+   * @return Backfilled IResourceAggregate.
+   */
+  public static IResourceAggregate backfillResourceAggregate(ResourceAggregate aggregate) {
+    if (!aggregate.isSetResources() || aggregate.getResources().isEmpty()) {
+      aggregate.addToResources(Resource.numCpus(aggregate.getNumCpus()));
+      aggregate.addToResources(Resource.ramMb(aggregate.getRamMb()));
+      aggregate.addToResources(Resource.diskMb(aggregate.getDiskMb()));
+    } else {
+      aggregate.setNumCpus(getResource(aggregate.getResources(), CPUS).getNumCpus());
+      aggregate.setRamMb(getResource(aggregate.getResources(), RAM_MB).getRamMb());
+      aggregate.setDiskMb(getResource(aggregate.getResources(), DISK_MB).getDiskMb());
+    }
+    return IResourceAggregate.build(aggregate);
   }
 
   private static ScheduledTask backfillScheduledTask(ScheduledTask task) {

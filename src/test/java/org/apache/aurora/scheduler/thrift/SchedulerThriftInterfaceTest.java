@@ -59,7 +59,6 @@ import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ReadOnlyScheduler;
-import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseDetail;
@@ -114,6 +113,9 @@ import org.junit.Test;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
@@ -507,9 +509,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setConstraints(ImmutableSet.of())
         .setMaxTaskFailures(0)
         .setResources(ImmutableSet.of(
-            Resource.numCpus(1.0),
-            Resource.ramMb(1024),
-            Resource.diskMb(1024)));
+            numCpus(1.0),
+            ramMb(1024),
+            diskMb(1024)));
 
     lockManager.assertNotLocked(LOCK_KEY);
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
@@ -653,7 +655,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setRamMb(200);
     quotaManager.saveQuota(
         ROLE,
-        IResourceAggregate.build(resourceAggregate),
+        IResourceAggregate.build(resourceAggregate.deepCopy()
+            .setResources(ImmutableSet.of(numCpus(10), ramMb(200), diskMb(100)))),
         storageUtil.mutableStoreProvider);
 
     control.replay();
@@ -669,7 +672,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setRamMb(200);
     quotaManager.saveQuota(
         ROLE,
-        IResourceAggregate.build(resourceAggregate),
+        IResourceAggregate.build(resourceAggregate.deepCopy()
+            .setResources(ImmutableSet.of(numCpus(10), ramMb(200), diskMb(100)))),
         storageUtil.mutableStoreProvider);
 
     expectLastCall().andThrow(new QuotaManager.QuotaException("fail"));

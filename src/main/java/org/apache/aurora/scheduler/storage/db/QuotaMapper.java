@@ -14,11 +14,13 @@
 package org.apache.aurora.scheduler.storage.db;
 
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
 import org.apache.aurora.gen.ResourceAggregate;
-import org.apache.aurora.gen.storage.SaveQuota;
+import org.apache.aurora.scheduler.storage.db.views.DBResourceAggregate;
+import org.apache.aurora.scheduler.storage.db.views.DBSaveQuota;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -26,12 +28,26 @@ import org.apache.ibatis.annotations.Param;
  */
 interface QuotaMapper {
   /**
-   * Saves the quota for the given {@code role}, updating the existing value if it exists.
+   * Inserts the quota for the given {@code role}.
    *
-   * @param role Role to save quota for.
+   * @param role Role to insert quota for.
    * @param quota Quota value to store.
+   * @param result Container for auto-generated ID of the inserted row.
    */
-  void merge(@Param("role") String role, @Param("quota") ResourceAggregate quota);
+  void insert(
+      @Param("role") String role,
+      @Param("quota") ResourceAggregate quota,
+      @Param("result") InsertResult result);
+
+  /**
+   * Insert quota resources.
+   *
+   * @param quotaId Quota ID to merge resources for.
+   * @param values Resources to merge.
+   */
+  void insertResources(
+      @Param("quotaId") long quotaId,
+      @Param("values") Map<Integer, String> values);
 
   /**
    * Gets the quota assigned to a role.
@@ -40,14 +56,14 @@ interface QuotaMapper {
    * @return The previously-saved quota for the role, if it exists.
    */
   @Nullable
-  ResourceAggregate select(String role);
+  DBResourceAggregate select(String role);
 
   /**
    * Gets all saved quotas.
    *
    * @return All quotas stored in the database.
    */
-  List<SaveQuota> selectAll();
+  List<DBSaveQuota> selectAll();
 
   /**
    * Removes the quota stored for a role.

@@ -31,6 +31,7 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateKey,
     JobUpdateQuery,
     JobUpdateRequest,
+    Resource,
     ResourceAggregate,
     TaskQuery
 )
@@ -286,7 +287,12 @@ class AuroraClientAPI(object):
   def set_quota(self, role, cpu, ram, disk):
     log.info("Setting quota for user:%s cpu:%f ram:%d disk: %d"
               % (role, cpu, ram, disk))
-    return self._scheduler_proxy.setQuota(role, ResourceAggregate(cpu, ram, disk))
+    return self._scheduler_proxy.setQuota(
+        role,
+        ResourceAggregate(cpu, ram, disk, frozenset([
+            Resource(numCpus=cpu),
+            Resource(ramMb=ram),
+            Resource(diskMb=disk)])))
 
   def force_task_state(self, task_id, status):
     log.info("Requesting that task %s transition to state %s" % (task_id, status))

@@ -67,7 +67,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -348,7 +347,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
           SaveQuota saveQuota = op.getSaveQuota();
           writeBehindQuotaStore.saveQuota(
               saveQuota.getRole(),
-              IResourceAggregate.build(saveQuota.getQuota()));
+              ThriftBackfill.backfillResourceAggregate(saveQuota.getQuota()));
         })
         .put(
             Op._Fields.REMOVE_QUOTA,

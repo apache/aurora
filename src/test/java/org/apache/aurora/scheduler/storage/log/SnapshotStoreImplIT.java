@@ -193,7 +193,8 @@ public class SnapshotStoreImplIT {
       .setInstanceCount(1)
       .setTaskConfig(TASK_CONFIG.newBuilder()));
   private static final String ROLE = "role";
-  private static final IResourceAggregate QUOTA = ResourceAggregates.LARGE;
+  private static final IResourceAggregate QUOTA =
+      ThriftBackfill.backfillResourceAggregate(ResourceAggregates.LARGE.newBuilder());
   private static final IHostAttributes ATTRIBUTES = IHostAttributes.build(
       new HostAttributes("host", ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))))
           .setMode(MaintenanceMode.NONE)

@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.resources.ResourceAggregates;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;
@@ -29,13 +28,13 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.aggregate;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class SlotSizeCounterTest extends EasyMockTest {
 
-  private static final IResourceAggregate SMALL =
-      IResourceAggregate.build(new ResourceAggregate(1.0, 1024, 4096));
+  private static final IResourceAggregate SMALL = aggregate(1.0, 1024, 4096);
   private static final IResourceAggregate LARGE = ResourceAggregates.scale(SMALL, 4);
 
   private static final Map<String, IResourceAggregate> SLOT_SIZES = ImmutableMap.of(
@@ -106,8 +105,7 @@ public class SlotSizeCounterTest extends EasyMockTest {
   @Test
   public void testTinyOffers() {
     expectStatExport();
-    expectGetSlots(new MachineResource(
-        IResourceAggregate.build(new ResourceAggregate(0.1, 1, 1)), false, false));
+    expectGetSlots(new MachineResource(aggregate(0.1, 1, 1), false, false));
 
     control.replay();
 
@@ -126,8 +124,7 @@ public class SlotSizeCounterTest extends EasyMockTest {
   public void testStarvedResourceVector() {
     expectStatExport();
     expectGetSlots(
-        new MachineResource(
-            IResourceAggregate.build(new ResourceAggregate(1000, 16384, 1)), false, false));
+        new MachineResource(aggregate(1000, 16384, 1), false, false));
 
     control.replay();
 
@@ -152,7 +149,7 @@ public class SlotSizeCounterTest extends EasyMockTest {
         new MachineResource(LARGE, false, true),
         new MachineResource(LARGE, true, true),
         new MachineResource(ResourceAggregates.scale(LARGE, 4), false, false),
-        new MachineResource(IResourceAggregate.build(new ResourceAggregate(1, 1, 1)), false, false),
+        new MachineResource(aggregate(1, 1, 1), false, false),
         new MachineResource(SMALL, true, false),
         new MachineResource(SMALL, true, false),
         new MachineResource(ResourceAggregates.scale(SMALL, 2), true, false));

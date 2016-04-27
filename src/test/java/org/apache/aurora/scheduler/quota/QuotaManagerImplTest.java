@@ -29,7 +29,6 @@ import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Range;
-import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
@@ -39,6 +38,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
+import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -69,10 +69,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   private static final String JOB_NAME = "job";
   private static final IJobUpdateKey UPDATE_KEY =
       IJobUpdateKey.build(new JobUpdateKey(JobKeys.from(ROLE, ENV, JOB_NAME).newBuilder(), "u1"));
-  private static final IResourceAggregate QUOTA = IResourceAggregate.build(new ResourceAggregate()
-      .setNumCpus(1.0)
-      .setRamMb(100L)
-      .setDiskMb(200L));
+  private static final IResourceAggregate QUOTA = aggregate(1.0, 100L, 200L);
   private static final Query.Builder ACTIVE_QUERY = Query.roleScoped(ROLE).active();
 
   private StorageTestUtil storageUtil;
@@ -95,7 +92,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     IScheduledTask prodDedicatedTask = prodDedicatedTask("foo2", 5, 5, 5);
     IScheduledTask nonProdSharedTask = nonProdTask("bar1", 2, 2, 2);
     IScheduledTask nonProdDedicatedTask = nonProdDedicatedTask("bar2", 7, 7, 7);
-    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate(4, 4, 4));
+    IResourceAggregate quota = aggregate(4, 4, 4);
 
     expectQuota(quota);
     expectTasks(prodSharedTask, nonProdSharedTask, prodDedicatedTask, nonProdDedicatedTask);
@@ -107,7 +104,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        new QuotaInfo(from(4, 4, 4), from(6, 6, 6), from(5, 5, 5), from(9, 9, 9), from(7, 7, 7)),
+        new QuotaInfo(
+            aggregate(4, 4, 4),
+            aggregate(6, 6, 6),
+            aggregate(5, 5, 5),
+            aggregate(9, 9, 9),
+            aggregate(7, 7, 7)),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
@@ -115,7 +117,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testGetQuotaInfoWithCronTasks() {
     IScheduledTask prodTask = prodTask("pc", 6, 6, 6);
     IScheduledTask nonProdTask = prodTask("npc", 7, 7, 7);
-    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate(4, 4, 4));
+    IResourceAggregate quota = aggregate(4, 4, 4);
 
     expectQuota(quota);
     expectTasks(prodTask, nonProdTask);
@@ -140,7 +142,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        new QuotaInfo(from(4, 4, 4), from(7, 7, 7), EMPTY, from(10, 10, 10), EMPTY),
+        new QuotaInfo(aggregate(4, 4, 4), aggregate(7, 7, 7), EMPTY, aggregate(10, 10, 10), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
@@ -150,7 +152,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     IScheduledTask updatingProdTask = createTask(JOB_NAME, "id1", 3, 3, 3, true, 1);
     IScheduledTask updatingFilteredProdTask = createTask(JOB_NAME, "id0", 3, 3, 3, true, 0);
     IScheduledTask nonProdTask = createTask("bar", "id1", 2, 2, 2, false, 0);
-    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate(4, 4, 4));
+    IResourceAggregate quota = aggregate(4, 4, 4);
 
     expectQuota(quota);
     expectTasks(prodTask, updatingProdTask, updatingFilteredProdTask, nonProdTask);
@@ -161,13 +163,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     // Expected consumption from: prodTask + updatingProdTask + job update.
     assertEquals(
-        new QuotaInfo(from(4, 4, 4), from(7, 7, 7), EMPTY, from(2, 2, 2), EMPTY),
+        new QuotaInfo(aggregate(4, 4, 4), aggregate(7, 7, 7), EMPTY, aggregate(2, 2, 2), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testGetQuotaInfoNoTasksNoUpdatesNoCronJobs() {
-    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate(4, 4, 4));
+    IResourceAggregate quota = aggregate(4, 4, 4);
 
     expectQuota(quota);
     expectNoTasks();
@@ -177,13 +179,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        new QuotaInfo(from(4, 4, 4), from(0, 0, 0), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(4, 4, 4), aggregate(0, 0, 0), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaPasses() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectQuota(aggregate(4, 4, 4));
     expectTasks(prodTask("foo", 2, 2, 2));
     expectJobUpdates(taskConfig(1, 1, 1, true), taskConfig(1, 1, 1, true));
     expectNoCronJobs();
@@ -197,7 +199,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaPassesNoTasks() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectQuota(aggregate(4, 4, 4));
     expectNoTasks();
     expectJobUpdates(taskConfig(1, 1, 1, true), taskConfig(1, 1, 1, true));
     expectNoCronJobs();
@@ -211,7 +213,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaPassesNoUpdates() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectQuota(aggregate(4, 4, 4));
     expectTasks(prodTask("foo", 2, 2, 2));
     expectNoJobUpdates();
     expectNoCronJobs();
@@ -225,7 +227,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaPassesNoTasksNoUpdates() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectQuota(aggregate(4, 4, 4));
     expectNoTasks();
     expectNoJobUpdates();
     expectNoCronJobs();
@@ -239,7 +241,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaPassesNonProdUnaccounted() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectQuota(aggregate(4, 4, 4));
     expectTasks(prodTask("foo", 2, 2, 2), createTask("bar", "id2", 5, 5, 5, false, 0));
 
     expectNoJobUpdates();
@@ -290,7 +292,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaExceedsCpu() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectQuota(aggregate(4, 4, 4));
     expectTasks(prodTask("foo", 3, 3, 3));
     expectNoJobUpdates();
     expectNoCronJobs();
@@ -305,7 +307,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaExceedsRam() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectQuota(aggregate(4, 4, 4));
     expectTasks(prodTask("foo", 3, 3, 3));
     expectNoJobUpdates();
     expectNoCronJobs();
@@ -320,7 +322,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaExceedsDisk() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectQuota(aggregate(4, 4, 4));
     expectTasks(prodTask("foo", 3, 3, 3));
     expectNoJobUpdates();
     expectNoCronJobs();
@@ -335,7 +337,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaExceedsCron() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(5, 5, 5))).times(2);
+    expectQuota(aggregate(5, 5, 5)).times(2);
     expectNoTasks().times(2);
     expectNoJobUpdates().times(2);
     expectCronJobs(
@@ -348,13 +350,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(2, 2, 2, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(5, 5, 5), from(4, 4, 4), EMPTY, from(7, 7, 7), EMPTY),
+        new QuotaInfo(aggregate(5, 5, 5), aggregate(4, 4, 4), EMPTY, aggregate(7, 7, 7), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaUpdatingTasksFilteredOut() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(5, 5, 5))).times(2);
+    expectQuota(aggregate(5, 5, 5)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), createTask(JOB_NAME, "id2", 3, 3, 3, true, 0))
         .times(2);
 
@@ -367,13 +369,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(5, 5, 5), from(4, 4, 4), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(5, 5, 5), aggregate(4, 4, 4), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaNonProdUpdatesUnaccounted() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(5, 5, 5))).times(2);
+    expectQuota(aggregate(5, 5, 5)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask("bar", 2, 2, 2)).times(2);
 
     expectJobUpdates(taskConfig(8, 8, 8, false), taskConfig(4, 4, 4, false), 2);
@@ -385,13 +387,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(5, 5, 5), from(4, 4, 4), EMPTY, from(8, 8, 8), EMPTY),
+        new QuotaInfo(aggregate(5, 5, 5), aggregate(4, 4, 4), EMPTY, aggregate(8, 8, 8), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaProdToNonUpdateUnaccounted() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(5, 5, 5))).times(2);
+    expectQuota(aggregate(5, 5, 5)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask("bar", 1, 1, 1)).times(2);
 
     expectJobUpdates(taskConfig(1, 1, 1, true), taskConfig(7, 7, 7, false), 2);
@@ -403,13 +405,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(5, 5, 5), from(4, 4, 4), EMPTY, from(7, 7, 7), EMPTY),
+        new QuotaInfo(aggregate(5, 5, 5), aggregate(4, 4, 4), EMPTY, aggregate(7, 7, 7), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaNonToProdUpdateExceedsQuota() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(5, 5, 5))).times(2);
+    expectQuota(aggregate(5, 5, 5)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask("bar", 2, 2, 2)).times(2);
 
     expectJobUpdates(taskConfig(1, 1, 1, false), taskConfig(1, 1, 1, true), 2);
@@ -421,13 +423,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(5, 5, 5), from(5, 5, 5), EMPTY, from(1, 1, 1), EMPTY),
+        new QuotaInfo(aggregate(5, 5, 5), aggregate(5, 5, 5), EMPTY, aggregate(1, 1, 1), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaOldJobUpdateConfigMatters() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectQuota(aggregate(6, 6, 6)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask("bar", 2, 2, 2)).times(2);
     expectJobUpdates(taskConfig(2, 2, 2, true), taskConfig(1, 1, 1, true), 2);
     expectNoCronJobs().times(2);
@@ -438,13 +440,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(6, 6, 6), from(6, 6, 6), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(6, 6, 6), aggregate(6, 6, 6), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaUpdateAddsInstances() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectQuota(aggregate(6, 6, 6)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask("bar", 2, 2, 2)).times(2);
     expectJobUpdates(taskConfig(1, 1, 1, true), 1, taskConfig(1, 1, 1, true), 2, 2);
     expectNoCronJobs().times(2);
@@ -455,13 +457,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(6, 6, 6), from(6, 6, 6), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(6, 6, 6), aggregate(6, 6, 6), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaUpdateRemovesInstances() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectQuota(aggregate(6, 6, 6)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask("bar", 2, 2, 2)).times(2);
     expectJobUpdates(taskConfig(1, 1, 1, true), 2, taskConfig(1, 1, 1, true), 1, 2);
     expectNoCronJobs().times(2);
@@ -472,13 +474,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(6, 6, 6), from(6, 6, 6), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(6, 6, 6), aggregate(6, 6, 6), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaUpdateInitialConfigsUsedForFiltering() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectQuota(aggregate(6, 6, 6)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask(JOB_NAME, 2, 2, 2)).times(2);
 
     ITaskConfig config = taskConfig(2, 2, 2, true);
@@ -501,13 +503,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(6, 6, 6), from(4, 4, 4), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(6, 6, 6), aggregate(4, 4, 4), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaUpdateDesiredConfigsUsedForFiltering() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectQuota(aggregate(6, 6, 6)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask(JOB_NAME, 2, 2, 2)).times(2);
 
     ITaskConfig config = taskConfig(2, 2, 2, true);
@@ -530,13 +532,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(6, 6, 6), from(4, 4, 4), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(6, 6, 6), aggregate(4, 4, 4), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaNoDesiredState() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectQuota(aggregate(6, 6, 6)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask("bar", 2, 2, 2)).times(2);
 
     ITaskConfig config = taskConfig(2, 2, 2, true);
@@ -559,13 +561,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkInstanceAddition(taskConfig(1, 1, 1, true), 1, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(6, 6, 6), from(6, 6, 6), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(6, 6, 6), aggregate(6, 6, 6), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaNewInPlaceUpdate() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectQuota(aggregate(6, 6, 6)).times(2);
     expectTasks(
         prodTask("foo", 2, 2, 2),
         createTask(JOB_NAME, "id1", 2, 2, 2, true, 0),
@@ -587,13 +589,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
     QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(6, 6, 6), from(6, 6, 6), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(6, 6, 6), aggregate(6, 6, 6), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaNewUpdateAddsInstances() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectQuota(aggregate(6, 6, 6)).times(2);
     expectTasks(prodTask("foo", 2, 2, 2), prodTask(JOB_NAME, 2, 2, 2)).times(2);
     expectNoJobUpdates().times(2);
 
@@ -612,13 +614,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
     QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update, storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(6, 6, 6), from(4, 4, 4), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(6, 6, 6), aggregate(4, 4, 4), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaNewUpdateRemovesInstances() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectQuota(aggregate(6, 6, 6)).times(2);
     expectTasks(
         prodTask("foo", 2, 2, 2),
         createTask(JOB_NAME, "id1", 2, 2, 2, true, 0),
@@ -640,7 +642,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     QuotaCheckResult checkQuota = quotaManager.checkJobUpdate(update, storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(6, 6, 6), from(6, 6, 6), EMPTY, from(0, 0, 0), EMPTY),
+        new QuotaInfo(aggregate(6, 6, 6), aggregate(6, 6, 6), EMPTY, aggregate(0, 0, 0), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
@@ -701,7 +703,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     expectNoCronJobs();
     IScheduledTask prodTask = prodTask("foo", 1, 1, 1);
     expectTasks(prodTask);
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(1, 1, 1)));
+    expectQuota(aggregate(1, 1, 1));
 
     storageUtil.quotaStore.saveQuota(ROLE, QUOTA);
 
@@ -717,24 +719,18 @@ public class QuotaManagerImplTest extends EasyMockTest {
     expectNoJobUpdates();
     expectNoCronJobs();
     expectNoTasks();
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(1, 1, 1)));
+    expectQuota(aggregate(1, 1, 1));
 
     storageUtil.quotaStore.saveQuota(ROLE, EMPTY);
 
     control.replay();
-    quotaManager.saveQuota(
-        ROLE,
-        IResourceAggregate.build(new ResourceAggregate()),
-        storageUtil.mutableStoreProvider);
+    quotaManager.saveQuota(ROLE, aggregate(0, 0, 0), storageUtil.mutableStoreProvider);
   }
 
   @Test(expected = QuotaException.class)
   public void testSaveQuotaFailsNegativeValues() throws Exception {
     control.replay();
-    quotaManager.saveQuota(
-        ROLE,
-        IResourceAggregate.build(new ResourceAggregate(-2.0, 4, 5)),
-        storageUtil.mutableStoreProvider);
+    quotaManager.saveQuota(ROLE, aggregate(-2.0, 4, 5), storageUtil.mutableStoreProvider);
   }
 
   @Test(expected = QuotaException.class)
@@ -743,19 +739,16 @@ public class QuotaManagerImplTest extends EasyMockTest {
     expectNoCronJobs();
     IScheduledTask prodTask = prodTask("foo", 10, 100, 100);
     expectTasks(prodTask);
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(20, 200, 200)));
+    expectQuota(aggregate(20, 200, 200));
 
     control.replay();
 
-    quotaManager.saveQuota(
-        ROLE,
-        IResourceAggregate.build(new ResourceAggregate(1, 1, 1)),
-        storageUtil.mutableStoreProvider);
+    quotaManager.saveQuota(ROLE, aggregate(1, 1, 1), storageUtil.mutableStoreProvider);
   }
 
   @Test
   public void testCheckQuotaCronUpdateDownsize() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(5, 5, 5))).times(2);
+    expectQuota(aggregate(5, 5, 5)).times(2);
     expectNoTasks().times(2);
     expectNoJobUpdates().times(2);
 
@@ -769,13 +762,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkCronUpdate(createJob(prodTask("pc", 1, 1, 1), 2), storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(5, 5, 5), from(4, 4, 4), EMPTY, from(7, 7, 7), EMPTY),
+        new QuotaInfo(aggregate(5, 5, 5), aggregate(4, 4, 4), EMPTY, aggregate(7, 7, 7), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaCronUpdateUpsize() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(5, 5, 5))).times(2);
+    expectQuota(aggregate(5, 5, 5)).times(2);
     expectNoTasks().times(2);
     expectNoJobUpdates().times(2);
 
@@ -789,13 +782,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkCronUpdate(createJob(prodTask("pc", 5, 5, 5), 1), storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(5, 5, 5), from(4, 4, 4), EMPTY, from(7, 7, 7), EMPTY),
+        new QuotaInfo(aggregate(5, 5, 5), aggregate(4, 4, 4), EMPTY, aggregate(7, 7, 7), EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaCronUpdateFails() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(5, 5, 5))).times(2);
+    expectQuota(aggregate(5, 5, 5)).times(2);
     expectNoTasks().times(2);
     expectNoJobUpdates().times(2);
 
@@ -809,13 +802,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkCronUpdate(createJob(prodTask("pc", 5, 5, 5), 2), storeProvider);
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(5, 5, 5), from(4, 4, 4), EMPTY, EMPTY, EMPTY),
+        new QuotaInfo(aggregate(5, 5, 5), aggregate(4, 4, 4), EMPTY, EMPTY, EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
   @Test
   public void testCheckQuotaCronCreate() {
-    expectQuota(IResourceAggregate.build(new ResourceAggregate(5, 5, 5))).times(2);
+    expectQuota(aggregate(5, 5, 5)).times(2);
     expectNoTasks().times(2);
     expectNoJobUpdates().times(2);
     expectNoCronJobs().times(2);
@@ -827,7 +820,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
         quotaManager.checkCronUpdate(createJob(prodTask("pc", 5, 5, 5), 1), storeProvider);
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
     assertEquals(
-        new QuotaInfo(from(5, 5, 5), EMPTY, EMPTY, EMPTY, EMPTY),
+        new QuotaInfo(aggregate(5, 5, 5), EMPTY, EMPTY, EMPTY, EMPTY),
         quotaManager.getQuotaInfo(ROLE, storeProvider));
   }
 
@@ -990,7 +983,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
         .setInstanceCount(instanceCount));
   }
 
-  private static IResourceAggregate from(double cpu, int ramMb, int diskMb) {
-    return IResourceAggregate.build(new ResourceAggregate(cpu, ramMb, diskMb));
+  private static IResourceAggregate aggregate(double numCpus, long ramMb, long diskMb) {
+    return ResourceTestUtil.nonBackfilledAggregate(numCpus, ramMb, diskMb);
   }
 }

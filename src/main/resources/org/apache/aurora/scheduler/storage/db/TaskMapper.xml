@@ -207,10 +207,10 @@
       name,
       port
     ) VALUES (
-    <foreach item="port" collection="ports" separator="),(">
+    <foreach index="name" item="port" collection="ports" separator="),(">
       #{taskRowId},
-      #{port.first},
-      #{port.second}
+      #{name},
+      #{port}
     </foreach>
     )
   </insert>

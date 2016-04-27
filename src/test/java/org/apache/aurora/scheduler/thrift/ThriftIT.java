@@ -34,7 +34,6 @@ import org.apache.aurora.gen.Container._Fields;
 import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.JobConfiguration;
-import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.ServerInfo;
@@ -53,6 +52,7 @@ import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.quota.QuotaModule;
+import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.stats.StatsModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
@@ -72,8 +72,7 @@ import static org.junit.Assert.assertEquals;
 public class ThriftIT extends EasyMockTest {
 
   private static final String USER = "someuser";
-  private static final IResourceAggregate QUOTA =
-      IResourceAggregate.build(new ResourceAggregate(1, 1, 1));
+  private static final IResourceAggregate QUOTA = ResourceTestUtil.aggregate(1, 1, 1);
   private static final IServerInfo SERVER_INFO = IServerInfo.build(new ServerInfo());
 
   private AuroraAdmin.Iface thrift;

@@ -16,15 +16,13 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.QuotaMapper">
-  <insert id="merge">
-    MERGE INTO quotas (
-      id,
+  <insert id="insert" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
+    INSERT INTO quotas (
       role,
       num_cpus,
       ram_mb,
       disk_mb
-    ) KEY(role) VALUES (
-      null,
+    ) VALUES (
       #{role},
       #{quota.numCpus},
       #{quota.ramMb},
@@ -32,18 +30,54 @@
     )
   </insert>
 
-  <select id="select" resultType="org.apache.aurora.gen.ResourceAggregate">
-    SELECT * FROM quotas
+  <insert id="insertResources">
+    INSERT INTO quota_resource (
+      quota_id,
+      type_id,
+      value
+    ) VALUES (
+    <foreach index="type" item="value" collection="values" separator="),(">
+      #{quotaId},
+      #{type},
+      #{value}
+    </foreach>
+    )
+  </insert>
+
+  <resultMap id="quotaMap" type="org.apache.aurora.scheduler.storage.db.views.DBResourceAggregate">
+    <id column="id" />
+    <collection
+        property="resources"
+        columnPrefix="qr_"
+        resultMap="org.apache.aurora.scheduler.storage.db.TaskConfigMapper.resourceMap"/>
+  </resultMap>
+
+  <resultMap id="quotaResultMap" type="org.apache.aurora.scheduler.storage.db.views.DBSaveQuota">
+    <id column="id" />
+    <association property="quota" resultMap="quotaMap" />
+  </resultMap>
+
+  <sql id="unscopedSelect">
+    SELECT
+      q.id,
+      q.role,
+      q.num_cpus,
+      q.ram_mb,
+      q.disk_mb,
+      qr.id as qr_id,
+      qr.type_id as qr_type_id,
+      qr.value as qr_value
+    FROM quotas AS q
+    INNER JOIN quota_resource AS qr ON qr.quota_id = q.id
+  </sql>
+
+  <select id="select" resultMap="quotaMap">
+    <include refid="unscopedSelect"/>
     WHERE role = #{id}
   </select>
 
-  <resultMap id="quotaResultMap" type="org.apache.aurora.gen.storage.SaveQuota">
-    <id column="id" />
-    <association property="quota" javaType="org.apache.aurora.gen.ResourceAggregate" />
-  </resultMap>
-
   <select id="selectAll" resultMap="quotaResultMap">
-    SELECT * FROM quotas
+    <include refid="unscopedSelect"/>
   </select>
 
   <delete id="delete">

@@ -284,10 +284,10 @@
       type_id,
       value
     ) VALUES (
-      <foreach item="value" collection="values" separator="),(">
+      <foreach index="type" item="value" collection="values" separator="),(">
         #{configId},
-        #{value.first},
-        #{value.second}
+        #{type},
+        #{value}
       </foreach>
     )
   </insert>
@@ -298,10 +298,10 @@
       label,
       url
     ) VALUES (
-      <foreach item="link" collection="links" separator="),(">
+      <foreach index="label" item="url" collection="links" separator="),(">
         #{configId},
-        #{link.first},
-        #{link.second}
+        #{label},
+        #{url}
       </foreach>
     )
   </insert>

@@ -43,16 +43,6 @@ CREATE TABLE locks(
   UNIQUE(token)
 );
 
-CREATE TABLE quotas(
-  id IDENTITY,
-  role VARCHAR NOT NULL,
-  num_cpus DOUBLE NOT NULL,
-  ram_mb BIGINT NOT NULL,
-  disk_mb BIGINT NOT NULL,
-
-  UNIQUE(role)
-);
-
 CREATE TABLE maintenance_modes(
   id INT PRIMARY KEY,
   name VARCHAR NOT NULL,
@@ -114,6 +104,25 @@ CREATE TABLE task_resource(
   value VARCHAR NOT NULL,
 
   UNIQUE(task_config_id, type_id, value)
+);
+
+CREATE TABLE quotas(
+  id IDENTITY,
+  role VARCHAR NOT NULL,
+  num_cpus DOUBLE NOT NULL,
+  ram_mb BIGINT NOT NULL,
+  disk_mb BIGINT NOT NULL,
+
+  UNIQUE(role)
+);
+
+CREATE TABLE quota_resource(
+  id IDENTITY,
+  quota_id BIGINT NOT NULL REFERENCES quotas(id) ON DELETE CASCADE,
+  type_id INT NOT NULL REFERENCES resource_types(id),
+  value VARCHAR NOT NULL,
+
+  UNIQUE(quota_id, type_id, value)
 );
 
 CREATE TABLE task_constraints(

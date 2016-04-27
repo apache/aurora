@@ -14,11 +14,11 @@
 package org.apache.aurora.scheduler.storage.db;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.scheduler.storage.db.views.DbScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -83,9 +83,7 @@ interface TaskMapper {
    * @param taskRowId Task row ID.
    * @param ports Assigned ports to insert.
    */
-  void insertPorts(
-      @Param("taskRowId") long taskRowId,
-      @Param("ports") List<Pair<String, Integer>> ports);
+  void insertPorts(@Param("taskRowId") long taskRowId, @Param("ports") Map<String, Integer> ports);
 
   /**
    * Deletes all task rows.

@@ -37,7 +37,6 @@ import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.Resource;
-import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.ResponseDetail;
@@ -46,6 +45,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
+import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
@@ -74,8 +74,7 @@ final class Fixtures {
   private static final Function<String, ResponseDetail> MESSAGE_TO_DETAIL =
       message -> new ResponseDetail().setMessage(message);
   static final String CRON_SCHEDULE = "0 * * * *";
-  static final IResourceAggregate QUOTA =
-      IResourceAggregate.build(new ResourceAggregate(10.0, 1024, 2048));
+  static final IResourceAggregate QUOTA = ResourceTestUtil.aggregate(10.0, 1024, 2048);
   static final QuotaCheckResult ENOUGH_QUOTA = new QuotaCheckResult(SUFFICIENT_QUOTA);
   static final QuotaCheckResult NOT_ENOUGH_QUOTA = new QuotaCheckResult(INSUFFICIENT_QUOTA);
   static final InstanceKey INSTANCE_KEY = new InstanceKey(JOB_KEY.newBuilder(), 0);

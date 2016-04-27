@@ -20,11 +20,8 @@ import javax.inject.Inject;
 
 import com.google.common.collect.Maps;
 
-import org.apache.aurora.GuavaUtils;
-import org.apache.aurora.common.collections.Pair;
-import org.apache.aurora.scheduler.resources.ResourceType;
+import org.apache.aurora.scheduler.storage.db.views.DBResourceAggregate;
 import org.apache.aurora.scheduler.storage.db.views.DbTaskConfig;
-import org.apache.aurora.scheduler.storage.db.views.Pairs;
 import org.apache.aurora.scheduler.storage.entities.IAppcImage;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
@@ -102,11 +99,7 @@ class TaskConfigManager {
     if (!config.getResources().isEmpty()) {
       configMapper.insertResources(
           configInsert.getId(),
-          config.getResources().stream()
-              .map(e -> Pair.of(
-                  ResourceType.fromResource(e).getValue(),
-                  ResourceType.fromResource(e).getTypeConverter().stringify(e.getRawValue())))
-              .collect(GuavaUtils.toImmutableList()));
+          DBResourceAggregate.mapFromResources(config.getResources()));
     }
 
     if (!config.getRequestedPorts().isEmpty()) {
@@ -114,9 +107,7 @@ class TaskConfigManager {
     }
 
     if (!config.getTaskLinks().isEmpty()) {
-      configMapper.insertTaskLinks(
-          configInsert.getId(),
-          Pairs.fromMap(config.getTaskLinks()));
+      configMapper.insertTaskLinks(configInsert.getId(), config.getTaskLinks());
     }
 
     if (!config.getMetadata().isEmpty()) {

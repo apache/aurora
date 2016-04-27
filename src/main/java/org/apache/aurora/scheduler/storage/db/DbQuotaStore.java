@@ -14,13 +14,15 @@
 package org.apache.aurora.scheduler.storage.db;
 
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
 
-import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.scheduler.storage.QuotaStore;
+import org.apache.aurora.scheduler.storage.db.views.DBResourceAggregate;
+import org.apache.aurora.scheduler.storage.db.views.DBSaveQuota;
+import org.apache.aurora.scheduler.storage.db.views.Pairs;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static java.util.Objects.requireNonNull;
@@ -43,17 +45,15 @@ class DbQuotaStore implements QuotaStore.Mutable {
   @Override
   public Optional<IResourceAggregate> fetchQuota(String role) {
     return Optional.fromNullable(mapper.select(role))
-        .transform(IResourceAggregate::build);
+        .transform(DBResourceAggregate::toImmutable);
   }
 
   @Timed("quota_store_fetch_quotas")
   @Override
   public Map<String, IResourceAggregate> fetchQuotas() {
-    ImmutableMap.Builder<String, IResourceAggregate> results = ImmutableMap.builder();
-    for (SaveQuota result : mapper.selectAll()) {
-      results.put(result.getRole(), IResourceAggregate.build(result.getQuota()));
-    }
-    return results.build();
+    return Pairs.toMap(mapper.selectAll().stream()
+        .map(DBSaveQuota::toImmutable)
+        .collect(Collectors.toList()));
   }
 
   @Timed("quota_store_delete_quotas")
@@ -71,6 +71,12 @@ class DbQuotaStore implements QuotaStore.Mutable {
   @Timed("quota_store_save_quota")
   @Override
   public void saveQuota(String role, IResourceAggregate quota) {
-    mapper.merge(role, quota.newBuilder());
+    mapper.delete(role);
+    InsertResult quotaInsert = new InsertResult();
+    mapper.insert(role, quota.newBuilder(), quotaInsert);
+    mapper.insertResources(
+        quotaInsert.getId(),
+        DBResourceAggregate.mapFromResources(quota.getResources()));
+
   }
 }

@@ -106,9 +106,9 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IRange;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 import org.apache.aurora.scheduler.updater.JobDiff;
@@ -493,7 +493,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     try {
       storage.write((NoResult<QuotaException>) store -> quotaManager.saveQuota(
           ownerRole,
-          IResourceAggregate.build(resourceAggregate),
+          ThriftBackfill.backfillResourceAggregate(resourceAggregate),
           store));
       return ok();
     } catch (QuotaException e) {

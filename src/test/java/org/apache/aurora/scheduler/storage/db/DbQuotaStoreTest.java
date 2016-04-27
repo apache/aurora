@@ -19,7 +19,7 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -33,10 +33,8 @@ public class DbQuotaStoreTest {
 
   private static final String ROLE_A = "roleA";
   private static final String ROLE_B = "roleB";
-  private static final IResourceAggregate QUOTA_A =
-      IResourceAggregate.build(new ResourceAggregate(1.0D, 2, 3));
-  private static final IResourceAggregate QUOTA_B =
-      IResourceAggregate.build(new ResourceAggregate(2.0D, 4, 6));
+  private static final IResourceAggregate QUOTA_A = ResourceTestUtil.aggregate(1.0, 2, 3);
+  private static final IResourceAggregate QUOTA_B = ResourceTestUtil.aggregate(2.0, 4, 6);
 
   private Storage storage;
 

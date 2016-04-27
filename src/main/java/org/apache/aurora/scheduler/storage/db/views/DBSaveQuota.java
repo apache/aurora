@@ -13,26 +13,17 @@
  */
 package org.apache.aurora.scheduler.storage.db.views;
 
-import java.util.Map;
-
-import com.google.common.collect.ImmutableMap;
-
 import org.apache.aurora.common.collections.Pair;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
-/**
- * Utility class for translating collections of {@link Pair} to and from maps.
- */
-public final class Pairs {
+public final class DBSaveQuota {
+  private String role;
+  private DBResourceAggregate quota;
 
-  private Pairs() {
-    // Utility class.
+  private DBSaveQuota() {
   }
 
-  public static <K, V> Map<K, V> toMap(Iterable<Pair<K, V>> pairs) {
-    ImmutableMap.Builder<K, V> map = ImmutableMap.builder();
-    for (Pair<K, V> pair : pairs) {
-      map.put(pair.getFirst(), pair.getSecond());
-    }
-    return map.build();
+  public Pair<String, IResourceAggregate> toImmutable() {
+    return Pair.of(role, quota.toImmutable());
   }
 }

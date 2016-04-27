@@ -41,15 +41,6 @@ struct Identity {
   2: string user
 }
 
-struct ResourceAggregate {
-  /** Number of CPU cores allotted. */
-  1: double numCpus
-  /** Megabytes of RAM allotted. */
-  2: i64 ramMb
-  /** Megabytes of disk space allotted. */
-  3: i64 diskMb
-}
-
 /** A single host attribute. */
 struct Attribute {
   1: string name
@@ -276,6 +267,17 @@ struct TaskConfig {
  // code generator.  See AURORA-1185 for details.
  /** the container the task should use to execute */
  29: Container container = { "mesos": {} }
+}
+
+struct ResourceAggregate {
+  /** Number of CPU cores allotted. */
+  1: double numCpus
+  /** Megabytes of RAM allotted. */
+  2: i64 ramMb
+  /** Megabytes of disk space allotted. */
+  3: i64 diskMb
+  /** Aggregated resource values. */
+  4: set<Resource> resources
 }
 
 /** Defines the policy for launching a new cron job when one is already running. */

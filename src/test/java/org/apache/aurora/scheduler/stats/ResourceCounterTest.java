@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.Constraint;
-import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -32,11 +31,11 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
@@ -119,10 +118,8 @@ public class ResourceCounterTest {
   @Test
   public void testComputeQuotaAllocationTotals() {
     storage.write((NoResult.Quiet) storeProvider -> {
-      storeProvider.getQuotaStore()
-          .saveQuota("a", IResourceAggregate.build(new ResourceAggregate(1, 1, 1)));
-      storeProvider.getQuotaStore()
-          .saveQuota("b", IResourceAggregate.build(new ResourceAggregate(2, 3, 4)));
+      storeProvider.getQuotaStore().saveQuota("a", ResourceTestUtil.aggregate(1, 1, 1));
+      storeProvider.getQuotaStore().saveQuota("b", ResourceTestUtil.aggregate(2, 3, 4));
     });
 
     assertEquals(new Metric(3, 4, 5), resourceCounter.computeQuotaAllocationTotals());

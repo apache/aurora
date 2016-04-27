@@ -38,7 +38,6 @@ import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.db.views.DbScheduledTask;
-import org.apache.aurora.scheduler.storage.db.views.Pairs;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -147,9 +146,7 @@ class DbTaskStore implements TaskStore.Mutable {
         taskMapper.insertTaskEvents(result.getId(), task.getTaskEvents());
       }
       if (!task.getAssignedTask().getAssignedPorts().isEmpty()) {
-        taskMapper.insertPorts(
-            result.getId(),
-            Pairs.fromMap(task.getAssignedTask().getAssignedPorts()));
+        taskMapper.insertPorts(result.getId(), task.getAssignedTask().getAssignedPorts());
       }
     }
   }

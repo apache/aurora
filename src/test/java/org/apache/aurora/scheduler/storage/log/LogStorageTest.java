@@ -86,6 +86,7 @@ import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
+import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -113,6 +114,9 @@ import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeConfig;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
 import static org.easymock.EasyMock.capture;
@@ -302,11 +306,16 @@ public class LogStorageTest extends EasyMockTest {
     builder.add(createTransaction(Op.removeTasks(removeTasks)));
     storageUtil.taskStore.deleteTasks(removeTasks.getTaskIds());
 
-    SaveQuota saveQuota = new SaveQuota(JOB_KEY.getRole(), new ResourceAggregate());
+    ResourceAggregate nonBackfilled = new ResourceAggregate()
+        .setNumCpus(1.0)
+        .setRamMb(32)
+        .setDiskMb(64);
+    SaveQuota saveQuota = new SaveQuota(JOB_KEY.getRole(), nonBackfilled);
     builder.add(createTransaction(Op.saveQuota(saveQuota)));
     storageUtil.quotaStore.saveQuota(
         saveQuota.getRole(),
-        IResourceAggregate.build(saveQuota.getQuota()));
+        IResourceAggregate.build(nonBackfilled.deepCopy()
+            .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)))));
 
     builder.add(createTransaction(Op.removeQuota(new RemoveQuota(JOB_KEY.getRole()))));
     storageUtil.quotaStore.removeQuota(JOB_KEY.getRole());
@@ -730,7 +739,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveQuota() throws Exception {
     String role = "role";
-    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate(1.0, 128L, 1024L));
+    IResourceAggregate quota = ResourceTestUtil.aggregate(1.0, 128L, 1024L);
 
     new AbstractMutationFixture() {
       @Override
