@@ -38,7 +38,7 @@ function install_base_packages {
       libcurl4-nss-dev \
       libsasl2-dev \
       libsvn-dev \
-      openjdk-8-jdk \
+      openjdk-8-jdk-headless \
       python-dev
   update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
   # Installing zookeeperd as a separate command, as otherwise openjdk-7-jdk is also installed.
@@ -60,12 +60,13 @@ function install_docker {
 }
 
 function install_mesos {
-  URL_BASE='http://repos.mesosphere.com/ubuntu/pool/main/m/mesos'
-  DEB_URL="$URL_BASE/mesos_${MESOS_VERSION}-2.0.15.ubuntu1404_amd64.deb"
-  deb=$(basename $DEB_URL)
-  wget -c "$DEB_URL"
-  dpkg --install $deb
-  rm $deb
+  apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF
+  DISTRO=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
+  CODENAME=$(lsb_release -cs)
+  echo "deb http://repos.mesosphere.io/${DISTRO} ${CODENAME} main" \
+      > /etc/apt/sources.list.d/mesosphere.list
+  apt-get update
+  apt-get -y install mesos=${MESOS_VERSION}*
 }
 
 function install_thrift {
