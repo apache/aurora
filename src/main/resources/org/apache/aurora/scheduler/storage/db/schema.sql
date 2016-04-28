@@ -122,7 +122,7 @@ CREATE TABLE quota_resource(
   type_id INT NOT NULL REFERENCES resource_types(id),
   value VARCHAR NOT NULL,
 
-  UNIQUE(quota_id, type_id, value)
+  UNIQUE(quota_id, type_id)
 );
 
 CREATE TABLE task_constraints(

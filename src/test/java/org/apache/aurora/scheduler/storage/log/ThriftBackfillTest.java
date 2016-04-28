@@ -121,4 +121,25 @@ public class ThriftBackfillTest {
 
     assertEquals(expected, ThriftBackfill.backfillResourceAggregate(aggregate));
   }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testResourceAggregateTooManyResources() {
+    ResourceAggregate aggregate = new ResourceAggregate()
+        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64), numCpus(2.0)));
+    ThriftBackfill.backfillResourceAggregate(aggregate);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testResourceAggregateInvalidResources() {
+    ResourceAggregate aggregate = new ResourceAggregate()
+        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), namedPort("http")));
+    ThriftBackfill.backfillResourceAggregate(aggregate);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testResourceAggregateMissingResources() {
+    ResourceAggregate aggregate = new ResourceAggregate()
+        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32)));
+    ThriftBackfill.backfillResourceAggregate(aggregate);
+  }
 }

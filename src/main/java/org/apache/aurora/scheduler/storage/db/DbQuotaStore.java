@@ -76,7 +76,7 @@ class DbQuotaStore implements QuotaStore.Mutable {
     mapper.insert(role, quota.newBuilder(), quotaInsert);
     mapper.insertResources(
         quotaInsert.getId(),
-        DBResourceAggregate.mapFromResources(quota.getResources()));
+        Pairs.toMap(DBResourceAggregate.pairsFromResources(quota.getResources())));
 
   }
 }

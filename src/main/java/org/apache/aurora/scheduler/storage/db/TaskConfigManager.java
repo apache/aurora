@@ -99,7 +99,7 @@ class TaskConfigManager {
     if (!config.getResources().isEmpty()) {
       configMapper.insertResources(
           configInsert.getId(),
-          DBResourceAggregate.mapFromResources(config.getResources()));
+          DBResourceAggregate.pairsFromResources(config.getResources()));
     }
 
     if (!config.getRequestedPorts().isEmpty()) {

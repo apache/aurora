@@ -36,7 +36,7 @@ public class V005_CreateQuotaResourceTable implements MigrationScript {
         + "quota_id BIGINT NOT NULL REFERENCES quotas(id) ON DELETE CASCADE,"
         + "type_id INT NOT NULL REFERENCES resource_types(id),"
         + "value VARCHAR NOT NULL,"
-        + "UNIQUE(quota_id, type_id, value)"
+        + "UNIQUE(quota_id, type_id)"
         + ");\n"
         + migrateScript();
   }

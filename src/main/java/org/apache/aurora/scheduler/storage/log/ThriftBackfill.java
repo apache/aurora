@@ -13,7 +13,9 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
+import java.util.EnumSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.gen.JobConfiguration;
@@ -117,6 +119,17 @@ public final class ThriftBackfill {
       aggregate.addToResources(Resource.ramMb(aggregate.getRamMb()));
       aggregate.addToResources(Resource.diskMb(aggregate.getDiskMb()));
     } else {
+      EnumSet<ResourceType> quotaResources = EnumSet.of(CPUS, RAM_MB, DISK_MB);
+      if (aggregate.getResources().size() > quotaResources.size()) {
+        throw new IllegalArgumentException("Too many resource values in quota.");
+      }
+
+      if (!quotaResources.equals(aggregate.getResources().stream()
+              .map(e -> ResourceType.fromResource(IResource.build(e)))
+              .collect(Collectors.toSet()))) {
+
+        throw new IllegalArgumentException("Quota resources must be exactly: " + quotaResources);
+      }
       aggregate.setNumCpus(getResource(aggregate.getResources(), CPUS).getNumCpus());
       aggregate.setRamMb(getResource(aggregate.getResources(), RAM_MB).getRamMb());
       aggregate.setDiskMb(getResource(aggregate.getResources(), DISK_MB).getDiskMb());

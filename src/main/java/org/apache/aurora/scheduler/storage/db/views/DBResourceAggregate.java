@@ -14,10 +14,9 @@
 package org.apache.aurora.scheduler.storage.db.views;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.resources.ResourceType;
@@ -43,12 +42,12 @@ public final class DBResourceAggregate {
         .setResources(resources.stream().map(DBResource::toThrift).collect(toImmutableSet()));
   }
 
-  public static Map<Integer, String> mapFromResources(Set<IResource> resources) {
-    return Pairs.toMap(resources.stream()
+  public static List<Pair<Integer, String>> pairsFromResources(Set<IResource> resources) {
+    return resources.stream()
         .map(e -> Pair.of(
             ResourceType.fromResource(e).getValue(),
             ResourceType.fromResource(e).getTypeConverter().stringify(e.getRawValue())))
-        .collect(Collectors.toList()));
+        .collect(GuavaUtils.toImmutableList());
   }
 
   public IResourceAggregate toImmutable() {
