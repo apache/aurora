@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.resources;
 
 import java.util.EnumSet;
+import java.util.Optional;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -29,6 +30,7 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.quantity.Data.GB;
 import static org.apache.aurora.common.quantity.Data.MB;
+import static org.apache.aurora.scheduler.resources.ResourceMapper.PORT_MAPPER;
 import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.DOUBLE;
 import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.LONG;
 import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.STRING;
@@ -43,22 +45,38 @@ public enum ResourceType implements TEnum {
   /**
    * CPU resource.
    */
-  CPUS(_Fields.NUM_CPUS, SCALAR, "cpus", DOUBLE, "CPU", 16, false),
+  CPUS(_Fields.NUM_CPUS, SCALAR, "cpus", DOUBLE, Optional.empty(), "CPU", 16, false),
 
   /**
    * RAM resource.
    */
-  RAM_MB(_Fields.RAM_MB, SCALAR, "mem", LONG, "RAM", Amount.of(24, GB).as(MB), false),
+  RAM_MB(
+      _Fields.RAM_MB,
+      SCALAR,
+      "mem",
+      LONG,
+      Optional.empty(),
+      "RAM",
+      Amount.of(24, GB).as(MB),
+      false),
 
   /**
    * DISK resource.
    */
-  DISK_MB(_Fields.DISK_MB, SCALAR, "disk", LONG, "disk", Amount.of(450, GB).as(MB), false),
+  DISK_MB(
+      _Fields.DISK_MB,
+      SCALAR,
+      "disk",
+      LONG,
+      Optional.empty(),
+      "disk",
+      Amount.of(450, GB).as(MB),
+      false),
 
   /**
    * Port resource.
    */
-  PORTS(_Fields.NAMED_PORT, RANGES, "ports", STRING, "ports", 1000, true);
+  PORTS(_Fields.NAMED_PORT, RANGES, "ports", STRING, Optional.of(PORT_MAPPER), "ports", 1000, true);
 
   /**
    * Correspondent thrift {@link org.apache.aurora.gen.Resource} enum value.
@@ -79,6 +97,11 @@ public enum ResourceType implements TEnum {
    * Type converter for resource values.
    */
   private final ResourceTypeConverter<?> typeConverter;
+
+  /**
+   * Optional resource mapper to use.
+   */
+  private final Optional<ResourceMapper> mapper;
 
   /**
    * Aurora resource name.
@@ -105,6 +128,7 @@ public enum ResourceType implements TEnum {
    * @param mesosType See {@link #getMesosType()} for more details.
    * @param mesosName See {@link #getMesosName()} for more details.
    * @param typeConverter See {@link #getTypeConverter()} for more details.
+   * @param mapper See {@link #getMapper()} for more details.
    * @param auroraName See {@link #getAuroraName()} for more details.
    * @param scalingRange See {@link #getScalingRange()} for more details.
    * @param isMultipleAllowed See {@link #isMultipleAllowed()} for more details.
@@ -114,6 +138,7 @@ public enum ResourceType implements TEnum {
       Protos.Value.Type mesosType,
       String mesosName,
       ResourceTypeConverter<?> typeConverter,
+      Optional<ResourceMapper> mapper,
       String auroraName,
       int scalingRange,
       boolean isMultipleAllowed) {
@@ -123,6 +148,7 @@ public enum ResourceType implements TEnum {
     this.mesosName = requireNonNull(mesosName);
     this.typeConverter = requireNonNull(typeConverter);
     this.auroraName = requireNonNull(auroraName);
+    this.mapper = requireNonNull(mapper);
     this.scalingRange = scalingRange;
     this.isMultipleAllowed = isMultipleAllowed;
   }
@@ -168,6 +194,15 @@ public enum ResourceType implements TEnum {
    */
   public ResourceTypeConverter<?> getTypeConverter() {
     return typeConverter;
+  }
+
+  /**
+   * Gets optional resource mapper. See {@link ResourceMapper} for more details.
+   *
+   * @return Optional ResourceMapper.
+   */
+  public Optional<ResourceMapper> getMapper() {
+    return mapper;
   }
 
   /**

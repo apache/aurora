@@ -43,6 +43,7 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.common.quantity.Data.BYTES;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
@@ -94,7 +95,7 @@ public final class ResourceSlot {
         task.getNumCpus(),
         Amount.of(task.getRamMb(), Data.MB),
         Amount.of(task.getDiskMb(), Data.MB),
-        task.getRequestedPorts().size());
+        Iterables.size(ResourceManager.getTaskResources(task, PORTS)));
   }
 
   /**

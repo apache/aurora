@@ -52,6 +52,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.resetPorts;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
@@ -103,18 +104,18 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     ResourceSlot twoPorts = Resources.from(
         Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 81))).slot();
 
-    ITaskConfig noPortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
-        .newBuilder()
-        .setRequestedPorts(ImmutableSet.of()));
-    ITaskConfig onePortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
-        .newBuilder()
-        .setRequestedPorts(ImmutableSet.of("one")));
-    ITaskConfig twoPortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
-        .newBuilder()
-        .setRequestedPorts(ImmutableSet.of("one", "two")));
-    ITaskConfig threePortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
-        .newBuilder()
-        .setRequestedPorts(ImmutableSet.of("one", "two", "three")));
+    ITaskConfig noPortTask = resetPorts(
+        makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK),
+        ImmutableSet.of());
+    ITaskConfig onePortTask = resetPorts(
+        makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK),
+        ImmutableSet.of("one"));
+    ITaskConfig twoPortTask = resetPorts(
+        makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK),
+        ImmutableSet.of("one", "two"));
+    ITaskConfig threePortTask = resetPorts(
+        makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK),
+        ImmutableSet.of("one", "two", "three"));
 
     Set<Veto> none = ImmutableSet.of();
     IHostAttributes hostA = hostAttributes(HOST_A, host(HOST_A), rack(RACK_A));

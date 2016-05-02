@@ -20,8 +20,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduledTask;
@@ -56,41 +54,31 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.offer;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.LAUNCH_FAILED_MSG;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.mesos.Protos.Offer;
+import static org.easymock.EasyMock.anyObject;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class TaskAssignerImplTest extends EasyMockTest {
 
-  private static final int PORT = 5000;
-  private static final String SLAVE_ID = "slaveId";
-  private static final Offer MESOS_OFFER = Offer.newBuilder()
-      .setId(OfferID.newBuilder().setValue("offerId"))
-      .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
-      .setSlaveId(SlaveID.newBuilder().setValue(SLAVE_ID))
-      .setHostname("hostName")
-      .addResources(Resource.newBuilder()
-          .setName("ports")
-          .setType(Type.RANGES)
-          .setRanges(
-              Ranges.newBuilder().addRange(Range.newBuilder().setBegin(PORT).setEnd(PORT))))
-      .build();
+  private static final int PORT = 1000;
+  private static final Offer MESOS_OFFER = offer(mesosRange(PORTS, PORT));
+  private static final String SLAVE_ID = MESOS_OFFER.getSlaveId().getValue();
   private static final HostOffer OFFER =
       new HostOffer(MESOS_OFFER, IHostAttributes.build(new HostAttributes()));
-  private static final String PORT_NAME = "http";
-  private static final IScheduledTask TASK = IScheduledTask.build(
-      new ScheduledTask()
-          .setAssignedTask(new AssignedTask()
-              .setTaskId("taskId")
-              .setTask(new TaskConfig()
-                  .setJob(new JobKey("r", "e", "n"))
-                  .setExecutorConfig(new ExecutorConfig().setData("opaque data"))
-                  .setRequestedPorts(ImmutableSet.of(PORT_NAME)))));
+  private static final IScheduledTask TASK = makeTask("id", JOB);
   private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(TASK.getAssignedTask().getTask());
   private static final TaskInfo TASK_INFO = TaskInfo.newBuilder()
       .setName("taskName")
@@ -108,7 +96,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
   private SchedulingFilter filter;
   private MesosTaskFactory taskFactory;
   private OfferManager offerManager;
-  private TaskAssigner assigner;
+  private TaskAssignerImpl assigner;
   private TierManager tierManager;
 
   @Before
@@ -128,13 +116,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     offerManager.launchTask(MESOS_OFFER.getId(), TASK_INFO);
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
     expect(filter.filter(UNUSED, RESOURCE_REQUEST)).andReturn(ImmutableSet.of());
-    expect(stateManager.assignTask(
-        storeProvider,
-        Tasks.id(TASK),
-        MESOS_OFFER.getHostname(),
-        MESOS_OFFER.getSlaveId(),
-        ImmutableMap.of(PORT_NAME, PORT)))
-        .andReturn(TASK.getAssignedTask());
+    expectAssignTask(MESOS_OFFER);
     expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER))
         .andReturn(TASK_INFO);
 
@@ -190,13 +172,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     expectLastCall().andThrow(new OfferManager.LaunchException("expected"));
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
     expect(filter.filter(UNUSED, RESOURCE_REQUEST)).andReturn(ImmutableSet.of());
-    expect(stateManager.assignTask(
-        storeProvider,
-        Tasks.id(TASK),
-        MESOS_OFFER.getHostname(),
-        MESOS_OFFER.getSlaveId(),
-        ImmutableMap.of(PORT_NAME, PORT)))
-        .andReturn(TASK.getAssignedTask());
+    expectAssignTask(MESOS_OFFER);
     expect(stateManager.changeState(
         storeProvider,
         Tasks.id(TASK),
@@ -254,13 +230,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(offer, OFFER));
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
     expect(filter.filter(UNUSED, RESOURCE_REQUEST)).andReturn(ImmutableSet.of());
-    expect(stateManager.assignTask(
-        storeProvider,
-        Tasks.id(TASK),
-        offer.getOffer().getHostname(),
-        offer.getOffer().getSlaveId(),
-        ImmutableMap.of(PORT_NAME, PORT)))
-        .andReturn(TASK.getAssignedTask());
+    expectAssignTask(offer.getOffer());
     expect(taskFactory.createFrom(TASK.getAssignedTask(), offer.getOffer()))
         .andReturn(TASK_INFO);
     offerManager.launchTask(offer.getOffer().getId(), TASK_INFO);
@@ -306,13 +276,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
         .andReturn(ImmutableSet.of());
 
-    expect(stateManager.assignTask(
-        storeProvider,
-        Tasks.id(TASK),
-        OFFER.getOffer().getHostname(),
-        OFFER.getOffer().getSlaveId(),
-        ImmutableMap.of(PORT_NAME, PORT)))
-        .andReturn(TASK.getAssignedTask());
+    expectAssignTask(MESOS_OFFER);
     expect(taskFactory.createFrom(TASK.getAssignedTask(), OFFER.getOffer()))
         .andReturn(TASK_INFO);
     offerManager.launchTask(OFFER.getOffer().getId(), TASK_INFO);
@@ -325,5 +289,24 @@ public class TaskAssignerImplTest extends EasyMockTest {
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
         ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
+  }
+
+  @Test
+  public void testResourceMapperCallback() {
+    ScheduledTask builder = TASK.newBuilder();
+    builder.getAssignedTask().unsetAssignedPorts();
+
+    control.replay();
+
+    assertEquals(TASK, assigner.mapAndAssignResources(MESOS_OFFER, IScheduledTask.build(builder)));
+  }
+
+  private void expectAssignTask(Offer offer) {
+    expect(stateManager.assignTask(
+        eq(storeProvider),
+        eq(Tasks.id(TASK)),
+        eq(offer.getHostname()),
+        eq(offer.getSlaveId()),
+        anyObject())).andReturn(TASK.getAssignedTask());
   }
 }

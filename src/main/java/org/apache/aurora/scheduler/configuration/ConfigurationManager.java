@@ -38,16 +38,20 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.UserProvidedStrings;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IContainer;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
 
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -224,8 +228,6 @@ public class ConfigurationManager {
       builder.setRequestedPorts(ImmutableSet.of());
     }
 
-    maybeFillLinks(builder);
-
     if (config.isSetTier() && !UserProvidedStrings.isGoodIdentifier(config.getTier())) {
       throw new TaskDescriptionException("Tier contains illegal characters: " + config.getTier());
     }
@@ -327,6 +329,8 @@ public class ConfigurationManager {
       throw new TaskDescriptionException("Multiple resource values are not supported for " + types);
     }
 
+    maybeFillLinks(builder);
+
     return ITaskConfig.build(builder);
   }
 
@@ -343,11 +347,12 @@ public class ConfigurationManager {
   private static void maybeFillLinks(TaskConfig task) {
     if (task.getTaskLinksSize() == 0) {
       ImmutableMap.Builder<String, String> links = ImmutableMap.builder();
-      if (task.getRequestedPorts().contains("health")) {
-        links.put("health", "http://%host%:%port:health%");
-      }
-      if (task.getRequestedPorts().contains("http")) {
-        links.put("http", "http://%host%:%port:http%");
+      for (IResource resource : ResourceManager.getTaskResources(ITaskConfig.build(task), PORTS)) {
+        if (resource.getNamedPort().equals("health")) {
+          links.put("health", "http://%host%:%port:health%");
+        } else if (resource.getNamedPort().equals("http")) {
+          links.put("http", "http://%host%:%port:http%");
+        }
       }
       task.setTaskLinks(links.build());
     }

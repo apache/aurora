@@ -29,6 +29,9 @@ import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Resource;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.offer;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
@@ -51,10 +54,10 @@ public class AcceptedOfferTest {
 
   @Test
   public void testReservedPredicates() {
-    Protos.Resource withRole = makeScalar(CPUS.getMesosName(), TEST_ROLE, false, 1.0);
+    Protos.Resource withRole = mesosScalar(CPUS, TEST_ROLE, false, 1.0);
     assertTrue(AcceptedOffer.RESERVED.apply(withRole));
     assertFalse(AcceptedOffer.NOT_RESERVED.apply(withRole));
-    Protos.Resource absentRole = makeScalar(CPUS.getMesosName(), ABSENT_ROLE, false, 1.0);
+    Protos.Resource absentRole = mesosScalar(CPUS, ABSENT_ROLE, false, 1.0);
     assertFalse(AcceptedOffer.RESERVED.apply(absentRole));
     assertTrue(AcceptedOffer.NOT_RESERVED.apply(absentRole));
   }
@@ -62,7 +65,7 @@ public class AcceptedOfferTest {
   @Test
   public void testAllocateEmpty() {
     AcceptedOffer acceptedOffer = AcceptedOffer.create(
-        fakeOffer(Collections.emptyList()),
+        offer(),
         ResourceSlot.NONE,
         ResourceSlot.NONE,
         ImmutableSet.of(),
@@ -73,12 +76,10 @@ public class AcceptedOfferTest {
 
   @Test
   public void testAllocateRange() {
-    List<Resource> resources = ImmutableList.<Resource>builder()
-        .add(makePortResource(Optional.absent(), 80, 81, 90, 91, 92, 93))
-        .add(makePortResource(TEST_ROLE, 100, 101))
-        .build();
     AcceptedOffer acceptedOffer = AcceptedOffer.create(
-        fakeOffer(resources),
+        offer(
+            mesosRange(PORTS, Optional.absent(), 80, 81, 90, 91, 92, 93),
+            mesosRange(PORTS, TEST_ROLE, 100, 101)),
         ResourceSlot.NONE,
         ResourceSlot.NONE,
         ImmutableSet.of(80, 90, 100),
@@ -87,8 +88,8 @@ public class AcceptedOfferTest {
     List<Resource> expected = ImmutableList.<Resource>builder()
         // Because we prefer reserved resources and handle them before non-reserved resources,
         // result should have ports for the reserved resources first.
-        .add(makePortResource(TEST_ROLE, 100))
-        .add(makePortResource(Optional.absent(), 80, 90))
+        .add(mesosRange(PORTS, TEST_ROLE, 100))
+        .add(mesosRange(PORTS, Optional.absent(), 80, 90))
         .build();
     assertEquals(expected, acceptedOffer.getTaskResources());
     assertEquals(Collections.emptyList(), acceptedOffer.getExecutorResources());
@@ -96,11 +97,10 @@ public class AcceptedOfferTest {
 
   @Test(expected = Resources.InsufficientResourcesException.class)
   public void testAllocateRangeInsufficent() {
-    List<Resource> resources = ImmutableList.of(
-        makePortResource(ABSENT_ROLE, 80),
-        makePortResource(ABSENT_ROLE, 100, 101));
     AcceptedOffer.create(
-        fakeOffer(resources),
+        offer(
+            mesosRange(PORTS, ABSENT_ROLE, 80),
+            mesosRange(PORTS, ABSENT_ROLE, 100, 101)),
         ResourceSlot.NONE,
         ResourceSlot.NONE,
         ImmutableSet.of(80, 90, 100),
@@ -116,52 +116,43 @@ public class AcceptedOfferTest {
   }
 
   private void runAllocateSingleRole(Optional<String> role, boolean cpuRevocable) {
-    List<Resource> resources = ImmutableList.<Resource>builder()
-        .add(makeScalar(
-            CPUS.getMesosName(), role, cpuRevocable, TOTAL_SLOT.getNumCpus()))
-        .add(makeScalar(
-            RAM_MB.getMesosName(), role, false, TOTAL_SLOT.getRam().as(Data.MB)))
-        .add(makeScalar(
-            DISK_MB.getMesosName(), role, false, TOTAL_SLOT.getDisk().as(Data.MB)))
-        .add(makePortResource(role, TASK_PORTS))
-        .build();
-    Protos.Offer offer = fakeOffer(resources);
+    Protos.Offer offer = offer(
+        mesosScalar(CPUS, role, cpuRevocable, TOTAL_SLOT.getNumCpus()),
+        mesosScalar(RAM_MB, role, false, TOTAL_SLOT.getRam().as(Data.MB)),
+        mesosScalar(DISK_MB, role, false, TOTAL_SLOT.getDisk().as(Data.MB)),
+        mesosRange(PORTS, role, TASK_PORTS));
 
     AcceptedOffer offerAllocation = AcceptedOffer.create(
         offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false, cpuRevocable));
 
     List<Resource> taskList = ImmutableList.<Resource>builder()
-        .add(makeScalar(CPUS.getMesosName(), role, cpuRevocable, TASK_SLOT.getNumCpus()))
-        .add(makeScalar(RAM_MB.getMesosName(), role, false, TASK_SLOT.getRam().as(Data.MB)))
-        .add(makeScalar(
-            DISK_MB.getMesosName(), role, false, TASK_SLOT.getDisk().as(Data.MB)))
-        .add(makePortResource(role, TASK_PORTS))
+        .add(mesosScalar(CPUS, role, cpuRevocable, TASK_SLOT.getNumCpus()))
+        .add(mesosScalar(RAM_MB, role, false, TASK_SLOT.getRam().as(Data.MB)))
+        .add(mesosScalar(
+            DISK_MB, role, false, TASK_SLOT.getDisk().as(Data.MB)))
+        .add(mesosRange(PORTS, role, TASK_PORTS))
         .build();
     assertEquals(taskList, offerAllocation.getTaskResources());
 
     List<Resource> executorList = ImmutableList.<Resource>builder()
-        .add(makeScalar(
-            CPUS.getMesosName(), role, cpuRevocable, EXECUTOR_SLOT.getNumCpus()))
-        .add(makeScalar(
-            RAM_MB.getMesosName(), role, false, EXECUTOR_SLOT.getRam().as(Data.MB)))
-        .add(makeScalar(
-            DISK_MB.getMesosName(), role, false, EXECUTOR_SLOT.getDisk().as(Data.MB)))
+        .add(mesosScalar(
+            CPUS, role, cpuRevocable, EXECUTOR_SLOT.getNumCpus()))
+        .add(mesosScalar(
+            RAM_MB, role, false, EXECUTOR_SLOT.getRam().as(Data.MB)))
+        .add(mesosScalar(
+            DISK_MB, role, false, EXECUTOR_SLOT.getDisk().as(Data.MB)))
         .build();
     assertEquals(executorList, offerAllocation.getExecutorResources());
   }
 
   @Test(expected = Resources.InsufficientResourcesException.class)
   public void testAllocateSingleRoleInsufficient() {
-    List<Resource> resources = ImmutableList.<Resource>builder()
+    Protos.Offer offer = offer(
         // EXECUTOR_SLOT's CPU is not included here.
-        .add(makeScalar(CPUS.getMesosName(), TEST_ROLE, false, TASK_SLOT.getNumCpus()))
-        .add(makeScalar(
-            RAM_MB.getMesosName(), TEST_ROLE, false, TOTAL_SLOT.getRam().as(Data.MB)))
-        .add(makeScalar(
-            DISK_MB.getMesosName(), TEST_ROLE, false, TOTAL_SLOT.getDisk().as(Data.MB)))
-        .add(makePortResource(TEST_ROLE, TASK_PORTS))
-        .build();
-    Protos.Offer offer = fakeOffer(resources);
+        mesosScalar(CPUS, TEST_ROLE, false, TASK_SLOT.getNumCpus()),
+        mesosScalar(RAM_MB, TEST_ROLE, false, TOTAL_SLOT.getRam().as(Data.MB)),
+        mesosScalar(DISK_MB, TEST_ROLE, false, TOTAL_SLOT.getDisk().as(Data.MB)),
+        mesosRange(PORTS, TEST_ROLE, TASK_PORTS));
 
     AcceptedOffer.create(
         offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false, false));
@@ -174,136 +165,64 @@ public class AcceptedOfferTest {
   }
 
   private void runMultipleRoles(boolean cpuRevocable) {
-    List<Resource> resources = ImmutableList.<Resource>builder()
+    Protos.Offer offer = offer(
         // Make cpus come from two roles.
-        .add(makeScalar(
-            CPUS.getMesosName(),
-            TEST_ROLE,
-            cpuRevocable,
-            EXECUTOR_SLOT.getNumCpus()))
-        .add(makeScalar(
-            CPUS.getMesosName(),
-            ABSENT_ROLE,
-            cpuRevocable,
-            TASK_SLOT.getNumCpus()))
+        mesosScalar(CPUS, TEST_ROLE, cpuRevocable, EXECUTOR_SLOT.getNumCpus()),
+        mesosScalar(CPUS, ABSENT_ROLE, cpuRevocable, TASK_SLOT.getNumCpus()),
         // Make ram come from default role
-        .add(makeScalar(
-            RAM_MB.getMesosName(),
-            ABSENT_ROLE,
-            false,
-            TOTAL_SLOT.getRam().as(Data.MB)))
+        mesosScalar(RAM_MB, ABSENT_ROLE, false, TOTAL_SLOT.getRam().as(Data.MB)),
         // Make disk come from non-default role.
-        .add(makeScalar(
-            DISK_MB.getMesosName(),
-            TEST_ROLE,
-            false,
-            TOTAL_SLOT.getDisk().as(Data.MB)))
-        .add(makePortResource(TEST_ROLE, 80))
-        .add(makePortResource(ABSENT_ROLE, 90))
-        .build();
-
-    Protos.Offer offer = fakeOffer(resources);
+        mesosScalar(DISK_MB, TEST_ROLE, false, TOTAL_SLOT.getDisk().as(Data.MB)),
+        mesosRange(PORTS, TEST_ROLE, 80),
+        mesosRange(PORTS, ABSENT_ROLE, 90));
 
     AcceptedOffer offerAllocation = AcceptedOffer.create(
         offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false, cpuRevocable));
 
     List<Resource> taskList = ImmutableList.<Resource>builder()
         // We intentionally sliced the offer resource to not align with TASK_SLOT's num cpus.
-        .add(makeScalar(
-            CPUS.getMesosName(), TEST_ROLE, cpuRevocable, EXECUTOR_SLOT.getNumCpus()))
-        .add(makeScalar(
-            CPUS.getMesosName(),
+        .add(mesosScalar(
+            CPUS, TEST_ROLE, cpuRevocable, EXECUTOR_SLOT.getNumCpus()))
+        .add(mesosScalar(
+            CPUS,
             ABSENT_ROLE,
             cpuRevocable,
             TASK_SLOT.subtract(EXECUTOR_SLOT).getNumCpus()))
-        .add(makeScalar(
-            RAM_MB.getMesosName(), ABSENT_ROLE, false, TASK_SLOT.getRam().as(Data.MB)))
-        .add(makeScalar(
-            DISK_MB.getMesosName(), TEST_ROLE, false, TASK_SLOT.getDisk().as(Data.MB)))
-        .add(makePortResource(TEST_ROLE, 80))
-        .add(makePortResource(ABSENT_ROLE, 90))
+        .add(mesosScalar(
+            RAM_MB, ABSENT_ROLE, false, TASK_SLOT.getRam().as(Data.MB)))
+        .add(mesosScalar(
+            DISK_MB, TEST_ROLE, false, TASK_SLOT.getDisk().as(Data.MB)))
+        .add(mesosRange(PORTS, TEST_ROLE, 80))
+        .add(mesosRange(PORTS, ABSENT_ROLE, 90))
         .build();
     assertEquals(taskList, offerAllocation.getTaskResources());
 
     List<Resource> executorList = ImmutableList.<Resource>builder()
-        .add(makeScalar(
-            CPUS.getMesosName(), ABSENT_ROLE, cpuRevocable, EXECUTOR_SLOT.getNumCpus()))
-        .add(makeScalar(
-            RAM_MB.getMesosName(), ABSENT_ROLE, false, EXECUTOR_SLOT.getRam().as(Data.MB)))
-        .add(makeScalar(
-            DISK_MB.getMesosName(), TEST_ROLE, false, EXECUTOR_SLOT.getDisk().as(Data.MB)))
+        .add(mesosScalar(
+            CPUS, ABSENT_ROLE, cpuRevocable, EXECUTOR_SLOT.getNumCpus()))
+        .add(mesosScalar(
+            RAM_MB, ABSENT_ROLE, false, EXECUTOR_SLOT.getRam().as(Data.MB)))
+        .add(mesosScalar(
+            DISK_MB, TEST_ROLE, false, EXECUTOR_SLOT.getDisk().as(Data.MB)))
         .build();
     assertEquals(executorList, offerAllocation.getExecutorResources());
   }
 
   @Test(expected = Resources.InsufficientResourcesException.class)
   public void testMultipleRolesInsufficient() {
-    // Similar to testMultipleRoles, but make some of cpus as revocable
-    List<Resource> resources = ImmutableList.<Resource>builder()
+    Protos.Offer offer = offer(
+        // Similar to testMultipleRoles, but make some of cpus as revocable
         // Make cpus come from two roles.
-        .add(makeScalar(
-            CPUS.getMesosName(),
-            TEST_ROLE,
-            true,
-            EXECUTOR_SLOT.getNumCpus()))
-        .add(makeScalar(
-            CPUS.getMesosName(),
-            ABSENT_ROLE,
-            false,
-            TASK_SLOT.getNumCpus()))
+        mesosScalar(CPUS, TEST_ROLE, true, EXECUTOR_SLOT.getNumCpus()),
+        mesosScalar(CPUS, ABSENT_ROLE, false, TASK_SLOT.getNumCpus()),
         // Make ram come from default role
-        .add(makeScalar(
-            RAM_MB.getMesosName(),
-            ABSENT_ROLE,
-            false,
-            TOTAL_SLOT.getRam().as(Data.MB)))
+        mesosScalar(RAM_MB, ABSENT_ROLE, false, TOTAL_SLOT.getRam().as(Data.MB)),
         // Make disk come from non-default role.
-        .add(makeScalar(
-            DISK_MB.getMesosName(),
-            TEST_ROLE,
-            false,
-            TOTAL_SLOT.getDisk().as(Data.MB)))
-        .add(makePortResource(TEST_ROLE, 80))
-        .add(makePortResource(ABSENT_ROLE, 90))
-        .build();
-    Protos.Offer offer = fakeOffer(resources);
+        mesosScalar(DISK_MB, TEST_ROLE, false, TOTAL_SLOT.getDisk().as(Data.MB)),
+        mesosRange(PORTS, TEST_ROLE, 80),
+        mesosRange(PORTS, ABSENT_ROLE, 90));
     // We don't have enough resource to satisfy a non-revocable request.
     AcceptedOffer.create(
         offer, TASK_SLOT, EXECUTOR_SLOT, TASK_PORTS_SET, new TierInfo(false, false));
-  }
-
-  private static Resource makePortResource(Optional<String> role, Integer... values) {
-    Resource.Builder prototype = Resource.newBuilder()
-        .setType(Protos.Value.Type.RANGES)
-        .setName(PORTS.getMesosName());
-    if (role.isPresent()) {
-      prototype.setRole(role.get());
-    }
-    return AcceptedOffer.makeMesosRangeResource(prototype.build(), ImmutableSet.copyOf(values));
-  }
-
-  private static Resource makeScalar(
-      String name, Optional<String> role, boolean revocable, double value) {
-    Resource.Builder resource = Resource.newBuilder()
-        .setName(name)
-        .setType(Protos.Value.Type.SCALAR)
-        .setScalar(Protos.Value.Scalar.newBuilder().setValue(value));
-    if (role.isPresent()) {
-      resource.setRole(role.get());
-    }
-    if (revocable) {
-      resource.setRevocable(Resource.RevocableInfo.getDefaultInstance());
-    }
-    return resource.build();
-  }
-
-  private static Protos.Offer fakeOffer(List<Resource> resources) {
-    return Protos.Offer.newBuilder()
-        .setId(Protos.OfferID.newBuilder().setValue("offer-id"))
-        .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("framework-id"))
-        .setSlaveId(Protos.SlaveID.newBuilder().setValue("slave-id"))
-        .setHostname("hostname")
-        .addAllResources(resources)
-        .build();
   }
 }

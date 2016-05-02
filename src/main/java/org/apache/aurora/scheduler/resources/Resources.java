@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.resources;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Function;
@@ -23,10 +21,7 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
@@ -117,32 +112,6 @@ public final class Resources {
         Amount.of((long) getScalarValue(RAM_MB.getMesosName()), Data.MB),
         Amount.of((long) getScalarValue(DISK_MB.getMesosName()), Data.MB),
         getNumAvailablePorts());
-  }
-
-  /**
-   * Attempts to grab {@code numPorts} from this resource instance.
-   *
-   * @param numPorts The number of ports to grab.
-   * @return The set of ports grabbed.
-   * @throws InsufficientResourcesException if not enough ports were available.
-   */
-  public Set<Integer> getPorts(int numPorts)
-      throws InsufficientResourcesException {
-
-    if (numPorts == 0) {
-      return ImmutableSet.of();
-    }
-
-    List<Integer> availablePorts = Lists.newArrayList(Sets.newHashSet(Iterables.concat(
-        Iterables.transform(getPortRanges(), RANGE_TO_MEMBERS))));
-
-    if (availablePorts.size() < numPorts) {
-      throw new InsufficientResourcesException(
-          String.format("Could not get %d ports from %s", numPorts, availablePorts));
-    }
-
-    Collections.shuffle(availablePorts);
-    return ImmutableSet.copyOf(availablePorts.subList(0, numPorts));
   }
 
   private int getNumAvailablePorts() {

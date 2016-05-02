@@ -18,11 +18,11 @@ import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
@@ -165,18 +165,18 @@ public class StateManagerImpl implements StateManager {
       String taskId,
       String slaveHost,
       SlaveID slaveId,
-      Map<String, Integer> assignedPorts) {
+      Function<IScheduledTask, IScheduledTask> resourceAssigner) {
 
     checkNotBlank(taskId);
     checkNotBlank(slaveHost);
     requireNonNull(slaveId);
-    requireNonNull(assignedPorts);
+    requireNonNull(resourceAssigner);
 
     IScheduledTask mutated = storeProvider.getUnsafeTaskStore().mutateTask(taskId,
         task -> {
+          task = resourceAssigner.apply(task);
           ScheduledTask builder = task.newBuilder();
           builder.getAssignedTask()
-              .setAssignedPorts(assignedPorts)
               .setSlaveHost(slaveHost)
               .setSlaveId(slaveId.getValue());
           return IScheduledTask.build(builder);
@@ -231,9 +231,6 @@ public class StateManagerImpl implements StateManager {
         transitionMessage);
   }
 
-  private static final Function<SideEffect, Action> GET_ACTION =
-      SideEffect::getAction;
-
   private static final List<Action> ACTIONS_IN_ORDER = ImmutableList.of(
       Action.INCREMENT_FAILURES,
       Action.SAVE_STATE,
@@ -252,7 +249,7 @@ public class StateManagerImpl implements StateManager {
   // (thus losing the object to copy), or rescheduling a task before incrementing the failure count
   // (thus not carrying forward the failure increment).
   private static final Ordering<SideEffect> ACTION_ORDER =
-      Ordering.explicit(ACTIONS_IN_ORDER).onResultOf(GET_ACTION);
+      Ordering.explicit(ACTIONS_IN_ORDER).onResultOf(SideEffect::getAction);
 
   private StateChangeResult updateTaskAndExternalState(
       TaskStore.Mutable taskStore,

@@ -303,10 +303,6 @@ public interface SchedulingFilter {
       return jobState;
     }
 
-    public Set<String> getRequestedPorts() {
-      return task.getRequestedPorts();
-    }
-
     @Override
     public boolean equals(Object o) {
       if (!(o instanceof ResourceRequest)) {

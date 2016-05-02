@@ -66,6 +66,7 @@ import static org.apache.aurora.scheduler.mesos.TaskExecutors.SOME_OVERHEAD_EXEC
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_CONFIG;
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_EXECUTOR;
 import static org.apache.aurora.scheduler.resources.ResourceSlot.makeMesosRangeResource;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.resetPorts;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -187,8 +188,9 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
   @Test
   public void testCreateFromPortsUnset() {
     AssignedTask builder = TASK.newBuilder();
-    builder.getTask().unsetRequestedPorts();
     builder.unsetAssignedPorts();
+    builder.setTask(
+        resetPorts(ITaskConfig.build(builder.getTask()), ImmutableSet.of()).newBuilder());
     IAssignedTask assignedTask = IAssignedTask.build(builder);
     expect(tierManager.getTier(assignedTask.getTask())).andReturn(DEV_TIER);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
@@ -353,8 +355,9 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
   public void testPopulateDiscoveryInfoNoPort() {
     config = new ExecutorSettings(THERMOS_CONFIG, true);
     AssignedTask builder = TASK.newBuilder();
-    builder.getTask().unsetRequestedPorts();
     builder.unsetAssignedPorts();
+    builder.setTask(
+        resetPorts(ITaskConfig.build(builder.getTask()), ImmutableSet.of()).newBuilder());
     IAssignedTask assignedTask = IAssignedTask.build(builder);
     expect(tierManager.getTier(assignedTask.getTask())).andReturn(DEV_TIER);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);

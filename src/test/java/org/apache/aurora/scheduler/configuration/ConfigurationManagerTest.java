@@ -298,6 +298,17 @@ public class ConfigurationManagerTest {
     DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
   }
 
+  @Test
+  public void testTaskLinks() throws Exception {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.addToResources(namedPort("health"));
+    builder.unsetTaskLinks();
+
+    ITaskConfig populated =
+        DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+    assertEquals(ImmutableSet.of("health", "http"), populated.getTaskLinks().keySet());
+  }
+
   private void expectTaskDescriptionException(String message) {
     expectedException.expect(TaskDescriptionException.class);
     expectedException.expectMessage(message);

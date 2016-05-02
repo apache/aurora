@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -22,8 +21,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.FluentIterable;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.stats.Stats;
@@ -38,8 +35,11 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.offers.OfferManager;
+import org.apache.aurora.scheduler.resources.ResourceManager;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos.TaskInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,26 +103,29 @@ public interface TaskAssigner {
       this.tierManager = requireNonNull(tierManager);
     }
 
+    @VisibleForTesting
+    IScheduledTask mapAndAssignResources(Offer offer, IScheduledTask task) {
+      IScheduledTask assigned = task;
+      for (ResourceType type : ResourceManager.getTaskResourceTypes(assigned)) {
+        if (type.getMapper().isPresent()) {
+          assigned = type.getMapper().get().mapAndAssign(offer, assigned);
+        }
+      }
+      return assigned;
+    }
+
     private TaskInfo assign(
         MutableStoreProvider storeProvider,
         Offer offer,
-        Set<String> requestedPorts,
         String taskId) {
 
       String host = offer.getHostname();
-      Set<Integer> selectedPorts = Resources.from(offer).getPorts(requestedPorts.size());
-      Preconditions.checkState(selectedPorts.size() == requestedPorts.size());
-
-      final Iterator<String> names = requestedPorts.iterator();
-      Map<String, Integer> portsByName = FluentIterable.from(selectedPorts)
-          .uniqueIndex(input -> names.next());
-
       IAssignedTask assigned = stateManager.assignTask(
           storeProvider,
           taskId,
           host,
           offer.getSlaveId(),
-          portsByName);
+          task -> mapAndAssignResources(offer, task));
       LOG.info(
           "Offer on slave {} (id {}) is being assigned task for {}.",
           host, offer.getSlaveId().getValue(), taskId);
@@ -158,7 +161,6 @@ public interface TaskAssigner {
           TaskInfo taskInfo = assign(
               storeProvider,
               offer.getOffer(),
-              resourceRequest.getRequestedPorts(),
               taskId);
 
           try {

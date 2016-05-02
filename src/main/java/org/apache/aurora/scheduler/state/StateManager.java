@@ -13,13 +13,14 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.SlaveID;
 
@@ -62,7 +63,7 @@ public interface StateManager {
    * @param taskId ID of the task to mutate.
    * @param slaveHost Host name that the task is being assigned to.
    * @param slaveId ID of the slave that the task is being assigned to.
-   * @param assignedPorts Ports on the host that are being assigned to the task.
+   * @param resourceAssigner The resource assign operation.
    * @return The updated task record, or {@code null} if the task was not found.
    */
   IAssignedTask assignTask(
@@ -70,7 +71,7 @@ public interface StateManager {
       String taskId,
       String slaveHost,
       SlaveID slaveId,
-      Map<String, Integer> assignedPorts);
+      Function<IScheduledTask, IScheduledTask> resourceAssigner);
 
   /**
    * Inserts pending instances using {@code task} as their configuration. Tasks will immediately

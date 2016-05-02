@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -44,6 +46,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.mesos.Driver;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -69,6 +72,8 @@ import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.resetPorts;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.state.StateChangeResult.ILLEGAL;
 import static org.apache.aurora.scheduler.state.StateChangeResult.INVALID_CAS_STATE;
 import static org.apache.aurora.scheduler.state.StateChangeResult.NOOP;
@@ -403,14 +408,10 @@ public class StateManagerImplTest extends EasyMockTest {
         storeProvider -> stateManager.deleteTasks(storeProvider, ImmutableSet.of(taskId)));
   }
 
-  private static ITaskConfig setRequestedPorts(ITaskConfig config, Set<String> portNames) {
-    return ITaskConfig.build(config.newBuilder().setRequestedPorts(portNames));
-  }
-
   @Test
   public void testPortResource() throws Exception {
     Set<String> requestedPorts = ImmutableSet.of("one", "two", "three");
-    ITaskConfig task = setRequestedPorts(NON_SERVICE_CONFIG, requestedPorts);
+    ITaskConfig task = resetPorts(NON_SERVICE_CONFIG, requestedPorts);
 
     String taskId = "a";
     expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
@@ -425,13 +426,15 @@ public class StateManagerImplTest extends EasyMockTest {
 
     assertEquals(
         requestedPorts,
-        actual.getAssignedTask().getTask().getRequestedPorts());
+        StreamSupport.stream(ResourceManager.getTaskResources(actual, PORTS).spliterator(), false)
+          .map(e -> e.getNamedPort())
+          .collect(Collectors.toSet()));
   }
 
   @Test
   public void testPortResourceResetAfterReschedule() throws Exception {
     Set<String> requestedPorts = ImmutableSet.of("one");
-    ITaskConfig task = setRequestedPorts(NON_SERVICE_CONFIG, requestedPorts);
+    ITaskConfig task = resetPorts(NON_SERVICE_CONFIG, requestedPorts);
 
     String taskId = "a";
     expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
@@ -561,6 +564,10 @@ public class StateManagerImplTest extends EasyMockTest {
         taskId,
         host.getHost(),
         SlaveID.newBuilder().setValue(host.getSlaveId()).build(),
-        ports));
+        e -> {
+          ScheduledTask builder = e.newBuilder();
+          builder.getAssignedTask().setAssignedPorts(ports);
+          return IScheduledTask.build(builder);
+        }));
   }
 }
