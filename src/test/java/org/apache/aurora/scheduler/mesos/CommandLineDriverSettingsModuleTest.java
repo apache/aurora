@@ -73,6 +73,7 @@ public class CommandLineDriverSettingsModuleTest {
   @Test
   public void testFrameworkInfoNoRevocable() {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "aurora",
         "user",
         Optional.absent(),
         Amount.of(1L, Time.MINUTES),
@@ -86,6 +87,7 @@ public class CommandLineDriverSettingsModuleTest {
   @Test
   public void testFrameworkInfoRevocable() {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "aurora",
         "user",
         Optional.absent(),
         Amount.of(1L, Time.MINUTES),
@@ -100,6 +102,7 @@ public class CommandLineDriverSettingsModuleTest {
   @Test
   public void testFrameworkInfoNoRevocableWithAnnouncedPrincipal() {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "aurora",
         "user",
         Optional.of("auroraprincipal"),
         Amount.of(1L, Time.MINUTES),
@@ -113,8 +116,9 @@ public class CommandLineDriverSettingsModuleTest {
   @Test
   public void testFrameworkInfoRevocableWithAnnouncedPrincipalAndRole() {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "aurora",
         "user",
-            Optional.of("auroraprincipal"),
+        Optional.of("auroraprincipal"),
         Amount.of(1L, Time.MINUTES),
         true,
         Optional.of(TEST_ROLE));

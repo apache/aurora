@@ -3,20 +3,25 @@
 
 ### New/updated:
 
+- Upgraded Mesos to 0.27.2
 - Added a new optional [Apache Curator](https://curator.apache.org/) backend for performing
   scheduler leader election. You can enable this with the new `-zk_use_curator` scheduler argument.
-- Adding --nosetuid-health-checks flag to control whether the executor runs health checks as the job's
-  role's user.
-- Upgraded Mesos to 0.27.2
+- Adding --nosetuid-health-checks flag to control whether the executor runs health checks as the
+  job's role's user.
 - New scheduler command line argument `-offer_filter_duration` to control the time after which we
   expect Mesos to re-offer unused resources. A short duration improves scheduling performance in
   smaller clusters, but might lead to resource starvation for other frameworks if you run multiple
   ones in your cluster. Uses the Mesos default of 5s.
+- New scheduler command line option `-framework_name`  to change the name used for registering
+  the Aurora framework with Mesos. The current default value is 'TwitterScheduler'.
 
 ### Deprecations and removals:
 
 - Deprecated `--restart-threshold` option in the `aurora job restart` command to match the job
   updater behavior. This option has no effect now and will be removed in the future release.
+- Deprecated `-framework_name` default argument 'TwitterScheduler'. In a future release this
+  will change to 'aurora'. Please be aware that depending on your usage of Mesos, this will
+  be a backward incompatible change. For details, see MESOS-703.
 
 0.13.0
 ------

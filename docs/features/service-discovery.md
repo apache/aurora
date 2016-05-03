@@ -28,17 +28,15 @@ An example is using [Mesos-DNS](https://github.com/mesosphere/mesos-dns), which 
 records. With current implementation, the example job with key `devcluster/vagrant/test/http-example` generates at
 least the following:
 
-1. An A record for `http_example.test.vagrant.twitterscheduler.mesos` (which only includes IP address);
+1. An A record for `http_example.test.vagrant.aurora.mesos` (which only includes IP address);
 2. A [SRV record](https://en.wikipedia.org/wiki/SRV_record) for
- `_http_example.test.vagrant._tcp.twitterscheduler.mesos`, which includes IP address and every port. This should only
+ `_http_example.test.vagrant._tcp.aurora.mesos`, which includes IP address and every port. This should only
   be used if the service has one port.
-3. A SRV record `_{port-name}._http_example.test.vagrant._tcp.twitterscheduler.mesos` for each port name
+3. A SRV record `_{port-name}._http_example.test.vagrant._tcp.aurora.mesos` for each port name
   defined. This should be used when the service has multiple ports.
 
 Things to note:
 
 1. The domain part (".mesos" in above example) can be configured in [Mesos DNS](http://mesosphere.github.io/mesos-dns/docs/configuration-parameters.html);
-2. The `twitterscheduler` part is the lower-case of framework name, which is not configurable right now (see
-   [TWITTER_SCHEDULER_NAME](https://github.com/apache/aurora/blob/master/src/main/java/org/apache/aurora/scheduler/mesos/CommandLineDriverSettingsModule.java#L98));
-3. Right now, portmap and port aliases in announcer object are not reflected in DiscoveryInfo, therefore not visible in
+2. Right now, portmap and port aliases in announcer object are not reflected in DiscoveryInfo, therefore not visible in
    Mesos DNS records either. This is because they are only resolved in thermos executors.

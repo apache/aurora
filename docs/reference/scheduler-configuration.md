@@ -16,6 +16,10 @@ Required flags:
 	Directory to store backups under. Will be created if it does not exist.
 -cluster_name [not null]
 	Name to identify the cluster being served.
+-db_max_active_connection_count [must be > 0]
+	Max number of connections to use with database via MyBatis
+-db_max_idle_connection_count [must be > 0]
+	Max number of idle connections to the database via MyBatis
 -framework_authentication_file
 	Properties file which contains framework credentials to authenticate with Mesosmaster. Must contain the properties 'aurora_authentication_principal' and 'aurora_authentication_secret'.
 -mesos_master_address [not null]
@@ -30,8 +34,6 @@ Required flags:
 	Path to the thermos executor entry point.
 -tier_config [file must be readable]
 	Configuration file defining supported task tiers, task traits and behaviors.
--zk_digest_credentials
-	user:password to use when authenticating with ZooKeeper.
 -zk_endpoints [must have at least 1 item]
 	Endpoint specification for the ZooKeeper servers.
 
@@ -83,9 +85,11 @@ Optional flags:
 -flapping_task_threshold (default (5, mins))
 	A task that repeatedly runs for less than this time is considered to be flapping.
 -framework_announce_principal (default false)
-	When 'framework_authentication_file' flag is set, the FrameworkInfo registered with the mesos master will also contain the principal. This is necessary if you intend to use mesos authorization via mesos ACLs. The default will change in a future release.
+	When 'framework_authentication_file' flag is set, the FrameworkInfo registered with the mesos master will also contain the principal. This is necessary if you intend to use mesos authorization via mesos ACLs. The default will change in a future release. Changing this value is backwards incompatible. For details, see MESOS-703.
 -framework_failover_timeout (default (21, days))
 	Time after which a framework is considered deleted.  SHOULD BE VERY HIGH.
+-framework_name (default TwitterScheduler)
+	Name used to register the Aurora framework with Mesos. Changing this value can be backwards incompatible. For details, see MESOS-703.
 -global_container_mounts (default [])
 	A comma separated list of mount points (in host:container form) to mount into all (non-mesos) containers.
 -history_max_per_job_threshold (default 100)
@@ -154,6 +158,8 @@ Optional flags:
 	The timeout for doing log appends and truncations.
 -native_log_zk_group_path
 	A zookeeper node for use by the native log to track the master coordinator.
+-offer_filter_duration (default (5, secs))
+	Duration after which we expect Mesos to re-offer unused resources. A short duration improves scheduling performance in smaller clusters, but might lead to resource starvation for other frameworks if you run many frameworks in your cluster.
 -offer_hold_jitter_window (default (1, mins))
 	Maximum amount of random jitter to add to the offer hold time window.
 -offer_reservation_duration (default (3, mins))
@@ -180,7 +186,7 @@ Optional flags:
 	If false, Docker tasks may run without an executor (EXPERIMENTAL)
 -shiro_ini_path
 	Path to shiro.ini for authentication and authorization configuration.
--shiro_realm_modules (default [org.apache.aurora.scheduler.app.MoreModules$1@2d3379b4])
+-shiro_realm_modules (default [org.apache.aurora.scheduler.app.MoreModules$1@13c9d689])
 	Guice modules for configuring Shiro Realms.
 -sla_non_prod_metrics (default [])
 	Metric categories collected for non production tasks.
@@ -216,9 +222,13 @@ Optional flags:
 	URL prefix for job container stats.
 -zk_chroot_path
 	chroot path to use for the ZooKeeper connections
+-zk_digest_credentials
+	user:password to use when authenticating with ZooKeeper.
 -zk_in_proc (default false)
 	Launches an embedded zookeeper server for local testing causing -zk_endpoints to be ignored if specified.
 -zk_session_timeout (default (4, secs))
 	The ZooKeeper session timeout.
+-zk_use_curator (default false)
+	Uses Apache Curator as the zookeeper client; otherwise a copy of Twitter commons/zookeeper (the legacy library) is used.
 -------------------------------------------------------------------------
 ```

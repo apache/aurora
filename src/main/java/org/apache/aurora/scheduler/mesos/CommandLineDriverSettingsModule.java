@@ -72,8 +72,14 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       help = "When 'framework_authentication_file' flag is set, the FrameworkInfo "
           + "registered with the mesos master will also contain the principal. This is "
           + "necessary if you intend to use mesos authorization via mesos ACLs. "
-          + "The default will change in a future release.")
+          + "The default will change in a future release. Changing this value is backwards "
+          + "incompatible. For details, see MESOS-703.")
   private static final Arg<Boolean> FRAMEWORK_ANNOUNCE_PRINCIPAL = Arg.create(false);
+
+  @CmdLine(name = "framework_name",
+      help = "Name used to register the Aurora framework with Mesos. Changing this value can be "
+          + "backwards incompatible. For details, see MESOS-703.")
+  private static final Arg<String> FRAMEWORK_NAME = Arg.create("TwitterScheduler");
 
   @CmdLine(name = "executor_user",
       help = "User to start the executor. Defaults to \"root\". "
@@ -94,9 +100,6 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
           + "resources in offer.")
   private static final Arg<String> MESOS_ROLE = Arg.create();
 
-  // TODO(wfarner): Figure out a way to change this without risk of fallout (MESOS-703).
-  private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
-
   @Override
   protected void configure() {
     Optional<Protos.Credential> credentials = getCredentials();
@@ -110,6 +113,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
         MESOS_MASTER_ADDRESS.get(),
         credentials,
         buildFrameworkInfo(
+            FRAMEWORK_NAME.get(),
             EXECUTOR_USER.get(),
             principal,
             FRAMEWORK_FAILOVER_TIMEOUT.get(),
@@ -143,6 +147,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
 
   @VisibleForTesting
   static FrameworkInfo buildFrameworkInfo(
+      String frameworkName,
       String executorUser,
       Optional<String> principal,
       Amount<Long, Time> failoverTimeout,
@@ -150,8 +155,8 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       Optional<String> role) {
 
     FrameworkInfo.Builder infoBuilder = FrameworkInfo.newBuilder()
+        .setName(frameworkName)
         .setUser(executorUser)
-        .setName(TWITTER_FRAMEWORK_NAME)
             // Require slave checkpointing.  Assumes slaves have '--checkpoint=true' arg set.
         .setCheckpoint(true)
         .setFailoverTimeout(failoverTimeout.as(Time.SECONDS));
