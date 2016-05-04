@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.resources;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import com.google.common.collect.Iterables;
 
@@ -24,6 +25,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.Resource;
 
+import static org.apache.aurora.scheduler.resources.ResourceType.fromResource;
 import static org.apache.mesos.Protos.Offer;
 
 /**
@@ -42,7 +44,7 @@ public final class ResourceManager {
    * @return Offer resources matching {@link ResourceType}.
    */
   public static Iterable<Resource> getOfferResources(Offer offer, ResourceType type) {
-    return Iterables.filter(offer.getResourcesList(), r -> r.getName().equals(type.getMesosName()));
+    return Iterables.filter(offer.getResourcesList(), r -> fromResource(r).equals(type));
   }
 
   /**
@@ -64,7 +66,7 @@ public final class ResourceManager {
    * @return Task resources matching {@link ResourceType}.
    */
   public static Iterable<IResource> getTaskResources(ITaskConfig task, ResourceType type) {
-    return Iterables.filter(task.getResources(), r -> ResourceType.fromResource(r).equals(type));
+    return Iterables.filter(task.getResources(), r -> fromResource(r).equals(type));
   }
 
   /**
@@ -75,7 +77,21 @@ public final class ResourceManager {
    */
   public static Set<ResourceType> getTaskResourceTypes(IScheduledTask task) {
     return EnumSet.copyOf(task.getAssignedTask().getTask().getResources().stream()
-        .map(r -> ResourceType.fromResource(r))
+        .map(r -> fromResource(r))
         .collect(Collectors.toSet()));
+  }
+
+  /**
+   * Gets the quantity of the Mesos resource specified by {@code type}.
+   *
+   * @param resources Mesos resources.
+   * @param type Type of resource to quantify.
+   * @return Mesos resource value.
+   */
+  public static Double quantityOf(Iterable<Resource> resources, ResourceType type) {
+    return StreamSupport.stream(resources.spliterator(), false)
+        .filter(r -> fromResource(r).equals(type))
+        .map(r -> fromResource(r).getMesosResourceConverter().quantify(r))
+        .reduce((l, r) -> l + r).orElse(0.0);
   }
 }

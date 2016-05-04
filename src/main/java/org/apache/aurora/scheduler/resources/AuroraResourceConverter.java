@@ -16,10 +16,10 @@ package org.apache.aurora.scheduler.resources;
 import com.google.common.primitives.Longs;
 
 /**
- * Converts resource values to/from generic (String) representation.
+ * Converts Aurora resource values to/from generic (String) representation.
  * @param <T> Resource value type to convert.
  */
-public interface ResourceTypeConverter<T> {
+public interface AuroraResourceConverter<T> {
   /**
    * Parses resource value from the string representation.
    *
@@ -42,21 +42,21 @@ public interface ResourceTypeConverter<T> {
   DoubleConverter DOUBLE = new DoubleConverter();
   StringConverter STRING = new StringConverter();
 
-  class LongConverter implements ResourceTypeConverter<Long> {
+  class LongConverter implements AuroraResourceConverter<Long> {
     @Override
     public Long parseFrom(String value) {
       return Longs.tryParse(value);
     }
   }
 
-  class DoubleConverter implements ResourceTypeConverter<Double> {
+  class DoubleConverter implements AuroraResourceConverter<Double> {
     @Override
     public Double parseFrom(String value) {
       return Double.parseDouble(value);
     }
   }
 
-  class StringConverter implements ResourceTypeConverter<String> {
+  class StringConverter implements AuroraResourceConverter<String> {
     @Override
     public String parseFrom(String value) {
       return value;

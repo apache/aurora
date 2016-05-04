@@ -32,6 +32,7 @@ import org.apache.mesos.Protos.Value.Range;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.resources.ResourceManager.quantityOf;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
@@ -108,40 +109,10 @@ public final class Resources {
    * @return {@code ResourceSlot} instance.
    */
   public ResourceSlot slot() {
-    return new ResourceSlot(getScalarValue(CPUS.getMesosName()),
-        Amount.of((long) getScalarValue(RAM_MB.getMesosName()), Data.MB),
-        Amount.of((long) getScalarValue(DISK_MB.getMesosName()), Data.MB),
-        getNumAvailablePorts());
-  }
-
-  private int getNumAvailablePorts() {
-    int offeredPorts = 0;
-    for (Range range : getPortRanges()) {
-      offeredPorts += 1 + range.getEnd() - range.getBegin();
-    }
-    return offeredPorts;
-  }
-
-  private double getScalarValue(String key) {
-    Iterable<Resource> resources = getResources(key);
-    double value = 0;
-    for (Resource r : resources) {
-      value += r.getScalar().getValue();
-    }
-    return value;
-  }
-
-  private Iterable<Resource> getResources(String key) {
-    return Iterables.filter(mesosResources, e -> e.getName().equals(key));
-  }
-
-  private Iterable<Range> getPortRanges() {
-    ImmutableList.Builder<Range> ranges = ImmutableList.builder();
-    for (Resource r : getResources(PORTS.getMesosName())) {
-      ranges.addAll(r.getRanges().getRangeList().iterator());
-    }
-
-    return ranges.build();
+    return new ResourceSlot(quantityOf(mesosResources, CPUS),
+        Amount.of(quantityOf(mesosResources, RAM_MB).longValue(), Data.MB),
+        Amount.of(quantityOf(mesosResources, DISK_MB).longValue(), Data.MB),
+        quantityOf(mesosResources, PORTS).intValue());
   }
 
   /**

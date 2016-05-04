@@ -23,19 +23,19 @@ import com.google.common.collect.Maps;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.gen.Resource._Fields;
 import org.apache.aurora.scheduler.storage.entities.IResource;
-import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.Resource;
 import org.apache.thrift.TEnum;
 
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.quantity.Data.GB;
 import static org.apache.aurora.common.quantity.Data.MB;
+import static org.apache.aurora.scheduler.resources.AuroraResourceConverter.DOUBLE;
+import static org.apache.aurora.scheduler.resources.AuroraResourceConverter.LONG;
+import static org.apache.aurora.scheduler.resources.AuroraResourceConverter.STRING;
+import static org.apache.aurora.scheduler.resources.MesosResourceConverter.RANGES;
+import static org.apache.aurora.scheduler.resources.MesosResourceConverter.SCALAR;
 import static org.apache.aurora.scheduler.resources.ResourceMapper.PORT_MAPPER;
-import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.DOUBLE;
-import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.LONG;
-import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.STRING;
-import static org.apache.mesos.Protos.Value.Type.RANGES;
-import static org.apache.mesos.Protos.Value.Type.SCALAR;
 
 /**
  * Describes Mesos resource types and their Aurora traits.
@@ -84,9 +84,9 @@ public enum ResourceType implements TEnum {
   private final _Fields value;
 
   /**
-   * Mesos resource type.
+   * Mesos resource converter.
    */
-  private final Protos.Value.Type mesosType;
+  private final MesosResourceConverter mesosResourceConverter;
 
   /**
    * Mesos resource name.
@@ -96,7 +96,7 @@ public enum ResourceType implements TEnum {
   /**
    * Type converter for resource values.
    */
-  private final ResourceTypeConverter<?> typeConverter;
+  private final AuroraResourceConverter<?> auroraResourceConverter;
 
   /**
    * Optional resource mapper to use.
@@ -121,13 +121,16 @@ public enum ResourceType implements TEnum {
   private static ImmutableMap<Integer, ResourceType> byField =
       Maps.uniqueIndex(EnumSet.allOf(ResourceType.class),  ResourceType::getValue);
 
+  private static ImmutableMap<String, ResourceType> byMesosName =
+      Maps.uniqueIndex(EnumSet.allOf(ResourceType.class), ResourceType::getMesosName);
+
   /**
    * Describes a Resource type.
    *
    * @param value Correspondent {@link _Fields} value.
-   * @param mesosType See {@link #getMesosType()} for more details.
+   * @param mesosResourceConverter See {@link #getMesosResourceConverter()} for more details.
    * @param mesosName See {@link #getMesosName()} for more details.
-   * @param typeConverter See {@link #getTypeConverter()} for more details.
+   * @param auroraResourceConverter See {@link #getAuroraResourceConverter()} for more details.
    * @param mapper See {@link #getMapper()} for more details.
    * @param auroraName See {@link #getAuroraName()} for more details.
    * @param scalingRange See {@link #getScalingRange()} for more details.
@@ -135,18 +138,18 @@ public enum ResourceType implements TEnum {
    */
   ResourceType(
       _Fields value,
-      Protos.Value.Type mesosType,
+      MesosResourceConverter mesosResourceConverter,
       String mesosName,
-      ResourceTypeConverter<?> typeConverter,
+      AuroraResourceConverter<?> auroraResourceConverter,
       Optional<ResourceMapper> mapper,
       String auroraName,
       int scalingRange,
       boolean isMultipleAllowed) {
 
     this.value = value;
-    this.mesosType = requireNonNull(mesosType);
+    this.mesosResourceConverter = requireNonNull(mesosResourceConverter);
     this.mesosName = requireNonNull(mesosName);
-    this.typeConverter = requireNonNull(typeConverter);
+    this.auroraResourceConverter = requireNonNull(auroraResourceConverter);
     this.auroraName = requireNonNull(auroraName);
     this.mapper = requireNonNull(mapper);
     this.scalingRange = scalingRange;
@@ -164,15 +167,12 @@ public enum ResourceType implements TEnum {
   }
 
   /**
-   * Gets Mesos resource type.
-   * <p>
-   * @see <a href="https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto/">Mesos
-   * protobuf for more details</a>
+   * Gets {@link MesosResourceConverter} to convert Mesos resource values.
    *
-   * @return Mesos resource type.
+   * @return {@link MesosResourceConverter} instance.
    */
-  public Protos.Value.Type getMesosType() {
-    return mesosType;
+  public MesosResourceConverter getMesosResourceConverter() {
+    return mesosResourceConverter;
   }
 
   /**
@@ -188,12 +188,12 @@ public enum ResourceType implements TEnum {
   }
 
   /**
-   * Gets {@link ResourceTypeConverter} to convert resource values.
+   * Gets {@link AuroraResourceConverter} to convert resource values.
    *
-   * @return {@link ResourceTypeConverter} instance.
+   * @return {@link AuroraResourceConverter} instance.
    */
-  public ResourceTypeConverter<?> getTypeConverter() {
-    return typeConverter;
+  public AuroraResourceConverter<?> getAuroraResourceConverter() {
+    return auroraResourceConverter;
   }
 
   /**
@@ -256,5 +256,17 @@ public enum ResourceType implements TEnum {
     return requireNonNull(
         byField.get((int) resource.getSetField().getThriftFieldId()),
         "Unknown resource: " + resource);
+  }
+
+  /**
+   * Returns a {@link ResourceType} for the given Mesos resource.
+   *
+   * @param resource {@link Resource} to search by.
+   * @return {@link ResourceType}.
+   */
+  public static ResourceType fromResource(Resource resource) {
+    return requireNonNull(
+        byMesosName.get(resource.getName()),
+        "Unknown Mesos resource: " + resource);
   }
 }

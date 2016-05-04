@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.resources;
 
 import java.util.EnumSet;
+import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -30,7 +31,10 @@ import static org.apache.aurora.gen.Resource.namedPort;
 import static org.apache.aurora.gen.Resource.numCpus;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.apache.mesos.Protos.Value.Type.SCALAR;
@@ -84,5 +88,19 @@ public class ResourceManagerTest {
     assertEquals(
         EnumSet.allOf(ResourceType.class),
         ResourceManager.getTaskResourceTypes(IScheduledTask.build(builder)));
+  }
+
+  @Test
+  public void testMesosResourceQuantity() {
+    Set<Protos.Resource> resources = ImmutableSet.of(
+        mesosScalar(CPUS, 3.0),
+        mesosScalar(CPUS, 4.0),
+        mesosScalar(RAM_MB, 64),
+        mesosRange(PORTS, 1, 3));
+
+    assertEquals(7.0, ResourceManager.quantityOf(resources, CPUS), 0.0);
+    assertEquals(64, ResourceManager.quantityOf(resources, RAM_MB), 0.0);
+    assertEquals(0.0, ResourceManager.quantityOf(resources, DISK_MB), 0.0);
+    assertEquals(2, ResourceManager.quantityOf(resources, PORTS), 0.0);
   }
 }

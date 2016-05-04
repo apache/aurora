@@ -25,6 +25,8 @@ public final class DBResource {
   }
 
   Resource toThrift() {
-    return IResource.newBuilder(type.getValue(), type.getTypeConverter().parseFrom(value));
+    return IResource.newBuilder(
+        type.getValue(),
+        type.getAuroraResourceConverter().parseFrom(value));
   }
 }

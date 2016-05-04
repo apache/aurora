@@ -46,7 +46,7 @@ public final class DBResourceAggregate {
     return resources.stream()
         .map(e -> Pair.of(
             ResourceType.fromResource(e).getValue(),
-            ResourceType.fromResource(e).getTypeConverter().stringify(e.getRawValue())))
+            ResourceType.fromResource(e).getAuroraResourceConverter().stringify(e.getRawValue())))
         .collect(GuavaUtils.toImmutableList());
   }
 

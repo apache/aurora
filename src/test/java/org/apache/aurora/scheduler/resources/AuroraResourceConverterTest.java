@@ -15,12 +15,12 @@ package org.apache.aurora.scheduler.resources;
 
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.DOUBLE;
-import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.LONG;
-import static org.apache.aurora.scheduler.resources.ResourceTypeConverter.STRING;
+import static org.apache.aurora.scheduler.resources.AuroraResourceConverter.DOUBLE;
+import static org.apache.aurora.scheduler.resources.AuroraResourceConverter.LONG;
+import static org.apache.aurora.scheduler.resources.AuroraResourceConverter.STRING;
 import static org.junit.Assert.assertEquals;
 
-public class ResourceTypeConverterTest {
+public class AuroraResourceConverterTest {
   @Test
   public void testRoundtrip() {
     assertEquals(234L, LONG.parseFrom(LONG.stringify(234L)).longValue());
