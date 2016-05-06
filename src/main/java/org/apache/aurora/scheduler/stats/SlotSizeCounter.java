@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.stats;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
@@ -24,22 +25,27 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Ordering;
 
-import org.apache.aurora.scheduler.resources.ResourceAggregates;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.scheduler.resources.ResourceBag.LARGE;
+import static org.apache.aurora.scheduler.resources.ResourceBag.MEDIUM;
+import static org.apache.aurora.scheduler.resources.ResourceBag.SMALL;
+import static org.apache.aurora.scheduler.resources.ResourceBag.XLARGE;
 
 /**
  * A stat computer that aggregates the number of 'slots' available at different pre-determined
  * slot sizes, broken down by dedicated and non-dedicated hosts.
  */
 class SlotSizeCounter implements Runnable {
-  private static final Map<String, IResourceAggregate> SLOT_SIZES = ImmutableMap.of(
-      "small", ResourceAggregates.SMALL,
-      "medium", ResourceAggregates.MEDIUM,
-      "large", ResourceAggregates.LARGE,
-      "xlarge", ResourceAggregates.XLARGE);
+  private static final Map<String, ResourceBag> SLOT_SIZES = ImmutableMap.of(
+      "small", SMALL,
+      "medium", MEDIUM,
+      "large", LARGE,
+      "xlarge", XLARGE);
 
   // Ensures all counters are always initialized regardless of the Resource availability.
   private static final Iterable<String> SLOT_GROUPS = ImmutableList.of(
@@ -49,13 +55,13 @@ class SlotSizeCounter implements Runnable {
       getPrefix(true, true)
   );
 
-  private final Map<String, IResourceAggregate> slotSizes;
+  private final Map<String, ResourceBag> slotSizes;
   private final MachineResourceProvider machineResourceProvider;
   private final CachedCounters cachedCounters;
 
   @VisibleForTesting
   SlotSizeCounter(
-      final Map<String, IResourceAggregate> slotSizes,
+      final Map<String, ResourceBag> slotSizes,
       MachineResourceProvider machineResourceProvider,
       CachedCounters cachedCounters) {
 
@@ -65,17 +71,17 @@ class SlotSizeCounter implements Runnable {
   }
 
   static class MachineResource {
-    private final IResourceAggregate size;
+    private final ResourceBag size;
     private final boolean dedicated;
     private final boolean revocable;
 
-    MachineResource(IResourceAggregate size, boolean dedicated, boolean revocable) {
+    MachineResource(ResourceBag size, boolean dedicated, boolean revocable) {
       this.size = requireNonNull(size);
       this.dedicated = dedicated;
       this.revocable = revocable;
     }
 
-    public IResourceAggregate getSize() {
+    public ResourceBag getSize() {
       return size;
     }
 
@@ -125,9 +131,12 @@ class SlotSizeCounter implements Runnable {
     return getPrefix(dedicated, revocable) + slotName;
   }
 
-  private int countSlots(Iterable<IResourceAggregate> slots, final IResourceAggregate slotSize) {
-    Function<IResourceAggregate, Integer> counter =
-        machineSlack -> ResourceAggregates.divide(machineSlack, slotSize);
+  private int countSlots(Iterable<ResourceBag> slots, final ResourceBag slotSize) {
+    Function<ResourceBag, Integer> counter = machineSlack -> Ordering.natural().min(
+        machineSlack.divide(slotSize).getResourceVectors().entrySet().stream()
+            .map(entry -> entry.getValue())
+            .collect(Collectors.toSet()))
+        .intValue();
 
     int sum = 0;
     for (int slotCount : FluentIterable.from(slots).transform(counter)) {
@@ -139,14 +148,14 @@ class SlotSizeCounter implements Runnable {
   private void updateStats(
       String name,
       Iterable<MachineResource> slots,
-      IResourceAggregate slotSize) {
+      ResourceBag slotSize) {
 
-    ImmutableMultimap.Builder<String, IResourceAggregate> builder = ImmutableMultimap.builder();
+    ImmutableMultimap.Builder<String, ResourceBag> builder = ImmutableMultimap.builder();
     for (MachineResource slot : slots) {
       builder.put(getStatName(name, slot.isDedicated(), slot.isRevocable()), slot.getSize());
     }
 
-    ImmutableMultimap<String, IResourceAggregate> sizes = builder.build();
+    ImmutableMultimap<String, ResourceBag> sizes = builder.build();
 
     for (String slotGroup : SLOT_GROUPS) {
       String statName = slotGroup + name;

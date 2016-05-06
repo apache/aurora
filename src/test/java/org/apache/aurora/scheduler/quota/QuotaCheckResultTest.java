@@ -13,12 +13,15 @@
  */
 package org.apache.aurora.scheduler.quota;
 
-import org.apache.aurora.gen.ResourceAggregate;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.greaterOrEqual;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.bag;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -26,61 +29,31 @@ public class QuotaCheckResultTest {
 
   @Test
   public void testGreaterOrEqualPass() {
-    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate()
-        .setNumCpus(1.0)
-        .setRamMb(256L)
-        .setDiskMb(512L));
-    IResourceAggregate request = IResourceAggregate.build(new ResourceAggregate()
-        .setNumCpus(1.0)
-        .setRamMb(256L)
-        .setDiskMb(512L));
-    assertEquals(SUFFICIENT_QUOTA, QuotaCheckResult.greaterOrEqual(quota, request).getResult());
+    assertEquals(
+        SUFFICIENT_QUOTA,
+        greaterOrEqual(bag(1.0, 256, 512), bag(1.0, 256, 512)).getResult());
   }
 
   @Test
   public void testGreaterOrEqualFailsCpu() {
-    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate()
-        .setNumCpus(1.0)
-        .setRamMb(256L)
-        .setDiskMb(512L));
-    IResourceAggregate request = IResourceAggregate.build(new ResourceAggregate()
-        .setNumCpus(2.0)
-        .setRamMb(256L)
-        .setDiskMb(512L));
-    QuotaCheckResult result = QuotaCheckResult.greaterOrEqual(quota, request);
+    QuotaCheckResult result = greaterOrEqual(bag(1.0, 256, 512), bag(2.0, 256, 512));
     assertEquals(INSUFFICIENT_QUOTA, result.getResult());
-    assertTrue(result.getDetails().get().contains("CPU"));
+    assertTrue(result.getDetails().get().contains(CPUS.getAuroraName()));
   }
 
   @Test
   public void testGreaterOrEqualFailsRam() {
-    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate()
-        .setNumCpus(1.0)
-        .setRamMb(256L)
-        .setDiskMb(512L));
-    IResourceAggregate request = IResourceAggregate.build(new ResourceAggregate()
-        .setNumCpus(1.0)
-        .setRamMb(512L)
-        .setDiskMb(512L));
-    QuotaCheckResult result = QuotaCheckResult.greaterOrEqual(quota, request);
+    QuotaCheckResult result = greaterOrEqual(bag(1.0, 256, 512), bag(1.0, 512, 512));
     assertEquals(INSUFFICIENT_QUOTA, result.getResult());
     assertTrue(result.getDetails().get().length() > 0);
-    assertTrue(result.getDetails().get().contains("RAM"));
+    assertTrue(result.getDetails().get().contains(RAM_MB.getAuroraName()));
   }
 
   @Test
   public void testGreaterOrEqualFailsDisk() {
-    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate()
-        .setNumCpus(1.0)
-        .setRamMb(256L)
-        .setDiskMb(512L));
-    IResourceAggregate request = IResourceAggregate.build(new ResourceAggregate()
-        .setNumCpus(1.0)
-        .setRamMb(256L)
-        .setDiskMb(1024L));
-    QuotaCheckResult result = QuotaCheckResult.greaterOrEqual(quota, request);
+    QuotaCheckResult result = greaterOrEqual(bag(1.0, 256, 512), bag(1.0, 256, 1024));
     assertEquals(INSUFFICIENT_QUOTA, result.getResult());
     assertTrue(result.getDetails().get().length() > 0);
-    assertTrue(result.getDetails().get().contains("DISK"));
+    assertTrue(result.getDetails().get().contains(DISK_MB.getAuroraName()));
   }
 }

@@ -21,23 +21,25 @@ import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.scheduler.resources.ResourceAggregates;
+import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.resources.ResourceTestUtil.aggregate;
+import static org.apache.aurora.scheduler.resources.ResourceBag.SMALL;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class SlotSizeCounterTest extends EasyMockTest {
+  private static final ResourceBag LARGE = SMALL.scale(4);
 
-  private static final IResourceAggregate SMALL = aggregate(1.0, 1024, 4096);
-  private static final IResourceAggregate LARGE = ResourceAggregates.scale(SMALL, 4);
-
-  private static final Map<String, IResourceAggregate> SLOT_SIZES = ImmutableMap.of(
+  private static final Map<String, ResourceBag> SLOT_SIZES = ImmutableMap.of(
       "small", SMALL,
       "large", LARGE);
 
@@ -105,7 +107,7 @@ public class SlotSizeCounterTest extends EasyMockTest {
   @Test
   public void testTinyOffers() {
     expectStatExport();
-    expectGetSlots(new MachineResource(aggregate(0.1, 1, 1), false, false));
+    expectGetSlots(new MachineResource(bag(0.1, 1, 1), false, false));
 
     control.replay();
 
@@ -124,7 +126,7 @@ public class SlotSizeCounterTest extends EasyMockTest {
   public void testStarvedResourceVector() {
     expectStatExport();
     expectGetSlots(
-        new MachineResource(aggregate(1000, 16384, 1), false, false));
+        new MachineResource(bag(1000, 16384, 1), false, false));
 
     control.replay();
 
@@ -148,11 +150,11 @@ public class SlotSizeCounterTest extends EasyMockTest {
         new MachineResource(LARGE, false, false),
         new MachineResource(LARGE, false, true),
         new MachineResource(LARGE, true, true),
-        new MachineResource(ResourceAggregates.scale(LARGE, 4), false, false),
-        new MachineResource(aggregate(1, 1, 1), false, false),
+        new MachineResource(LARGE.scale(4), false, false),
+        new MachineResource(bag(1, 1, 1), false, false),
         new MachineResource(SMALL, true, false),
         new MachineResource(SMALL, true, false),
-        new MachineResource(ResourceAggregates.scale(SMALL, 2), true, false));
+        new MachineResource(SMALL.scale(2), true, false));
 
     control.replay();
 
@@ -165,5 +167,11 @@ public class SlotSizeCounterTest extends EasyMockTest {
     assertEquals(0, largeDedicatedCounter.get());
     assertEquals(1, largeRevocableCounter.get());
     assertEquals(1, largeDedicatedRevocableCounter.get());
+  }
+
+  private static ResourceBag bag(double cpus, double ram, double disk) {
+    // Add default port count to simulate actual machine resources.
+    return ResourceTestUtil.bag(
+        ImmutableMap.of(CPUS, cpus, RAM_MB, ram, DISK_MB, disk, PORTS, 3.0));
   }
 }

@@ -25,6 +25,7 @@ import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
@@ -119,7 +120,7 @@ public final class ThriftBackfill {
       aggregate.addToResources(Resource.ramMb(aggregate.getRamMb()));
       aggregate.addToResources(Resource.diskMb(aggregate.getDiskMb()));
     } else {
-      EnumSet<ResourceType> quotaResources = EnumSet.of(CPUS, RAM_MB, DISK_MB);
+      EnumSet<ResourceType> quotaResources = QuotaManager.QUOTA_RESOURCE_TYPES;
       if (aggregate.getResources().size() > quotaResources.size()) {
         throw new IllegalArgumentException("Too many resource values in quota.");
       }

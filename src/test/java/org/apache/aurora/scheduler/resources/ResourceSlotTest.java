@@ -56,18 +56,6 @@ public class ResourceSlotTest {
       .setRequestedPorts(ImmutableSet.of("http", "debug")));
 
   @Test
-  public void testMaxElements() {
-    ResourceSlot highRAM = new ResourceSlot(1, Amount.of(8L, Data.GB), Amount.of(10L, Data.MB), 0);
-    ResourceSlot rest = new ResourceSlot(10, Amount.of(1L, Data.MB), Amount.of(10L, Data.GB), 1);
-
-    ResourceSlot result = ResourceSlot.maxElements(highRAM, rest);
-    assertEquals(result.getNumCpus(), 10, 0.001);
-    assertEquals(result.getRam(), Amount.of(8L, Data.GB));
-    assertEquals(result.getDisk(), Amount.of(10L, Data.GB));
-    assertEquals(result.getNumPorts(), 1);
-  }
-
-  @Test
   public void testSubtract() {
     assertEquals(ONE, TWO.subtract(ONE));
     assertEquals(TWO, THREE.subtract(ONE));

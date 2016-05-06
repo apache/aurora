@@ -38,6 +38,22 @@ public interface AuroraResourceConverter<T> {
     return value.toString();
   }
 
+  /**
+   * Gets resource quantity.
+   *
+   * @param value Value to quantify.
+   * @return Resource quantity.
+   */
+  Double quantify(Object value);
+
+  /**
+   * Converts resource quantity to matching resource value type (if such conversion exists).
+   *
+   * @param value Resource quantity.
+   * @return Value of type T.
+   */
+  T valueOf(Double value);
+
   LongConverter LONG = new LongConverter();
   DoubleConverter DOUBLE = new DoubleConverter();
   StringConverter STRING = new StringConverter();
@@ -47,6 +63,16 @@ public interface AuroraResourceConverter<T> {
     public Long parseFrom(String value) {
       return Longs.tryParse(value);
     }
+
+    @Override
+    public Double quantify(Object value) {
+      return (double) (long) value;
+    }
+
+    @Override
+    public Long valueOf(Double value) {
+      return value.longValue();
+    }
   }
 
   class DoubleConverter implements AuroraResourceConverter<Double> {
@@ -54,12 +80,32 @@ public interface AuroraResourceConverter<T> {
     public Double parseFrom(String value) {
       return Double.parseDouble(value);
     }
+
+    @Override
+    public Double quantify(Object value) {
+      return (Double) value;
+    }
+
+    @Override
+    public Double valueOf(Double value) {
+      return value;
+    }
   }
 
   class StringConverter implements AuroraResourceConverter<String> {
     @Override
     public String parseFrom(String value) {
       return value;
+    }
+
+    @Override
+    public Double quantify(Object value) {
+      return 1.0;
+    }
+
+    @Override
+    public String valueOf(Double value) {
+      throw new UnsupportedOperationException("Unsupported for string resource types");
     }
   }
 }

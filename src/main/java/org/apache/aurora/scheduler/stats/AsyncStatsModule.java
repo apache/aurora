@@ -25,24 +25,22 @@ import com.google.inject.PrivateModule;
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.offers.OfferManager;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
-import org.apache.aurora.scheduler.resources.Resources;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.resources.ResourceSlot.NONE;
-import static org.apache.aurora.scheduler.resources.Resources.NON_REVOCABLE;
-import static org.apache.aurora.scheduler.resources.Resources.REVOCABLE;
+import static org.apache.aurora.scheduler.resources.ResourceBag.IS_MESOS_REVOCABLE;
+import static org.apache.aurora.scheduler.resources.ResourceBag.IS_POSITIVE;
+import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
+import static org.apache.aurora.scheduler.resources.ResourceManager.getNonRevocableOfferResources;
+import static org.apache.aurora.scheduler.resources.ResourceManager.getRevocableOfferResources;
 
 /**
  * Module to configure export of cluster-wide resource allocation and consumption statistics.
@@ -152,30 +150,26 @@ public class AsyncStatsModule extends AbstractModule {
 
       ImmutableList.Builder<MachineResource> builder = ImmutableList.builder();
       for (HostOffer offer : offers) {
-        ResourceSlot revocable = Resources.from(offer.getOffer()).filter(REVOCABLE).slot();
-        ResourceSlot nonRevocable =
-            Resources.from(offer.getOffer()).filter(NON_REVOCABLE).slot();
+        ResourceBag revocable = bagFromMesosResources(getRevocableOfferResources(offer.getOffer()));
+        ResourceBag nonRevocable =
+            bagFromMesosResources(getNonRevocableOfferResources(offer.getOffer()));
         boolean isDedicated = Conversions.isDedicated(offer.getOffer());
 
-        // It's insufficient to compare revocable against NONE here as RAM, DISK and PORTS
+        // It's insufficient to compare revocable against EMPTY here as RAM, DISK and PORTS
         // are always rolled in to revocable as non-compressible resources. Only if revocable
         // CPU is non-zero should we expose the revocable resources as aggregates.
-        if (revocable.getNumCpus() > 0.0) {
-          builder.add(new MachineResource(fromSlot(revocable), isDedicated, true));
+        if (revocable.getResourceVectors().entrySet().stream()
+            .filter(IS_POSITIVE.and(IS_MESOS_REVOCABLE))
+            .findFirst()
+            .isPresent()) {
+          builder.add(new MachineResource(revocable, isDedicated, true));
         }
 
-        if (!nonRevocable.equals(NONE)) {
-          builder.add(new MachineResource(fromSlot(nonRevocable), isDedicated, false));
+        if (!nonRevocable.equals(ResourceBag.EMPTY)) {
+          builder.add(new MachineResource(nonRevocable, isDedicated, false));
         }
       }
       return builder.build();
-    }
-
-    private static IResourceAggregate fromSlot(ResourceSlot slot) {
-      return IResourceAggregate.build(new ResourceAggregate()
-          .setNumCpus(slot.getNumCpus())
-          .setRamMb(slot.getRam().as(Data.MB))
-          .setDiskMb(slot.getDisk().as(Data.MB)));
     }
   }
 }

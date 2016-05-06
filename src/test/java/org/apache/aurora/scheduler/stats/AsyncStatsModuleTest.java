@@ -17,16 +17,18 @@ import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.offers.OfferManager;
-import org.apache.aurora.scheduler.resources.ResourceType;
+import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.mesos.Protos;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.apache.aurora.scheduler.stats.AsyncStatsModule.OfferAdapter;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -41,8 +43,10 @@ public class AsyncStatsModuleTest extends EasyMockTest {
             .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("frameworkId"))
             .setSlaveId(Protos.SlaveID.newBuilder().setValue("slaveId"))
             .setHostname("hostName")
-            .addResources(getCpuResource(true, 2.0))
-            .addResources(getCpuResource(false, 4.0))
+            .addResources(mesosScalar(CPUS, 2.0, true))
+            .addResources(mesosScalar(CPUS, 4.0, false))
+            .addResources(mesosScalar(RAM_MB, 1024))
+            .addResources(mesosScalar(DISK_MB, 2048))
             .build(),
             IHostAttributes.build(new HostAttributes()))));
 
@@ -55,21 +59,8 @@ public class AsyncStatsModuleTest extends EasyMockTest {
 
   private static MachineResource resource(boolean revocable, double cpu) {
     return new MachineResource(
-        IResourceAggregate.build(new ResourceAggregate().setNumCpus(cpu)),
+        ResourceTestUtil.bag(cpu, 1024, 2048),
         false,
         revocable);
-  }
-
-  private static Protos.Resource getCpuResource(boolean revocable, double value) {
-    Protos.Resource.Builder builder = Protos.Resource.newBuilder()
-        .setName(ResourceType.CPUS.getMesosName())
-        .setType(Protos.Value.Type.SCALAR)
-        .setScalar(Protos.Value.Scalar.newBuilder().setValue(value));
-
-    if (revocable) {
-      builder.setRevocable(Protos.Resource.RevocableInfo.newBuilder());
-    }
-
-    return builder.build();
   }
 }

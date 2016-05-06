@@ -16,9 +16,12 @@ package org.apache.aurora.scheduler.quota;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
+import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceType;
 
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.scheduler.resources.ResourceBag.IS_NEGATIVE;
 
 /**
  * Calculates and formats detailed quota comparison result.
@@ -38,21 +41,6 @@ public class QuotaCheckResult {
      * There is not enough allocated quota for the requested operation.
      */
     INSUFFICIENT_QUOTA
-  }
-
-  enum Resource {
-    CPU("core(s)"),
-    RAM("MB"),
-    DISK("MB");
-
-    private final String unit;
-    Resource(String unit) {
-      this.unit = unit;
-    }
-
-    String getUnit() {
-      return unit;
-    }
   }
 
   private final Optional<String> details;
@@ -86,34 +74,25 @@ public class QuotaCheckResult {
     return details;
   }
 
-  static QuotaCheckResult greaterOrEqual(IResourceAggregate a, IResourceAggregate b) {
+  static QuotaCheckResult greaterOrEqual(ResourceBag a, ResourceBag b) {
     StringBuilder details = new StringBuilder();
-    boolean result = compare(a.getNumCpus(), b.getNumCpus(), Resource.CPU, details)
-        & compare(a.getRamMb(), b.getRamMb(), Resource.RAM, details)
-        & compare(a.getDiskMb(), b.getDiskMb(), Resource.DISK, details);
+    ResourceBag difference = a.subtract(b);
+    difference.getResourceVectors().entrySet().stream()
+        .filter(IS_NEGATIVE)
+        .forEach(entry -> addMessage(entry.getKey(), Math.abs(entry.getValue()), details));
 
     return new QuotaCheckResult(
-        result ? Result.SUFFICIENT_QUOTA : Result.INSUFFICIENT_QUOTA,
+        details.length() > 0 ? Result.INSUFFICIENT_QUOTA : Result.SUFFICIENT_QUOTA,
         Optional.of(details.toString()));
   }
 
-  private static boolean compare(
-      double a,
-      double b,
-      Resource resource,
-      StringBuilder details) {
-
-    boolean result = a >= b;
-    if (!result) {
-      details
-          .append(details.length() > 0 ? "; " : "")
-          .append(resource)
-          .append(" quota exceeded by ")
-          .append(String.format("%.2f", b - a))
-          .append(" ")
-          .append(resource.getUnit());
-    }
-
-    return result;
+  private static void addMessage(ResourceType resourceType, Double overage, StringBuilder details) {
+    details
+        .append(details.length() > 0 ? "; " : "")
+        .append(resourceType.getAuroraName())
+        .append(" quota exceeded by ")
+        .append(String.format("%.2f", overage))
+        .append(" ")
+        .append(resourceType.getAuroraUnit());
   }
 }

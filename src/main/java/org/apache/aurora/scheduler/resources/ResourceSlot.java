@@ -189,28 +189,6 @@ public final class ResourceSlot {
   }
 
   /**
-   * Generates a ResourceSlot where each resource component is a max out of the two components.
-   *
-   * @param a A resource to compare.
-   * @param b A resource to compare.
-   *
-   * @return Returns a ResourceSlot instance where each component is a max of the two components.
-   */
-  @VisibleForTesting
-  static ResourceSlot maxElements(ResourceSlot a, ResourceSlot b) {
-    double maxCPU = Math.max(a.getNumCpus(), b.getNumCpus());
-    Amount<Long, Data> maxRAM = Amount.of(
-        Math.max(a.getRam().as(Data.MB), b.getRam().as(Data.MB)),
-        Data.MB);
-    Amount<Long, Data> maxDisk = Amount.of(
-        Math.max(a.getDisk().as(Data.MB), b.getDisk().as(Data.MB)),
-        Data.MB);
-    int maxPorts = Math.max(a.getNumPorts(), b.getNumPorts());
-
-    return new ResourceSlot(maxCPU, maxRAM, maxDisk, maxPorts);
-  }
-
-  /**
    * Number of CPUs.
    *
    * @return CPUs.

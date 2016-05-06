@@ -45,7 +45,17 @@ public enum ResourceType implements TEnum {
   /**
    * CPU resource.
    */
-  CPUS(_Fields.NUM_CPUS, SCALAR, "cpus", DOUBLE, Optional.empty(), "CPU", 16, false),
+  CPUS(
+      _Fields.NUM_CPUS,
+      SCALAR,
+      "cpus",
+      DOUBLE,
+      Optional.empty(),
+      "CPU",
+      "core(s)",
+      16,
+      false,
+      true),
 
   /**
    * RAM resource.
@@ -57,7 +67,9 @@ public enum ResourceType implements TEnum {
       LONG,
       Optional.empty(),
       "RAM",
+      "MB",
       Amount.of(24, GB).as(MB),
+      false,
       false),
 
   /**
@@ -70,13 +82,25 @@ public enum ResourceType implements TEnum {
       LONG,
       Optional.empty(),
       "disk",
+      "MB",
       Amount.of(450, GB).as(MB),
+      false,
       false),
 
   /**
    * Port resource.
    */
-  PORTS(_Fields.NAMED_PORT, RANGES, "ports", STRING, Optional.of(PORT_MAPPER), "ports", 1000, true);
+  PORTS(
+      _Fields.NAMED_PORT,
+      RANGES,
+      "ports",
+      STRING,
+      Optional.of(PORT_MAPPER),
+      "ports",
+      "count",
+      1000,
+      true,
+      false);
 
   /**
    * Correspondent thrift {@link org.apache.aurora.gen.Resource} enum value.
@@ -109,6 +133,11 @@ public enum ResourceType implements TEnum {
   private final String auroraName;
 
   /**
+   * Aurora resource unit.
+   */
+  private final String auroraUnit;
+
+  /**
    * Scaling range for comparing scheduling vetoes.
    */
   private final int scalingRange;
@@ -117,6 +146,11 @@ public enum ResourceType implements TEnum {
    * Indicates if multiple resource types are allowed in a task.
    */
   private final boolean isMultipleAllowed;
+
+  /**
+   * Indicates if a resource can be Mesos-revocable.
+   */
+  private final boolean isMesosRevocable;
 
   private static ImmutableMap<Integer, ResourceType> byField =
       Maps.uniqueIndex(EnumSet.allOf(ResourceType.class),  ResourceType::getValue);
@@ -133,8 +167,10 @@ public enum ResourceType implements TEnum {
    * @param auroraResourceConverter See {@link #getAuroraResourceConverter()} for more details.
    * @param mapper See {@link #getMapper()} for more details.
    * @param auroraName See {@link #getAuroraName()} for more details.
+   * @param auroraUnit See {@link #getAuroraUnit()} for more details.
    * @param scalingRange See {@link #getScalingRange()} for more details.
    * @param isMultipleAllowed See {@link #isMultipleAllowed()} for more details.
+   * @param isMesosRevocable See {@link #isMesosRevocable()} for more details.
    */
   ResourceType(
       _Fields value,
@@ -143,17 +179,21 @@ public enum ResourceType implements TEnum {
       AuroraResourceConverter<?> auroraResourceConverter,
       Optional<ResourceMapper> mapper,
       String auroraName,
+      String auroraUnit,
       int scalingRange,
-      boolean isMultipleAllowed) {
+      boolean isMultipleAllowed,
+      boolean isMesosRevocable) {
 
     this.value = value;
     this.mesosResourceConverter = requireNonNull(mesosResourceConverter);
     this.mesosName = requireNonNull(mesosName);
     this.auroraResourceConverter = requireNonNull(auroraResourceConverter);
-    this.auroraName = requireNonNull(auroraName);
     this.mapper = requireNonNull(mapper);
+    this.auroraName = requireNonNull(auroraName);
+    this.auroraUnit = requireNonNull(auroraUnit);
     this.scalingRange = scalingRange;
     this.isMultipleAllowed = isMultipleAllowed;
+    this.isMesosRevocable = isMesosRevocable;
   }
 
   /**
@@ -215,6 +255,15 @@ public enum ResourceType implements TEnum {
   }
 
   /**
+   * Gets resource unit for internal Aurora representation.
+   *
+   * @return Aurora resource unit.
+   */
+  public String getAuroraUnit() {
+    return auroraUnit;
+  }
+
+  /**
    * Scaling range to use for comparison of scheduling vetoes.
    * <p>
    * This has no real bearing besides trying to determine if a veto along one resource vector
@@ -234,6 +283,18 @@ public enum ResourceType implements TEnum {
    */
   public boolean isMultipleAllowed() {
     return isMultipleAllowed;
+  }
+
+  /**
+   * Returns a flag indicating if a resource can be Mesos-revocable.
+   * <p>
+   * @see <a href="https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto/">Mesos
+   * protobuf for more details</a>
+   *
+   * @return True if a resource can be Mesos-revocable, false otherwise.
+   */
+  public boolean isMesosRevocable() {
+    return isMesosRevocable;
   }
 
   /**

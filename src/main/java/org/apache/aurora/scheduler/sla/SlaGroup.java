@@ -26,14 +26,21 @@ import com.google.common.collect.Range;
 
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static org.apache.aurora.scheduler.resources.ResourceAggregates.EMPTY;
-import static org.apache.aurora.scheduler.resources.ResourceAggregates.LARGE;
-import static org.apache.aurora.scheduler.resources.ResourceAggregates.MEDIUM;
-import static org.apache.aurora.scheduler.resources.ResourceAggregates.SMALL;
-import static org.apache.aurora.scheduler.resources.ResourceAggregates.XLARGE;
+import static org.apache.aurora.scheduler.resources.ResourceBag.EMPTY;
+import static org.apache.aurora.scheduler.resources.ResourceBag.LARGE;
+import static org.apache.aurora.scheduler.resources.ResourceBag.MEDIUM;
+import static org.apache.aurora.scheduler.resources.ResourceBag.SMALL;
+import static org.apache.aurora.scheduler.resources.ResourceBag.XLARGE;
+import static org.apache.aurora.scheduler.resources.ResourceManager.getTaskResources;
+import static org.apache.aurora.scheduler.resources.ResourceManager.quantityOf;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
  * Defines a logical grouping criteria to be applied over a set of tasks.
@@ -56,30 +63,30 @@ interface SlaGroup {
     CLUSTER(new Cluster()),
     RESOURCE_CPU(new Resource<>(
         ImmutableMap.of(
-            "sla_cpu_small_", Range.closed(EMPTY.getNumCpus(), SMALL.getNumCpus()),
-            "sla_cpu_medium_", Range.openClosed(SMALL.getNumCpus(), MEDIUM.getNumCpus()),
-            "sla_cpu_large_", Range.openClosed(MEDIUM.getNumCpus(), LARGE.getNumCpus()),
-            "sla_cpu_xlarge_", Range.openClosed(LARGE.getNumCpus(), XLARGE.getNumCpus()),
-            "sla_cpu_xxlarge_", Range.greaterThan(XLARGE.getNumCpus())),
-        task -> task.getAssignedTask().getTask().getNumCpus()
+            "sla_cpu_small_", Range.closed(fromBag(EMPTY, CPUS), fromBag(SMALL, CPUS)),
+            "sla_cpu_medium_", Range.openClosed(fromBag(SMALL, CPUS), fromBag(MEDIUM, CPUS)),
+            "sla_cpu_large_", Range.openClosed(fromBag(MEDIUM, CPUS), fromBag(LARGE, CPUS)),
+            "sla_cpu_xlarge_", Range.openClosed(fromBag(LARGE, CPUS), fromBag(XLARGE, CPUS)),
+            "sla_cpu_xxlarge_", Range.greaterThan(fromBag(XLARGE, CPUS))),
+        task -> quantityOf(getTaskResources(task.getAssignedTask().getTask(), CPUS))
     )),
     RESOURCE_RAM(new Resource<>(
         ImmutableMap.of(
-            "sla_ram_small_", Range.closed(EMPTY.getRamMb(), SMALL.getRamMb()),
-            "sla_ram_medium_", Range.openClosed(SMALL.getRamMb(), MEDIUM.getRamMb()),
-            "sla_ram_large_", Range.openClosed(MEDIUM.getRamMb(), LARGE.getRamMb()),
-            "sla_ram_xlarge_", Range.openClosed(LARGE.getRamMb(), XLARGE.getRamMb()),
-            "sla_ram_xxlarge_", Range.greaterThan(XLARGE.getRamMb())),
-        task -> task.getAssignedTask().getTask().getRamMb()
+            "sla_ram_small_", Range.closed(fromBag(EMPTY, RAM_MB), fromBag(SMALL, RAM_MB)),
+            "sla_ram_medium_", Range.openClosed(fromBag(SMALL, RAM_MB), fromBag(MEDIUM, RAM_MB)),
+            "sla_ram_large_", Range.openClosed(fromBag(MEDIUM, RAM_MB), fromBag(LARGE, RAM_MB)),
+            "sla_ram_xlarge_", Range.openClosed(fromBag(LARGE, RAM_MB), fromBag(XLARGE, RAM_MB)),
+            "sla_ram_xxlarge_", Range.greaterThan(fromBag(XLARGE, RAM_MB))),
+        task -> quantityOf(getTaskResources(task.getAssignedTask().getTask(), RAM_MB))
     )),
     RESOURCE_DISK(new Resource<>(
         ImmutableMap.of(
-            "sla_disk_small_", Range.closed(EMPTY.getDiskMb(), SMALL.getDiskMb()),
-            "sla_disk_medium_", Range.openClosed(SMALL.getDiskMb(), MEDIUM.getDiskMb()),
-            "sla_disk_large_", Range.openClosed(MEDIUM.getDiskMb(), LARGE.getDiskMb()),
-            "sla_disk_xlarge_", Range.openClosed(LARGE.getDiskMb(), XLARGE.getDiskMb()),
-            "sla_disk_xxlarge_", Range.greaterThan(XLARGE.getDiskMb())),
-        task -> task.getAssignedTask().getTask().getDiskMb()
+            "sla_disk_small_", Range.closed(fromBag(EMPTY, DISK_MB), fromBag(SMALL, DISK_MB)),
+            "sla_disk_medium_", Range.openClosed(fromBag(SMALL, DISK_MB), fromBag(MEDIUM, DISK_MB)),
+            "sla_disk_large_", Range.openClosed(fromBag(MEDIUM, DISK_MB), fromBag(LARGE, DISK_MB)),
+            "sla_disk_xlarge_", Range.openClosed(fromBag(LARGE, DISK_MB), fromBag(XLARGE, DISK_MB)),
+            "sla_disk_xxlarge_", Range.greaterThan(fromBag(XLARGE, DISK_MB))),
+        task -> quantityOf(getTaskResources(task.getAssignedTask().getTask(), DISK_MB))
     ));
 
     private SlaGroup group;
@@ -89,6 +96,12 @@ interface SlaGroup {
 
     SlaGroup getSlaGroup() {
       return group;
+    }
+
+    // TODO(maxim): Refactor SLA management to build groups dynamically from
+    // all available ResourceType values.
+    private static Double fromBag(ResourceBag bag, ResourceType type) {
+      return bag.getResourceVectors().get(type);
     }
   }
 

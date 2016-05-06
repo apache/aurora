@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.resources;
 
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
@@ -44,19 +45,20 @@ public final class ResourceTestUtil {
     // Utility class.
   }
 
+  public static ResourceBag bag(Map<ResourceType, Double> resources) {
+    return new ResourceBag(resources);
+  }
+
+  public static ResourceBag bag(double numCpus, long ramMb, long diskMb) {
+    return ResourceManager.bagFromAggregate(aggregate(numCpus, ramMb, diskMb));
+  }
+
   public static IResourceAggregate aggregate(double numCpus, long ramMb, long diskMb) {
     return IResourceAggregate.build(new ResourceAggregate(numCpus, ramMb, diskMb, ImmutableSet.of(
         numCpus(numCpus),
         ramMb(ramMb),
         diskMb(diskMb)
     )));
-  }
-
-  public static IResourceAggregate nonBackfilledAggregate(double numCpus, long ramMb, long diskMb) {
-    return IResourceAggregate.build(new ResourceAggregate()
-        .setNumCpus(numCpus)
-        .setRamMb(ramMb)
-        .setDiskMb(diskMb));
   }
 
   public static ITaskConfig resetPorts(ITaskConfig config, Set<String> portNames) {

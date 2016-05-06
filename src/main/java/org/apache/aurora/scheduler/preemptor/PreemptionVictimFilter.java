@@ -35,6 +35,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceSlot;
 import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
@@ -98,7 +99,7 @@ public interface PreemptionVictimFilter {
     }
 
     private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
-        offer -> Resources.from(offer.getOffer()).filter(Resources.NON_REVOCABLE).slot();
+        offer -> Resources.from(offer.getOffer()).filter(ResourceManager.NON_REVOCABLE).slot();
 
     private static final Function<HostOffer, String> OFFER_TO_HOST =
         offer -> offer.getOffer().getHostname();

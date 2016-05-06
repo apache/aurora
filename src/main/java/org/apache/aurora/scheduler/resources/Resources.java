@@ -17,7 +17,6 @@ import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableList;
@@ -32,7 +31,9 @@ import org.apache.mesos.Protos.Value.Range;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.resources.ResourceManager.quantityOf;
+import static org.apache.aurora.scheduler.resources.ResourceManager.NON_REVOCABLE;
+import static org.apache.aurora.scheduler.resources.ResourceManager.REVOCABLE;
+import static org.apache.aurora.scheduler.resources.ResourceManager.quantityOfMesosResource;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
@@ -42,23 +43,6 @@ import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
  * A container for multiple Mesos resource vectors.
  */
 public final class Resources {
-
-  /**
-   * CPU resource filter.
-   */
-  private static final Predicate<Resource> CPU = e -> e.getName().equals(CPUS.getMesosName());
-
-  /**
-   * Revocable resource filter.
-   */
-  public static final Predicate<Resource> REVOCABLE =
-      Predicates.or(Predicates.not(CPU), Predicates.and(CPU, Resource::hasRevocable));
-
-  /**
-   * Non-revocable resource filter.
-   */
-  public static final Predicate<Resource> NON_REVOCABLE = Predicates.not(Resource::hasRevocable);
-
   /**
    * Convert range to set of integers.
    */
@@ -109,10 +93,10 @@ public final class Resources {
    * @return {@code ResourceSlot} instance.
    */
   public ResourceSlot slot() {
-    return new ResourceSlot(quantityOf(mesosResources, CPUS),
-        Amount.of(quantityOf(mesosResources, RAM_MB).longValue(), Data.MB),
-        Amount.of(quantityOf(mesosResources, DISK_MB).longValue(), Data.MB),
-        quantityOf(mesosResources, PORTS).intValue());
+    return new ResourceSlot(quantityOfMesosResource(mesosResources, CPUS),
+        Amount.of(quantityOfMesosResource(mesosResources, RAM_MB).longValue(), Data.MB),
+        Amount.of(quantityOfMesosResource(mesosResources, DISK_MB).longValue(), Data.MB),
+        quantityOfMesosResource(mesosResources, PORTS).intValue());
   }
 
   /**

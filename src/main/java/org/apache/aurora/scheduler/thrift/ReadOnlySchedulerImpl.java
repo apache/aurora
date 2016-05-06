@@ -103,6 +103,7 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
+import static org.apache.aurora.scheduler.resources.ResourceManager.aggregateFromBag;
 import static org.apache.aurora.scheduler.thrift.Responses.error;
 import static org.apache.aurora.scheduler.thrift.Responses.invalidRequest;
 import static org.apache.aurora.scheduler.thrift.Responses.ok;
@@ -281,12 +282,16 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
     MorePreconditions.checkNotBlank(ownerRole);
     return storage.read(storeProvider -> {
       QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ownerRole, storeProvider);
-      GetQuotaResult result = new GetQuotaResult(quotaInfo.getQuota().newBuilder())
-          .setProdSharedConsumption(quotaInfo.getProdSharedConsumption().newBuilder())
-          .setProdDedicatedConsumption(quotaInfo.getProdDedicatedConsumption().newBuilder())
-          .setNonProdSharedConsumption(quotaInfo.getNonProdSharedConsumption().newBuilder())
-          .setNonProdDedicatedConsumption(
-              quotaInfo.getNonProdDedicatedConsumption().newBuilder());
+      GetQuotaResult result = new GetQuotaResult()
+          .setQuota(aggregateFromBag(quotaInfo.getQuota()).newBuilder())
+          .setProdSharedConsumption(aggregateFromBag(
+              quotaInfo.getProdSharedConsumption()).newBuilder())
+          .setProdDedicatedConsumption(aggregateFromBag(
+              quotaInfo.getProdDedicatedConsumption()).newBuilder())
+          .setNonProdSharedConsumption(aggregateFromBag(
+              quotaInfo.getNonProdSharedConsumption()).newBuilder())
+          .setNonProdDedicatedConsumption(aggregateFromBag(
+              quotaInfo.getNonProdDedicatedConsumption()).newBuilder());
 
       return ok(Result.getQuotaResult(result));
     });

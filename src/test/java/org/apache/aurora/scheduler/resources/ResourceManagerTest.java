@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.resources;
 import java.util.EnumSet;
 import java.util.Set;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
@@ -27,10 +28,14 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.Resource.diskMb;
 import static org.apache.aurora.gen.Resource.namedPort;
 import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.aggregate;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.bag;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
@@ -51,6 +56,13 @@ public class ResourceManagerTest {
 
     Protos.Resource resource2 = Protos.Resource.newBuilder()
         .setType(SCALAR)
+        .setName(CPUS.getMesosName())
+        .setRevocable(Protos.Resource.RevocableInfo.getDefaultInstance())
+        .setScalar(Scalar.newBuilder().setValue(1.0).build())
+        .build();
+
+    Protos.Resource resource3 = Protos.Resource.newBuilder()
+        .setType(SCALAR)
         .setName(RAM_MB.getMesosName())
         .setScalar(Scalar.newBuilder().setValue(64).build())
         .build();
@@ -60,14 +72,20 @@ public class ResourceManagerTest {
         .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("framework-id"))
         .setSlaveId(Protos.SlaveID.newBuilder().setValue("slave-id"))
         .setHostname("hostname")
-        .addAllResources(ImmutableSet.of(resource1, resource2)).build();
+        .addAllResources(ImmutableSet.of(resource1, resource2, resource3)).build();
 
     assertEquals(
-        resource1,
-        Iterables.getOnlyElement(ResourceManager.getOfferResources(offer, CPUS)));
+        ImmutableSet.of(resource1, resource2),
+        ImmutableSet.copyOf(ResourceManager.getOfferResources(offer, CPUS)));
     assertEquals(
-        resource2,
+        resource3,
         Iterables.getOnlyElement(ResourceManager.getOfferResources(offer, RAM_MB)));
+    assertEquals(
+        ImmutableSet.of(resource1, resource3),
+        ImmutableSet.copyOf(ResourceManager.getNonRevocableOfferResources(offer)));
+    assertEquals(
+        ImmutableSet.of(resource2, resource3),
+        ImmutableSet.copyOf(ResourceManager.getRevocableOfferResources(offer)));
   }
 
   @Test
@@ -78,6 +96,11 @@ public class ResourceManagerTest {
     assertEquals(
         IResource.build(namedPort("http")),
         Iterables.getOnlyElement(ResourceManager.getTaskResources(makeTask("id", JOB), PORTS)));
+    assertEquals(
+        ImmutableSet.of(IResource.build(numCpus(1.0)), IResource.build(ramMb(1024))),
+        ImmutableSet.copyOf(ResourceManager.getTaskResources(
+            makeTask("id", JOB).getAssignedTask().getTask(),
+            EnumSet.of(CPUS, RAM_MB))));
   }
 
   @Test
@@ -98,9 +121,46 @@ public class ResourceManagerTest {
         mesosScalar(RAM_MB, 64),
         mesosRange(PORTS, 1, 3));
 
-    assertEquals(7.0, ResourceManager.quantityOf(resources, CPUS), 0.0);
-    assertEquals(64, ResourceManager.quantityOf(resources, RAM_MB), 0.0);
-    assertEquals(0.0, ResourceManager.quantityOf(resources, DISK_MB), 0.0);
-    assertEquals(2, ResourceManager.quantityOf(resources, PORTS), 0.0);
+    assertEquals(7.0, ResourceManager.quantityOfMesosResource(resources, CPUS), 0.0);
+    assertEquals(64, ResourceManager.quantityOfMesosResource(resources, RAM_MB), 0.0);
+    assertEquals(0.0, ResourceManager.quantityOfMesosResource(resources, DISK_MB), 0.0);
+    assertEquals(2, ResourceManager.quantityOfMesosResource(resources, PORTS), 0.0);
+  }
+
+  @Test
+  public void testResourceQuantity() {
+    assertEquals(
+        8.0,
+        ResourceManager.quantityOf(ImmutableSet.of(
+            IResource.build(numCpus(3.0)),
+            IResource.build(numCpus(5.0)))),
+        0.0);
+  }
+
+  @Test
+  public void testBagFromResources() {
+    assertEquals(
+        bag(2.0, 32, 64),
+        ResourceManager.bagFromResources(ImmutableSet.of(
+            IResource.build(numCpus(2.0)),
+            IResource.build(ramMb(32)),
+            IResource.build(diskMb(64)))));
+  }
+
+  @Test
+  public void testBagFromMesosResources() {
+    assertEquals(
+        new ResourceBag(ImmutableMap.of(CPUS, 3.0)),
+        ResourceManager.bagFromMesosResources(ImmutableSet.of(mesosScalar(CPUS, 3.0))));
+  }
+
+  @Test
+  public void testBagFromAggregate() {
+    assertEquals(bag(1.0, 32, 64), ResourceManager.bagFromAggregate(aggregate(1.0, 32, 64)));
+  }
+
+  @Test
+  public void testAggregateFromBag() {
+    assertEquals(aggregate(1.0, 1024, 4096), ResourceManager.aggregateFromBag(ResourceBag.SMALL));
   }
 }

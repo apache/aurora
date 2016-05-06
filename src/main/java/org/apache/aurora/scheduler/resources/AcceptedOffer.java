@@ -97,7 +97,7 @@ public final class AcceptedOffer {
     List<Resource.Builder> cpuResources = filterToBuilders(
         reservedFirst,
         ResourceType.CPUS.getMesosName(),
-        revocable ? Resources.REVOCABLE : Resources.NON_REVOCABLE);
+        revocable ? ResourceManager.REVOCABLE : ResourceManager.NON_REVOCABLE);
     List<Resource.Builder> memResources = filterToBuilderNonRevocable(
         reservedFirst, ResourceType.RAM_MB.getMesosName());
     List<Resource.Builder> diskResources = filterToBuilderNonRevocable(
@@ -230,6 +230,6 @@ public final class AcceptedOffer {
       List<Resource> resources,
       String name) {
 
-    return filterToBuilders(resources, name, Resources.NON_REVOCABLE);
+    return filterToBuilders(resources, name, ResourceManager.NON_REVOCABLE);
   }
 }

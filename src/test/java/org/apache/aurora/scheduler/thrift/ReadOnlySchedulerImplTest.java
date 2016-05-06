@@ -91,10 +91,11 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
-import static org.apache.aurora.scheduler.resources.ResourceAggregates.LARGE;
-import static org.apache.aurora.scheduler.resources.ResourceAggregates.MEDIUM;
-import static org.apache.aurora.scheduler.resources.ResourceAggregates.SMALL;
-import static org.apache.aurora.scheduler.resources.ResourceAggregates.XLARGE;
+import static org.apache.aurora.scheduler.resources.ResourceBag.LARGE;
+import static org.apache.aurora.scheduler.resources.ResourceBag.MEDIUM;
+import static org.apache.aurora.scheduler.resources.ResourceBag.SMALL;
+import static org.apache.aurora.scheduler.resources.ResourceBag.XLARGE;
+import static org.apache.aurora.scheduler.resources.ResourceManager.aggregateFromBag;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_JOB;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_SCHEDULE;
 import static org.apache.aurora.scheduler.thrift.Fixtures.IDENTITY;
@@ -323,11 +324,11 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     control.replay();
 
     GetQuotaResult expected = new GetQuotaResult()
-        .setQuota(QUOTA.newBuilder())
-        .setProdSharedConsumption(XLARGE.newBuilder())
-        .setProdDedicatedConsumption(LARGE.newBuilder())
-        .setNonProdSharedConsumption(MEDIUM.newBuilder())
-        .setNonProdDedicatedConsumption(SMALL.newBuilder());
+        .setQuota(aggregateFromBag(QUOTA).newBuilder())
+        .setProdSharedConsumption(aggregateFromBag(XLARGE).newBuilder())
+        .setProdDedicatedConsumption(aggregateFromBag(LARGE).newBuilder())
+        .setNonProdSharedConsumption(aggregateFromBag(MEDIUM).newBuilder())
+        .setNonProdDedicatedConsumption(aggregateFromBag(SMALL).newBuilder());
 
     Response response = assertOkResponse(thrift.getQuota(ROLE));
     assertEquals(expected, response.getResult().getGetQuotaResult());

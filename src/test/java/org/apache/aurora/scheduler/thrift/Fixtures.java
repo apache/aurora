@@ -45,11 +45,11 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
-import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IResult;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -74,7 +74,7 @@ final class Fixtures {
   private static final Function<String, ResponseDetail> MESSAGE_TO_DETAIL =
       message -> new ResponseDetail().setMessage(message);
   static final String CRON_SCHEDULE = "0 * * * *";
-  static final IResourceAggregate QUOTA = ResourceTestUtil.aggregate(10.0, 1024, 2048);
+  static final ResourceBag QUOTA = ResourceTestUtil.bag(10.0, 1024, 2048);
   static final QuotaCheckResult ENOUGH_QUOTA = new QuotaCheckResult(SUFFICIENT_QUOTA);
   static final QuotaCheckResult NOT_ENOUGH_QUOTA = new QuotaCheckResult(INSUFFICIENT_QUOTA);
   static final InstanceKey INSTANCE_KEY = new InstanceKey(JOB_KEY.newBuilder(), 0);

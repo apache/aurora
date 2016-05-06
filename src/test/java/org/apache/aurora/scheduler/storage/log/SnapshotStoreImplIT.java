@@ -51,7 +51,7 @@ import org.apache.aurora.gen.storage.StoredCronJob;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
-import org.apache.aurora.scheduler.resources.ResourceAggregates;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.db.MigrationManager;
@@ -69,6 +69,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
 import static org.apache.aurora.common.util.testing.FakeBuildInfo.generateBuildInfo;
+import static org.apache.aurora.scheduler.resources.ResourceManager.aggregateFromBag;
 import static org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import static org.apache.aurora.scheduler.storage.db.DbModule.testModuleWithWorkQueue;
 import static org.apache.aurora.scheduler.storage.db.DbUtil.createStorage;
@@ -194,7 +195,7 @@ public class SnapshotStoreImplIT {
       .setTaskConfig(TASK_CONFIG.newBuilder()));
   private static final String ROLE = "role";
   private static final IResourceAggregate QUOTA =
-      ThriftBackfill.backfillResourceAggregate(ResourceAggregates.LARGE.newBuilder());
+      ThriftBackfill.backfillResourceAggregate(aggregateFromBag(ResourceBag.LARGE).newBuilder());
   private static final IHostAttributes ATTRIBUTES = IHostAttributes.build(
       new HostAttributes("host", ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))))
           .setMode(MaintenanceMode.NONE)

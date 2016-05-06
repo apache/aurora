@@ -55,7 +55,7 @@ public class ResourcesTest {
 
     assertEquals(
         new ResourceSlot(8.0, Amount.of(1024L, MB), Amount.of(0L, MB), 0),
-        Resources.from(offer).filter(Resources.REVOCABLE).slot());
+        Resources.from(offer).filter(ResourceManager.REVOCABLE).slot());
   }
 
   @Test
