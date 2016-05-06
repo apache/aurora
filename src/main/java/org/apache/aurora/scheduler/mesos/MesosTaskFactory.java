@@ -20,6 +20,7 @@ import java.util.Set;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
@@ -35,9 +36,13 @@ import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.resources.AcceptedOffer;
 import org.apache.aurora.scheduler.resources.ResourceSlot;
 import org.apache.aurora.scheduler.resources.Resources;
+import org.apache.aurora.scheduler.storage.entities.IAppcImage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
+import org.apache.aurora.scheduler.storage.entities.IDockerImage;
+import org.apache.aurora.scheduler.storage.entities.IImage;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IMesosContainer;
 import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -169,7 +174,15 @@ public interface MesosTaskFactory {
       }
 
       if (config.getContainer().isSetMesos()) {
-        configureTaskForNoContainer(task, taskBuilder, acceptedOffer);
+        ExecutorInfo.Builder executorInfoBuilder = configureTaskForExecutor(task, acceptedOffer);
+
+        Optional<ContainerInfo.Builder> containerInfoBuilder = configureTaskForImage(
+            task.getTask().getContainer().getMesos());
+        if (containerInfoBuilder.isPresent()) {
+          executorInfoBuilder.setContainer(containerInfoBuilder.get());
+        }
+
+        taskBuilder.setExecutor(executorInfoBuilder.build());
       } else if (config.getContainer().isSetDocker()) {
         IDockerContainer dockerContainer = config.getContainer().getDocker();
         if (config.isSetExecutorConfig()) {
@@ -193,12 +206,43 @@ public interface MesosTaskFactory {
       }
     }
 
-    private void configureTaskForNoContainer(
-        IAssignedTask task,
-        TaskInfo.Builder taskBuilder,
-        AcceptedOffer acceptedOffer) {
+    private Optional<ContainerInfo.Builder> configureTaskForImage(IMesosContainer mesosContainer) {
+      requireNonNull(mesosContainer);
 
-      taskBuilder.setExecutor(configureTaskForExecutor(task, acceptedOffer).build());
+      if (mesosContainer.isSetImage()) {
+        IImage image = mesosContainer.getImage();
+
+        Protos.Image.Builder imageBuilder = Protos.Image.newBuilder();
+
+        if (image.isSetAppc()) {
+          IAppcImage appcImage = image.getAppc();
+
+          imageBuilder.setType(Protos.Image.Type.APPC);
+          imageBuilder.setAppc(Protos.Image.Appc.newBuilder()
+              .setName(appcImage.getName())
+              .setId(appcImage.getImageId()));
+        } else if (image.isSetDocker()) {
+          IDockerImage dockerImage = image.getDocker();
+
+          imageBuilder.setType(Protos.Image.Type.DOCKER);
+          imageBuilder.setDocker(Protos.Image.Docker.newBuilder()
+              .setName(dockerImage.getName() + ":" + dockerImage.getTag()));
+        } else {
+          throw new SchedulerException("Task had no supported image set.");
+        }
+
+        ContainerInfo.MesosInfo.Builder mesosContainerBuilder =
+            ContainerInfo.MesosInfo.newBuilder();
+
+        mesosContainerBuilder.setImage(imageBuilder);
+
+        return Optional.of(ContainerInfo.newBuilder()
+            .setType(ContainerInfo.Type.MESOS)
+            .setMesos(mesosContainerBuilder)
+            .addAllVolumes(executorSettings.getExecutorConfig().getVolumeMounts()));
+      }
+
+      return Optional.absent();
     }
 
     private ContainerInfo getDockerContainerInfo(IDockerContainer config) {

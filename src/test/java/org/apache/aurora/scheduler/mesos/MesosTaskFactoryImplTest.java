@@ -22,10 +22,13 @@ import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.gen.AppcImage;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.DockerContainer;
+import org.apache.aurora.gen.DockerImage;
 import org.apache.aurora.gen.DockerParameter;
+import org.apache.aurora.gen.Image;
 import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.TaskConfig;
@@ -44,6 +47,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo;
+import org.apache.mesos.Protos.ContainerInfo.MesosInfo;
 import org.apache.mesos.Protos.ContainerInfo.Type;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Offer;
@@ -73,7 +77,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class MesosTaskFactoryImplTest extends EasyMockTest {
-
   private static final ITaskConfig TASK_CONFIG = ITaskConfig.build(
       TaskTestUtil.makeConfig(TaskTestUtil.JOB)
           .newBuilder()
@@ -94,6 +97,17 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
               .setContainer(Container.docker(
                   new DockerContainer("testimage").setParameters(
                       ImmutableList.of(new DockerParameter("label", "testparameter")))))));
+
+  private static final ExecutorSettings EXECUTOR_SETTINGS_WITH_VOLUMES = new ExecutorSettings(
+      new ExecutorConfig(
+          TestExecutorSettings.THERMOS_EXECUTOR_INFO,
+          ImmutableList.of(
+              Volume.newBuilder()
+                  .setHostPath("/host")
+                  .setContainerPath("/container")
+                  .setMode(Mode.RO)
+                  .build())),
+      false /* populate discovery info */);
 
   private static final SlaveID SLAVE = SlaveID.newBuilder().setValue("slave-id").build();
   private static final Offer OFFER_THERMOS_EXECUTOR = Protos.Offer.newBuilder()
@@ -288,16 +302,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   @Test
   public void testGlobalMounts() {
-    config = new ExecutorSettings(
-        new ExecutorConfig(
-            TestExecutorSettings.THERMOS_EXECUTOR_INFO,
-            ImmutableList.of(
-                Volume.newBuilder()
-                    .setHostPath("/host")
-                    .setContainerPath("/container")
-                    .setMode(Mode.RO)
-                    .build())),
-        false);
+    config = EXECUTOR_SETTINGS_WITH_VOLUMES;
 
     expect(tierManager.getTier(TASK_WITH_DOCKER.getTask())).andReturn(DEV_TIER);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
@@ -353,7 +358,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   @Test
   public void testPopulateDiscoveryInfoNoPort() {
-    config = new ExecutorSettings(THERMOS_CONFIG, true);
+    config = new ExecutorSettings(THERMOS_CONFIG, true /* populate discovery info */);
     AssignedTask builder = TASK.newBuilder();
     builder.unsetAssignedPorts();
     builder.setTask(
@@ -371,7 +376,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   @Test
   public void testPopulateDiscoveryInfo() {
-    config = new ExecutorSettings(THERMOS_CONFIG, true);
+    config = new ExecutorSettings(THERMOS_CONFIG, true /* populate discovery info */);
     expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEV_TIER);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
@@ -379,6 +384,73 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     TaskInfo task = taskFactory.createFrom(TASK, OFFER_THERMOS_EXECUTOR);
     checkTaskResources(TASK.getTask(), task);
     checkDiscoveryInfo(task, ImmutableMap.of("http", 80), TASK.getTask().getJob());
+  }
+
+  @Test
+  public void testDockerImageWithMesosContainer() throws Exception {
+    String imageName = "some-image-name";
+    String imageTag = "some-image-tag";
+    IAssignedTask taskWithDockerImage = IAssignedTask.build(TASK.newBuilder()
+        .setTask(
+            new TaskConfig(TASK.getTask().newBuilder()
+                .setContainer(Container.mesos(
+                    new MesosContainer().setImage(
+                        Image.docker(new DockerImage(imageName, imageTag))))))));
+
+    expect(tierManager.getTier(taskWithDockerImage.getTask())).andReturn(DEV_TIER);
+    control.replay();
+
+    taskFactory = new MesosTaskFactoryImpl(
+        EXECUTOR_SETTINGS_WITH_VOLUMES,
+        tierManager,
+        SERVER_INFO);
+
+    TaskInfo task = taskFactory.createFrom(taskWithDockerImage, OFFER_THERMOS_EXECUTOR);
+    assertEquals(
+        ContainerInfo.newBuilder()
+            .setType(Type.MESOS)
+            .setMesos(MesosInfo.newBuilder().setImage(
+                Protos.Image.newBuilder()
+                    .setType(Protos.Image.Type.DOCKER)
+                    .setDocker(Protos.Image.Docker.newBuilder()
+                        .setName(imageName + ":" + imageTag))))
+            .addAllVolumes(EXECUTOR_SETTINGS_WITH_VOLUMES.getExecutorConfig().getVolumeMounts())
+            .build(),
+        task.getExecutor().getContainer());
+  }
+
+  @Test
+  public void testAppcImageWithMesosContainer() throws Exception {
+    String imageName = "some-image-name";
+    String imageId = "some-image-id";
+    IAssignedTask taskWithAppcImage = IAssignedTask.build(TASK.newBuilder()
+        .setTask(
+            new TaskConfig(TASK.getTask().newBuilder()
+                .setContainer(Container.mesos(
+                    new MesosContainer().setImage(
+                        Image.appc(new AppcImage(imageName, imageId))))))));
+
+    expect(tierManager.getTier(taskWithAppcImage.getTask())).andReturn(DEV_TIER);
+    control.replay();
+
+    taskFactory = new MesosTaskFactoryImpl(
+        EXECUTOR_SETTINGS_WITH_VOLUMES,
+        tierManager,
+        SERVER_INFO);
+
+    TaskInfo task = taskFactory.createFrom(taskWithAppcImage, OFFER_THERMOS_EXECUTOR);
+    assertEquals(
+        ContainerInfo.newBuilder()
+            .setType(Type.MESOS)
+            .setMesos(MesosInfo.newBuilder().setImage(
+                Protos.Image.newBuilder()
+                    .setType(Protos.Image.Type.APPC)
+                    .setAppc(Protos.Image.Appc.newBuilder()
+                        .setName(imageName)
+                        .setId(imageId))))
+            .addAllVolumes(EXECUTOR_SETTINGS_WITH_VOLUMES.getExecutorConfig().getVolumeMounts())
+            .build(),
+        task.getExecutor().getContainer());
   }
 
   private static ResourceSlot getTotalTaskResources(TaskInfo task) {

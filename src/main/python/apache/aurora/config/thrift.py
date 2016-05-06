@@ -18,18 +18,30 @@ import re
 from pystachio import Empty, Ref
 from twitter.common.lang import Compatibility
 
-from apache.aurora.config.schema.base import HealthCheckConfig, MesosContext, MesosTaskInstance
+from apache.aurora.config.schema.base import AppcImage as PystachioAppcImage
+from apache.aurora.config.schema.base import Container as PystachioContainer
+from apache.aurora.config.schema.base import DockerImage as PystachioDockerImage
+from apache.aurora.config.schema.base import (
+    Docker,
+    HealthCheckConfig,
+    Mesos,
+    MesosContext,
+    MesosTaskInstance
+)
 from apache.thermos.config.loader import ThermosTaskValidator
 
 from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME, GOOD_IDENTIFIER_PATTERN_PYTHON
 from gen.apache.aurora.api.ttypes import (
+    AppcImage,
     Constraint,
     Container,
     CronCollisionPolicy,
     DockerContainer,
+    DockerImage,
     DockerParameter,
     ExecutorConfig,
     Identity,
+    Image,
     JobConfiguration,
     JobKey,
     LimitConstraint,
@@ -127,17 +139,55 @@ def select_service_bit(job):
   return fully_interpolated(job.service(), bool)
 
 
+def create_docker_container(container):
+  params = list()
+  if container.parameters() is not Empty:
+    for p in fully_interpolated(container.parameters()):
+      params.append(DockerParameter(p['name'], p['value']))
+  return DockerContainer(fully_interpolated(container.image()), params)
+
+
 def create_container_config(container):
   if container is Empty:
     return Container(MesosContainer(), None)
-  elif container.docker() is not Empty:
-    params = list()
-    if container.docker().parameters() is not Empty:
-      for p in fully_interpolated(container.docker().parameters()):
-        params.append(DockerParameter(p['name'], p['value']))
-    return Container(None, DockerContainer(fully_interpolated(container.docker().image()), params))
-  else:
-    raise InvalidConfig('If a container is specified it must set one type.')
+
+  def is_docker_container(c):
+    return isinstance(c, PystachioContainer) and c.docker() is not None
+
+  unwrapped = container.unwrap()
+  if isinstance(unwrapped, Docker) or is_docker_container(unwrapped):
+    return Container(
+        None,
+        (create_docker_container(unwrapped.docker()
+         if is_docker_container(unwrapped)
+         else unwrapped)))
+
+  if isinstance(unwrapped, Mesos):
+    return Container(MesosContainer(image_to_thrift(unwrapped.image())), None)
+
+  raise InvalidConfig('If a container is specified it must set one type.')
+
+
+def image_to_thrift(image):
+  if image is Empty:
+    return None
+
+  unwrapped = image.unwrap()
+  if isinstance(unwrapped, PystachioAppcImage):
+    return Image(
+        docker=None,
+        appc=AppcImage(
+            fully_interpolated(unwrapped.name()),
+            fully_interpolated(unwrapped.image_id())))
+
+  if isinstance(unwrapped, PystachioDockerImage):
+    return Image(
+        docker=DockerImage(
+            fully_interpolated(unwrapped.name()),
+            fully_interpolated(unwrapped.tag())),
+        appc=None)
+
+  raise InvalidConfig('Invalid image configuration: unexpected image type found.')
 
 
 # TODO(wickman): We should revert to using the MesosTaskInstance.

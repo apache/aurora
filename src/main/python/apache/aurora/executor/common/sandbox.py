@@ -62,8 +62,9 @@ class DefaultSandboxProvider(SandboxProvider):
   SANDBOX_NAME = 'sandbox'
 
   def from_assigned_task(self, assigned_task):
-    if assigned_task.task.container.docker:
-      return DockerDirectorySandbox(self.SANDBOX_NAME)
+    container = assigned_task.task.container
+    if container.docker or container.mesos and container.mesos.image:
+      return FileSystemImageSandbox(self.SANDBOX_NAME, self._get_sandbox_user(assigned_task))
     else:
       return DirectorySandbox(
         os.path.abspath(self.SANDBOX_NAME),
@@ -119,24 +120,27 @@ class DirectorySandbox(SandboxInterface):
       raise self.DeletionError('Failed to destroy sandbox: %s' % e)
 
 
-class DockerDirectorySandbox(DirectorySandbox):
-  """ A sandbox implementation that configures the sandbox correctly for docker. """
+class FileSystemImageSandbox(DirectorySandbox):
+  """
+  A sandbox implementation that configures the sandbox correctly for tasks provisioned from a
+  filesystem image.
+  """
 
   MESOS_DIRECTORY_ENV_VARIABLE = 'MESOS_DIRECTORY'
   MESOS_SANDBOX_ENV_VARIABLE = 'MESOS_SANDBOX'
 
-  def __init__(self, sandbox_name):
+  def __init__(self, sandbox_name, user=None):
     self._mesos_host_sandbox = os.environ[self.MESOS_DIRECTORY_ENV_VARIABLE]
     self._root = os.path.join(self._mesos_host_sandbox, sandbox_name)
-    super(DockerDirectorySandbox, self).__init__(self._root, user=None)
+    super(FileSystemImageSandbox, self).__init__(self._root, user=user)
 
   def _create_symlinks(self):
-    # This sets up the docker container to have a similar directory structure to the host.
+    # This sets up the container to have a similar directory structure to the host.
     # It takes self._mesos_host_sandbox (e.g. "[exec-root]/runs/RUN1/") and:
     #   - Sets mesos_host_sandbox_root = "[exec-root]/runs/" (one level up from mesos_host_sandbox)
     #   - Creates mesos_host_sandbox_root (recursively)
     #   - Symlinks _mesos_host_sandbox -> $MESOS_SANDBOX (typically /mnt/mesos/sandbox)
-    # $MESOS_SANDBOX is provided in the environment by the Mesos docker containerizer.
+    # $MESOS_SANDBOX is provided in the environment by the Mesos containerizer.
 
     mesos_host_sandbox_root = os.path.dirname(self._mesos_host_sandbox)
     try:
@@ -147,4 +151,4 @@ class DockerDirectorySandbox(DirectorySandbox):
 
   def create(self):
     self._create_symlinks()
-    super(DockerDirectorySandbox, self).create()
+    super(FileSystemImageSandbox, self).create()

@@ -1,7 +1,6 @@
 Containers
 ==========
 
-
 Docker
 ------
 
@@ -41,3 +40,21 @@ Example (available in the [Vagrant environment](../getting-started/vagrant.md)):
 In order to correctly execute processes inside a job, the docker container must have Python 2.7
 installed. Further details of how to use Docker can be found in the
 [Reference Documentation](../reference/configuration.md#docker-object).
+
+Mesos
+-----
+
+*Note: In order to use filesystem images with Aurora, you must be running at least Mesos 0.28.x*
+
+Aurora supports specifying a task filesystem image to use with the [Mesos containerizer](http://mesos.apache.org/documentation/latest/container-image/).
+This is done by setting the ```container``` property of the Job to a ```Mesos``` container object
+that includes the image to use. Both [AppC](https://github.com/appc/spec/blob/master/SPEC.md) and 
+[Docker](https://github.com/docker/docker/blob/master/image/spec/v1.md) images are supported.
+
+```
+job = Job(
+   ...
+   container = Mesos(image=DockerImage(name='my-image', tag='my-tag'))
+   ...
+)
+```

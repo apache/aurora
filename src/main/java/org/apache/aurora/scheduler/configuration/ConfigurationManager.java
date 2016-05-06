@@ -207,10 +207,6 @@ public class ConfigurationManager {
   static final String EXECUTOR_REQUIRED_WITH_DOCKER =
       "This scheduler is configured to require an executor for Docker-based tasks.";
 
-  @VisibleForTesting
-  static final String CONTAINER_AND_IMAGE_ARE_MUTUALLY_EXCLUSIVE =
-      "A task may not have both a Docker container and an image.";
-
   /**
    * Check validity of and populates defaults in a task configuration.  This will return a deep copy
    * of the provided task configuration with default configuration values applied, and configuration
@@ -309,10 +305,6 @@ public class ConfigurationManager {
       throw new TaskDescriptionException(
           "This scheduler is not configured to allow the container type "
               + containerType.get().toString());
-    }
-
-    if (containerType.get() != Container._Fields.MESOS && config.isSetImage()) {
-      throw new TaskDescriptionException(CONTAINER_AND_IMAGE_ARE_MUTUALLY_EXCLUSIVE);
     }
 
     ThriftBackfill.backfillTask(builder);

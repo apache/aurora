@@ -15,6 +15,9 @@
 FROM python:2.7
 
 # mesos.native requires libcurl-nss to initialize MesosExecutorDriver
-RUN apt-get update && apt-get -y install libcurl4-nss-dev
+# The mesos containerizer does not auto-create mount points, so we must initialize them manually.
+# TODO(jcohen): Remove this mkdir when https://issues.apache.org/jira/browse/MESOS-5229 is resolved.
+RUN apt-get update && apt-get -y install libcurl4-nss-dev \
+    && mkdir -p /home/vagrant/aurora/examples/vagrant/config
 
 COPY http_example.py /tmp/

@@ -21,7 +21,7 @@ mox==0.5.3
 pex==1.1.2
 protobuf==2.6.1
 psutil==3.2.2
-pystachio==0.8.0
+pystachio==0.8.1
 requests==2.7.0
 requests-kerberos==0.7.0
 subprocess32==3.2.7

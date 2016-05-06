@@ -19,10 +19,13 @@ import pytest
 
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.schema.base import (
+    AppcImage,
     Container,
     Docker,
+    DockerImage,
     HealthCheckConfig,
     Job,
+    Mesos,
     Parameter,
     SimpleTask
 )
@@ -80,6 +83,28 @@ def test_config_with_tier():
   config = HELLO_WORLD(tier='devel')
   job = convert_pystachio_to_thrift(config)
   assert job.taskConfig.tier == 'devel'
+
+
+def test_config_with_docker_image():
+  image_name = 'some-image'
+  image_tag = 'some-tag'
+  job = convert_pystachio_to_thrift(
+      HELLO_WORLD(container=Mesos(image=DockerImage(name=image_name, tag=image_tag))))
+
+  assert job.taskConfig.container.mesos.image.appc is None
+  assert job.taskConfig.container.mesos.image.docker.name == image_name
+  assert job.taskConfig.container.mesos.image.docker.tag == image_tag
+
+
+def test_config_with_appc_image():
+  image_name = 'some-image'
+  image_id = 'some-image-id'
+  job = convert_pystachio_to_thrift(
+          HELLO_WORLD(container=Mesos(image=AppcImage(name=image_name, image_id=image_id))))
+
+  assert job.taskConfig.container.mesos.image.docker is None
+  assert job.taskConfig.container.mesos.image.appc.name == image_name
+  assert job.taskConfig.container.mesos.image.appc.imageId == image_id
 
 
 def test_docker_with_parameters():

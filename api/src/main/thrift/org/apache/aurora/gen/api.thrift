@@ -167,8 +167,32 @@ struct Volume {
   3: Mode mode
 }
 
+/** Describes an image for use with the Mesos unified containerizer in the Docker format */
+struct DockerImage {
+  /** The name of the image to run */
+  1: string name
+  /** The Docker tag identifying the image */
+  2: string tag
+}
+
+/** Describes an image for use with the Mesos unified containerizer in the AppC format */
+struct AppcImage {
+  /** The name of the image to run */
+  1: string name
+  /** The appc image id identifying the image */
+  2: string imageId
+}
+
+/** Describes an image to be used with the Mesos unified containerizer */
+union Image {
+  1: DockerImage docker
+  2: AppcImage appc
+}
+
 /** Describes a mesos container, this is the default */
 struct MesosContainer {
+  /** the optional filesystem image to use when launching this task. */
+  1: optional Image image
 }
 
 /** Describes a parameter passed to docker cli */
@@ -191,28 +215,6 @@ struct DockerContainer {
 union Container {
   1: MesosContainer mesos
   2: DockerContainer docker
-}
-
-/** Describes an image for use with the Mesos unified containerizer in the Docker format */
-struct DockerImage {
-  /** The name of the image to run */
-  1: string name
-  /** The Docker tag identifying the image */
-  2: string tag
-}
-
-/** Describes an image for use with the Mesos unified containerizer in the AppC format */
-struct AppcImage {
-  /** The name of the image to run */
-  1: string name
-  /** The appc image id identifying the image */
-  2: string imageId
-}
-
-/** Describes an image to be used with the Mesos unified containerizer */
-union Image {
-  1: DockerImage docker
-  2: AppcImage appc
 }
 
 /** Describes resource value required to run a task. */
@@ -240,11 +242,6 @@ struct TaskConfig {
  18: optional bool production
  /** Task tier type. */
  30: optional string tier
- /**
-  * If using the Mesos unified containerizer, the image to run (N.B. mutually exlusive with
-  * specifying a container)
-  */
- 31: optional Image image
  /** All resources required to run a task. */
  32: set<Resource> resources
 

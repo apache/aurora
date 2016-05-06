@@ -62,5 +62,11 @@ jobs = [
     container = Container(docker=Docker(image = 'http_example'))
   ).bind(
     cmd = 'cp /tmp/http_example.py .'
+  ),
+  job(
+    name = 'http_example_appc',
+    container = Mesos(image=AppcImage(name='http_example', image_id='{{appc_image_id}}'))
+  ).bind(
+    cmd = 'cp /tmp/http_example.py .'
   )
 ]

@@ -19,15 +19,20 @@ import org.apache.aurora.gen.MesosContainer;
 
 public final class DbContainer {
   private DockerContainer docker;
+  private DbImage image;
 
   private DbContainer() {
   }
 
   Container toThrift() {
-    if (docker == null) {
-      return Container.mesos(new MesosContainer());
-    } else {
+    if (docker != null) {
       return Container.docker(docker);
     }
+
+    if (image != null) {
+      return Container.mesos(new MesosContainer().setImage(image.toThrift()));
+    }
+
+    return Container.mesos(new MesosContainer());
   }
 }

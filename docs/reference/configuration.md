@@ -328,16 +328,20 @@ Job Schema
 
 ### Job Objects
 
+*Note: Specifying a ```Container``` object as the value of the ```container``` property is
+  deprecated in favor of setting its value directly to the appropriate ```Docker``` or ```Mesos```
+  container type*
+
    name | type | description
    ------ | :-------: | -------
   ```task``` | Task | The Task object to bind to this job. Required.
   ```name``` | String | Job name. (Default: inherited from the task attribute's name)
   ```role``` | String | Job role account. Required.
   ```cluster``` | String | Cluster in which this job is scheduled. Required.
-   ```environment``` | String | Job environment, default ```devel```. Must be one of ```prod```, ```devel```, ```test``` or ```staging<number>```.
+  ```environment``` | String | Job environment, default ```devel```. Must be one of ```prod```, ```devel```, ```test``` or ```staging<number>```.
   ```contact``` | String | Best email address to reach the owner of the job. For production jobs, this is usually a team mailing list.
   ```instances```| Integer | Number of instances (sometimes referred to as replicas or shards) of the task to create. (Default: 1)
-   ```cron_schedule``` | String | Cron schedule in cron format. May only be used with non-service jobs. See [Cron Jobs](../features/cron-jobs.md) for more information. Default: None (not a cron job.)
+  ```cron_schedule``` | String | Cron schedule in cron format. May only be used with non-service jobs. See [Cron Jobs](../features/cron-jobs.md) for more information. Default: None (not a cron job.)
   ```cron_collision_policy``` | String | Policy to use when a cron job is triggered while a previous run is still active. KILL_EXISTING Kill the previous run, and schedule the new run CANCEL_NEW Let the previous run continue, and cancel the new run. (Default: KILL_EXISTING)
   ```update_config``` | ```UpdateConfig``` object | Parameters for controlling the rate and policy of rolling updates.
   ```constraints``` | dict | Scheduling constraints for the tasks. See the section on the [constraint specification language](#specifying-scheduling-constraints)
@@ -346,7 +350,7 @@ Job Schema
   ```priority``` | Integer | Preemption priority to give the task (Default 0). Tasks with higher priorities may preempt tasks at lower priorities.
   ```production``` | Boolean |  Whether or not this is a production task that may [preempt](../features/multitenancy.md#preemption) other tasks (Default: False). Production job role must have the appropriate [quota](../features/multitenancy.md#preemption).
   ```health_check_config``` | ```HealthCheckConfig``` object | Parameters for controlling a task's health checks. HTTP health check is only used if a  health port was assigned with a command line wildcard.
-  ```container``` | ```Container``` object | An optional container to run all processes inside of.
+  ```container``` | Choice of ```Container```, ```Docker``` or ```Mesos``` object | An optional container to run all processes inside of.
   ```lifecycle``` | ```LifecycleConfig``` object | An optional task lifecycle configuration that dictates commands to be executed on startup/teardown.  HTTP lifecycle is enabled by default if the "health" port is requested.  See [LifecycleConfig Objects](#lifecycleconfig-objects) for more information.
   ```tier``` | String | Task tier type. The default scheduler tier configuration allows for 3 tiers: `revocable`, `preemptible`, and `preferred`. The `revocable` tier requires the task to run with Mesos revocable resources. Setting the task's tier to `preemptible` allows for the possibility of that task being preempted by other tasks when cluster is running low on resources. The `preferred` tier prevents the task from using revocable resources and from being preempted. Since it is possible that a cluster is configured with a custom tier configuration, users should consult their cluster administrator to be informed of the tiers supported by the cluster. Attempts to schedule jobs with an unsupported tier will be rejected by the scheduler.
 
@@ -366,8 +370,6 @@ Parameters for controlling the rate and policy of rolling updates.
 | ```pulse_interval_secs```    | Integer  |  Indicates a [coordinated update](../features/job-updates.md#coordinated-job-updates). If no pulses are received within the provided interval the update will be blocked. Beta-updater only. Will fail on submission when used with client updater. (Default: None)
 
 ### HealthCheckConfig Objects
-
-*Note: ```endpoint```, ```expected_response``` and ```expected_response_code``` are deprecated from ```HealthCheckConfig``` and must be definied in ```HttpHealthChecker```.*
 
 Parameters for controlling a task's health checks via HTTP or a shell command.
 
@@ -448,16 +450,18 @@ guarantees should they be needed.
 
 ### Container Objects
 
-*Note: The only container type currently supported is "docker".  Docker support is currently EXPERIMENTAL.*
+*Note: Both Docker and Mesos unified-container support are currently EXPERIMENTAL.*
 *Note: In order to correctly execute processes inside a job, the Docker container must have python 2.7 installed.*
 
 *Note: For private docker registry, mesos mandates the docker credential file to be named as `.dockercfg`, even though docker may create a credential file with a different name on various platforms. Also, the `.dockercfg` file needs to be copied into the sandbox using the `-thermos_executor_resources` flag, specified while starting Aurora.*
 
-Describes the container the job's processes will run inside.
+Describes the container the job's processes will run inside. If not using Docker or the Mesos
+unified-container, the container can be omitted from your job config.
 
   param          | type           | description
   -----          | :----:         | -----------
   ```docker```   | Docker         | A docker container to use.
+  ```mesos```    | Mesos          | A mesos container to use.
 
 ### Docker Object
 
@@ -475,6 +479,34 @@ See [Docker Command Line Reference](https://docs.docker.com/reference/commandlin
   -----            | :----:          | -----------
   ```name```       | String          | The name of the docker parameter. E.g. volume
   ```value```      | String          | The value of the parameter. E.g. /usr/local/bin:/usr/bin:rw
+
+### Mesos Object
+
+  param            | type                           | description
+  -----            | :----:                         | -----------
+  ```image```      | Choice(AppcImage, DockerImage) | An optional filesystem image to use within this container.
+
+### AppcImage
+
+*Note: In order to correctly execute processes inside a job, the filesystem image must include python 2.7.*
+
+Describes an AppC filesystem image.
+
+  param          | type   | description
+  -----          | :----: | -----------
+  ```name```     | String | The name of the appc image.
+  ```image_id``` | String | The [image id](https://github.com/appc/spec/blob/master/spec/aci.md#image-id) of the appc image.
+
+### DockerImage
+
+*Note: In order to correctly execute processes inside a job, the filesystem image must include python 2.7.*
+
+Describes a Docker filesystem image.
+
+  param      | type   | description
+  -----      | :----: | -----------
+  ```name``` | String | The name of the docker image.
+  ```tag```  | String | The tag that identifies the docker image.
 
 ### LifecycleConfig Objects
 
@@ -570,4 +602,3 @@ For example, if '{{`thermos.ports[http]`}}' is specified in a `Process`
 configuration, it is automatically extracted and auto-populated by
 Aurora, but must be specified with, for example, `thermos -P http:12345`
 to map `http` to port 12345 when running via the CLI.
-

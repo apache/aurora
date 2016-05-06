@@ -121,10 +121,10 @@ class TaskConfigManager {
       if (!container.getParameters().isEmpty()) {
         configMapper.insertDockerParameters(containerInsert.getId(), container.getParameters());
       }
-    }
+    } else if (config.getContainer().isSetMesos()
+        && config.getContainer().getMesos().isSetImage()) {
 
-    if (config.isSetImage()) {
-      IImage image = config.getImage();
+      IImage image = config.getContainer().getMesos().getImage();
 
       switch (image.getSetField()) {
         case DOCKER:

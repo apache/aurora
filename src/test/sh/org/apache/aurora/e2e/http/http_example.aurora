@@ -41,7 +41,7 @@ health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1
 
 job = Service(
   cluster = 'devcluster',
-  instances = 2,
+  instances = 1,
   update_config = update_config,
   health_check_config = health_check_config,
   task = test_task,
@@ -68,6 +68,12 @@ jobs = [
   job(
     name = 'http_example_docker',
     container = Container(docker=Docker(image = 'http_example'))
+  ).bind(
+    cmd = 'cp /tmp/http_example.py .'
+  ),
+  job(
+    name = 'http_example_appc',
+    container = Mesos(image=AppcImage(name='http_example', image_id='{{appc_image_id}}'))
   ).bind(
     cmd = 'cp /tmp/http_example.py .'
   )

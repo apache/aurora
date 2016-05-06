@@ -15,6 +15,8 @@
 # Disable checkstyle for this entire file as it is a pystachio schema.
 # checkstyle: noqa
 
+from pystachio import Choice
+
 from apache.thermos.config.schema import *
 
 
@@ -109,13 +111,29 @@ class MesosTaskInstance(Struct):
   health_check_config = Default(HealthCheckConfig, HealthCheckConfig())
   lifecycle           = LifecycleConfig
 
+
 class Parameter(Struct):
   name = Required(String)
   value = Required(String)
 
+
 class Docker(Struct):
   image = Required(String)
   parameters = Default(List(Parameter), [])
+
+
+class AppcImage(Struct):
+  name = Required(String)
+  image_id = Required(String)
+
+
+class DockerImage(Struct):
+  name = Required(String)
+  tag = Required(String)
+
+
+class Mesos(Struct):
+  image = Choice([AppcImage, DockerImage])
 
 
 class Container(Struct):
@@ -150,7 +168,9 @@ class MesosJob(Struct):
 
   enable_hooks = Default(Boolean, False)  # enable client API hooks; from env python-list 'hooks'
 
-  container = Container
+  # Specifying a `Container` with a `docker` property for Docker jobs is deprecated, instead just
+  # specify the value of the container property to be a `Docker` container directly.
+  container = Choice([Container, Docker, Mesos])
 
 
 Job = MesosJob

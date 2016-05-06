@@ -19,7 +19,7 @@
 # from within the environment.
 if [[ "$USER" != "vagrant" ]]; then
   vagrant up
-  vagrant ssh -c /vagrant/src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh "$@"
+  time vagrant ssh -c /vagrant/src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh "$@"
   exit $?
 fi
 
@@ -90,13 +90,15 @@ test_config() {
 
 test_inspect() {
   local _jobkey=$1 _config=$2
+  shift 2
+  local _extra_args="${@}"
 
-  aurora job inspect $_jobkey $_config
+  aurora job inspect $_jobkey $_config $_extra_args
 }
 
 test_create() {
   local _jobkey=$1 _config=$2
-  shift; shift
+  shift 2
   local _extra_args="${@}"
 
   aurora job create $_jobkey $_config $_extra_args
@@ -165,8 +167,10 @@ assert_update_state() {
 
 test_update() {
   local _jobkey=$1 _config=$2 _cluster=$3
+  shift 3
+  local _extra_args="${@}"
 
-  aurora update start $_jobkey $_config
+  aurora update start $_jobkey $_config $_extra_args
   assert_update_state $_jobkey 'ROLLING_FORWARD'
   local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
       | tail -n +2 | awk '{print $2}')
@@ -189,8 +193,11 @@ test_update() {
 
 test_update_fail() {
   local _jobkey=$1 _config=$2 _cluster=$3  _bad_healthcheck_config=$4
+  shift 4
+  local _extra_args="${@}"
+
   # Make sure our updates works.
-  aurora update start $_jobkey $_config
+  aurora update start $_jobkey $_config $_extra_args
   assert_update_state $_jobkey 'ROLLING_FORWARD'
   local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
       | tail -n +2 | awk '{print $2}')
@@ -198,7 +205,7 @@ test_update_fail() {
   aurora update wait $_jobkey $_update_id
 
   # Starting update with a health check that is meant to fail. Expected behavior is roll back.
-  aurora update start $_jobkey $_bad_healthcheck_config
+  aurora update start $_jobkey $_bad_healthcheck_config $_extra_args
   local _update_id=$(aurora update list $_jobkey --status active \
       | tail -n +2 | awk '{print $2}')
   # || is so that we don't return an EXIT so that `trap collect_result` doesn't get triggered.
@@ -312,22 +319,24 @@ test_http_example() {
   local _base_config=$4 _updated_config=$5
   local _bad_healthcheck_config=$6
   local _job=$7
+  local _bind_parameters=${8:-""}
+
   local _jobkey="$_cluster/$_role/$_env/$_job"
   local _task_id_prefix="${_role}-${_env}-${_job}-0"
   local _discovery_name="${_job}.${_env}.${_role}"
 
   test_config $_base_config $_jobkey
-  test_inspect $_jobkey $_base_config
-  test_create $_jobkey $_base_config
+  test_inspect $_jobkey $_base_config $_bind_parameters
+  test_create $_jobkey $_base_config $_bind_parameters
   test_job_status $_cluster $_role $_env $_job
   test_scheduler_ui $_role $_env $_job
   test_observer_ui $_cluster $_role $_job
   test_discovery_info $_task_id_prefix $_discovery_name
   test_restart $_jobkey
-  test_update $_jobkey $_updated_config $_cluster
-  test_update_fail $_jobkey $_base_config  $_cluster $_bad_healthcheck_config
+  test_update $_jobkey $_updated_config $_cluster $_bind_parameters
+  test_update_fail $_jobkey $_base_config  $_cluster $_bad_healthcheck_config $_bind_parameters
   # Running test_update second time to change state to success.
-  test_update $_jobkey $_updated_config $_cluster
+  test_update $_jobkey $_updated_config $_cluster $_bind_parameters
   test_announce $_role $_env $_job
   test_run $_jobkey
   test_kill $_jobkey
@@ -387,6 +396,29 @@ test_basic_auth_unauthenticated() {
   restore_netrc
 }
 
+test_appc() {
+  TEMP_PATH=$(mktemp -d)
+  pushd "$TEMP_PATH"
+
+  # build the appc image from the docker image
+  docker save -o http_example-latest.tar http_example
+  docker2aci http_example-latest.tar
+
+  APPC_IMAGE_ID="sha512-$(sha512sum http_example-latest.aci | awk '{print $1}')"
+  APPC_IMAGE_DIRECTORY="/tmp/mesos/images/appc/images/$APPC_IMAGE_ID"
+
+  sudo mkdir -p "$APPC_IMAGE_DIRECTORY"
+  sudo tar -xf http_example-latest.aci -C "$APPC_IMAGE_DIRECTORY"
+  # This restart is necessary for mesos to pick up the image from the local store.
+  sudo restart mesos-slave
+
+  popd
+  rm -rf "$TEMP_PATH"
+
+  TEST_JOB_APPC_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_APPC" "--bind appc_image_id=$APPC_IMAGE_ID")
+  test_http_example "${TEST_JOB_APPC_ARGS[@]}"
+}
+
 RETCODE=1
 # Set up shorthands for test
 export TEST_ROOT=/vagrant/src/test/sh/org/apache/aurora/e2e
@@ -398,6 +430,7 @@ TEST_ENV=test
 TEST_JOB=http_example
 TEST_JOB_REVOCABLE=http_example_revocable
 TEST_JOB_DOCKER=http_example_docker
+TEST_JOB_APPC=http_example_appc
 TEST_CONFIG_FILE=$EXAMPLE_DIR/http_example.aurora
 TEST_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_updated.aurora
 TEST_BAD_HEALTHCHECK_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_bad_healthcheck.aurora
@@ -441,6 +474,9 @@ test_http_revocable_example "${TEST_JOB_REVOCABLE_ARGS[@]}"
 # build the test docker image
 sudo docker build -t http_example ${TEST_ROOT}
 test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
+
+# This test relies on the docker image having been built above.
+test_appc
 
 test_admin "${TEST_ADMIN_ARGS[@]}"
 test_basic_auth_unauthenticated  "${TEST_JOB_ARGS[@]}"

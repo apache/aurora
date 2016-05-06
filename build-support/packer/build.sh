@@ -59,6 +59,46 @@ function install_docker {
     docker-engine
 }
 
+function install_docker2aci {
+  DOCKER2ACI_VERSION="0.9.3"
+  GOLANG_VERSION="1.6.2"
+
+  TEMP_PATH=$(mktemp -d)
+  pushd "$TEMP_PATH"
+
+  echo "Downloading go..."
+  curl -sL "https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-amd64.tar.gz" | tar -xz
+
+  export GOROOT="$PWD/go"
+  export PATH="$PATH:$GOROOT/bin"
+
+  echo "Downloading docker2aci source..."
+  curl -sL "https://github.com/appc/docker2aci/archive/v${DOCKER2ACI_VERSION}.tar.gz" | tar -xz
+  pushd "docker2aci-${DOCKER2ACI_VERSION}"
+
+  # This is a version of https://github.com/appc/docker2aci/blob/v0.9.3/build.sh that has been
+  # modified to work without the need to be in a git repo.
+  ORG_PATH="github.com/appc"
+  REPO_PATH="${ORG_PATH}/docker2aci"
+  GLDFLAGS="-X github.com/appc/docker2aci/lib.Version=${DOCKER2ACI_VERSION}"
+
+  if [ ! -h "gopath/src/${REPO_PATH}" ]; then
+    mkdir -p "gopath/src/${ORG_PATH}"
+    ln -s ../../../.. "gopath/src/${REPO_PATH}" || exit 255
+  fi
+  export GOBIN="${PWD}/bin"
+  export GOPATH="${PWD}/gopath:${PWD}/Godeps/_workspace"
+  eval "$(go env)"
+  echo "Building docker2aci..."
+  go build -o "$GOBIN/docker2aci" -ldflags "${GLDFLAGS}" "${REPO_PATH}/"
+  mv "$GOBIN/docker2aci" /usr/local/bin/docker2aci
+
+  popd
+  popd
+
+  rm -rf "$TEMP_PATH"
+}
+
 function install_mesos {
   apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF
   DISTRO=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
@@ -114,6 +154,7 @@ function compact_box {
 remove_unused
 install_base_packages
 install_docker
+install_docker2aci
 install_mesos
 install_thrift
 warm_artifact_cache

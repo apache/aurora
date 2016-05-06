@@ -18,7 +18,7 @@ import mock
 import pytest
 from twitter.common.contextutil import temporary_dir
 
-from apache.aurora.executor.common.sandbox import DirectorySandbox, DockerDirectorySandbox
+from apache.aurora.executor.common.sandbox import DirectorySandbox, FileSystemImageSandbox
 
 
 def test_directory_sandbox():
@@ -82,16 +82,16 @@ def test_create_ioerror(chown):
 
 
 @mock.patch('os.makedirs')
-def test_docker_sandbox_create_ioerror(makedirs):
+def test_filesystem_image_sandbox_create_ioerror(makedirs):
   makedirs.side_effect = IOError('Disk is borked')
 
   with mock.patch.dict('os.environ', {
-      DockerDirectorySandbox.MESOS_DIRECTORY_ENV_VARIABLE: 'some-directory',
-      DockerDirectorySandbox.MESOS_SANDBOX_ENV_VARIABLE: 'some-sandbox'
+    FileSystemImageSandbox.MESOS_DIRECTORY_ENV_VARIABLE: 'some-directory',
+    FileSystemImageSandbox.MESOS_SANDBOX_ENV_VARIABLE: 'some-sandbox'
   }):
     with temporary_dir() as d:
       real_path = os.path.join(d, 'sandbox')
-      ds = DockerDirectorySandbox(real_path)
+      ds = FileSystemImageSandbox(real_path)
       with pytest.raises(DirectorySandbox.CreationError):
         ds.create()
 

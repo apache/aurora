@@ -73,14 +73,10 @@ public class ExecutorModule extends AbstractModule {
       help = "Extra arguments to be passed to the thermos executor")
   private static final Arg<String> THERMOS_EXECUTOR_FLAGS = Arg.create(null);
 
-  @CmdLine(name = "thermos_observer_root",
-      help = "Path to the thermos observer root (by default /var/run/thermos.)")
-  private static final Arg<String> THERMOS_OBSERVER_ROOT = Arg.create("/var/run/thermos");
-
   @CmdLine(name = "thermos_home_in_sandbox",
       help = "If true, changes HOME to the sandbox before running the executor. "
-             + "This primarily has the effect of causing the executor and runner "
-             + "to extract themselves into the sandbox.")
+          + "This primarily has the effect of causing the executor and runner "
+          + "to extract themselves into the sandbox.")
   private static final Arg<Boolean> THERMOS_HOME_IN_SANDBOX = Arg.create(false);
 
   /**
@@ -140,11 +136,6 @@ public class ExecutorModule extends AbstractModule {
   private static ExecutorSettings makeThermosExecutorSettings()  {
     List<Protos.Volume> volumeMounts =
         ImmutableList.<Protos.Volume>builder()
-            .add(Protos.Volume.newBuilder()
-                .setHostPath(THERMOS_OBSERVER_ROOT.get())
-                .setContainerPath(THERMOS_OBSERVER_ROOT.get())
-                .setMode(Protos.Volume.Mode.RW)
-                .build())
             .addAll(Iterables.transform(
                 GLOBAL_CONTAINER_MOUNTS.get(),
                 v -> Protos.Volume.newBuilder()
