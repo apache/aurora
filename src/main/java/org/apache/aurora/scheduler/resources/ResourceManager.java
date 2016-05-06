@@ -20,6 +20,7 @@ import java.util.stream.StreamSupport;
 
 import com.google.common.collect.Iterables;
 
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -75,8 +76,8 @@ public final class ResourceManager {
    * @param task Task to get resource types from.
    * @return Set of {@link ResourceType} instances representing task resources.
    */
-  public static Set<ResourceType> getTaskResourceTypes(IScheduledTask task) {
-    return EnumSet.copyOf(task.getAssignedTask().getTask().getResources().stream()
+  public static Set<ResourceType> getTaskResourceTypes(IAssignedTask task) {
+    return EnumSet.copyOf(task.getTask().getResources().stream()
         .map(r -> fromResource(r))
         .collect(Collectors.toSet()));
   }

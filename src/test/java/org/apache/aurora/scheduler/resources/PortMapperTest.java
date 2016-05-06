@@ -13,8 +13,8 @@
  */
 package org.apache.aurora.scheduler.resources;
 
-import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.Protos;
 import org.junit.Test;
 
@@ -29,17 +29,17 @@ import static org.junit.Assert.assertEquals;
 public class PortMapperTest {
   @Test
   public void testAssignNoPorts() {
-    ScheduledTask builder = makeTask("id", JOB).newBuilder();
-    builder.getAssignedTask().getTask().unsetResources();
-    builder.getAssignedTask().unsetAssignedPorts();
-    IScheduledTask task = IScheduledTask.build(builder);
+    AssignedTask builder = makeTask("id", JOB).newBuilder().getAssignedTask();
+    builder.getTask().unsetResources();
+    builder.unsetAssignedPorts();
+    IAssignedTask task = IAssignedTask.build(builder);
 
     assertEquals(task, PORT_MAPPER.mapAndAssign(offer(), task));
   }
 
   @Test(expected = IllegalStateException.class)
   public void testPortRangeScarcity() {
-    PORT_MAPPER.mapAndAssign(offer(), makeTask("id", JOB));
+    PORT_MAPPER.mapAndAssign(offer(), makeTask("id", JOB).getAssignedTask());
   }
 
   @Test
@@ -47,8 +47,8 @@ public class PortMapperTest {
     Protos.Offer offer = offer(mesosRange(PORTS, 1, 2, 3, 4, 5));
     assertEquals(
         1,
-        PORT_MAPPER.mapAndAssign(offer, makeTask("id", JOB))
-            .getAssignedTask().getAssignedPorts().size());
+        PORT_MAPPER.mapAndAssign(offer, makeTask("id", JOB).getAssignedTask())
+            .getAssignedPorts().size());
   }
 
   @Test
@@ -56,7 +56,7 @@ public class PortMapperTest {
     Protos.Offer offer = offer(mesosRange(PORTS, 1));
     assertEquals(
         1,
-        PORT_MAPPER.mapAndAssign(offer, makeTask("id", JOB))
-            .getAssignedTask().getAssignedPorts().size());
+        PORT_MAPPER.mapAndAssign(offer, makeTask("id", JOB).getAssignedTask())
+            .getAssignedPorts().size());
   }
 }

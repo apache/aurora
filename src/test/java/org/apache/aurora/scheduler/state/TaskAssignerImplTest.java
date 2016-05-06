@@ -20,9 +20,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobKey;
-import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TierManager;
@@ -36,6 +36,7 @@ import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -293,12 +294,14 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
   @Test
   public void testResourceMapperCallback() {
-    ScheduledTask builder = TASK.newBuilder();
-    builder.getAssignedTask().unsetAssignedPorts();
+    AssignedTask builder = TASK.newBuilder().getAssignedTask();
+    builder.unsetAssignedPorts();
 
     control.replay();
 
-    assertEquals(TASK, assigner.mapAndAssignResources(MESOS_OFFER, IScheduledTask.build(builder)));
+    assertEquals(
+        TASK.getAssignedTask(),
+        assigner.mapAndAssignResources(MESOS_OFFER, IAssignedTask.build(builder)));
   }
 
   private void expectAssignTask(Offer offer) {

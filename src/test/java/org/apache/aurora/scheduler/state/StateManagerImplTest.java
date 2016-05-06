@@ -52,6 +52,7 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -564,10 +565,6 @@ public class StateManagerImplTest extends EasyMockTest {
         taskId,
         host.getHost(),
         SlaveID.newBuilder().setValue(host.getSlaveId()).build(),
-        e -> {
-          ScheduledTask builder = e.newBuilder();
-          builder.getAssignedTask().setAssignedPorts(ports);
-          return IScheduledTask.build(builder);
-        }));
+        e -> IAssignedTask.build(e.newBuilder().setAssignedPorts(ports))));
   }
 }

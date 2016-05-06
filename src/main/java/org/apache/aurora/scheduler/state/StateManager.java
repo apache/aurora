@@ -20,7 +20,6 @@ import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.SlaveID;
 
@@ -71,7 +70,7 @@ public interface StateManager {
       String taskId,
       String slaveHost,
       SlaveID slaveId,
-      Function<IScheduledTask, IScheduledTask> resourceAssigner);
+      Function<IAssignedTask, IAssignedTask> resourceAssigner);
 
   /**
    * Inserts pending instances using {@code task} as their configuration. Tasks will immediately

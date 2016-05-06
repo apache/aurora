@@ -39,7 +39,6 @@ import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos.TaskInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,8 +103,8 @@ public interface TaskAssigner {
     }
 
     @VisibleForTesting
-    IScheduledTask mapAndAssignResources(Offer offer, IScheduledTask task) {
-      IScheduledTask assigned = task;
+    IAssignedTask mapAndAssignResources(Offer offer, IAssignedTask task) {
+      IAssignedTask assigned = task;
       for (ResourceType type : ResourceManager.getTaskResourceTypes(assigned)) {
         if (type.getMapper().isPresent()) {
           assigned = type.getMapper().get().mapAndAssign(offer, assigned);

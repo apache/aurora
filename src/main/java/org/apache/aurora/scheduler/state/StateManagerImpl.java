@@ -165,7 +165,7 @@ public class StateManagerImpl implements StateManager {
       String taskId,
       String slaveHost,
       SlaveID slaveId,
-      Function<IScheduledTask, IScheduledTask> resourceAssigner) {
+      Function<IAssignedTask, IAssignedTask> resourceAssigner) {
 
     checkNotBlank(taskId);
     checkNotBlank(slaveHost);
@@ -174,8 +174,8 @@ public class StateManagerImpl implements StateManager {
 
     IScheduledTask mutated = storeProvider.getUnsafeTaskStore().mutateTask(taskId,
         task -> {
-          task = resourceAssigner.apply(task);
           ScheduledTask builder = task.newBuilder();
+          builder.setAssignedTask(resourceAssigner.apply(task.getAssignedTask()).newBuilder());
           builder.getAssignedTask()
               .setSlaveHost(slaveHost)
               .setSlaveId(slaveId.getValue());

@@ -19,9 +19,9 @@ import java.util.Set;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
-import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IResource;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Value.Scalar;
@@ -82,12 +82,12 @@ public class ResourceManagerTest {
 
   @Test
   public void testGetTaskResourceTypes() {
-    ScheduledTask builder = makeTask("id", JOB).newBuilder();
-    builder.getAssignedTask().getTask().addToResources(namedPort("health"));
+    AssignedTask builder = makeTask("id", JOB).newBuilder().getAssignedTask();
+    builder.getTask().addToResources(namedPort("health"));
 
     assertEquals(
         EnumSet.allOf(ResourceType.class),
-        ResourceManager.getTaskResourceTypes(IScheduledTask.build(builder)));
+        ResourceManager.getTaskResourceTypes(IAssignedTask.build(builder)));
   }
 
   @Test

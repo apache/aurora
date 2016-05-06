@@ -23,8 +23,8 @@ import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Range;
 
-import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.Protos.Offer;
 
 import static java.util.stream.StreamSupport.stream;
@@ -46,13 +46,13 @@ public interface ResourceMapper {
    * @param task Task with requested resources.
    * @return A new task with updated mapping.
    */
-  IScheduledTask mapAndAssign(Offer offer, IScheduledTask task);
+  IAssignedTask mapAndAssign(Offer offer, IAssignedTask task);
 
   PortMapper PORT_MAPPER = new PortMapper();
 
   class PortMapper implements ResourceMapper {
     @Override
-    public IScheduledTask mapAndAssign(Offer offer, IScheduledTask task) {
+    public IAssignedTask mapAndAssign(Offer offer, IAssignedTask task) {
       List<Integer> availablePorts =
           stream(ResourceManager.getOfferResources(offer, PORTS).spliterator(), false)
               .flatMap(resource -> resource.getRanges().getRangeList().stream())
@@ -64,7 +64,7 @@ public interface ResourceMapper {
       Collections.shuffle(availablePorts);
 
       List<String> requestedPorts =
-          stream(ResourceManager.getTaskResources(task, PORTS).spliterator(), false)
+          stream(ResourceManager.getTaskResources(task.getTask(), PORTS).spliterator(), false)
             .map(e -> e.getNamedPort())
             .collect(Collectors.toList());
 
@@ -76,9 +76,9 @@ public interface ResourceMapper {
       Map<String, Integer> portMap =
           requestedPorts.stream().collect(Collectors.toMap(key -> key, value -> ports.next()));
 
-      ScheduledTask builder = task.newBuilder();
-      builder.getAssignedTask().setAssignedPorts(ImmutableMap.copyOf(portMap));
-      return IScheduledTask.build(builder);
+      AssignedTask builder = task.newBuilder();
+      builder.setAssignedPorts(ImmutableMap.copyOf(portMap));
+      return IAssignedTask.build(builder);
     }
   }
 }
