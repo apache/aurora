@@ -163,5 +163,5 @@ Specify a tier configuration file path (unless you want to use the [default](../
     -tier_config=path/to/tiers/config.json
 
 
-See the [Configuration Reference](../references/configuration.md) for details on how to mark a job
+See the [Configuration Reference](../reference/configuration.md) for details on how to mark a job
 as being revocable.
