@@ -18,13 +18,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Ordering;
 import com.google.common.collect.Range;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -285,37 +283,4 @@ public final class ResourceSlot {
         Amount.of(getDisk().as(BYTES) - other.getDisk().as(BYTES), BYTES),
         getNumPorts() - other.getNumPorts());
   }
-
-  /**
-   * A Resources object is greater than another iff _all_ of its resource components are greater
-   * or equal. A Resources object compares as equal if some but not all components are greater than
-   * or equal to the other.
-   */
-  public static final Ordering<ResourceSlot> ORDER = new Ordering<ResourceSlot>() {
-    @Override
-    public int compare(ResourceSlot left, ResourceSlot right) {
-      int diskC = left.getDisk().compareTo(right.getDisk());
-      int ramC = left.getRam().compareTo(right.getRam());
-      int portC = Integer.compare(left.getNumPorts(), right.getNumPorts());
-      int cpuC = Double.compare(left.getNumCpus(), right.getNumCpus());
-
-      List<Integer> vector = ImmutableList.of(diskC, ramC, portC, cpuC);
-
-      if (vector.stream().allMatch(IS_ZERO))  {
-        return 0;
-      }
-
-      if (vector.stream().filter(IS_ZERO.negate()).allMatch(e -> e > 0)) {
-        return 1;
-      }
-
-      if (vector.stream().filter(IS_ZERO.negate()).allMatch(e -> e < 0)) {
-        return -1;
-      }
-
-      return 0;
-    }
-  };
-
-  private static final Predicate<Integer> IS_ZERO = e -> e == 0;
 }

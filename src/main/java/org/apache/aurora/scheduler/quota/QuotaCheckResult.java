@@ -77,9 +77,8 @@ public class QuotaCheckResult {
   static QuotaCheckResult greaterOrEqual(ResourceBag a, ResourceBag b) {
     StringBuilder details = new StringBuilder();
     ResourceBag difference = a.subtract(b);
-    difference.getResourceVectors().entrySet().stream()
-        .filter(IS_NEGATIVE)
-        .forEach(entry -> addMessage(entry.getKey(), Math.abs(entry.getValue()), details));
+    difference.filter(IS_NEGATIVE).streamResourceVectors().forEach(
+        entry -> addMessage(entry.getKey(), Math.abs(entry.getValue()), details));
 
     return new QuotaCheckResult(
         details.length() > 0 ? Result.INSUFFICIENT_QUOTA : Result.SUFFICIENT_QUOTA,

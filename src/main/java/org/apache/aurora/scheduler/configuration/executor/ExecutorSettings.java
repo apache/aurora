@@ -15,10 +15,8 @@ package org.apache.aurora.scheduler.configuration.executor;
 
 import java.util.Objects;
 
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Data;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
-import org.apache.aurora.scheduler.resources.ResourceType;
+import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 
 import static java.util.Objects.requireNonNull;
 
@@ -44,20 +42,8 @@ public class ExecutorSettings {
     return populateDiscoveryInfo;
   }
 
-  private double getExecutorResourceValue(ResourceType resource) {
-    return config.getExecutor().getResourcesList().stream()
-        .filter(r -> r.getName().equals(resource.getMesosName()))
-        .findFirst()
-        .map(r -> r.getScalar().getValue())
-        .orElse(0D);
-  }
-
-  public ResourceSlot getExecutorOverhead() {
-    return new ResourceSlot(
-        getExecutorResourceValue(ResourceType.CPUS),
-        Amount.of((long) getExecutorResourceValue(ResourceType.RAM_MB), Data.MB),
-        Amount.of((long) getExecutorResourceValue(ResourceType.DISK_MB), Data.MB),
-        0);
+  public ResourceBag getExecutorOverhead() {
+    return ResourceManager.bagFromMesosResources(config.getExecutor().getResourcesList());
   }
 
   @Override

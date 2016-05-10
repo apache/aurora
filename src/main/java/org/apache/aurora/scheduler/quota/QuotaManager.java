@@ -174,7 +174,7 @@ public interface QuotaManager {
       QuotaInfo info = getQuotaInfo(ownerRole, Optional.absent(), storeProvider);
       ResourceBag prodConsumption = info.getProdSharedConsumption();
       ResourceBag overage = bagFromAggregate(quota).subtract(prodConsumption);
-      if (overage.getResourceVectors().entrySet().stream().anyMatch(IS_NEGATIVE)) {
+      if (!overage.filter(IS_NEGATIVE).getResourceVectors().isEmpty()) {
         throw new QuotaException(String.format(
             "Quota: %s is less then current prod reservation: %s",
             quota.toString(),

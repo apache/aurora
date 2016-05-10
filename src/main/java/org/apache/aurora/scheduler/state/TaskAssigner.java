@@ -37,7 +37,6 @@ import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
-import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.Protos.TaskInfo;
 import org.slf4j.Logger;
@@ -47,6 +46,8 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
+import static org.apache.aurora.scheduler.resources.ResourceManager.getOfferResources;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.mesos.Protos.Offer;
 
@@ -152,7 +153,7 @@ public interface TaskAssigner {
         TierInfo tierInfo = tierManager.getTier(groupKey.getTask());
         Set<Veto> vetoes = filter.filter(
             new UnusedResource(
-                Resources.from(offer.getOffer()).filter(tierInfo).slot(),
+                bagFromMesosResources(getOfferResources(offer.getOffer(), tierInfo)),
                 offer.getAttributes()),
             resourceRequest);
 

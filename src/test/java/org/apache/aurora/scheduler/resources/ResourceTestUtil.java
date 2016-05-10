@@ -69,6 +69,15 @@ public final class ResourceTestUtil {
     return ITaskConfig.build(builder);
   }
 
+  public static ITaskConfig resetResource(ITaskConfig config, ResourceType type, Double value) {
+    TaskConfig builder = config.newBuilder();
+    builder.getResources().removeIf(e -> fromResource(IResource.build(e)).equals(type));
+    builder.addToResources(IResource.newBuilder(
+        type.getValue(),
+        type.getAuroraResourceConverter().valueOf(value)));
+    return ITaskConfig.build(builder);
+  }
+
   public static Protos.Resource mesosScalar(ResourceType type, double value) {
     return mesosScalar(type, Optional.absent(), false, value);
   }

@@ -133,7 +133,7 @@ class SlotSizeCounter implements Runnable {
 
   private int countSlots(Iterable<ResourceBag> slots, final ResourceBag slotSize) {
     Function<ResourceBag, Integer> counter = machineSlack -> Ordering.natural().min(
-        machineSlack.divide(slotSize).getResourceVectors().entrySet().stream()
+        machineSlack.divide(slotSize).streamResourceVectors()
             .map(entry -> entry.getValue())
             .collect(Collectors.toSet()))
         .intValue();

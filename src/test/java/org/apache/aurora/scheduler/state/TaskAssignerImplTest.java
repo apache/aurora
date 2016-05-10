@@ -34,7 +34,6 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.offers.OfferManager;
-import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -58,6 +57,7 @@ import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
+import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.offer;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
@@ -87,8 +87,9 @@ public class TaskAssignerImplTest extends EasyMockTest {
       .setSlaveId(MESOS_OFFER.getSlaveId())
       .build();
   private static final Map<String, TaskGroupKey> NO_RESERVATION = ImmutableMap.of();
-  private static final UnusedResource UNUSED =
-      new UnusedResource(Resources.from(MESOS_OFFER).slot(), OFFER.getAttributes());
+  private static final UnusedResource UNUSED = new UnusedResource(
+      bagFromMesosResources(MESOS_OFFER.getResourcesList()),
+      OFFER.getAttributes());
   private static final ResourceRequest RESOURCE_REQUEST =
       new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY);
 
@@ -267,13 +268,14 @@ public class TaskAssignerImplTest extends EasyMockTest {
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER).times(2);
     expect(filter.filter(
         new UnusedResource(
-            Resources.from(mismatched.getOffer()).slot(),
+            bagFromMesosResources(mismatched.getOffer().getResourcesList()),
             mismatched.getAttributes()),
         new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("constraint mismatch")));
     offerManager.banOffer(mismatched.getOffer().getId(), GROUP_KEY);
     expect(filter.filter(
-        new UnusedResource(Resources.from(OFFER.getOffer()).slot(), OFFER.getAttributes()),
+        new UnusedResource(
+            bagFromMesosResources(MESOS_OFFER.getResourcesList()), OFFER.getAttributes()),
         new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
         .andReturn(ImmutableSet.of());
 

@@ -101,7 +101,7 @@ interface SlaGroup {
     // TODO(maxim): Refactor SLA management to build groups dynamically from
     // all available ResourceType values.
     private static Double fromBag(ResourceBag bag, ResourceType type) {
-      return bag.getResourceVectors().get(type);
+      return bag.valueOf(type);
     }
   }
 

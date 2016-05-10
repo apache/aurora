@@ -25,12 +25,12 @@ import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
-import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
@@ -41,10 +41,6 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
-import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
-import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
-import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
  * Implementation of the scheduling filter that ensures resource requirements of tasks are
@@ -74,12 +70,10 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     }
   }
 
-  private static Set<Veto> getResourceVetoes(ResourceSlot available, ResourceSlot required) {
+  private static Set<Veto> getResourceVetoes(ResourceBag available, ResourceBag required) {
     ImmutableSet.Builder<Veto> vetoes = ImmutableSet.builder();
-    maybeAddVeto(vetoes, CPUS, available.getNumCpus(), required.getNumCpus());
-    maybeAddVeto(vetoes, RAM_MB, available.getRam().as(Data.MB), required.getRam().as(Data.MB));
-    maybeAddVeto(vetoes, DISK_MB, available.getDisk().as(Data.MB), required.getDisk().as(Data.MB));
-    maybeAddVeto(vetoes, PORTS, available.getNumPorts(), required.getNumPorts());
+    required.streamResourceVectors().forEach(
+        e -> maybeAddVeto(vetoes, e.getKey(), available.valueOf(e.getKey()), e.getValue()));
     return vetoes.build();
   }
 
@@ -167,6 +161,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     // 4. Resource check (lowest score).
     return getResourceVetoes(
         resource.getResourceSlot(),
-        ResourceSlot.from(request.getTask()).add(executorSettings.getExecutorOverhead()));
+        ResourceManager.bagFromResources(request.getTask().getResources())
+            .add(executorSettings.getExecutorOverhead()));
   }
 }

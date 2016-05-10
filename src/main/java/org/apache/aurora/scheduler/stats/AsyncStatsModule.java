@@ -158,10 +158,7 @@ public class AsyncStatsModule extends AbstractModule {
         // It's insufficient to compare revocable against EMPTY here as RAM, DISK and PORTS
         // are always rolled in to revocable as non-compressible resources. Only if revocable
         // CPU is non-zero should we expose the revocable resources as aggregates.
-        if (revocable.getResourceVectors().entrySet().stream()
-            .filter(IS_POSITIVE.and(IS_MESOS_REVOCABLE))
-            .findFirst()
-            .isPresent()) {
+        if (!revocable.filter(IS_POSITIVE.and(IS_MESOS_REVOCABLE)).getResourceVectors().isEmpty()) {
           builder.add(new MachineResource(revocable, isDedicated, true));
         }
 

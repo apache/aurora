@@ -25,6 +25,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -100,6 +101,19 @@ public final class ResourceManager {
   }
 
   /**
+   * Gets offer resources filtered by the provided {@code tierInfo} instance.
+   *
+   * @param offer Offer to get resources from.
+   * @param tierInfo Tier info.
+   * @return Offer resources filtered by {@code tierInfo}.
+   */
+  public static Iterable<Resource> getOfferResources(Offer offer, TierInfo tierInfo) {
+    return tierInfo.isRevocable()
+        ? getRevocableOfferResources(offer)
+        : getNonRevocableOfferResources(offer);
+  }
+
+  /**
    * Same as {@link #getTaskResources(ITaskConfig, ResourceType)}.
    *
    * @param task Scheduled task to get resources from.
@@ -163,6 +177,19 @@ public final class ResourceManager {
   }
 
   /**
+   * Gets the quantity of resource specified by {@code type}.
+   *
+   * @param resources Resources.
+   * @param type Type of resource to quantify.
+   * @return Aggregate resource value.
+   */
+  public static Double quantityOf(Iterable<IResource> resources, ResourceType type) {
+    return quantityOf(StreamSupport.stream(resources.spliterator(), false)
+        .filter(r -> fromResource(r).equals(type))
+        .collect(Collectors.toList()));
+  }
+
+  /**
    * Gets the quantity of resources. Caller to ensure all resources are of the same type.
    *
    * @param resources Resources to sum up.
@@ -214,7 +241,7 @@ public final class ResourceManager {
    */
   public static IResourceAggregate aggregateFromBag(ResourceBag bag) {
     return ThriftBackfill.backfillResourceAggregate(new ResourceAggregate()
-        .setResources(bag.getResourceVectors().entrySet().stream()
+        .setResources(bag.streamResourceVectors()
             .map(e -> IResource.newBuilder(
                 e.getKey().getValue(),
                 e.getKey().getAuroraResourceConverter().valueOf(e.getValue())))

@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
-import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.Constraint;
@@ -38,11 +37,9 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType;
-import org.apache.aurora.scheduler.mesos.Offers;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceType;
-import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -50,8 +47,14 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
+import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.resetPorts;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
@@ -76,8 +79,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final int DEFAULT_CPUS = 4;
   private static final long DEFAULT_RAM = 1000;
   private static final long DEFAULT_DISK = 2000;
-  private static final ResourceSlot DEFAULT_OFFER = Resources.from(
-      Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 80))).slot();
+  private static final ResourceBag DEFAULT_OFFER = bagFromMesosResources(ImmutableSet.of(
+      mesosScalar(CPUS, DEFAULT_CPUS),
+      mesosScalar(RAM_MB, DEFAULT_RAM),
+      mesosScalar(DISK_MB, DEFAULT_DISK),
+      mesosRange(PORTS, 80, 81)));
 
   private SchedulingFilter defaultFilter;
 
@@ -101,9 +107,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testSufficientPorts() {
     control.replay();
 
-    ResourceSlot twoPorts = Resources.from(
-        Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 81))).slot();
-
     ITaskConfig noPortTask = resetPorts(
         makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK),
         ImmutableSet.of());
@@ -122,22 +125,22 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertEquals(
         none,
         defaultFilter.filter(
-            new UnusedResource(twoPorts, hostA),
+            new UnusedResource(DEFAULT_OFFER, hostA),
             new ResourceRequest(noPortTask, EMPTY)));
     assertEquals(
         none,
         defaultFilter.filter(
-            new UnusedResource(twoPorts, hostA),
+            new UnusedResource(DEFAULT_OFFER, hostA),
             new ResourceRequest(onePortTask, EMPTY)));
     assertEquals(
         none,
         defaultFilter.filter(
-            new UnusedResource(twoPorts, hostA),
+            new UnusedResource(DEFAULT_OFFER, hostA),
             new ResourceRequest(twoPortTask, EMPTY)));
     assertEquals(
         ImmutableSet.of(veto(PORTS, 1)),
         defaultFilter.filter(
-            new UnusedResource(twoPorts, hostA),
+            new UnusedResource(DEFAULT_OFFER, hostA),
             new ResourceRequest(threePortTask, EMPTY)));
   }
 
@@ -617,6 +620,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .setNumCpus(cpus)
         .setRamMb(ramMb)
         .setDiskMb(diskMb)
+        .setResources(ImmutableSet.of(numCpus(cpus), ramMb(ramMb), diskMb(diskMb)))
         .setExecutorConfig(new ExecutorConfig("aurora", "config")));
   }
 

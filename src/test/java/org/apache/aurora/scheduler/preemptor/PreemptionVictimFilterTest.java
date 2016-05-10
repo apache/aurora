@@ -40,7 +40,10 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceTestUtil;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -59,8 +62,11 @@ import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.PREFERRED_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
+import static org.apache.aurora.scheduler.preemptor.PreemptionVictimFilter.PreemptionVictimFilterImpl.ORDER;
 import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.MISSING_ATTRIBUTES_NAME;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.bag;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.apache.mesos.Protos.Offer;
 import static org.apache.mesos.Protos.Resource;
 import static org.easymock.EasyMock.expect;
@@ -255,11 +261,13 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   public void testProductionPreemptingManyNonProduction() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(a1, CPUS, 1.0);
+    setResource(a1, RAM_MB, 512.0);
     expectGetTier(a1, DEV_TIER).atLeastOnce();
 
     ScheduledTask b1 = makeTask(USER_B, JOB_B, TASK_ID_B + "_b1");
-    b1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(b1, CPUS, 1.0);
+    setResource(b1, RAM_MB, 512.0);
     expectGetTier(b1, DEV_TIER).atLeastOnce();
 
     setUpHost();
@@ -268,7 +276,8 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     assignToHost(b1);
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    setResource(p1, CPUS, 2.0);
+    setResource(p1, RAM_MB, 1024.0);
     expectGetTier(p1, PREFERRED_TIER).times(2);
 
     control.replay();
@@ -280,15 +289,19 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   public void testMinimalSetPreempted() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(4).setRamMb(4096);
+    setResource(a1, CPUS, 4.0);
+    setResource(a1, RAM_MB, 4096.0);
     expectGetTier(a1, DEV_TIER).atLeastOnce();
 
     ScheduledTask b1 = makeTask(USER_B, JOB_B, TASK_ID_B + "_b1");
     b1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(b1, CPUS, 1.0);
+    setResource(b1, RAM_MB, 512.0);
     expectGetTier(b1, DEV_TIER).anyTimes();
 
     ScheduledTask b2 = makeTask(USER_B, JOB_B, TASK_ID_B + "_b2");
-    b2.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(b2, CPUS, 1.0);
+    setResource(b2, RAM_MB, 512.0);
     expectGetTier(b2, DEV_TIER).anyTimes();
 
     setUpHost();
@@ -298,7 +311,8 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     assignToHost(b2);
 
     ScheduledTask p1 = makeProductionTask(USER_C, JOB_C, TASK_ID_C + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    setResource(p1, CPUS, 2.0);
+    setResource(p1, RAM_MB, 1024.0);
     expectGetTier(p1, PREFERRED_TIER).times(3);
 
     control.replay();
@@ -358,12 +372,14 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(a1, CPUS, 1.0);
+    setResource(a1, RAM_MB, 512.0);
     assignToHost(a1);
     expectGetTier(a1, DEV_TIER).times(2);
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    setResource(p1, CPUS, 2.0);
+    setResource(p1, RAM_MB, 1024.0);
     expectGetTier(p1, PREFERRED_TIER);
 
     control.replay();
@@ -381,12 +397,14 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(a1, CPUS, 1.0);
+    setResource(a1, RAM_MB, 512.0);
     assignToHost(a1);
     expectGetTier(a1, REVOCABLE_TIER).times(2);
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    setResource(p1, CPUS, 2.0);
+    setResource(p1, RAM_MB, 1024.0);
     expectGetTier(p1, PREFERRED_TIER);
 
     control.replay();
@@ -404,12 +422,14 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(a1, CPUS, 1.0);
+    setResource(a1, RAM_MB, 512.0);
     assignToHost(a1);
     expectGetTier(a1, REVOCABLE_TIER).times(2);
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    setResource(p1, CPUS, 2.0);
+    setResource(p1, RAM_MB, 1024.0);
     expectGetTier(p1, PREFERRED_TIER);
 
     control.replay();
@@ -429,17 +449,20 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(a1, CPUS, 1.0);
+    setResource(a1, RAM_MB, 512.0);
     assignToHost(a1);
     expectGetTier(a1, DEV_TIER).atLeastOnce();
 
     ScheduledTask a2 = makeTask(USER_A, JOB_B, TASK_ID_A + "_a2");
-    a2.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(a2, CPUS, 1.0);
+    setResource(a2, RAM_MB, 512.0);
     assignToHost(a2);
     expectGetTier(a2, DEV_TIER).atLeastOnce();
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(4).setRamMb(2048);
+    setResource(p1, CPUS, 4.0);
+    setResource(p1, RAM_MB, 2048.0);
     expectGetTier(p1, PREFERRED_TIER).times(2);
 
     control.replay();
@@ -466,7 +489,8 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     expectGetTier(task, PREFERRED_TIER);
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(a1, CPUS, 1.0);
+    setResource(a1, RAM_MB, 512.0);
     assignToHost(a1);
     expectGetTier(a1, DEV_TIER);
 
@@ -486,7 +510,8 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     expectGetTier(task, PREFERRED_TIER);
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    setResource(a1, CPUS, 1.0);
+    setResource(a1, RAM_MB, 512.0);
     assignToHost(a1);
     expectGetTier(a1, DEV_TIER).times(2);
 
@@ -496,6 +521,18 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     control.replay();
 
     assertNoVictims(runFilter(task, NO_OFFER, a1));
+  }
+
+  @Test
+  public void testOrder() {
+    control.replay();
+
+    ResourceBag one = bag(1, 1, 1);
+    ResourceBag two = bag(2, 2, 2);
+    ResourceBag three = bag(3, 3, 3);
+    assertEquals(
+        ImmutableList.of(one, two, three, three),
+        ORDER.sortedCopy(ImmutableList.of(three, one, two, three)));
   }
 
   private static ImmutableSet<PreemptionVictim> preemptionVictims(ScheduledTask... tasks) {
@@ -569,7 +606,14 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
         .andReturn(tier);
   }
 
-  static ScheduledTask makeTask(
+  private static void setResource(ScheduledTask task, ResourceType type, Double value) {
+    task.getAssignedTask().setTask(ResourceTestUtil.resetResource(
+        ITaskConfig.build(task.getAssignedTask().getTask()),
+        type,
+        value).newBuilder());
+  }
+
+  private static ScheduledTask makeTask(
       String role,
       String job,
       String taskId,

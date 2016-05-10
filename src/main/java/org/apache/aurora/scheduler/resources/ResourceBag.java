@@ -17,14 +17,19 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.BinaryOperator;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
+
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
 
 import static java.util.stream.Collectors.toMap;
 
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
@@ -91,6 +96,25 @@ public class ResourceBag {
   }
 
   /**
+   * Convenience function to return a stream of resource vectors.
+   *
+   * @return A stream of resource vectors.
+   */
+  public Stream<Map.Entry<ResourceType, Double>> streamResourceVectors() {
+    return resourceVectors.entrySet().stream();
+  }
+
+  /**
+   * Gets the value of resource specified by {@code type} or 0.0.
+   *
+   * @param type Resource type to get value for.
+   * @return Resource value or 0.0 if no mapping for {@code type} is found.
+   */
+  public Double valueOf(ResourceType type) {
+    return resourceVectors.getOrDefault(type, 0.0);
+  }
+
+  /**
    * Adds this and other bag contents.
    *
    * @param other Other bag to add.
@@ -139,6 +163,32 @@ public class ResourceBag {
   public ResourceBag scale(int m) {
     return new ResourceBag(resourceVectors.entrySet().stream()
         .collect(toMap(Map.Entry::getKey, v -> v.getValue() * m)));
+  }
+
+  /**
+   * Filters bag resources by {@code predicate}.
+   *
+   * @param predicate Predicate to filter by.
+   * @return A new bag with resources filtered by {@code predicate}.
+   */
+  public ResourceBag filter(Predicate<Map.Entry<ResourceType, Double>> predicate) {
+    return new ResourceBag(resourceVectors.entrySet().stream()
+        .filter(predicate)
+        .collect(toMap(Map.Entry::getKey, Map.Entry::getValue)));
+  }
+
+  /**
+   * Temporary bridge between bag and slot to facilitate migration.
+   *
+   * TODO(maxim): remove together with ResourceSlot.
+   * @return ResourceSlot.
+   */
+  public ResourceSlot toSlot() {
+    return new ResourceSlot(
+        valueOf(CPUS),
+        Amount.of(valueOf(RAM_MB).longValue(), Data.MB),
+        Amount.of(valueOf(DISK_MB).longValue(), Data.MB),
+        valueOf(PORTS).intValue());
   }
 
   private ResourceBag binaryOp(ResourceBag other, BinaryOperator<Double> operator) {

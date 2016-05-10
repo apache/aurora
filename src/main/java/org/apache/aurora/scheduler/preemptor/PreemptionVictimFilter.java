@@ -18,10 +18,12 @@ import java.util.Set;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
@@ -35,16 +37,17 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
-import org.apache.aurora.scheduler.resources.ResourceManager;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
-import org.apache.aurora.scheduler.resources.Resources;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.resources.ResourceSlot.sum;
+import static org.apache.aurora.scheduler.resources.ResourceBag.EMPTY;
+import static org.apache.aurora.scheduler.resources.ResourceBag.IS_MESOS_REVOCABLE;
+import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
+import static org.apache.aurora.scheduler.resources.ResourceManager.getNonRevocableOfferResources;
 
 /**
  * Filters active tasks (victims) and available offer (slack) resources that can accommodate a
@@ -98,33 +101,63 @@ public interface PreemptionVictimFilter {
       this.tierManager = requireNonNull(tierManager);
     }
 
-    private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
-        offer -> Resources.from(offer.getOffer()).filter(ResourceManager.NON_REVOCABLE).slot();
-
     private static final Function<HostOffer, String> OFFER_TO_HOST =
         offer -> offer.getOffer().getHostname();
 
     private static final Function<PreemptionVictim, String> VICTIM_TO_HOST =
         PreemptionVictim::getSlaveHost;
 
-    private final Function<PreemptionVictim, ResourceSlot> victimToResources =
-        new Function<PreemptionVictim, ResourceSlot>() {
+    private final Function<PreemptionVictim, ResourceBag> victimToResources =
+        new Function<PreemptionVictim, ResourceBag>() {
           @Override
-          public ResourceSlot apply(PreemptionVictim victim) {
-            ResourceSlot slot = victim.getResourceSlot();
+          public ResourceBag apply(PreemptionVictim victim) {
+            ResourceBag bag = victim.getResourceBag();
             if (tierManager.getTier(victim.getConfig()).isRevocable()) {
               // Revocable task CPU cannot be used for preemption purposes as it's a compressible
               // resource. We can still use RAM, DISK and PORTS as they are not compressible.
-              slot = new ResourceSlot(0.0, slot.getRam(), slot.getDisk(), slot.getNumPorts());
+              bag = bag.filter(IS_MESOS_REVOCABLE.negate());
             }
-            return slot.add(executorSettings.getExecutorOverhead());
+            return bag.add(executorSettings.getExecutorOverhead());
           }
         };
+
+    private static final java.util.function.Predicate<Integer> IS_ZERO = e -> e == 0;
+
+    /**
+     * A Resources object is greater than another iff _all_ of its resource components are greater.
+     * A Resources object compares as equal if some but not all components are greater
+     * than or equal to the other.
+     */
+    @VisibleForTesting
+    static final Ordering<ResourceBag> ORDER = new Ordering<ResourceBag>() {
+      @Override
+      public int compare(ResourceBag left, ResourceBag right) {
+        ImmutableList.Builder<Integer> builder = ImmutableList.builder();
+        left.streamResourceVectors().forEach(
+            entry -> builder.add(entry.getValue().compareTo(right.valueOf(entry.getKey()))));
+
+        List<Integer> results = builder.build();
+
+        if (results.stream().allMatch(IS_ZERO))  {
+          return 0;
+        }
+
+        if (results.stream().filter(IS_ZERO.negate()).allMatch(e -> e > 0)) {
+          return 1;
+        }
+
+        if (results.stream().filter(IS_ZERO.negate()).allMatch(e -> e < 0)) {
+          return -1;
+        }
+
+        return 0;
+      }
+    };
 
     // TODO(zmanji) Consider using Dominant Resource Fairness for ordering instead of the vector
     // ordering
     private final Ordering<PreemptionVictim> resourceOrder =
-        ResourceSlot.ORDER.onResultOf(victimToResources).reverse();
+        ORDER.onResultOf(victimToResources).reverse();
 
     @Override
     public Optional<ImmutableSet<PreemptionVictim>> filterPreemptionVictims(
@@ -140,7 +173,10 @@ public interface PreemptionVictimFilter {
           .addAll(Iterables.transform(possibleVictims, VICTIM_TO_HOST))
           .addAll(Iterables.transform(offer.asSet(), OFFER_TO_HOST)).build();
 
-      ResourceSlot slackResources = sum(Iterables.transform(offer.asSet(), OFFER_TO_RESOURCE_SLOT));
+      ResourceBag slackResources = offer.asSet().stream()
+          .map(o -> bagFromMesosResources(getNonRevocableOfferResources(o.getOffer())))
+          .reduce((l, r) -> l.add(r))
+          .orElse(EMPTY);
 
       FluentIterable<PreemptionVictim> preemptableTasks = FluentIterable.from(possibleVictims)
           .filter(preemptionFilter(pendingTask));
@@ -160,7 +196,7 @@ public interface PreemptionVictimFilter {
         return Optional.absent();
       }
 
-      ResourceSlot totalResource = slackResources;
+      ResourceBag totalResource = slackResources;
       for (PreemptionVictim victim : sortedVictims) {
         toPreemptTasks.add(victim);
         totalResource = totalResource.add(victimToResources.apply(victim));

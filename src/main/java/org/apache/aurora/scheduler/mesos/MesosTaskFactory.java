@@ -149,7 +149,7 @@ public interface MesosTaskFactory {
         acceptedOffer = AcceptedOffer.create(
             offer,
             ResourceSlot.from(config),
-            executorSettings.getExecutorOverhead(),
+            executorSettings.getExecutorOverhead().toSlot(),
             ImmutableSet.copyOf(task.getAssignedPorts().values()),
             tierManager.getTier(task.getTask()));
       } catch (Resources.InsufficientResourcesException e) {

@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.resources.ResourceBag.IS_NEGATIVE;
 import static org.apache.aurora.scheduler.resources.ResourceBag.LARGE;
 import static org.apache.aurora.scheduler.resources.ResourceBag.MEDIUM;
 import static org.apache.aurora.scheduler.resources.ResourceBag.SMALL;
@@ -24,6 +25,7 @@ import static org.apache.aurora.scheduler.resources.ResourceBag.XLARGE;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.bag;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.junit.Assert.assertEquals;
 
@@ -62,5 +64,18 @@ public class ResourceBagTest {
     assertEquals(
         LARGE.add(new ResourceBag(ImmutableMap.of(CPUS, 1.0))),
         new ResourceBag(ImmutableMap.of(CPUS, 9.0, RAM_MB, 16384.0, DISK_MB, 32768.0)));
+  }
+
+  @Test
+  public void testValueOf() {
+    assertEquals(1.0, SMALL.valueOf(CPUS), 0.0);
+    assertEquals(0.0, SMALL.valueOf(PORTS), 0.0);
+  }
+
+  @Test
+  public void testFilter() {
+    assertEquals(
+        new ResourceBag(ImmutableMap.of(CPUS, -1.0)),
+        bag(-1.0, 128, 1024).filter(IS_NEGATIVE));
   }
 }

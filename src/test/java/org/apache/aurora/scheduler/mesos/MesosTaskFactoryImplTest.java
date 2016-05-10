@@ -37,9 +37,8 @@ import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceType;
-import org.apache.aurora.scheduler.resources.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
@@ -69,6 +68,8 @@ import static org.apache.aurora.scheduler.mesos.TaskExecutors.NO_OVERHEAD_EXECUT
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.SOME_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_CONFIG;
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_EXECUTOR;
+import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
+import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromResources;
 import static org.apache.aurora.scheduler.resources.ResourceSlot.makeMesosRangeResource;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.resetPorts;
 import static org.easymock.EasyMock.expect;
@@ -116,15 +117,17 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
       .setSlaveId(SLAVE)
       .setHostname("slave-hostname")
       .addAllResources(
-          ResourceSlot.from(TASK_CONFIG).add(THERMOS_EXECUTOR.getExecutorOverhead())
+          bagFromResources(TASK_CONFIG.getResources()).add(THERMOS_EXECUTOR.getExecutorOverhead())
+              .toSlot()
               .toResourceList(DEV_TIER))
       .addResources(makeMesosRangeResource(ResourceType.PORTS, ImmutableSet.of(80)))
       .build();
   private static final Offer OFFER_SOME_OVERHEAD_EXECUTOR = OFFER_THERMOS_EXECUTOR.toBuilder()
       .clearResources()
-      .addAllResources(
-              ResourceSlot.from(TASK_CONFIG).add(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())
-                      .toResourceList(DEV_TIER))
+      .addAllResources(bagFromResources(TASK_CONFIG.getResources())
+          .add(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())
+          .toSlot()
+          .toResourceList(DEV_TIER))
       .addResources(makeMesosRangeResource(ResourceType.PORTS, ImmutableSet.of(80)))
       .build();
 
@@ -239,9 +242,13 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
   }
 
   private void checkTaskResources(ITaskConfig task, TaskInfo taskInfo) {
+    ResourceBag taskResources = bagFromMesosResources(taskInfo.getResourcesList());
+    ResourceBag executorResources =
+        bagFromMesosResources(taskInfo.getExecutor().getResourcesList());
+
     assertEquals(
-        ResourceSlot.from(task).add(config.getExecutorOverhead()),
-        getTotalTaskResources(taskInfo));
+        bagFromResources(task.getResources()).add(config.getExecutorOverhead()),
+        taskResources.add(executorResources));
   }
 
   private void checkDiscoveryInfoUnset(TaskInfo taskInfo) {
@@ -451,20 +458,5 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
             .addAllVolumes(EXECUTOR_SETTINGS_WITH_VOLUMES.getExecutorConfig().getVolumeMounts())
             .build(),
         task.getExecutor().getContainer());
-  }
-
-  private static ResourceSlot getTotalTaskResources(TaskInfo task) {
-    Resources taskResources = fromResourceList(task.getResourcesList());
-    Resources executorResources = fromResourceList(task.getExecutor().getResourcesList());
-    return taskResources.slot().add(executorResources.slot());
-  }
-
-  private static Resources fromResourceList(Iterable<Resource> resources) {
-    return Resources.from(Protos.Offer.newBuilder()
-        .setId(Protos.OfferID.newBuilder().setValue("ignored"))
-        .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("ignored"))
-        .setSlaveId(SlaveID.newBuilder().setValue("ignored"))
-        .setHostname("ignored")
-        .addAllResources(resources).build());
   }
 }

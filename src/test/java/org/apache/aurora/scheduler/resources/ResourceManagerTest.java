@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.mesos.Protos;
@@ -86,6 +87,12 @@ public class ResourceManagerTest {
     assertEquals(
         ImmutableSet.of(resource2, resource3),
         ImmutableSet.copyOf(ResourceManager.getRevocableOfferResources(offer)));
+    assertEquals(
+        ImmutableSet.of(resource1, resource3),
+        ImmutableSet.copyOf(ResourceManager.getOfferResources(offer, new TierInfo(false, false))));
+    assertEquals(
+        ImmutableSet.of(resource2, resource3),
+        ImmutableSet.copyOf(ResourceManager.getOfferResources(offer, new TierInfo(false, true))));
   }
 
   @Test
@@ -134,6 +141,19 @@ public class ResourceManagerTest {
         ResourceManager.quantityOf(ImmutableSet.of(
             IResource.build(numCpus(3.0)),
             IResource.build(numCpus(5.0)))),
+        0.0);
+  }
+
+  @Test
+  public void testResourceQuantityByType() {
+    assertEquals(
+        8.0,
+        ResourceManager.quantityOf(
+            ImmutableSet.of(
+                IResource.build(numCpus(3.0)),
+                IResource.build(numCpus(5.0)),
+                IResource.build(ramMb(128))),
+            CPUS),
         0.0);
   }
 

@@ -18,7 +18,7 @@ import java.util.Set;
 
 import com.google.common.base.MoreObjects;
 
-import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -246,15 +246,15 @@ public interface SchedulingFilter {
    * An available resource in the cluster.
    */
   class UnusedResource {
-    private final ResourceSlot offer;
+    private final ResourceBag offer;
     private final IHostAttributes attributes;
 
-    public UnusedResource(ResourceSlot offer, IHostAttributes attributes) {
+    public UnusedResource(ResourceBag offer, IHostAttributes attributes) {
       this.offer = offer;
       this.attributes = attributes;
     }
 
-    public ResourceSlot getResourceSlot() {
+    public ResourceBag getResourceSlot() {
       return offer;
     }
 

@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.resources;
 
 import java.util.Set;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
@@ -31,7 +30,6 @@ import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.apache.aurora.scheduler.resources.ResourceSlot.makeMesosRangeResource;
 import static org.apache.aurora.scheduler.resources.ResourceSlot.makeMesosResource;
-import static org.apache.aurora.scheduler.resources.ResourceSlot.sum;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
@@ -61,18 +59,6 @@ public class ResourceSlotTest {
     assertEquals(TWO, THREE.subtract(ONE));
     assertEquals(NEGATIVE_ONE, ONE.subtract(TWO));
     assertEquals(NEGATIVE_ONE, TWO.subtract(THREE));
-  }
-
-  @Test
-  public void testAdd() {
-    assertEquals(TWO, ONE.add(ONE));
-    assertEquals(THREE, ONE.add(TWO));
-    assertEquals(THREE, TWO.add(ONE));
-  }
-
-  @Test
-  public void testSum() {
-    assertEquals(THREE, sum(ImmutableList.of(ONE, ONE, ONE)));
   }
 
   @Test
@@ -136,13 +122,6 @@ public class ResourceSlotTest {
     ResourceSlot resources = ResourceSlot.from(TASK);
     assertNotEquals(resources, "Hello");
     assertNotEquals(resources, null);
-  }
-
-  @Test
-  public void testOrder() {
-    assertEquals(
-        ImmutableList.of(ONE, TWO, THREE, THREE),
-        ResourceSlot.ORDER.sortedCopy(ImmutableList.of(THREE, ONE, TWO, THREE)));
   }
 
   private void expectRanges(Set<Pair<Long, Long>> expected, Set<Integer> values) {
