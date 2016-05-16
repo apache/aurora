@@ -17,10 +17,12 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Range;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -37,7 +39,7 @@ import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 /**
  * Maps requested (task) resources to available (offer) resources.
  */
-public interface ResourceMapper {
+public interface ResourceMapper<T> {
 
   /**
    * Maps task resources to offer resources and returns a new task with updated mapping.
@@ -48,9 +50,17 @@ public interface ResourceMapper {
    */
   IAssignedTask mapAndAssign(Offer offer, IAssignedTask task);
 
+  /**
+   * Gets assigned resource values stored in {@code task}.
+   *
+   * @param task Task to get assigned resources from.
+   * @return Assigned resource values.
+   */
+  T getAssigned(IAssignedTask task);
+
   PortMapper PORT_MAPPER = new PortMapper();
 
-  class PortMapper implements ResourceMapper {
+  class PortMapper implements ResourceMapper<Set<Integer>> {
     @Override
     public IAssignedTask mapAndAssign(Offer offer, IAssignedTask task) {
       List<Integer> availablePorts =
@@ -79,6 +89,11 @@ public interface ResourceMapper {
       AssignedTask builder = task.newBuilder();
       builder.setAssignedPorts(ImmutableMap.copyOf(portMap));
       return IAssignedTask.build(builder);
+    }
+
+    @Override
+    public Set<Integer> getAssigned(IAssignedTask task) {
+      return ImmutableSet.copyOf(task.getAssignedPorts().values());
     }
   }
 }

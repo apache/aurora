@@ -20,10 +20,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Range;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
@@ -59,15 +57,6 @@ public final class ResourceSlot {
    */
   public static final ResourceSlot NONE =
       new ResourceSlot(0, Amount.of(0L, Data.BITS), Amount.of(0L, Data.BITS), 0);
-
-  /**
-   * Convert {@link com.google.common.collect.Range} to {@link org.apache.mesos.Protos.Value.Range}.
-   */
-  public static final Function<Range<Integer>, Protos.Value.Range> RANGE_TRANSFORM =
-      input -> Protos.Value.Range.newBuilder()
-          .setBegin(input.lowerEndpoint())
-          .setEnd(input.upperEndpoint())
-          .build();
 
   public ResourceSlot(
       double numCpus,
@@ -156,7 +145,7 @@ public final class ResourceSlot {
         .setName(resourceType.getMesosName())
         .setType(Protos.Value.Type.RANGES)
         .setRanges(Protos.Value.Ranges.newBuilder()
-            .addAllRange(Iterables.transform(Numbers.toRanges(values), RANGE_TRANSFORM)))
+            .addAllRange(Iterables.transform(Numbers.toRanges(values), Numbers.RANGE_TRANSFORM)))
         .build();
   }
 

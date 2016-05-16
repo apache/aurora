@@ -149,10 +149,15 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   private static ExecutorInfo populateDynamicFields(ExecutorInfo executor, IAssignedTask task) {
     return executor.toBuilder()
+        .clearResources()
         .setExecutorId(MesosTaskFactoryImpl.getExecutorId(task.getTaskId()))
         .setSource(
             MesosTaskFactoryImpl.getInstanceSourceName(task.getTask(), task.getInstanceId()))
         .build();
+  }
+
+  private static ExecutorInfo makeComparable(ExecutorInfo executorInfo) {
+    return executorInfo.toBuilder().clearResources().build();
   }
 
   private static ExecutorInfo purgeZeroResources(ExecutorInfo executor) {
@@ -176,7 +181,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
     TaskInfo task = taskFactory.createFrom(TASK, OFFER_THERMOS_EXECUTOR);
 
-    assertEquals(populateDynamicFields(DEFAULT_EXECUTOR, TASK), task.getExecutor());
+    assertEquals(populateDynamicFields(DEFAULT_EXECUTOR, TASK), makeComparable(task.getExecutor()));
     checkTaskResources(TASK.getTask(), task);
     checkDiscoveryInfoUnset(task);
   }
@@ -233,7 +238,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     assertEquals(
         purgeZeroResources(populateDynamicFields(
             NO_OVERHEAD_EXECUTOR.getExecutorConfig().getExecutor(), TASK)),
-        task.getExecutor());
+        makeComparable(task.getExecutor()));
 
     // Simulate the upsizing needed for the task to meet the minimum thermos requirements.
     TaskConfig dummyTask = TASK.getTask().newBuilder();

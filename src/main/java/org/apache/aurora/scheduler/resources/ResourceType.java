@@ -125,7 +125,7 @@ public enum ResourceType implements TEnum {
   /**
    * Optional resource mapper to use.
    */
-  private final Optional<ResourceMapper> mapper;
+  private final Optional<ResourceMapper<?>> mapper;
 
   /**
    * Aurora resource name.
@@ -177,7 +177,7 @@ public enum ResourceType implements TEnum {
       MesosResourceConverter mesosResourceConverter,
       String mesosName,
       AuroraResourceConverter<?> auroraResourceConverter,
-      Optional<ResourceMapper> mapper,
+      Optional<ResourceMapper<?>> mapper,
       String auroraName,
       String auroraUnit,
       int scalingRange,
@@ -241,7 +241,7 @@ public enum ResourceType implements TEnum {
    *
    * @return Optional ResourceMapper.
    */
-  public Optional<ResourceMapper> getMapper() {
+  public Optional<ResourceMapper<?>> getMapper() {
     return mapper;
   }
 

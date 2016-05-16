@@ -114,6 +114,22 @@ public final class ResourceManager {
   }
 
   /**
+   * Gets offer resoruces filtered by the {@code tierInfo} and {@code type}.
+   *
+   * @param offer Offer to get resources from.
+   * @param tierInfo Tier info.
+   * @param type Resource type.
+   * @return Offer resources filtered by {@code tierInfo} and {@code type}.
+   */
+  public static Iterable<Resource> getOfferResources(
+      Offer offer,
+      TierInfo tierInfo,
+      ResourceType type) {
+
+    return Iterables.filter(getOfferResources(offer, tierInfo), r -> fromResource(r).equals(type));
+  }
+
+  /**
    * Same as {@link #getTaskResources(ITaskConfig, ResourceType)}.
    *
    * @param task Scheduled task to get resources from.
@@ -156,9 +172,10 @@ public final class ResourceManager {
    * @return Set of {@link ResourceType} instances representing task resources.
    */
   public static Set<ResourceType> getTaskResourceTypes(IAssignedTask task) {
-    return EnumSet.copyOf(task.getTask().getResources().stream()
+    Set<ResourceType> types = task.getTask().getResources().stream()
         .map(RESOURCE_TO_TYPE)
-        .collect(Collectors.toSet()));
+        .collect(Collectors.toSet());
+    return types.isEmpty() ? types : EnumSet.copyOf(types);
   }
 
   /**

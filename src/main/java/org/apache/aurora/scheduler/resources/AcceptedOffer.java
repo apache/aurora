@@ -14,54 +14,37 @@
 package org.apache.aurora.scheduler.resources;
 
 import java.util.List;
-import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.StreamSupport;
 
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-import com.google.common.collect.FluentIterable;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 
-import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.scheduler.TierInfo;
-import org.apache.aurora.scheduler.base.Numbers;
-import org.apache.mesos.Protos;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
+
+import static org.apache.aurora.scheduler.resources.ResourceManager.getOfferResources;
 
 /**
  * Allocate resources from an accepted Mesos Offer to TaskInfo and ExecutorInfo.
  */
 public final class AcceptedOffer {
-
-  public static final String DEFAULT_ROLE_NAME = "*";
-
   /**
    * Reserved resource filter.
    */
-  public static final Predicate<Resource> RESERVED =
-      e -> e.hasRole() && !e.getRole().equals(DEFAULT_ROLE_NAME);
-
-  /**
-   * Non reserved resource filter.
-   */
-  public static final Predicate<Resource> NOT_RESERVED = Predicates.not(RESERVED);
-
-  /**
-   * Helper function to check a resource value is small enough to be considered zero.
-   */
-  public static boolean nearZero(double value) {
-    return Math.abs(value) < EPSILON;
-  }
+  @VisibleForTesting
+  static final Predicate<Resource> RESERVED = e -> e.hasRole() && !e.getRole().equals("*");
 
   /**
    * Get proper value for {@link org.apache.mesos.Protos.TaskInfo}'s resources.
    * @return A list of Resource used for TaskInfo.
    */
-  public List<Resource> getTaskResources() {
+  public Iterable<Resource> getTaskResources() {
     return taskResources;
   }
 
@@ -69,56 +52,51 @@ public final class AcceptedOffer {
    * Get proper value for {@link org.apache.mesos.Protos.ExecutorInfo}'s resources.
    * @return A list of Resource used for ExecutorInfo.
    */
-  public List<Resource> getExecutorResources() {
+  public Iterable<Resource> getExecutorResources() {
     return executorResources;
   }
 
-  /**
-   * Use this epsilon value to avoid comparison with zero.
-   */
-  private static final double EPSILON = 1e-6;
-
-  private final List<Resource> taskResources;
-  private final List<Resource> executorResources;
+  private final Iterable<Resource> taskResources;
+  private final Iterable<Resource> executorResources;
 
   public static AcceptedOffer create(
       Offer offer,
-      ResourceSlot taskSlot,
-      ResourceSlot executorSlot,
-      Set<Integer> selectedPorts,
+      IAssignedTask task,
+      ResourceBag executorOverhead,
       TierInfo tierInfo) throws Resources.InsufficientResourcesException {
 
-    List<Resource> reservedFirst = ImmutableList.<Resource>builder()
-        .addAll(Iterables.filter(offer.getResourcesList(), RESERVED))
-        .addAll(Iterables.filter(offer.getResourcesList(), NOT_RESERVED))
-        .build();
+    ImmutableList.Builder<Resource> taskResources = ImmutableList.builder();
+    ImmutableList.Builder<Resource> executorResources = ImmutableList.builder();
 
-    boolean revocable = tierInfo.isRevocable();
-    List<Resource.Builder> cpuResources = filterToBuilders(
-        reservedFirst,
-        ResourceType.CPUS.getMesosName(),
-        revocable ? ResourceManager.REVOCABLE : ResourceManager.NON_REVOCABLE);
-    List<Resource.Builder> memResources = filterToBuilderNonRevocable(
-        reservedFirst, ResourceType.RAM_MB.getMesosName());
-    List<Resource.Builder> diskResources = filterToBuilderNonRevocable(
-        reservedFirst, ResourceType.DISK_MB.getMesosName());
-    List<Resource.Builder> portsResources = filterToBuilderNonRevocable(
-        reservedFirst, ResourceType.PORTS.getMesosName());
+    ResourceManager.bagFromResources(task.getTask().getResources())
+        .streamResourceVectors()
+        .forEach(entry -> {
+          ResourceType type = entry.getKey();
+          Iterable<Resource.Builder> offerResources = StreamSupport
+              .stream(getOfferResources(offer, tierInfo, entry.getKey()).spliterator(), false)
+              // Note the reverse order of args in .compare(): we want RESERVED resources first.
+              .sorted((l, r) -> Boolean.compare(RESERVED.test(r), RESERVED.test(l)))
+              .map(Resource::toBuilder)
+              .collect(toList());
 
-    List<Resource> taskResources = ImmutableList.<Resource>builder()
-        .addAll(allocateScalarType(cpuResources, taskSlot.getNumCpus(), revocable))
-        .addAll(allocateScalarType(memResources, taskSlot.getRam().as(Data.MB), false))
-        .addAll(allocateScalarType(diskResources, taskSlot.getDisk().as(Data.MB), false))
-        .addAll(allocateRangeType(portsResources, selectedPorts))
-        .build();
+          boolean isRevocable = type.isMesosRevocable() && tierInfo.isRevocable();
 
-    List<Resource> executorResources = ImmutableList.<Resource>builder()
-        .addAll(allocateScalarType(cpuResources, executorSlot.getNumCpus(), revocable))
-        .addAll(allocateScalarType(memResources, executorSlot.getRam().as(Data.MB), false))
-        .addAll(allocateScalarType(diskResources, executorSlot.getDisk().as(Data.MB), false))
-        .build();
+          taskResources.addAll(type.getMesosResourceConverter().toMesosResource(
+              offerResources,
+              type.getMapper().isPresent()
+                  ? () -> type.getMapper().get().getAssigned(task)
+                  : () -> entry.getValue(),
+              isRevocable));
 
-    return new AcceptedOffer(taskResources, executorResources);
+          if (executorOverhead.getResourceVectors().containsKey(type)) {
+            executorResources.addAll(type.getMesosResourceConverter().toMesosResource(
+                offerResources,
+                () -> executorOverhead.getResourceVectors().get(type),
+                isRevocable));
+          }
+        });
+
+    return new AcceptedOffer(taskResources.build(), executorResources.build());
   }
 
   private AcceptedOffer(
@@ -127,109 +105,5 @@ public final class AcceptedOffer {
 
     this.taskResources = requireNonNull(taskResources);
     this.executorResources = requireNonNull(executorResources);
-  }
-
-  private static List<Resource> allocateRangeType(
-      List<Resource.Builder> from,
-      Set<Integer> valueSet) throws Resources.InsufficientResourcesException {
-
-    Set<Integer> leftOver = Sets.newHashSet(valueSet);
-    ImmutableList.Builder<Resource> result = ImmutableList.<Resource>builder();
-    for (Resource.Builder r : from) {
-      Set<Integer> fromResource = Sets.newHashSet(Iterables.concat(
-          Iterables.transform(r.getRanges().getRangeList(), Resources.RANGE_TO_MEMBERS)));
-      Set<Integer> available = Sets.newHashSet(Sets.intersection(leftOver, fromResource));
-      if (available.isEmpty()) {
-        continue;
-      }
-      Resource newResource = makeMesosRangeResource(r.build(), available);
-      result.add(newResource);
-      leftOver.removeAll(available);
-      if (leftOver.isEmpty()) {
-        break;
-      }
-    }
-    if (!leftOver.isEmpty()) {
-      // NOTE: this will not happen as long as Veto logic from TaskAssigner.maybeAssign is
-      // consistent.
-      // Maybe we should consider implementing resource veto with this class to ensure that.
-      throw new Resources.InsufficientResourcesException(
-          "Insufficient resource for range type when allocating from offer");
-    }
-    return result.build();
-  }
-
-  /**
-   * Creates a mesos resource of integer ranges from given prototype.
-   *
-   * @param prototype Resource prototype.
-   * @param values    Values to translate into ranges.
-   * @return A new mesos ranges resource.
-   */
-  static Resource makeMesosRangeResource(
-      Resource prototype,
-      Set<Integer> values) {
-
-    return Protos.Resource.newBuilder(prototype)
-        .setRanges(Protos.Value.Ranges.newBuilder()
-            .addAllRange(
-                Iterables.transform(Numbers.toRanges(values), ResourceSlot.RANGE_TRANSFORM)))
-        .build();
-  }
-
-  private static List<Resource> allocateScalarType(
-      List<Resource.Builder> from,
-      double amount,
-      boolean revocable) throws Resources.InsufficientResourcesException {
-
-    double remaining = amount;
-    ImmutableList.Builder<Resource> result = ImmutableList.builder();
-    for (Resource.Builder r : from) {
-      if (nearZero(remaining)) {
-        break;
-      }
-      final double available = r.getScalar().getValue();
-      if (nearZero(available)) {
-        // Skip resource slot that is already used up.
-        continue;
-      }
-      final double used = Math.min(remaining, available);
-      remaining -= used;
-      Resource.Builder newResource =
-          Resource.newBuilder(r.build())
-              .setScalar(Protos.Value.Scalar.newBuilder().setValue(used).build());
-      if (revocable) {
-        newResource.setRevocable(Resource.RevocableInfo.newBuilder());
-      }
-      result.add(newResource.build());
-      r.getScalarBuilder().setValue(available - used);
-    }
-    if (!nearZero(remaining)) {
-      // NOTE: this will not happen as long as Veto logic from TaskAssigner.maybeAssign is
-      // consistent.
-      // Maybe we should consider implementing resource veto with this class to ensure that.
-      throw new Resources.InsufficientResourcesException(
-          "Insufficient resource when allocating from offer");
-    }
-    return result.build();
-  }
-
-  private static List<Resource.Builder> filterToBuilders(
-      List<Resource> resources,
-      String name,
-      Predicate<Resource> additionalFilter) {
-
-    return FluentIterable.from(resources)
-        .filter(e -> e.getName().equals(name))
-        .filter(additionalFilter)
-        .transform(Resource::toBuilder)
-        .toList();
-  }
-
-  private static List<Resource.Builder> filterToBuilderNonRevocable(
-      List<Resource> resources,
-      String name) {
-
-    return filterToBuilders(resources, name, ResourceManager.NON_REVOCABLE);
   }
 }

@@ -110,7 +110,7 @@ public final class ResourceTestUtil {
         .setRanges(Protos.Value.Ranges.newBuilder().addAllRange(
             Iterables.transform(
                 Numbers.toRanges(ImmutableSet.copyOf(values)),
-                ResourceSlot.RANGE_TRANSFORM)))
+                Numbers.RANGE_TRANSFORM)))
         .build();
   }
 

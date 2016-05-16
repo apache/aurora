@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -148,14 +147,13 @@ public interface MesosTaskFactory {
       try {
         acceptedOffer = AcceptedOffer.create(
             offer,
-            ResourceSlot.from(config),
-            executorSettings.getExecutorOverhead().toSlot(),
-            ImmutableSet.copyOf(task.getAssignedPorts().values()),
+            task,
+            executorSettings.getExecutorOverhead(),
             tierManager.getTier(task.getTask()));
       } catch (Resources.InsufficientResourcesException e) {
         throw new SchedulerException(e);
       }
-      List<Resource> resources = acceptedOffer.getTaskResources();
+      Iterable<Resource> resources = acceptedOffer.getTaskResources();
 
       LOG.debug(
           "Setting task resources to {}",
@@ -266,7 +264,7 @@ public interface MesosTaskFactory {
       ExecutorInfo.Builder builder = executorSettings.getExecutorConfig().getExecutor().toBuilder()
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setSource(getInstanceSourceName(task.getTask(), task.getInstanceId()));
-      List<Resource> executorResources = acceptedOffer.getExecutorResources();
+      Iterable<Resource> executorResources = acceptedOffer.getExecutorResources();
       LOG.debug(
           "Setting executor resources to {}",
           Iterables.transform(executorResources, Protobufs::toString));

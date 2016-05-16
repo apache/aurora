@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.base;
 
 import java.util.Set;
 
+import com.google.common.base.Function;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.ImmutableSet;
@@ -25,11 +26,20 @@ import com.google.common.collect.Sets;
 
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.scheduler.storage.entities.IRange;
+import org.apache.mesos.Protos;
 
 /**
  * Utility class for working with numbers.
  */
 public final class Numbers {
+  /**
+   * Convert {@link com.google.common.collect.Range} to {@link org.apache.mesos.Protos.Value.Range}.
+   */
+  public static final Function<Range<Integer>, Protos.Value.Range> RANGE_TRANSFORM =
+      input -> Protos.Value.Range.newBuilder()
+          .setBegin(input.lowerEndpoint())
+          .setEnd(input.upperEndpoint())
+          .build();
 
   private Numbers() {
     // Utility class.
