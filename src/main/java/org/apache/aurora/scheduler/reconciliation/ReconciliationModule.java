@@ -88,6 +88,17 @@ public class ReconciliationModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> RECONCILIATION_SCHEDULE_SPREAD =
       Arg.create(Amount.of(30L, Time.MINUTES));
 
+  @Positive
+  @CmdLine(name = "reconciliation_explicit_batch_size",
+      help = "Number of tasks in a single batch request sent to Mesos for explicit reconciliation.")
+  private static final Arg<Integer> RECONCILIATION_BATCH_SIZE = Arg.create(1000);
+
+  @Positive
+  @CmdLine(name = "reconciliation_explicit_batch_interval",
+      help = "Interval between explicit batch reconciliation requests.")
+  private static final Arg<Amount<Long, Time>> RECONCILIATION_BATCH_INTERVAL =
+      Arg.create(Amount.of(5L, Time.SECONDS));
+
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   @interface BackgroundWorker { }
@@ -127,7 +138,9 @@ public class ReconciliationModule extends AbstractModule {
             RECONCILIATION_INITIAL_DELAY.get(),
             RECONCILIATION_EXPLICIT_INTERVAL.get(),
             RECONCILIATION_IMPLICIT_INTERVAL.get(),
-            RECONCILIATION_SCHEDULE_SPREAD.get()));
+            RECONCILIATION_SCHEDULE_SPREAD.get(),
+            RECONCILIATION_BATCH_INTERVAL.get(),
+            RECONCILIATION_BATCH_SIZE.get()));
         bind(ScheduledExecutorService.class).annotatedWith(BackgroundWorker.class)
             .toInstance(AsyncUtil.loggingScheduledExecutor(1, "TaskReconciler-%d", LOG));
         bind(TaskReconciler.class).in(Singleton.class);

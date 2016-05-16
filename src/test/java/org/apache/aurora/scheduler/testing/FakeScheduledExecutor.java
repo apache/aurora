@@ -120,6 +120,11 @@ public final class FakeScheduledExecutor extends FakeClock {
       int maxInvocations) {
 
     FakeScheduledExecutor executor = new FakeScheduledExecutor();
+    mock.schedule(EasyMock.<Runnable>anyObject(), EasyMock.anyLong(), EasyMock.anyObject());
+    expectLastCall().andAnswer(() -> {
+      ((Runnable) EasyMock.getCurrentArguments()[0]).run();
+      return null;
+    }).anyTimes();
     mock.scheduleAtFixedRate(
         EasyMock.anyObject(),
         EasyMock.anyLong(),

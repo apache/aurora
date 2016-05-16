@@ -13,12 +13,13 @@
  */
 package org.apache.aurora.scheduler.reconciliation;
 
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -36,10 +37,13 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
+import org.apache.mesos.Protos;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.common.quantity.Time.MINUTES;
+import static org.apache.aurora.common.quantity.Time.SECONDS;
 import static org.apache.aurora.scheduler.reconciliation.TaskReconciler.EXPLICIT_STAT_NAME;
 import static org.apache.aurora.scheduler.reconciliation.TaskReconciler.IMPLICIT_STAT_NAME;
 import static org.apache.aurora.scheduler.reconciliation.TaskReconciler.TASK_TO_PROTO;
@@ -53,11 +57,15 @@ public class TaskReconcilerTest extends EasyMockTest {
   private static final Amount<Long, Time> EXPLICIT_SCHEDULE = Amount.of(60L, MINUTES);
   private static final Amount<Long, Time> IMPLICT_SCHEDULE = Amount.of(180L, MINUTES);
   private static final Amount<Long, Time> SPREAD = Amount.of(30L, MINUTES);
+  private static final Amount<Long, Time> BATCH_DELAY = Amount.of(3L, SECONDS);
+  private static final int BATCH_SIZE = 1;
   private static final TaskReconcilerSettings SETTINGS = new TaskReconcilerSettings(
       INITIAL_DELAY,
       EXPLICIT_SCHEDULE,
       IMPLICT_SCHEDULE,
-      SPREAD);
+      SPREAD,
+      BATCH_DELAY,
+      BATCH_SIZE);
 
   private StorageTestUtil storageUtil;
   private StatsProvider statsProvider;
@@ -83,15 +91,25 @@ public class TaskReconcilerTest extends EasyMockTest {
     FakeScheduledExecutor clock =
         FakeScheduledExecutor.scheduleAtFixedRateExecutor(executorService, 2, 5);
 
-    IScheduledTask task = makeTask("id1", TaskTestUtil.makeConfig(TaskTestUtil.JOB));
+    IScheduledTask task1 = makeTask("id1", TaskTestUtil.makeConfig(TaskTestUtil.JOB));
+    IScheduledTask task2 = makeTask("id2", TaskTestUtil.makeConfig(TaskTestUtil.JOB));
     storageUtil.expectOperations();
-    storageUtil.expectTaskFetch(Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES), task)
-        .times(5);
+    storageUtil.expectTaskFetch(
+        Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES),
+        task1,
+        task2).times(5);
 
-    driver.reconcileTasks(ImmutableSet.of(TASK_TO_PROTO.apply(task)));
+    List<List<Protos.TaskStatus>> batches = Lists.partition(ImmutableList.of(
+        TASK_TO_PROTO.apply(task1),
+        TASK_TO_PROTO.apply(task2)), BATCH_SIZE);
+
+    driver.reconcileTasks(batches.get(0));
     expectLastCall().times(5);
 
-    driver.reconcileTasks(ImmutableSet.of());
+    driver.reconcileTasks(batches.get(1));
+    expectLastCall().times(5);
+
+    driver.reconcileTasks(EasyMock.anyObject());
     expectLastCall().times(2);
 
     control.replay();
@@ -130,7 +148,9 @@ public class TaskReconcilerTest extends EasyMockTest {
         INITIAL_DELAY,
         EXPLICIT_SCHEDULE,
         IMPLICT_SCHEDULE,
-        Amount.of(Long.MAX_VALUE, MINUTES));
+        Amount.of(Long.MAX_VALUE, MINUTES),
+        BATCH_DELAY,
+        BATCH_SIZE);
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -141,7 +161,9 @@ public class TaskReconcilerTest extends EasyMockTest {
         Amount.of(Long.MAX_VALUE, MINUTES),
         EXPLICIT_SCHEDULE,
         IMPLICT_SCHEDULE,
-        SPREAD);
+        SPREAD,
+        BATCH_DELAY,
+        BATCH_SIZE);
   }
 
   private static IScheduledTask makeTask(String id, ITaskConfig config) {
