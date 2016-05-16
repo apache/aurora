@@ -104,7 +104,7 @@ public interface MesosResourceConverter {
         // NOTE: this will not happen as long as Veto logic from TaskAssigner.maybeAssign is
         // consistent.
         // Maybe we should consider implementing resource veto with this class to ensure that.
-        throw new Resources.InsufficientResourcesException(
+        throw new ResourceManager.InsufficientResourcesException(
             "Insufficient resource when allocating from offer");
       }
       return result.build();
@@ -132,7 +132,7 @@ public interface MesosResourceConverter {
       ImmutableList.Builder<Resource> result = ImmutableList.builder();
       for (Resource.Builder r : offerResources) {
         Set<Integer> fromResource = Sets.newHashSet(Iterables.concat(
-            Iterables.transform(r.getRanges().getRangeList(), Resources.RANGE_TO_MEMBERS)));
+            Iterables.transform(r.getRanges().getRangeList(), Numbers.RANGE_TO_MEMBERS)));
         Set<Integer> available = Sets.newHashSet(Sets.intersection(leftOver, fromResource));
         if (available.isEmpty()) {
           continue;
@@ -156,7 +156,7 @@ public interface MesosResourceConverter {
         // NOTE: this will not happen as long as Veto logic from TaskAssigner.maybeAssign is
         // consistent.
         // Maybe we should consider implementing resource veto with this class to ensure that.
-        throw new Resources.InsufficientResourcesException(
+        throw new ResourceManager.InsufficientResourcesException(
             "Insufficient resource for range type when allocating from offer");
       }
       return result.build();

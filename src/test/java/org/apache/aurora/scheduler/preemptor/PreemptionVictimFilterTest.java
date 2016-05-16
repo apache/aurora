@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.preemptor;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
@@ -41,7 +42,6 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.resources.ResourceBag;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.stats.CachedCounters;
@@ -56,6 +56,8 @@ import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
+import static java.util.stream.Collectors.toSet;
+
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
@@ -65,7 +67,11 @@ import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
 import static org.apache.aurora.scheduler.preemptor.PreemptionVictimFilter.PreemptionVictimFilterImpl.ORDER;
 import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.MISSING_ATTRIBUTES_NAME;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.bag;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.apache.mesos.Protos.Offer;
 import static org.apache.mesos.Protos.Resource;
@@ -560,8 +566,14 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
       int numPorts,
       boolean revocable) {
 
-    List<Resource> resources =
-        new ResourceSlot(cpu, ram, disk, numPorts).toResourceList(DEV_TIER);
+    List<Resource> resources = ImmutableList.of(
+        mesosScalar(CPUS, cpu),
+        mesosScalar(RAM_MB, ram.getValue()),
+        mesosScalar(DISK_MB, disk.getValue()),
+        mesosRange(
+            PORTS,
+            Optional.absent(),
+            IntStream.range(1, numPorts).boxed().collect(toSet())));
     if (revocable) {
       resources = ImmutableList.<Resource>builder()
           .addAll(FluentIterable.from(resources)

@@ -33,8 +33,7 @@ import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.resources.AcceptedOffer;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
-import org.apache.aurora.scheduler.resources.Resources;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.storage.entities.IAppcImage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
@@ -150,7 +149,7 @@ public interface MesosTaskFactory {
             task,
             executorSettings.getExecutorOverhead(),
             tierManager.getTier(task.getTask()));
-      } catch (Resources.InsufficientResourcesException e) {
+      } catch (ResourceManager.InsufficientResourcesException e) {
         throw new SchedulerException(e);
       }
       Iterable<Resource> resources = acceptedOffer.getTaskResources();
@@ -198,10 +197,8 @@ public interface MesosTaskFactory {
 
       if (taskBuilder.hasExecutor()) {
         taskBuilder.setData(ByteString.copyFrom(serializeTask(task)));
-        return ResourceSlot.matchResourceTypes(taskBuilder.build());
-      } else {
-        return taskBuilder.build();
       }
+      return taskBuilder.build();
     }
 
     private Optional<ContainerInfo.Builder> configureTaskForImage(IMesosContainer mesosContainer) {

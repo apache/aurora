@@ -63,7 +63,7 @@ public final class AcceptedOffer {
       Offer offer,
       IAssignedTask task,
       ResourceBag executorOverhead,
-      TierInfo tierInfo) throws Resources.InsufficientResourcesException {
+      TierInfo tierInfo) throws ResourceManager.InsufficientResourcesException {
 
     ImmutableList.Builder<Resource> taskResources = ImmutableList.builder();
     ImmutableList.Builder<Resource> executorResources = ImmutableList.builder();

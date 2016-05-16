@@ -280,4 +280,13 @@ public final class ResourceManager {
                 .reduce(REDUCE_VALUES)
                 .orElse(0.0))));
   }
+
+  /**
+   * Thrown when there are insufficient resources to satisfy a request.
+   */
+  public static class InsufficientResourcesException extends RuntimeException {
+    InsufficientResourcesException(String message) {
+      super(message);
+    }
+  }
 }

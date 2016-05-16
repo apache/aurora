@@ -83,7 +83,7 @@ public class MesosResourceConverterTest {
     assertEquals(expected, actual);
   }
 
-  @Test(expected = Resources.InsufficientResourcesException.class)
+  @Test(expected = ResourceManager.InsufficientResourcesException.class)
   public void testAllocateRangeInsufficent() {
     RANGES.toMesosResource(
         ImmutableSet.of(mesosRange(PORTS, Optional.absent(), 80, 81, 90, 91, 92).toBuilder()),
@@ -121,7 +121,7 @@ public class MesosResourceConverterTest {
     assertEquals(expected, actual);
   }
 
-  @Test(expected = Resources.InsufficientResourcesException.class)
+  @Test(expected = ResourceManager.InsufficientResourcesException.class)
   public void testAllocateScalarInsufficent() {
     SCALAR.toMesosResource(
         ImmutableSet.of(mesosScalar(RAM_MB, 32.0).toBuilder()),

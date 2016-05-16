@@ -15,11 +15,9 @@ package org.apache.aurora.scheduler.mesos;
 
 import com.google.common.collect.ImmutableList;
 
-import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.configuration.executor.Executors;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;
@@ -70,10 +68,10 @@ public final class TestExecutorSettings {
       THERMOS_CONFIG,
       false /* populate discovery info */);
 
-  public static ExecutorSettings thermosOnlyWithOverhead(ResourceSlot overhead) {
+  public static ExecutorSettings thermosOnlyWithOverhead(Iterable<Resource> resources) {
     ExecutorConfig config = THERMOS_EXECUTOR.getExecutorConfig();
     ExecutorInfo.Builder executor = config.getExecutor().toBuilder();
-    executor.clearResources().addAllResources(overhead.toResourceList(TaskTestUtil.DEV_TIER));
+    executor.clearResources().addAllResources(resources);
     return new ExecutorSettings(
         new ExecutorConfig(executor.build(), config.getVolumeMounts()),
         false /* populate discovery info */);

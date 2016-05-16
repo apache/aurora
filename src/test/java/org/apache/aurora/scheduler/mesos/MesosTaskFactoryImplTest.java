@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -70,8 +71,10 @@ import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_CON
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_EXECUTOR;
 import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
 import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromResources;
-import static org.apache.aurora.scheduler.resources.ResourceSlot.makeMesosRangeResource;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalarFromBag;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.resetPorts;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -116,19 +119,15 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
       .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("framework-id"))
       .setSlaveId(SLAVE)
       .setHostname("slave-hostname")
-      .addAllResources(
-          bagFromResources(TASK_CONFIG.getResources()).add(THERMOS_EXECUTOR.getExecutorOverhead())
-              .toSlot()
-              .toResourceList(DEV_TIER))
-      .addResources(makeMesosRangeResource(ResourceType.PORTS, ImmutableSet.of(80)))
+      .addAllResources(mesosScalarFromBag(bagFromResources(
+              TASK_CONFIG.getResources()).add(THERMOS_EXECUTOR.getExecutorOverhead())))
+      .addResources(mesosRange(PORTS, 80))
       .build();
   private static final Offer OFFER_SOME_OVERHEAD_EXECUTOR = OFFER_THERMOS_EXECUTOR.toBuilder()
       .clearResources()
-      .addAllResources(bagFromResources(TASK_CONFIG.getResources())
-          .add(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())
-          .toSlot()
-          .toResourceList(DEV_TIER))
-      .addResources(makeMesosRangeResource(ResourceType.PORTS, ImmutableSet.of(80)))
+      .addAllResources(mesosScalarFromBag(bagFromResources(
+          TASK_CONFIG.getResources()).add(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())))
+      .addResources(mesosRange(PORTS, 80))
       .build();
 
   private static final String CLUSTER_NAME = "cluster_name";
@@ -191,12 +190,19 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     expect(tierManager.getTier(TASK_CONFIG)).andReturn(REVOCABLE_TIER);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
-    Resource revocableCPU = OFFER_THERMOS_EXECUTOR.getResources(0).toBuilder()
-        .setRevocable(Resource.RevocableInfo.getDefaultInstance())
-        .build();
+    List<Resource> revocable = OFFER_THERMOS_EXECUTOR.getResourcesList().stream()
+        .map(r -> {
+          ResourceType type = ResourceType.fromResource(r);
+          if (type.isMesosRevocable()) {
+            r = r.toBuilder().setRevocable(Resource.RevocableInfo.getDefaultInstance()).build();
+          }
+          return r;
+        })
+        .collect(Collectors.toList());
+
     Offer withRevocable = OFFER_THERMOS_EXECUTOR.toBuilder()
-        .removeResources(0)
-        .addResources(0, revocableCPU)
+        .clearResources()
+        .addAllResources(revocable)
         .build();
 
     control.replay();

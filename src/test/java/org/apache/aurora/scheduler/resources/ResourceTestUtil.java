@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.resources;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
@@ -112,6 +113,23 @@ public final class ResourceTestUtil {
                 Numbers.toRanges(ImmutableSet.copyOf(values)),
                 Numbers.RANGE_TRANSFORM)))
         .build();
+  }
+
+  public static Protos.Resource mesosRange(
+      ResourceType type,
+      Optional<String> role,
+      Iterable<Integer> values) {
+
+    return resourceBuilder(type, role, false)
+        .setRanges(Protos.Value.Ranges.newBuilder().addAllRange(
+            Iterables.transform(Numbers.toRanges(values), Numbers.RANGE_TRANSFORM)))
+        .build();
+  }
+
+  public static Iterable<Protos.Resource> mesosScalarFromBag(ResourceBag bag) {
+    return bag.streamResourceVectors()
+        .map(entry -> mesosScalar(entry.getKey(), entry.getValue()))
+        .collect(Collectors.toSet());
   }
 
   public static Protos.Offer offer(Protos.Resource... resources) {

@@ -22,14 +22,10 @@ import java.util.stream.Stream;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Data;
-
 import static java.util.stream.Collectors.toMap;
 
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
-import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
@@ -175,20 +171,6 @@ public class ResourceBag {
     return new ResourceBag(resourceVectors.entrySet().stream()
         .filter(predicate)
         .collect(toMap(Map.Entry::getKey, Map.Entry::getValue)));
-  }
-
-  /**
-   * Temporary bridge between bag and slot to facilitate migration.
-   *
-   * TODO(maxim): remove together with ResourceSlot.
-   * @return ResourceSlot.
-   */
-  public ResourceSlot toSlot() {
-    return new ResourceSlot(
-        valueOf(CPUS),
-        Amount.of(valueOf(RAM_MB).longValue(), Data.MB),
-        Amount.of(valueOf(DISK_MB).longValue(), Data.MB),
-        valueOf(PORTS).intValue());
   }
 
   private ResourceBag binaryOp(ResourceBag other, BinaryOperator<Double> operator) {

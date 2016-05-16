@@ -14,18 +14,25 @@
 package org.apache.aurora.benchmark;
 
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.offers.OfferManager;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos;
 
-import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
  * Offer factory.
@@ -90,8 +97,13 @@ final class Offers {
       int id = 0;
       for (IHostAttributes attributes : hostAttributes) {
         Protos.Offer offer = Protos.Offer.newBuilder()
-            .addAllResources(new ResourceSlot(cpu, ram, disk, ports)
-                .toResourceList(DEV_TIER))
+            .addAllResources(ImmutableSet.of(
+                makeScalar(CPUS, cpu),
+                makeScalar(RAM_MB, ram.getValue()),
+                makeScalar(DISK_MB, disk.getValue()),
+                makeRange(
+                    PORTS,
+                    IntStream.range(1, ports).boxed().collect(Collectors.toSet()))))
             .setId(Protos.OfferID.newBuilder().setValue(String.format(OFFER_ID_FORMAT, id++)))
             .setFrameworkId(Protos.FrameworkID.newBuilder().setValue(FRAMEWORK_ID))
             .setSlaveId(Protos.SlaveID.newBuilder().setValue(attributes.getSlaveId()))
@@ -102,6 +114,23 @@ final class Offers {
       }
 
       return offers.build();
+    }
+
+    private static Protos.Resource makeScalar(ResourceType type, double value) {
+      return Protos.Resource.newBuilder()
+          .setType(Protos.Value.Type.SCALAR)
+          .setName(type.getMesosName())
+          .setScalar(Protos.Value.Scalar.newBuilder().setValue(value).build())
+          .build();
+    }
+
+    private static Protos.Resource makeRange(ResourceType type, Iterable<Integer> values) {
+      return Protos.Resource.newBuilder()
+          .setType(Protos.Value.Type.RANGES)
+          .setName(type.getMesosName())
+          .setRanges(Protos.Value.Ranges.newBuilder().addAllRange(
+              Iterables.transform(Numbers.toRanges(values), Numbers.RANGE_TRANSFORM)))
+          .build();
     }
   }
 }

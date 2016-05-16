@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.app;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,8 +42,6 @@ import com.google.inject.Module;
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.Lifecycle;
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
@@ -73,7 +72,6 @@ import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
-import org.apache.aurora.scheduler.resources.ResourceSlot;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -83,6 +81,7 @@ import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Status;
@@ -99,6 +98,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.common.testing.easymock.EasyMockTest.createCapture;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
@@ -184,13 +186,11 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
         bind(DriverFactory.class).toInstance(driverFactory);
         bind(DriverSettings.class).toInstance(SETTINGS);
         bind(Log.class).toInstance(log);
-        ResourceSlot executorOverhead = new ResourceSlot(
-            0.1,
-            Amount.of(1L, Data.MB),
-            Amount.of(0L, Data.MB),
-            0);
+        Set<Protos.Resource> overhead = ImmutableSet.of(
+            mesosScalar(CPUS, 0.1),
+            mesosScalar(RAM_MB, 1));
         bind(ExecutorSettings.class)
-            .toInstance(TestExecutorSettings.thermosOnlyWithOverhead(executorOverhead));
+            .toInstance(TestExecutorSettings.thermosOnlyWithOverhead(overhead));
         install(new BackupModule(backupDir, SnapshotStoreImpl.class));
 
         bind(IServerInfo.class).toInstance(
