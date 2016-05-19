@@ -38,6 +38,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -202,7 +203,11 @@ public interface PreemptionVictimFilter {
         totalResource = totalResource.add(victimToResources.apply(victim));
         Set<Veto> vetoes = schedulingFilter.filter(
             new UnusedResource(totalResource, attributes.get()),
-            new ResourceRequest(pendingTask, jobState));
+            new ResourceRequest(
+                pendingTask,
+                ResourceManager.bagFromResources(pendingTask.getResources())
+                    .add(executorSettings.getExecutorOverhead()),
+                jobState));
 
         if (vetoes.isEmpty()) {
           return Optional.of(ImmutableSet.copyOf(toPreemptTasks));

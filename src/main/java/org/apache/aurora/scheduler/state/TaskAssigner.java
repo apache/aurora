@@ -46,8 +46,6 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
-import static org.apache.aurora.scheduler.resources.ResourceManager.getOfferResources;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.mesos.Protos.Offer;
 
@@ -152,9 +150,7 @@ public interface TaskAssigner {
 
         TierInfo tierInfo = tierManager.getTier(groupKey.getTask());
         Set<Veto> vetoes = filter.filter(
-            new UnusedResource(
-                bagFromMesosResources(getOfferResources(offer.getOffer(), tierInfo)),
-                offer.getAttributes()),
+            new UnusedResource(offer.getResourceBag(tierInfo), offer.getAttributes()),
             resourceRequest);
 
         if (vetoes.isEmpty()) {

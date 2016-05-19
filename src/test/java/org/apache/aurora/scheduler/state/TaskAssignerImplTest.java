@@ -34,6 +34,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.offers.OfferManager;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -90,8 +91,10 @@ public class TaskAssignerImplTest extends EasyMockTest {
   private static final UnusedResource UNUSED = new UnusedResource(
       bagFromMesosResources(MESOS_OFFER.getResourcesList()),
       OFFER.getAttributes());
-  private static final ResourceRequest RESOURCE_REQUEST =
-      new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY);
+  private static final ResourceRequest RESOURCE_REQUEST = new ResourceRequest(
+      TASK.getAssignedTask().getTask(),
+      ResourceBag.EMPTY,
+      EMPTY);
 
   private MutableStoreProvider storeProvider;
   private StateManager stateManager;
@@ -126,7 +129,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     assertTrue(assigner.maybeAssign(
         storeProvider,
-        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+        new ResourceRequest(TASK.getAssignedTask().getTask(), ResourceBag.EMPTY, EMPTY),
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
         ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
@@ -144,7 +147,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     assertFalse(assigner.maybeAssign(
         storeProvider,
-        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+        RESOURCE_REQUEST,
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
         NO_RESERVATION));
@@ -161,7 +164,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     assertFalse(assigner.maybeAssign(
         storeProvider,
-        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+        RESOURCE_REQUEST,
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
         NO_RESERVATION));
@@ -189,7 +192,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     assertFalse(assigner.maybeAssign(
         storeProvider,
-        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+        RESOURCE_REQUEST,
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
         NO_RESERVATION));
@@ -203,7 +206,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     assertFalse(assigner.maybeAssign(
         storeProvider,
-        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+        RESOURCE_REQUEST,
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
         ImmutableMap.of(SLAVE_ID, TaskGroupKey.from(
@@ -241,7 +244,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     assertTrue(assigner.maybeAssign(
         storeProvider,
-        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+        RESOURCE_REQUEST,
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
         ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
@@ -270,13 +273,13 @@ public class TaskAssignerImplTest extends EasyMockTest {
         new UnusedResource(
             bagFromMesosResources(mismatched.getOffer().getResourcesList()),
             mismatched.getAttributes()),
-        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
+        RESOURCE_REQUEST))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("constraint mismatch")));
     offerManager.banOffer(mismatched.getOffer().getId(), GROUP_KEY);
     expect(filter.filter(
         new UnusedResource(
             bagFromMesosResources(MESOS_OFFER.getResourcesList()), OFFER.getAttributes()),
-        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY)))
+        RESOURCE_REQUEST))
         .andReturn(ImmutableSet.of());
 
     expectAssignTask(MESOS_OFFER);
@@ -288,7 +291,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     assertTrue(assigner.maybeAssign(
         storeProvider,
-        new ResourceRequest(TASK.getAssignedTask().getTask(), EMPTY),
+        RESOURCE_REQUEST,
         TaskGroupKey.from(TASK.getAssignedTask().getTask()),
         Tasks.id(TASK),
         ImmutableMap.of(SLAVE_ID, GROUP_KEY)));

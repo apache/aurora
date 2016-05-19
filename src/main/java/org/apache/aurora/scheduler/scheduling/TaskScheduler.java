@@ -29,6 +29,7 @@ import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
@@ -51,6 +52,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromResources;
 
 /**
  * Enables scheduling and preemption of tasks.
@@ -86,6 +88,7 @@ public interface TaskScheduler extends EventSubscriber {
     private final Storage storage;
     private final TaskAssigner assigner;
     private final Preemptor preemptor;
+    private final ExecutorSettings executorSettings;
     private final BiCache<String, TaskGroupKey> reservations;
 
     private final AtomicLong attemptsFired = Stats.exportLong("schedule_attempts_fired");
@@ -97,11 +100,13 @@ public interface TaskScheduler extends EventSubscriber {
         Storage storage,
         TaskAssigner assigner,
         Preemptor preemptor,
+        ExecutorSettings executorSettings,
         BiCache<String, TaskGroupKey> reservations) {
 
       this.storage = requireNonNull(storage);
       this.assigner = requireNonNull(assigner);
       this.preemptor = requireNonNull(preemptor);
+      this.executorSettings = requireNonNull(executorSettings);
       this.reservations = requireNonNull(reservations);
     }
 
@@ -137,7 +142,10 @@ public interface TaskScheduler extends EventSubscriber {
 
         boolean launched = assigner.maybeAssign(
             store,
-            new ResourceRequest(task, aggregate),
+            new ResourceRequest(
+                task,
+                bagFromResources(task.getResources()).add(executorSettings.getExecutorOverhead()),
+                aggregate),
             TaskGroupKey.from(task),
             taskId,
             reservations.asMap());

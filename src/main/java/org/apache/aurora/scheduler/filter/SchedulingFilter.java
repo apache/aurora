@@ -254,7 +254,7 @@ public interface SchedulingFilter {
       this.attributes = attributes;
     }
 
-    public ResourceBag getResourceSlot() {
+    public ResourceBag getResourceBag() {
       return offer;
     }
 
@@ -269,8 +269,8 @@ public interface SchedulingFilter {
       }
 
       UnusedResource other = (UnusedResource) o;
-      return Objects.equals(getResourceSlot(), other.getResourceSlot())
-          && Objects.equals(getAttributes(), other.getAttributes());
+      return Objects.equals(offer, other.offer)
+          && Objects.equals(attributes, other.attributes);
     }
 
     @Override
@@ -284,10 +284,12 @@ public interface SchedulingFilter {
    */
   class ResourceRequest {
     private final ITaskConfig task;
+    private final ResourceBag request;
     private final AttributeAggregate jobState;
 
-    public ResourceRequest(ITaskConfig task, AttributeAggregate jobState) {
+    public ResourceRequest(ITaskConfig task, ResourceBag request, AttributeAggregate jobState) {
       this.task = task;
+      this.request = request;
       this.jobState = jobState;
     }
 
@@ -297,6 +299,10 @@ public interface SchedulingFilter {
 
     public ITaskConfig getTask() {
       return task;
+    }
+
+    public ResourceBag getResourceBag() {
+      return request;
     }
 
     public AttributeAggregate getJobState() {
@@ -310,12 +316,14 @@ public interface SchedulingFilter {
       }
 
       ResourceRequest other = (ResourceRequest) o;
-      return Objects.equals(task, other.task) && Objects.equals(getJobState(), other.getJobState());
+      return Objects.equals(task, other.task)
+          && Objects.equals(request, other.request)
+          && Objects.equals(jobState, other.jobState);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(task, jobState);
+      return Objects.hash(task, request, jobState);
     }
   }
 

@@ -36,12 +36,15 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.preemptor.Preemptor;
+import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.scheduling.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.TaskAssigner;
@@ -61,6 +64,7 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
+import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_EXECUTOR;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;
@@ -110,6 +114,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
             bind(Clock.class).toInstance(createMock(Clock.class));
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(Storage.class).toInstance(storageImpl);
+            bind(ExecutorSettings.class).toInstance(THERMOS_EXECUTOR);
             PubsubEventModule.bindSubscriber(binder(), TaskScheduler.class);
           }
         });
@@ -121,13 +126,18 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         ImmutableSet.of(task));
   }
 
+  private ResourceBag bag(IScheduledTask task) {
+    return ResourceManager.bagFromResources(task.getAssignedTask().getTask().getResources())
+        .add(THERMOS_EXECUTOR.getExecutorOverhead());
+  }
+
   private IExpectationSetters<Boolean> expectAssigned(
       IScheduledTask task,
       Map<String, TaskGroupKey> reservationMap) {
 
     return expect(assigner.maybeAssign(
         storageUtil.mutableStoreProvider,
-        new ResourceRequest(task.getAssignedTask().getTask(), EMPTY),
+        new ResourceRequest(task.getAssignedTask().getTask(), bag(task), EMPTY),
         TaskGroupKey.from(task.getAssignedTask().getTask()),
         Tasks.id(task),
         reservationMap));
@@ -261,7 +271,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectAsMap(NO_RESERVATION);
     expect(assigner.maybeAssign(
         EasyMock.anyObject(),
-        eq(new ResourceRequest(taskA.getAssignedTask().getTask(), EMPTY)),
+        eq(new ResourceRequest(taskA.getAssignedTask().getTask(), bag(taskA), EMPTY)),
         eq(TaskGroupKey.from(taskA.getAssignedTask().getTask())),
         eq(Tasks.id(taskA)),
         eq(NO_RESERVATION))).andReturn(true);

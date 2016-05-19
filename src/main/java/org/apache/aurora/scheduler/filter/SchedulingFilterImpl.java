@@ -22,21 +22,16 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
-import com.google.inject.Inject;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
-import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.resources.ResourceBag;
-import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-
-import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
@@ -91,14 +86,6 @@ public class SchedulingFilterImpl implements SchedulingFilter {
           return isValueConstraint(a) ? -1 : 1;
         }
       });
-
-  private final ExecutorSettings executorSettings;
-
-  @Inject
-  @VisibleForTesting
-  public SchedulingFilterImpl(ExecutorSettings executorSettings) {
-    this.executorSettings = requireNonNull(executorSettings);
-  }
 
   private Optional<Veto> getConstraintVeto(
       Iterable<IConstraint> taskConstraints,
@@ -159,9 +146,6 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     }
 
     // 4. Resource check (lowest score).
-    return getResourceVetoes(
-        resource.getResourceSlot(),
-        ResourceManager.bagFromResources(request.getTask().getResources())
-            .add(executorSettings.getExecutorOverhead()));
+    return getResourceVetoes(resource.getResourceBag(), request.getResourceBag());
   }
 }

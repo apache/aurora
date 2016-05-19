@@ -39,6 +39,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType;
 import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -89,7 +90,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    defaultFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
+    defaultFilter = new SchedulingFilterImpl();
   }
 
   @Test
@@ -126,22 +127,22 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         none,
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostA),
-            new ResourceRequest(noPortTask, EMPTY)));
+            new ResourceRequest(noPortTask, bag(noPortTask), EMPTY)));
     assertEquals(
         none,
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostA),
-            new ResourceRequest(onePortTask, EMPTY)));
+            new ResourceRequest(onePortTask, bag(onePortTask), EMPTY)));
     assertEquals(
         none,
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostA),
-            new ResourceRequest(twoPortTask, EMPTY)));
+            new ResourceRequest(twoPortTask, bag(twoPortTask), EMPTY)));
     assertEquals(
         ImmutableSet.of(veto(PORTS, 1)),
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostA),
-            new ResourceRequest(threePortTask, EMPTY)));
+            new ResourceRequest(threePortTask, bag(threePortTask), EMPTY)));
   }
 
   @Test
@@ -407,7 +408,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         ImmutableSet.of(),
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostA),
-            new ResourceRequest(task, EMPTY)));
+            new ResourceRequest(task, bag(task), EMPTY)));
 
     Constraint jvmNegated = jvmConstraint.deepCopy();
     jvmNegated.getConstraint().getValue().setNegated(true);
@@ -519,7 +520,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         expected,
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostAttributes),
-            new ResourceRequest(task, aggregate))
+            new ResourceRequest(task, bag(task), aggregate))
             .isEmpty());
 
     Constraint negated = constraint.deepCopy();
@@ -529,7 +530,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         !expected,
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostAttributes),
-            new ResourceRequest(negatedTask, aggregate))
+            new ResourceRequest(negatedTask, bag(negatedTask), aggregate))
             .isEmpty());
     return task;
   }
@@ -560,7 +561,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         ImmutableSet.copyOf(vetoes),
         defaultFilter.filter(
             new UnusedResource(DEFAULT_OFFER, hostAttributes),
-            new ResourceRequest(task, jobState)));
+            new ResourceRequest(task, bag(task), jobState)));
   }
 
   private static IHostAttributes hostAttributes(
@@ -630,5 +631,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   private ITaskConfig makeTask() {
     return makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK);
+  }
+
+  private ResourceBag bag(ITaskConfig task) {
+    return ResourceManager.bagFromResources(task.getResources())
+        .add(TaskExecutors.NO_OVERHEAD_EXECUTOR.getExecutorOverhead());
   }
 }
