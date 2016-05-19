@@ -33,6 +33,7 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.common.util.testing.FakeClock;
+import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.TierModule;
@@ -60,6 +61,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -157,6 +159,7 @@ public class SchedulingBenchmarks {
               bind(Clock.class).toInstance(clock);
               bind(StatsProvider.class).toInstance(new FakeStatsProvider());
               bind(EventSink.class).toInstance(eventBus::post);
+              bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo("jmh", "")));
             }
           }
       );

@@ -142,6 +142,28 @@ public class SlotSizeCounterTest extends EasyMockTest {
   }
 
   @Test
+  public void testMissingResourceVector() {
+    expectStatExport();
+    expectGetSlots(
+        new MachineResource(
+            ResourceTestUtil.bag(ImmutableMap.of(RAM_MB, 65536.0, DISK_MB, 65536.0)),
+            false,
+            false));
+
+    control.replay();
+
+    slotCounter.run();
+    assertEquals(0, smallCounter.get());
+    assertEquals(0, smallDedicatedCounter.get());
+    assertEquals(0, smallRevocableCounter.get());
+    assertEquals(0, smallDedicatedRevocableCounter.get());
+    assertEquals(0, largeCounter.get());
+    assertEquals(0, largeDedicatedCounter.get());
+    assertEquals(0, largeRevocableCounter.get());
+    assertEquals(0, largeDedicatedRevocableCounter.get());
+  }
+
+  @Test
   public void testCountSlots() {
     expectStatExport();
     expectGetSlots(

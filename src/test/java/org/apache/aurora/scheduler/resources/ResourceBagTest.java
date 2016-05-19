@@ -17,6 +17,8 @@ import com.google.common.collect.ImmutableMap;
 
 import org.junit.Test;
 
+import static java.lang.Double.POSITIVE_INFINITY;
+
 import static org.apache.aurora.scheduler.resources.ResourceBag.IS_NEGATIVE;
 import static org.apache.aurora.scheduler.resources.ResourceBag.LARGE;
 import static org.apache.aurora.scheduler.resources.ResourceBag.MEDIUM;
@@ -58,12 +60,21 @@ public class ResourceBagTest {
   @Test
   public void testKeyMismatch() {
     assertEquals(
-        new ResourceBag(ImmutableMap.of(CPUS, 9.0)),
+        new ResourceBag(ImmutableMap.of(CPUS, 9.0, RAM_MB, 16384.0, DISK_MB, 32768.0)),
         new ResourceBag(ImmutableMap.of(CPUS, 1.0)).add(LARGE));
 
+    // Check add with mismatched keys is still commutative.
     assertEquals(
-        LARGE.add(new ResourceBag(ImmutableMap.of(CPUS, 1.0))),
-        new ResourceBag(ImmutableMap.of(CPUS, 9.0, RAM_MB, 16384.0, DISK_MB, 32768.0)));
+        new ResourceBag(ImmutableMap.of(CPUS, 9.0, RAM_MB, 16384.0, DISK_MB, 32768.0)),
+        LARGE.add(new ResourceBag(ImmutableMap.of(CPUS, 1.0))));
+
+    // Check divide with missing values on the right.
+    assertEquals(
+        new ResourceBag(ImmutableMap.of(
+            CPUS, 1.0,
+            RAM_MB, POSITIVE_INFINITY,
+            DISK_MB, POSITIVE_INFINITY)),
+        LARGE.divide(new ResourceBag(ImmutableMap.of(CPUS, 8.0))));
   }
 
   @Test

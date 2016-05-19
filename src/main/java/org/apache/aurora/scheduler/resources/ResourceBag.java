@@ -15,12 +15,14 @@ package org.apache.aurora.scheduler.resources;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.BinaryOperator;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 
 import static java.util.stream.Collectors.toMap;
 
@@ -132,7 +134,9 @@ public class ResourceBag {
 
   /**
    * Divides this by other bag contents.
-   *
+   * <p>
+   * Note: any missing or zero resource values in {@code other} will result in
+   * {@code java.lang.Double.POSITIVE_INFINITY}.
    * @param other Other bag to divide by.
    * @return Result of division.
    */
@@ -173,16 +177,22 @@ public class ResourceBag {
         .collect(toMap(Map.Entry::getKey, Map.Entry::getValue)));
   }
 
+  /**
+   * Applies {@code operator} to this and {@code other} resource values. Any missing resource type
+   * values on either side will get substituted with 0.0 before applying the operator.
+   *
+   * @param other Other ResourceBag.
+   * @param operator Operator to apply.
+   * @return Operation result.
+   */
   private ResourceBag binaryOp(ResourceBag other, BinaryOperator<Double> operator) {
     ImmutableMap.Builder<ResourceType, Double> builder = ImmutableMap.builder();
-    for (Map.Entry<ResourceType, Double> entry : resourceVectors.entrySet()) {
-      // Apply binary operator only on matching keys from the other. If there is no match, keep the
-      // current value unchanged.
-      builder.put(
-          entry.getKey(),
-          other.getResourceVectors().containsKey(entry.getKey())
-              ? operator.apply(entry.getValue(), other.getResourceVectors().get(entry.getKey()))
-              : entry.getValue());
+    Set<ResourceType> resourceTypes =
+        Sets.union(resourceVectors.keySet(), other.getResourceVectors().keySet());
+    for (ResourceType type : resourceTypes) {
+      Double left = resourceVectors.getOrDefault(type, 0.0);
+      Double right = other.getResourceVectors().getOrDefault(type, 0.0);
+      builder.put(type, operator.apply(left, right));
     }
 
     return new ResourceBag(builder.build());

@@ -15,6 +15,7 @@ package org.apache.aurora.benchmark;
 
 import java.util.Set;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
@@ -31,6 +32,10 @@ import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 
 /**
  * Task factory.
@@ -140,12 +145,17 @@ final class Tasks {
         builder.getAssignedTask()
             .setInstanceId(i)
             .setTaskId(taskId);
+        builder.getAssignedTask().setAssignedPorts(ImmutableMap.of());
         builder.getAssignedTask().getTask()
             .setConstraints(constraints.build())
             .setNumCpus(cpu)
             .setRamMb(ram.as(Data.MB))
             .setDiskMb(disk.as(Data.MB))
             .setProduction(isProduction)
+            .setResources(ImmutableSet.of(
+                numCpus(cpu),
+                ramMb(ram.as(Data.MB)),
+                diskMb(disk.as(Data.MB))))
             .setRequestedPorts(ImmutableSet.of());
         tasks.add(IScheduledTask.build(builder));
       }

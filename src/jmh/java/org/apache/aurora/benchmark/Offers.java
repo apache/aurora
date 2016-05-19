@@ -99,8 +99,8 @@ final class Offers {
         Protos.Offer offer = Protos.Offer.newBuilder()
             .addAllResources(ImmutableSet.of(
                 makeScalar(CPUS, cpu),
-                makeScalar(RAM_MB, ram.getValue()),
-                makeScalar(DISK_MB, disk.getValue()),
+                makeScalar(RAM_MB, ram.as(Data.MB)),
+                makeScalar(DISK_MB, disk.as(Data.MB)),
                 makeRange(
                     PORTS,
                     IntStream.range(1, ports).boxed().collect(Collectors.toSet()))))
