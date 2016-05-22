@@ -27,8 +27,8 @@ The following properties may be set:
   **Property**             | **Type** | **Description**
   :------------------------| :------- | :--------------
    **name**                | String   | Cluster name (Required)
-   **slave_root**          | String   | Path to mesos slave work dir (Required)
-   **slave_run_directory** | String   | Name of mesos slave run dir (Required)
+   **slave_root**          | String   | Path to Mesos agent work dir (Required)
+   **slave_run_directory** | String   | Name of Mesos agent run dir (Required)
    **zk**                  | String   | Hostname of ZooKeeper instance used to resolve Aurora schedulers.
    **zk_port**             | Integer  | Port of ZooKeeper instance used to locate Aurora schedulers (Default: 2181)
    **scheduler_zk_path**   | String   | ZooKeeper path under which scheduler instances are registered.
@@ -46,7 +46,7 @@ any job keys identifying jobs running within the cluster.
 
 ### `slave_root`
 
-The path on the mesos slaves where executing tasks can be found. It is used in combination with the
+The path on the Mesos agents where executing tasks can be found. It is used in combination with the
 `slave_run_directory` property by `aurora task run` and `aurora task ssh` to change into the sandbox
 directory after connecting to the host. This value should match the value passed to `mesos-slave`
 as `-work_dir`.

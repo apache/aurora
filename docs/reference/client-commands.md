@@ -86,7 +86,7 @@ refer to different Jobs. For example, job key
 `cluster2/foo/prod/workhorse` is different from
 `cluster1/tyg/test/workhorse.`
 
-Role names are user accounts existing on the slave machines. If you don't know what accounts
+Role names are user accounts existing on the agent machines. If you don't know what accounts
 are available, contact your sysadmin.
 
 Environment names are namespaces; you can count on `prod`, `devel` and `test` existing.

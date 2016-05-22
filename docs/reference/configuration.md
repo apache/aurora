@@ -410,12 +410,12 @@ no announcement will take place.  For more information about ServerSets, see the
 documentation.
 
 By default, the hostname in the registered endpoints will be the `--hostname` parameter
-that is passed to the mesos slave. To override the hostname value, the executor can be started
+that is passed to the mesos agent. To override the hostname value, the executor can be started
 with `--announcer-hostname=<overriden_value>`. If you decide to use `--announcer-hostname` and if
 the overriden value needs to change for every executor, then the executor has to be started inside a wrapper, see [Executor Wrapper](../operations/configuration.md#thermos-executor-wrapper).
 
 For example, if you want the hostname in the endpoint to be an IP address instead of the hostname,
-the `--hostname` parameter to the mesos slave can be set to the machine IP or the executor can
+the `--hostname` parameter to the mesos agent can be set to the machine IP or the executor can
 be started with `--announcer-hostname=<host_ip>` while wrapping the executor inside a script.
 
 | object                         | type      | description
@@ -445,7 +445,7 @@ find a static port 80.  No port would be requested of or allocated by Mesos.
 
 Static ports should be used cautiously as Aurora does nothing to prevent two
 tasks with the same static port allocations from being co-scheduled.
-External constraints such as slave attributes should be used to enforce such
+External constraints such as agent attributes should be used to enforce such
 guarantees should they be needed.
 
 ### Container Objects
@@ -570,7 +570,7 @@ Aurora client or Aurora-provided services.
 
 ### mesos Namespace
 
-The `mesos` namespace contains variables which relate to the `mesos` slave
+The `mesos` namespace contains variables which relate to the `mesos` agent
 which launched the task. The `instance` variable can be used
 to distinguish between Task replicas.
 

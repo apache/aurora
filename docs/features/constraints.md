@@ -1,7 +1,7 @@
 Scheduling Constraints
 ======================
 
-By default, Aurora will pick any random slave with sufficient resources
+By default, Aurora will pick any random agent with sufficient resources
 in order to schedule a task. This scheduling choice can be further
 restricted with the help of constraints.
 
@@ -11,10 +11,10 @@ Mesos Attributes
 
 Data centers are often organized with hierarchical failure domains.  Common failure domains
 include hosts, racks, rows, and PDUs.  If you have this information available, it is wise to tag
-the Mesos slave with them as
+the Mesos agent with them as
 [attributes](https://mesos.apache.org/documentation/attributes-resources/).
 
-The Mesos slave `--attributes` command line argument can be used to mark slaves with
+The Mesos agent `--attributes` command line argument can be used to mark agents with
 static key/value pairs, so called attributes (not to be confused with `--resources`, which are
 dynamic and accounted).
 
@@ -58,7 +58,7 @@ Value Constraints
 -----------------
 
 Value constraints can be used to express that a certain attribute with a certain value
-should be present on a Mesos slave. For example, the following job would only be
+should be present on a Mesos agent. For example, the following job would only be
 scheduled on nodes that claim to have an `SSD` as their disk.
 
     Service(
@@ -94,18 +94,18 @@ the scheduler requires that the `$role` component matches the `role` field in th
 configuration, and will reject the job creation otherwise.  The remainder of the attribute is
 free-form. We've developed the idiom of formatting this attribute as `$role/$job`, but do not
 enforce this. For example: a job `devcluster/www-data/prod/hello` with a dedicated constraint set as
-`www-data/web.multi` will have its tasks scheduled only on Mesos slaves configured with:
+`www-data/web.multi` will have its tasks scheduled only on Mesos agents configured with:
 `--attributes=dedicated:www-data/web.multi`.
 
 A wildcard (`*`) may be used for the role portion of the dedicated attribute, which will allow any
 owner to elect for a job to run on the host(s). For example: tasks from both
 `devcluster/www-data/prod/hello` and `devcluster/vagrant/test/hello` with a dedicated constraint
-formatted as `*/web.multi` will be scheduled only on Mesos slaves configured with
+formatted as `*/web.multi` will be scheduled only on Mesos agents configured with
 `--attributes=dedicated:*/web.multi`. This may be useful when assembling a virtual cluster of
 machines sharing the same set of traits or requirements.
 
 ##### Example
-Consider the following slave command line:
+Consider the following agent command line:
 
     mesos-slave --attributes="dedicated:db_team/redis" ...
 
@@ -120,7 +120,7 @@ And this job configuration:
       ...
     )
 
-The job configuration is indicating that it should only be scheduled on slaves with the attribute
+The job configuration is indicating that it should only be scheduled on agents with the attribute
 `dedicated:db_team/redis`.  Additionally, Aurora will prevent any tasks that do _not_ have that
-constraint from running on those slaves.
+constraint from running on those agents.
 

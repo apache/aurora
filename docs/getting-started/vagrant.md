@@ -85,7 +85,7 @@ To verify that Aurora is running on the cluster, visit the following URLs:
 * Scheduler - http://192.168.33.7:8081
 * Observer - http://192.168.33.7:1338
 * Mesos Master - http://192.168.33.7:5050
-* Mesos Slave - http://192.168.33.7:5051
+* Mesos Agent - http://192.168.33.7:5051
 
 
 Log onto the VM

@@ -53,6 +53,8 @@ a functioning Aurora cluster.
   When a user task is launched, the agent will launch the executor (in the context of a Linux cgroup
   or Docker container depending upon the environment), which will in turn fork user processes.
 
+  In earlier versions of Mesos and Aurora, the Mesos agent was known as the Mesos slave.
+
 
 Jobs, Tasks and Processes
 --------------------------
@@ -73,7 +75,7 @@ A task can merely be a single *process* corresponding to a single
 command line, such as `python2.7 my_script.py`. However, a task can also
 consist of many separate processes, which all run within a single
 sandbox. For example, running multiple cooperating agents together,
-such as `logrotate`, `installer`, master, or slave processes. This is
+such as `logrotate`, `installer`, master, or agent processes. This is
 where Thermos comes in. While Aurora provides a `Job` abstraction on
 top of Mesos `Tasks`, Thermos provides a `Process` abstraction
 underneath Mesos `Task`s and serves as part of the Aurora framework's

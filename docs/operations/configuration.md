@@ -75,7 +75,7 @@ other available Mesos replicated log configuration options and default values.
 ### Changing the Quorum Size
 Special care needs to be taken when changing the size of the Aurora scheduler quorum.
 Since Aurora uses a Mesos replicated log, similar steps need to be followed as when
-[changing the mesos quorum size](http://mesos.apache.org/documentation/latest/operational-guide).
+[changing the Mesos quorum size](http://mesos.apache.org/documentation/latest/operational-guide).
 
 As a preparation, increase `-native_log_quorum_size` on each existing scheduler and restart them.
 When updating from 3 to 5 schedulers, the quorum size would grow from 2 to 3.
@@ -148,7 +148,7 @@ For example, to wrap the executor inside a simple wrapper, the scheduler will be
 ### Docker containers
 In order for Aurora to launch jobs using docker containers, a few extra configuration options
 must be set.  The [docker containerizer](http://mesos.apache.org/documentation/latest/docker-containerizer/)
-must be enabled on the mesos slaves by launching them with the `--containerizers=docker,mesos` option.
+must be enabled on the Mesos agents by launching them with the `--containerizers=docker,mesos` option.
 
 By default, Aurora will configure Mesos to copy the file specified in `-thermos_executor_path`
 into the container's sandbox.  If using a wrapper script to launch the thermos executor,
@@ -158,10 +158,10 @@ wrapper script and executor are correctly copied into the sandbox. Finally, ensu
 script does not access resources outside of the sandbox, as when the script is run from within a
 docker container those resources will not exist.
 
-A scheduler flag, `-global_container_mounts` allows mounting paths from the host (i.e., the slave)
+A scheduler flag, `-global_container_mounts` allows mounting paths from the host (i.e the agent machine)
 into all containers on that host. The format is a comma separated list of host_path:container_path[:mode]
 tuples. For example `-global_container_mounts=/opt/secret_keys_dir:/mnt/secret_keys_dir:ro` mounts
-`/opt/secret_keys_dir` from the slaves into all launched containers. Valid modes are `ro` and `rw`.
+`/opt/secret_keys_dir` from the agents into all launched containers. Valid modes are `ro` and `rw`.
 
 If you would like to run a container with a read-only filesystem, it may also be necessary to
 pass to use the scheduler flag `-thermos_home_in_sandbox` in order to set HOME to the sandbox

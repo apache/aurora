@@ -119,7 +119,7 @@ The number of tasks stored in the scheduler that are in the `LOST` state, and ha
 
 If this value is increasing at a high rate, it is a sign of trouble.
 
-There are many sources of `LOST` tasks in Mesos: the scheduler, master, slave, and executor can all
+There are many sources of `LOST` tasks in Mesos: the scheduler, master, agent, and executor can all
 trigger this.  The first step is to look in the scheduler logs for `LOST` to identify where the
 state changes are originating.
 
@@ -169,7 +169,7 @@ This value is currently known to increase occasionally when the scheduler fails 
 value warrants investigation.
 
 The scheduler will log when it times out a task. You should trace the task ID of the timed out
-task into the master, slave, and/or executors to determine where the message was dropped.
+task into the master, agent, and/or executors to determine where the message was dropped.
 
 ### `http_500_responses_events`
 Type: integer counter

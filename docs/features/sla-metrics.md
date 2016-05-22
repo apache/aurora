@@ -45,11 +45,11 @@ will not degrade this metric.*
 A fault in the task environment may cause the Aurora/Mesos to have different views on the task state
 or lose track of the task existence. In such cases, the service task is marked as LOST and
 rescheduled by Aurora. For example, this may happen when the task stays in ASSIGNED or STARTING
-for too long or the Mesos slave becomes unhealthy (or disappears completely). The time between
+for too long or the Mesos agent becomes unhealthy (or disappears completely). The time between
 task entering LOST and its replacement reaching RUNNING state is counted towards platform downtime.
 
 Another example of a platform downtime event is the administrator-requested task rescheduling. This
-happens during planned Mesos slave maintenance when all slave tasks are marked as DRAINED and
+happens during planned Mesos agent maintenance when all agent tasks are marked as DRAINED and
 rescheduled elsewhere.
 
 To accurately calculate Platform Uptime, we must separate platform incurred downtime from user

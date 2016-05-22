@@ -26,14 +26,14 @@ particular role" or attribute limit constraints such as "at most 2
 finds a suitable match, it assigns the `Task` to a machine and puts the
 `Task` into the `ASSIGNED` state.
 
-From the `ASSIGNED` state, the scheduler sends an RPC to the slave
-machine containing `Task` configuration, which the slave uses to spawn
+From the `ASSIGNED` state, the scheduler sends an RPC to the agent
+machine containing `Task` configuration, which the agent uses to spawn
 an executor responsible for the `Task`'s lifecycle. When the scheduler
 receives an acknowledgment that the machine has accepted the `Task`,
 the `Task` goes into `STARTING` state.
 
 `STARTING` state initializes a `Task` sandbox. When the sandbox is fully
-initialized, Thermos begins to invoke `Process`es. Also, the slave
+initialized, Thermos begins to invoke `Process`es. Also, the agent
 machine sends an update to the scheduler that the `Task` is
 in `RUNNING` state.
 
@@ -67,7 +67,7 @@ failure.
 ### Forceful Termination: KILLING, RESTARTING
 
 You can terminate a `Task` by issuing an `aurora job kill` command, which
-moves it into `KILLING` state. The scheduler then sends the slave a
+moves it into `KILLING` state. The scheduler then sends the agent a
 request to terminate the `Task`. If the scheduler receives a successful
 response, it moves the Task into `KILLED` state and never restarts it.
 
@@ -75,7 +75,7 @@ If a `Task` is forced into the `RESTARTING` state via the `aurora job restart`
 command, the scheduler kills the underlying task but in parallel schedules
 an identical replacement for it.
 
-In any case, the responsible executor on the slave follows an escalation
+In any case, the responsible executor on the agent follows an escalation
 sequence when killing a running task:
 
   1. If a `HttpLifecycleConfig` is not present, skip to (4).
@@ -95,9 +95,9 @@ If a `Task` stays in a transient task state for too long (such as `ASSIGNED`
 or `STARTING`), the scheduler forces it into `LOST` state, creating a new
 `Task` in its place that's sent into `PENDING` state.
 
-In addition, if the Mesos core tells the scheduler that a slave has
+In addition, if the Mesos core tells the scheduler that a agent has
 become unhealthy (or outright disappeared), the `Task`s assigned to that
-slave go into `LOST` state and new `Task`s are created in their place.
+agent go into `LOST` state and new `Task`s are created in their place.
 From `PENDING` state, there is no guarantee a `Task` will be reassigned
 to the same machine unless job constraints explicitly force it there.
 
@@ -121,9 +121,9 @@ preempted in favor of production tasks.
 
 ### Making Room for Maintenance: DRAINING
 
-Cluster operators can set slave into maintenance mode. This will transition
-all `Task` running on this slave into `DRAINING` and eventually to `KILLED`.
-Drained `Task`s will be restarted on other slaves for which no maintenance
+Cluster operators can set agent into maintenance mode. This will transition
+all `Task` running on this agent into `DRAINING` and eventually to `KILLED`.
+Drained `Task`s will be restarted on other agents for which no maintenance
 has been announced yet.
 
 

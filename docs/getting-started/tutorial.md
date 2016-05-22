@@ -122,7 +122,7 @@ identifies a Job. A job key consists of four parts, each separated by a
 in that order:
 
 * Cluster refers to the name of a particular Aurora installation.
-* Role names are user accounts existing on the slave machines. If you
+* Role names are user accounts existing on the agent machines. If you
 don't know what accounts are available, contact your sysadmin.
 * Environment names are namespaces; you can count on `test`, `devel`,
 `staging` and `prod` existing.

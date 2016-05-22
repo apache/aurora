@@ -230,7 +230,7 @@ working directory.
 
 Typically, you save this code somewhere. You then need to define a Process
 in your `.aurora` configuration file that fetches the code from that somewhere
-to where the slave can see it. For a public cloud, that can be anywhere public on
+to where the agent can see it. For a public cloud, that can be anywhere public on
 the Internet, such as S3. For a private cloud internal storage, you need to put in
 on an accessible HDFS cluster or similar storage.
 

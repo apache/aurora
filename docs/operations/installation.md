@@ -145,7 +145,7 @@ The executor typically does not require configuration.  Command line arguments c
 be passed to the executor using a command line argument on the scheduler.
 
 The observer needs to be configured to look at the correct mesos directory in order to find task
-sandboxes. You should 1st find the Mesos working directory by looking for the Mesos slave
+sandboxes. You should 1st find the Mesos working directory by looking for the Mesos agent
 `--work_dir` flag. You should see something like:
 
         ps -eocmd | grep "mesos-slave" | grep -v grep | tr ' ' '\n' | grep "\--work_dir"
@@ -237,7 +237,7 @@ dev, test, prod) for a production job.
 
 
 ## Installing Mesos
-Mesos uses a single package for the Mesos master and slave.  As a result, the package dependencies
+Mesos uses a single package for the Mesos master and agent.  As a result, the package dependencies
 are identical for both.
 
 ### Mesos on Ubuntu Trusty
