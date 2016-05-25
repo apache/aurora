@@ -16,24 +16,18 @@ from __future__ import print_function
 
 import json
 import logging
-import os
 import pprint
-import subprocess
 import textwrap
 import webbrowser
 from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime
-from itertools import chain
-from pipes import quote
-from tempfile import NamedTemporaryFile
 
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
 
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.restarter import RestartSettings
-from apache.aurora.client.api.scheduler_client import SchedulerProxy
 from apache.aurora.client.base import get_job_page, synthesize_url
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
@@ -45,6 +39,7 @@ from apache.aurora.client.cli import (
     Verb
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
+from apache.aurora.client.cli.diff_formatter import DiffFormatter
 from apache.aurora.client.cli.options import (
     ADD_INSTANCE_WAIT_OPTION,
     ALL_INSTANCES,
@@ -69,8 +64,8 @@ from apache.aurora.client.cli.options import (
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config.resource import ResourceManager
 
-from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME
-from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
+from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.ttypes import ResponseCode, ScheduleStatus
 
 # Utility type, representing job keys with wildcards.
 PartialJobKey = namedtuple('PartialJobKey', ['cluster', 'role', 'env', 'name'])
@@ -184,76 +179,6 @@ class DiffCommand(Verb):
         INSTANCES_SPEC_ARGUMENT,
         CONFIG_ARGUMENT]
 
-  def pretty_print_task(self, task):
-    task.configuration = None
-    executor_config = json.loads(task.executorConfig.data)
-    pretty_executor = json.dumps(executor_config, indent=2, sort_keys=True)
-    pretty_executor = '\n'.join(["    %s" % s for s in pretty_executor.split("\n")])
-    # Make start cleaner, and display multi-line commands across multiple lines.
-    pretty_executor = '\n    ' + pretty_executor.replace(r'\n', '\n')
-    # Avoid re-escaping as it's already pretty printed.
-    class RawRepr(object):
-      def __init__(self, data):
-        self.data = data
-
-      def __repr__(self):
-        return self.data
-
-    task.executorConfig = ExecutorConfig(
-        name=AURORA_EXECUTOR_NAME,
-        data=RawRepr(pretty_executor))
-    return self.prettyprinter.pformat(vars(task))
-
-  def pretty_print_tasks(self, tasks):
-    return ",\n".join(self.pretty_print_task(t) for t in tasks)
-
-  def dump_tasks(self, tasks, out_file):
-    out_file.write(self.pretty_print_tasks(tasks))
-    out_file.write("\n")
-    out_file.flush()
-
-  def diff_tasks(self, context, local_tasks, remote_tasks):
-    diff_program = os.environ.get("DIFF_VIEWER", "diff")
-    with NamedTemporaryFile() as local:
-      self.dump_tasks(local_tasks, local)
-      with NamedTemporaryFile() as remote:
-        self.dump_tasks(remote_tasks, remote)
-        result = subprocess.call("%s %s %s" % (
-            diff_program, quote(remote.name), quote(local.name)), shell=True)
-        # Unlike most commands, diff doesn't return zero on success; it returns
-        # 1 when a successful diff is non-empty.
-        if result not in (0, 1):
-          raise context.CommandError(EXIT_COMMAND_FAILURE, "Error running diff command")
-
-  def show_diff(self, context, header, configs_summaries, local_task=None):
-    def min_start(ranges):
-      return min(ranges, key=lambda r: r.first).first
-
-    def format_ranges(ranges):
-      instances = []
-      for task_range in sorted(list(ranges), key=lambda r: r.first):
-        if task_range.first == task_range.last:
-          instances.append("[%s]" % task_range.first)
-        else:
-          instances.append("[%s-%s]" % (task_range.first, task_range.last))
-      return instances
-
-    def print_instances(instances):
-      context.print_out("%s %s" % (header, ", ".join(str(span) for span in instances)))
-
-    summaries = sorted(list(configs_summaries), key=lambda s: min_start(s.instances))
-
-    if local_task:
-      for summary in summaries:
-        print_instances(format_ranges(summary.instances))
-        context.print_out("with diff:\n")
-        self.diff_tasks(context, [deepcopy(local_task)], [summary.config])
-        context.print_out('')
-    else:
-      if summaries:
-        print_instances(
-          format_ranges(r for r in chain.from_iterable(s.instances for s in summaries)))
-
   def execute(self, context):
     config = context.get_job_config(
         context.options.instance_spec.jobkey,
@@ -280,41 +205,14 @@ class DiffCommand(Verb):
     local_tasks = [
         deepcopy(local_task) for _ in range(config.instances())
     ]
-
-    def diff_no_update_details():
-      resp = api.query(api.build_query(role, name, env=env, statuses=ACTIVE_STATES))
-      context.log_response_and_raise(
-        resp,
-        err_code=EXIT_INVALID_PARAMETER,
-        err_msg="Could not find job to diff against")
-      if resp.result.scheduleStatusResult.tasks is None:
-        context.print_err("No tasks found for job %s" % context.options.instance_spec.jobkey)
-        return EXIT_COMMAND_FAILURE
-      else:
-        remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
-      self.diff_tasks(context, local_tasks, remote_tasks)
+    instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
+                 context.options.instance_spec.instance)
+    formatter = DiffFormatter(context, config, cluster, role, env, name)
 
     if config.raw().has_cron_schedule():
-      diff_no_update_details()
+      formatter.diff_no_update_details(local_tasks)
     else:
-      instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
-          context.options.instance_spec.instance)
-      try:
-        resp = api.get_job_update_diff(config, instances)
-        context.log_response_and_raise(
-            resp,
-            err_code=EXIT_COMMAND_FAILURE,
-            err_msg="Error getting diff info from scheduler")
-        diff = resp.result.getJobUpdateDiffResult
-        context.print_out("This job update will:")
-        self.show_diff(context, "add instances:", diff.add)
-        self.show_diff(context, "remove instances:", diff.remove)
-        self.show_diff(context, "update instances:", diff.update, local_task)
-        self.show_diff(context, "not change instances:", diff.unchanged)
-      except SchedulerProxy.ThriftInternalError:
-        # TODO(maxim): Temporary fallback to ensure client/scheduler backwards compatibility
-        # (i.e. new client works against old scheduler).
-        diff_no_update_details()
+      formatter.show_job_update_diff(instances, local_task)
 
     return EXIT_OK
 

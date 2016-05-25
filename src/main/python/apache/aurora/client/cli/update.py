@@ -33,6 +33,7 @@ from apache.aurora.client.cli import (
     Verb
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
+from apache.aurora.client.cli.diff_formatter import DiffFormatter
 from apache.aurora.client.cli.options import (
     ALL_INSTANCES,
     BIND_OPTION,
@@ -169,6 +170,8 @@ class StartUpdate(Verb):
           "Cron jobs may only be updated with \"aurora cron schedule\" command")
 
     api = context.get_api(config.cluster())
+    formatter = DiffFormatter(context, config)
+    formatter.show_job_update_diff(instances)
     try:
       resp = api.start_job_update(config, context.options.message, instances)
     except AuroraClientAPI.UpdateConfigError as e:

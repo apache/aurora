@@ -16,7 +16,7 @@ import time
 
 import mock
 import pytest
-from mock import ANY, Mock, call, create_autospec
+from mock import ANY, Mock, call, create_autospec, patch
 from pystachio import Empty
 
 from apache.aurora.client.cli import (
@@ -27,6 +27,7 @@ from apache.aurora.client.cli import (
     EXIT_UNKNOWN_ERROR,
     Context
 )
+from apache.aurora.client.cli.diff_formatter import DiffFormatter
 from apache.aurora.client.cli.options import TaskInstanceKey
 from apache.aurora.client.cli.update import (
     AbortUpdate,
@@ -97,6 +98,7 @@ class TestStartUpdate(AuroraClientCommandTest):
     self._fake_context = FakeAuroraCommandContext()
     self._fake_context.set_options(self._mock_options)
     self._mock_api = self._fake_context.get_api('UNUSED')
+    self._formatter = Mock(spec=DiffFormatter)
 
   @classmethod
   def create_mock_config(cls, is_cron=False):
@@ -114,8 +116,9 @@ class TestStartUpdate(AuroraClientCommandTest):
         ResponseCode.LOCK_ERROR,
         "Error.")
 
-    with pytest.raises(Context.CommandError):
-      self._command.execute(self._fake_context)
+    with patch('apache.aurora.client.cli.update.DiffFormatter'):
+      with pytest.raises(Context.CommandError):
+        self._command.execute(self._fake_context)
 
     assert self._mock_api.start_job_update.mock_calls == [
         call(mock_config, None, self._mock_options.instance_spec.instance)
@@ -137,8 +140,13 @@ class TestStartUpdate(AuroraClientCommandTest):
     self._fake_context.get_job_config = Mock(return_value=mock_config)
     self._mock_api.start_job_update.return_value = self.create_simple_success_response()
 
-    self._command.execute(self._fake_context)
+    with patch('apache.aurora.client.cli.update.DiffFormatter') as formatter:
+      formatter.return_value = self._formatter
+      self._command.execute(self._fake_context)
 
+    assert self._formatter.show_job_update_diff.mock_calls == [
+      call(self._mock_options.instance_spec.instance)
+    ]
     assert self._mock_api.start_job_update.mock_calls == [
         call(mock_config, None, self._mock_options.instance_spec.instance)
     ]
@@ -152,14 +160,20 @@ class TestStartUpdate(AuroraClientCommandTest):
     self._fake_context.get_job_config = Mock(return_value=mock_config)
     self._mock_options.instance_spec = TaskInstanceKey(self._job_key, None)
     self._mock_options.message = 'hello'
-    assert self._command.execute(self._fake_context) == EXIT_OK
 
+    with patch('apache.aurora.client.cli.update.DiffFormatter') as formatter:
+      formatter.return_value = self._formatter
+      assert self._command.execute(self._fake_context) == EXIT_OK
+
+    assert self._formatter.show_job_update_diff.mock_calls == [
+      call(self._mock_options.instance_spec.instance)
+    ]
     assert self._mock_api.start_job_update.mock_calls == [
         call(ANY, 'hello', None)
     ]
     assert self._fake_context.get_out() == [
-        StartUpdate.UPDATE_MSG_TEMPLATE %
-        ('http://something_or_other/scheduler/role/env/name/update/id')
+      StartUpdate.UPDATE_MSG_TEMPLATE %
+      ('http://something_or_other/scheduler/role/env/name/update/id'),
     ]
     assert self._fake_context.get_err() == []
 
@@ -176,17 +190,22 @@ class TestStartUpdate(AuroraClientCommandTest):
         get_status_query_response(status=JobUpdateStatus.ROLLED_FORWARD)
     ]
 
-    assert self._command.execute(self._fake_context) == EXIT_OK
+    with patch('apache.aurora.client.cli.update.DiffFormatter') as formatter:
+      formatter.return_value = self._formatter
+      assert self._command.execute(self._fake_context) == EXIT_OK
 
+    assert self._formatter.show_job_update_diff.mock_calls == [
+      call(self._mock_options.instance_spec.instance)
+    ]
     assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None)]
     assert self._mock_api.query_job_updates.mock_calls == [
-        call(update_key=resp.result.startJobUpdateResult.key)
+      call(update_key=resp.result.startJobUpdateResult.key)
     ]
 
     assert self._fake_context.get_out() == [
-        StartUpdate.UPDATE_MSG_TEMPLATE %
-        ('http://something_or_other/scheduler/role/env/name/update/id'),
-        'Current state ROLLED_FORWARD'
+      StartUpdate.UPDATE_MSG_TEMPLATE %
+      ('http://something_or_other/scheduler/role/env/name/update/id'),
+      'Current state ROLLED_FORWARD'
     ]
     assert self._fake_context.get_err() == []
 
@@ -203,7 +222,8 @@ class TestStartUpdate(AuroraClientCommandTest):
         get_status_query_response(status=JobUpdateStatus.ROLLED_BACK)
     ]
 
-    assert self._command.execute(self._fake_context) == EXIT_COMMAND_FAILURE
+    with patch('apache.aurora.client.cli.update.DiffFormatter'):
+      assert self._command.execute(self._fake_context) == EXIT_COMMAND_FAILURE
 
   def test_start_update_and_wait_error(self):
     mock_config = self.create_mock_config()
@@ -218,7 +238,8 @@ class TestStartUpdate(AuroraClientCommandTest):
         get_status_query_response(status=JobUpdateStatus.ERROR)
     ]
 
-    assert self._command.execute(self._fake_context) == EXIT_UNKNOWN_ERROR
+    with patch('apache.aurora.client.cli.update.DiffFormatter'):
+      assert self._command.execute(self._fake_context) == EXIT_UNKNOWN_ERROR
 
   def test_start_update_command_line_succeeds_noop_update(self):
     resp = self.create_simple_success_response()
@@ -226,11 +247,18 @@ class TestStartUpdate(AuroraClientCommandTest):
     self._mock_api.start_job_update.return_value = resp
     mock_config = self.create_mock_config()
     self._fake_context.get_job_config = Mock(return_value=mock_config)
-    result = self._command.execute(self._fake_context)
-    assert result == EXIT_OK
 
+    with patch('apache.aurora.client.cli.update.DiffFormatter') as formatter:
+      formatter.return_value = self._formatter
+      assert self._command.execute(self._fake_context) == EXIT_OK
+
+    assert self._formatter.show_job_update_diff.mock_calls == [
+      call(self._mock_options.instance_spec.instance)
+    ]
     assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None)]
-    assert self._fake_context.get_out() == ["Noop update."]
+    assert self._fake_context.get_out() == [
+      "Noop update."
+    ]
     assert self._fake_context.get_err() == []
 
   def test_update_pulse_interval_too_small(self):
@@ -240,8 +268,9 @@ class TestStartUpdate(AuroraClientCommandTest):
     error = Context.CommandError(100, 'something failed')
     self._mock_api.start_job_update.side_effect = error
 
-    with pytest.raises(Context.CommandError) as e:
-      self._command.execute(self._fake_context)
+    with patch('apache.aurora.client.cli.update.DiffFormatter'):
+      with pytest.raises(Context.CommandError) as e:
+        self._command.execute(self._fake_context)
 
     assert e.value == error
     assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None)]
