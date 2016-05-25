@@ -163,9 +163,9 @@
         $scope.resources = getQuota(quotaResponse);
         $scope.resourcesTableColumns = [
           {label: '', map: 'resource'},
-          {label: 'CPU', map: 'numCpus'},
-          {label: 'RAM', map: 'ramMb'},
-          {label: 'Disk', map: 'diskMb'}
+          {label: 'CPU', map: 'cpus'},
+          {label: 'RAM', map: 'ram'},
+          {label: 'Disk', map: 'disk'}
         ];
       });
 
@@ -180,9 +180,9 @@
           var consumption = quotaResponse.quota;
           return {
             resource: name,
-            numCpus: $filter('toCores')(consumption[vector].numCpus),
-            ramMb: $filter('scaleMb')(consumption[vector].ramMb),
-            diskMb: $filter('scaleMb')(consumption[vector].diskMb)
+            cpus: $filter('toResourceValue')(consumption[vector].resources, 'CPUS'),
+            ram: $filter('toResourceValue')(consumption[vector].resources, 'RAM'),
+            disk: $filter('toResourceValue')(consumption[vector].resources, 'Disk')
           };
         }
 

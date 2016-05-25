@@ -79,10 +79,10 @@
     };
   });
 
-  auroraUI.filter('scaleMb', function () {
+  auroraUI.filter('toResourceValue', function () {
     var SCALE = ['MiB', 'GiB', 'TiB', 'PiB', 'EiB'];
 
-    return function (sizeInMb) {
+    function formatMem(sizeInMb) {
       var size = sizeInMb;
       var unit = 0;
       while (size >= 1024 && unit < SCALE.length) {
@@ -90,12 +90,32 @@
         unit++;
       }
       return size.toFixed(2).toString() + ' ' + SCALE[unit];
-    };
-  });
+    }
 
-  auroraUI.filter('toCores', function () {
-    return  function (count) {
-      return count + ' cores';
+    return function (resources, type) {
+      var RESOURCE_MAP = {
+        'CPUS': {
+          filter: function (e) { return e.numCpus !== null; },
+          format: function (v) { return v.numCpus + ' cores'; }
+        },
+        'RAM': {
+          filter: function (e) { return e.ramMb !== null; },
+          format: function (v) { return formatMem(v.ramMb); }
+        },
+        'Disk': {
+          filter: function (e) { return e.diskMb !== null; },
+          format: function (v) { return formatMem(v.diskMb); }
+        }
+      };
+
+      if (RESOURCE_MAP.hasOwnProperty(type)) {
+        var resource = _.find(resources, RESOURCE_MAP[type].filter);
+        if (resource) {
+          return RESOURCE_MAP[type].format(resource);
+        }
+      }
+
+      return '';
     };
   });
 

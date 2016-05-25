@@ -432,9 +432,7 @@
           }
 
           return {
-            numCpus: task.numCpus,
-            ramMb: task.ramMb,
-            diskMb: task.diskMb,
+            resources: task.resources,
             isService: task.isService,
             production: task.production,
             contact: task.contactEmail || '',

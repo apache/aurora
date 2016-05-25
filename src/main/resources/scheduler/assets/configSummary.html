@@ -19,15 +19,15 @@
   <tr>
     <td class="cellLabel" rowspan="3">resources</td>
     <td>cpu</td>
-    <td>{{group.summary.schedulingDetail.numCpus | toCores}}</td>
+    <td>{{group.summary.schedulingDetail.resources | toResourceValue:'CPUS'}}</td>
   </tr>
   <tr>
     <td>ram</td>
-    <td>{{group.summary.schedulingDetail.ramMb | scaleMb}}</td>
+    <td>{{group.summary.schedulingDetail.resources | toResourceValue:'RAM'}}</td>
   </tr>
   <tr>
     <td>disk</td>
-    <td>{{group.summary.schedulingDetail.diskMb | scaleMb}}</td>
+    <td>{{group.summary.schedulingDetail.resources | toResourceValue:'Disk'}}</td>
   </tr>
   <tr>
     <td class="cellLabel">constraints</td>
