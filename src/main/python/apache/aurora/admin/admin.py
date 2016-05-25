@@ -19,7 +19,7 @@ import optparse
 import sys
 
 from twitter.common import app, log
-from twitter.common.quantity import Amount, Data, Time
+from twitter.common.quantity import Data, Time
 from twitter.common.quantity.parse_simple import parse_data, parse_time
 
 from apache.aurora.client.api import AuroraClientAPI
@@ -36,6 +36,7 @@ from apache.aurora.client.base import (
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 from apache.aurora.common.shellify import shellify
+from apache.aurora.config.resource import ResourceManager, ResourceType
 
 from .admin_util import (
     FILENAME_OPTION,
@@ -209,18 +210,26 @@ def increase_quota(cluster, role, cpu_str, ram_str, disk_str):
   Increases the amount of production quota allocated to a user.
   """
   cpu = float(cpu_str)
-  ram = parse_data(ram_str)
-  disk = parse_data(disk_str)
+  ram = parse_data(ram_str).as_(Data.MB)
+  disk = parse_data(disk_str).as_(Data.MB)
 
   client = make_admin_client(cluster)
   resp = client.get_quota(role)
   quota = resp.result.getQuotaResult.quota
-  log.info('Current quota for %s:\n\tCPU\t%s\n\tRAM\t%s MB\n\tDisk\t%s MB' %
-           (role, quota.numCpus, quota.ramMb, quota.diskMb))
+  resource_details = ResourceManager.resource_details_from_quota(quota)
+  log.info('Current quota for %s:\n\t%s' % (
+      role,
+      '\n\t'.join('%s\t%s%s' % (
+          r.resource_type.display_name,
+          r.value,
+          r.resource_type.display_unit) for r in resource_details)))
 
-  new_cpu = float(cpu + quota.numCpus)
-  new_ram = int((ram + Amount(quota.ramMb, Data.MB)).as_(Data.MB))
-  new_disk = int((disk + Amount(quota.diskMb, Data.MB)).as_(Data.MB))
+  new_cpu = ResourceType.CPUS.value_type(
+    cpu + ResourceManager.quantity_of(resource_details, ResourceType.CPUS))
+  new_ram = ResourceType.RAM_MB.value_type(
+    ram + ResourceManager.quantity_of(resource_details, ResourceType.RAM_MB))
+  new_disk = ResourceType.DISK_MB.value_type(
+    disk + ResourceManager.quantity_of(resource_details, ResourceType.DISK_MB))
 
   log.info('Attempting to update quota for %s to\n\tCPU\t%s\n\tRAM\t%s MB\n\tDisk\t%s MB' %
            (role, new_cpu, new_ram, new_disk))

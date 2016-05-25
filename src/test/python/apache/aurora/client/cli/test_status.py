@@ -236,15 +236,15 @@ class TestJobStatus(AuroraClientCommandTest):
       expected = textwrap.dedent("""\
           Active tasks (3):
           \tTask role: bozo, env: test, name: woops, instance: 1, status: RUNNING on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \tTask role: bozo, env: test, name: woops, instance: 2, status: RUNNING on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \tTask role: bozo, env: test, name: woops, instance: 3, status: RUNNING on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           Inactive tasks (0):
@@ -264,32 +264,32 @@ class TestJobStatus(AuroraClientCommandTest):
       expected = textwrap.dedent("""\
           Active tasks (3):
           \tTask role: bozo, env: test, name: woops, instance: 1, status: RUNNING on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \tTask role: bozo, env: test, name: woops, instance: 2, status: RUNNING on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \tTask role: bozo, env: test, name: woops, instance: 3, status: RUNNING on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           Inactive tasks (3):
           \tTask role: bozo, env: test, name: woops, instance: 0, status: KILLED on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## KILLED: Hi there
           \t   1970-11-23 ##:##:## FINISHED: Hi there
           \t   1970-11-23 ##:##:## FAILED: Hi there
           \tTask role: bozo, env: test, name: woops, instance: 1, status: FINISHED on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## KILLED: Hi there
           \t   1970-11-23 ##:##:## FINISHED: Hi there
           \t   1970-11-23 ##:##:## FAILED: Hi there
           \tTask role: bozo, env: test, name: woops, instance: 2, status: FAILED on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## KILLED: Hi there
           \t   1970-11-23 ##:##:## FINISHED: Hi there
@@ -310,21 +310,21 @@ class TestJobStatus(AuroraClientCommandTest):
       expected = textwrap.dedent("""\
           Active tasks (3):
           \tTask role: bozo, env: test, name: woops, instance: 1, status: RUNNING on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:
           \t\t  (key: 'meta', value: 'data')
           \t\t  (key: 'data', value: 'meta')
           \tTask role: bozo, env: test, name: woops, instance: 2, status: RUNNING on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:
           \t\t  (key: 'meta', value: 'data')
           \t\t  (key: 'data', value: 'meta')
           \tTask role: bozo, env: test, name: woops, instance: 3, status: RUNNING on slavehost
-          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  CPU: 2 core(s), RAM: 2 MB, Disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:

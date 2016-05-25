@@ -67,6 +67,7 @@ from apache.aurora.client.cli.options import (
     CommandOption
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.config.resource import ResourceManager
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME
 from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
@@ -716,11 +717,15 @@ class StatusCommand(Verb):
               ScheduleStatus._VALUES_TO_NAMES[scheduled_task.status],
               assigned_task.slaveHost))
 
+      resource_details = ResourceManager.resource_details_from_task(task_info)
       if task_info:
-        task_strings.append("""\t  cpus: %s, ram: %s MB, disk: %s MB""" % (
-            task_info.numCpus, task_info.ramMb, task_info.diskMb))
+        task_strings.append("""\t  %s""" % ", ".join("%s: %s%s" % (
+            r.resource_type.display_name,
+            r.value,
+            r.resource_type.display_unit) for r in resource_details))
+
       if assigned_task.assignedPorts:
-        task_strings.append("\t  ports: %s" % assigned_task.assignedPorts)
+        task_strings.append("\t  assigned ports: %s" % assigned_task.assignedPorts)
         # TODO(mchucarroll): only add the max if taskInfo is filled in!
         task_strings.append("\t  failure count: %s (max %s)" % (scheduled_task.failureCount,
             task_info.maxTaskFailures))

@@ -20,6 +20,7 @@ from thrift.TSerialization import serialize
 from apache.aurora.client.cli import EXIT_OK, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import JSON_WRITE_OPTION, ROLE_ARGUMENT
+from apache.aurora.config.resource import ResourceManager
 
 
 class GetQuotaCmd(Verb):
@@ -35,19 +36,12 @@ class GetQuotaCmd(Verb):
     return [JSON_WRITE_OPTION, ROLE_ARGUMENT]
 
   def render_quota(self, write_json, quota_resp):
-    def get_quota_json(quota):
-      result = {}
-      result['cpu'] = quota.numCpus
-      result['ram'] = float(quota.ramMb) / 1024
-      result['disk'] = float(quota.diskMb) / 1024
-      return result
-
     def get_quota_str(quota):
-      result = []
-      result.append('  CPU: %s' % quota.numCpus)
-      result.append('  RAM: %f GB' % (float(quota.ramMb) / 1024))
-      result.append('  Disk: %f GB' % (float(quota.diskMb) / 1024))
-      return result
+      resource_details = ResourceManager.resource_details_from_quota(quota)
+      return ('  %s: %s%s' % (
+          r.resource_type.display_name,
+          r.value,
+          r.resource_type.display_unit) for r in resource_details)
 
     if write_json:
       return serialize(quota_resp.result.getQuotaResult,

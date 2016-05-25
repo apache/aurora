@@ -51,19 +51,19 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     api.get_quota.return_value = response
 
   def test_get_quota_no_consumption(self):
-    assert ('Allocated:\n  CPU: 5\n  RAM: 20.000000 GB\n  Disk: 40.000000 GB' ==
+    assert ('Allocated:\n  CPU: 5 core(s)\n  RAM: 20480 MB\n  Disk: 40960 MB' ==
             self._get_quota(False, ['quota', 'get', 'west/bozo']))
 
   def test_get_quota_with_consumption(self):
-    expected_output = ('Allocated:\n  CPU: 5\n  RAM: 20.000000 GB\n  Disk: 40.000000 GB\n'
+    expected_output = ('Allocated:\n  CPU: 5 core(s)\n  RAM: 20480 MB\n  Disk: 40960 MB\n'
                        'Production shared pool resources consumed:\n'
-                       '  CPU: 1\n  RAM: 0.500000 GB\n  Disk: 1.000000 GB\n'
+                       '  CPU: 1 core(s)\n  RAM: 512 MB\n  Disk: 1024 MB\n'
                        'Production dedicated pool resources consumed:\n'
-                       '  CPU: 2\n  RAM: 1.000000 GB\n  Disk: 2.000000 GB\n'
+                       '  CPU: 2 core(s)\n  RAM: 1024 MB\n  Disk: 2048 MB\n'
                        'Non-production shared pool resources consumed:\n'
-                       '  CPU: 3\n  RAM: 2.000000 GB\n  Disk: 4.000000 GB\n'
+                       '  CPU: 3 core(s)\n  RAM: 2048 MB\n  Disk: 4096 MB\n'
                        'Non-production dedicated pool resources consumed:\n'
-                       '  CPU: 4\n  RAM: 4.000000 GB\n  Disk: 8.000000 GB')
+                       '  CPU: 4 core(s)\n  RAM: 4096 MB\n  Disk: 8192 MB')
     assert expected_output == self._get_quota(True, ['quota', 'get', 'west/bozo'])
 
   def test_get_quota_with_no_consumption_json(self):

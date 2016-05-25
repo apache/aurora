@@ -18,6 +18,7 @@ python_library(
   name = 'config',
   sources = rglobs('*.py'),
   dependencies = [
+    '3rdparty/python:enum34',
     '3rdparty/python:pystachio',
     '3rdparty/python:twitter.common.lang',
     'api/src/main/thrift/org/apache/aurora/gen',
