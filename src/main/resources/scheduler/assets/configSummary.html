@@ -23,11 +23,11 @@
   </tr>
   <tr>
     <td>ram</td>
-    <td>{{group.summary.schedulingDetail.resources | toResourceValue:'RAM'}}</td>
+    <td>{{group.summary.schedulingDetail.resources | toResourceValue:'RAM_MB'}}</td>
   </tr>
   <tr>
     <td>disk</td>
-    <td>{{group.summary.schedulingDetail.resources | toResourceValue:'Disk'}}</td>
+    <td>{{group.summary.schedulingDetail.resources | toResourceValue:'DISK_MB'}}</td>
   </tr>
   <tr>
     <td class="cellLabel">constraints</td>
@@ -41,9 +41,9 @@
     <td class="cellLabel">service</td>
     <td colspan="2">{{group.summary.schedulingDetail.isService}}</td>
   </tr>
-  <tr ng-if='group.summary.schedulingDetail.ports'>
+  <tr ng-if='(group.summary.schedulingDetail.resources | toResourceValue:"PORTS").length > 0'>
     <td class="cellLabel">ports</td>
-    <td colspan="2">{{group.summary.schedulingDetail.ports}}</td>
+    <td colspan="2">{{group.summary.schedulingDetail.resources | toResourceValue:'PORTS'}}</td>
   </tr>
   <tr ng-if='group.summary.schedulingDetail.metadata'>
     <td class="cellLabel">metadata</td>

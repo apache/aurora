@@ -96,22 +96,32 @@
       var RESOURCE_MAP = {
         'CPUS': {
           filter: function (e) { return e.numCpus !== null; },
-          format: function (v) { return v.numCpus + ' cores'; }
+          format: function (v) { return _.first(v).numCpus + ' cores'; }
         },
-        'RAM': {
+        'RAM_MB': {
           filter: function (e) { return e.ramMb !== null; },
-          format: function (v) { return formatMem(v.ramMb); }
+          format: function (v) { return formatMem(_.first(v).ramMb); }
         },
-        'Disk': {
+        'DISK_MB': {
           filter: function (e) { return e.diskMb !== null; },
-          format: function (v) { return formatMem(v.diskMb); }
+          format: function (v) { return formatMem(_.first(v).diskMb); }
+        },
+        'PORTS': {
+          filter: function (e) { return e.namedPort !== null; },
+          format: function (v) {
+            return _.chain(v)
+                .map(function (r) { return r.namedPort; })
+                .sortBy()
+                .value()
+                .join(', ');
+          }
         }
       };
 
       if (RESOURCE_MAP.hasOwnProperty(type)) {
-        var resource = _.find(resources, RESOURCE_MAP[type].filter);
-        if (resource) {
-          return RESOURCE_MAP[type].format(resource);
+        var match = _.filter(resources, RESOURCE_MAP[type].filter);
+        if (match && !_.isEmpty(match)) {
+          return RESOURCE_MAP[type].format(match);
         }
       }
 

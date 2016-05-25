@@ -436,7 +436,6 @@
             isService: task.isService,
             production: task.production,
             contact: task.contactEmail || '',
-            ports: _.sortBy(task.requestedPorts).join(', '),
             constraints: constraints,
             metadata: metadata,
             container: container

@@ -181,8 +181,8 @@
           return {
             resource: name,
             cpus: $filter('toResourceValue')(consumption[vector].resources, 'CPUS'),
-            ram: $filter('toResourceValue')(consumption[vector].resources, 'RAM'),
-            disk: $filter('toResourceValue')(consumption[vector].resources, 'Disk')
+            ram: $filter('toResourceValue')(consumption[vector].resources, 'RAM_MB'),
+            disk: $filter('toResourceValue')(consumption[vector].resources, 'DISK_MB')
           };
         }
 
