@@ -115,6 +115,10 @@ public class JettyServerModule extends AbstractModule {
       help = "The port to start an HTTP server on.  Default value will choose a random port.")
   protected static final Arg<Integer> HTTP_PORT = Arg.create(0);
 
+  @CmdLine(name = "ip",
+      help = "The ip address to listen. If not set, the scheduler will listen on all interfaces.")
+  protected static final Arg<String> LISTEN_IP = Arg.create();
+
   public static final Map<String, String> GUICE_CONTAINER_PARAMS = ImmutableMap.of(
       FEATURE_POJO_MAPPING, Boolean.TRUE.toString(),
       PROPERTY_CONTAINER_REQUEST_FILTERS, GZIPContentEncodingFilter.class.getName(),
@@ -377,6 +381,10 @@ public class JettyServerModule extends AbstractModule {
 
       ServerConnector connector = new ServerConnector(server);
       connector.setPort(HTTP_PORT.get());
+      if (LISTEN_IP.hasAppliedValue()) {
+        connector.setHost(LISTEN_IP.get());
+      }
+
       server.addConnector(connector);
       server.setHandler(getGzipHandler(getRewriteHandler(rootHandler)));
 

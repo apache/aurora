@@ -22,6 +22,8 @@
 - Upgraded to pystachio 0.8.1 to pick up support for the new [Choice type](https://github.com/wickman/pystachio/blob/v0.8.1/README.md#choices).
 - The `container` property of a `Job` is now a Choice of either a `Container` holder, or a direct
   reference to either a `Docker` or `Mesos` container.
+- New scheduler command line argument `-ip` to control what ip address to bind the schedulers http
+  server to.
 
 ### Deprecations and removals:
 
