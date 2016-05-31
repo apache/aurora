@@ -268,10 +268,14 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   if task.numCpus <= 0 or task.ramMb <= 0 or task.diskMb <= 0:
     raise InvalidConfig('Task has invalid resources.  cpu/ramMb/diskMb must all be positive: '
         'cpu:%r ramMb:%r diskMb:%r' % (task.numCpus, task.ramMb, task.diskMb))
+  numGpus = fully_interpolated(task_raw.resources().gpu())
 
   task.resources = frozenset(
-      [Resource(numCpus=task.numCpus), Resource(ramMb=task.ramMb), Resource(diskMb=task.diskMb)] +
-      [Resource(namedPort=p) for p in ports])
+      [Resource(numCpus=task.numCpus),
+       Resource(ramMb=task.ramMb),
+       Resource(diskMb=task.diskMb)]
+      + [Resource(namedPort=p) for p in ports]
+      + [Resource(numGpus=numGpus)] if numGpus else [])
 
   task.job = key
   task.owner = owner

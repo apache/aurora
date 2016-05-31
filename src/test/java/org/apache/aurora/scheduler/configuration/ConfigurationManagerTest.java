@@ -45,6 +45,7 @@ import org.junit.rules.ExpectedException;
 import static org.apache.aurora.gen.Resource.diskMb;
 import static org.apache.aurora.gen.Resource.namedPort;
 import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.numGpus;
 import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
 import static org.apache.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
@@ -113,17 +114,19 @@ public class ConfigurationManagerTest {
 
   private static final ConfigurationManager CONFIGURATION_MANAGER = new ConfigurationManager(
       new ConfigurationManagerSettings(
-      ALL_CONTAINER_TYPES,
-      false,
-      ImmutableMultimap.of(),
-      true),
+          ALL_CONTAINER_TYPES,
+          false,
+          ImmutableMultimap.of(),
+          true,
+          false),
       TaskTestUtil.DEV_TIER_MANAGER);
   private static final ConfigurationManager DOCKER_CONFIGURATION_MANAGER = new ConfigurationManager(
       new ConfigurationManagerSettings(
-        ALL_CONTAINER_TYPES,
-        true,
-        ImmutableMultimap.of("foo", "bar"),
-        false),
+          ALL_CONTAINER_TYPES,
+          true,
+          ImmutableMultimap.of("foo", "bar"),
+          false,
+          true),
       TaskTestUtil.DEV_TIER_MANAGER);
 
   @Test
@@ -269,6 +272,22 @@ public class ConfigurationManagerTest {
     builder.addToResources(namedPort("thrift"));
 
     DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testGpuResourcesNotAllowed() throws Exception {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.addToResources(numGpus(2));
+
+    expectTaskDescriptionException("GPU resource support is disabled in this cluster.");
+    new ConfigurationManager(
+        new ConfigurationManagerSettings(
+            ALL_CONTAINER_TYPES,
+            true,
+            ImmutableMultimap.of("foo", "bar"),
+            false,
+            false),
+        TaskTestUtil.DEV_TIER_MANAGER).validateAndPopulate(ITaskConfig.build(builder));
   }
 
   @Test

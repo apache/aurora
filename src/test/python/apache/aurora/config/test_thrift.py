@@ -45,7 +45,7 @@ HELLO_WORLD = Job(
   task=Task(
     name='main',
     processes=[Process(name='hello_world', cmdline='echo {{mesos.instance}}')],
-    resources=Resources(cpu=0.1, ram=64 * 1048576, disk=64 * 1048576),
+    resources=Resources(cpu=0.1, ram=64 * 1048576, disk=64 * 1048576, gpu=2),
   )
 )
 
@@ -77,6 +77,7 @@ def test_simple_config():
   assert Resource(ramMb=64) in list(tti.resources)
   assert Resource(diskMb=64) in list(tti.resources)
   assert Resource(namedPort='health') in list(tti.resources)
+  assert Resource(numGpus=2) in list(tti.resources)
 
 
 def test_config_with_tier():

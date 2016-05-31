@@ -51,6 +51,7 @@ import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.resources.ResourceType.GPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 
 /**
@@ -114,17 +115,20 @@ public class ConfigurationManager {
     private final boolean allowDockerParameters;
     private final Multimap<String, String> defaultDockerParameters;
     private final boolean requireDockerUseExecutor;
+    private final boolean allowGpuResource;
 
     public ConfigurationManagerSettings(
         ImmutableSet<Container._Fields> allowedContainerTypes,
         boolean allowDockerParameters,
         Multimap<String, String> defaultDockerParameters,
-        boolean requireDockerUseExecutor) {
+        boolean requireDockerUseExecutor,
+        boolean allowGpuResource) {
 
       this.allowedContainerTypes = requireNonNull(allowedContainerTypes);
       this.allowDockerParameters = allowDockerParameters;
       this.defaultDockerParameters = requireNonNull(defaultDockerParameters);
       this.requireDockerUseExecutor = requireDockerUseExecutor;
+      this.allowGpuResource = allowGpuResource;
     }
   }
 
@@ -319,6 +323,14 @@ public class ConfigurationManager {
 
     if (!Strings.isNullOrEmpty(types)) {
       throw new TaskDescriptionException("Multiple resource values are not supported for " + types);
+    }
+
+    if (!settings.allowGpuResource && config.getResources().stream()
+        .filter(r -> ResourceType.fromResource(r).equals(GPUS))
+        .findAny()
+        .isPresent()) {
+
+      throw new TaskDescriptionException("GPU resource support is disabled in this cluster.");
     }
 
     maybeFillLinks(builder);

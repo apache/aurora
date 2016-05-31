@@ -223,18 +223,22 @@ union Resource {
   2: i64 ramMb
   3: i64 diskMb
   4: string namedPort
+  5: i64 numGpus
 }
 
 /** Description of the tasks contained within a job. */
 struct TaskConfig {
  /** Job task belongs to. */
  28: JobKey job
- // TODO(maxim): Remove in 0.7.0. (AURORA-749)
+ // TODO(maxim): Deprecated. See AURORA-749.
  /** contains the role component of JobKey */
  17: Identity owner
   7: bool isService
+  // TODO(maxim): Deprecated. See AURORA-1707.
   8: double numCpus
+  // TODO(maxim): Deprecated. See AURORA-1707.
   9: i64 ramMb
+  // TODO(maxim): Deprecated. See AURORA-1707.
  10: i64 diskMb
  11: i32 priority
  13: i32 maxTaskFailures
@@ -267,10 +271,13 @@ struct TaskConfig {
 }
 
 struct ResourceAggregate {
+  // TODO(maxim): Deprecated. See AURORA-1707.
   /** Number of CPU cores allotted. */
   1: double numCpus
+  // TODO(maxim): Deprecated. See AURORA-1707.
   /** Megabytes of RAM allotted. */
   2: i64 ramMb
+  // TODO(maxim): Deprecated. See AURORA-1707.
   /** Megabytes of disk space allotted. */
   3: i64 diskMb
   /** Aggregated resource values. */
@@ -299,7 +306,7 @@ struct JobConfiguration {
    * used to construct it server-side.
    */
   9: JobKey key
-  // TODO(maxim): Remove in 0.7.0. (AURORA-749)
+  // TODO(maxim): Deprecated. See AURORA-749.
   /** Owner of this job. */
   7: Identity owner
   /**

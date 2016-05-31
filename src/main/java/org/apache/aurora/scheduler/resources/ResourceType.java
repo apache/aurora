@@ -100,6 +100,21 @@ public enum ResourceType implements TEnum {
       "count",
       1000,
       true,
+      false),
+
+  /**
+   * GPU resource.
+   */
+  GPUS(
+      _Fields.NUM_GPUS,
+      SCALAR,
+      "gpus",
+      LONG,
+      Optional.empty(),
+      "GPU",
+      "core(s)",
+      4,
+      false,
       false);
 
   /**

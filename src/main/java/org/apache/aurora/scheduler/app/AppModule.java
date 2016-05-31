@@ -94,6 +94,9 @@ public class AppModule extends AbstractModule {
       help = "If false, Docker tasks may run without an executor (EXPERIMENTAL)")
   private static final Arg<Boolean> REQUIRE_DOCKER_USE_EXECUTOR = Arg.create(true);
 
+  @CmdLine(name = "allow_gpu_resource", help = "Allow jobs to request Mesos GPU resource.")
+  private static final Arg<Boolean> ALLOW_GPU_RESOURCE = Arg.create(false);
+
   private final ConfigurationManagerSettings configurationManagerSettings;
 
   @VisibleForTesting
@@ -106,7 +109,8 @@ public class AppModule extends AbstractModule {
         ImmutableSet.copyOf(ALLOWED_CONTAINER_TYPES.get()),
         ENABLE_DOCKER_PARAMETERS.get(),
         DEFAULT_DOCKER_PARAMETERS.get(),
-        REQUIRE_DOCKER_USE_EXECUTOR.get()));
+        REQUIRE_DOCKER_USE_EXECUTOR.get(),
+        ALLOW_GPU_RESOURCE.get()));
   }
 
   @Override

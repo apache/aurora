@@ -24,6 +24,21 @@
   reference to either a `Docker` or `Mesos` container.
 - New scheduler command line argument `-ip` to control what ip address to bind the schedulers http
   server to.
+- Added experimental support for Mesos GPU resource. This feature will be available in Mesos 0.29.0
+  and is disabled by default. Use `-allow_gpu_resource` flag to enable it.
+
+  **IMPORTANT: once this feature is enabled, creating jobs with GPU resource will make scheduler
+  snapshot backwards incompatible. Scheduler will be unable to read snapshot if rolled back to
+  previous version. If rollback is absolutely necessary, perform the following steps:**
+  1. Set `-allow_gpu_resource` to false
+  2. Delete all jobs with GPU resource (including cron job schedules if applicable)
+  3. Wait until GPU task history is pruned. You may speed it up by changing the history retention
+    flags, e.g.: `-history_prune_threshold=1mins` and `-history_max_per_job_threshold=0`
+  4. In case there were GPU job updates created, prune job update history for affected jobs from
+    `/h2console` endpoint or reduce job update pruning thresholds, e.g.:
+    `-job_update_history_pruning_threshold=1mins` and `-job_update_history_per_job_threshold=0`
+  5. Ensure a new snapshot is created by running `aurora_admin scheduler_snapshot <cluster>`
+  6. Rollback to previous version
 
 ### Deprecations and removals:
 
@@ -37,6 +52,8 @@
   sandbox.
 - Setting the `container` property of a `Job` to a `Container` holder is deprecated in favor of
   setting it directly to the appropriate (i.e. `Docker` or `Mesos`) container type.
+- Deprecated `numCpus`, `ramMb` and `diskMb` fields in `TaskConfig` and `ResourceAggregate` thrift
+  structs. Use `set<Resource> resources` to specify task resources or quota values.
 
 0.13.0
 ------

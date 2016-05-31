@@ -51,17 +51,28 @@ def test_order():
 
 
 def test_add_resources():
-  assert Units.resources_sum(Resources(), Resources()) == Resources(cpu=0, ram=0, disk=0)
+  assert Units.resources_sum(Resources(), Resources()) == Resources(cpu=0, ram=0, disk=0, gpu=0)
 
-  r100 = Resources(cpu=1, ram=0, disk=0)
-  r010 = Resources(cpu=0, ram=1, disk=0)
-  r001 = Resources(cpu=0, ram=0, disk=1)
-  r111 = Resources(cpu=1, ram=1, disk=1)
-  r222 = Resources(cpu=2, ram=2, disk=2)
+  r1000 = Resources(cpu=1, ram=0, disk=0, gpu=0)
+  r1001 = Resources(cpu=1, ram=0, disk=0, gpu=1)
+  r0100 = Resources(cpu=0, ram=1, disk=0, gpu=0)
+  r0010 = Resources(cpu=0, ram=0, disk=1, gpu=0)
+  r1110 = Resources(cpu=1, ram=1, disk=1, gpu=0)
+  r1101 = Resources(cpu=1, ram=1, disk=0, gpu=1)
+  r2220 = Resources(cpu=2, ram=2, disk=2, gpu=0)
 
-  assert reduce(Units.resources_sum, [r100, r010, r001]) == r111
-  assert Units.resources_sum(r111, r111) == r222
-  assert r222 == Units.resources_sum(r100, r010, r001, r111, Resources())
+  assert reduce(Units.resources_sum, [r1000, r0100, r0010]) == r1110
+  assert Units.resources_sum(r1110, r1110) == r2220
+  assert r2220 == Units.resources_sum(r1000, r0100, r0010, r1110, Resources())
+  assert Units.resources_sum(r1001, r0100) == r1101
+
+
+def test_max_resources():
+  assert Resources(cpu=1, ram=2, disk=3, gpu=4) == Units.resources_max([
+      Resources(cpu=0, ram=2, disk=1, gpu=4),
+      Resources(cpu=1, ram=1, disk=2, gpu=0),
+      Resources(cpu=0, ram=1, disk=3, gpu=1)
+  ])
 
 
 def test_combine_tasks():

@@ -101,6 +101,14 @@ are still available but you shouldn't count on them being so.
 application can write above its quota without getting an ENOSPC, but it
 will be killed shortly after. This is subject to change.
 
+### GPU Isolation
+
+GPU isolation will be supported for Nvidia devices starting from Mesos 0.29.0.
+Access to the allocated units will be exclusive with no sharing between tasks
+allowed (e.g. no fractional GPU allocation). Until official documentation is released,
+see [Mesos design document](https://docs.google.com/document/d/10GJ1A80x4nIEo8kfdeo9B11PIbS1xJrrB4Z373Ifkpo/edit#heading=h.w84lz7p4eexl)
+for more details.
+
 ### Other Resources
 
 Other resources, such as network bandwidth, do not have any performance
@@ -141,6 +149,10 @@ add the maximum size of the Java heap to your disk space requirement, in
 order to account for an out of memory error dumping the heap
 into the application's sandbox space.
 
+## GPU Sizing
+
+GPU is highly dependent on your application requirements and is only limited
+by the number of physical GPU units available on a target box.
 
 Oversubscription
 ----------------

@@ -17,9 +17,14 @@
       configuration details for instances {{group.label}}
     </th>
   <tr>
-    <td class="cellLabel" rowspan="3">resources</td>
+    <td class="cellLabel"
+        rowspan="{{group.summary.schedulingDetail.resources | toResourceValue}}">resources</td>
     <td>cpu</td>
     <td>{{group.summary.schedulingDetail.resources | toResourceValue:'CPUS'}}</td>
+  </tr>
+  <tr ng-if='(group.summary.schedulingDetail.resources | toResourceValue:"GPUS").length > 0'>
+    <td>gpu</td>
+    <td>{{group.summary.schedulingDetail.resources | toResourceValue:'GPUS'}}</td>
   </tr>
   <tr>
     <td>ram</td>
@@ -28,6 +33,10 @@
   <tr>
     <td>disk</td>
     <td>{{group.summary.schedulingDetail.resources | toResourceValue:'DISK_MB'}}</td>
+  </tr>
+  <tr ng-if='(group.summary.schedulingDetail.resources | toResourceValue:"PORTS").length > 0'>
+    <td>ports</td>
+    <td>{{group.summary.schedulingDetail.resources | toResourceValue:'PORTS'}}</td>
   </tr>
   <tr>
     <td class="cellLabel">constraints</td>
@@ -40,10 +49,6 @@
   <tr>
     <td class="cellLabel">service</td>
     <td colspan="2">{{group.summary.schedulingDetail.isService}}</td>
-  </tr>
-  <tr ng-if='(group.summary.schedulingDetail.resources | toResourceValue:"PORTS").length > 0'>
-    <td class="cellLabel">ports</td>
-    <td colspan="2">{{group.summary.schedulingDetail.resources | toResourceValue:'PORTS'}}</td>
   </tr>
   <tr ng-if='group.summary.schedulingDetail.metadata'>
     <td class="cellLabel">metadata</td>

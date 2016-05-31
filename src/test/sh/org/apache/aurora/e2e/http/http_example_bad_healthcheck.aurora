@@ -14,7 +14,19 @@
 
 import getpass
 
-DEFAULT_CMD = 'cp /vagrant/src/test/sh/org/apache/aurora/e2e/http_example.py .'
+class DefaultProfile(Struct):
+  role=Default(String, getpass.getuser())
+  cmd=Default(String, 'cp /vagrant/src/test/sh/org/apache/aurora/e2e/http_example.py .')
+  gpu=Default(Integer, 0)
+
+
+ContainerProfile = DefaultProfile(
+  cmd = 'cp /tmp/http_example.py .'
+)
+
+GpuProfile = DefaultProfile(
+  gpu=1
+)
 
 run_server = Process(
   name = 'run_server',
@@ -23,12 +35,12 @@ run_server = Process(
 
 stage_server = Process(
   name = 'stage_server',
-  cmdline = '{{cmd}}'
+  cmdline = '{{profile.cmd}}'
 )
 
 test_task = Task(
   name = 'http_example',
-  resources = Resources(cpu=0.5, ram=32*MB, disk=64*MB),
+  resources = Resources(cpu=0.5, ram=32*MB, disk=64*MB, gpu='{{profile.gpu}}'),
   processes = [stage_server, run_server],
   constraints = order(stage_server, run_server)
 )
@@ -53,34 +65,29 @@ job = Service(
   update_config = update_config,
   health_check_config = health_check_config,
   task = test_task,
-  role = getpass.getuser(),
+  role = '{{profile.role}}',
   environment = 'test',
-  contact = '{{role}}@localhost',
+  contact = '{{profile.role}}@localhost',
   announce = Announcer(),
 )
 
 jobs = [
   job(
     name = 'http_example'
-  ).bind(
-    cmd = DEFAULT_CMD
-  ),
+  ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_revocable',
     tier = 'revocable'
-  ).bind(
-    cmd = DEFAULT_CMD
-  ),
+  ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_docker',
     container = Container(docker=Docker(image = 'http_example'))
-  ).bind(
-    cmd = 'cp /tmp/http_example.py .'
-  ),
+  ).bind(profile=ContainerProfile),
   job(
     name = 'http_example_appc',
     container = Mesos(image=AppcImage(name='http_example', image_id='{{appc_image_id}}'))
-  ).bind(
-    cmd = 'cp /tmp/http_example.py .'
-  )
+  ).bind(profile=ContainerProfile),
+  job(
+    name = 'http_example_gpu'
+  ).bind(profile=GpuProfile)
 ]

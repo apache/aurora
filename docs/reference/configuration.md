@@ -321,6 +321,7 @@ resources are allocated.
   ```cpu```  | Float   | Fractional number of cores required by the task.
   ```ram```  | Integer | Bytes of RAM required by the task.
   ```disk``` | Integer | Bytes of disk required by the task.
+  ```gpu```  | Integer | Number of GPU cores required by the task
 
 
 Job Schema

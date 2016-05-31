@@ -32,6 +32,7 @@ import org.junit.Test;
 import static org.apache.aurora.gen.Resource.diskMb;
 import static org.apache.aurora.gen.Resource.namedPort;
 import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.numGpus;
 import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
@@ -114,6 +115,7 @@ public class ResourceManagerTest {
   public void testGetTaskResourceTypes() {
     AssignedTask builder = makeTask("id", JOB).newBuilder().getAssignedTask();
     builder.getTask().addToResources(namedPort("health"));
+    builder.getTask().addToResources(numGpus(4));
 
     assertEquals(
         EnumSet.allOf(ResourceType.class),

@@ -51,6 +51,7 @@ class Resources(Struct):
   cpu  = Required(Float)
   ram  = Required(Integer)
   disk = Required(Integer)
+  gpu  = Default(Integer, 0)
 
 
 class Constraint(Struct):

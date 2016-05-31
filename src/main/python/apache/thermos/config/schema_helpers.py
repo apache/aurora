@@ -69,9 +69,13 @@ class Units(object):
     def add(r1, r2):
       return Resources(cpu=add_unit(r1.cpu(), r2.cpu()),
                        ram=add_unit(r1.ram(), r2.ram()),
-                       disk=add_unit(r1.disk(), r2.disk()))
+                       disk=add_unit(r1.disk(), r2.disk()),
+                       gpu=add_unit(r1.gpu(), r2.gpu()))
 
-    return reduce(add, map(cls.optional_resources, resources), Resources(cpu=0, ram=0, disk=0))
+    return reduce(
+        add,
+        map(cls.optional_resources, resources),
+        Resources(cpu=0, ram=0, disk=0, gpu=0))
 
   @classmethod
   def finalization_wait_sum(cls, waits):
@@ -88,10 +92,13 @@ class Units(object):
     def resource_max(r1, r2):
       return Resources(cpu=max_unit(r1.cpu(), r2.cpu()),
                        ram=max_unit(r1.ram(), r2.ram()),
-                       disk=max_unit(r1.disk(), r2.disk()))
+                       disk=max_unit(r1.disk(), r2.disk()),
+                       gpu=max_unit(r1.gpu(), r2.gpu()))
 
-    return reduce(resource_max,
-        map(cls.optional_resources, resources), Resources(cpu=0, ram=0, disk=0))
+    return reduce(
+        resource_max,
+        map(cls.optional_resources, resources),
+        Resources(cpu=0, ram=0, disk=0, gpu=0))
 
   @classmethod
   def finalization_wait_max(cls, waits):

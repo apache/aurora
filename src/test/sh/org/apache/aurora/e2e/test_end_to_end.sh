@@ -152,7 +152,7 @@ test_observer_ui() {
 test_restart() {
   local _jobkey=$1
 
-  aurora job restart --batch-size=2 $_jobkey
+  aurora job restart --batch-size=2 --watch-secs=10 $_jobkey
 }
 
 assert_update_state() {
@@ -343,7 +343,7 @@ test_http_example() {
   test_quota $_cluster $_role
 }
 
-test_http_revocable_example() {
+test_http_example_basic() {
   local _cluster=$1 _role=$2 _env=$3
   local _base_config=$4
   local _job=$7
@@ -429,6 +429,7 @@ TEST_ROLE=vagrant
 TEST_ENV=test
 TEST_JOB=http_example
 TEST_JOB_REVOCABLE=http_example_revocable
+TEST_JOB_GPU=http_example_gpu
 TEST_JOB_DOCKER=http_example_docker
 TEST_JOB_APPC=http_example_appc
 TEST_CONFIG_FILE=$EXAMPLE_DIR/http_example.aurora
@@ -450,6 +451,8 @@ TEST_JOB_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB")
 
 TEST_JOB_REVOCABLE_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_REVOCABLE")
 
+TEST_JOB_GPU_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_GPU")
+
 TEST_JOB_DOCKER_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_DOCKER")
 
 TEST_ADMIN_ARGS=($TEST_CLUSTER)
@@ -469,7 +472,9 @@ test_version
 test_http_example "${TEST_JOB_ARGS[@]}"
 test_health_check
 
-test_http_revocable_example "${TEST_JOB_REVOCABLE_ARGS[@]}"
+test_http_example_basic "${TEST_JOB_REVOCABLE_ARGS[@]}"
+
+test_http_example_basic "${TEST_JOB_GPU_ARGS[@]}"
 
 # build the test docker image
 sudo docker build -t http_example ${TEST_ROOT}

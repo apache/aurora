@@ -68,6 +68,7 @@ public final class TaskTestUtil {
           ImmutableSet.of(_Fields.MESOS),
           false,
           ImmutableMultimap.of(),
+          true,
           true);
   public static final ConfigurationManager CONFIGURATION_MANAGER =
       new ConfigurationManager(CONFIGURATION_MANAGER_SETTINGS, DEV_TIER_MANAGER);

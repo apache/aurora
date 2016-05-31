@@ -95,31 +95,50 @@
     return function (resources, type) {
       var RESOURCE_MAP = {
         'CPUS': {
-          filter: function (e) { return e.numCpus !== null; },
-          format: function (v) { return _.first(v).numCpus + ' cores'; }
+          field: 'numCpus',
+          format: function (v) { return _.first(v)[this.field] + ' core(s)'; }
         },
         'RAM_MB': {
-          filter: function (e) { return e.ramMb !== null; },
-          format: function (v) { return formatMem(_.first(v).ramMb); }
+          field: 'ramMb',
+          format: function (v) { return formatMem(_.first(v)[this.field]); }
         },
         'DISK_MB': {
-          filter: function (e) { return e.diskMb !== null; },
-          format: function (v) { return formatMem(_.first(v).diskMb); }
+          field: 'diskMb',
+          format: function (v) { return formatMem(_.first(v)[this.field]); }
         },
         'PORTS': {
-          filter: function (e) { return e.namedPort !== null; },
+          field: 'namedPort',
           format: function (v) {
+            var field = this.field;
             return _.chain(v)
-                .map(function (r) { return r.namedPort; })
+                .map(function (r) { return r[field]; })
                 .sortBy()
                 .value()
                 .join(', ');
           }
+        },
+        'GPUS': {
+          field: 'numGpus',
+          format: function (v) { return _.first(v)[this.field] + ' core(s)'; }
         }
       };
 
-      if (RESOURCE_MAP.hasOwnProperty(type)) {
-        var match = _.filter(resources, RESOURCE_MAP[type].filter);
+      if (!type) {
+        return _.chain(resources)
+            .groupBy(function (r) {
+              for (var key in RESOURCE_MAP) {
+                var field = RESOURCE_MAP[key].field;
+                if (r.hasOwnProperty(field) && r[field] !== null) {
+                  return field;
+                }
+              }
+              return null;
+            })
+            .size()
+            .value();
+      } else if (RESOURCE_MAP.hasOwnProperty(type)) {
+        var field = RESOURCE_MAP[type].field;
+        var match = _.filter(resources, function (r) { return r[field] !== null; });
         if (match && !_.isEmpty(match)) {
           return RESOURCE_MAP[type].format(match);
         }
