@@ -10,7 +10,7 @@ Example (available in the [Vagrant environment](../getting-started/vagrant.md)):
 
 
     $ cat /vagrant/examples/jobs/docker/hello_docker.aurora
-    hello_docker = Process(
+    hello_world_proc = Process(
       name = 'hello',
       cmdline = """
         while true; do
