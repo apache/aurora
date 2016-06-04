@@ -360,7 +360,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
           if (attributes.isSetSlaveId()) {
             writeBehindAttributeStore.saveHostAttributes(IHostAttributes.build(attributes));
           } else {
-            LOG.info("Dropping host attributes with no slave ID: " + attributes);
+            LOG.info("Dropping host attributes with no agent ID: " + attributes);
           }
         })
         .put(

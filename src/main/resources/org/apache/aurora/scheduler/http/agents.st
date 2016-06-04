@@ -13,25 +13,25 @@
  -->
  <html>
   <head>
-    <title>Aurora $cluster_name$ slaves</title>
+    <title>Aurora $cluster_name$ agents</title>
     <link href="/assets/bower_components/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet" />
   </head>
   <body>
-    <h2>Slave Hosts</h2>
+    <h2>Agent Hosts</h2>
     <table class="table table-striped table-condensed table-hover">
       <thead>
         <th>Host
-        <th>Slave ID
+        <th>Agent ID
         <th>Maintenance mode
         <th>Attributes
       </thead>
       <tbody>
-        $slaves:{ slave |
+        $agents:{ agent |
         <tr>
-          <td><a href="http://$slave.host$:1338">$slave.host$</a>
-          <td>$slave.id$
-          <td>$slave.mode$
-          <td>$slave.attributes$
+          <td><a href="http://$agent.host$:1338">$agent.host$</a>
+          <td>$agent.id$
+          <td>$agent.mode$
+          <td>$agent.attributes$
         </tr>
         }$
       </tbody>

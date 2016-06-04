@@ -87,7 +87,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
           + "\"--no-root_submissions\". If set to anything other than \"root\", the executor "
           + "will ignore the \"role\" setting for jobs since it can't use setuid() anymore. "
           + "This means that all your jobs will run under the specified user and the user has "
-          + "to exist on the mesos slaves.")
+          + "to exist on the Mesos agents.")
   private static final Arg<String> EXECUTOR_USER = Arg.create("root");
 
   @CmdLine(name = "receive_revocable_resources",

@@ -125,7 +125,7 @@ public interface TaskAssigner {
           offer.getSlaveId(),
           task -> mapAndAssignResources(offer, task));
       LOG.info(
-          "Offer on slave {} (id {}) is being assigned task for {}.",
+          "Offer on agent {} (id {}) is being assigned task for {}.",
           host, offer.getSlaveId().getValue(), taskId);
       return taskFactory.createFrom(assigned, offer);
     }
@@ -185,7 +185,7 @@ public interface TaskAssigner {
             offerManager.banOffer(offer.getOffer().getId(), groupKey);
           }
 
-          LOG.debug("Slave " + offer.getOffer().getHostname()
+          LOG.debug("Agent " + offer.getOffer().getHostname()
               + " vetoed task " + taskId + ": " + vetoes);
         }
       }

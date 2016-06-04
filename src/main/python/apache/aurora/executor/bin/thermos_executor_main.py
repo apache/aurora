@@ -15,7 +15,7 @@
 """Command-line entry point to the Thermos Executor
 
 This module wraps the Thermos Executor into an executable suitable for launching by a Mesos
-slave.
+agent.
 
 """
 
@@ -88,7 +88,7 @@ app.add_option(
     type=str,
     default=None,
     help='Set hostname to be announced. By default it is'
-         'the --hostname argument passed into the mesos slave'
+         'the --hostname argument passed into the Mesos agent.'
 )
 
 app.add_option(

@@ -139,7 +139,7 @@ public class MesosSchedulerImpl implements Scheduler {
 
   @Override
   public void slaveLost(SchedulerDriver schedulerDriver, SlaveID slaveId) {
-    log.info("Received notification of lost slave: " + slaveId);
+    log.info("Received notification of lost agent: " + slaveId);
   }
 
   @Override

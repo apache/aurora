@@ -37,10 +37,10 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
 
 /**
- * HTTP interface to serve as a HUD for the mesos slaves tracked in the scheduler.
+ * HTTP interface to serve as a HUD for the Mesos agents tracked in the scheduler.
  */
-@Path("/slaves")
-public class Slaves extends JerseyTemplateServlet {
+@Path("/agents")
+public class Agents extends JerseyTemplateServlet {
   private final String clusterName;
   private final Storage storage;
 
@@ -51,8 +51,8 @@ public class Slaves extends JerseyTemplateServlet {
    * @param storage store to fetch the host attributes from
    */
   @Inject
-  public Slaves(IServerInfo serverInfo, Storage storage) {
-    super("slaves");
+  public Agents(IServerInfo serverInfo, Storage storage) {
+    super("agents");
     this.clusterName = checkNotBlank(serverInfo.getClusterName());
     this.storage = requireNonNull(storage);
   }
@@ -61,11 +61,8 @@ public class Slaves extends JerseyTemplateServlet {
     return storage.read(storeProvider -> storeProvider.getAttributeStore().getHostAttributes());
   }
 
-  private static final Function<IHostAttributes, Slave> TO_SLAVE =
-      Slave::new;
-
   /**
-   * Fetches the listing of known slaves.
+   * Fetches the listing of known agents.
    *
    * @return HTTP response.
    */
@@ -75,8 +72,8 @@ public class Slaves extends JerseyTemplateServlet {
     return fillTemplate(template -> {
       template.setAttribute("cluster_name", clusterName);
 
-      template.setAttribute("slaves",
-          FluentIterable.from(getHostAttributes()).transform(TO_SLAVE).toList());
+      template.setAttribute("agents",
+          FluentIterable.from(getHostAttributes()).transform(Agent::new).toList());
     });
   }
 
@@ -89,12 +86,12 @@ public class Slaves extends JerseyTemplateServlet {
       });
 
   /**
-   * Template object to represent a slave.
+   * Template object to represent a agent.
    */
-  private static class Slave {
+  private static class Agent {
     private final IHostAttributes attributes;
 
-    Slave(IHostAttributes attributes) {
+    Agent(IHostAttributes attributes) {
       this.attributes = attributes;
     }
 

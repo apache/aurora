@@ -54,6 +54,7 @@
   setting it directly to the appropriate (i.e. `Docker` or `Mesos`) container type.
 - Deprecated `numCpus`, `ramMb` and `diskMb` fields in `TaskConfig` and `ResourceAggregate` thrift
   structs. Use `set<Resource> resources` to specify task resources or quota values.
+- The endpoint `/slaves` is deprecated. Please use `/agents` instead.
 
 0.13.0
 ------

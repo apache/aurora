@@ -122,7 +122,7 @@ def group_hosts(hostnames, grouping_function=DEFAULT_GROUPING):
   rack of hosts at a time.
 
   :param hostnames: Hostnames to break into groups
-  :type hostnames: list of host names, must match the host names that slaves are registered with
+  :type hostnames: list of host names, must match the host names that agents are registered with
   :param grouping_function: Key within GROUPING_FUNCTIONS to partition hosts into desired batches
   :type grouping_function: string
   :rtype: dictionary of batches

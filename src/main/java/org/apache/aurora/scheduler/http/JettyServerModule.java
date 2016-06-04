@@ -203,6 +203,7 @@ public class JettyServerModule extends AbstractModule {
   };
 
   private static final Set<String> LEADER_ENDPOINTS = ImmutableSet.of(
+      "agents",
       "api",
       "cron",
       "locks",
@@ -218,6 +219,7 @@ public class JettyServerModule extends AbstractModule {
   private static final Multimap<Class<?>, String> JAX_RS_ENDPOINTS =
       ImmutableMultimap.<Class<?>, String>builder()
           .put(AbortHandler.class, "abortabortabort")
+          .put(Agents.class, "agents")
           .put(ContentionPrinter.class, "contention")
           .put(Cron.class, "cron")
           .put(HealthHandler.class, "health")
@@ -230,7 +232,6 @@ public class JettyServerModule extends AbstractModule {
           .put(QuitHandler.class, "quitquitquit")
           .put(Quotas.class, "quotas")
           .put(Services.class, "services")
-          .put(Slaves.class, "slaves")
           .put(StructDump.class, "structdump")
           .put(ThreadStackPrinter.class, "threads")
           .put(TimeSeriesDataSource.class, "graphdata")
@@ -326,6 +327,7 @@ public class JettyServerModule extends AbstractModule {
             .put("/graphview(?:/index.html)?", "/assets/graphview/graphview.html")
             .put("/graphview/(.*)", "/assets/graphview/$1")
             .put("/(?:scheduler|updates)(?:/.*)?", "/assets/scheduler/index.html")
+            .put("/slaves", "/agents")
             .build();
 
     private static Handler getRewriteHandler(Handler wrapped) {

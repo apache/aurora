@@ -24,7 +24,7 @@
         'frequently.',
 
       ASSIGNED: 'The scheduler has selected a machine to run the task and is instructing the ' +
-        'slave to launch it.',
+        'agent to launch it.',
 
       STARTING: 'The executor is preparing to launch the task.',
       RUNNING: 'The user process(es) are running.',
@@ -33,7 +33,7 @@
       KILLED: 'A user or cron invocation terminated the task.',
       PREEMPTING: 'This task is being killed to make resources available for a production task.',
       KILLING: 'A user request or cron invocation has requested the task be killed.',
-      LOST: 'The task cannot be accounted for, usually a result of slave process or machine ' +
+      LOST: 'The task cannot be accounted for, usually a result of agent process or machine ' +
         'failure.',
       DRAINING: 'The task is being restarted since the host is undergoing scheduled maintenance.'
     };

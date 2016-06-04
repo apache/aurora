@@ -15,6 +15,9 @@ org/apache/aurora/scheduler/base/Conversions$3
 org/apache/aurora/scheduler/configuration/executor/ExecutorModule$1
 org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl
 org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl$1
+org/apache/aurora/scheduler/http/Agents
+org/apache/aurora/scheduler/http/Agents$1
+org/apache/aurora/scheduler/http/Agents$Agent
 org/apache/aurora/scheduler/discovery/FlaggedZooKeeperConfig
 org/apache/aurora/scheduler/discovery/ServiceDiscoveryModule$TestServerService
 org/apache/aurora/scheduler/discovery/ServiceDiscoveryModule$LocalZooKeeperClusterProvider
@@ -34,13 +37,6 @@ org/apache/aurora/scheduler/http/Quotas
 org/apache/aurora/scheduler/http/Quotas$1
 org/apache/aurora/scheduler/http/Quotas$2
 org/apache/aurora/scheduler/http/Quotas$ResourceAggregateBean
-org/apache/aurora/scheduler/http/Slaves
-org/apache/aurora/scheduler/http/Slaves$1
-org/apache/aurora/scheduler/http/Slaves$2
-org/apache/aurora/scheduler/http/Slaves$3
-org/apache/aurora/scheduler/http/Slaves$4
-org/apache/aurora/scheduler/http/Slaves$Slave
-org/apache/aurora/scheduler/http/Slaves$Slave$1
 org/apache/aurora/scheduler/http/StructDump
 org/apache/aurora/scheduler/http/StructDump$1
 org/apache/aurora/scheduler/http/StructDump$2

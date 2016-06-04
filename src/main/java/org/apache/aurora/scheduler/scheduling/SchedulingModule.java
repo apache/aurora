@@ -78,7 +78,7 @@ public class SchedulingModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> MAX_SCHEDULE_PENALTY =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
-  @CmdLine(name = "offer_reservation_duration", help = "Time to reserve a slave's offers while "
+  @CmdLine(name = "offer_reservation_duration", help = "Time to reserve a agent's offers while "
       + "trying to satisfy a task preempting another.")
   private static final Arg<Amount<Long, Time>> RESERVATION_DURATION =
       Arg.create(Amount.of(3L, Time.MINUTES));
