@@ -39,7 +39,8 @@
     `-job_update_history_pruning_threshold=1mins` and `-job_update_history_per_job_threshold=0`
   5. Ensure a new snapshot is created by running `aurora_admin scheduler_snapshot <cluster>`
   6. Rollback to previous version
-- Adding a webhook feature which POSTs all task state changes to a user defined endpoint.
+- Experimental support for a webhook feature which POSTs all task state changes to a user defined
+  endpoint.
 
 ### Deprecations and removals:
 

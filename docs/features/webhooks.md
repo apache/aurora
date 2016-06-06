@@ -1,13 +1,13 @@
 Webhooks
-==================
+========
 
-Aurora has an optional feature which allows operator to specify a file to configure a HTTP webhook to receive task state
- change events. It can be enabled with a scheduler flag eg
- -webhook_config=/path/to/webhook.json
+Aurora has an optional feature which allows operator to specify a file to configure a HTTP webhook
+to receive task state change events. It can be enabled with a scheduler flag eg
+`-webhook_config=/path/to/webhook.json`. At this point, webhooks are still considered *experimental*.
 
- Below is a sample configuration:
+Below is a sample configuration:
 
- ```json
+```json
 {
   "headers": {
     "Content-Type": "application/vnd.kafka.json.v1+json",
@@ -77,3 +77,4 @@ And an example of a response that you will get back:
         },
         "oldState":{}}
 ```
+
