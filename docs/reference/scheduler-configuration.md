@@ -218,6 +218,8 @@ Optional flags:
 	Whether to use the experimental database-backed task store.
 -viz_job_url_prefix (default )
 	URL prefix for job container stats.
+-webhook_config [file must be readable]
+    File to configure a HTTP webhook to receive task state change events.
 -zk_chroot_path
 	chroot path to use for the ZooKeeper connections
 -zk_digest_credentials

@@ -18,6 +18,7 @@ import java.util.Set;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
+import com.google.gson.Gson;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
@@ -157,6 +158,11 @@ public interface PubsubEvent {
           .add("newState", getNewState())
           .toString();
     }
+
+    public String toJson() {
+      return new Gson().toJson(this);
+    }
+
   }
 
   /**

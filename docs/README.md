@@ -27,6 +27,7 @@ Description of important Aurora features.
  * [Services](features/services.md)
  * [Service Discovery](features/service-discovery.md)
  * [SLA Metrics](features/sla-metrics.md)
+ * [Webhooks](features/webhooks.md)
 
 ## Operators
 For those that wish to manage and fine-tune an Aurora cluster.

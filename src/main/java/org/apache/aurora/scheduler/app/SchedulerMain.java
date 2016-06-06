@@ -52,6 +52,7 @@ import org.apache.aurora.scheduler.configuration.executor.ExecutorModule;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.discovery.FlaggedZooKeeperConfig;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryModule;
+import org.apache.aurora.scheduler.events.WebhookModule;
 import org.apache.aurora.scheduler.http.HttpService;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
@@ -198,7 +199,9 @@ public class SchedulerMain {
             new LibMesosLoadingModule(),
             new MesosLogStreamModule(FlaggedZooKeeperConfig.create()),
             new LogStorageModule(),
-            new TierModule())
+            new TierModule(),
+            new WebhookModule()
+        )
         .build();
     flagConfiguredMain(Modules.combine(modules));
   }
