@@ -32,6 +32,8 @@ import com.google.common.collect.Iterables;
 
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -40,6 +42,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import static org.apache.aurora.scheduler.quota.QuotaManager.DEDICATED;
 import static org.apache.aurora.scheduler.quota.QuotaManager.NON_PROD_SHARED;
 import static org.apache.aurora.scheduler.quota.QuotaManager.PROD_SHARED;
+import static org.apache.aurora.scheduler.quota.QuotaManager.QUOTA_RESOURCES;
 
 /**
  * Computes aggregate metrics about resource allocation and consumption in the scheduler.
@@ -58,22 +61,21 @@ public class ResourceCounter {
         Tasks::getConfig);
   }
 
-  private static final Function<MetricType, GlobalMetric> TO_GLOBAL_METRIC =
-      GlobalMetric::new;
+  private static final Function<MetricType, Metric> TO_METRIC = Metric::new;
 
   /**
    * Computes totals for each of the {@link MetricType}s.
    *
-   * @return aggregates for each global metric type.
+   * @return aggregates for each metric type.
    * @throws StorageException if there was a problem fetching tasks from storage.
    */
-  public List<GlobalMetric> computeConsumptionTotals() throws StorageException {
-    List<GlobalMetric> counts = FluentIterable.from(Arrays.asList(MetricType.values()))
-        .transform(TO_GLOBAL_METRIC)
+  public List<Metric> computeConsumptionTotals() throws StorageException {
+    List<Metric> counts = FluentIterable.from(Arrays.asList(MetricType.values()))
+        .transform(TO_METRIC)
         .toList();
 
     for (ITaskConfig task : getTasks(Query.unscoped().active())) {
-      for (GlobalMetric count : counts) {
+      for (Metric count : counts) {
         count.accumulate(task);
       }
     }
@@ -89,9 +91,7 @@ public class ResourceCounter {
   public Metric computeQuotaAllocationTotals() throws StorageException {
     return storage.read(storeProvider -> {
       Metric allocation = new Metric();
-      for (IResourceAggregate quota : storeProvider.getQuotaStore().fetchQuotas().values()) {
-        allocation.accumulate(quota);
-      }
+      storeProvider.getQuotaStore().fetchQuotas().values().forEach(allocation::accumulate);
       return allocation;
     });
   }
@@ -137,85 +137,40 @@ public class ResourceCounter {
     }
   }
 
-  public static class GlobalMetric extends Metric {
-    public final MetricType type;
-
-    public GlobalMetric(MetricType type) {
-      this(type, 0, 0, 0);
-    }
-
-    @VisibleForTesting
-    GlobalMetric(MetricType type, long cpu, long ramMb, long diskMb) {
-      super(cpu, ramMb, diskMb);
-      this.type = type;
-    }
-
-    @Override
-    protected void accumulate(ITaskConfig task) {
-      if (type.filter.apply(task)) {
-        super.accumulate(task);
-      }
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof GlobalMetric)) {
-        return false;
-      }
-
-      GlobalMetric other = (GlobalMetric) o;
-      return super.equals(other)
-          && Objects.equals(other.type, this.type);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(super.hashCode(), type);
-    }
-  }
-
   public static class Metric {
-    private long cpu = 0;
-    private long ramMb = 0;
-    private long diskMb = 0;
+    public final MetricType type;
+    private ResourceBag bag;
 
     public Metric() {
-      this(0, 0, 0);
+      this(MetricType.TOTAL_CONSUMED);
+    }
+
+    public Metric(MetricType type) {
+      this(type, ResourceBag.EMPTY);
     }
 
     public Metric(Metric copy) {
-      this(copy.cpu, copy.ramMb, copy.diskMb);
+      this(copy.type, copy.bag);
     }
 
     @VisibleForTesting
-    Metric(long cpu, long ramMb, long diskMb) {
-      this.cpu = cpu;
-      this.ramMb = ramMb;
-      this.diskMb = diskMb;
+    Metric(MetricType type, ResourceBag bag) {
+      this.type = type;
+      this.bag = bag;
     }
 
-    protected void accumulate(ITaskConfig task) {
-      cpu += task.getNumCpus();
-      ramMb += task.getRamMb();
-      diskMb += task.getDiskMb();
+    void accumulate(ITaskConfig task) {
+      if (type.filter.apply(task)) {
+        bag = bag.add(QUOTA_RESOURCES.apply(task));
+      }
     }
 
-    protected void accumulate(IResourceAggregate quota) {
-      cpu += quota.getNumCpus();
-      ramMb += quota.getRamMb();
-      diskMb += quota.getDiskMb();
+    void accumulate(IResourceAggregate aggregate) {
+      bag = bag.add(ResourceManager.bagFromAggregate(aggregate));
     }
 
-    public long getCpu() {
-      return cpu;
-    }
-
-    public long getRamGb() {
-      return ramMb / 1024;
-    }
-
-    public long getDiskGb() {
-      return diskMb / 1024;
+    public ResourceBag getBag() {
+      return bag;
     }
 
     @Override
@@ -225,14 +180,13 @@ public class ResourceCounter {
       }
 
       Metric other = (Metric) o;
-      return getCpu() == other.getCpu()
-          && getRamGb() == other.getRamGb()
-          && getDiskGb() == other.getDiskGb();
+      return Objects.equals(other.type, this.type)
+          && Objects.equals(other.bag, this.bag);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(cpu, ramMb, diskMb);
+      return Objects.hash(type, bag);
     }
   }
 }

@@ -39,4 +39,9 @@ public class ResourceTypeTest {
   public void testFindByMesosResource() {
     assertEquals(RAM_MB, fromResource(mesosScalar(RAM_MB, 1.0)));
   }
+
+  @Test
+  public void testGetAuroraStatUnit() {
+    assertEquals("cores", CPUS.getAuroraStatUnit());
+  }
 }

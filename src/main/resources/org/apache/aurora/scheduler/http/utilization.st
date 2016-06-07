@@ -35,8 +35,8 @@
             $metric.title$
           $endif$
           <td>$metric.cpu$
-          <td>$metric.ramGb$ GB
-          <td>$metric.diskGb$ GB
+          <td>$metric.ram$ MB
+          <td>$metric.disk$ MB
         </tr>
         }$
       </tbody>

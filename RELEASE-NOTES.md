@@ -24,7 +24,7 @@
   reference to either a `Docker` or `Mesos` container.
 - New scheduler command line argument `-ip` to control what ip address to bind the schedulers http
   server to.
-- Added experimental support for Mesos GPU resource. This feature will be available in Mesos 0.29.0
+- Added experimental support for Mesos GPU resource. This feature will be available in Mesos 1.0
   and is disabled by default. Use `-allow_gpu_resource` flag to enable it.
 
   **IMPORTANT: once this feature is enabled, creating jobs with GPU resource will make scheduler
@@ -63,6 +63,8 @@
 - The endpoint `/slaves` is deprecated. Please use `/agents` instead.
 - Deprecated `production` field in `TaskConfig` thrift struct. Use `tier` field to specify task
   scheduling and resource handling behavior.
+- The scheduler `resources_*_ram_gb` and `resources_*_disk_gb` metrics have been renamed to
+  `resources_*_ram_mb` and `resources_*_disk_mb` respectively. Note the unit change: GB -> MB.
 
 0.13.0
 ------

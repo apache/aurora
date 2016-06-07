@@ -89,6 +89,9 @@ public interface QuotaManager {
 
   EnumSet<ResourceType> QUOTA_RESOURCE_TYPES = EnumSet.of(CPUS, RAM_MB, DISK_MB);
 
+  Function<ITaskConfig, ResourceBag> QUOTA_RESOURCES =
+      config -> bagFromResources(getTaskResources(config, QUOTA_RESOURCE_TYPES));
+
   /**
    * Saves a new quota for the provided role or overrides the existing one.
    *
@@ -415,9 +418,6 @@ public interface QuotaManager {
           .setRole(role)
           .setUpdateStatuses(Updates.ACTIVE_JOB_UPDATE_STATES));
     }
-
-    private static final Function<ITaskConfig, ResourceBag> QUOTA_RESOURCES =
-        config -> bagFromResources(getTaskResources(config, QUOTA_RESOURCE_TYPES));
 
     private static final Function<IInstanceTaskConfig, ResourceBag> INSTANCE_RESOURCES =
         config -> scale(config.getTask(), getUpdateInstanceCount(config.getInstances()));

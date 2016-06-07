@@ -15,7 +15,9 @@ package org.apache.aurora.scheduler.stats;
 
 import javax.inject.Inject;
 
-import org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
+import com.google.common.base.Joiner;
+
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.slf4j.Logger;
@@ -39,16 +41,19 @@ class TaskStatCalculator implements Runnable {
   }
 
   private void update(String prefix, Metric metric) {
-    counters.get(prefix + "_cpu").set(metric.getCpu());
-    counters.get(prefix + "_ram_gb").set(metric.getRamGb());
-    counters.get(prefix + "_disk_gb").set(metric.getDiskGb());
+    metric.getBag().streamResourceVectors().forEach(r -> {
+      ResourceType type = r.getKey();
+      String metricName =
+          Joiner.on("_").join(prefix, type.getAuroraName(), type.getAuroraStatUnit()).toLowerCase();
+      counters.get(metricName).set(metric.getBag().valueOf(type).longValue());
+    });
   }
 
   @Override
   public void run() {
     try {
-      for (GlobalMetric metric : resourceCounter.computeConsumptionTotals()) {
-        update("resources_" + metric.type.name().toLowerCase(), metric);
+      for (Metric metric : resourceCounter.computeConsumptionTotals()) {
+        update("resources_" + metric.type.name(), metric);
       }
       update("resources_allocated_quota", resourceCounter.computeQuotaAllocationTotals());
     } catch (StorageException e) {

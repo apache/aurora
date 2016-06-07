@@ -31,6 +31,7 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
@@ -48,7 +49,7 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.bag;
 import static org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
 import static org.apache.aurora.scheduler.stats.ResourceCounter.MetricType.DEDICATED_CONSUMED;
 import static org.apache.aurora.scheduler.stats.ResourceCounter.MetricType.FREE_POOL_CONSUMED;
@@ -58,7 +59,7 @@ import static org.junit.Assert.assertEquals;
 
 public class ResourceCounterTest {
 
-  private static final Metric ZERO = new Metric(0, 0, 0);
+  private static final Metric ZERO = new Metric(TOTAL_CONSUMED, ResourceBag.EMPTY);
   private static final long GB = 1024;
   private static final Optional<String> NOT_DEDICATED = Optional.absent();
 
@@ -87,7 +88,7 @@ public class ResourceCounterTest {
     assertEquals(ImmutableMap.of(), aggregates);
 
     for (Metric metric : resourceCounter.computeConsumptionTotals()) {
-      assertEquals(ZERO, metric);
+      assertEquals(ZERO.getBag(), metric.getBag());
     }
   }
 
@@ -105,12 +106,11 @@ public class ResourceCounterTest {
         task("lil", "jobI", "i", 1, GB, GB, PRODUCTION,    FINISHED,   NOT_DEDICATED)
     );
 
-    Set<GlobalMetric> expected = ImmutableSet.of(
-        new GlobalMetric(TOTAL_CONSUMED,     8, 8 * GB, 8 * GB),
-        new GlobalMetric(DEDICATED_CONSUMED, 2, 2 * GB, 2 * GB),
-        new GlobalMetric(QUOTA_CONSUMED,     4, 4 * GB, 4 * GB),
-        new GlobalMetric(FREE_POOL_CONSUMED, 2, 2 * GB, 2 * GB)
-    );
+    Set<Metric> expected = ImmutableSet.of(
+        new Metric(TOTAL_CONSUMED,     bag(8, 8 * GB, 8 * GB)),
+        new Metric(DEDICATED_CONSUMED, bag(2, 2 * GB, 2 * GB)),
+        new Metric(QUOTA_CONSUMED,     bag(4, 4 * GB, 4 * GB)),
+        new Metric(FREE_POOL_CONSUMED, bag(2, 2 * GB, 2 * GB)));
 
     assertEquals(expected, ImmutableSet.copyOf(resourceCounter.computeConsumptionTotals()));
   }
@@ -122,7 +122,9 @@ public class ResourceCounterTest {
       storeProvider.getQuotaStore().saveQuota("b", ResourceTestUtil.aggregate(2, 3, 4));
     });
 
-    assertEquals(new Metric(3, 4, 5), resourceCounter.computeQuotaAllocationTotals());
+    assertEquals(
+        new Metric(TOTAL_CONSUMED, bag(3, 4, 5)),
+        resourceCounter.computeQuotaAllocationTotals());
   }
 
   @Test
@@ -140,8 +142,8 @@ public class ResourceCounterTest {
 
     assertEquals(
         ImmutableMap.of(
-            JobKeys.from("bob", "test", "jobA"), new Metric(1, 1 * GB, 1 * GB),
-            JobKeys.from("bob", "test", "jobB"), new Metric(2, 2 * GB, 2 * GB)
+            JobKeys.from("bob", "test", "jobA"), new Metric(TOTAL_CONSUMED, bag(1, 1 * GB, 1 * GB)),
+            JobKeys.from("bob", "test", "jobB"), new Metric(TOTAL_CONSUMED, bag(2, 2 * GB, 2 * GB))
         ),
         resourceCounter.computeAggregates(
             Query.roleScoped("bob"),

@@ -279,6 +279,15 @@ public enum ResourceType implements TEnum {
   }
 
   /**
+   * Gets "stats-friendly" unit for using in metrics.
+   *
+   * @return
+   */
+  public String getAuroraStatUnit() {
+    return auroraUnit.replaceAll("\\(|\\)", "");
+  }
+
+  /**
    * Scaling range to use for comparison of scheduling vetoes.
    * <p>
    * This has no real bearing besides trying to determine if a veto along one resource vector
