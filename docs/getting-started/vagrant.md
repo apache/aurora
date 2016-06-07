@@ -139,9 +139,16 @@ you can use the command `vagrant destroy` to turn off and delete the virtual fil
 Troubleshooting
 ---------------
 
-Most of the vagrant related problems can be fixed by the following steps:
+Most of the Vagrant related problems can be fixed by the following steps:
 
 * Destroying the vagrant environment with `vagrant destroy`
 * Killing any orphaned VMs (see AURORA-499) with `virtualbox` UI or `VBoxManage` command line tool
 * Cleaning the repository of build artifacts and other intermediate output with `git clean -fdx`
 * Bringing up the vagrant environment with `vagrant up`
+
+If that still doesn't solve your problem, make sure to inspect the log files:
+
+* Scheduler: `/var/log/upstart/aurora-scheduler.log`
+* Observer: `/var/log/upstart/aurora-thermos-observer.log`
+* Mesos Master: `/var/log/mesos/mesos-master.INFO` (also see `.WARNING` and `.ERROR`)
+* Mesos Agent: `/var/log/mesos/mesos-slave.INFO` (also see `.WARNING` and `.ERROR`)
