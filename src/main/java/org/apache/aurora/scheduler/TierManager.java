@@ -18,6 +18,7 @@ import java.util.Map;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -42,18 +43,46 @@ public interface TierManager {
    */
   TierInfo getTier(ITaskConfig taskConfig);
 
+  /**
+   * Gets name of the default tier.
+   *
+   * @return Name for the default tier.
+   */
+  String getDefaultTierName();
+
+  /**
+   * Gets the map of tier name to {@link TierInfo} instance.
+   *
+   * @return A readonly view of all tiers.
+   */
+  Map<String, TierInfo> getTiers();
+
   class TierManagerImpl implements TierManager {
     private final TierConfig tierConfig;
 
     @VisibleForTesting
     public static class TierConfig {
+      private final String defaultTier;
       private final Map<String, TierInfo> tiers;
 
       @VisibleForTesting
       @JsonCreator
-      public TierConfig(@JsonProperty("tiers") Map<String, TierInfo> tiers) {
+      public TierConfig(
+          @JsonProperty("default") String defaultTier,
+          @JsonProperty("tiers") Map<String, TierInfo> tiers) {
+
+        checkArgument(!Strings.isNullOrEmpty(defaultTier), "Default tier name cannot be empty.");
         checkArgument(!tiers.isEmpty(), "Tiers cannot be empty.");
+        checkArgument(
+            tiers.containsKey(defaultTier),
+            "Default tier name should match supplied tiers.");
+        this.defaultTier = defaultTier;
         this.tiers = ImmutableMap.copyOf(tiers);
+      }
+
+      @VisibleForTesting
+      public String getDefault() {
+        return defaultTier;
       }
 
       @VisibleForTesting
@@ -81,6 +110,16 @@ public interface TierManager {
               .findFirst()
               .orElseThrow(() -> new IllegalStateException(
                   format("No matching implicit tier for task of job %s", taskConfig.getJob())));
+    }
+
+    @Override
+    public String getDefaultTierName() {
+      return tierConfig.defaultTier;
+    }
+
+    @Override
+    public Map<String, TierInfo> getTiers() {
+      return tierConfig.tiers;
     }
   }
 }

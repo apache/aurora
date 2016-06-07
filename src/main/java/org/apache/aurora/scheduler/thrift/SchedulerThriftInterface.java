@@ -396,6 +396,11 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return readOnlyScheduler.getJobUpdateDiff(request);
   }
 
+  @Override
+  public Response getTierConfigs() throws TException {
+    return readOnlyScheduler.getTierConfigs();
+  }
+
   private void validateLockForTasks(Iterable<IScheduledTask> tasks) throws LockException {
     ImmutableSet<IJobKey> uniqueKeys = FluentIterable.from(tasks)
         .transform(Tasks::getJob)

@@ -40,6 +40,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.gen.ConfigGroup;
 import org.apache.aurora.gen.ConfigSummary;
@@ -50,6 +51,7 @@ import org.apache.aurora.gen.GetJobUpdateSummariesResult;
 import org.apache.aurora.gen.GetJobsResult;
 import org.apache.aurora.gen.GetPendingReasonResult;
 import org.apache.aurora.gen.GetQuotaResult;
+import org.apache.aurora.gen.GetTierConfigResult;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobSummary;
@@ -69,6 +71,8 @@ import org.apache.aurora.gen.ScheduleStatusResult;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.gen.TierConfig;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Query;
@@ -119,6 +123,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   private final NearestFit nearestFit;
   private final CronPredictor cronPredictor;
   private final QuotaManager quotaManager;
+  private final TierManager tierManager;
 
   @Inject
   ReadOnlySchedulerImpl(
@@ -126,13 +131,15 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
       Storage storage,
       NearestFit nearestFit,
       CronPredictor cronPredictor,
-      QuotaManager quotaManager) {
+      QuotaManager quotaManager,
+      TierManager tierManager) {
 
     this.configurationManager = requireNonNull(configurationManager);
     this.storage = requireNonNull(storage);
     this.nearestFit = requireNonNull(nearestFit);
     this.cronPredictor = requireNonNull(cronPredictor);
     this.quotaManager = requireNonNull(quotaManager);
+    this.tierManager = requireNonNull(tierManager);
   }
 
   @Override
@@ -366,6 +373,18 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
           .setUpdate(instancesToConfigGroups(update))
           .setUnchanged(instancesToConfigGroups(diff.getUnchangedInstances()))));
     });
+  }
+
+  @Override
+  public Response getTierConfigs() throws TException {
+    return ok(Result.getTierConfigResult(
+        new GetTierConfigResult(
+            tierManager.getDefaultTierName(),
+            tierManager.getTiers()
+                .entrySet()
+                .stream()
+                .map(entry -> new TierConfig(entry.getKey(), entry.getValue().toMap()))
+                .collect(GuavaUtils.toImmutableSet()))));
   }
 
   private static Set<ConfigGroup> instancesToConfigGroups(Map<Integer, ITaskConfig> tasks) {

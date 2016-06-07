@@ -13,9 +13,11 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.util.Map;
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableMap;
 
 import org.codehaus.jackson.annotate.JsonCreator;
 import org.codehaus.jackson.annotate.JsonProperty;
@@ -54,6 +56,18 @@ public final class TierInfo {
    */
   public boolean isRevocable() {
     return revocable;
+  }
+
+  /**
+   * Gets the map of tier attribute names to values.
+   *
+   * @return A readonly view of all tier attributes.
+   */
+  public Map<String, String> toMap() {
+    return ImmutableMap.of(
+        "preemptible", String.valueOf(preemptible),
+        "revocable", String.valueOf(revocable)
+    );
   }
 
   @Override

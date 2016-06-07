@@ -1,4 +1,5 @@
 {
+  "default": "preemptible",
   "tiers":
   {
     "preferred":

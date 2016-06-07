@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.base;
 
+import java.util.Map;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
@@ -61,8 +63,23 @@ public final class TaskTestUtil {
       new TierInfo(false /* preemptible */, false /* revocable */);
   public static final String DEV_TIER_NAME = "tier-dev";
   public static final TierConfig DEV_TIER_CONFIG =
-      new TierConfig(ImmutableMap.of(DEV_TIER_NAME, DEV_TIER));
-  public static final TierManager DEV_TIER_MANAGER = taskConfig -> DEV_TIER;
+      new TierConfig(DEV_TIER_NAME, ImmutableMap.of(DEV_TIER_NAME, DEV_TIER));
+  public static final TierManager DEV_TIER_MANAGER = new TierManager() {
+    @Override
+    public TierInfo getTier(ITaskConfig taskConfig) {
+      return DEV_TIER;
+    }
+
+    @Override
+    public String getDefaultTierName() {
+      return DEV_TIER_NAME;
+    }
+
+    @Override
+    public Map<String, TierInfo> getTiers() {
+      return ImmutableMap.of(DEV_TIER_NAME, DEV_TIER);
+    }
+  };
   public static final ConfigurationManagerSettings CONFIGURATION_MANAGER_SETTINGS =
       new ConfigurationManagerSettings(
           ImmutableSet.of(_Fields.MESOS),

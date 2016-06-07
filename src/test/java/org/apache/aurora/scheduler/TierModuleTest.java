@@ -52,7 +52,8 @@ public class TierModuleTest {
     assertEquals(
         ImmutableMap.of("revocable", REVOCABLE_TIER),
         parseTierConfig(
-            "{\"tiers\":{"
+            "{\"default\": \"revocable\","
+            + "\"tiers\":{"
             + "\"revocable\": {\"revocable\": true, \"preemptible\": true}"
             + "}}")
             .getTiers());
@@ -60,6 +61,7 @@ public class TierModuleTest {
 
   @Test(expected = RuntimeException.class)
   public void testTierConfigExtraKeysNotAllowed() {
-    parseTierConfig("{\"tiers\":{\"revocable\": {\"revocable\": true, \"foo\": false}}}");
+    parseTierConfig("{\"default\": \"revocable\", "
+        + "\"tiers\":{\"revocable\": {\"revocable\": true, \"foo\": false}}}");
   }
 }

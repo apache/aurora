@@ -42,6 +42,10 @@
 - Experimental support for a webhook feature which POSTs all task state changes to a user defined
   endpoint.
 
+- Added support for specifying the default tier name in tier configuration file (`tiers.json`). The
+  `default` property is required and is initialized with the `preemptible` tier (`preemptible` tier
+  tasks can be preempted but their resources cannot be revoked).
+
 ### Deprecations and removals:
 
 - Deprecated `--restart-threshold` option in the `aurora job restart` command to match the job
@@ -57,6 +61,8 @@
 - Deprecated `numCpus`, `ramMb` and `diskMb` fields in `TaskConfig` and `ResourceAggregate` thrift
   structs. Use `set<Resource> resources` to specify task resources or quota values.
 - The endpoint `/slaves` is deprecated. Please use `/agents` instead.
+- Deprecated `production` field in `TaskConfig` thrift struct. Use `tier` field to specify task
+  scheduling and resource handling behavior.
 
 0.13.0
 ------

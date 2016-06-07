@@ -242,6 +242,7 @@ struct TaskConfig {
  10: i64 diskMb
  11: i32 priority
  13: i32 maxTaskFailures
+ // TODO(mnurolahzade): Deprecated. See AURORA-1708.
  /** Whether this is a production task, which can preempt. */
  18: optional bool production
  /** Task tier type. */
@@ -905,6 +906,22 @@ struct GetJobUpdateDiffResult {
   4: set<ConfigGroup> unchanged
 }
 
+/** Tier information. */
+struct TierConfig {
+  /** Name of tier. */
+  1: string name
+  /** Tier attributes. */
+  2: map<string, string> settings
+}
+
+/** Result of the getTierConfigResult call. */
+struct GetTierConfigResult {
+  /** Name of the default tier. */
+  1: string defaultTierName
+  /** Set of tier configurations. */
+  2: set<TierConfig> tiers
+}
+
 /** Information about the scheduler. */
 struct ServerInfo {
   1: string clusterName
@@ -932,6 +949,7 @@ union Result {
   24: GetJobUpdateDetailsResult getJobUpdateDetailsResult
   25: PulseJobUpdateResult pulseJobUpdateResult
   26: GetJobUpdateDiffResult getJobUpdateDiffResult
+  27: GetTierConfigResult getTierConfigResult
 }
 
 struct ResponseDetail {
@@ -996,6 +1014,9 @@ service ReadOnlyScheduler {
 
   /** Gets the diff between client (desired) and server (current) job states. */
   Response getJobUpdateDiff(1: JobUpdateRequest request)
+
+  /** Gets tier configurations. */
+  Response getTierConfigs()
 }
 
 service AuroraSchedulerManager extends ReadOnlyScheduler {
