@@ -143,7 +143,122 @@ If you need to do computation before starting the thermos executor (for example,
 For example, to wrap the executor inside a simple wrapper, the scheduler will be started like this
 `-thermos_executor_path=/path/to/wrapper.sh -thermos_executor_resources=/usr/share/aurora/bin/thermos_executor.pex`
 
+## Custom Executor  
 
+If the need arises to use a Mesos executor other than the Thermos executor, the scheduler can be
+configured to utilize a custom executor by specifying the `-custom_executor_config` flag.
+The flag must be set to the path of a valid executor configuration file. 
+
+The configuration file must be valid JSON and contain, at minimum, the name, command and resources fields.
+
+
+### executor
+
+Property                 | Description
+-----------------------  | ---------------------------------
+name (required)          | Name of the executor.
+command (required)       | How to run the executor.
+resources (required)     | Overhead to use for each executor instance.
+
+#### command
+
+Property                 | Description
+-----------------------  | ---------------------------------
+value (required)         | The command to execute.
+arguments (optional)     | A list of arguments to pass to the command.
+uris (optional)          | List of resources to download into the task sandbox.
+
+##### uris (list)
+* Follows the [Mesos Fetcher schema](http://mesos.apache.org/documentation/latest/fetcher/)
+
+Property                 | Description
+-----------------------  | ---------------------------------
+value (required)         | Path to the resource needed in the sandbox.
+executable (optional)    | Change resource to be executable via chmod.
+extract (optional)       | Extract files from packed or compressed archives into the sandbox.
+cache (optional)         | Use caching mechanism provided by Mesos for resources.
+
+#### resources (list)
+
+Property             | Description
+-------------------  | ---------------------------------
+name (required)      | Name of the resource: cpus or mem.
+type (required)      | Type of resource. Should always be SCALAR.
+scalar (required)    | Value in float for cpus or int for mem (in MBs)
+
+### volume_mounts (list)
+
+Property                  | Description
+------------------------  | ---------------------------------
+host_path (required)      | Host path to mount inside the container.
+container_path (required) | Path inside the container where `host_path` will be mounted.
+mode (required)           | Mode in which to mount the volume, Read-Write (RW) or Read-Only (RO).
+
+
+A sample configuration is as follows: 
+```
+     {
+       "executor": {
+         "name": "myExecutor",
+         "command": {
+           "value": "myExecutor.sh",
+           "arguments": [
+             "localhost:2181",
+             "-verbose",
+             "-config myConfiguration.config"
+           ],
+           "uris": [
+             {
+               "value": "/dist/myExecutor.sh",
+               "executable": true,
+               "extract": false,
+               "cache": true
+             },
+             {
+               "value": "/home/user/myConfiguration.config",
+               "executable": false,
+               "extract": false,
+               "cache": false
+             }
+           ]
+         },
+         "resources": [
+           {
+             "name": "cpus",
+             "type": "SCALAR",
+             "scalar": {
+               "value": 1.00
+             }
+           },
+           {
+             "name": "mem",
+             "type": "SCALAR",
+             "scalar": {
+               "value": 512
+             }
+           }
+         ]
+       },
+       "volume_mounts": [
+         {
+           "mode": "RO",
+           "container_path": "/path/on/container",
+           "host_path": "/path/to/host/directory"
+         },
+         {
+           "mode": "RW",
+           "container_path": "/container",
+           "host_path": "/host"
+         }
+       ]
+     }
+```
+
+It should be noted that if you do not use thermos or a thermos based executor, links in the scheduler's
+Web UI for tasks  will not work (at least for the time being).
+Some information about launched tasks can still be accessed via the Mesos Web UI or via the Aurora Client.
+Furthermore, this configuration replaces the default thermos executor.
+Work is in progress to allow support for multiple executors to co-exist within a single scheduler.
 
 ### Docker containers
 In order for Aurora to launch jobs using docker containers, a few extra configuration options
