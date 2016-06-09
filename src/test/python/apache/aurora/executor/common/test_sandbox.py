@@ -18,7 +18,13 @@ import mock
 import pytest
 from twitter.common.contextutil import temporary_dir
 
-from apache.aurora.executor.common.sandbox import DirectorySandbox, FileSystemImageSandbox
+from apache.aurora.executor.common.sandbox import (
+    DefaultSandboxProvider,
+    DirectorySandbox,
+    FileSystemImageSandbox
+)
+
+from gen.apache.aurora.api.ttypes import AssignedTask, Container, DockerContainer, TaskConfig
 
 
 def test_directory_sandbox():
@@ -55,6 +61,29 @@ def test_create(chmod, chown, getpwnam, getgrgid):
   getgrgid.assert_called_with(123)
   chown.assert_called_with(real_path, 456, 123)
   chmod.assert_called_with(real_path, 0700)
+
+
+@mock.patch('grp.getgrgid')
+@mock.patch('pwd.getpwnam')
+@mock.patch('os.chown')
+@mock.patch('os.chmod')
+def test_create_no_user(*args):
+  with temporary_dir() as d:
+    real_path = os.path.join(d, 'sandbox')
+    ds = DirectorySandbox(real_path)
+    ds.create()
+    assert os.path.exists(real_path)
+
+  for mocked in args:
+    mocked.assert_not_called()
+
+
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
+def test_sandbox_provider_docker_container():
+  sandbox = DefaultSandboxProvider().from_assigned_task(
+          AssignedTask(task=TaskConfig(container=Container(docker=DockerContainer()))))
+
+  assert sandbox._user is None
 
 
 @mock.patch('pwd.getpwnam')

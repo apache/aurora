@@ -63,7 +63,9 @@ class DefaultSandboxProvider(SandboxProvider):
 
   def from_assigned_task(self, assigned_task):
     container = assigned_task.task.container
-    if container.docker or container.mesos and container.mesos.image:
+    if container.docker:
+      return FileSystemImageSandbox(self.SANDBOX_NAME)
+    elif container.mesos and container.mesos.image:
       return FileSystemImageSandbox(self.SANDBOX_NAME, self._get_sandbox_user(assigned_task))
     else:
       return DirectorySandbox(
