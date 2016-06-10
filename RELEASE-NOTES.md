@@ -1,5 +1,5 @@
-0.14.0 (Not yet released)
-=======
+0.14.0
+======
 
 ### New/updated:
 
