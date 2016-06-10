@@ -1,3 +1,41 @@
+Aurora 0.14.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1660] - Download page must not link to snapshots / nightly builds
+    * [AURORA-1668] - http://aurora.apache.org/documentation/latest/ is mainly broken for 0.13.0
+    * [AURORA-1588] - Unnecessary HealthCheckConfig endpoint warning
+    * [AURORA-1568] - rpm builder does not handle snapshot versions
+    * [AURORA-1709] - After rb/46835 job key's role is required to exist as a user
+    * [AURORA-1665] - DbCronJobStore is missing @Timed annotations
+    * [AURORA-1687] - Nightly packaging builds broken by ppa:openjdk-r java packaging shift.
+    * [AURORA-1673] - Links going out from http://aurora.apache.org/documentation/0.13.0/ 404
+    * [AURORA-1682] - https://builds.apache.org/job/aurora-packaging-nightly is broken
+
+## Story
+    * [AURORA-572] - Provide control over listening network interfaces/addresses
+    * [AURORA-300] - changelog generation should document potentially breaking API changes
+    * [AURORA-1145] - Remove --no-fast from python test invocation
+    * [AURORA-1658] - Aurora does not allow to configure the Mesos offer filter duration
+    * [AURORA-1098] - end-to-end test should use docker
+
+## Task
+    * [AURORA-1683] - Implement an optional webhook parameter to scheduler to POST TaskStateChange events
+    * [AURORA-1616] - Support for preemptible tasks via tier configuration
+    * [AURORA-1667] - Sort out vagrant box versioning
+    * [AURORA-1636] - Update Scheduler to accept tasks with images
+    * [AURORA-1637] - Update Executor to support launching tasks with images.
+    * [AURORA-1451] - Refer to "Mesos Agent" instead of "Mesos Slave" in documentation
+    * [AURORA-1450] - Refer to "Mesos Agent" instead of "Mesos Slave" in UI
+    * [AURORA-1672] - Duplicate task events displayed in UI
+    * [AURORA-1468] - Replace org.apache.aurora.commons.zookeeper with a Apache Curator
+    * [AURORA-945] - Advertise Aurora as "Aurora" to Mesos master.
+    * [AURORA-1638] - Update MesosTaskFactory to send tasks with images configured to use the unified containerizer
+    * [AURORA-1639] - Update client to allow configuring tasks with images.
+    * [AURORA-1449] - Rename /slaves endpoint to /agents
+    * [AURORA-1631] - Consider removing --restart-threshold from "aurora job restart"
+    * [AURORA-1624] - Thrift API for retrieving scheduler tier configuration
+
+
 Aurora 0.13.0
 --------------------------------------------------------------------------------
 ## Bug
