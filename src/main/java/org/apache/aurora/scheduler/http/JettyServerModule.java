@@ -206,7 +206,6 @@ public class JettyServerModule extends AbstractModule {
       "agents",
       "api",
       "cron",
-      "locks",
       "maintenance",
       "mname",
       "offers",
