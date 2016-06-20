@@ -490,6 +490,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setDiskMb(1024)
         .setIsService(true)
         .setProduction(true)
+        .setTier(TaskTestUtil.PROD_TIER_NAME)
         .setOwner(IDENTITY)
         .setContainer(Container.mesos(new MesosContainer()))
         .setJob(JOB_KEY.newBuilder());

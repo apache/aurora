@@ -29,10 +29,13 @@ import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.junit.Assert.assertEquals;
 
 public class TierManagerTest {
+  private static final String PREFERRED_TIER_NAME = "preferred";
+  private static final String PREEMPTIBLE_TIER_NAME = "preemptible";
+  private static final String REVOCABLE_TIER_NAME = "revocable";
   private static final Map<String, TierInfo> TIERS = ImmutableMap.of(
-      "preferred", PREFERRED_TIER,
-      "preemptible", DEV_TIER,
-      "revocable", REVOCABLE_TIER);
+      PREFERRED_TIER_NAME, PREFERRED_TIER,
+      PREEMPTIBLE_TIER_NAME, DEV_TIER,
+      REVOCABLE_TIER_NAME, REVOCABLE_TIER);
   private static final TierManager TIER_MANAGER = new TierManagerImpl(
       parseTierConfig("{\"default\": \"preemptible\","
           + "\"tiers\":{"
@@ -42,63 +45,38 @@ public class TierManagerTest {
           + "}}"));
 
   @Test
-  public void testRevocable() {
+  public void testGetTierRevocable() {
     assertEquals(
         REVOCABLE_TIER,
-        TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig().setTier("revocable"))));
+        TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig().setTier(REVOCABLE_TIER_NAME))));
   }
 
   @Test
-  public void testRevocableAndProduction() {
+  public void testGetTierRevocableAndProduction() {
     assertEquals(
         REVOCABLE_TIER,
         TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig()
-            .setTier("revocable")
+            .setTier(REVOCABLE_TIER_NAME)
             .setProduction(true))));
   }
 
   @Test
-  public void testPreemptibleAndProduction() {
+  public void testGetTierPreemptibleAndProduction() {
     assertEquals(
         DEV_TIER,
         TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig()
-            .setTier("preemptible")
+            .setTier(PREEMPTIBLE_TIER_NAME)
             .setProduction(true))));
   }
 
   @Test(expected = IllegalArgumentException.class)
-  public void testNameMismatch() {
+  public void testGetTierNameMismatch() {
     TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig().setTier("Revocable")));
   }
 
   @Test
-  public void testProduction() {
-    assertEquals(
-        PREFERRED_TIER,
-        TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig().setProduction(true))));
-  }
-
-  @Test
-  public void testNoTierInTaskConfig() {
-    assertEquals(DEV_TIER, TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig())));
-  }
-
-  @Test(expected = IllegalStateException.class)
-  public void testBadTierConfiguration() {
-    TierManager tierManager = new TierManagerImpl(
-        parseTierConfig("{\"default\": \"revocable\","
-            + "\"tiers\":{"
-            + "\"preferred\": {\"revocable\": false, \"preemptible\": false},"
-            + "\"revocable\": {\"revocable\": true, \"preemptible\": true}"
-            + "}}"));
-    // preemptible: false, revocable: false
-    ITaskConfig taskConfig = ITaskConfig.build(new TaskConfig());
-    tierManager.getTier(taskConfig);
-  }
-
-  @Test
-  public void testDefault() {
-    assertEquals("preemptible", TIER_MANAGER.getDefaultTierName());
+  public void testGetDefaultTierName() {
+    assertEquals(PREEMPTIBLE_TIER_NAME, TIER_MANAGER.getDefaultTierName());
   }
 
   @Test
@@ -113,7 +91,7 @@ public class TierManagerTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void testEmptyTiersInTierConfig() {
-    new TierManagerImpl.TierConfig("preemptible", ImmutableMap.of());
+    new TierManagerImpl.TierConfig(PREEMPTIBLE_TIER_NAME, ImmutableMap.of());
   }
 
   @Test(expected = IllegalArgumentException.class)

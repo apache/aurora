@@ -44,6 +44,7 @@ import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
@@ -106,6 +107,7 @@ final class Fixtures {
         .setRamMb(1024)
         .setDiskMb(1024)
         .setProduction(production)
+        .setTier(production ? TaskTestUtil.PROD_TIER_NAME : TaskTestUtil.DEV_TIER_NAME)
         .setRequestedPorts(ImmutableSet.of())
         .setTaskLinks(ImmutableMap.of())
         .setMaxTaskFailures(1)

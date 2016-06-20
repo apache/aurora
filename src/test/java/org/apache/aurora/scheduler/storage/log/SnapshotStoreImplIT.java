@@ -100,7 +100,8 @@ public class SnapshotStoreImplIT {
         clock,
         storage,
         dbTaskStore,
-        createStorageInjector(testModuleWithWorkQueue()).getInstance(MigrationManager.class));
+        createStorageInjector(testModuleWithWorkQueue()).getInstance(MigrationManager.class),
+        TaskTestUtil.THRIFT_BACKFILL);
   }
 
   private static Snapshot makeComparable(Snapshot snapshot) {

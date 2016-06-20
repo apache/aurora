@@ -17,6 +17,8 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.google.inject.Inject;
+
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobUpdate;
@@ -25,6 +27,8 @@ import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.TierInfo;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -32,6 +36,10 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
+import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
@@ -42,8 +50,12 @@ import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
  * Helps migrating thrift schema by populating deprecated and/or replacement fields.
  */
 public final class ThriftBackfill {
-  private ThriftBackfill() {
-    // Utility class.
+
+  private final TierManager tierManager;
+
+  @Inject
+  public ThriftBackfill(TierManager tierManager) {
+    this.tierManager = requireNonNull(tierManager);
   }
 
   private static Resource getResource(Set<Resource> resources, ResourceType type) {
@@ -59,7 +71,7 @@ public final class ThriftBackfill {
    * @param config TaskConfig to backfill.
    * @return Backfilled TaskConfig.
    */
-  public static TaskConfig backfillTask(TaskConfig config) {
+  public TaskConfig backfillTask(TaskConfig config) {
     if (!config.isSetResources() || config.getResources().isEmpty()) {
       config.addToResources(Resource.numCpus(config.getNumCpus()));
       config.addToResources(Resource.ramMb(config.getRamMb()));
@@ -81,7 +93,26 @@ public final class ThriftBackfill {
         config.setRequestedPorts(ports);
       }
     }
+    backfillTier(config);
     return config;
+  }
+
+  private void backfillTier(TaskConfig config) {
+    ITaskConfig taskConfig = ITaskConfig.build(config);
+    if (config.isSetTier()) {
+      TierInfo tier = tierManager.getTier(taskConfig);
+      config.setProduction(!tier.isPreemptible() && !tier.isRevocable());
+    } else {
+      config.setTier(tierManager.getTiers()
+          .entrySet()
+          .stream()
+          .filter(e -> e.getValue().isPreemptible() == !taskConfig.isProduction()
+              && !e.getValue().isRevocable())
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException(
+              format("No matching implicit tier for task of job %s", taskConfig.getJob())))
+          .getKey());
+    }
   }
 
   /**
@@ -90,7 +121,7 @@ public final class ThriftBackfill {
    * @param jobConfig JobConfiguration to backfill.
    * @return Backfilled JobConfiguration.
    */
-  public static IJobConfiguration backfillJobConfiguration(JobConfiguration jobConfig) {
+  public IJobConfiguration backfillJobConfiguration(JobConfiguration jobConfig) {
     backfillTask(jobConfig.getTaskConfig());
     return IJobConfiguration.build(jobConfig);
   }
@@ -101,9 +132,9 @@ public final class ThriftBackfill {
    * @param tasks Set of tasks to backfill.
    * @return Backfilled set of tasks.
    */
-  public static Set<IScheduledTask> backfillTasks(Set<ScheduledTask> tasks) {
+  public Set<IScheduledTask> backfillTasks(Set<ScheduledTask> tasks) {
     return tasks.stream()
-        .map(ThriftBackfill::backfillScheduledTask)
+        .map(t -> backfillScheduledTask(t))
         .map(IScheduledTask::build)
         .collect(GuavaUtils.toImmutableSet());
   }
@@ -138,7 +169,7 @@ public final class ThriftBackfill {
     return IResourceAggregate.build(aggregate);
   }
 
-  private static ScheduledTask backfillScheduledTask(ScheduledTask task) {
+  private ScheduledTask backfillScheduledTask(ScheduledTask task) {
     backfillTask(task.getAssignedTask().getTask());
     return task;
   }
@@ -149,7 +180,7 @@ public final class ThriftBackfill {
    * @param update JobUpdate to backfill.
    * @return Backfilled job update.
    */
-  static IJobUpdate backFillJobUpdate(JobUpdate update) {
+  IJobUpdate backFillJobUpdate(JobUpdate update) {
     JobUpdateInstructions instructions = update.getInstructions();
     if (instructions.isSetDesiredState()) {
       backfillTask(instructions.getDesiredState().getTask());

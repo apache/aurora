@@ -185,6 +185,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   private final AttributeStore.Mutable writeBehindAttributeStore;
   private final JobUpdateStore.Mutable writeBehindJobUpdateStore;
   private final ReentrantLock writeLock;
+  private final ThriftBackfill thriftBackfill;
 
   private StreamManager streamManager;
   private final WriteAheadStorage writeAheadStorage;
@@ -217,7 +218,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       @Volatile AttributeStore.Mutable attributeStore,
       @Volatile JobUpdateStore.Mutable jobUpdateStore,
       EventSink eventSink,
-      ReentrantLock writeLock) {
+      ReentrantLock writeLock,
+      ThriftBackfill thriftBackfill) {
 
     this(logManager,
         new ScheduledExecutorSchedulingService(shutdownRegistry, settings.getShutdownGracePeriod()),
@@ -232,7 +234,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         attributeStore,
         jobUpdateStore,
         eventSink,
-        writeLock);
+        writeLock,
+        thriftBackfill);
   }
 
   @VisibleForTesting
@@ -250,7 +253,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       AttributeStore.Mutable attributeStore,
       JobUpdateStore.Mutable jobUpdateStore,
       EventSink eventSink,
-      ReentrantLock writeLock) {
+      ReentrantLock writeLock,
+      ThriftBackfill thriftBackfill) {
 
     this.logManager = requireNonNull(logManager);
     this.schedulingService = requireNonNull(schedulingService);
@@ -270,6 +274,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     this.writeBehindAttributeStore = requireNonNull(attributeStore);
     this.writeBehindJobUpdateStore = requireNonNull(jobUpdateStore);
     this.writeLock = requireNonNull(writeLock);
+    this.thriftBackfill = requireNonNull(thriftBackfill);
     TransactionManager transactionManager = new TransactionManager() {
       @Override
       public boolean hasActiveTransaction() {
@@ -325,7 +330,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         .put(Op._Fields.SAVE_CRON_JOB, op -> {
           SaveCronJob cronJob = op.getSaveCronJob();
           writeBehindJobStore.saveAcceptedJob(
-              ThriftBackfill.backfillJobConfiguration(cronJob.getJobConfig()));
+              thriftBackfill.backfillJobConfiguration(cronJob.getJobConfig()));
         })
         .put(
             Op._Fields.REMOVE_JOB,
@@ -333,7 +338,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         .put(
             Op._Fields.SAVE_TASKS,
             op -> writeBehindTaskStore.saveTasks(
-                ThriftBackfill.backfillTasks(op.getSaveTasks().getTasks())))
+                thriftBackfill.backfillTasks(op.getSaveTasks().getTasks())))
         .put(Op._Fields.REWRITE_TASK, op -> {
           RewriteTask rewriteTask = op.getRewriteTask();
           writeBehindTaskStore.unsafeModifyInPlace(
@@ -371,7 +376,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
             op -> writeBehindLockStore.removeLock(ILockKey.build(op.getRemoveLock().getLockKey())))
         .put(Op._Fields.SAVE_JOB_UPDATE, op ->
           writeBehindJobUpdateStore.saveJobUpdate(
-              ThriftBackfill.backFillJobUpdate(op.getSaveJobUpdate().getJobUpdate()),
+              thriftBackfill.backFillJobUpdate(op.getSaveJobUpdate().getJobUpdate()),
               Optional.fromNullable(op.getSaveJobUpdate().getLockToken())))
         .put(Op._Fields.SAVE_JOB_UPDATE_EVENT, op -> {
           SaveJobUpdateEvent event = op.getSaveJobUpdateEvent();

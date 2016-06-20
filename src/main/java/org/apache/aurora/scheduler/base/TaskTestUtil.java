@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.base;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -45,6 +46,7 @@ import org.apache.aurora.scheduler.configuration.ConfigurationManager.Configurat
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
 
 /**
  * Convenience methods for working with tasks.
@@ -61,25 +63,15 @@ public final class TaskTestUtil {
       new TierInfo(true /* preemptible */, false /* revocable */);
   public static final TierInfo PREFERRED_TIER =
       new TierInfo(false /* preemptible */, false /* revocable */);
+  public static final String PROD_TIER_NAME = "tier-prod";
   public static final String DEV_TIER_NAME = "tier-dev";
-  public static final TierConfig DEV_TIER_CONFIG =
-      new TierConfig(DEV_TIER_NAME, ImmutableMap.of(DEV_TIER_NAME, DEV_TIER));
-  public static final TierManager DEV_TIER_MANAGER = new TierManager() {
-    @Override
-    public TierInfo getTier(ITaskConfig taskConfig) {
-      return DEV_TIER;
-    }
-
-    @Override
-    public String getDefaultTierName() {
-      return DEV_TIER_NAME;
-    }
-
-    @Override
-    public Map<String, TierInfo> getTiers() {
-      return ImmutableMap.of(DEV_TIER_NAME, DEV_TIER);
-    }
-  };
+  public static final TierConfig TIER_CONFIG =
+      new TierConfig(DEV_TIER_NAME, ImmutableMap.of(
+          PROD_TIER_NAME, PREFERRED_TIER,
+          DEV_TIER_NAME, DEV_TIER
+      ));
+  public static final TierManager TIER_MANAGER = new TierManager.TierManagerImpl(TIER_CONFIG);
+  public static final ThriftBackfill THRIFT_BACKFILL = new ThriftBackfill(TIER_MANAGER);
   public static final ConfigurationManagerSettings CONFIGURATION_MANAGER_SETTINGS =
       new ConfigurationManagerSettings(
           ImmutableSet.of(_Fields.MESOS),
@@ -88,7 +80,7 @@ public final class TaskTestUtil {
           true,
           true);
   public static final ConfigurationManager CONFIGURATION_MANAGER =
-      new ConfigurationManager(CONFIGURATION_MANAGER_SETTINGS, DEV_TIER_MANAGER);
+      new ConfigurationManager(CONFIGURATION_MANAGER_SETTINGS, TIER_MANAGER, THRIFT_BACKFILL);
 
   private TaskTestUtil() {
     // Utility class.
@@ -105,7 +97,7 @@ public final class TaskTestUtil {
         .setPriority(1)
         .setMaxTaskFailures(-1)
         .setProduction(true)
-        .setTier(DEV_TIER_NAME)
+        .setTier(PROD_TIER_NAME)
         .setConstraints(ImmutableSet.of(
             new Constraint(
                 "valueConstraint",
@@ -166,5 +158,20 @@ public final class TaskTestUtil {
         .setStatus(status)
         .setScheduler("scheduler"));
     return IScheduledTask.build(builder);
+  }
+
+  public static Map<String, TierInfo> tierInfos() {
+    return ImmutableMap.of(
+        "preferred", PREFERRED_TIER,
+        "preemptible", DEV_TIER,
+        "revocable", REVOCABLE_TIER);
+  }
+
+  public static Set<org.apache.aurora.gen.TierConfig> tierConfigs() {
+    return ImmutableSet.of(
+        new org.apache.aurora.gen.TierConfig("preferred", PREFERRED_TIER.toMap()),
+        new org.apache.aurora.gen.TierConfig("preemptible", DEV_TIER.toMap()),
+        new org.apache.aurora.gen.TierConfig("revocable", REVOCABLE_TIER.toMap())
+    );
   }
 }

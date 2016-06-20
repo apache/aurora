@@ -222,7 +222,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
           if (snapshot.isSetTasks()) {
             store.getUnsafeTaskStore()
-                .saveTasks(ThriftBackfill.backfillTasks(snapshot.getTasks()));
+                .saveTasks(thriftBackfill.backfillTasks(snapshot.getTasks()));
           }
         }
       },
@@ -250,7 +250,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
           if (snapshot.isSetCronJobs()) {
             for (StoredCronJob job : snapshot.getCronJobs()) {
               store.getCronJobStore().saveAcceptedJob(
-                  ThriftBackfill.backfillJobConfiguration(job.getJobConfiguration()));
+                  thriftBackfill.backfillJobConfiguration(job.getJobConfiguration()));
             }
           }
         }
@@ -327,7 +327,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
             for (StoredJobUpdateDetails storedDetails : snapshot.getJobUpdateDetails()) {
               JobUpdateDetails details = storedDetails.getDetails();
               updateStore.saveJobUpdate(
-                  ThriftBackfill.backFillJobUpdate(details.getUpdate()),
+                  thriftBackfill.backFillJobUpdate(details.getUpdate()),
                   Optional.fromNullable(storedDetails.getLockToken()));
 
               if (details.getUpdateEventsSize() > 0) {
@@ -356,6 +356,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   private final Storage storage;
   private final boolean useDbSnapshotForTaskStore;
   private final MigrationManager migrationManager;
+  private final ThriftBackfill thriftBackfill;
 
   /**
    * Identifies if experimental task store is in use.
@@ -371,13 +372,15 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       Clock clock,
       @Volatile Storage storage,
       @ExperimentalTaskStore boolean useDbSnapshotForTaskStore,
-      MigrationManager migrationManager) {
+      MigrationManager migrationManager,
+      ThriftBackfill thriftBackfill) {
 
     this.buildInfo = requireNonNull(buildInfo);
     this.clock = requireNonNull(clock);
     this.storage = requireNonNull(storage);
     this.useDbSnapshotForTaskStore = useDbSnapshotForTaskStore;
     this.migrationManager = requireNonNull(migrationManager);
+    this.thriftBackfill = requireNonNull(thriftBackfill);
   }
 
   @Timed("snapshot_create")

@@ -134,11 +134,17 @@ public class ConfigurationManager {
 
   private final ConfigurationManagerSettings settings;
   private final TierManager tierManager;
+  private final ThriftBackfill thriftBackfill;
 
   @Inject
-  public ConfigurationManager(ConfigurationManagerSettings settings, TierManager tierManager) {
+  public ConfigurationManager(
+      ConfigurationManagerSettings settings,
+      TierManager tierManager,
+      ThriftBackfill thriftBackfill) {
+
     this.settings = requireNonNull(settings);
     this.tierManager = requireNonNull(tierManager);
+    this.thriftBackfill = requireNonNull(thriftBackfill);
   }
 
   private static String getRole(IValueConstraint constraint) {
@@ -311,7 +317,7 @@ public class ConfigurationManager {
               + containerType.get().toString());
     }
 
-    ThriftBackfill.backfillTask(builder);
+    thriftBackfill.backfillTask(builder);
 
     String types = config.getResources().stream()
         .collect(Collectors.groupingBy(e -> ResourceType.fromResource(e)))

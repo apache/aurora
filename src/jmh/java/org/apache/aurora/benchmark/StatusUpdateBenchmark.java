@@ -175,7 +175,7 @@ public class StatusUpdateBenchmark {
 
     Injector injector = Guice.createInjector(
         new StateModule(),
-        new TierModule(TaskTestUtil.DEV_TIER_CONFIG),
+        new TierModule(TaskTestUtil.TIER_CONFIG),
         new AbstractModule() {
           @Override
           protected void configure() {

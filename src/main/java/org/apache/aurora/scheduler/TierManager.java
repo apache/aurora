@@ -91,8 +91,9 @@ public interface TierManager {
       }
     }
 
+    @VisibleForTesting
     @Inject
-    TierManagerImpl(TierConfig tierConfig) {
+    public TierManagerImpl(TierConfig tierConfig) {
       this.tierConfig = requireNonNull(tierConfig);
     }
 
@@ -102,14 +103,7 @@ public interface TierManager {
           !taskConfig.isSetTier() || tierConfig.tiers.containsKey(taskConfig.getTier()),
           format("Invalid tier '%s' in TaskConfig.", taskConfig.getTier()));
 
-      return taskConfig.isSetTier()
-          ? tierConfig.tiers.get(taskConfig.getTier())
-          : tierConfig.getTiers().values().stream()
-              // Backward compatibility mode until tier is required in TaskConfig (AURORA-1624).
-              .filter(v -> v.isPreemptible() == !taskConfig.isProduction() && !v.isRevocable())
-              .findFirst()
-              .orElseThrow(() -> new IllegalStateException(
-                  format("No matching implicit tier for task of job %s", taskConfig.getJob())));
+      return tierConfig.tiers.get(taskConfig.getTier());
     }
 
     @Override

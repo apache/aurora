@@ -81,7 +81,7 @@ public class RecoveryTest extends EasyMockTest {
     shutDownNow = createMock(Command.class);
     ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
     clock = FakeScheduledExecutor.scheduleExecutor(executor);
-    TemporaryStorageFactory factory = new TemporaryStorageFactory();
+    TemporaryStorageFactory factory = new TemporaryStorageFactory(TaskTestUtil.THRIFT_BACKFILL);
     storageBackup = new StorageBackupImpl(
         snapshotStore,
         clock,

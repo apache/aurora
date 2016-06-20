@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.thrift;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -24,7 +23,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -64,8 +62,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskQuery;
-import org.apache.aurora.gen.TierConfig;
-import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
@@ -97,9 +93,6 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
-import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
-import static org.apache.aurora.scheduler.base.TaskTestUtil.PREFERRED_TIER;
-import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.apache.aurora.scheduler.resources.ResourceBag.LARGE;
 import static org.apache.aurora.scheduler.resources.ResourceBag.MEDIUM;
 import static org.apache.aurora.scheduler.resources.ResourceBag.SMALL;
@@ -860,29 +853,14 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   @Test
   public void testGetTierConfig() throws Exception {
     expect(tierManager.getDefaultTierName()).andReturn("preemptible");
-    expect(tierManager.getTiers()).andReturn(tierInfos());
+    expect(tierManager.getTiers()).andReturn(TaskTestUtil.tierInfos());
     control.replay();
 
     GetTierConfigResult expected = new GetTierConfigResult()
         .setDefaultTierName("preemptible")
-        .setTiers(tierConfigs());
+        .setTiers(TaskTestUtil.tierConfigs());
 
     Response response = assertOkResponse(thrift.getTierConfigs());
     assertEquals(expected, response.getResult().getGetTierConfigResult());
-  }
-
-  private static Map<String, TierInfo> tierInfos() {
-    return ImmutableMap.of(
-        "preferred", PREFERRED_TIER,
-        "preemptible", DEV_TIER,
-        "revocable", REVOCABLE_TIER);
-  }
-
-  private static Set<TierConfig> tierConfigs() {
-    return ImmutableSet.of(
-        new TierConfig("preferred", PREFERRED_TIER.toMap()),
-        new TierConfig("preemptible", DEV_TIER.toMap()),
-        new TierConfig("revocable", REVOCABLE_TIER.toMap())
-    );
   }
 }

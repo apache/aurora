@@ -209,7 +209,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     Injector injector = Guice.createInjector(
         ImmutableList.<Module>builder()
             .add(SchedulerMain.getUniversalModule())
-            .add(new TierModule(TaskTestUtil.DEV_TIER_CONFIG))
+            .add(new TierModule(TaskTestUtil.TIER_CONFIG))
             .add(new LogStorageModule())
             .add(new ServiceDiscoveryModule(zkClientConfig, SERVERSET_PATH))
             .add(testModule)

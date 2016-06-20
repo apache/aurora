@@ -119,7 +119,8 @@ public class ConfigurationManagerTest {
           ImmutableMultimap.of(),
           true,
           false),
-      TaskTestUtil.DEV_TIER_MANAGER);
+      TaskTestUtil.TIER_MANAGER,
+      TaskTestUtil.THRIFT_BACKFILL);
   private static final ConfigurationManager DOCKER_CONFIGURATION_MANAGER = new ConfigurationManager(
       new ConfigurationManagerSettings(
           ALL_CONTAINER_TYPES,
@@ -127,7 +128,8 @@ public class ConfigurationManagerTest {
           ImmutableMultimap.of("foo", "bar"),
           false,
           true),
-      TaskTestUtil.DEV_TIER_MANAGER);
+      TaskTestUtil.TIER_MANAGER,
+      TaskTestUtil.THRIFT_BACKFILL);
 
   @Test
   public void testIsGoodIdentifier() {
@@ -287,7 +289,8 @@ public class ConfigurationManagerTest {
             ImmutableMultimap.of("foo", "bar"),
             false,
             false),
-        TaskTestUtil.DEV_TIER_MANAGER).validateAndPopulate(ITaskConfig.build(builder));
+        TaskTestUtil.TIER_MANAGER,
+        TaskTestUtil.THRIFT_BACKFILL).validateAndPopulate(ITaskConfig.build(builder));
   }
 
   @Test

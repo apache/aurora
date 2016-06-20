@@ -17,6 +17,7 @@ import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
+import com.google.inject.Inject;
 
 import org.apache.aurora.common.util.BuildInfo;
 import org.apache.aurora.common.util.testing.FakeClock;
@@ -29,6 +30,9 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
+
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.util.testing.FakeBuildInfo.generateBuildInfo;
 
@@ -64,6 +68,14 @@ interface TemporaryStorage {
    * A factory that creates temporary storage instances, detached from the rest of the system.
    */
   class TemporaryStorageFactory implements Function<Snapshot, TemporaryStorage> {
+
+    private final ThriftBackfill thriftBackfill;
+
+    @Inject
+    TemporaryStorageFactory(ThriftBackfill thriftBackfill) {
+      this.thriftBackfill = requireNonNull(thriftBackfill);
+    }
+
     @Override
     public TemporaryStorage apply(Snapshot snapshot) {
       final Storage storage = DbUtil.createFlaggedStorage();
@@ -79,7 +91,8 @@ interface TemporaryStorage {
           false /** useDbSnapshotForTaskStore */,
           // We can just pass an empty lambda for the MigrationManager as migration is a no-op
           // when restoring from backup.
-          () -> { } /** migrationManager */);
+          () -> { } /** migrationManager */,
+          thriftBackfill);
       snapshotStore.applySnapshot(snapshot);
 
       return new TemporaryStorage() {

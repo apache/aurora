@@ -113,7 +113,7 @@ public class SchedulingBenchmarks {
       Injector injector = Guice.createInjector(
           new StateModule(),
           new PreemptorModule(true, NO_DELAY, NO_DELAY),
-          new TierModule(TaskTestUtil.DEV_TIER_CONFIG),
+          new TierModule(TaskTestUtil.TIER_CONFIG),
           new PrivateModule() {
             @Override
             protected void configure() {
