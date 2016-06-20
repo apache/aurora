@@ -62,12 +62,8 @@ run_tests() {
   ./src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh
 }
 
-# TODO(wfarner): Share this with make-mesos-native-egg.
 setup_tempdir() {
   cleanup() {
-    if [[ -f Vagrantfile ]]; then
-      vagrant destroy -f
-    fi
     rm -fr "$TMPDIR"
   }
   trap cleanup EXIT

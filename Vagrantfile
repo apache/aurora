@@ -30,7 +30,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.define "devcluster" do |dev|
     dev.vm.network :private_network, ip: "192.168.33.7"
     dev.vm.provider :virtualbox do |vb|
-      vb.customize ["modifyvm", :id, "--memory", "2048"]
+      vb.customize ["modifyvm", :id, "--memory", "3072"]
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
     end
     dev.vm.provision "shell", path: "examples/vagrant/provision-dev-cluster.sh"
