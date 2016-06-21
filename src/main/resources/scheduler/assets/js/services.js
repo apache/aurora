@@ -435,6 +435,7 @@
             resources: task.resources,
             isService: task.isService,
             production: task.production,
+            tier: task.tier,
             contact: task.contactEmail || '',
             constraints: constraints,
             metadata: metadata,
