@@ -354,6 +354,8 @@ Job Schema
   ```container``` | Choice of ```Container```, ```Docker``` or ```Mesos``` object | An optional container to run all processes inside of.
   ```lifecycle``` | ```LifecycleConfig``` object | An optional task lifecycle configuration that dictates commands to be executed on startup/teardown.  HTTP lifecycle is enabled by default if the "health" port is requested.  See [LifecycleConfig Objects](#lifecycleconfig-objects) for more information.
   ```tier``` | String | Task tier type. The default scheduler tier configuration allows for 3 tiers: `revocable`, `preemptible`, and `preferred`. The `revocable` tier requires the task to run with Mesos revocable resources. Setting the task's tier to `preemptible` allows for the possibility of that task being preempted by other tasks when cluster is running low on resources. The `preferred` tier prevents the task from using revocable resources and from being preempted. Since it is possible that a cluster is configured with a custom tier configuration, users should consult their cluster administrator to be informed of the tiers supported by the cluster. Attempts to schedule jobs with an unsupported tier will be rejected by the scheduler.
+  ```announce``` | ```Announcer``` object | Optionally enable Zookeeper ServerSet announcements. See [Announcer Objects] for more information.
+  ```enable_hooks``` | Boolean | Whether to enable [Client Hooks](client-hooks.md) for this job. (Default: False)
 
 
 ### UpdateConfig Objects
