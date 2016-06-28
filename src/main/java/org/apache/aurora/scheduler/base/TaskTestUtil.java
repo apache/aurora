@@ -160,6 +160,15 @@ public final class TaskTestUtil {
     return IScheduledTask.build(builder);
   }
 
+  public static String tierConfigFile() {
+    return "{\"default\": \"preemptible\","
+        + "\"tiers\":{"
+        + "\"preferred\": {\"revocable\": false, \"preemptible\": false},"
+        + "\"preemptible\": {\"revocable\": false, \"preemptible\": true},"
+        + "\"revocable\": {\"revocable\": true, \"preemptible\": true}"
+        + "}}";
+  }
+
   public static Map<String, TierInfo> tierInfos() {
     return ImmutableMap.of(
         "preferred", PREFERRED_TIER,

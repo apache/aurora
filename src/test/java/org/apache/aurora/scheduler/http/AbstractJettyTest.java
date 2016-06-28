@@ -46,6 +46,7 @@ import org.apache.aurora.common.util.BackoffStrategy;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.async.AsyncModule;
@@ -125,6 +126,7 @@ public abstract class AbstractJettyTest extends EasyMockTest {
             bindMock(OfferManager.class);
             bindMock(RescheduleCalculator.class);
             bindMock(TaskScheduler.class);
+            bindMock(TierManager.class);
             bindMock(Thread.UncaughtExceptionHandler.class);
 
             bind(ServletContextListener.class).toProvider(() -> {

@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.TierManager.TierManagerImpl;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Test;
 
@@ -37,12 +38,7 @@ public class TierManagerTest {
       PREEMPTIBLE_TIER_NAME, DEV_TIER,
       REVOCABLE_TIER_NAME, REVOCABLE_TIER);
   private static final TierManager TIER_MANAGER = new TierManagerImpl(
-      parseTierConfig("{\"default\": \"preemptible\","
-          + "\"tiers\":{"
-          + "\"preferred\": {\"revocable\": false, \"preemptible\": false},"
-          + "\"preemptible\": {\"revocable\": false, \"preemptible\": true},"
-          + "\"revocable\": {\"revocable\": true, \"preemptible\": true}"
-          + "}}"));
+      parseTierConfig(TaskTestUtil.tierConfigFile()));
 
   @Test
   public void testGetTierRevocable() {
