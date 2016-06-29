@@ -45,6 +45,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.CommandInfo.URI;
 import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo;
 import org.apache.mesos.Protos.ContainerInfo.MesosInfo;
@@ -152,6 +153,18 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         .setExecutorId(MesosTaskFactoryImpl.getExecutorId(task.getTaskId()))
         .setSource(
             MesosTaskFactoryImpl.getInstanceSourceName(task.getTask(), task.getInstanceId()))
+        .setCommand(executor.getCommand().toBuilder().addAllUris(
+            ImmutableSet.of(
+                URI.newBuilder()
+                    .setValue("pathA")
+                    .setExecutable(false)
+                    .setExtract(true)
+                    .setCache(true).build(),
+                URI.newBuilder()
+                    .setValue("pathB")
+                    .setExecutable(false)
+                    .setExtract(true)
+                    .setCache(true).build())))
         .build();
   }
 

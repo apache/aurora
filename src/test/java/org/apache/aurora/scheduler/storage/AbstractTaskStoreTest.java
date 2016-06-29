@@ -49,6 +49,7 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.Image;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.MesosContainer;
+import org.apache.aurora.gen.MesosFetcherURI;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskQuery;
@@ -173,6 +174,18 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
         ImmutableSet.of(
             new Metadata("package", "a"),
             new Metadata("package", "b")));
+    IScheduledTask task = IScheduledTask.build(builder);
+    saveTasks(task);
+    assertStoreContents(task);
+  }
+
+  @Test
+  public void testSaveWithMesosFetcherUris() {
+    ScheduledTask builder = TASK_A.newBuilder();
+    builder.getAssignedTask().getTask().setMesosFetcherUris(
+        ImmutableSet.of(
+            new MesosFetcherURI("pathA").setExtract(true).setCache(true),
+            new MesosFetcherURI("pathB").setExtract(true).setCache(true)));
     IScheduledTask task = IScheduledTask.build(builder);
     saveTasks(task);
     assertStoreContents(task);

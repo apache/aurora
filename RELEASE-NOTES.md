@@ -1,3 +1,15 @@
+0.15.0
+======
+
+### New/updated:
+
+- New scheduler commandline argument -enable_mesos_fetcher to allow job submissions
+to contain URIs which will be passed to the Mesos Fetcher and subsequently downloaded into
+the sandbox. Please note that enabling job submissions to download resources from arbitrary
+URIs may have security implications.
+
+### Deprecations and removals:
+
 0.14.0
 ======
 

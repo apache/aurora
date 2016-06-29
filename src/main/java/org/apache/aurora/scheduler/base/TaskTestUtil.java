@@ -30,6 +30,7 @@ import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.MesosFetcherURI;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -78,6 +79,7 @@ public final class TaskTestUtil {
           false,
           ImmutableMultimap.of(),
           true,
+          true,
           true);
   public static final ConfigurationManager CONFIGURATION_MANAGER =
       new ConfigurationManager(CONFIGURATION_MANAGER_SETTINGS, TIER_MANAGER, THRIFT_BACKFILL);
@@ -110,6 +112,9 @@ public final class TaskTestUtil {
         .setTaskLinks(ImmutableMap.of("http", "link", "admin", "otherLink"))
         .setContactEmail("foo@bar.com")
         .setMetadata(ImmutableSet.of(new Metadata("key", "value")))
+        .setMesosFetcherUris(ImmutableSet.of(
+            new MesosFetcherURI("pathA").setExtract(true).setCache(true),
+            new MesosFetcherURI("pathB").setExtract(true).setCache(true)))
         .setExecutorConfig(new ExecutorConfig("name", "config"))
         .setContainer(Container.docker(
             new DockerContainer("imagename")

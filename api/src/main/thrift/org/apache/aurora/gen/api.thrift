@@ -142,6 +142,16 @@ struct InstanceKey {
   2: i32 instanceId
 }
 
+/** URI which mirrors CommandInfo.URI in the Mesos Protobuf */
+struct MesosFetcherURI {
+  /** Where to get the resource from */
+  1: string value
+  /** Extract compressed archive after downloading */
+  2: optional bool extract
+  /** Cache value using Mesos Fetcher caching mechanism **/
+  3: optional bool cache
+}
+
 struct ExecutorConfig {
   /** Name identifying the Executor. */
   1: string name
@@ -253,6 +263,8 @@ struct TaskConfig {
  20: set<Constraint> constraints
  /** a list of named ports this task requests */
  21: set<string> requestedPorts
+ /** Resources to retrieve with Mesos Fetcher */
+ 33: optional set<MesosFetcherURI> mesosFetcherUris
  /**
   * Custom links to include when displaying this task on the scheduler dashboard. Keys are anchor
   * text, values are URLs. Wildcards are supported for dynamic link crafting based on host, ports,

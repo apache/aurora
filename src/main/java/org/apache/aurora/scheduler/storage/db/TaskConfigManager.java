@@ -114,6 +114,10 @@ class TaskConfigManager {
       configMapper.insertMetadata(configInsert.getId(), config.getMetadata());
     }
 
+    if (!config.getMesosFetcherUris().isEmpty()) {
+      configMapper.insertMesosFetcherUris(configInsert.getId(), config.getMesosFetcherUris());
+    }
+
     if (config.getContainer().isSetDocker()) {
       IDockerContainer container = config.getContainer().getDocker();
       InsertResult containerInsert = new InsertResult();

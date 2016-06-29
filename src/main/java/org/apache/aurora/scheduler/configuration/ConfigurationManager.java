@@ -116,19 +116,22 @@ public class ConfigurationManager {
     private final Multimap<String, String> defaultDockerParameters;
     private final boolean requireDockerUseExecutor;
     private final boolean allowGpuResource;
+    private final boolean enableMesosFetcher;
 
     public ConfigurationManagerSettings(
         ImmutableSet<Container._Fields> allowedContainerTypes,
         boolean allowDockerParameters,
         Multimap<String, String> defaultDockerParameters,
         boolean requireDockerUseExecutor,
-        boolean allowGpuResource) {
+        boolean allowGpuResource,
+        boolean enableMesosFetcher) {
 
       this.allowedContainerTypes = requireNonNull(allowedContainerTypes);
       this.allowDockerParameters = allowDockerParameters;
       this.defaultDockerParameters = requireNonNull(defaultDockerParameters);
       this.requireDockerUseExecutor = requireDockerUseExecutor;
       this.allowGpuResource = allowGpuResource;
+      this.enableMesosFetcher = enableMesosFetcher;
     }
   }
 
@@ -217,6 +220,9 @@ public class ConfigurationManager {
   static final String EXECUTOR_REQUIRED_WITH_DOCKER =
       "This scheduler is configured to require an executor for Docker-based tasks.";
 
+  @VisibleForTesting
+  static final String MESOS_FETCHER_DISABLED =
+      "Mesos Fetcher for individual jobs is disabled in this cluster.";
   /**
    * Check validity of and populates defaults in a task configuration.  This will return a deep copy
    * of the provided task configuration with default configuration values applied, and configuration
@@ -337,6 +343,10 @@ public class ConfigurationManager {
         .isPresent()) {
 
       throw new TaskDescriptionException("GPU resource support is disabled in this cluster.");
+    }
+
+    if (!settings.enableMesosFetcher && !config.getMesosFetcherUris().isEmpty()) {
+      throw new TaskDescriptionException(MESOS_FETCHER_DISABLED);
     }
 
     maybeFillLinks(builder);

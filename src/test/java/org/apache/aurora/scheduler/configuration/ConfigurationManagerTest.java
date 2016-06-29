@@ -29,6 +29,7 @@ import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.MesosFetcherURI;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
@@ -118,6 +119,7 @@ public class ConfigurationManagerTest {
           false,
           ImmutableMultimap.of(),
           true,
+          false,
           false),
       TaskTestUtil.TIER_MANAGER,
       TaskTestUtil.THRIFT_BACKFILL);
@@ -127,6 +129,7 @@ public class ConfigurationManagerTest {
           true,
           ImmutableMultimap.of("foo", "bar"),
           false,
+          true,
           true),
       TaskTestUtil.TIER_MANAGER,
       TaskTestUtil.THRIFT_BACKFILL);
@@ -288,9 +291,31 @@ public class ConfigurationManagerTest {
             true,
             ImmutableMultimap.of("foo", "bar"),
             false,
+            false,
             false),
         TaskTestUtil.TIER_MANAGER,
         TaskTestUtil.THRIFT_BACKFILL).validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testMesosFetcherDisabled() throws Exception {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    builder.setMesosFetcherUris(
+        ImmutableSet.of(
+            new MesosFetcherURI("pathA").setExtract(true).setCache(true),
+            new MesosFetcherURI("pathB").setExtract(true).setCache(true)));
+
+    expectTaskDescriptionException(ConfigurationManager.MESOS_FETCHER_DISABLED);
+    new ConfigurationManager(
+            new ConfigurationManagerSettings(
+                    ALL_CONTAINER_TYPES,
+                    true,
+                    ImmutableMultimap.of("foo", "bar"),
+                    false,
+                    false,
+                    false),
+            TaskTestUtil.TIER_MANAGER,
+            TaskTestUtil.THRIFT_BACKFILL).validateAndPopulate(ITaskConfig.build(builder));
   }
 
   @Test

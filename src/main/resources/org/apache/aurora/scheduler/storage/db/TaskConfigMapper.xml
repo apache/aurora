@@ -126,6 +126,10 @@
     <id column="id" />
   </resultMap>
 
+  <resultMap id="mesosFetcherUrisMap" type="org.apache.aurora.gen.MesosFetcherURI">
+    <id column="id" />
+  </resultMap>
+
   <resultMap id="resourceMap" type="org.apache.aurora.scheduler.storage.db.views.DBResource">
     <id column="id" />
     <result property="type"
@@ -151,6 +155,7 @@
       <result column="port_name" />
     </collection>
     <collection property="metadata" resultMap="metadataMap" columnPrefix="m_"/>
+    <collection property="mesosFetcherUris" resultMap="mesosFetcherUrisMap" columnPrefix="u_"/>
     <collection
         property="taskLinks"
         select="selectTaskLinks"
@@ -188,6 +193,10 @@
       m.id AS m_id,
       m.key AS m_key,
       m.value AS m_value,
+      u.id AS u_id,
+      u.value AS u_value,
+      u.extract AS u_extract,
+      u.cache AS u_cache,
       di.name as c_image_docker_name,
       di.tag as c_image_docker_tag,
       ai.name as c_image_appc_name,
@@ -204,6 +213,7 @@
     LEFT OUTER JOIN task_config_requested_ports AS p ON p.task_config_id = c.id
     LEFT OUTER JOIN task_config_docker_containers AS d ON d.task_config_id = c.id
     LEFT OUTER JOIN task_config_metadata AS m ON m.task_config_id = c.id
+    LEFT OUTER JOIN task_config_mesos_fetcher_uris AS u ON u.task_config_id = c.id
     LEFT OUTER JOIN task_config_docker_images AS di ON di.task_config_id = c.id
     LEFT OUTER JOIN task_config_appc_images AS ai ON ai.task_config_id = c.id
     LEFT OUTER JOIN task_constraints AS tc ON tc.task_config_id = c.id
@@ -389,6 +399,22 @@
       #{configId},
       #{entry.key},
       #{entry.value}
+    </foreach>
+    )
+  </insert>
+
+  <insert id="insertMesosFetcherUris">
+    INSERT INTO task_config_mesos_fetcher_uris (
+      task_config_id,
+      value,
+      extract,
+      cache
+    ) VALUES (
+    <foreach item="entry" collection="uris" separator="),(">
+      #{configId},
+      #{entry.value},
+      #{entry.extract},
+      #{entry.cache}
     </foreach>
     )
   </insert>

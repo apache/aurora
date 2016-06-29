@@ -113,6 +113,7 @@ final class Fixtures {
         .setMaxTaskFailures(1)
         .setConstraints(ImmutableSet.of())
         .setMetadata(ImmutableSet.of())
+        .setMesosFetcherUris(ImmutableSet.of())
         .setContainer(Container.mesos(new MesosContainer()))
         .setResources(ImmutableSet.of(
             Resource.numCpus(1),

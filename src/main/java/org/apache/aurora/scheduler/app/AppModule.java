@@ -97,6 +97,11 @@ public class AppModule extends AbstractModule {
   @CmdLine(name = "allow_gpu_resource", help = "Allow jobs to request Mesos GPU resource.")
   private static final Arg<Boolean> ALLOW_GPU_RESOURCE = Arg.create(false);
 
+  @CmdLine(name = "enable_mesos_fetcher", help = "Allow jobs to pass URIs "
+      + "to the Mesos Fetcher. Note that enabling this feature could pose "
+      + "a privilege escalation threat.")
+  private static final Arg<Boolean> ENABLE_MESOS_FETCHER = Arg.create(false);
+
   private final ConfigurationManagerSettings configurationManagerSettings;
 
   @VisibleForTesting
@@ -110,7 +115,8 @@ public class AppModule extends AbstractModule {
         ENABLE_DOCKER_PARAMETERS.get(),
         DEFAULT_DOCKER_PARAMETERS.get(),
         REQUIRE_DOCKER_USE_EXECUTOR.get(),
-        ALLOW_GPU_RESOURCE.get()));
+        ALLOW_GPU_RESOURCE.get(),
+        ENABLE_MESOS_FETCHER.get()));
   }
 
   @Override

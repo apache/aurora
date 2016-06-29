@@ -13,8 +13,10 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
@@ -261,6 +263,17 @@ public interface MesosTaskFactory {
       ExecutorInfo.Builder builder = executorSettings.getExecutorConfig().getExecutor().toBuilder()
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setSource(getInstanceSourceName(task.getTask(), task.getInstanceId()));
+
+      //TODO: (rdelvalle) add output_file when Aurora's Mesos dep is updated (MESOS-4735)
+      List<CommandInfo.URI> mesosFetcherUris = task.getTask().getMesosFetcherUris().stream()
+          .map(u -> Protos.CommandInfo.URI.newBuilder().setValue(u.getValue())
+              .setExecutable(false)
+              .setExtract(u.isExtract())
+              .setCache(u.isCache()).build())
+          .collect(Collectors.toList());
+
+      builder.setCommand(builder.getCommand().toBuilder().addAllUris(mesosFetcherUris));
+
       Iterable<Resource> executorResources = acceptedOffer.getExecutorResources();
       LOG.debug(
           "Setting executor resources to {}",

@@ -181,6 +181,14 @@ CREATE TABLE task_config_metadata(
   value VARCHAR NOT NULL
 );
 
+CREATE TABLE task_config_mesos_fetcher_uris(
+  id IDENTITY,
+  task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
+  value VARCHAR NOT NULL,
+  extract BOOLEAN NOT NULL,
+  cache BOOLEAN NOT NULL
+);
+
 CREATE TABLE task_config_docker_containers(
   id IDENTITY,
   task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,

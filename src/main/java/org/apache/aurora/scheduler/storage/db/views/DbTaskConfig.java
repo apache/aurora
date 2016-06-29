@@ -23,6 +23,7 @@ import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.MesosContainer;
+import org.apache.aurora.gen.MesosFetcherURI;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -46,6 +47,7 @@ public final class DbTaskConfig {
   private String contactEmail;
   private ExecutorConfig executorConfig;
   private List<Metadata> metadata;
+  private List<MesosFetcherURI> mesosFetcherUris;
   private DbContainer container;
   private String tier;
   private List<DBResource> resources;
@@ -77,6 +79,7 @@ public final class DbTaskConfig {
         .setContactEmail(contactEmail)
         .setExecutorConfig(executorConfig)
         .setMetadata(ImmutableSet.copyOf(metadata))
+        .setMesosFetcherUris(ImmutableSet.copyOf(mesosFetcherUris))
         .setContainer(
             container == null ? Container.mesos(new MesosContainer()) : container.toThrift())
         .setResources(resources.stream().map(DBResource::toThrift).collect(toImmutableSet()));
