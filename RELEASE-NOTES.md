@@ -7,6 +7,7 @@
 to contain URIs which will be passed to the Mesos Fetcher and subsequently downloaded into
 the sandbox. Please note that enabling job submissions to download resources from arbitrary
 URIs may have security implications.
+- Upgraded Mesos to 0.28.2.
 
 ### Deprecations and removals:
 
