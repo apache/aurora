@@ -1,11 +1,3 @@
-Aurora 0.15.0
---------------------------------------------------------------------------------
-## Task
-    * [AURORA-1725] - Expose tier configurations as a debug page 
-    * [AURORA-1458] - Add tier into the UI "show config" summary
-    * [AURORA-1720] - Broken link in http://aurora.apache.org/
-
-
 Aurora 0.14.0
 --------------------------------------------------------------------------------
 ## Bug
