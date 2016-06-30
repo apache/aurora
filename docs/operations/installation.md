@@ -198,7 +198,7 @@ NB: In Aurora releases up through 0.12.0, you'll also need to edit /etc/init/the
 
 Make an edit to add the `--mesos-root` flag resulting in something like:
 
-    grep -A5 OBSERVER_ARGS /etc/sysconfig/thermos-observer
+    grep -A5 OBSERVER_ARGS /etc/sysconfig/thermos
     OBSERVER_ARGS=(
       --port=1338
       --mesos-root=/tmp/mesos
