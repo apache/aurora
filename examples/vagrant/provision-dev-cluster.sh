@@ -75,6 +75,8 @@ function prepare_sources {
   cp /vagrant/examples/vagrant/mesos_config/etc_mesos-master/* /etc/mesos-master
   stop mesos-master || true
   stop mesos-slave || true
+  # Remove slave metadata to ensure slave start does not pick up old state.
+  rm -rf /var/lib/mesos/meta/slaves/latest
   start mesos-master
   start mesos-slave
 

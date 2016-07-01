@@ -51,7 +51,11 @@ will be helpful to update this box and keep this cost low.
 
         config.vm.box = "aurora-dev-env-testing"
 
-    At this point, you can use the box as normal to run integraion tests.
+    and comment out vm version
+
+        # config.vm.box_version = "0.0.X"
+
+    At this point, you can use the box as normal to run integration tests.
 
 6. Upload the box to Vagrant Cloud
     Our boxes are stored [here](https://atlas.hashicorp.com/apache-aurora/boxes/dev-environment).
