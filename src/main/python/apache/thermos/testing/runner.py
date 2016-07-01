@@ -70,10 +70,8 @@ class AngryHandler(TaskRunnerUniversalHandler):
         sys.exit(1)
 
 sandbox = os.path.join('%(sandbox)s', '%(task_id)s')
-args = {}
+args = %(extra_task_runner_args)r
 args['task_id'] = '%(task_id)s'
-if %(portmap)s:
-  args['portmap'] = %(portmap)s
 args['universal_handler'] = AngryHandler
 
 runner = TaskRunner(task, '%(root)s', sandbox, **args)
@@ -83,7 +81,7 @@ with open('%(state_filename)s', 'w') as fp:
   fp.write(thrift_serialize(runner.state))
 """
 
-  def __init__(self, task, portmap={}, success_rate=100, random_seed=31337):
+  def __init__(self, task, success_rate=100, random_seed=31337, **extra_task_runner_args):
     """
       task = Thermos task
       portmap = port map
@@ -99,7 +97,7 @@ with open('%(state_filename)s', 'w') as fp:
     self.tempdir = tempfile.mkdtemp()
     self.task_id = '%s-runner-base' % int(time.time() * 1000000)
     self.sandbox = os.path.join(self.tempdir, 'sandbox')
-    self.portmap = portmap
+    self.extra_task_runner_args = extra_task_runner_args
     self.cleaned = False
     self.pathspec = TaskPath(root=self.tempdir, task_id=self.task_id)
     self.script_filename = None
@@ -130,9 +128,9 @@ with open('%(state_filename)s', 'w') as fp:
         'root': self.tempdir,
         'task_id': self.task_id,
         'state_filename': self.state_filename,
-        'portmap': repr(self.portmap),
         'success_rate': self.success_rate,
         'random_seed': self.random_seed + self._run_count,
+        'extra_task_runner_args': self.extra_task_runner_args,
       })
 
     with environment_as(PYTHONPATH=os.pathsep.join(sys.path)):
@@ -193,12 +191,16 @@ with open('%(state_filename)s', 'w') as fp:
 
 class RunnerTestBase(object):
   @classmethod
+  def extra_task_runner_args(cls):
+    return dict(portmap=getattr(cls, 'portmap', {}))
+
+  @classmethod
   def task(cls):
     raise NotImplementedError
 
   @classmethod
   def setup_class(cls):
-    cls.runner = Runner(cls.task(), portmap=getattr(cls, 'portmap', {}))
+    cls.runner = Runner(cls.task(), **cls.extra_task_runner_args())
     cls.runner.run()
     cls.state = cls.runner.state
 

@@ -66,11 +66,11 @@ from apache.thermos.config.loader import (
     ThermosTaskValidator,
     ThermosTaskWrapper
 )
-from apache.thermos.config.schema import ThermosContext
+from apache.thermos.config.schema import Logger, RotatePolicy, ThermosContext
 
 from .helper import TaskRunnerHelper
 from .muxer import ProcessMuxer
-from .process import LoggerDestination, LoggerMode, Process
+from .process import LoggerMode, Process
 
 from gen.apache.thermos.ttypes import (
     ProcessState,
@@ -722,6 +722,9 @@ class TaskRunner(object):
       rotate_log_backups=rotate_log_backups,
       preserve_env=self._preserve_env)
 
+  _DEFAULT_LOGGER = Logger()
+  _DEFAULT_ROTATION = RotatePolicy()
+
   def _build_process_logger_args(self, process):
     """
       Build the appropriate logging configuration based on flags + process
@@ -730,27 +733,36 @@ class TaskRunner(object):
       If no configuration (neither flags nor process config), default to
       "standard" mode.
     """
-    destination, mode, size, backups = None, None, None, None
+
+    destination, mode, size, backups = (self._DEFAULT_LOGGER.destination().get(),
+                                        self._DEFAULT_LOGGER.mode().get(),
+                                        None,
+                                        None)
+
     logger = process.logger()
     if logger is Empty:
       if self._process_logger_destination:
         destination = self._process_logger_destination
-      else:
-        destination = LoggerDestination.FILE
-
       if self._process_logger_mode:
-        mode = self._process_logger_mode,
-        size = Amount(self._rotate_log_size_mb, Data.MB)
-        backups = self._rotate_log_backups
-      else:
-        mode = LoggerMode.STANDARD
+        mode = self._process_logger_mode
     else:
       destination = logger.destination().get()
       mode = logger.mode().get()
-      if mode == LoggerMode.ROTATE:
+
+    if mode == LoggerMode.ROTATE:
+      size = Amount(self._DEFAULT_ROTATION.log_size().get(), Data.BYTES)
+      backups = self._DEFAULT_ROTATION.backups().get()
+      if logger is Empty:
+        if self._rotate_log_size_mb:
+          size = Amount(self._rotate_log_size_mb, Data.MB)
+        if self._rotate_log_backups:
+          backups = self._rotate_log_backups
+      else:
         rotate = logger.rotate()
-        size = Amount(rotate.log_size().get(), Data.BYTES)
-        backups = rotate.backups().get()
+        if rotate is not Empty:
+          size = Amount(rotate.log_size().get(), Data.BYTES)
+          backups = rotate.backups().get()
+
     return destination, mode, size, backups
 
   def deadlocked(self, plan=None):

@@ -55,9 +55,6 @@ LogOptions.set_simple(True)
 LogOptions.set_disk_log_level('DEBUG')
 LogOptions.set_log_dir(CWD)
 
-_LOGGER_DESTINATIONS = ', '.join(LoggerDestination.VALUES)
-_LOGGER_MODES = ', '.join(LoggerMode.VALUES)
-
 
 app.add_option(
     '--announcer-ensemble',
@@ -88,8 +85,7 @@ app.add_option(
     type=str,
     default=None,
     help='Set hostname to be announced. By default it is'
-         'the --hostname argument passed into the Mesos agent.'
-)
+         'the --hostname argument passed into the Mesos agent.')
 
 app.add_option(
     '--announcer-zookeeper-auth-config',
@@ -118,25 +114,22 @@ app.add_option(
     dest='nosetuid_health_checks',
     action="store_true",
     help='If set, the executor will not run shell health checks as job\'s role\'s user',
-    default=False
-)
+    default=False)
 
 
 app.add_option(
     '--runner-logger-destination',
     dest='runner_logger_destination',
-    type=str,
-    default='file',
-    help='The logger destination [%s] to use for all processes run by thermos.'
-      % _LOGGER_DESTINATIONS)
+    choices=LoggerDestination.VALUES,
+    help='The logger destination %r to use for all processes run by thermos.'
+      % (LoggerDestination.VALUES,))
 
 
 app.add_option(
     '--runner-logger-mode',
     dest='runner_logger_mode',
-    type=str,
-    default=None,
-    help='The logger mode [%s] to use for all processes run by thermos.' % _LOGGER_MODES)
+    choices=LoggerMode.VALUES,
+    help='The logger mode %r to use for all processes run by thermos.' % (LoggerMode.VALUES,))
 
 
 app.add_option(

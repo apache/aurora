@@ -103,10 +103,10 @@ Maximum number of backups to retain before deleting the oldest backup(s).
 ## Process Logs
 
 ### Log destination
-By default, Thermos will write process stdout/stderr to log files in the sandbox. Process object configuration
-allows specifying alternate log file destinations like streamed stdout/stderr or suppression of all log output.
-Default behavior can be configured for the entire cluster with the following flag (through the `-thermos_executor_flags`
-argument to the Aurora scheduler):
+By default, Thermos will write process stdout/stderr to log files in the sandbox. Process object
+configuration allows specifying alternate log file destinations like streamed stdout/stderr or
+suppression of all log output. Default behavior can be configured for the entire cluster with the
+following flag (through the `-thermos_executor_flags` argument to the Aurora scheduler):
 
     --runner-logger-destination=both
 
@@ -128,7 +128,6 @@ In order to enable rotation by default, the following flags can be applied to Th
 In the above example, each instance of the Thermos runner will rotate stderr/stdout logs once they
 reach 100 MiB in size and keep a maximum of 10 backups. If a user has provided a custom setting for
 their process, it will override these default settings.
-
 
 
 ## Thermos Executor Wrapper

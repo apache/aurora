@@ -121,30 +121,27 @@ schedule.
 
 #### logger
 
-The default behavior of Thermos is to store  stderr/stdout logs in files which grow unbounded.
-In the event that you have large log volume, you may want to configure Thermos to automatically rotate logs
-after they grow to a certain size, which can prevent your job from using more than its allocated
-disk space.
+The default behavior of Thermos is to store stderr/stdout logs in files which grow unbounded.
+In the event that you have large log volume, you may want to configure Thermos to automatically
+rotate logs after they grow to a certain size, which can prevent your job from using more than its
+allocated disk space.
 
-A Logger union consists of a destination enum, a mode enum and a rotation policy.
-It's to set where the process logs should be sent using `destination`. Default
-option is `file`. Its also possible to specify `console` to get logs output
-to stdout/stderr, `none` to suppress any logs output or `both` to send logs to files and
-console output. In case of using `none` or `console` rotation attributes are ignored.
-Rotation policies only apply to loggers whose mode is `rotate`. The acceptable values
-for the LoggerMode enum are `standard` and `rotate`. The rotation policy applies to both
-stderr and stdout.
+Logger objects specify a `destination` for Process logs which is, by default, `file` - a pair of
+`stdout` and `stderr` files. Its also possible to specify `console` to get logs output to
+the Process stdout and stderr streams, `none` to suppress any logs output or `both` to send logs to
+files and console streams.
 
-By default, all processes use the `standard` LoggerMode.
+The default Logger `mode` is `standard` which lets the stdout and stderr streams grow without bound.
 
   **Attribute Name**  | **Type**          | **Description**
   ------------------- | :---------------: | ---------------------------------
    **destination**    | LoggerDestination | Destination of logs. (Default: `file`)
    **mode**           | LoggerMode        | Mode of the logger. (Default: `standard`)
-   **rotate**         | RotatePolicy      | An optional rotation policy.
+   **rotate**         | RotatePolicy      | An optional rotation policy. (Default: `Empty`)
 
-A RotatePolicy describes log rotation behavior for when `mode` is set to `rotate`. It is ignored
-otherwise.
+A RotatePolicy describes log rotation behavior for when `mode` is set to `rotate` and it is ignored
+otherwise. If `rotate` is `Empty` or `RotatePolicy()` when the `mode` is set to `rotate` the
+defaults below are used.
 
   **Attribute Name**  | **Type**     | **Description**
   ------------------- | :----------: | ---------------------------------
