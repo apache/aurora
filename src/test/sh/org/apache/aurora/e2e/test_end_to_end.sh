@@ -251,6 +251,9 @@ test_run() {
   local _ssh_key=~/.ssh/id_rsa
   rm -f ${_ssh_key}*
   ssh-keygen -t rsa -N "" -f $_ssh_key
+  # Ensure a new line for the new key to start on.
+  # See: https://issues.apache.org/jira/browse/AURORA-1728
+  echo >> ~/.ssh/authorized_keys
   cat ${_ssh_key}.pub >> ~/.ssh/authorized_keys
 
   # Using the sandbox contents as a proxy for functioning SSH.  List sandbox contents, we expect
