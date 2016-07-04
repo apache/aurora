@@ -33,8 +33,16 @@ public class CuratorServiceGroupMonitorTest extends BaseCuratorDiscoveryTest {
   }
 
   @Test
-  public void testExceptionalLifecycle() throws Exception {
+  public void testNeverStarted() throws Exception {
     // Close on a non-started or failed-to-start monitor should be allowed.
+    getGroupMonitor().close();
+  }
+
+  @Test
+  public void testAlreadyStopped() throws Exception {
+    startGroupMonitor();
+    getGroupMonitor().close();
+    // Multiple closes on a started monitor should be allowed.
     getGroupMonitor().close();
   }
 

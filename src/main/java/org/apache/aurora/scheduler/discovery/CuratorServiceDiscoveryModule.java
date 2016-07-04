@@ -155,12 +155,25 @@ class CuratorServiceDiscoveryModule extends PrivateModule {
   @Singleton
   @Exposed
   ServiceGroupMonitor provideServiceGroupMonitor(
+      ShutdownRegistry shutdownRegistry,
       CuratorFramework client,
       Codec<ServiceInstance> codec) {
 
     PathChildrenCache groupCache =
         new PathChildrenCache(client, discoveryPath, true /* cacheData */);
-    return new CuratorServiceGroupMonitor(groupCache, MEMBER_SELECTOR, codec);
+
+    // NB: Even though we do not start the serviceGroupMonitor here, the registered close shutdown
+    // action is safe since the underlying PathChildrenCache close is tolerant of an un-started
+    // state. Its also crucial so that its underlying groupCache is closed prior to its
+    // curatorFramework dependency in the case when the PathChildrenCache is in fact started (via
+    // CuratorServiceGroupMonitor::start) since a CuratorFramework should have no active clients
+    // when it is closed to avoid errors in those clients when attempting to use it.
+
+    ServiceGroupMonitor serviceGroupMonitor =
+        new CuratorServiceGroupMonitor(groupCache, MEMBER_SELECTOR, codec);
+    shutdownRegistry.addAction(groupCache::close);
+
+    return serviceGroupMonitor;
   }
 
   @Provides

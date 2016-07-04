@@ -79,6 +79,16 @@ class CuratorServiceGroupMonitor implements ServiceGroupMonitor {
     }
   }
 
+  /**
+   * The complement of {@link #start()}; stops service group monitoring activities.
+   *
+   * NB: This operation idempotent; a close can be safely called regardless of the current state of
+   * this service group monitor and only if in a started state will action be taken; otherwise close
+   * will no-op.
+   *
+   * @throws IOException if there is a problem stopping any of the service group monitoring
+   *                     activities.
+   */
   @Override
   public void close() throws IOException {
     groupCache.close();
