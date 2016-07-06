@@ -79,6 +79,10 @@ version. This will automatically clean up the release candidate rc0 branch and s
 
 5. Once the vote has successfully passed create the release
 
+**IMPORTANT: make sure to use the correct release at this final step (e.g.: `-r 1` if rc1 candidate
+has been voted for). Once the release tag is pushed it will be very hard to undo due to remote
+git pre-receive hook explicitly forbidding release tag manipulations.**
+
                ./build-support/release/release
 
 6. Update the draft email created fom the `release` script in step #5 to include the Apache ID's for
