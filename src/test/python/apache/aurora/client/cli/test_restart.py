@@ -98,7 +98,6 @@ class TestRestartCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
-    mock_scheduler_proxy.getTierConfigs.return_value = self.get_mock_tier_configurations()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
@@ -171,7 +170,6 @@ class TestRestartCommand(AuroraClientCommandTest):
     mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_error_response()
-    mock_scheduler_proxy.getTierConfigs.return_value = self.get_mock_tier_configurations()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
@@ -195,7 +193,6 @@ class TestRestartCommand(AuroraClientCommandTest):
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     # Make getTasksWithoutConfigs return an error, which is what happens when a job is not found.
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_error_response()
-    mock_scheduler_proxy.getTierConfigs.return_value = self.get_mock_tier_configurations()
     with contextlib.nested(
         patch('apache.aurora.client.cli.context.AuroraCommandContext.print_err',
               side_effect=mock_io.put),
@@ -226,7 +223,6 @@ class TestRestartCommand(AuroraClientCommandTest):
     mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     mock_scheduler_proxy.restartShards.return_value = self.create_error_response()
-    mock_scheduler_proxy.getTierConfigs.return_value = self.get_mock_tier_configurations()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
@@ -269,7 +265,6 @@ class TestRestartCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
-    mock_scheduler_proxy.getTierConfigs.return_value = self.get_mock_tier_configurations()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
@@ -296,7 +291,6 @@ class TestRestartCommand(AuroraClientCommandTest):
     mock_health_check = self.setup_health_checks()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     mock_scheduler_proxy.restartShards.return_value = self.create_error_response()
-    mock_scheduler_proxy.getTierConfigs.return_value = self.get_mock_tier_configurations()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',

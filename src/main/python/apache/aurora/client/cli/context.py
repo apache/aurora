@@ -18,8 +18,6 @@ import functools
 import logging
 from fnmatch import fnmatch
 
-from pystachio import Boolean, String
-
 from apache.aurora.client.api import AuroraClientAPI, SchedulerProxy
 from apache.aurora.client.base import AURORA_V2_USER_AGENT_NAME, combine_messages
 from apache.aurora.client.cli import (
@@ -30,7 +28,7 @@ from apache.aurora.client.cli import (
     EXIT_INVALID_PARAMETER,
     Context
 )
-from apache.aurora.client.config import AnnotatedAuroraConfig, get_config
+from apache.aurora.client.config import get_config
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
@@ -101,52 +99,6 @@ class AuroraCommandContext(Context):
       apis[cluster] = api
     return add_auth_error_handler(apis[cluster])
 
-  def log_response_and_raise(self, resp, err_code=EXIT_API_ERROR, err_msg="Command failure:"):
-    if resp.responseCode == ResponseCode.OK:
-      msg = combine_messages(resp)
-      if msg:
-        logging.info(msg)
-    else:
-      self.print_err(err_msg)
-      self.print_err("\t%s" % combine_messages(resp))
-      if resp.responseCode == ResponseCode.LOCK_ERROR:
-        self.print_err("\t%s" % self.LOCK_ERROR_MSG)
-      raise self.CommandErrorLogged(err_code, err_msg)
-
-  def _get_tier_configurations(self, cluster):
-    api = self.get_api(cluster)
-    resp = api.get_tier_configs()
-    self.log_response_and_raise(resp, err_msg="Error getting tier configurations.")
-    return resp.result.getTierConfigResult
-
-  def _get_config_with_production_and_tier(self, cluster, config):
-    tier_configurations = self._get_tier_configurations(cluster)
-
-    def to_bool(value):
-      return Boolean.coerce(value)
-
-    def production_tier_filter(tier):
-      return not to_bool(tier.settings['preemptible']) and not to_bool(tier.settings['revocable'])
-
-    task = config.job().taskConfig
-    if task.tier is None:
-      backfill_args = {
-        'tier': String(
-          next(
-            (t.name for t in tier_configurations.tiers if
-              production_tier_filter(t) == task.production),
-            tier_configurations.defaultTierName))
-      }
-    else:
-      backfill_args = {
-      'production': Boolean(
-        next(
-          (not to_bool(t.settings['preemptible']) for t in tier_configurations.tiers if
-            t.name == task.tier),
-          task.production))
-      }
-    return AnnotatedAuroraConfig(config.raw()(**backfill_args))
-
   def get_job_config_optional(self, jobkey, config_file):
     """Loads a job configuration if provided."""
     return self.get_job_config(jobkey, config_file) if config_file is not None else None
@@ -170,9 +122,21 @@ class AuroraCommandContext(Context):
       check_result = result.raw().check()
       if not check_result.ok():
         raise self.CommandError(EXIT_INVALID_CONFIGURATION, check_result)
-      return self._get_config_with_production_and_tier(jobkey.cluster, result)
+      return result
     except Exception as e:
       raise self.CommandError(EXIT_INVALID_CONFIGURATION, 'Error loading configuration: %s' % e)
+
+  def log_response_and_raise(self, resp, err_code=EXIT_API_ERROR, err_msg="Command failure:"):
+    if resp.responseCode == ResponseCode.OK:
+      msg = combine_messages(resp)
+      if msg:
+        logging.info(msg)
+    else:
+      self.print_err(err_msg)
+      self.print_err("\t%s" % combine_messages(resp))
+      if resp.responseCode == ResponseCode.LOCK_ERROR:
+        self.print_err("\t%s" % self.LOCK_ERROR_MSG)
+      raise self.CommandErrorLogged(err_code, err_msg)
 
   def get_job_list(self, clusters, role=None):
     """Get a list of jobs from a group of clusters.

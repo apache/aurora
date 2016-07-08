@@ -22,8 +22,6 @@ import math
 import re
 import sys
 
-from twitter.common import log
-
 from apache.aurora.client import binding_helper
 from apache.aurora.client.base import die
 from apache.aurora.config import AuroraConfig
@@ -116,33 +114,10 @@ def _validate_update_config(config):
         (watch_secs, target_watch, initial_interval_secs, max_consecutive_failures, interval_secs))
 
 
-PRODUCTION_DEPRECATED_WARNING = (
-  'Job configuration attribute \'production\' is deprecated.\n'
-  'Use \'tier\' attribute instead. For more information please refer to \n'
-  'http://aurora.apache.org/documentation/latest/reference/configuration/#job-objects')
-
-
-def deprecation_warning(text):
-  log.warning('')
-  log.warning('*' * 80)
-  log.warning('* The command you ran is deprecated and will soon break!')
-  for line in text.split('\n'):
-    log.warning('* %s' % line)
-  log.warning('*' * 80)
-  log.warning('')
-
-
-def _validate_deprecated_config(config):
-  task = config.job().taskConfig
-  if task.production and task.tier is None:
-    deprecation_warning(PRODUCTION_DEPRECATED_WARNING)
-
-
 def validate_config(config, env=None):
   _validate_update_config(config)
   _validate_announce_configuration(config)
   _validate_environment_name(config)
-  _validate_deprecated_config(config)
 
 
 class GlobalHookRegistry(object):
