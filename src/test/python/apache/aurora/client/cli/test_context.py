@@ -13,9 +13,10 @@
 #
 import mock
 import pytest
+from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api import AuroraClientAPI, SchedulerProxy
-from apache.aurora.client.cli import EXIT_AUTH_ERROR, Context
+from apache.aurora.client.cli import EXIT_AUTH_ERROR, CommandOption, Context
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -23,6 +24,7 @@ from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import CLUSTERS
 
 from ...api_util import SchedulerProxyApiSpec
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 TEST_CLUSTER = Cluster(name='some-cluster', auth_mechanism='nothing', scheduler_uri='nowhere')
 
@@ -75,3 +77,76 @@ def test_handles_api_auth_error():
 
   assert e.value.code == EXIT_AUTH_ERROR
   assert mock_scheduler_proxy.killTasks.call_count == 1
+
+
+def create_mock_options():
+  mock_options = mock.Mock(spec=CommandOption)
+  mock_options.read_json = False
+  mock_options.bindings = ()
+  return mock_options
+
+
+def create_test_config(extra=''):
+  return AuroraClientCommandTest.get_test_config(
+    AuroraClientCommandTest.CONFIG_BASE,
+    AuroraClientCommandTest.TEST_CLUSTER,
+    AuroraClientCommandTest.TEST_ROLE,
+    AuroraClientCommandTest.TEST_ENV,
+    AuroraClientCommandTest.TEST_JOB,
+    extra)
+
+
+def test_get_config_with_production_and_tier_is_preemptible():
+  context = FakeAuroraCommandContext()
+  context.set_options(create_mock_options())
+  with CLUSTERS.patch(AuroraClientCommandTest.TEST_CLUSTERS.values()):
+    api = context.get_api(TEST_CLUSTER.name)
+    api.get_tier_configs.return_value = AuroraClientCommandTest.get_mock_tier_configurations()
+    with temporary_file() as fp:
+      fp.write(create_test_config())
+      fp.flush()
+      config = context.get_job_config(AuroraClientCommandTest.TEST_JOBKEY, fp.name)
+      assert not config.job().taskConfig.production
+      assert config.job().taskConfig.tier == AuroraClientCommandTest.PREEMPTIBLE_TIER.name
+
+
+def test_get_config_with_production_and_tier_is_preferred():
+  context = FakeAuroraCommandContext()
+  context.set_options(create_mock_options())
+  with CLUSTERS.patch(AuroraClientCommandTest.TEST_CLUSTERS.values()):
+    api = context.get_api(TEST_CLUSTER.name)
+    api.get_tier_configs.return_value = AuroraClientCommandTest.get_mock_tier_configurations()
+    with temporary_file() as fp:
+      fp.write(create_test_config("production='true',"))
+      fp.flush()
+      config = context.get_job_config(AuroraClientCommandTest.TEST_JOBKEY, fp.name)
+      assert config.job().taskConfig.production
+      assert config.job().taskConfig.tier == AuroraClientCommandTest.PREFERRED_TIER.name
+
+
+def test_get_config_with_production_and_tier_resets_production():
+  context = FakeAuroraCommandContext()
+  context.set_options(create_mock_options())
+  with CLUSTERS.patch(AuroraClientCommandTest.TEST_CLUSTERS.values()):
+    api = context.get_api(TEST_CLUSTER.name)
+    api.get_tier_configs.return_value = AuroraClientCommandTest.get_mock_tier_configurations()
+    with temporary_file() as fp:
+      fp.write(create_test_config("production='true', tier='revocable',"))
+      fp.flush()
+      config = context.get_job_config(AuroraClientCommandTest.TEST_JOBKEY, fp.name)
+      assert not config.job().taskConfig.production
+      assert config.job().taskConfig.tier == AuroraClientCommandTest.REVOCABLE_TIER.name
+
+
+def test_get_config_with_production_and_tier_sets_production():
+  context = FakeAuroraCommandContext()
+  context.set_options(create_mock_options())
+  with CLUSTERS.patch(AuroraClientCommandTest.TEST_CLUSTERS.values()):
+    api = context.get_api(TEST_CLUSTER.name)
+    api.get_tier_configs.return_value = AuroraClientCommandTest.get_mock_tier_configurations()
+    with temporary_file() as fp:
+      fp.write(create_test_config("tier='preferred',"))
+      fp.flush()
+      config = context.get_job_config(AuroraClientCommandTest.TEST_JOBKEY, fp.name)
+      assert config.job().taskConfig.production
+      assert config.job().taskConfig.tier == AuroraClientCommandTest.PREFERRED_TIER.name

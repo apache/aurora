@@ -110,6 +110,7 @@ class TestPlugins(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
 
       # This is the real test: invoke create as if it had been called by the command line.
       with temporary_file() as fp:

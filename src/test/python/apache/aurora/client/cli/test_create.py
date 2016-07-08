@@ -135,6 +135,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
 
       # This is the real test: invoke create as if it had been called by the command line.
       with temporary_file() as fp:
@@ -163,6 +164,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -191,6 +193,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         mock_context.add_expected_status_query_result(self.create_mock_status_query_result(result))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -210,6 +213,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
           self.create_mock_status_query_result(ScheduleStatus.INIT))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_failed_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -288,6 +292,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -318,6 +323,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -337,6 +343,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
           self.create_mock_status_query_result(ScheduleStatus.INIT))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_failed_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -366,6 +373,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
 
       # This is the real test: invoke create as if it had been called by the command line.
       with temporary_file() as fp:
@@ -404,11 +412,13 @@ class TestClientCreateCommand(AuroraClientCommandTest):
             fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
       assert mock_context.get_out() == []
-      assert "Error loading configuration: TypeCheck(FAILED):" in mock_context.get_err()[0]
+      assert "Error loading configuration: " in mock_context.get_err()[0]
 
   def test_create_cron_job_fails(self):
     """Test a cron job is not accepted."""
     mock_context = FakeAuroraCommandContext()
+    api = mock_context.get_api('west')
+    api.get_tier_configs.return_value = self.get_mock_tier_configurations()
     with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       with temporary_file() as fp:
         fp.write(self.get_valid_cron_config())

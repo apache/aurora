@@ -43,6 +43,7 @@ class TestCronNoun(AuroraClientCommandTest):
 
       api = mock_context.get_api('west')
       api.schedule_cron.return_value = self.create_simple_success_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
       with temporary_file() as fp:
         fp.write(self.get_valid_cron_config())
         fp.flush()
@@ -62,6 +63,7 @@ class TestCronNoun(AuroraClientCommandTest):
     with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
       api = mock_context.get_api('west')
       api.schedule_cron.return_value = self.create_error_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
       with temporary_file() as fp:
         fp.write(self.get_valid_cron_config())
         fp.flush()
@@ -76,6 +78,8 @@ class TestCronNoun(AuroraClientCommandTest):
 
   def test_schedule_failed_non_cron(self):
     mock_context = FakeAuroraCommandContext()
+    api = mock_context.get_api('west')
+    api.get_tier_configs.return_value = self.get_mock_tier_configurations()
     with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -104,6 +108,7 @@ class TestCronNoun(AuroraClientCommandTest):
     with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
       api = mock_context.get_api("west")
       api.schedule_cron.return_value = self.create_simple_success_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
       with temporary_file() as fp:
         fp.write(self.get_valid_cron_config())
         fp.flush()

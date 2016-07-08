@@ -113,6 +113,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         lambda x: self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api("west")
       api.create_job.return_value = self.get_createjob_response()
+      api.get_tier_configs.return_value = self.get_mock_tier_configurations()
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())

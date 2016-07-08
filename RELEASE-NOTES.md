@@ -1,3 +1,17 @@
+0.16.0 (Not yet released)
+======
+
+### New/Updated:
+
+- Scheduler command line behavior has been modified to warn users of the deprecation of `production`
+  attribute in `Job` thrift struct. The scheduler is queried for tier configurations and the user's
+  choice of `tier` and `production` attributes is revised, if necessary. If `tier` is already set,
+  the `production` attribute might be adjusted to match the `tier` selection. Otherwise, `tier` is
+  selected based on the value of `production` attribute. If a matching tier is not found, the
+  `default` tier from tier configuration file (`tiers.json`) is used.
+
+### Deprecations and removals:
+
 0.15.0
 ======
 
