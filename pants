@@ -21,13 +21,14 @@
 #
 # You can learn more here: https://pantsbuild.github.io/setup
 # ====================================================================
+set -e
 
 PYTHON=${PYTHON:-$(which python2.7)}
 
 PANTS_HOME="${PANTS_HOME:-${HOME}/.cache/pants/setup}"
 PANTS_BOOTSTRAP="${PANTS_HOME}/bootstrap-$(uname -s)-$(uname -m)"
 
-VENV_VERSION=13.1.0
+VENV_VERSION=15.0.2
 
 VENV_PACKAGE=virtualenv-${VENV_VERSION}
 VENV_TARBALL=${VENV_PACKAGE}.tar.gz
@@ -54,7 +55,7 @@ function bootstrap_venv {
       mkdir -p "${PANTS_BOOTSTRAP}" && \
       staging_dir=$(tempdir "${PANTS_BOOTSTRAP}") && \
       cd "${staging_dir}" && \
-      curl -O https://pypi.python.org/packages/source/v/virtualenv/${VENV_TARBALL} && \
+      curl -LO https://pypi.io/packages/source/v/virtualenv/${VENV_TARBALL} && \
       tar -xzf ${VENV_TARBALL} && \
       ln -s "${staging_dir}/${VENV_PACKAGE}" "${staging_dir}/latest" && \
       mv "${staging_dir}/latest" "${PANTS_BOOTSTRAP}/${VENV_PACKAGE}"
@@ -81,9 +82,8 @@ function bootstrap_pants {
     (
       venv_path="$(bootstrap_venv)" && \
       staging_dir=$(tempdir "${PANTS_BOOTSTRAP}") && \
-      "${PYTHON}" "${venv_path}/virtualenv.py" "${staging_dir}/install" && \
-      source "${staging_dir}/install/bin/activate" && \
-      pip install "${pants_requirement}" && \
+      "${PYTHON}" "${venv_path}/virtualenv.py" --no-download "${staging_dir}/install" && \
+      "${staging_dir}/install/bin/python" "${staging_dir}/install/bin/pip" install "${pants_requirement}" && \
       ln -s "${staging_dir}/install" "${staging_dir}/${pants_version}" && \
       mv "${staging_dir}/${pants_version}" "${PANTS_BOOTSTRAP}/${pants_version}"
     ) 1>&2
@@ -92,4 +92,4 @@ function bootstrap_pants {
 }
 
 pants_dir=$(bootstrap_pants) && \
-exec "${pants_dir}/bin/pants" "$@"
+exec "${pants_dir}/bin/python" "${pants_dir}/bin/pants" "$@"
