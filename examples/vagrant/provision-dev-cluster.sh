@@ -42,14 +42,6 @@ Host *
 EOF
 }
 
-function enable_gradle_daemon {
-  install -o vagrant -g vagrant -d -m 0755 /home/vagrant/.gradle
-  cat > /home/vagrant/.gradle/gradle.properties <<EOF
-org.gradle.daemon=true
-EOF
-  chown vagrant:vagrant /home/vagrant/.gradle/gradle.properties
-}
-
 function configure_netrc {
   cat > /home/vagrant/.netrc <<EOF
 machine $(hostname -f)
@@ -100,7 +92,6 @@ prepare_extras
 install_cluster_config
 install_ssh_config
 start_services
-enable_gradle_daemon
 configure_netrc
 sudoless_docker_setup
 su vagrant -c "aurorabuild all"
