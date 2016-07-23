@@ -1,3 +1,15 @@
+0.16.0 (Not yet released)
+======
+
+### New/updated:
+
+- The `/offers` endpoint has been modified to display attributes of resource offers as received
+  from Mesos. This has affected rendering of some of the existing attributes. Furthermore, it now
+  dumps additional offer attributes including [reservations](http://mesos.apache.org/documentation/latest/reservation/)
+  and [persistent volumes](http://mesos.apache.org/documentation/latest/persistent-volume/).
+
+### Deprecations and removals:
+
 0.15.0
 ======
 

@@ -26,7 +26,6 @@ org/apache/aurora/scheduler/http/api/security/Kerberos5Realm
 org/apache/aurora/scheduler/http/JerseyTemplateServlet
 org/apache/aurora/scheduler/http/LogConfig
 org/apache/aurora/scheduler/http/LogConfig$LoggerConfig
-org/apache/aurora/scheduler/http/Offers
 org/apache/aurora/scheduler/http/Offers$1
 org/apache/aurora/scheduler/http/Offers$2
 org/apache/aurora/scheduler/http/Offers$3
