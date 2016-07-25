@@ -3,12 +3,23 @@
 
 ### New/updated:
 
+- Scheduler command line behavior has been modified to warn users of the deprecation of `production`
+  attribute in `Job` thrift struct. The scheduler is queried for tier configurations and the user's
+  choice of `tier` and `production` attributes is revised, if necessary. If `tier` is already set,
+  the `production` attribute might be adjusted to match the `tier` selection. Otherwise, `tier` is
+  selected based on the value of `production` attribute. If a matching tier is not found, the
+  `default` tier from tier configuration file (`tiers.json`) is used.
 - The `/offers` endpoint has been modified to display attributes of resource offers as received
   from Mesos. This has affected rendering of some of the existing attributes. Furthermore, it now
   dumps additional offer attributes including [reservations](http://mesos.apache.org/documentation/latest/reservation/)
   and [persistent volumes](http://mesos.apache.org/documentation/latest/persistent-volume/).
 
 ### Deprecations and removals:
+
+- The job configuration flag `production` is now deprecated. To achieve the same scheduling behavior
+  that `production=true` used to provide, users should elect a `tier` for the job with attributes
+  `preemptible=false` and `revocable=false`. For example, the `preferred` tier in the default tier
+  configuration file (`tiers.json`) matches the above criteria.
 
 0.15.0
 ======

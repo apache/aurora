@@ -294,6 +294,10 @@ class AuroraClientAPI(object):
             Resource(ramMb=ram),
             Resource(diskMb=disk)])))
 
+  def get_tier_configs(self):
+    log.debug("Getting tier configurations")
+    return self._scheduler_proxy.getTierConfigs()
+
   def force_task_state(self, task_id, status):
     log.info("Requesting that task %s transition to state %s" % (task_id, status))
     return self._scheduler_proxy.forceTaskState(task_id, status)

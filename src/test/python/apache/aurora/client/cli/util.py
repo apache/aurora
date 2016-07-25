@@ -29,6 +29,7 @@ from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     ExecutorConfig,
+    GetTierConfigResult,
     JobKey,
     Response,
     ResponseCode,
@@ -39,7 +40,8 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatusResult,
     TaskConfig,
     TaskEvent,
-    TaskQuery
+    TaskQuery,
+    TierConfig
 )
 
 
@@ -385,6 +387,30 @@ jobs = [HELLO_WORLD]
   @classmethod
   def assert_lock_message(cls, context):
     assert [line for line in context.get_err() if line == "\t%s" % context.LOCK_ERROR_MSG]
+
+  PREFERRED_TIER = TierConfig(
+    name='preferred',
+    settings={'preemptible': 'false', 'revocable': 'false'}
+  )
+
+  PREEMPTIBLE_TIER = TierConfig(
+    name='preemptible',
+    settings={'preemptible': 'true', 'revocable': 'false'}
+  )
+
+  REVOCABLE_TIER = TierConfig(
+    name='revocable',
+    settings={'preemptible': 'true', 'revocable': 'true'}
+  )
+
+  @classmethod
+  def get_mock_tier_configurations(cls):
+    response = cls.create_simple_success_response()
+    response.result = Result(getTierConfigResult=GetTierConfigResult(
+      defaultTierName=cls.PREEMPTIBLE_TIER.name,
+      tiers=frozenset([cls.PREFERRED_TIER, cls.PREEMPTIBLE_TIER, cls.REVOCABLE_TIER])
+    ))
+    return response
 
 
 class IOMock(object):
