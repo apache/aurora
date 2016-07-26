@@ -22,6 +22,7 @@ import math
 import re
 import sys
 
+from pystachio import Empty
 from twitter.common import log
 
 from apache.aurora.client import binding_helper
@@ -133,8 +134,7 @@ def deprecation_warning(text):
 
 
 def _validate_deprecated_config(config):
-  task = config.job().taskConfig
-  if task.production and task.tier is None:
+  if config.raw().production().get() and config.raw().tier() is Empty:
     deprecation_warning(PRODUCTION_DEPRECATED_WARNING)
 
 
