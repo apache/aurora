@@ -33,6 +33,7 @@ from apache.aurora.config.schema.base import (
     Task,
     UpdateConfig
 )
+from apache.thermos.config.schema_base import Process
 
 MESOS_CONFIG_BASE = """
 HELLO_WORLD = Job(
@@ -227,8 +228,8 @@ def test_update_config_fails_insufficient_watch_secs_equal_to_target():
 
 def test_validate_deprecated_config_adds_warning_for_production():
   job = Job(name='hello_world', role='john_doe', cluster='test-cluster', environment='test',
-    task=Task(name='main', processes=[], resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)),
-    production='true')
+    task=Task(name='main', processes=[Process(cmdline='echo {{_unbound_}}', name='eco')],
+    resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)), production='true')
   with mock.patch('apache.aurora.client.config.deprecation_warning') as mock_warning:
     config._validate_deprecated_config(AuroraConfig(job))
     mock_warning.assert_called_once_with(PRODUCTION_DEPRECATED_WARNING)
@@ -236,7 +237,8 @@ def test_validate_deprecated_config_adds_warning_for_production():
 
 def test_validate_deprecated_config_adds_no_warning_when_tier_is_set():
   job = Job(name='hello_world', role='john_doe', cluster='test-cluster', environment='test',
-    task=Task(name='main', processes=[], resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)),
+    task=Task(name='main', processes=[Process(cmdline='echo {{_unbound_}}', name='eco')],
+    resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)),
   production='true', tier='preferred')
   with mock.patch('apache.aurora.client.config.deprecation_warning') as mock_warning:
     config._validate_deprecated_config(AuroraConfig(job))
