@@ -34,6 +34,24 @@ in the case of a typical Job, releases may progress through the following phases
 increasing level of stability: `devel`, `test`, `staging`, `production`.
 
 
+Configuration Tiers
+-------------------
+
+Tier is a predefined bundle of task configuration options. Aurora schedules tasks and assigns them
+resources based on their tier assignment. The default scheduler tier configuration allows for
+3 tiers:
+ - `revocable`: The `revocable` tier requires the task to run with [revocable](../resource-isolation/#oversubscription)
+ resources.
+ - `preemptible`: Setting the task’s tier to `preemptible` allows for the possibility of that task
+ being [preempted](#preemption) by other tasks when cluster is running low on resources.
+ - `preferred`: The `preferred` tier prevents the task from using [revocable](../resource-isolation/#oversubscription)
+ resources and from being [preempted](#preemption).
+
+Since it is possible that a cluster is configured with a custom tier configuration, users should
+consult their cluster administrator to be informed of the tiers supported by the cluster. Attempts
+to schedule jobs with an unsupported tier will be rejected by the scheduler.
+
+
 Preemption
 ----------
 
@@ -46,12 +64,12 @@ prevents this. Active tasks can become the victim of preemption, if:
  - both candidate and victim are owned by the same role and the
    [priority](../reference/configuration.md#job-objects) of a victim is lower than the
    [priority](../reference/configuration.md#job-objects) of the candidate.
- - OR a victim is non-[production](../reference/configuration.md#job-objects) and the candidate is
-   [production](../reference/configuration.md#job-objects).
+ - OR a victim is a `preemptible` or `revocable` [tier](#configuration-tiers) task and the candidate
+   is a `preferred` [tier](#configuration-tiers) task.
 
-In other words, tasks from [production](../reference/configuration.md#job-objects) jobs may preempt
-tasks from any non-production job. However, a production task may only be preempted by tasks from
-production jobs in the same role with higher [priority](../reference/configuration.md#job-objects).
+In other words, tasks from `preferred` [tier](../reference/configuration.md#job-objects) jobs may
+preempt tasks from any `preemptible` or `revocable` job. However, a `preferred` task may only be
+preempted by tasks from `preferred` jobs in the same role with higher [priority](../reference/configuration.md#job-objects).
 
 Aurora requires resource quotas for [production non-dedicated jobs](../reference/configuration.md#job-objects).
 Quota is enforced at the job role level and when set, defines a non-preemptible pool of compute resources within

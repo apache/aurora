@@ -330,6 +330,9 @@ Job Schema
   deprecated in favor of setting its value directly to the appropriate ```Docker``` or ```Mesos```
   container type*
 
+*Note: Specifying preemption behavior of tasks through `production` flag is deprecated in favor of
+  electing appropriate task tier via `tier` attribute.*
+
    name | type | description
    ------ | :-------: | -------
   ```task``` | Task | The Task object to bind to this job. Required.
@@ -346,11 +349,11 @@ Job Schema
   ```service``` | Boolean | If True, restart tasks regardless of success or failure. (Default: False)
   ```max_task_failures``` | Integer | Maximum number of failures after which the task is considered to have failed (Default: 1) Set to -1 to allow for infinite failures
   ```priority``` | Integer | Preemption priority to give the task (Default 0). Tasks with higher priorities may preempt tasks at lower priorities.
-  ```production``` | Boolean |  Whether or not this is a production task that may [preempt](../features/multitenancy.md#preemption) other tasks (Default: False). Production job role must have the appropriate [quota](../features/multitenancy.md#preemption).
+  ```production``` | Boolean |  (Deprecated) Whether or not this is a production task that may [preempt](../features/multitenancy.md#preemption) other tasks (Default: False). Production job role must have the appropriate [quota](../features/multitenancy.md#preemption).
   ```health_check_config``` | ```HealthCheckConfig``` object | Parameters for controlling a task's health checks. HTTP health check is only used if a  health port was assigned with a command line wildcard.
   ```container``` | Choice of ```Container```, ```Docker``` or ```Mesos``` object | An optional container to run all processes inside of.
   ```lifecycle``` | ```LifecycleConfig``` object | An optional task lifecycle configuration that dictates commands to be executed on startup/teardown.  HTTP lifecycle is enabled by default if the "health" port is requested.  See [LifecycleConfig Objects](#lifecycleconfig-objects) for more information.
-  ```tier``` | String | Task tier type. The default scheduler tier configuration allows for 3 tiers: `revocable`, `preemptible`, and `preferred`. The `revocable` tier requires the task to run with Mesos revocable resources. Setting the task's tier to `preemptible` allows for the possibility of that task being preempted by other tasks when cluster is running low on resources. The `preferred` tier prevents the task from using revocable resources and from being preempted. Since it is possible that a cluster is configured with a custom tier configuration, users should consult their cluster administrator to be informed of the tiers supported by the cluster. Attempts to schedule jobs with an unsupported tier will be rejected by the scheduler.
+  ```tier``` | String | Task tier type. The default scheduler tier configuration allows for 3 tiers: `revocable`, `preemptible`, and `preferred`. If a tier is not elected, Aurora assigns the task to a tier based on its choice of `production` (that is `preferred` for production and `preemptible` for non-production jobs). See the section on [Configuration Tiers](../features/multitenancy#configuration-tiers) for more information.
   ```announce``` | ```Announcer``` object | Optionally enable Zookeeper ServerSet announcements. See [Announcer Objects] for more information.
   ```enable_hooks``` | Boolean | Whether to enable [Client Hooks](client-hooks.md) for this job. (Default: False)
 
