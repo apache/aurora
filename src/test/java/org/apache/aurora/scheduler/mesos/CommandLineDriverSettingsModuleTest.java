@@ -26,6 +26,7 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.mesos.Protos;
 import org.junit.Test;
 
+import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.GPU_RESOURCES;
 import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RESOURCES;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -77,7 +78,8 @@ public class CommandLineDriverSettingsModuleTest {
         "user",
         Optional.absent(),
         Amount.of(1L, Time.MINUTES),
-        false,
+        false, // revocable
+        false, // allow gpu
         Optional.absent());
     assertEquals("", info.getPrincipal());
     assertEquals(0, info.getCapabilitiesCount());
@@ -91,11 +93,28 @@ public class CommandLineDriverSettingsModuleTest {
         "user",
         Optional.absent(),
         Amount.of(1L, Time.MINUTES),
-        true,
+        true, // revocable
+        false, // allow gpu
         Optional.absent());
     assertEquals("", info.getPrincipal());
     assertEquals(1, info.getCapabilitiesCount());
     assertEquals(REVOCABLE_RESOURCES, info.getCapabilities(0).getType());
+    assertFalse(info.hasRole());
+  }
+
+  @Test
+  public void testFrameworkInfoAllowGpu() {
+    Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "aurora",
+        "user",
+        Optional.absent(),
+        Amount.of(1L, Time.MINUTES),
+        false, // revocable
+        true, // allow gpu
+        Optional.absent());
+    assertEquals("", info.getPrincipal());
+    assertEquals(1, info.getCapabilitiesCount());
+    assertEquals(GPU_RESOURCES, info.getCapabilities(0).getType());
     assertFalse(info.hasRole());
   }
 
@@ -106,7 +125,8 @@ public class CommandLineDriverSettingsModuleTest {
         "user",
         Optional.of("auroraprincipal"),
         Amount.of(1L, Time.MINUTES),
-        false,
+        false, // revocable
+        false, // allow gpu
         Optional.absent());
     assertEquals("auroraprincipal", info.getPrincipal());
     assertEquals(0, info.getCapabilitiesCount());
@@ -120,11 +140,13 @@ public class CommandLineDriverSettingsModuleTest {
         "user",
         Optional.of("auroraprincipal"),
         Amount.of(1L, Time.MINUTES),
-        true,
+        true, // revocable
+        true, // allow gpu
         Optional.of(TEST_ROLE));
     assertEquals("auroraprincipal", info.getPrincipal());
-    assertEquals(1, info.getCapabilitiesCount());
+    assertEquals(2, info.getCapabilitiesCount());
     assertEquals(REVOCABLE_RESOURCES, info.getCapabilities(0).getType());
+    assertEquals(GPU_RESOURCES, info.getCapabilities(1).getType());
     assertTrue(info.hasRole());
     assertEquals(TEST_ROLE, info.getRole());
   }

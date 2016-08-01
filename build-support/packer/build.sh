@@ -17,7 +17,7 @@ set -o errexit
 set -o nounset
 set -o verbose
 
-readonly MESOS_VERSION=0.28.2
+readonly MESOS_VERSION=1.0.0
 
 function remove_unused {
   # The default ubuntu/trusty64 image includes juju-core, which adds ~300 MB to our image.
@@ -133,10 +133,12 @@ function warm_artifact_cache {
   mkdir -p "$THIRD_PARTY_DIR"
 
   # Fetch the mesos egg, needed to build python components.
-  # The mesos.native target in 3rdparty/python/BUILD expects to find the native egg in third_party.
+  # The mesos.executor target in 3rdparty/python/BUILD expects to find the native egg in
+  # third_party.
   SVN_ROOT='https://svn.apache.org/repos/asf/aurora/3rdparty'
   pushd "$THIRD_PARTY_DIR"
-    wget -c ${SVN_ROOT}/ubuntu/trusty64/python/mesos.native-${MESOS_VERSION}-py2.7-linux-x86_64.egg
+    wget -c \
+      ${SVN_ROOT}/ubuntu/trusty64/python/mesos.executor-${MESOS_VERSION}-py2.7-linux-x86_64.egg
   popd
 
   chown -R vagrant:vagrant aurora

@@ -90,6 +90,9 @@ public interface MesosTaskFactory {
     @VisibleForTesting
     static final String DEFAULT_PORT_PROTOCOL = "TCP";
 
+    @VisibleForTesting
+    static final String SOURCE_LABEL = "source";
+
     private final ExecutorSettings executorSettings;
     private final TierManager tierManager;
     private final IServerInfo serverInfo;
@@ -262,7 +265,11 @@ public interface MesosTaskFactory {
 
       ExecutorInfo.Builder builder = executorSettings.getExecutorConfig().getExecutor().toBuilder()
           .setExecutorId(getExecutorId(task.getTaskId()))
-          .setSource(getInstanceSourceName(task.getTask(), task.getInstanceId()));
+          .setLabels(
+              Labels.newBuilder().addLabels(
+                  Label.newBuilder()
+                      .setKey(SOURCE_LABEL)
+                      .setValue(getInstanceSourceName(task.getTask(), task.getInstanceId()))));
 
       //TODO: (rdelvalle) add output_file when Aurora's Mesos dep is updated (MESOS-4735)
       List<CommandInfo.URI> mesosFetcherUris = task.getTask().getMesosFetcherUris().stream()

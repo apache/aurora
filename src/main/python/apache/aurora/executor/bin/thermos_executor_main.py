@@ -42,7 +42,7 @@ from apache.aurora.executor.thermos_task_runner import (
 )
 
 try:
-  from mesos.native import MesosExecutorDriver
+  from mesos.executor import MesosExecutorDriver
 except ImportError:
   print(traceback.format_exc(), file=sys.stderr)
   MesosExecutorDriver = None

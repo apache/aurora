@@ -3,6 +3,10 @@
 
 ### New/updated:
 
+- Upgraded Mesos to 1.0.0. Note: as part of this upgrade we have switched from depending on
+  the mesos.native egg for Thermos in favor of the stripped down mesos.executor egg. This means
+  users launching Docker tasks with the Mesos DockerContainerizer are no longer required to use
+  images that include all of Mesos's dependencies.
 - Scheduler command line behavior has been modified to warn users of the deprecation of `production`
   attribute in `Job` thrift struct. The scheduler is queried for tier configurations and the user's
   choice of `tier` and `production` attributes is revised, if necessary. If `tier` is already set,

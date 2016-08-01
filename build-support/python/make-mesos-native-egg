@@ -84,7 +84,7 @@ build_ubuntu_trusty64() {
       $(fetch_and_build_mesos "$mesos_version")
 EOF
     mkdir -pv "$python_outdir"
-    cp -v mesos.native*.egg "$python_outdir"
+    cp -v mesos.executor*.egg "$python_outdir"
   popd
 }
 
@@ -126,7 +126,7 @@ build_centos6() {
 EOS
 EOF
     mkdir -pv "$python_outdir"
-    cp -v mesos.native*.egg "$python_outdir"
+    cp -v mesos.executor*.egg "$python_outdir"
   popd
 }
 
@@ -154,7 +154,7 @@ build_centos7() {
     sudo yum -y install ${CENTOS7_X86_64_DEPENDENCIES[*]}
     $(fetch_and_build_mesos "$mesos_version")
 EOF
-    cp -v mesos.native*.egg "$python_outdir"
+    cp -v mesos.executor*.egg "$python_outdir"
   popd
 }
 

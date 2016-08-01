@@ -65,6 +65,7 @@ import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.DEFAULT_PORT_PROTOCOL;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.METADATA_LABEL_PREFIX;
+import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.SOURCE_LABEL;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.getInverseJobSourceName;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.NO_OVERHEAD_EXECUTOR;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.SOME_OVERHEAD_EXECUTOR;
@@ -151,8 +152,14 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     return executor.toBuilder()
         .clearResources()
         .setExecutorId(MesosTaskFactoryImpl.getExecutorId(task.getTaskId()))
-        .setSource(
-            MesosTaskFactoryImpl.getInstanceSourceName(task.getTask(), task.getInstanceId()))
+        .setLabels(
+            Protos.Labels.newBuilder().addLabels(
+                Protos.Label.newBuilder()
+                    .setKey(SOURCE_LABEL)
+                    .setValue(
+                        MesosTaskFactoryImpl.getInstanceSourceName(
+                            task.getTask(),
+                            task.getInstanceId()))))
         .setCommand(executor.getCommand().toBuilder().addAllUris(
             ImmutableSet.of(
                 URI.newBuilder()

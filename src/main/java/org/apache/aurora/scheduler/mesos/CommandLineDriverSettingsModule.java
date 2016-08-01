@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.apache.mesos.Protos.FrameworkInfo.Capability;
+import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.GPU_RESOURCES;
 import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RESOURCES;
 
 /**
@@ -100,6 +101,12 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
           + "resources in offer.")
   private static final Arg<String> MESOS_ROLE = Arg.create();
 
+  private final boolean allowGpuResource;
+
+  public CommandLineDriverSettingsModule(boolean allowGpuResource) {
+    this.allowGpuResource = allowGpuResource;
+  }
+
   @Override
   protected void configure() {
     Optional<Protos.Credential> credentials = getCredentials();
@@ -118,6 +125,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
             principal,
             FRAMEWORK_FAILOVER_TIMEOUT.get(),
             RECEIVE_REVOCABLE_RESOURCES.get(),
+            allowGpuResource,
             role));
     bind(DriverSettings.class).toInstance(settings);
   }
@@ -152,6 +160,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       Optional<String> principal,
       Amount<Long, Time> failoverTimeout,
       boolean revocable,
+      boolean allowGpu,
       Optional<String> role) {
 
     FrameworkInfo.Builder infoBuilder = FrameworkInfo.newBuilder()
@@ -166,6 +175,10 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
 
     if (revocable) {
       infoBuilder.addCapabilities(Capability.newBuilder().setType(REVOCABLE_RESOURCES));
+    }
+
+    if (allowGpu) {
+      infoBuilder.addCapabilities(Capability.newBuilder().setType(GPU_RESOURCES));
     }
 
     if (role.isPresent()) {

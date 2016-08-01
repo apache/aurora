@@ -86,6 +86,9 @@ public class SchedulerMain {
   @CmdLine(name = "viz_job_url_prefix", help = "URL prefix for job container stats.")
   private static final Arg<String> STATS_URL_PREFIX = Arg.create("");
 
+  @CmdLine(name = "allow_gpu_resource", help = "Allow jobs to request Mesos GPU resource.")
+  private static final Arg<Boolean> ALLOW_GPU_RESOURCE = Arg.create(false);
+
   @Inject private SingletonService schedulerService;
   @Inject private HttpService httpService;
   @Inject private SchedulerLifecycle schedulerLifecycle;
@@ -134,7 +137,7 @@ public class SchedulerMain {
     return Modules.combine(
         new LifecycleModule(),
         new StatsModule(),
-        new AppModule(),
+        new AppModule(ALLOW_GPU_RESOURCE.get()),
         new CronModule(),
         new DbModule.MigrationManagerModule(),
         DbModule.productionModule(Bindings.annotatedKeyFactory(Storage.Volatile.class)),
@@ -195,7 +198,7 @@ public class SchedulerMain {
 
     List<Module> modules = ImmutableList.<Module>builder()
         .add(
-            new CommandLineDriverSettingsModule(),
+            new CommandLineDriverSettingsModule(ALLOW_GPU_RESOURCE.get()),
             new LibMesosLoadingModule(),
             new MesosLogStreamModule(FlaggedZooKeeperConfig.create()),
             new LogStorageModule(),

@@ -11,7 +11,7 @@
 # limitations under the License.
 #
 
-MESOS_REV = '0.28.2'
+MESOS_REV = '1.0.0'
 
 python_requirement_library(
   name = 'mesos.interface',
@@ -23,14 +23,13 @@ python_requirement_library(
 )
 
 python_requirement_library(
-  name = 'mesos.native',
+  name = 'mesos.executor',
   requirements = [
     python_requirement(
-      requirement = 'mesos.native==%s' % MESOS_REV,
-      # This native egg  must currently be fetched out-of-band.
-      # See examples/vagrant/provision-dev-cluster.sh which fetches
-      # to third_party/ and uses mesos.native to enable a running
-      # cluster inside the root Vagrant machine.
+      requirement = 'mesos.executor==%s' % MESOS_REV,
+      # This native executor egg must currently be fetched out-of-band.
+      # See build-support/packer/build.sh which fetches to third_party/ and uses mesos.executor to
+      # enable a running cluster inside the root Vagrant machine.
       repository = '%s/third_party' % get_buildroot(),
     )
   ]

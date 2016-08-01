@@ -54,7 +54,7 @@ python_binary(
     ':_executor',
     # TODO(ksweeney): This violates the rule that every library export the same deps as its
     # contained binaries.
-    '3rdparty/python:mesos.native',
+    '3rdparty/python:mesos.executor',
   ]
 )
 
