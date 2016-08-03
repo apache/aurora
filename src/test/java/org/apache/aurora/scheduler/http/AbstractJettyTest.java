@@ -175,6 +175,12 @@ public abstract class AbstractJettyTest extends EasyMockTest {
     return String.format("http://%s:%s%s", httpServer.getHostText(), httpServer.getPort(), path);
   }
 
+  protected WebResource.Builder getPlainRequestBuilder(String path) {
+    assertNotNull("HTTP server must be started first", httpServer);
+    Client client = Client.create(new DefaultClientConfig());
+    return client.resource(makeUrl(path)).getRequestBuilder();
+  }
+
   protected WebResource.Builder getRequestBuilder(String path) {
     assertNotNull("HTTP server must be started first", httpServer);
     ClientConfig config = new DefaultClientConfig();
