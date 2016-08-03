@@ -42,6 +42,11 @@ test_task = SequentialTask(
   resources = Resources(cpu=0.4, ram=34*MB, disk=64*MB, gpu='{{profile.gpu}}'),
   processes = [stage_server, run_server])
 
+no_python_task = Task(
+  name = 'http_example_no_python',
+  resources = Resources(cpu=0.4, ram=32*MB, disk=64*MB),
+  processes = [Process(name='run_server', cmdline='run-server.sh {{thermos.ports[http]}}')])
+
 update_config = UpdateConfig(watch_secs=10, batch_size=3)
 health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)
 
@@ -70,10 +75,11 @@ jobs = [
     container = Container(docker=Docker(image = 'http_example'))
   ).bind(profile=ContainerProfile),
   job(
-    name = 'http_example_appc',
-    container = Mesos(image=AppcImage(name='http_example', image_id='{{appc_image_id}}'))
-  ).bind(profile=ContainerProfile),
-  job(
     name = 'http_example_gpu'
-  ).bind(profile=GpuProfile)
+  ).bind(profile=GpuProfile),
+  job(
+    name = 'http_example_appc',
+    container = Mesos(image=AppcImage(name='http_example_netcat', image_id='{{appc_image_id}}')),
+    task = no_python_task
+  ).bind(profile=DefaultProfile())
 ]

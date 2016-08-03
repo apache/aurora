@@ -256,11 +256,11 @@ test_run() {
   echo >> ~/.ssh/authorized_keys
   cat ${_ssh_key}.pub >> ~/.ssh/authorized_keys
 
-  # Using the sandbox contents as a proxy for functioning SSH.  List sandbox contents, we expect
-  # 3 instances of the same thing - our python script.
-  sandbox_contents=$(aurora task run $_jobkey 'ls' | awk '{print $2}' | sort | uniq -c)
+  # Using the sandbox contents as a proxy for functioning SSH.  List sandbox contents, looking for
+  # the .logs directory. We expect to find 3 instances.
+  sandbox_contents=$(aurora task run $_jobkey 'ls -a' | awk '{print $2}' | grep ".logs" | sort | uniq -c)
   echo "$sandbox_contents"
-  [[ "$sandbox_contents" = "      3 http_example.py" ]]
+  [[ "$sandbox_contents" = "      3 .logs" ]]
 }
 
 test_kill() {
@@ -404,14 +404,15 @@ test_appc() {
   pushd "$TEMP_PATH"
 
   # build the appc image from the docker image
-  docker save -o http_example-latest.tar http_example
-  docker2aci http_example-latest.tar
+  sudo docker build -t http_example_netcat -f "${TEST_ROOT}/Dockerfile.netcat" ${TEST_ROOT}
+  docker save -o http_example_netcat-latest.tar http_example_netcat
+  docker2aci http_example_netcat-latest.tar
 
-  APPC_IMAGE_ID="sha512-$(sha512sum http_example-latest.aci | awk '{print $1}')"
+  APPC_IMAGE_ID="sha512-$(sha512sum http_example_netcat-latest.aci | awk '{print $1}')"
   APPC_IMAGE_DIRECTORY="/tmp/mesos/images/appc/images/$APPC_IMAGE_ID"
 
   sudo mkdir -p "$APPC_IMAGE_DIRECTORY"
-  sudo tar -xf http_example-latest.aci -C "$APPC_IMAGE_DIRECTORY"
+  sudo tar -xf http_example_netcat-latest.aci -C "$APPC_IMAGE_DIRECTORY"
   # This restart is necessary for mesos to pick up the image from the local store.
   sudo restart mesos-slave
 
@@ -480,10 +481,9 @@ test_http_example_basic "${TEST_JOB_REVOCABLE_ARGS[@]}"
 test_http_example_basic "${TEST_JOB_GPU_ARGS[@]}"
 
 # build the test docker image
-sudo docker build -t http_example ${TEST_ROOT}
+sudo docker build -t http_example -f "${TEST_ROOT}/Dockerfile.python" ${TEST_ROOT}
 test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
 
-# This test relies on the docker image having been built above.
 test_appc
 
 test_admin "${TEST_ADMIN_ARGS[@]}"

@@ -25,6 +25,7 @@ python_library(
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
     '3rdparty/python:twitter.common.recordio',
+    'api/src/main/thrift/org/apache/aurora/gen',
     'api/src/main/thrift/org/apache/thermos',
     'src/main/python/apache/thermos/common',
     'src/main/python/apache/thermos/config',

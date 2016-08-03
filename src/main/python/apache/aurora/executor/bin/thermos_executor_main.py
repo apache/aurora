@@ -95,6 +95,14 @@ app.add_option(
     help='Path to ZooKeeper authentication to use for announcer nodes.')
 
 app.add_option(
+    '--mesos-containerizer-path',
+    dest='mesos_containerizer_path',
+    type=str,
+    help='The path to the mesos-containerizer executable that will be used to isolate the task''s '
+         'filesystem when using a filesystem image. Note: this path should match the value of the '
+         'Mesos Agent''s -launcher_dir flag.')
+
+app.add_option(
     '--execute-as-user',
     dest='execute_as_user',
     type=str,
@@ -207,7 +215,8 @@ def initialize(options):
       process_logger_mode=options.runner_logger_mode,
       rotate_log_size_mb=options.runner_rotate_log_size_mb,
       rotate_log_backups=options.runner_rotate_log_backups,
-      preserve_env=options.preserve_env
+      preserve_env=options.preserve_env,
+      mesos_containerizer_path=options.mesos_containerizer_path
     )
     thermos_runner_provider.set_role(None)
 
@@ -225,7 +234,8 @@ def initialize(options):
       process_logger_mode=options.runner_logger_mode,
       rotate_log_size_mb=options.runner_rotate_log_size_mb,
       rotate_log_backups=options.runner_rotate_log_backups,
-      preserve_env=options.preserve_env
+      preserve_env=options.preserve_env,
+      mesos_containerizer_path=options.mesos_containerizer_path
     )
 
     thermos_executor = AuroraExecutor(

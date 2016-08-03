@@ -64,6 +64,8 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.gen.apiConstants.TASK_FILESYSTEM_MOUNT_POINT;
+
 /**
  * A factory to create mesos task objects.
  */
@@ -234,12 +236,17 @@ public interface MesosTaskFactory {
         ContainerInfo.MesosInfo.Builder mesosContainerBuilder =
             ContainerInfo.MesosInfo.newBuilder();
 
-        mesosContainerBuilder.setImage(imageBuilder);
+        Protos.Volume volume = Protos.Volume.newBuilder()
+            .setImage(imageBuilder)
+            .setContainerPath(TASK_FILESYSTEM_MOUNT_POINT)
+            .setMode(Protos.Volume.Mode.RO)
+            .build();
 
         return Optional.of(ContainerInfo.newBuilder()
             .setType(ContainerInfo.Type.MESOS)
             .setMesos(mesosContainerBuilder)
-            .addAllVolumes(executorSettings.getExecutorConfig().getVolumeMounts()));
+            .addAllVolumes(executorSettings.getExecutorConfig().getVolumeMounts())
+            .addVolumes(volume));
       }
 
       return Optional.absent();

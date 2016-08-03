@@ -23,7 +23,7 @@ import time
 import mock
 import pytest
 from twitter.common.contextutil import mutable_sys, temporary_dir
-from twitter.common.dirutil import safe_mkdir
+from twitter.common.dirutil import chmod_plus_x, safe_mkdir
 from twitter.common.quantity import Amount, Data
 from twitter.common.recordio import ThriftRecordReader
 
@@ -98,6 +98,43 @@ def test_simple_process():
 
     assert rc == 0
     assert_log_content(taskpath, 'stdout', 'hello world\n')
+
+
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
+def test_simple_process_filesystem_isolator():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    sandbox = setup_sandbox(td, taskpath)
+
+    test_isolator_path = os.path.join(td, 'fake-mesos-containerier')
+    with open(test_isolator_path, 'w') as fd:
+      # We use a fake version of the mesos-containerizer binary that just echoes out its args so
+      # we can assert on them in the process's output.
+      fd.write('\n'.join([
+        '#!/bin/sh',
+        'echo "$@"'
+      ]))
+
+      fd.close()
+
+      chmod_plus_x(test_isolator_path)
+
+      p = TestProcess(
+          'process',
+          'echo hello world',
+          0,
+          taskpath,
+          sandbox,
+          mesos_containerizer_path=test_isolator_path)
+      p.start()
+
+    rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
+    assert rc == 0
+    assert_log_content(
+        taskpath,
+        'stdout',
+        'launch --unshare_namespace_mnt --rootfs=/some/path/taskfs --user=None '
+        '--command={"shell":true,"value":"echo hello world"}\n')
 
 
 @mock.patch('os.chown')

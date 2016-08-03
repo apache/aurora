@@ -421,7 +421,7 @@ class TaskRunner(object):
                universal_handler=None, planner_class=TaskPlanner, hostname=None,
                process_logger_destination=None, process_logger_mode=None,
                rotate_log_size_mb=None, rotate_log_backups=None,
-               preserve_env=False):
+               preserve_env=False, mesos_containerizer_path=None):
     """
       required:
         task (config.Task) = the task to run
@@ -449,6 +449,8 @@ class TaskRunner(object):
         rotate_log_backups (integer) = The maximum number of rotated stdout/stderr log backups.
         preserve_env (boolean) = whether or not env variables for the runner should be in the
                                  env for the task being run
+        mesos_containerizer_path = the path to the mesos-containerizer executable that will be used
+                                   to isolate the task's filesystem (if using a filesystem image).
     """
     if not issubclass(planner_class, TaskPlanner):
       raise TypeError('planner_class must be a TaskPlanner.')
@@ -511,6 +513,7 @@ class TaskRunner(object):
     self._watcher = ProcessMuxer(self._pathspec)
     self._state = RunnerState(processes={})
     self._preserve_env = preserve_env
+    self._mesos_containerizer_path = mesos_containerizer_path
 
     # create runner state
     universal_handler = universal_handler or TaskRunnerUniversalHandler
@@ -720,7 +723,8 @@ class TaskRunner(object):
       logger_mode=logger_mode,
       rotate_log_size=rotate_log_size,
       rotate_log_backups=rotate_log_backups,
-      preserve_env=self._preserve_env)
+      preserve_env=self._preserve_env,
+      mesos_containerizer_path=self._mesos_containerizer_path)
 
   _DEFAULT_LOGGER = Logger()
   _DEFAULT_ROTATION = RotatePolicy()

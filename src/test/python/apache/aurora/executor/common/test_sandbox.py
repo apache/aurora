@@ -12,7 +12,10 @@
 # limitations under the License.
 #
 
+import grp
 import os
+import pwd
+import subprocess
 
 import mock
 import pytest
@@ -21,6 +24,7 @@ from twitter.common.contextutil import temporary_dir
 from apache.aurora.executor.common.sandbox import (
     DefaultSandboxProvider,
     DirectorySandbox,
+    DockerDirectorySandbox,
     FileSystemImageSandbox
 )
 
@@ -111,16 +115,16 @@ def test_create_ioerror(chown):
 
 
 @mock.patch('os.makedirs')
-def test_filesystem_image_sandbox_create_ioerror(makedirs):
+def test_docker_directory_sandbox_create_ioerror(makedirs):
   makedirs.side_effect = IOError('Disk is borked')
 
   with mock.patch.dict('os.environ', {
-    FileSystemImageSandbox.MESOS_DIRECTORY_ENV_VARIABLE: 'some-directory',
-    FileSystemImageSandbox.MESOS_SANDBOX_ENV_VARIABLE: 'some-sandbox'
+    DockerDirectorySandbox.MESOS_DIRECTORY_ENV_VARIABLE: 'some-directory',
+    DockerDirectorySandbox.MESOS_SANDBOX_ENV_VARIABLE: 'some-sandbox'
   }):
     with temporary_dir() as d:
       real_path = os.path.join(d, 'sandbox')
-      ds = FileSystemImageSandbox(real_path)
+      ds = DockerDirectorySandbox(real_path)
       with pytest.raises(DirectorySandbox.CreationError):
         ds.create()
 
@@ -135,3 +139,52 @@ def test_destroy_ioerror():
       shutil_rmtree.side_effect = IOError('What even are you doing?')
       with pytest.raises(DirectorySandbox.DeletionError):
         ds.destroy()
+
+
+def assert_create_user_and_group(mock_check_call, gid_exists, uid_exists):
+  mock_pwent = pwd.struct_passwd((
+    'someuser',       # login name
+    'hunter2',        # password
+    834,              # uid
+    835,              # gid
+    'Some User',      # user name
+    '/home/someuser', # home directory
+    '/bin/sh'))       # login shell
+
+  mock_grent = grp.struct_group((
+    'users',       # group name
+    '*',           # password
+    835,           # gid
+    ['someuser'])) # members
+
+
+  exception = subprocess.CalledProcessError(
+      returncode=FileSystemImageSandbox._USER_OR_GROUP_ID_EXISTS,
+      cmd='some command',
+      output=None)
+
+  mock_check_call.side_effect = [
+      None if gid_exists else exception,
+      None if uid_exists else exception]
+
+  with temporary_dir() as d:
+    with mock.patch.object(
+            FileSystemImageSandbox,
+            'get_user_and_group',
+            return_value=(mock_pwent, mock_grent)):
+
+      sandbox = FileSystemImageSandbox(os.path.join(d, 'sandbox'), user='someuser')
+      sandbox._create_user_and_group_in_taskfs()
+
+  assert len(mock_check_call.mock_calls) == 2
+
+@mock.patch('subprocess.check_call')
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
+def test_uid_exists(mock_check_call):
+  assert_create_user_and_group(mock_check_call, False, True)
+
+
+@mock.patch('subprocess.check_call')
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
+def test_gid_exists(mock_check_call):
+  assert_create_user_and_group(mock_check_call, True, False)

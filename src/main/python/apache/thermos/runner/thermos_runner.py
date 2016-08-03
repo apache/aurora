@@ -83,6 +83,15 @@ app.add_option(
 
 
 app.add_option(
+    "--mesos_containerizer_path",
+    dest="mesos_containerizer_path",
+    metavar="PATH",
+    default=None,
+    help="The path to the mesos-containerizer executable that will be used to isolate the task's "
+         "filesystem (if using a filesystem image).")
+
+
+app.add_option(
      "--preserve_env",
      dest="preserve_env",
      default=False,
@@ -211,8 +220,8 @@ def proxy_main(args, opts):
       process_logger_mode=opts.process_logger_mode,
       rotate_log_size_mb=opts.rotate_log_size_mb,
       rotate_log_backups=opts.rotate_log_backups,
-      preserve_env=opts.preserve_env
-  )
+      preserve_env=opts.preserve_env,
+      mesos_containerizer_path=opts.mesos_containerizer_path)
 
   for sig in (signal.SIGUSR1, signal.SIGUSR2):
     signal.signal(sig, functools.partial(runner_teardown, task_runner))

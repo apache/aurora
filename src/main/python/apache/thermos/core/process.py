@@ -38,6 +38,7 @@ from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Data, Time
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
+from gen.apache.aurora.api.constants import TASK_FILESYSTEM_MOUNT_POINT
 from gen.apache.thermos.ttypes import ProcessState, ProcessStatus, RunnerCkpt
 
 
@@ -96,7 +97,7 @@ class ProcessBase(object):
 
   def __init__(self, name, cmdline, sequence, pathspec, sandbox_dir, user=None, platform=None,
                logger_destination=LoggerDestination.FILE, logger_mode=LoggerMode.STANDARD,
-               rotate_log_size=None, rotate_log_backups=None):
+               rotate_log_size=None, rotate_log_backups=None, mesos_containerizer_path=None):
     """
       required:
         name        = name of the process
@@ -114,6 +115,8 @@ class ProcessBase(object):
         logger_mode        = The type of logger to use for the process.
         rotate_log_size    = The maximum size of the rotated stdout/stderr logs.
         rotate_log_backups = The maximum number of rotated stdout/stderr log backups.
+        mesos_containerizer_path = The path to the mesos-containerizer binary to be used for task
+                                   filesystem isolation.
     """
     self._name = name
     self._cmdline = cmdline
@@ -134,6 +137,7 @@ class ProcessBase(object):
     self._logger_mode = logger_mode
     self._rotate_log_size = rotate_log_size
     self._rotate_log_backups = rotate_log_backups
+    self._mesos_containerizer_path = mesos_containerizer_path
 
     if not LoggerDestination.is_valid(self._logger_destination):
       raise ValueError("Logger destination %s is invalid." % self._logger_destination)
@@ -182,6 +186,16 @@ class ProcessBase(object):
                                coordinator_pid=self._pid)
 
   def cmdline(self):
+    if self._mesos_containerizer_path is not None:
+      return ('%s launch '
+          '--unshare_namespace_mnt '
+          '--rootfs=%s '
+          '--user=%s '
+          '--command=\'{"shell":true,"value":"%s"}\'' % (
+          self._mesos_containerizer_path,
+          os.path.join(os.environ['MESOS_DIRECTORY'], TASK_FILESYSTEM_MOUNT_POINT),
+          self._user,
+          self._cmdline.replace('"', '\\"')))
     return self._cmdline
 
   def name(self):
@@ -344,6 +358,7 @@ class Process(ProcessBase):
     self._use_chroot = bool(kw.pop('chroot', False))
     self._rc = None
     self._preserve_env = bool(kw.pop('preserve_env', False))
+
     kw['platform'] = RealPlatform(fork=fork)
     ProcessBase.__init__(self, *args, **kw)
     if self._use_chroot and self._sandbox is None:
@@ -377,15 +392,28 @@ class Process(ProcessBase):
     os.setsid()
     if self._use_chroot:
       self._chroot()
-    self._setuid()
+
+    # If the mesos containerizer path is set, then this process will be launched from within an
+    # isolated filesystem image by the mesos-containerizer executable. This executable needs to be
+    # run as root so that it can properly set up the filesystem as such we'll skip calling setuid at
+    # this point. We'll instead setuid after the process has been forked (mesos-containerizer itself
+    # ensures the forked process is run as the correct user).
+    taskfs_isolated = self._mesos_containerizer_path is not None
+    if not taskfs_isolated:
+      self._setuid()
 
     # start process
     start_time = self._platform.clock().time()
 
     if not self._sandbox:
-      sandbox = os.getcwd()
+      cwd = sandbox = os.getcwd()
     else:
-      sandbox = self._sandbox if not self._use_chroot else '/'
+      if self._use_chroot or taskfs_isolated:
+        sandbox = '/'
+        cwd = self._sandbox if taskfs_isolated else sandbox
+      else:
+        cwd = sandbox = self._sandbox
+        homedir = sandbox
 
     thermos_profile = os.path.join(sandbox, self.RCFILE)
 
@@ -395,7 +423,7 @@ class Process(ProcessBase):
       env = {}
 
     env.update({
-      'HOME': homedir if self._use_chroot else sandbox,
+      'HOME': homedir,
       'LOGNAME': username,
       'USER': username,
       'PATH': os.environ['PATH']
@@ -403,35 +431,34 @@ class Process(ProcessBase):
 
     if os.path.exists(thermos_profile):
       env.update(BASH_ENV=thermos_profile)
-
     subprocess_args = {
       'args': ["/bin/bash", "-c", self.cmdline()],
       'close_fds': self.FD_CLOEXEC,
-      'cwd': sandbox,
+      'cwd': cwd,
       'env': env,
       'pathspec': self._pathspec
     }
 
-    log_destination_resolver = LogDestinationResolver(self._pathspec,
-                                                       destination=self._logger_destination,
-                                                       mode=self._logger_mode,
-                                                       rotate_log_size=self._rotate_log_size,
-                                                       rotate_log_backups=self._rotate_log_backups)
+    log_destination_resolver = LogDestinationResolver(
+        self._pathspec,
+        destination=self._logger_destination,
+        mode=self._logger_mode,
+        rotate_log_size=self._rotate_log_size,
+        rotate_log_backups=self._rotate_log_backups)
     stdout, stderr, handlers_are_files = log_destination_resolver.get_handlers()
     if handlers_are_files:
-      executor = SubprocessExecutor(stdout=stdout,
-                                    stderr=stderr,
-                                    **subprocess_args)
+      executor = SubprocessExecutor(stdout=stdout, stderr=stderr, **subprocess_args)
     else:
-      executor = PipedSubprocessExecutor(stdout=stdout,
-                                       stderr=stderr,
-                                       **subprocess_args)
+      executor = PipedSubprocessExecutor(stdout=stdout, stderr=stderr, **subprocess_args)
 
     pid = executor.start()
 
-    self._write_process_update(state=ProcessState.RUNNING,
-                               pid=pid,
-                               start_time=start_time)
+    # Now that we've forked the process, if the task's filesystem is isolated it's now safe to
+    # setuid.
+    if taskfs_isolated:
+      self._setuid()
+
+    self._write_process_update(state=ProcessState.RUNNING, pid=pid, start_time=start_time)
 
     rc = executor.wait()
 
@@ -443,9 +470,7 @@ class Process(ProcessBase):
     else:
       state = ProcessState.FAILED
 
-    self._write_process_update(state=state,
-                               return_code=rc,
-                               stop_time=self._platform.clock().time())
+    self._write_process_update(state=state, return_code=rc, stop_time=self._platform.clock().time())
     self._rc = rc
 
   def finish(self):

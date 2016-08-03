@@ -1201,3 +1201,7 @@ service AuroraAdmin extends AuroraSchedulerManager {
 
 // The name of the header that should be sent to bypass leader redirection in the Scheduler.
 const string BYPASS_LEADER_REDIRECT_HEADER_NAME = 'Bypass-Leader-Redirect'
+
+// The path under which a task's filesystem should be mounted when using images and the Mesos
+// unified containerizer.
+const string TASK_FILESYSTEM_MOUNT_POINT = 'taskfs'
