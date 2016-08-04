@@ -38,6 +38,7 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.UserProvidedStrings;
+import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
@@ -138,16 +139,19 @@ public class ConfigurationManager {
   private final ConfigurationManagerSettings settings;
   private final TierManager tierManager;
   private final ThriftBackfill thriftBackfill;
+  private final ExecutorSettings executorSettings;
 
   @Inject
   public ConfigurationManager(
       ConfigurationManagerSettings settings,
       TierManager tierManager,
-      ThriftBackfill thriftBackfill) {
+      ThriftBackfill thriftBackfill,
+      ExecutorSettings executorSettings) {
 
     this.settings = requireNonNull(settings);
     this.tierManager = requireNonNull(tierManager);
     this.thriftBackfill = requireNonNull(thriftBackfill);
+    this.executorSettings = requireNonNull(executorSettings);
   }
 
   private static String getRole(IValueConstraint constraint) {
@@ -223,6 +227,13 @@ public class ConfigurationManager {
   @VisibleForTesting
   static final String MESOS_FETCHER_DISABLED =
       "Mesos Fetcher for individual jobs is disabled in this cluster.";
+
+  @VisibleForTesting
+  public static final String NO_EXECUTOR_OR_CONTAINER = "Configuration may not be null.";
+
+  @VisibleForTesting
+  static final String INVALID_EXECUTOR_CONFIG = "Executor name may not be left unset.";
+
   /**
    * Check validity of and populates defaults in a task configuration.  This will return a deep copy
    * of the provided task configuration with default configuration values applied, and configuration
@@ -259,7 +270,20 @@ public class ConfigurationManager {
     if (!builder.isSetExecutorConfig()
         && !(builder.isSetContainer() && builder.getContainer().isSetDocker())) {
 
-      throw new TaskDescriptionException("Configuration may not be null");
+      throw new TaskDescriptionException(NO_EXECUTOR_OR_CONTAINER);
+    }
+
+    // Docker containers don't require executors, validate the rest
+    if (builder.isSetExecutorConfig()) {
+
+      if (!builder.getExecutorConfig().isSetName())  {
+        throw new TaskDescriptionException(INVALID_EXECUTOR_CONFIG);
+      }
+
+      executorSettings.getExecutorConfig(builder.getExecutorConfig().getName()).orElseThrow(
+          () -> new TaskDescriptionException("Configuration for executor '"
+              + builder.getExecutorConfig().getName()
+              + "' doesn't exist."));
     }
 
     // Maximize the usefulness of any thrown error message by checking required fields first.

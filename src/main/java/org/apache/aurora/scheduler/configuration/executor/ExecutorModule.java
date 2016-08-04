@@ -23,6 +23,7 @@ import java.util.stream.Stream;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 
@@ -35,6 +36,7 @@ import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.gen.Volume;
+import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
@@ -133,7 +135,7 @@ public class ExecutorModule extends AbstractModule {
         .build();
   }
 
-  private static ExecutorSettings makeThermosExecutorSettings()  {
+  private static ExecutorConfig makeThermosExecutorConfig()  {
     List<Protos.Volume> volumeMounts =
         ImmutableList.<Protos.Volume>builder()
             .addAll(Iterables.transform(
@@ -145,34 +147,41 @@ public class ExecutorModule extends AbstractModule {
                     .build()))
             .build();
 
-    return new ExecutorSettings(
-        new ExecutorConfig(
-            ExecutorInfo.newBuilder()
-                .setName("aurora.task")
-                // Necessary as executorId is a required field.
-                .setExecutorId(Executors.PLACEHOLDER_EXECUTOR_ID)
-                .setCommand(
-                    makeExecutorCommand(
-                        THERMOS_EXECUTOR_PATH.get(),
-                        THERMOS_EXECUTOR_RESOURCES.get(),
-                        THERMOS_HOME_IN_SANDBOX.get(),
-                        THERMOS_EXECUTOR_FLAGS.get()))
-                .addResources(makeResource(CPUS, EXECUTOR_OVERHEAD_CPUS.get()))
-                .addResources(makeResource(RAM_MB, EXECUTOR_OVERHEAD_RAM.get().as(Data.MB)))
-                .build(),
-            volumeMounts),
-        POPULATE_DISCOVERY_INFO.get());
+    return new ExecutorConfig(
+        ExecutorInfo.newBuilder()
+            .setName(apiConstants.AURORA_EXECUTOR_NAME)
+            // Necessary as executorId is a required field.
+            .setExecutorId(Executors.PLACEHOLDER_EXECUTOR_ID)
+            .setCommand(
+                makeExecutorCommand(
+                    THERMOS_EXECUTOR_PATH.get(),
+                    THERMOS_EXECUTOR_RESOURCES.get(),
+                    THERMOS_HOME_IN_SANDBOX.get(),
+                    THERMOS_EXECUTOR_FLAGS.get()))
+            .addResources(makeResource(CPUS, EXECUTOR_OVERHEAD_CPUS.get()))
+            .addResources(makeResource(RAM_MB, EXECUTOR_OVERHEAD_RAM.get().as(Data.MB)))
+            .build(),
+        volumeMounts,
+        "thermos-");
   }
 
-  private static ExecutorSettings makeCustomExecutorSettings() {
+  private static ExecutorSettings makeExecutorSettings() {
     try {
-      return
-          new ExecutorSettings(
-              ExecutorSettingsLoader.read(
-                  Files.newBufferedReader(
-                      CUSTOM_EXECUTOR_CONFIG.get().toPath(),
-                      StandardCharsets.UTF_8)),
-              POPULATE_DISCOVERY_INFO.get());
+
+      ImmutableMap.Builder<String, ExecutorConfig> configsBuilder = ImmutableMap.builder();
+
+      configsBuilder.put(apiConstants.AURORA_EXECUTOR_NAME, makeThermosExecutorConfig());
+
+      if (CUSTOM_EXECUTOR_CONFIG.hasAppliedValue()) {
+        configsBuilder.putAll(
+            ExecutorSettingsLoader.read(
+                Files.newBufferedReader(
+                    CUSTOM_EXECUTOR_CONFIG.get().toPath(),
+                    StandardCharsets.UTF_8)));
+      }
+
+      return new ExecutorSettings(configsBuilder.build(), POPULATE_DISCOVERY_INFO.get());
+
     } catch (ExecutorSettingsLoader.ExecutorConfigException | IOException e) {
       throw new IllegalArgumentException("Failed to read executor settings: " + e, e);
     }
@@ -180,9 +189,7 @@ public class ExecutorModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(ExecutorSettings.class).toInstance(CUSTOM_EXECUTOR_CONFIG.hasAppliedValue()
-        ? makeCustomExecutorSettings()
-        : makeThermosExecutorSettings());
+    bind(ExecutorSettings.class).toInstance(makeExecutorSettings());
   }
 
   private static Resource makeResource(ResourceType type, double value) {

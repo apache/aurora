@@ -36,6 +36,7 @@ import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.preemptor.Preemptor;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -140,12 +141,19 @@ public interface TaskScheduler extends EventSubscriber {
         ITaskConfig task = assignedTask.getTask();
         AttributeAggregate aggregate = AttributeAggregate.getJobActiveState(store, task.getJob());
 
+        // Valid Docker tasks can have a container but no executor config
+        ResourceBag overhead = ResourceBag.EMPTY;
+        if (task.isSetExecutorConfig()) {
+          overhead = executorSettings.getExecutorOverhead(task.getExecutorConfig().getName())
+              .orElseThrow(
+                  () -> new IllegalArgumentException("Cannot find executor configuration"));
+        }
+
         boolean launched = assigner.maybeAssign(
             store,
             new ResourceRequest(
                 task,
-                bagFromResources(task.getResources()).add(executorSettings.getExecutorOverhead()),
-                aggregate),
+                bagFromResources(task.getResources()).add(overhead), aggregate),
             TaskGroupKey.from(task),
             taskId,
             reservations.asMap());

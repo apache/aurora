@@ -27,7 +27,6 @@ import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.Container._Fields;
 import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.DockerParameter;
-import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.MesosFetcherURI;
@@ -39,15 +38,21 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.TierManager.TierManagerImpl.TierConfig;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
+import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
+import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
+import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.Protos.ExecutorInfo;
 
 /**
  * Convenience methods for working with tasks.
@@ -81,8 +86,23 @@ public final class TaskTestUtil {
           true,
           true,
           true);
+  public static final ExecutorID EXECUTOR_ID = ExecutorID.newBuilder()
+      .setValue("PLACEHOLDER")
+      .build();
+  public static final ExecutorInfo EXECUTOR_INFO = ExecutorInfo.newBuilder()
+      .setExecutorId(EXECUTOR_ID)
+      .setName(apiConstants.AURORA_EXECUTOR_NAME)
+      .setCommand(Protos.CommandInfo.newBuilder().build()).build();
+  public static final ExecutorSettings EXECUTOR_SETTINGS = new ExecutorSettings(
+      ImmutableMap.<String, ExecutorConfig>builder()
+          .put(EXECUTOR_INFO.getName(), new ExecutorConfig(EXECUTOR_INFO, ImmutableList.of(), ""))
+          .build(),
+      false);
   public static final ConfigurationManager CONFIGURATION_MANAGER =
-      new ConfigurationManager(CONFIGURATION_MANAGER_SETTINGS, TIER_MANAGER, THRIFT_BACKFILL);
+      new ConfigurationManager(CONFIGURATION_MANAGER_SETTINGS,
+          TIER_MANAGER,
+          THRIFT_BACKFILL,
+          EXECUTOR_SETTINGS);
 
   private TaskTestUtil() {
     // Utility class.
@@ -115,7 +135,9 @@ public final class TaskTestUtil {
         .setMesosFetcherUris(ImmutableSet.of(
             new MesosFetcherURI("pathA").setExtract(true).setCache(true),
             new MesosFetcherURI("pathB").setExtract(true).setCache(true)))
-        .setExecutorConfig(new ExecutorConfig("name", "config"))
+        .setExecutorConfig(new org.apache.aurora.gen.ExecutorConfig(
+            EXECUTOR_INFO.getName(),
+            "config"))
         .setContainer(Container.docker(
             new DockerContainer("imagename")
                 .setParameters(ImmutableList.of(

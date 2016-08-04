@@ -70,10 +70,12 @@ import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronException;
@@ -166,6 +168,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final String AUDIT_MESSAGE = "message";
   private static final AuditData AUDIT = new AuditData(USER, Optional.of(AUDIT_MESSAGE));
   private static final Thresholds THRESHOLDS = new Thresholds(1000, 2000);
+  private static final String EXECUTOR_NAME = apiConstants.AURORA_EXECUTOR_NAME;
 
   private StorageTestUtil storageUtil;
   private LockManager lockManager;
@@ -413,7 +416,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testCreateJobFailsNoExecutorConfig() throws Exception {
+  public void testCreateJobFailsNoExecutorOrContainerConfig() throws Exception {
     JobConfiguration job = makeJob();
     job.getTaskConfig().unsetExecutorConfig();
 
@@ -421,8 +424,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Response response = thrift.createJob(job);
     assertResponse(INVALID_REQUEST, response);
-    // TODO(wfarner): Don't rely on a magic string here, reference a constant from the source.
-    assertMessageMatches(response, "Configuration may not be null");
+    assertMessageMatches(response, ConfigurationManager.NO_EXECUTOR_OR_CONTAINER);
   }
 
   @Test
@@ -484,7 +486,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testCreateJobPopulateDefaults() throws Exception {
     TaskConfig task = new TaskConfig()
         .setContactEmail("testing@twitter.com")
-        .setExecutorConfig(new ExecutorConfig("aurora", "config"))  // Arbitrary opaque data.
+        .setExecutorConfig(
+            new ExecutorConfig(EXECUTOR_NAME, "config")) // Arbitrary opaque data.
         .setNumCpus(1.0)
         .setRamMb(1024)
         .setDiskMb(1024)
@@ -567,7 +570,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setInstanceId(instanceId)
             .setTask(populatedTask()
                 .setIsService(true)
-                .setExecutorConfig(new ExecutorConfig().setData(executorData)))));
+                .setExecutorConfig(new ExecutorConfig().setName(EXECUTOR_NAME)
+                    .setData(executorData)))));
   }
 
   private IScheduledTask buildScheduledTask() {
@@ -1040,7 +1044,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteShardCasMismatch() throws Exception {
     TaskConfig storedConfig = productionTask();
     TaskConfig modifiedConfig =
-        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
+        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten"));
     IScheduledTask storedTask = IScheduledTask.build(
         new ScheduledTask().setAssignedTask(new AssignedTask().setTask(storedConfig)));
     InstanceKey instance = new InstanceKey(storedConfig.getJob(), 0);
@@ -1060,7 +1064,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteInstance() throws Exception {
     TaskConfig storedConfig = productionTask();
     ITaskConfig modifiedConfig = ITaskConfig.build(
-        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten")));
+        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten")));
     String taskId = "task_id";
     IScheduledTask storedTask = IScheduledTask.build(new ScheduledTask().setAssignedTask(
         new AssignedTask()
@@ -1109,7 +1113,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteJobCasMismatch() throws Exception {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
+    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten"));
     expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
         .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
 
@@ -1125,7 +1129,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteJobNotFound() throws Exception {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
+    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten"));
     expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
         .andReturn(Optional.absent());
 
@@ -1141,7 +1145,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteJob() throws Exception {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
+    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten"));
     expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
         .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
     storageUtil.jobStore.saveAcceptedJob(validateAndPopulate(IJobConfiguration.build(newJob)));

@@ -28,12 +28,14 @@ import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.TierManager;
@@ -639,7 +641,8 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
             .setJob(new JobKey(role, env, job))
             .setPriority(priority)
             .setProduction(production)
-            .setConstraints(Sets.newHashSet()));
+            .setConstraints(Sets.newHashSet())
+            .setExecutorConfig(new ExecutorConfig(apiConstants.AURORA_EXECUTOR_NAME, "config")));
     return new ScheduledTask().setAssignedTask(assignedTask);
   }
 

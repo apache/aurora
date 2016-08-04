@@ -43,6 +43,7 @@ import org.apache.aurora.gen.ResponseDetail;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
@@ -102,7 +103,7 @@ final class Fixtures {
         .setJob(JOB_KEY.newBuilder())
         .setOwner(IDENTITY)
         .setContactEmail("testing@twitter.com")
-        .setExecutorConfig(new ExecutorConfig("aurora", "data"))
+        .setExecutorConfig(new ExecutorConfig(apiConstants.AURORA_EXECUTOR_NAME, "data"))
         .setNumCpus(1)
         .setRamMb(1024)
         .setDiskMb(1024)

@@ -13,7 +13,9 @@
  */
 package org.apache.aurora.scheduler.configuration.executor;
 
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceManager;
@@ -24,26 +26,32 @@ import static java.util.Objects.requireNonNull;
  * Configuration for the executor to run, and resource overhead required for it.
  */
 public class ExecutorSettings {
-  private final ExecutorConfig config;
+  private final Map<String, ExecutorConfig> config;
   private final boolean populateDiscoveryInfo;
 
-  public ExecutorSettings(ExecutorConfig config, boolean populateDiscoveryInfo) {
+  public ExecutorSettings(
+      Map<String, ExecutorConfig> config,
+      boolean populateDiscoveryInfo) {
+
     this.config = requireNonNull(config);
     this.populateDiscoveryInfo = populateDiscoveryInfo;
   }
 
-  public ExecutorConfig getExecutorConfig() {
-    // TODO(wfarner): Replace this with a generic name-based accessor once tasks can specify the
-    // executor they wish to use.
-    return config;
+  public Optional<ExecutorConfig> getExecutorConfig(String name) {
+    return Optional.ofNullable(config.get(name));
   }
 
   public boolean shouldPopulateDiscoverInfo() {
     return populateDiscoveryInfo;
   }
 
-  public ResourceBag getExecutorOverhead() {
-    return ResourceManager.bagFromMesosResources(config.getExecutor().getResourcesList());
+  public Optional<ResourceBag> getExecutorOverhead(String name) {
+    if (config.containsKey(name)) {
+      return Optional.of(
+          ResourceManager.bagFromMesosResources(config.get(name).getExecutor().getResourcesList()));
+    } else {
+      return Optional.empty();
+    }
   }
 
   @Override

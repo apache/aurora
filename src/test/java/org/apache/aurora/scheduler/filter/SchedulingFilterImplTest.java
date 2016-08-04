@@ -31,6 +31,7 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
@@ -622,7 +623,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .setRamMb(ramMb)
         .setDiskMb(diskMb)
         .setResources(ImmutableSet.of(numCpus(cpus), ramMb(ramMb), diskMb(diskMb)))
-        .setExecutorConfig(new ExecutorConfig("aurora", "config")));
+        .setExecutorConfig(new ExecutorConfig(apiConstants.AURORA_EXECUTOR_NAME, "config")));
   }
 
   private ITaskConfig makeTask(int cpus, long ramMb, long diskMb) {
@@ -635,6 +636,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   private ResourceBag bag(ITaskConfig task) {
     return ResourceManager.bagFromResources(task.getResources())
-        .add(TaskExecutors.NO_OVERHEAD_EXECUTOR.getExecutorOverhead());
+        .add(TaskExecutors.NO_OVERHEAD_EXECUTOR.getExecutorOverhead(
+            task.getExecutorConfig().getName()).get());
   }
 }

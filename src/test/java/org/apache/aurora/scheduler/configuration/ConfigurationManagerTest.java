@@ -33,10 +33,12 @@ import org.apache.aurora.gen.MesosFetcherURI;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.storage.entities.IDockerParameter;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Rule;
@@ -78,7 +80,7 @@ public class ConfigurationManagerTest {
               .setJob(JOB_KEY)
               .setIsService(false)
               .setTaskLinks(ImmutableMap.of())
-              .setExecutorConfig(new ExecutorConfig("aurora", "config"))
+              .setExecutorConfig(new ExecutorConfig(apiConstants.AURORA_EXECUTOR_NAME, "config"))
               .setRequestedPorts(ImmutableSet.of())
               .setPriority(0)
               .setOwner(null)
@@ -122,7 +124,8 @@ public class ConfigurationManagerTest {
           false,
           false),
       TaskTestUtil.TIER_MANAGER,
-      TaskTestUtil.THRIFT_BACKFILL);
+      TaskTestUtil.THRIFT_BACKFILL,
+      TestExecutorSettings.THERMOS_EXECUTOR);
   private static final ConfigurationManager DOCKER_CONFIGURATION_MANAGER = new ConfigurationManager(
       new ConfigurationManagerSettings(
           ALL_CONTAINER_TYPES,
@@ -132,7 +135,8 @@ public class ConfigurationManagerTest {
           true,
           true),
       TaskTestUtil.TIER_MANAGER,
-      TaskTestUtil.THRIFT_BACKFILL);
+      TaskTestUtil.THRIFT_BACKFILL,
+      TestExecutorSettings.THERMOS_EXECUTOR);
 
   @Test
   public void testIsGoodIdentifier() {
@@ -294,7 +298,8 @@ public class ConfigurationManagerTest {
             false,
             false),
         TaskTestUtil.TIER_MANAGER,
-        TaskTestUtil.THRIFT_BACKFILL).validateAndPopulate(ITaskConfig.build(builder));
+        TaskTestUtil.THRIFT_BACKFILL,
+        TestExecutorSettings.THERMOS_EXECUTOR).validateAndPopulate(ITaskConfig.build(builder));
   }
 
   @Test
@@ -315,7 +320,8 @@ public class ConfigurationManagerTest {
                     false,
                     false),
             TaskTestUtil.TIER_MANAGER,
-            TaskTestUtil.THRIFT_BACKFILL).validateAndPopulate(ITaskConfig.build(builder));
+            TaskTestUtil.THRIFT_BACKFILL,
+            TestExecutorSettings.THERMOS_EXECUTOR).validateAndPopulate(ITaskConfig.build(builder));
   }
 
   @Test

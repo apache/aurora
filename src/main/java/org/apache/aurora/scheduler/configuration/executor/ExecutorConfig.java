@@ -30,10 +30,15 @@ public class ExecutorConfig {
 
   private final ExecutorInfo executor;
   private final List<Volume> volumeMounts;
+  private final String taskPrefix;
 
-  public ExecutorConfig(ExecutorInfo executor, List<Volume> volumeMounts) {
+  public ExecutorConfig(
+      ExecutorInfo executor,
+      List<Volume> volumeMounts,
+      String taskPrefix) {
     this.executor = requireNonNull(executor);
     this.volumeMounts = requireNonNull(volumeMounts);
+    this.taskPrefix = requireNonNull(taskPrefix);
   }
 
   public ExecutorInfo getExecutor() {
@@ -44,6 +49,10 @@ public class ExecutorConfig {
     return volumeMounts;
   }
 
+  public String getTaskPrefix() {
+    return taskPrefix;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (!(obj instanceof ExecutorConfig)) {
@@ -52,12 +61,13 @@ public class ExecutorConfig {
 
     ExecutorConfig other = (ExecutorConfig) obj;
     return Objects.equals(executor, other.executor)
-        && Objects.equals(volumeMounts, other.volumeMounts);
+        && Objects.equals(volumeMounts, other.volumeMounts)
+        && Objects.equals(taskPrefix, other.taskPrefix);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(executor, volumeMounts);
+    return Objects.hash(executor, volumeMounts, taskPrefix);
   }
 
   @Override
@@ -65,6 +75,7 @@ public class ExecutorConfig {
     return MoreObjects.toStringHelper(this)
         .add("executor", executor)
         .add("volumeMounts", volumeMounts)
+        .add("taskPrefix", taskPrefix)
         .toString();
   }
 }

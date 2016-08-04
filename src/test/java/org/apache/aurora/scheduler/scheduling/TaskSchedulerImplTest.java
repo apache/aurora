@@ -128,7 +128,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private ResourceBag bag(IScheduledTask task) {
     return ResourceManager.bagFromResources(task.getAssignedTask().getTask().getResources())
-        .add(THERMOS_EXECUTOR.getExecutorOverhead());
+        .add(THERMOS_EXECUTOR.getExecutorOverhead(task.getAssignedTask()
+            .getTask()
+            .getExecutorConfig()
+            .getName()).get());
   }
 
   private IExpectationSetters<Boolean> expectAssigned(

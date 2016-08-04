@@ -106,14 +106,16 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
                       ImmutableList.of(new DockerParameter("label", "testparameter")))))));
 
   private static final ExecutorSettings EXECUTOR_SETTINGS_WITH_VOLUMES = new ExecutorSettings(
-      new ExecutorConfig(
-          TestExecutorSettings.THERMOS_EXECUTOR_INFO,
-          ImmutableList.of(
-              Volume.newBuilder()
-                  .setHostPath("/host")
-                  .setContainerPath("/container")
-                  .setMode(Mode.RO)
-                  .build())),
+      ImmutableMap.<String, ExecutorConfig>builder().
+          put(TestExecutorSettings.THERMOS_EXECUTOR_INFO.getName(),
+              new ExecutorConfig(
+                  TestExecutorSettings.THERMOS_EXECUTOR_INFO,
+                  ImmutableList.of(
+                      Volume.newBuilder()
+                          .setHostPath("/host")
+                          .setContainerPath("/container")
+                          .setMode(Mode.RO).build()),
+                  TestExecutorSettings.THERMOS_TASK_PREFIX)).build(),
       false /* populate discovery info */);
 
   private static final SlaveID SLAVE = SlaveID.newBuilder().setValue("slave-id").build();
@@ -123,13 +125,15 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
       .setSlaveId(SLAVE)
       .setHostname("slave-hostname")
       .addAllResources(mesosScalarFromBag(bagFromResources(
-              TASK_CONFIG.getResources()).add(THERMOS_EXECUTOR.getExecutorOverhead())))
+              TASK_CONFIG.getResources()).add(THERMOS_EXECUTOR.getExecutorOverhead(
+                  TASK_CONFIG.getExecutorConfig().getName()).get())))
       .addResources(mesosRange(PORTS, 80))
       .build();
   private static final Offer OFFER_SOME_OVERHEAD_EXECUTOR = OFFER_THERMOS_EXECUTOR.toBuilder()
       .clearResources()
       .addAllResources(mesosScalarFromBag(bagFromResources(
-          TASK_CONFIG.getResources()).add(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead())))
+          TASK_CONFIG.getResources()).add(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead(
+              TASK_CONFIG.getExecutorConfig().getName()).get())))
       .addResources(mesosRange(PORTS, 80))
       .build();
 
@@ -152,7 +156,9 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
   private static ExecutorInfo populateDynamicFields(ExecutorInfo executor, IAssignedTask task) {
     return executor.toBuilder()
         .clearResources()
-        .setExecutorId(MesosTaskFactoryImpl.getExecutorId(task.getTaskId()))
+        .setExecutorId(MesosTaskFactoryImpl.getExecutorId(
+            task.getTaskId(),
+            THERMOS_EXECUTOR.getExecutorConfig(executor.getName()).get().getTaskPrefix()))
         .setLabels(
             Protos.Labels.newBuilder().addLabels(
                 Protos.Label.newBuilder()
@@ -264,7 +270,11 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     TaskInfo task = taskFactory.createFrom(TASK, OFFER_THERMOS_EXECUTOR);
     assertEquals(
         purgeZeroResources(populateDynamicFields(
-            NO_OVERHEAD_EXECUTOR.getExecutorConfig().getExecutor(), TASK)),
+            NO_OVERHEAD_EXECUTOR.getExecutorConfig(TASK.getTask()
+                .getExecutorConfig()
+                .getName()).get()
+                .getExecutor(),
+            TASK)),
         makeComparable(task.getExecutor()));
 
     // Simulate the upsizing needed for the task to meet the minimum thermos requirements.
@@ -279,7 +289,8 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         bagFromMesosResources(taskInfo.getExecutor().getResourcesList());
 
     assertEquals(
-        bagFromResources(task.getResources()).add(config.getExecutorOverhead()),
+        bagFromResources(task.getResources()).add(
+            config.getExecutorOverhead(task.getExecutorConfig().getName()).get()),
         taskResources.add(executorResources));
   }
 
@@ -350,7 +361,8 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
     TaskInfo taskInfo = taskFactory.createFrom(TASK_WITH_DOCKER, OFFER_THERMOS_EXECUTOR);
     assertEquals(
-        config.getExecutorConfig().getVolumeMounts(),
+        config.getExecutorConfig(TASK_WITH_DOCKER.getTask().getExecutorConfig().getName()).get()
+            .getVolumeMounts(),
         taskInfo.getExecutor().getContainer().getVolumesList());
   }
 
@@ -397,7 +409,10 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   @Test
   public void testPopulateDiscoveryInfoNoPort() {
-    config = new ExecutorSettings(THERMOS_CONFIG, true /* populate discovery info */);
+    config = new ExecutorSettings(
+        ImmutableMap.<String, ExecutorConfig>builder().put(THERMOS_CONFIG.getExecutor().getName(),
+            THERMOS_CONFIG).build(),
+        true /* populate discovery info */);
     AssignedTask builder = TASK.newBuilder();
     builder.unsetAssignedPorts();
     builder.setTask(
@@ -415,7 +430,10 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
   @Test
   public void testPopulateDiscoveryInfo() {
-    config = new ExecutorSettings(THERMOS_CONFIG, true /* populate discovery info */);
+    config = new ExecutorSettings(
+        ImmutableMap.<String, ExecutorConfig>builder().put(THERMOS_CONFIG.getExecutor().getName(),
+            THERMOS_CONFIG).build(),
+        true /* populate discovery info */);
     expect(tierManager.getTier(TASK_CONFIG)).andReturn(DEV_TIER);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
 
@@ -443,13 +461,13 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         EXECUTOR_SETTINGS_WITH_VOLUMES,
         tierManager,
         SERVER_INFO);
-
     TaskInfo task = taskFactory.createFrom(taskWithDockerImage, OFFER_THERMOS_EXECUTOR);
     assertEquals(
         ContainerInfo.newBuilder()
             .setType(Type.MESOS)
             .setMesos(MesosInfo.newBuilder())
-            .addAllVolumes(EXECUTOR_SETTINGS_WITH_VOLUMES.getExecutorConfig().getVolumeMounts())
+            .addAllVolumes(EXECUTOR_SETTINGS_WITH_VOLUMES.getExecutorConfig(
+                TASK.getTask().getExecutorConfig().getName()).get().getVolumeMounts())
             .addVolumes(Volume.newBuilder()
                 .setContainerPath(TASK_FILESYSTEM_MOUNT_POINT)
                 .setImage(Protos.Image.newBuilder()
@@ -485,7 +503,8 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
         ContainerInfo.newBuilder()
             .setType(Type.MESOS)
             .setMesos(MesosInfo.newBuilder())
-            .addAllVolumes(EXECUTOR_SETTINGS_WITH_VOLUMES.getExecutorConfig().getVolumeMounts())
+            .addAllVolumes(EXECUTOR_SETTINGS_WITH_VOLUMES.getExecutorConfig(
+                TASK.getTask().getExecutorConfig().getName()).get().getVolumeMounts())
             .addVolumes(Volume.newBuilder()
                 .setContainerPath(TASK_FILESYSTEM_MOUNT_POINT)
                 .setImage(Protos.Image.newBuilder()

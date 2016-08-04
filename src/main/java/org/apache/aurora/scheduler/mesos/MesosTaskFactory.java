@@ -22,6 +22,7 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
@@ -35,6 +36,7 @@ import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.resources.AcceptedOffer;
+import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.storage.entities.IAppcImage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
@@ -84,7 +86,6 @@ public interface MesosTaskFactory {
   // TODO(wfarner): Move this class to its own file to reduce visibility to package private.
   class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = LoggerFactory.getLogger(MesosTaskFactoryImpl.class);
-    private static final String EXECUTOR_PREFIX = "thermos-";
 
     @VisibleForTesting
     static final String METADATA_LABEL_PREFIX = "org.apache.aurora.metadata.";
@@ -111,8 +112,8 @@ public interface MesosTaskFactory {
     }
 
     @VisibleForTesting
-    static ExecutorID getExecutorId(String taskId) {
-      return ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + taskId).build();
+    static ExecutorID getExecutorId(String taskId, String taskPrefix) {
+      return ExecutorID.newBuilder().setValue(taskPrefix + taskId).build();
     }
 
     private static String getJobSourceName(IJobKey jobkey) {
@@ -121,6 +122,10 @@ public interface MesosTaskFactory {
 
     private static String getJobSourceName(ITaskConfig task) {
       return getJobSourceName(task.getJob());
+    }
+
+    private static String getExecutorName(IAssignedTask task) {
+      return task.getTask().getExecutorConfig().getName();
     }
 
     @VisibleForTesting
@@ -148,13 +153,21 @@ public interface MesosTaskFactory {
       requireNonNull(offer);
 
       ITaskConfig config = task.getTask();
+
+      // Docker-based tasks don't need executors
+      ResourceBag executorOverhead = ResourceBag.EMPTY;
+      if (config.isSetExecutorConfig()) {
+        executorOverhead =
+            executorSettings.getExecutorOverhead(getExecutorName(task)).orElse(ResourceBag.EMPTY);
+      }
+
       AcceptedOffer acceptedOffer;
       // TODO(wfarner): Re-evaluate if/why we need to continue handling unset assignedPorts field.
       try {
         acceptedOffer = AcceptedOffer.create(
             offer,
             task,
-            executorSettings.getExecutorOverhead(),
+            executorOverhead,
             tierManager.getTier(task.getTask()));
       } catch (ResourceManager.InsufficientResourcesException e) {
         throw new SchedulerException(e);
@@ -181,7 +194,8 @@ public interface MesosTaskFactory {
         ExecutorInfo.Builder executorInfoBuilder = configureTaskForExecutor(task, acceptedOffer);
 
         Optional<ContainerInfo.Builder> containerInfoBuilder = configureTaskForImage(
-            task.getTask().getContainer().getMesos());
+            task.getTask().getContainer().getMesos(),
+            getExecutorName(task));
         if (containerInfoBuilder.isPresent()) {
           executorInfoBuilder.setContainer(containerInfoBuilder.get());
         }
@@ -191,11 +205,13 @@ public interface MesosTaskFactory {
         IDockerContainer dockerContainer = config.getContainer().getDocker();
         if (config.isSetExecutorConfig()) {
           ExecutorInfo.Builder execBuilder = configureTaskForExecutor(task, acceptedOffer)
-              .setContainer(getDockerContainerInfo(dockerContainer));
+              .setContainer(getDockerContainerInfo(
+                  dockerContainer,
+                  Optional.of(getExecutorName(task))));
           taskBuilder.setExecutor(execBuilder.build());
         } else {
           LOG.warn("Running Docker-based task without an executor.");
-          taskBuilder.setContainer(getDockerContainerInfo(dockerContainer))
+          taskBuilder.setContainer(getDockerContainerInfo(dockerContainer, Optional.absent()))
               .setCommand(CommandInfo.newBuilder().setShell(false));
         }
       } else {
@@ -205,10 +221,13 @@ public interface MesosTaskFactory {
       if (taskBuilder.hasExecutor()) {
         taskBuilder.setData(ByteString.copyFrom(serializeTask(task)));
       }
+
       return taskBuilder.build();
     }
 
-    private Optional<ContainerInfo.Builder> configureTaskForImage(IMesosContainer mesosContainer) {
+    private Optional<ContainerInfo.Builder> configureTaskForImage(
+        IMesosContainer mesosContainer,
+        String executorName) {
       requireNonNull(mesosContainer);
 
       if (mesosContainer.isSetImage()) {
@@ -245,14 +264,17 @@ public interface MesosTaskFactory {
         return Optional.of(ContainerInfo.newBuilder()
             .setType(ContainerInfo.Type.MESOS)
             .setMesos(mesosContainerBuilder)
-            .addAllVolumes(executorSettings.getExecutorConfig().getVolumeMounts())
+            .addAllVolumes(executorSettings.getExecutorConfig(executorName).get().getVolumeMounts())
             .addVolumes(volume));
       }
 
       return Optional.absent();
     }
 
-    private ContainerInfo getDockerContainerInfo(IDockerContainer config) {
+    private ContainerInfo getDockerContainerInfo(
+        IDockerContainer config,
+        Optional<String> executorName) {
+
       Iterable<Protos.Parameter> parameters = Iterables.transform(config.getParameters(),
           item -> Protos.Parameter.newBuilder().setKey(item.getName())
             .setValue(item.getValue()).build());
@@ -262,7 +284,10 @@ public interface MesosTaskFactory {
       return ContainerInfo.newBuilder()
           .setType(ContainerInfo.Type.DOCKER)
           .setDocker(dockerBuilder.build())
-          .addAllVolumes(executorSettings.getExecutorConfig().getVolumeMounts())
+          .addAllVolumes(
+              executorName.isPresent()
+                  ? executorSettings.getExecutorConfig(executorName.get()).get().getVolumeMounts()
+                  : ImmutableList.of())
           .build();
     }
 
@@ -270,8 +295,13 @@ public interface MesosTaskFactory {
         IAssignedTask task,
         AcceptedOffer acceptedOffer) {
 
-      ExecutorInfo.Builder builder = executorSettings.getExecutorConfig().getExecutor().toBuilder()
-          .setExecutorId(getExecutorId(task.getTaskId()))
+      ExecutorInfo.Builder builder =
+          executorSettings.getExecutorConfig(getExecutorName(task)).get()
+          .getExecutor()
+          .toBuilder()
+          .setExecutorId(getExecutorId(
+              task.getTaskId(),
+              executorSettings.getExecutorConfig(getExecutorName(task)).get().getTaskPrefix()))
           .setLabels(
               Labels.newBuilder().addLabels(
                   Label.newBuilder()
@@ -325,5 +355,6 @@ public interface MesosTaskFactory {
         );
       }
     }
+
   }
 }

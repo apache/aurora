@@ -15,9 +15,11 @@ package org.apache.aurora;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Collector;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Service;
@@ -76,6 +78,20 @@ public final class GuavaUtils {
         ImmutableList.Builder::add,
         (l, r) -> l.addAll(r.build()),
         ImmutableList.Builder::build);
+  }
+
+  /**
+   * Collector to create a Guava ImmutableMap.
+   */
+  public static <T, K, V> Collector<T, ?, ImmutableMap<K, V>> toImmutableMap(
+      Function<? super T, ? extends K> keyMapper,
+      Function<? super T, ? extends V> valueMapper) {
+    return Collector.of(
+        ImmutableMap.Builder<K, V>::new,
+        (r, t) -> r.put(keyMapper.apply(t), valueMapper.apply(t)),
+        (l, r) -> l.putAll(r.build()),
+        ImmutableMap.Builder::build,
+        UNORDERED);
   }
 
   /**

@@ -14,7 +14,9 @@
 package org.apache.aurora.scheduler.mesos;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
+import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.configuration.executor.Executors;
@@ -35,7 +37,7 @@ public final class TestExecutorSettings {
   }
 
   public static final ExecutorInfo THERMOS_EXECUTOR_INFO = ExecutorInfo.newBuilder()
-      .setName("thermos")
+      .setName(apiConstants.AURORA_EXECUTOR_NAME)
       .setExecutorId(Executors.PLACEHOLDER_EXECUTOR_ID)
       .setCommand(CommandInfo.newBuilder().setValue("thermos_executor.pex")
           .addAllArguments(ImmutableList.of(
@@ -61,19 +63,30 @@ public final class TestExecutorSettings {
       ))
       .build();
 
+  public static final String THERMOS_TASK_PREFIX = "thermos-";
+
   public static final ExecutorConfig THERMOS_CONFIG =
-      new ExecutorConfig(THERMOS_EXECUTOR_INFO, ImmutableList.of());
+      new ExecutorConfig(THERMOS_EXECUTOR_INFO, ImmutableList.of(), THERMOS_TASK_PREFIX);
 
   public static final ExecutorSettings THERMOS_EXECUTOR = new ExecutorSettings(
-      THERMOS_CONFIG,
+      ImmutableMap.<String, ExecutorConfig>builder()
+          .put(apiConstants.AURORA_EXECUTOR_NAME, THERMOS_CONFIG)
+          .build(),
       false /* populate discovery info */);
 
   public static ExecutorSettings thermosOnlyWithOverhead(Iterable<Resource> resources) {
-    ExecutorConfig config = THERMOS_EXECUTOR.getExecutorConfig();
+    ExecutorConfig config =
+        THERMOS_EXECUTOR.getExecutorConfig(THERMOS_EXECUTOR_INFO.getName()).get();
+
     ExecutorInfo.Builder executor = config.getExecutor().toBuilder();
     executor.clearResources().addAllResources(resources);
     return new ExecutorSettings(
-        new ExecutorConfig(executor.build(), config.getVolumeMounts()),
+        ImmutableMap.<String, ExecutorConfig>builder().put(
+            apiConstants.AURORA_EXECUTOR_NAME,
+            new ExecutorConfig(
+                executor.build(),
+                config.getVolumeMounts(),
+                THERMOS_TASK_PREFIX)).build(),
         false /* populate discovery info */);
   }
 }
