@@ -140,7 +140,9 @@ class AuroraCommandContext(Context):
             t.name == task.tier),
           task.production))
       }
-    return AnnotatedAuroraConfig(config.raw()(**backfill_args))
+
+    config.update_job(config.raw()(**backfill_args))
+    return config
 
   def get_job_config_optional(self, jobkey, config_file):
     """Loads a job configuration if provided."""
