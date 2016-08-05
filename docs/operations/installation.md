@@ -61,8 +61,8 @@ Any machines that users submit jobs from.
 
         sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
 
-        wget -c https://apache.bintray.com/aurora/ubuntu-trusty/aurora-scheduler_0.14.0_amd64.deb
-        sudo dpkg -i aurora-scheduler_0.14.0_amd64.deb
+        wget -c https://apache.bintray.com/aurora/ubuntu-trusty/aurora-scheduler_0.15.0_amd64.deb
+        sudo dpkg -i aurora-scheduler_0.15.0_amd64.deb
 
 ### CentOS 7
 
@@ -83,8 +83,8 @@ Any machines that users submit jobs from.
 
         sudo yum install -y wget
 
-        wget -c https://apache.bintray.com/aurora/centos-7/aurora-scheduler-0.14.0-1.el7.centos.aurora.x86_64.rpm
-        sudo yum install -y aurora-scheduler-0.14.0-1.el7.centos.aurora.x86_64.rpm
+        wget -c https://apache.bintray.com/aurora/centos-7/aurora-scheduler-0.15.0-1.el7.centos.aurora.x86_64.rpm
+        sudo yum install -y aurora-scheduler-0.15.0-1.el7.centos.aurora.x86_64.rpm
 
 ### Finalizing
 By default, the scheduler will start in an uninitialized mode.  This is because external
@@ -123,8 +123,8 @@ CentOS: `sudo systemctl start aurora`
         # for the python mesos native bindings.
         sudo apt-get -y install libcurl4-nss-dev
 
-        wget -c https://apache.bintray.com/aurora/ubuntu-trusty/aurora-executor_0.14.0_amd64.deb
-        sudo dpkg -i aurora-executor_0.14.0_amd64.deb
+        wget -c https://apache.bintray.com/aurora/ubuntu-trusty/aurora-executor_0.15.0_amd64.deb
+        sudo dpkg -i aurora-executor_0.15.0_amd64.deb
 
 ### CentOS 7
 
@@ -137,8 +137,8 @@ CentOS: `sudo systemctl start aurora`
 
         sudo yum install -y python2 wget
 
-        wget -c https://apache.bintray.com/aurora/centos-7/aurora-executor-0.14.0-1.el7.centos.aurora.x86_64.rpm
-        sudo yum install -y aurora-executor-0.14.0-1.el7.centos.aurora.x86_64.rpm
+        wget -c https://apache.bintray.com/aurora/centos-7/aurora-executor-0.15.0-1.el7.centos.aurora.x86_64.rpm
+        sudo yum install -y aurora-executor-0.15.0-1.el7.centos.aurora.x86_64.rpm
 
 ### Configuration
 The executor typically does not require configuration.  Command line arguments can
@@ -199,15 +199,15 @@ Make an edit to add the `--mesos-root` flag resulting in something like:
 
     sudo apt-get install -y python2.7 wget
 
-    wget -c https://apache.bintray.com/aurora/ubuntu-trusty/aurora-tools_0.14.0_amd64.deb
-    sudo dpkg -i aurora-tools_0.14.0_amd64.deb
+    wget -c https://apache.bintray.com/aurora/ubuntu-trusty/aurora-tools_0.15.0_amd64.deb
+    sudo dpkg -i aurora-tools_0.15.0_amd64.deb
 
 ### CentOS 7
 
     sudo yum install -y python2 wget
 
-    wget -c https://apache.bintray.com/aurora/centos-7/aurora-tools-0.14.0-1.el7.centos.aurora.x86_64.rpm
-    sudo yum install -y aurora-tools-0.14.0-1.el7.centos.aurora.x86_64.rpm
+    wget -c https://apache.bintray.com/aurora/centos-7/aurora-tools-0.15.0-1.el7.centos.aurora.x86_64.rpm
+    sudo yum install -y aurora-tools-0.15.0-1.el7.centos.aurora.x86_64.rpm
 
 ### Mac OS X
 
@@ -239,12 +239,12 @@ are identical for both.
     sudo apt-get -y update
 
     # Use `apt-cache showpkg mesos | grep [version]` to find the exact version.
-    sudo apt-get -y install mesos=0.27.2-2.0.15.ubuntu1404_amd64
+    sudo apt-get -y install mesos=0.28.2-2.0.27.ubuntu1404_amd64
 
 ### Mesos on CentOS 7
 
     sudo rpm -Uvh https://repos.mesosphere.io/el/7/noarch/RPMS/mesosphere-el-repo-7-1.noarch.rpm
-    sudo yum -y install mesos-0.27.2
+    sudo yum -y install mesos-0.28.2
 
 
 
