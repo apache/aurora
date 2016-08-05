@@ -17,7 +17,7 @@
   from Mesos. This has affected rendering of some of the existing attributes. Furthermore, it now
   dumps additional offer attributes including [reservations](http://mesos.apache.org/documentation/latest/reservation/)
   and [persistent volumes](http://mesos.apache.org/documentation/latest/persistent-volume/).
-- The scheduler API now accepts both thrift JSON and binary thrift. If a request is sent with a
+- The scheduler API now accepts both thrift JSON and binary thrift. If a request is sent without a
   `Content-Type` header, or a `Content-Type` header of `application/x-thrift` or `application/json`
   or `application/vnd.apache.thrift.json` the request is treated as thrift JSON. If a request is
   sent with a `Content-Type` header of `application/vnd.apache.thrift.binary` the request is treated
