@@ -27,6 +27,8 @@
   the `-custom_executor_config` flag must point to a JSON file which contains at least one valid
   executor configuration as detailed in the [configuration](http://aurora.apache.org/documentation/latest/operations/configuration/)
   documentation.
+- The `ExecutorInfo.source` field is deprecated and has been replaced with a label named `source`.
+  It will be removed from Mesos in a future release.
 
 ### Deprecations and removals:
 

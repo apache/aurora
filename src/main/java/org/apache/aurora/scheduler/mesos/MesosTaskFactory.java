@@ -291,9 +291,12 @@ public interface MesosTaskFactory {
           .build();
     }
 
+    @SuppressWarnings("deprecation") // we set the source field for backwards compat.
     private ExecutorInfo.Builder configureTaskForExecutor(
         IAssignedTask task,
         AcceptedOffer acceptedOffer) {
+
+      String sourceName = getInstanceSourceName(task.getTask(), task.getInstanceId());
 
       ExecutorInfo.Builder builder =
           executorSettings.getExecutorConfig(getExecutorName(task)).get()
@@ -302,11 +305,12 @@ public interface MesosTaskFactory {
           .setExecutorId(getExecutorId(
               task.getTaskId(),
               executorSettings.getExecutorConfig(getExecutorName(task)).get().getTaskPrefix()))
+          .setSource(sourceName)
           .setLabels(
               Labels.newBuilder().addLabels(
                   Label.newBuilder()
                       .setKey(SOURCE_LABEL)
-                      .setValue(getInstanceSourceName(task.getTask(), task.getInstanceId()))));
+                      .setValue(sourceName)));
 
       //TODO: (rdelvalle) add output_file when Aurora's Mesos dep is updated (MESOS-4735)
       List<CommandInfo.URI> mesosFetcherUris = task.getTask().getMesosFetcherUris().stream()
