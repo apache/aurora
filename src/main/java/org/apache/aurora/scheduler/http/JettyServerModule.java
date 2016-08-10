@@ -51,7 +51,6 @@ import com.google.inject.name.Names;
 import com.google.inject.servlet.GuiceFilter;
 import com.google.inject.servlet.GuiceServletContextListener;
 import com.google.inject.util.Modules;
-import com.sun.jersey.api.container.filter.GZIPContentEncodingFilter;
 import com.sun.jersey.guice.JerseyServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
@@ -88,8 +87,6 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
-import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_RESPONSE_FILTERS;
 import static com.sun.jersey.api.json.JSONConfiguration.FEATURE_POJO_MAPPING;
 
 /**
@@ -120,9 +117,7 @@ public class JettyServerModule extends AbstractModule {
   protected static final Arg<String> LISTEN_IP = Arg.create();
 
   public static final Map<String, String> GUICE_CONTAINER_PARAMS = ImmutableMap.of(
-      FEATURE_POJO_MAPPING, Boolean.TRUE.toString(),
-      PROPERTY_CONTAINER_REQUEST_FILTERS, GZIPContentEncodingFilter.class.getName(),
-      PROPERTY_CONTAINER_RESPONSE_FILTERS, GZIPContentEncodingFilter.class.getName());
+      FEATURE_POJO_MAPPING, Boolean.TRUE.toString());
 
   private static final String STATIC_ASSETS_ROOT = Resource
       .newClassPathResource("scheduler/assets/index.html")
