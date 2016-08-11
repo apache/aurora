@@ -979,6 +979,14 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
+  public Response rollbackJobUpdate(JobUpdateKey mutableKey, @Nullable String message) {
+    return changeJobUpdateState(
+        mutableKey,
+        JobUpdateController::rollback,
+        Optional.fromNullable(message));
+  }
+
+  @Override
   public Response pulseJobUpdate(JobUpdateKey mutableUpdateKey) {
     IJobUpdateKey updateKey = validateJobUpdateKey(mutableUpdateKey);
     try {

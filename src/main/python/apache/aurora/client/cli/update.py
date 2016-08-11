@@ -76,11 +76,18 @@ class UpdateController(object):
     update_key = self.get_update_key(job_key)
     if update_key is None:
       self.context.print_err("No active update found for this job.")
-      return EXIT_INVALID_PARAMETER
+      return EXIT_INVALID_PARAMETER, update_key
     resp = mutate_fn(update_key)
     self.context.log_response_and_raise(resp, err_code=EXIT_API_ERROR, err_msg=error_msg)
     self.context.print_out(success_msg)
-    return EXIT_OK
+    return EXIT_OK, update_key
+
+  def rollback(self, job_key, message):
+    return self._modify_update(
+        job_key,
+        lambda key: self.api.rollback_job_update(key, message),
+        "Failed to rollback update due to error:",
+        "Update rollback has started.")
 
   def pause(self, job_key, message):
     return self._modify_update(
@@ -103,7 +110,6 @@ class UpdateController(object):
         "Failed to abort update due to error:",
         "Update has been aborted.")
 
-
 def format_timestamp(stamp_millis):
   return datetime.datetime.utcfromtimestamp(stamp_millis / 1000).isoformat()
 
@@ -116,15 +122,15 @@ MESSAGE_OPTION = CommandOption(
     help='Message to include with the update state transition')
 
 
+WAIT_OPTION = lambda help_msg: CommandOption(
+    '--wait',
+    default=False,
+    action='store_true',
+    help=help_msg)
+
 class StartUpdate(Verb):
 
   UPDATE_MSG_TEMPLATE = "Job update has started. View your update progress at %s"
-
-  WAIT_OPTION = CommandOption(
-      '--wait',
-      default=False,
-      action='store_true',
-      help='Wait until the update completes')
 
   def __init__(self, clock=time):
     self._clock = clock
@@ -143,7 +149,7 @@ class StartUpdate(Verb):
         STRICT_OPTION,
         INSTANCES_SPEC_ARGUMENT,
         CONFIG_ARGUMENT,
-        self.WAIT_OPTION
+        WAIT_OPTION('Wait until the update completes')
     ]
 
   @property
@@ -189,14 +195,26 @@ class StartUpdate(Verb):
       context.print_out(self.UPDATE_MSG_TEMPLATE % url)
 
       if context.options.wait:
-        return wait_for_update(context, self._clock, api, update_key)
+        return wait_for_update(context, self._clock, api, update_key, update_state_to_err_code)
     else:
       context.print_out(combine_messages(resp))
 
     return EXIT_OK
 
 
-def wait_for_update(context, clock, api, update_key):
+def rollback_state_to_err_code(state):
+    return (EXIT_OK if state == JobUpdateStatus.ROLLED_BACK else
+            EXIT_COMMAND_FAILURE if state == JobUpdateStatus.ROLLED_FORWARD else
+            EXIT_UNKNOWN_ERROR)
+
+
+def update_state_to_err_code(state):
+    return (EXIT_OK if state == JobUpdateStatus.ROLLED_FORWARD else
+            EXIT_COMMAND_FAILURE if state == JobUpdateStatus.ROLLED_BACK else
+            EXIT_UNKNOWN_ERROR)
+
+
+def wait_for_update(context, clock, api, update_key, state_to_err_code_func):
   cur_state = None
 
   while True:
@@ -209,12 +227,7 @@ def wait_for_update(context, clock, api, update_key):
         cur_state = new_state
         context.print_out('Current state %s' % JobUpdateStatus._VALUES_TO_NAMES[cur_state])
         if cur_state not in ACTIVE_JOB_UPDATE_STATES:
-          if cur_state == JobUpdateStatus.ROLLED_FORWARD:
-            return EXIT_OK
-          elif cur_state == JobUpdateStatus.ROLLED_BACK:
-            return EXIT_COMMAND_FAILURE
-          else:
-            return EXIT_UNKNOWN_ERROR
+          return state_to_err_code_func(cur_state)
       clock.sleep(5)
     elif len(summaries) == 0:
       raise context.CommandError(EXIT_INVALID_PARAMETER, 'Job update not found.')
@@ -252,7 +265,9 @@ class UpdateWait(Verb):
         context,
         self._clock,
         context.get_api(context.options.jobspec.cluster),
-        JobUpdateKey(job=context.options.jobspec.to_thrift(), id=context.options.id))
+        JobUpdateKey(job=context.options.jobspec.to_thrift(), id=context.options.id),
+        update_state_to_err_code
+    )
 
 
 class PauseUpdate(Verb):
@@ -269,9 +284,10 @@ class PauseUpdate(Verb):
 
   def execute(self, context):
     job_key = context.options.jobspec
-    return UpdateController(context.get_api(job_key.cluster), context).pause(
+    err_code, _ = UpdateController(context.get_api(job_key.cluster), context).pause(
         job_key,
         context.options.message)
+    return err_code
 
 
 class ResumeUpdate(Verb):
@@ -288,9 +304,10 @@ class ResumeUpdate(Verb):
 
   def execute(self, context):
     job_key = context.options.jobspec
-    return UpdateController(context.get_api(job_key.cluster), context).resume(
+    err_code, _ = UpdateController(context.get_api(job_key.cluster), context).resume(
         job_key,
         context.options.message)
+    return err_code
 
 
 class AbortUpdate(Verb):
@@ -307,9 +324,44 @@ class AbortUpdate(Verb):
 
   def execute(self, context):
     job_key = context.options.jobspec
-    return UpdateController(context.get_api(job_key.cluster), context).abort(
+    err_code, _ = UpdateController(context.get_api(job_key.cluster), context).abort(
         job_key,
         context.options.message)
+    return err_code
+
+
+class RollbackUpdate(Verb):
+  def __init__(self, clock=time):
+    self._clock = clock
+
+  @property
+  def name(self):
+    return 'rollback'
+
+  def get_options(self):
+    return [JOBSPEC_ARGUMENT, MESSAGE_OPTION, WAIT_OPTION('Wait until the update rolls back')]
+
+  @property
+  def help(self):
+    return 'Rollback an in-progress update.'
+
+  def execute(self, context):
+    job_key = context.options.jobspec
+    update_controller = UpdateController(
+      context.get_api(job_key.cluster), context)
+
+    err_code, update_key = update_controller.rollback(
+      job_key, context.options.message)
+    if err_code == EXIT_OK and context.options.wait:
+      return wait_for_update(
+        context,
+        self._clock,
+        context.get_api(job_key.cluster),
+        update_key,
+        rollback_state_to_err_code
+      )
+
+    return err_code
 
 
 UpdateFilter = namedtuple('UpdateFilter', ['cluster', 'role', 'env', 'job'])
@@ -554,6 +606,7 @@ class Update(Noun):
     self.register_verb(PauseUpdate())
     self.register_verb(ResumeUpdate())
     self.register_verb(AbortUpdate())
+    self.register_verb(RollbackUpdate())
     self.register_verb(ListUpdates())
     self.register_verb(UpdateInfo())
     self.register_verb(UpdateWait())

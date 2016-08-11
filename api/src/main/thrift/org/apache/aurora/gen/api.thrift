@@ -1106,6 +1106,15 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
       3: string message)
 
   /**
+   * Rollbacks the specified active job update to the initial state.
+   */
+  Response rollbackJobUpdate(
+      /** The update to rollback. */
+      1: JobUpdateKey key,
+      /** A user-specified message to include with the induced job update state change. */
+      2: string message)
+
+  /**
    * Allows progress of the job update in case blockIfNoPulsesAfterMs is specified in
    * JobUpdateSettings. Unblocks progress if the update was previously blocked.
    * Responds with ResponseCode.INVALID_REQUEST in case an unknown update key is specified.

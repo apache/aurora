@@ -246,6 +246,13 @@ class JobUpdateControllerImpl implements JobUpdateController {
         Functions.compose(createAuditedEvent(auditData), Functions.constant(ABORTED)));
   }
 
+  @Override
+  public void rollback(IJobUpdateKey key, AuditData auditData) throws UpdateStateException {
+    unscopedChangeUpdateStatus(
+        key,
+        Functions.compose(createAuditedEvent(auditData), Functions.constant(ROLLING_BACK)));
+  }
+
   private static Function<JobUpdateStatus, JobUpdateEvent> createAuditedEvent(
       final AuditData auditData) {
 

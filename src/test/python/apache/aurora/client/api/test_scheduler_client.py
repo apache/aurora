@@ -183,6 +183,11 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mox.ReplayAll()
     self.make_scheduler_proxy().abortJobUpdate('update_id')
 
+  def test_rollbackJobUpdate(self):
+    self.mock_thrift_client.rollbackJobUpdate('update_id').AndReturn(DEFAULT_RESPONSE)
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().rollbackJobUpdate('update_id')
+
   def test_pulseJobUpdate(self):
     self.mock_thrift_client.pulseJobUpdate('update_id').AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()

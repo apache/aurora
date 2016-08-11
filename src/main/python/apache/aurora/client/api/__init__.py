@@ -198,6 +198,17 @@ class AuroraClientAPI(object):
     """
     return self._scheduler_proxy.abortJobUpdate(update_key, message)
 
+  def rollback_job_update(self, update_key, message):
+    """Requests Scheduler to rollback active job update.
+
+    Arguments:
+    update_key -- Update identifier.
+    message -- Audit message to include with the change.
+
+    Returns response object.
+    """
+    return self._scheduler_proxy.rollbackJobUpdate(update_key, message)
+
   def get_job_update_diff(self, config, instances=None):
     """Requests scheduler to calculate difference between scheduler and client job views.
 

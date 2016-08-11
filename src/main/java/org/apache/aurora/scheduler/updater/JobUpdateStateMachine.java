@@ -70,9 +70,19 @@ final class JobUpdateStateMachine {
               ABORTED,
               ERROR,
               FAILED)
-          .putAll(ROLL_FORWARD_PAUSED, ROLLING_FORWARD, ROLL_FORWARD_AWAITING_PULSE, ABORTED, ERROR)
+          .putAll(ROLL_FORWARD_PAUSED,
+              ROLLING_BACK,
+              ROLLING_FORWARD,
+              ROLL_FORWARD_AWAITING_PULSE,
+              ABORTED,
+              ERROR)
           .putAll(ROLL_BACK_PAUSED, ROLLING_BACK, ROLL_BACK_AWAITING_PULSE, ABORTED, ERROR)
-          .putAll(ROLL_FORWARD_AWAITING_PULSE, ROLLING_FORWARD, ROLL_FORWARD_PAUSED, ABORTED, ERROR)
+          .putAll(ROLL_FORWARD_AWAITING_PULSE,
+              ROLLING_BACK,
+              ROLLING_FORWARD,
+              ROLL_FORWARD_PAUSED,
+              ABORTED,
+              ERROR)
           .putAll(ROLL_BACK_AWAITING_PULSE, ROLLING_BACK, ROLL_BACK_PAUSED, ABORTED, ERROR)
           .build();
 

@@ -34,6 +34,7 @@ from apache.aurora.client.cli.update import (
     ListUpdates,
     PauseUpdate,
     ResumeUpdate,
+    RollbackUpdate,
     StartUpdate,
     UpdateFilter,
     UpdateInfo,
@@ -705,3 +706,88 @@ class TestUpdateWait(AuroraClientCommandTest):
 
     assert self._fake_context.get_out() == []
     assert self._mock_api.query_job_updates.mock_calls == [self._fetch_call]
+
+
+class TestRollbackUpdate(AuroraClientCommandTest):
+  def setUp(self):
+    self._command = RollbackUpdate()
+    self._mock_options = mock_verb_options(self._command)
+    self._mock_options.jobspec = self.TEST_JOBKEY
+    self._mock_options.wait = False
+    self._fake_context = FakeAuroraCommandContext()
+    self._fake_context.set_options(self._mock_options)
+    self._mock_api = self._fake_context.get_api('UNUSED')
+
+  def test_rollback_update_command_line_succeeds(self):
+    self._mock_api.query_job_updates.return_value = get_status_query_response()
+    self._mock_api.rollback_job_update.return_value = self.create_simple_success_response()
+    self._mock_options.message = 'hello'
+    assert self._command.execute(self._fake_context) == EXIT_OK
+
+    assert self._mock_api.query_job_updates.mock_calls == [
+        call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]
+    assert self._mock_api.rollback_job_update.mock_calls == [call(UPDATE_KEY, 'hello')]
+    assert self._fake_context.get_out() == ["Update rollback has started."]
+    assert self._fake_context.get_err() == []
+
+  def test_rollback_update_command_line_error(self):
+    self._mock_api.query_job_updates.return_value = get_status_query_response()
+    self._mock_api.rollback_job_update.return_value = self.create_error_response()
+
+    with pytest.raises(Context.CommandError):
+      self._command.execute(self._fake_context)
+    assert self._mock_api.query_job_updates.mock_calls == [
+        call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]
+    assert self._mock_api.rollback_job_update.mock_calls == [call(UPDATE_KEY, None)]
+
+    assert self._fake_context.get_out() == []
+    assert self._fake_context.get_err() == ["Failed to rollback update due to error:", "\tWhoops"]
+
+  def test_rollback_invalid_api_response(self):
+    # Mimic the API returning two active updates for one job, which should be impossible.
+    self._mock_api.query_job_updates.return_value = get_status_query_response(count=2)
+    self._mock_api.rollback_job_update.return_value = self.create_error_response()
+    with pytest.raises(Context.CommandError) as error:
+      self._command.execute(self._fake_context)
+      assert error.message == (
+        'scheduler returned multiple active updates for this job.')
+
+    assert self._mock_api.query_job_updates.mock_calls == [
+        call(update_statuses=ACTIVE_JOB_UPDATE_STATES, job_key=self.TEST_JOBKEY)]
+    assert self._mock_api.rollback_job_update.mock_calls == []
+    assert self._fake_context.get_out() == []
+    assert self._fake_context.get_err() == []
+
+  def test_rollback_and_wait_success(self):
+    self._mock_options.wait = True
+
+    updating_response = get_status_query_response(status=JobUpdateStatus.ROLLING_FORWARD)
+    updated_response = get_status_query_response(status=JobUpdateStatus.ROLLED_BACK)
+
+    self._mock_api.query_job_updates.side_effect = [updating_response, updated_response]
+    self._mock_api.rollback_job_update.return_value = self.create_simple_success_response()
+
+    assert self._command.execute(self._fake_context) == EXIT_OK
+    assert self._mock_api.rollback_job_update.mock_calls == [call(UPDATE_KEY, None)]
+    assert self._fake_context.get_err() == []
+
+  def test_rollback_and_wait_rolled_forward(self):
+    self._mock_options.wait = True
+
+    updating_response = get_status_query_response(status=JobUpdateStatus.ROLLING_FORWARD)
+    updated_response = get_status_query_response(status=JobUpdateStatus.ROLLED_FORWARD)
+
+    self._mock_api.query_job_updates.side_effect = [updating_response, updated_response]
+
+    self._mock_api.rollback_job_update.return_value = self.create_simple_success_response()
+    assert self._command.execute(self._fake_context) == EXIT_COMMAND_FAILURE
+
+  def test_rollback_and_wait_error(self):
+    self._mock_options.wait = True
+    updating_response = get_status_query_response(status=JobUpdateStatus.ROLLING_FORWARD)
+    failed_response = get_status_query_response(status=JobUpdateStatus.ERROR)
+
+    self._mock_api.query_job_updates.side_effect = [updating_response, failed_response]
+
+    self._mock_api.rollback_job_update.return_value = self.create_simple_success_response()
+    assert self._command.execute(self._fake_context) == EXIT_UNKNOWN_ERROR

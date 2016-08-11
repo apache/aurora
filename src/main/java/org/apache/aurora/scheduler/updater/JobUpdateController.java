@@ -123,6 +123,26 @@ public interface JobUpdateController {
   void abort(IJobUpdateKey key, AuditData auditData) throws UpdateStateException;
 
   /**
+   * Rollbacks an active job update.
+   * <p>
+   * This will rollback the update to its initial state effectively 'undoing' it.
+   * The rollback is possible if update is in following states:
+   * <ul>
+   *    <li>ROLLING_FORWARD</li>
+   *    <li>ROLL_BACK_PAUSED</li>
+   *    <li>ROLL_BACK_AWAITING_PULSE</li>
+   *    <li>ROLL_FORWARD_PAUSED</li>
+   *    <li>ROLL_FORWARD_AWAITING_PULSE</li>
+   * </ul>
+   * has not reached its terminal state yet.
+   *
+   * @param key Update to rollback.
+   * @param auditData Details about the origin of this state change.
+   * @throws UpdateStateException If pre-condition is not met.
+   */
+  void rollback(IJobUpdateKey key, AuditData auditData) throws UpdateStateException;
+
+  /**
    * Notifies the updater that the state of an instance has changed. A state change could also mean
    * deletion.
    *

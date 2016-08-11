@@ -95,4 +95,9 @@ public interface AnnotatedAuroraAdmin extends AuroraAdmin.Iface {
   @Override
   Response pulseJobUpdate(
       @AuthorizingParam @Nullable JobUpdateKey key) throws TException;
+
+  @Override
+  Response rollbackJobUpdate(
+      @AuthorizingParam @Nullable JobUpdateKey key,
+      @Nullable String message) throws TException;
 }

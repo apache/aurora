@@ -29,6 +29,8 @@
   documentation.
 - The `ExecutorInfo.source` field is deprecated and has been replaced with a label named `source`.
   It will be removed from Mesos in a future release.
+- Add rollback API to the scheduler and new client command to support rolling back
+  active update jobs to their initial state.
 
 ### Deprecations and removals:
 
