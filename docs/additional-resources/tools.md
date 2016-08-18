@@ -19,3 +19,6 @@ Various tools integrate with Aurora. Is there a tool missing? Let us know, or su
 
 * Packaging and deployment:
   - [aurora-packaging](https://github.com/apache/aurora-packaging), the source of the official Aurora packages
+
+* Thrift Clients:
+  - [gorealis](https://github.com/rdelval/gorealis) for communicating with the scheduler using Go
