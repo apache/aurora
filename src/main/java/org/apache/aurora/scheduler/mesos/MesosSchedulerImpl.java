@@ -254,9 +254,12 @@ public class MesosSchedulerImpl implements Scheduler {
   @Override
   public void executorLost(SchedulerDriver schedulerDriver, ExecutorID executorID, SlaveID slaveID,
       int status) {
-
-    log.warn("Lost executor " + executorID + " on slave " + slaveID);
-    counters.get("scheduler_lost_executors").incrementAndGet();
+    // With the current implementation of MESOS-313, Mesos is also reporting clean terminations of
+    // custom executors via the executorLost callback.
+    if (status != 0) {
+      log.warn("Lost executor " + executorID + " on slave " + slaveID + " with status " + status);
+      counters.get("scheduler_lost_executors").incrementAndGet();
+    }
   }
 
   @Timed("scheduler_framework_message")
