@@ -23,6 +23,7 @@ from apache.thermos.core.helper import TaskRunnerHelper as TRH
 from gen.apache.thermos.ttypes import ProcessStatus, RunnerHeader, RunnerState
 
 USER1 = 'user1'
+ROOT_UID = 0
 UID = 567
 PID = 12345
 CREATE_TIME = time.time()
@@ -43,6 +44,13 @@ def mock_process(pid, username, uid=None):
   set_side_effect(process.username, username)
   process.create_time.return_value = CREATE_TIME
   return process
+
+
+def test_this_is_really_our_pid_root():
+  # Test the case where a process has a non root uid but the uid in the header
+  # was root (meaning that it `setuid` itself)
+  process = mock_process(PID, USER1, uid=UID)
+  assert TRH.this_is_really_our_pid(process, ROOT_UID, USER1, process.create_time())
 
 
 def test_this_is_really_our_pid():

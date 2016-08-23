@@ -101,6 +101,12 @@ class TaskRunnerHelper(object):
 
       if process_uid == uid:
         return True
+      elif uid == 0:
+        # If the process was launched as root but is now not root, we should
+        # kill this because it could have called `setuid` on itself.
+        log.info("pid %s appears to be have launched by root but it's uid is now %s" % (
+            process.pid, process_uid))
+        return True
       else:
         log.info("Expected pid %s to be ours but the pid uid is %s and we're %s" % (
             process.pid, process_uid, uid))
