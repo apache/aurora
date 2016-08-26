@@ -100,7 +100,34 @@ app.add_option(
     type=str,
     help='The path to the mesos-containerizer executable that will be used to isolate the task''s '
          'filesystem when using a filesystem image. Note: this path should match the value of the '
-         'Mesos Agent''s -launcher_dir flag.')
+         'Mesos Agent''s -launcher_dir flag.',
+    default='/usr/libexec/mesos/mesos-containerizer')
+
+
+app.add_option(
+    '--no-create-user',
+    dest='no_create_user',
+    action='store_true',
+    help='If set, the executor will not attempt to create the task''s user/group under the '
+         'filesystem image (only applicable when launching a task with a filesystem image).',
+    default=False)
+
+
+# Ideally we'd just be able to use the value of the MESOS_SANDBOX environment variable to get this
+# directly from Mesos. Unfortunately, our method of isolating the task's filesystem does not involve
+# setting a ContainerInfo on the task, but instead mounts the task's filesystem as a Volume with an
+# Image set. In practice this means the value of MESOS_SANDBOX matches the value of the
+# MESOS_DIRECTORY environment variable.
+app.add_option(
+    '--sandbox-mount-point',
+    dest='sandbox_mount_point',
+    type=str,
+    help='The path under the task''s filesystem where the sandbox directory should be mounted '
+         '(only applicable when launching a task with a filesystem image). Note: for '
+         'consistency, this path should match the value of the Mesos Agent''s '
+         '-sandbox_directory flag.',
+    default='/mnt/mesos/sandbox')
+
 
 app.add_option(
     '--execute-as-user',
@@ -223,7 +250,9 @@ def initialize(options):
     thermos_executor = AuroraExecutor(
       runner_provider=thermos_runner_provider,
       status_providers=status_providers,
-      sandbox_provider=UserOverrideDirectorySandboxProvider(options.execute_as_user)
+      sandbox_provider=UserOverrideDirectorySandboxProvider(options.execute_as_user),
+      no_sandbox_create_user=options.no_create_user,
+      sandbox_mount_point=options.sandbox_mount_point
     )
   else:
     thermos_runner_provider = DefaultThermosTaskRunnerProvider(
@@ -240,7 +269,9 @@ def initialize(options):
 
     thermos_executor = AuroraExecutor(
       runner_provider=thermos_runner_provider,
-      status_providers=status_providers
+      status_providers=status_providers,
+      no_sandbox_create_user=options.no_create_user,
+      sandbox_mount_point=options.sandbox_mount_point
     )
 
   return thermos_executor

@@ -47,7 +47,16 @@ app.add_option(
     dest="sandbox",
     metavar="PATH",
     default=None,
-    help="the sandbox in which this task should run")
+    help="The path on the host filesystem to the sandbox in which this task should run.")
+
+
+app.add_option(
+    '--container_sandbox',
+    dest='container_sandbox',
+    type=str,
+    default=None,
+    help='If running in an isolated filesystem, the path within that filesystem where the sandbox '
+         'is mounted.')
 
 
 app.add_option(
@@ -221,7 +230,8 @@ def proxy_main(args, opts):
       rotate_log_size_mb=opts.rotate_log_size_mb,
       rotate_log_backups=opts.rotate_log_backups,
       preserve_env=opts.preserve_env,
-      mesos_containerizer_path=opts.mesos_containerizer_path)
+      mesos_containerizer_path=opts.mesos_containerizer_path,
+      container_sandbox=opts.container_sandbox)
 
   for sig in (signal.SIGUSR1, signal.SIGUSR2):
     signal.signal(sig, functools.partial(runner_teardown, task_runner))

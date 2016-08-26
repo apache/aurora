@@ -421,7 +421,7 @@ class TaskRunner(object):
                universal_handler=None, planner_class=TaskPlanner, hostname=None,
                process_logger_destination=None, process_logger_mode=None,
                rotate_log_size_mb=None, rotate_log_backups=None,
-               preserve_env=False, mesos_containerizer_path=None):
+               preserve_env=False, mesos_containerizer_path=None, container_sandbox=None):
     """
       required:
         task (config.Task) = the task to run
@@ -451,6 +451,8 @@ class TaskRunner(object):
                                  env for the task being run
         mesos_containerizer_path = the path to the mesos-containerizer executable that will be used
                                    to isolate the task's filesystem (if using a filesystem image).
+        container_sandbox = the path within the isolated filesystem where the task's sandbox is
+                            mounted.
     """
     if not issubclass(planner_class, TaskPlanner):
       raise TypeError('planner_class must be a TaskPlanner.')
@@ -503,6 +505,7 @@ class TaskRunner(object):
         process_filter=lambda proc: proc.final().get() is True)
     self._chroot = chroot
     self._sandbox = sandbox
+    self._container_sandbox = container_sandbox
     self._terminal_state = None
     self._ckpt = None
     self._process_map = dict((p.name().get(), p) for p in self._task.processes())
@@ -724,7 +727,8 @@ class TaskRunner(object):
       rotate_log_size=rotate_log_size,
       rotate_log_backups=rotate_log_backups,
       preserve_env=self._preserve_env,
-      mesos_containerizer_path=self._mesos_containerizer_path)
+      mesos_containerizer_path=self._mesos_containerizer_path,
+      container_sandbox=self._container_sandbox)
 
   _DEFAULT_LOGGER = Logger()
   _DEFAULT_ROTATION = RotatePolicy()

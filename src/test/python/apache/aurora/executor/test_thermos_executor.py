@@ -74,8 +74,8 @@ class FastStatusManager(StatusManager):
 
 
 class DefaultTestSandboxProvider(SandboxProvider):
-  def from_assigned_task(self, assigned_task):
-    return DirectorySandbox(safe_mkdtemp())
+  def from_assigned_task(self, assigned_task, **kwargs):
+    return DirectorySandbox(safe_mkdtemp(), **kwargs)
 
 
 class FailingStartingTaskRunner(ThermosTaskRunner):
@@ -84,7 +84,7 @@ class FailingStartingTaskRunner(ThermosTaskRunner):
 
 
 class FailingSandbox(DirectorySandbox):
-  def __init__(self, root, exception_type):
+  def __init__(self, root, exception_type, **kwargs):
     self._exception_type = exception_type
     super(FailingSandbox, self).__init__(root)
 
@@ -96,8 +96,8 @@ class FailingSandboxProvider(SandboxProvider):
   def __init__(self, exception_type=DirectorySandbox.CreationError):
     self._exception_type = exception_type
 
-  def from_assigned_task(self, assigned_task):
-    return FailingSandbox(safe_mkdtemp(), exception_type=self._exception_type)
+  def from_assigned_task(self, assigned_task, **kwargs):
+    return FailingSandbox(safe_mkdtemp(), exception_type=self._exception_type, **kwargs)
 
 
 class SlowSandbox(DirectorySandbox):
@@ -115,8 +115,8 @@ class SlowSandbox(DirectorySandbox):
 
 
 class SlowSandboxProvider(SandboxProvider):
-  def from_assigned_task(self, assigned_task):
-    return SlowSandbox(safe_mkdtemp())
+  def from_assigned_task(self, assigned_task, **kwargs):
+    return SlowSandbox(safe_mkdtemp(), **kwargs)
 
 
 class ProxyDriver(object):

@@ -100,7 +100,6 @@ class ThermosTaskRunner(TaskRunner):
     self._monitor = None
     self._status = None
     self._ports = portmap
-    self._root = sandbox.root
     self._sandbox = sandbox
     self._checkpoint_root = checkpoint_root
     self._enable_chroot = sandbox.chrooted
@@ -239,14 +238,11 @@ class ThermosTaskRunner(TaskRunner):
       log.error('Could not quitquitquit runner: %s' % e)
 
   def _cmdline(self):
-    host_sandbox = None
-    if os.environ.get('MESOS_DIRECTORY'):
-      host_sandbox = os.path.join(os.environ.get('MESOS_DIRECTORY'), 'sandbox')
-
     params = dict(log_dir=LogOptions.log_dir(),
                   log_to_disk='DEBUG',
                   checkpoint_root=self._checkpoint_root,
-                  sandbox=host_sandbox or self._root,
+                  sandbox=self._sandbox.root,
+                  container_sandbox=self._sandbox.container_root,
                   task_id=self._task_id,
                   thermos_json=self._task_filename,
                   hostname=self._hostname,
@@ -266,8 +262,7 @@ class ThermosTaskRunner(TaskRunner):
     if self._preserve_env:
       cmdline_args.extend(['--preserve_env'])
     if self._sandbox.is_filesystem_image:
-      cmdline_args.extend(
-          ['--mesos_containerizer_path=%s' % self._mesos_containerizer_path])
+      cmdline_args.extend(['--mesos_containerizer_path=%s' % self._mesos_containerizer_path])
     for name, port in self._ports.items():
       cmdline_args.extend(['--port=%s:%s' % (name, port)])
     return cmdline_args

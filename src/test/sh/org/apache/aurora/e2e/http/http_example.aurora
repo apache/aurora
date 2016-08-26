@@ -42,20 +42,34 @@ stage_server = Process(
   cmdline = '{{profile.cmd}}'
 )
 
-test_task = Task(
+setup_env = Process(
+  name = 'setup_env',
+  cmdline='''cat <<EOF > .thermos_profile
+export IT_WORKED=hello
+EOF'''
+)
+
+read_env = Process(
+  name = 'read_env',
+  cmdline = 'echo "$IT_WORKED"'
+)
+
+test_task = SequentialTask(
   name = 'http_example',
   resources = Resources(cpu=0.5, ram=32*MB, disk=64*MB, gpu='{{profile.gpu}}'),
-  processes = [echo_ports, stage_server, run_server],
-  constraints = order(echo_ports, stage_server, run_server))
+  processes = [setup_env, read_env, echo_ports, stage_server, run_server]
+)
 
-no_python_task = Task(
+no_python_task = SequentialTask(
   name = 'http_example_no_python',
   resources = Resources(cpu=0.4, ram=32*MB, disk=64*MB),
   processes = [
+      setup_env,
+      read_env,
       echo_ports,
       Process(name='run_server', cmdline='run-server.sh {{thermos.ports[http]}}'),
-  ],
-  constraints = order(echo_ports, run_server))
+  ]
+)
 
 update_config = UpdateConfig(watch_secs=10, batch_size=2)
 health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)

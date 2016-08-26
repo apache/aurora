@@ -33,7 +33,11 @@ class SandboxInterface(Interface):
 
   @abstractproperty
   def root(self):
-    """Return the root path of the sandbox."""
+    """Return the root path of the sandbox within the host filesystem."""
+
+  @abstractproperty
+  def container_root(self):
+    """Return the root path of the sandbox as it's visible to the running task."""
 
   @abstractproperty
   def chrooted(self):
@@ -67,32 +71,37 @@ class SandboxProvider(Interface):
 
 class DefaultSandboxProvider(SandboxProvider):
   SANDBOX_NAME = 'sandbox'
+  MESOS_DIRECTORY_ENV_VARIABLE = 'MESOS_DIRECTORY'
 
-  def from_assigned_task(self, assigned_task):
+  def from_assigned_task(self, assigned_task, **kwargs):
+    sandbox_root = os.path.join(os.environ[self.MESOS_DIRECTORY_ENV_VARIABLE], self.SANDBOX_NAME)
+
     container = assigned_task.task.container
     if container.docker:
-      return DockerDirectorySandbox(self.SANDBOX_NAME)
+      return DockerDirectorySandbox(sandbox_root, **kwargs)
     elif container.mesos and container.mesos.image:
-      return FileSystemImageSandbox(self.SANDBOX_NAME, self._get_sandbox_user(assigned_task))
+      return FileSystemImageSandbox(
+          sandbox_root,
+          user=self._get_sandbox_user(assigned_task),
+          **kwargs)
     else:
-      return DirectorySandbox(
-          os.path.abspath(self.SANDBOX_NAME),
-          self._get_sandbox_user(assigned_task))
+      return DirectorySandbox(sandbox_root, user=self._get_sandbox_user(assigned_task), **kwargs)
 
 
 class DirectorySandbox(SandboxInterface):
   """ Basic sandbox implementation using a directory on the filesystem """
 
-  MESOS_DIRECTORY_ENV_VARIABLE = 'MESOS_DIRECTORY'
-  MESOS_SANDBOX_ENV_VARIABLE = 'MESOS_SANDBOX'
-
-  def __init__(self, root, user=getpass.getuser()):
+  def __init__(self, root, user=getpass.getuser(), **kwargs):
     self._root = root
     self._user = user
 
   @property
   def root(self):
     return self._root
+
+  @property
+  def container_root(self):
+    return self.root
 
   @property
   def chrooted(self):
@@ -144,10 +153,13 @@ class DirectorySandbox(SandboxInterface):
 class DockerDirectorySandbox(DirectorySandbox):
   """ A sandbox implementation that configures the sandbox correctly for docker containers. """
 
-  def __init__(self, sandbox_name):
-    self._mesos_host_sandbox = os.environ[self.MESOS_DIRECTORY_ENV_VARIABLE]
-    self._root = os.path.join(self._mesos_host_sandbox, sandbox_name)
-    super(DockerDirectorySandbox, self).__init__(self._root, user=None)
+  def __init__(self, root, **kwargs):
+    self._mesos_host_sandbox = os.environ[DefaultSandboxProvider.MESOS_DIRECTORY_ENV_VARIABLE]
+
+    # remove the user value from kwargs if it was set.
+    kwargs.pop('user', None)
+
+    super(DockerDirectorySandbox, self).__init__(root, user=None, **kwargs)
 
   def _create_symlinks(self):
     # This sets up the container to have a similar directory structure to the host.
@@ -160,7 +172,7 @@ class DockerDirectorySandbox(DirectorySandbox):
     mesos_host_sandbox_root = os.path.dirname(self._mesos_host_sandbox)
     try:
       safe_mkdir(mesos_host_sandbox_root)
-      os.symlink(os.environ[self.MESOS_SANDBOX_ENV_VARIABLE], self._mesos_host_sandbox)
+      os.symlink(os.environ['MESOS_SANDBOX'], self._mesos_host_sandbox)
     except (IOError, OSError) as e:
       raise self.CreationError('Failed to create the sandbox root: %s' % e)
 
@@ -178,11 +190,20 @@ class FileSystemImageSandbox(DirectorySandbox):
   # returncode from a `useradd` or `groupadd` call indicating that the uid/gid already exists.
   _USER_OR_GROUP_ID_EXISTS = 4
 
-  def __init__(self, root, user=None):
+  def __init__(self, root, **kwargs):
     self._task_fs_root = os.path.join(
-        os.environ[self.MESOS_DIRECTORY_ENV_VARIABLE],
+        os.environ[DefaultSandboxProvider.MESOS_DIRECTORY_ENV_VARIABLE],
         TASK_FILESYSTEM_MOUNT_POINT)
-    super(FileSystemImageSandbox, self).__init__(root, user=user)
+
+    self._no_create_user = kwargs.pop('no_create_user', False)
+    self._mounted_volume_paths = kwargs.pop('mounted_volume_paths', None)
+    self._sandbox_mount_point = kwargs.pop('sandbox_mount_point', None)
+
+    if self._sandbox_mount_point is None:
+      raise self.Error(
+          'Failed to initialize FileSystemImageSandbox: no value specified for sandbox_mount_point')
+
+    super(FileSystemImageSandbox, self).__init__(root, **kwargs)
 
   def _create_user_and_group_in_taskfs(self):
     if self._user:
@@ -218,26 +239,36 @@ class FileSystemImageSandbox(DirectorySandbox):
         else:
           raise self.CreationError('Failed to create user in sandbox for task image: %s' % e)
 
-  def _mount_mesos_directory_into_taskfs(self):
-    mesos_directory = os.environ[self.MESOS_DIRECTORY_ENV_VARIABLE]
-    mount_path = os.path.join(self._task_fs_root, mesos_directory[1:])
+  def _mount_paths(self):
+    def do_mount(source, destination):
+      safe_mkdir(destination)
+      log.info('Mounting %s into task filesystem at %s.' % (source, destination))
+      subprocess.check_call([
+        'mount',
+        '--bind',
+        source,
+        destination])
 
-    log.debug('Mounting mesos directory (%s) into task filesystem at %s' % (
-        mesos_directory,
-        mount_path))
+    if self._mounted_volume_paths is not None:
+      for container_path in self._mounted_volume_paths:
+        if container_path != TASK_FILESYSTEM_MOUNT_POINT:
+          target = container_path.lstrip('/')
+          do_mount(container_path, os.path.join(self._task_fs_root, target))
 
-    safe_mkdir(mount_path)
-    subprocess.check_call([
-      'mount',
-      '--bind',
-      mesos_directory,
-      mount_path])
+    do_mount(self.root, os.path.join(self._task_fs_root, self._sandbox_mount_point.lstrip('/')))
+
+  @property
+  def container_root(self):
+    return self._sandbox_mount_point
 
   @property
   def is_filesystem_image(self):
     return True
 
   def create(self):
-    self._create_user_and_group_in_taskfs()
-    self._mount_mesos_directory_into_taskfs()
+    if not self._no_create_user:
+      self._create_user_and_group_in_taskfs()
+
     super(FileSystemImageSandbox, self).create()
+
+    self._mount_paths()

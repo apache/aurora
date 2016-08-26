@@ -125,7 +125,8 @@ def test_simple_process_filesystem_isolator():
           0,
           taskpath,
           sandbox,
-          mesos_containerizer_path=test_isolator_path)
+          mesos_containerizer_path=test_isolator_path,
+          container_sandbox=sandbox)
       p.start()
 
     rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
@@ -133,8 +134,9 @@ def test_simple_process_filesystem_isolator():
     assert_log_content(
         taskpath,
         'stdout',
-        'launch --unshare_namespace_mnt --rootfs=/some/path/taskfs --user=None '
-        '--command={"shell":true,"value":"echo hello world"}\n')
+        'launch --unshare_namespace_mnt --working_directory=%s --rootfs=/some/path/taskfs --user=None '
+        '--command={"shell":true,"value":"/bin/bash -c \'echo hello world\'"}\n' % (
+            sandbox))
 
 
 @mock.patch('os.chown')

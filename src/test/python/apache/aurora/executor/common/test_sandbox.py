@@ -119,8 +119,8 @@ def test_docker_directory_sandbox_create_ioerror(makedirs):
   makedirs.side_effect = IOError('Disk is borked')
 
   with mock.patch.dict('os.environ', {
-    DockerDirectorySandbox.MESOS_DIRECTORY_ENV_VARIABLE: 'some-directory',
-    DockerDirectorySandbox.MESOS_SANDBOX_ENV_VARIABLE: 'some-sandbox'
+    'MESOS_DIRECTORY': 'some-directory',
+    'MESOS_SANDBOX': 'some-sandbox'
   }):
     with temporary_dir() as d:
       real_path = os.path.join(d, 'sandbox')
@@ -173,18 +173,92 @@ def assert_create_user_and_group(mock_check_call, gid_exists, uid_exists):
             'get_user_and_group',
             return_value=(mock_pwent, mock_grent)):
 
-      sandbox = FileSystemImageSandbox(os.path.join(d, 'sandbox'), user='someuser')
+      sandbox = FileSystemImageSandbox(
+          os.path.join(d, 'sandbox'),
+          user='someuser',
+          sandbox_mount_point='/some/path')
       sandbox._create_user_and_group_in_taskfs()
 
   assert len(mock_check_call.mock_calls) == 2
 
+
+MOCK_MESOS_DIRECTORY = '/some/path'
+
+
 @mock.patch('subprocess.check_call')
-@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
 def test_uid_exists(mock_check_call):
   assert_create_user_and_group(mock_check_call, False, True)
 
 
 @mock.patch('subprocess.check_call')
-@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
 def test_gid_exists(mock_check_call):
   assert_create_user_and_group(mock_check_call, True, False)
+
+
+@mock.patch('subprocess.check_call')
+@mock.patch('apache.aurora.executor.common.sandbox.safe_mkdir')
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
+def test_filesystem_sandbox_mounts_paths(mock_safe_mkdir, mock_check_call):
+  sandbox_mount_point = '/some/mount/point'
+  sandbox_directory = os.path.join(MOCK_MESOS_DIRECTORY, 'sandbox')
+
+  sandbox = FileSystemImageSandbox(
+      sandbox_directory,
+      user='someuser',
+      no_create_user=True,
+      mounted_volume_paths=['/some/container/path', '/some/other/container/path'],
+      sandbox_mount_point=sandbox_mount_point)
+
+  sandbox._mount_paths()
+
+  task_fs_path = os.path.join(MOCK_MESOS_DIRECTORY, 'taskfs')
+  # we should have mounted both of the paths we passed in as well as the sandbox directory itself.
+  assert mock_check_call.mock_calls == [
+      mock.call([
+          'mount',
+          '--bind',
+          '/some/container/path',
+          os.path.join(task_fs_path, 'some/container/path')
+      ]),
+      mock.call([
+          'mount',
+          '--bind',
+        '/some/other/container/path',
+        os.path.join(task_fs_path, 'some/other/container/path')
+      ]),
+      mock.call([
+          'mount',
+          '--bind',
+          sandbox_directory,
+          os.path.join(task_fs_path, sandbox_mount_point[1:])
+      ])
+  ]
+
+@mock.patch('subprocess.check_call')
+@mock.patch('apache.aurora.executor.common.sandbox.safe_mkdir')
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
+def test_filesystem_sandbox_no_volumes(mock_safe_mkdir, mock_check_call):
+  sandbox_mount_point = '/some/mount/point'
+  sandbox_directory = os.path.join(MOCK_MESOS_DIRECTORY, 'sandbox'),
+
+  sandbox = FileSystemImageSandbox(
+      sandbox_directory,
+      user='someuser',
+      no_create_user=True,
+      mounted_volume_paths=None,
+      sandbox_mount_point=sandbox_mount_point)
+
+  sandbox._mount_paths()
+
+  task_fs_path = os.path.join(MOCK_MESOS_DIRECTORY, 'taskfs')
+
+  assert mock_check_call.mock_calls == [
+    mock.call([
+      'mount',
+      '--bind',
+      sandbox_directory,
+      os.path.join(task_fs_path, sandbox_mount_point[1:])
+    ])
+  ]

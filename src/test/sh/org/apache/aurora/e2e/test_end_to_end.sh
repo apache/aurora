@@ -317,6 +317,12 @@ test_discovery_info() {
   fi
 }
 
+test_thermos_profile() {
+  read_env_output=$(aurora task ssh $_jobkey/0 --command='tail -1 .logs/read_env/0/stdout' |tr -d '\r\n' 2>/dev/null)
+  echo "$read_env_output"
+  [[ "$read_env_output" = "hello" ]]
+}
+
 test_http_example() {
   local _cluster=$1 _role=$2 _env=$3
   local _base_config=$4 _updated_config=$5
@@ -335,6 +341,7 @@ test_http_example() {
   test_scheduler_ui $_role $_env $_job
   test_observer_ui $_cluster $_role $_job
   test_discovery_info $_task_id_prefix $_discovery_name
+  test_thermos_profile $_jobkey
   test_restart $_jobkey
   test_update $_jobkey $_updated_config $_cluster $_bind_parameters
   test_update_fail $_jobkey $_base_config  $_cluster $_bad_healthcheck_config $_bind_parameters

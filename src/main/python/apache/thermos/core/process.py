@@ -25,6 +25,7 @@ import grp
 import os
 import pwd
 import select
+import shlex
 import signal
 import subprocess
 import sys
@@ -97,7 +98,7 @@ class ProcessBase(object):
 
   def __init__(self, name, cmdline, sequence, pathspec, sandbox_dir, user=None, platform=None,
                logger_destination=LoggerDestination.FILE, logger_mode=LoggerMode.STANDARD,
-               rotate_log_size=None, rotate_log_backups=None, mesos_containerizer_path=None):
+               rotate_log_size=None, rotate_log_backups=None):
     """
       required:
         name        = name of the process
@@ -115,8 +116,6 @@ class ProcessBase(object):
         logger_mode        = The type of logger to use for the process.
         rotate_log_size    = The maximum size of the rotated stdout/stderr logs.
         rotate_log_backups = The maximum number of rotated stdout/stderr log backups.
-        mesos_containerizer_path = The path to the mesos-containerizer binary to be used for task
-                                   filesystem isolation.
     """
     self._name = name
     self._cmdline = cmdline
@@ -137,7 +136,6 @@ class ProcessBase(object):
     self._logger_mode = logger_mode
     self._rotate_log_size = rotate_log_size
     self._rotate_log_backups = rotate_log_backups
-    self._mesos_containerizer_path = mesos_containerizer_path
 
     if not LoggerDestination.is_valid(self._logger_destination):
       raise ValueError("Logger destination %s is invalid." % self._logger_destination)
@@ -186,16 +184,6 @@ class ProcessBase(object):
                                coordinator_pid=self._pid)
 
   def cmdline(self):
-    if self._mesos_containerizer_path is not None:
-      return ('%s launch '
-          '--unshare_namespace_mnt '
-          '--rootfs=%s '
-          '--user=%s '
-          '--command=\'{"shell":true,"value":"%s"}\'' % (
-          self._mesos_containerizer_path,
-          os.path.join(os.environ['MESOS_DIRECTORY'], TASK_FILESYSTEM_MOUNT_POINT),
-          self._user,
-          self._cmdline.replace('"', '\\"')))
     return self._cmdline
 
   def name(self):
@@ -353,11 +341,20 @@ class Process(ProcessBase):
         fork: the fork function to use [default: os.fork]
         chroot: whether or not to chroot into the sandbox [default: False]
         preserve_env: whether or not to preserve env variables for the task [default: False]
+        mesos_containerizer_path: The path to the mesos-containerizer binary to be used for task
+                                  filesystem isolation.
+        container_sandbox: If running in an isolated filesystem, the path within that filesystem
+                           where the sandbox is mounted.
     """
     fork = kw.pop('fork', os.fork)
     self._use_chroot = bool(kw.pop('chroot', False))
     self._rc = None
     self._preserve_env = bool(kw.pop('preserve_env', False))
+    self._mesos_containerizer_path = kw.pop('mesos_containerizer_path', None)
+    self._container_sandbox = kw.pop('container_sandbox', None)
+
+    if self._mesos_containerizer_path is not None and self._container_sandbox is None:
+      raise self.UnspecifiedSandbox('If using mesos-containerizer, container_sandbox must be set.')
 
     kw['platform'] = RealPlatform(fork=fork)
     ProcessBase.__init__(self, *args, **kw)
@@ -381,6 +378,35 @@ class Process(ProcessBase):
     os.setgroups(group_ids)
     os.setgid(gid)
     os.setuid(uid)
+
+  def wrapped_cmdline(self, cwd):
+    cmdline = self.cmdline()
+
+    # If mesos-containerizer is not set, we only need to wrap the cmdline in a bash invocation.
+    if self._mesos_containerizer_path is None:
+      return ['/bin/bash', '-c', cmdline]
+
+    # We're going to embed this in JSON, so we must escape quotes and newlines.
+    cmdline = cmdline.replace('"', '\\"').replace('\n', '\\n')
+
+    # We must wrap the command in single quotes otherwise the shell that executes
+    # mesos-containerizer will expand any bash variables in the cmdline. Escaping single quotes in
+    # bash is hard: https://github.com/koalaman/shellcheck/wiki/SC1003.
+    bash_wrapper = "/bin/bash -c '\\''%s'\\''"
+
+    wrapped = ('%s launch '
+               '--unshare_namespace_mnt '
+               '--working_directory=%s '
+               '--rootfs=%s '
+               '--user=%s '
+               '--command=\'{"shell":true,"value":"%s"}\'' % (
+                   self._mesos_containerizer_path,
+                   cwd,
+                   os.path.join(os.environ['MESOS_DIRECTORY'], TASK_FILESYSTEM_MOUNT_POINT),
+                   self._user,
+                   bash_wrapper % cmdline))
+
+    return shlex.split(wrapped)
 
   def execute(self):
     """Perform final initialization and launch target process commandline in a subprocess."""
@@ -406,14 +432,15 @@ class Process(ProcessBase):
     start_time = self._platform.clock().time()
 
     if not self._sandbox:
-      cwd = sandbox = os.getcwd()
+      cwd = subprocess_cwd = sandbox = os.getcwd()
     else:
-      if self._use_chroot or taskfs_isolated:
-        sandbox = '/'
-        cwd = self._sandbox if taskfs_isolated else sandbox
+      if self._use_chroot:
+        cwd = subprocess_cwd = sandbox = '/'
+      elif taskfs_isolated:
+        cwd = homedir = sandbox = self._container_sandbox
+        subprocess_cwd = self._sandbox
       else:
-        cwd = sandbox = self._sandbox
-        homedir = sandbox
+        cwd = subprocess_cwd = homedir = sandbox = self._sandbox
 
     thermos_profile = os.path.join(sandbox, self.RCFILE)
 
@@ -429,12 +456,23 @@ class Process(ProcessBase):
       'PATH': os.environ['PATH']
     })
 
-    if os.path.exists(thermos_profile):
+    wrapped_cmdline = self.wrapped_cmdline(cwd)
+    log.debug('Wrapped cmdline: %s' % wrapped_cmdline)
+
+
+    real_thermos_profile_path = os.path.join(
+        os.environ['MESOS_DIRECTORY'],
+        TASK_FILESYSTEM_MOUNT_POINT,
+        thermos_profile.lstrip('/')) if taskfs_isolated else thermos_profile
+
+    if os.path.exists(real_thermos_profile_path):
       env.update(BASH_ENV=thermos_profile)
+
+    log.debug('ENV is: %s' % env)
     subprocess_args = {
-      'args': ["/bin/bash", "-c", self.cmdline()],
+      'args': wrapped_cmdline,
       'close_fds': self.FD_CLOEXEC,
-      'cwd': cwd,
+      'cwd': subprocess_cwd,
       'env': env,
       'pathspec': self._pathspec
     }
