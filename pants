@@ -23,6 +23,10 @@
 # ====================================================================
 set -e
 
+# AURORA-1717: If the PYTHONPATH is tainted, calling `./pants` may fail
+# with `ImportError: No module named pants.bin.pants_exe`
+unset PYTHONPATH
+
 PYTHON=${PYTHON:-$(which python2.7)}
 
 PANTS_HOME="${PANTS_HOME:-${HOME}/.cache/pants/setup}"
