@@ -32,7 +32,7 @@ Example (available in the [Vagrant environment](../getting-started/vagrant.md)):
         role = 'docker-test',
         name = 'hello_docker',
         task = hello_world_docker,
-        container = Container(docker = Docker(image = 'python:2.7'))
+        container = Docker(image = 'python:2.7')
       )
     ]
 
