@@ -244,9 +244,7 @@ test_announce() {
   validate_serverset "/aurora/$_jobkey"
 }
 
-test_run() {
-  local _jobkey=$1
-
+setup_ssh() {
   # Create an SSH public key so that local SSH works without a password.
   local _ssh_key=~/.ssh/id_rsa
   rm -f ${_ssh_key}*
@@ -255,6 +253,10 @@ test_run() {
   # See: https://issues.apache.org/jira/browse/AURORA-1728
   echo >> ~/.ssh/authorized_keys
   cat ${_ssh_key}.pub >> ~/.ssh/authorized_keys
+}
+
+test_run() {
+  local _jobkey=$1
 
   # Using the sandbox contents as a proxy for functioning SSH.  List sandbox contents, looking for
   # the .logs directory. We expect to find 3 instances.
@@ -479,6 +481,8 @@ TEST_JOB_EPHEMERAL_DAEMON_WITH_FINAL_ARGS=(
 trap collect_result EXIT
 
 aurorabuild all
+setup_ssh
+
 test_version
 test_http_example "${TEST_JOB_ARGS[@]}"
 test_health_check
