@@ -71,7 +71,7 @@ class ProcessTreeCollector(object):
       )
       new_samples[self._pid] = parent_sample
 
-    except PsutilError as e:
+    except (IOError, PsutilError) as e:
       log.warning('Error during process sampling: %s' % e)
       self._sample = ProcessSample.empty()
       self._rate = 0.0
