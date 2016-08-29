@@ -61,6 +61,7 @@ Are you using Aurora too?  Let us know, or submit a patch to join the list!
 - [Sabre Labs](http://www.sabre.com)
 - [TellApart](https://www.tellapart.com)
 - [Twitter](https://twitter.com)
+- [Uber](https://www.uber.com)
 
 ## Getting Help
 If you have questions that aren't answered in our [documentation](https://aurora.apache.org/documentation/latest/), you can reach out to one of our [mailing lists](https://aurora.apache.org/community/). We're also often available in IRC: #aurora on
