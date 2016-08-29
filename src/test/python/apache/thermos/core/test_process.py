@@ -134,8 +134,8 @@ def test_simple_process_filesystem_isolator():
     assert_log_content(
         taskpath,
         'stdout',
-        'launch --unshare_namespace_mnt --working_directory=%s --rootfs=/some/path/taskfs --user=None '
-        '--command={"shell":true,"value":"/bin/bash -c \'echo hello world\'"}\n' % (
+        'launch --unshare_namespace_mnt --working_directory=%s --rootfs=/some/path/taskfs '
+        '--user=None --command={"shell":true,"value":"/bin/bash -c \'echo hello world\'"}\n' % (
             sandbox))
 
 

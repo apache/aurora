@@ -459,7 +459,6 @@ class Process(ProcessBase):
     wrapped_cmdline = self.wrapped_cmdline(cwd)
     log.debug('Wrapped cmdline: %s' % wrapped_cmdline)
 
-
     real_thermos_profile_path = os.path.join(
         os.environ['MESOS_DIRECTORY'],
         TASK_FILESYSTEM_MOUNT_POINT,

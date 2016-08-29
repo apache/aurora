@@ -24,6 +24,7 @@ date
 ./build-support/python/isort-check
 
 # Run remaining Python style checks and all tests
+./build-support/python/checkstyle-check
 ./pants test.pytest --junit-xml-dir="$PWD/dist/test-results" \
   src/{main,test}/python:: -- -v
 

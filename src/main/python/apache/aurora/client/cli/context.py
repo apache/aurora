@@ -30,7 +30,7 @@ from apache.aurora.client.cli import (
     EXIT_INVALID_PARAMETER,
     Context
 )
-from apache.aurora.client.config import AnnotatedAuroraConfig, get_config
+from apache.aurora.client.config import get_config
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS

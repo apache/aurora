@@ -110,6 +110,7 @@ class UpdateController(object):
         "Failed to abort update due to error:",
         "Update has been aborted.")
 
+
 def format_timestamp(stamp_millis):
   return datetime.datetime.utcfromtimestamp(stamp_millis / 1000).isoformat()
 
@@ -127,6 +128,7 @@ WAIT_OPTION = lambda help_msg: CommandOption(
     default=False,
     action='store_true',
     help=help_msg)
+
 
 class StartUpdate(Verb):
 
@@ -203,15 +205,15 @@ class StartUpdate(Verb):
 
 
 def rollback_state_to_err_code(state):
-    return (EXIT_OK if state == JobUpdateStatus.ROLLED_BACK else
-            EXIT_COMMAND_FAILURE if state == JobUpdateStatus.ROLLED_FORWARD else
-            EXIT_UNKNOWN_ERROR)
+  return (EXIT_OK if state == JobUpdateStatus.ROLLED_BACK else
+          EXIT_COMMAND_FAILURE if state == JobUpdateStatus.ROLLED_FORWARD else
+          EXIT_UNKNOWN_ERROR)
 
 
 def update_state_to_err_code(state):
-    return (EXIT_OK if state == JobUpdateStatus.ROLLED_FORWARD else
-            EXIT_COMMAND_FAILURE if state == JobUpdateStatus.ROLLED_BACK else
-            EXIT_UNKNOWN_ERROR)
+  return (EXIT_OK if state == JobUpdateStatus.ROLLED_FORWARD else
+          EXIT_COMMAND_FAILURE if state == JobUpdateStatus.ROLLED_BACK else
+          EXIT_UNKNOWN_ERROR)
 
 
 def wait_for_update(context, clock, api, update_key, state_to_err_code_func):

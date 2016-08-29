@@ -143,20 +143,19 @@ def test_destroy_ioerror():
 
 def assert_create_user_and_group(mock_check_call, gid_exists, uid_exists):
   mock_pwent = pwd.struct_passwd((
-    'someuser',       # login name
-    'hunter2',        # password
-    834,              # uid
-    835,              # gid
-    'Some User',      # user name
-    '/home/someuser', # home directory
-    '/bin/sh'))       # login shell
+    'someuser',        # login name
+    'hunter2',         # password
+    834,               # uid
+    835,               # gid
+    'Some User',       # user name
+    '/home/someuser',  # home directory
+    '/bin/sh'))        # login shell
 
   mock_grent = grp.struct_group((
-    'users',       # group name
-    '*',           # password
-    835,           # gid
-    ['someuser'])) # members
-
+    'users',        # group name
+    '*',            # password
+    835,            # gid
+    ['someuser']))  # members
 
   exception = subprocess.CalledProcessError(
       returncode=FileSystemImageSandbox._USER_OR_GROUP_ID_EXISTS,
@@ -235,6 +234,7 @@ def test_filesystem_sandbox_mounts_paths(mock_safe_mkdir, mock_check_call):
           os.path.join(task_fs_path, sandbox_mount_point[1:])
       ])
   ]
+
 
 @mock.patch('subprocess.check_call')
 @mock.patch('apache.aurora.executor.common.sandbox.safe_mkdir')
