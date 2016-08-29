@@ -243,11 +243,15 @@ class FileSystemImageSandbox(DirectorySandbox):
     def do_mount(source, destination):
       safe_mkdir(destination)
       log.info('Mounting %s into task filesystem at %s.' % (source, destination))
+
+      # This mount call is meant to mimic what mesos does when mounting into the container. C.f.
+      # https://github.com/apache/mesos/blob/c3228f3c3d1a1b2c145d1377185cfe22da6079eb/src/slave/containerizer/mesos/isolators/filesystem/linux.cpp#L521-L528
       subprocess.check_call([
-        'mount',
-        '--bind',
-        source,
-        destination])
+          'mount',
+          '-n',
+          '--rbind',
+          source,
+          destination])
 
     if self._mounted_volume_paths is not None:
       for container_path in self._mounted_volume_paths:

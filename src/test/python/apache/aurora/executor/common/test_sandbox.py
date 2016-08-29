@@ -217,19 +217,22 @@ def test_filesystem_sandbox_mounts_paths(mock_safe_mkdir, mock_check_call):
   assert mock_check_call.mock_calls == [
       mock.call([
           'mount',
-          '--bind',
+          '-n',
+          '--rbind',
           '/some/container/path',
           os.path.join(task_fs_path, 'some/container/path')
       ]),
       mock.call([
           'mount',
-          '--bind',
+          '-n',
+          '--rbind',
         '/some/other/container/path',
         os.path.join(task_fs_path, 'some/other/container/path')
       ]),
       mock.call([
           'mount',
-          '--bind',
+          '-n',
+          '--rbind',
           sandbox_directory,
           os.path.join(task_fs_path, sandbox_mount_point[1:])
       ])
@@ -257,7 +260,8 @@ def test_filesystem_sandbox_no_volumes(mock_safe_mkdir, mock_check_call):
   assert mock_check_call.mock_calls == [
     mock.call([
       'mount',
-      '--bind',
+      '-n',
+      '--rbind',
       sandbox_directory,
       os.path.join(task_fs_path, sandbox_mount_point[1:])
     ])

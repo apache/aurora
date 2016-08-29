@@ -428,8 +428,14 @@ test_appc() {
   popd
   rm -rf "$TEMP_PATH"
 
+  num_mounts_before=$(mount |wc -l |tr -d '\n')
+
   TEST_JOB_APPC_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_APPC" "--bind appc_image_id=$APPC_IMAGE_ID")
   test_http_example "${TEST_JOB_APPC_ARGS[@]}"
+
+  num_mounts_after=$(mount |wc -l |tr -d '\n')
+  # We want to be sure that running the isolated task did not leak any mounts.
+  [[ "$num_mounts_before" = "$num_mounts_after" ]]
 }
 
 RETCODE=1
