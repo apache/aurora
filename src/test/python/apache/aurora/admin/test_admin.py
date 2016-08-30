@@ -198,7 +198,7 @@ class TestGetSchedulerCommand(AuroraClientCommandTest):
     mock_scheduler_client = create_autospec(spec=SchedulerClient, instance=True)
     mock_raw_url = PropertyMock(return_value="url")
     mock_proxy.scheduler_client.return_value = mock_scheduler_client
-    mock_scheduler_client.raw_url = mock_raw_url
+    type(mock_scheduler_client).raw_url = mock_raw_url
 
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
@@ -208,8 +208,8 @@ class TestGetSchedulerCommand(AuroraClientCommandTest):
     ) as (_, mock_make_admin_client, _):
 
       api = mock_make_admin_client.return_value
-      api.scheduler_proxy = PropertyMock(return_value=mock_proxy)
+      type(api).scheduler_proxy = PropertyMock(return_value=mock_proxy)
 
       get_scheduler([self.TEST_CLUSTER])
 
-      mock_raw_url.assert_called_once()
+      mock_raw_url.assert_called_once_with()
