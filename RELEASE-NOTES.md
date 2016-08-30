@@ -25,10 +25,8 @@
   then the response will be binary thrift. Any other value for `Accept` will result in thrift JSON.
 - Scheduler is now able to launch jobs using more than one executor at a time. To use this feature
   the `-custom_executor_config` flag must point to a JSON file which contains at least one valid
-  executor configuration as detailed in the [configuration](http://aurora.apache.org/documentation/latest/operations/configuration/)
+  executor configuration as detailed in the [configuration](docs/features/custom-executors.md)
   documentation.
-- The `ExecutorInfo.source` field is deprecated and has been replaced with a label named `source`.
-  It will be removed from Mesos in a future release.
 - Add rollback API to the scheduler and new client command to support rolling back
   active update jobs to their initial state.
 
@@ -38,6 +36,9 @@
   that `production=true` used to provide, users should elect a `tier` for the job with attributes
   `preemptible=false` and `revocable=false`. For example, the `preferred` tier in the default tier
   configuration file (`tiers.json`) matches the above criteria.
+- The `ExecutorInfo.source` field is deprecated and has been replaced with a label named `source`.
+  It will be removed from Mesos in a future release.
+
 
 0.15.0
 ======

@@ -144,8 +144,7 @@ For example, to wrap the executor inside a simple wrapper, the scheduler will be
 
 ## Custom Executors
 
-If the need arises to use a Mesos executor other than the Thermos executor, the scheduler can be
-configured to utilize a custom executor by specifying the `-custom_executor_config` flag.
+The scheduler can be configured to utilize a custom executor by specifying the `-custom_executor_config` flag.
 The flag must be set to the path of a valid executor configuration file.
 
 For more information on this feature please see the custom executors [documentation](../features/custom-executors.md).

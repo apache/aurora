@@ -1,6 +1,10 @@
 Custom Executors
 ================
 
+If the need arises to use a Mesos executor other than the Thermos executor, the scheduler can be
+configured to utilize a custom executor by specifying the `-custom_executor_config` flag.
+The flag must be set to the path of a valid executor configuration file.
+
 The configuration file must be a valid **JSON array** and contain, at minimum,
 one executor configuration including the name, command and resources fields and
 must be pointed to by the `-custom_executor_config` flag when the scheduler is
@@ -134,7 +138,7 @@ A sample configuration is as follows:
 
 ```
 
-It should be noted that if you do not use thermos or a thermos based executor, links in the scheduler's
+It should be noted that if you do not use Thermos or a Thermos based executor, links in the scheduler's
 Web UI for tasks will not work (at least for the time being).
 Some information about launched tasks can still be accessed via the Mesos Web UI or via the Aurora Client.
 
@@ -146,4 +150,3 @@ field must be set to match the name used in the custom executor configuration bl
 `JobConfiguration.TaskConfig.ExecutorConfig.name` must be set to `myExecutor`). While support for modifying
 this field in Pystachio created, the easiest way to launch jobs with custom executors is to use
 an existing custom Client such as [gorealis](https://github.com/rdelval/gorealis).
-
