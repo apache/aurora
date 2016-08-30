@@ -29,6 +29,11 @@
   documentation.
 - Add rollback API to the scheduler and new client command to support rolling back
   active update jobs to their initial state.
+- <a name="zk_use_curator_upgrade"></a> The scheduler flag `-zk_use_curator` now defaults to `true`
+  and care should be taken when upgrading from a configuration that does not pass the flag. The
+  scheduler upgrade should be performed by bringing all schedulers down, and then bringing upgraded
+  schedulers up. A rolling upgrade would result in no leading scheduler for the duration of the
+  roll which could be confusing to monitor and debug.
 
 ### Deprecations and removals:
 
@@ -38,7 +43,8 @@
   configuration file (`tiers.json`) matches the above criteria.
 - The `ExecutorInfo.source` field is deprecated and has been replaced with a label named `source`.
   It will be removed from Mesos in a future release.
-
+- The scheduler flag `-zk_use_curator` has been deprecated. If you have never set the flag and are
+  upgrading you should take care as described in the [note](#zk_use_curator_upgrade) above.
 
 0.15.0
 ======

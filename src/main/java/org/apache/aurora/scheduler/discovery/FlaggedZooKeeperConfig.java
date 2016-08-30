@@ -29,16 +29,20 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A factory that creates a {@link ZooKeeperConfig} instance based on command line argument
  * values.
  */
 public final class FlaggedZooKeeperConfig {
+  private static final Logger LOG = LoggerFactory.getLogger(FlaggedZooKeeperConfig.class);
+
   @CmdLine(name = "zk_use_curator",
-      help = "Uses Apache Curator as the zookeeper client; otherwise a copy of Twitter "
+      help = "DEPRECATED: Uses Apache Curator as the zookeeper client; otherwise a copy of Twitter "
           + "commons/zookeeper (the legacy library) is used.")
-  private static final Arg<Boolean> USE_CURATOR = Arg.create(false);
+  private static final Arg<Boolean> USE_CURATOR = Arg.create(true);
 
   @CmdLine(name = "zk_in_proc",
       help = "Launches an embedded zookeeper server for local testing causing -zk_endpoints "
@@ -70,6 +74,9 @@ public final class FlaggedZooKeeperConfig {
    * @return Configuration instance.
    */
   public static ZooKeeperConfig create() {
+    if (USE_CURATOR.hasAppliedValue()) {
+      LOG.warn("The -zk_use_curator flag is deprecated and will be removed in a future release.");
+    }
     return new ZooKeeperConfig(
         USE_CURATOR.get(),
         ZK_ENDPOINTS.get(),
