@@ -190,6 +190,10 @@ class FileSystemImageSandbox(DirectorySandbox):
   # returncode from a `useradd` or `groupadd` call indicating that the uid/gid already exists.
   _USER_OR_GROUP_ID_EXISTS = 4
 
+  # returncode from a `useradd` or `groupadd` call indicating that the user/group name
+  # already exists.
+  _USER_OR_GROUP_NAME_EXISTS = 9
+
   def __init__(self, root, **kwargs):
     self._task_fs_root = os.path.join(
         os.environ[DefaultSandboxProvider.MESOS_DIRECTORY_ENV_VARIABLE],
@@ -205,6 +209,36 @@ class FileSystemImageSandbox(DirectorySandbox):
 
     super(FileSystemImageSandbox, self).__init__(root, **kwargs)
 
+  def _verify_group_match_in_taskfs(self, group_id, group_name):
+    try:
+      result = subprocess.check_output(
+          ['chroot', self._task_fs_root, 'getent', 'group', group_name])
+    except subprocess.CalledProcessError as e:
+      raise self.CreationError(
+          'Error when getting group id for name %s in task image: %s' % (
+          group_name, e))
+    splitted = result.split(':')
+    if (len(splitted) < 3 or splitted[0] != '%s' % group_name or
+        splitted[2] != '%s' % group_id):
+      raise self.CreationError(
+          'Group id result %s from image does not match name %s and id %s' % (
+          result, group_name, group_id))
+
+  def _verify_user_match_in_taskfs(self, user_id, user_name, group_id, group_name):
+    try:
+      result = subprocess.check_output(
+          ['chroot', self._task_fs_root, 'id', '%s' % user_name])
+    except subprocess.CalledProcessError as e:
+      raise self.CreationError(
+          'Error when getting user id for name %s in task image: %s' % (
+          user_name, e))
+
+    expected_prefix = "uid=%s(%s) gid=%s(%s) groups=" % (user_id, user_name, group_id, group_name)
+    if not result.startswith(expected_prefix):
+      raise self.CreationError(
+          'User group result %s from task image does not start with expected prefix %s' % (
+          result, expected_prefix))
+
   def _create_user_and_group_in_taskfs(self):
     if self._user:
       pwent, grent = self.get_user_and_group()
@@ -214,7 +248,8 @@ class FileSystemImageSandbox(DirectorySandbox):
             ['groupadd', '-R', self._task_fs_root, '-g', '%s' % grent.gr_gid, grent.gr_name])
       except subprocess.CalledProcessError as e:
         # If the failure was due to the group existing, we're ok to continue, otherwise bail out.
-        if e.returncode == self._USER_OR_GROUP_ID_EXISTS:
+        if e.returncode in [self._USER_OR_GROUP_ID_EXISTS, self._USER_OR_GROUP_NAME_EXISTS]:
+          self._verify_group_match_in_taskfs(grent.gr_gid, grent.gr_name)
           log.info(
               'Group %s(%s) already exists in the task''s filesystem, no need to create.' % (
               grent.gr_name, grent.gr_gid))
@@ -232,7 +267,9 @@ class FileSystemImageSandbox(DirectorySandbox):
             pwent.pw_name])
       except subprocess.CalledProcessError as e:
         # If the failure was due to the user existing, we're ok to continue, otherwise bail out.
-        if e.returncode == self._USER_OR_GROUP_ID_EXISTS:
+        if e.returncode in [self._USER_OR_GROUP_ID_EXISTS, self._USER_OR_GROUP_NAME_EXISTS]:
+          self._verify_user_match_in_taskfs(
+              pwent.pw_uid, pwent.pw_name, pwent.pw_gid, grent.gr_name)
           log.info(
               'User %s (%s) already exists in the task''s filesystem, no need to create.' % (
               self._user, pwent.pw_uid))
