@@ -1,6 +1,9 @@
 Resources Isolation and Sizing
 ==============================
 
+This document assumes Aurora and Mesos have been configured
+using our [recommended resource isolation settings](../operations/configuration.md#resource-isolation).
+
 - [Isolation](#isolation)
 - [Sizing](#sizing)
 - [Oversubscription](#oversubscription)
@@ -11,11 +14,13 @@ Isolation
 
 Aurora is a multi-tenant system; a single software instance runs on a
 server, serving multiple clients/tenants. To share resources among
-tenants, it implements isolation of:
+tenants, it leverages Mesos for isolation of:
 
 * CPU
+* GPU
 * memory
 * disk space
+* ports
 
 CPU is a soft limit, and handled differently from memory and disk space.
 Too low a CPU value results in throttling your application and
@@ -24,10 +29,10 @@ application goes over these values, it's killed.
 
 ### CPU Isolation
 
-Mesos uses a quota based CPU scheduler (the *Completely Fair Scheduler*)
-to provide consistent and predictable performance.  This is effectively
-a guarantee of resources -- you receive at least what you requested, but
-also no more than you've requested.
+Mesos can be configured to use a quota based CPU scheduler (the *Completely*
+*Fair Scheduler*) to provide consistent and predictable performance.
+This is effectively a guarantee of resources -- you receive at least what
+you requested, but also no more than you've requested.
 
 The scheduler gives applications a CPU quota for every 100 ms interval.
 When an application uses its quota for an interval, it is throttled for
@@ -103,11 +108,11 @@ will be killed shortly after. This is subject to change.
 
 ### GPU Isolation
 
-GPU isolation will be supported for Nvidia devices starting from Mesos 0.29.0.
+GPU isolation will be supported for Nvidia devices starting from Mesos 1.0.
 Access to the allocated units will be exclusive with no sharing between tasks
-allowed (e.g. no fractional GPU allocation). Until official documentation is released,
-see [Mesos design document](https://docs.google.com/document/d/10GJ1A80x4nIEo8kfdeo9B11PIbS1xJrrB4Z373Ifkpo/edit#heading=h.w84lz7p4eexl)
-for more details.
+allowed (e.g. no fractional GPU allocation). For more details, see the
+[Mesos design document](https://docs.google.com/document/d/10GJ1A80x4nIEo8kfdeo9B11PIbS1xJrrB4Z373Ifkpo/edit#heading=h.w84lz7p4eexl)
+and the [Mesos agent configuration](http://mesos.apache.org/documentation/latest/configuration/).
 
 ### Other Resources
 
@@ -154,26 +159,23 @@ into the application's sandbox space.
 GPU is highly dependent on your application requirements and is only limited
 by the number of physical GPU units available on a target box.
 
+
 Oversubscription
 ----------------
 
-**WARNING**: This feature is currently in alpha status. Do not use it in production clusters!
+Mesos supports [oversubscription of machine resources](http://mesos.apache.org/documentation/latest/oversubscription/)
+via the concept of revocable tasks. In contrast to non-revocable tasks, revocable tasks are best-effort.
+Mesos reserves the right to throttle or even kill them if they might affect existing high-priority
+user-facing services.
 
-Mesos [supports a concept of revocable tasks](http://mesos.apache.org/documentation/latest/oversubscription/)
-by oversubscribing machine resources by the amount deemed safe to not affect the existing
-non-revocable tasks. Aurora now supports revocable jobs via a `tier` setting set to `revocable`
-value.
+As of today, the only revocable resource supported by Aurora are CPU resources. A job can opt-in to
+use those by specifying the `revocable` [Configuration Tier](../features/multitenancy.md#configuration-tiers).
+A revocable job will only be scheduled using revocable CPU resources, even if there are plenty of
+non-revocable resources available.
 
-The Aurora scheduler must be configured to receive revocable offers from Mesos and accept revocable
-jobs. If not configured properly revocable tasks will never get assigned to hosts and will stay in
-`PENDING`. Set these scheduler flag to allow receiving revocable Mesos offers:
+The Aurora scheduler must be [configured to receive revocable offers](../operations/configuration.md#resource-isolation)
+from Mesos and accept revocable jobs. If not configured properly revocable tasks will never get
+assigned to hosts and will stay in `PENDING`.
 
-    -receive_revocable_resources=true
-
-Specify a tier configuration file path (unless you want to use the [default](../../src/main/resources/org/apache/aurora/scheduler/tiers.json)):
-
-    -tier_config=path/to/tiers/config.json
-
-
-See the [Configuration Reference](../reference/configuration.md) for details on how to mark a job
-as being revocable.
+For details on how to mark a job as being revocable, see the
+[Configuration Reference](../reference/configuration.md).

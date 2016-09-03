@@ -40,6 +40,7 @@ Configuration Tiers
 Tier is a predefined bundle of task configuration options. Aurora schedules tasks and assigns them
 resources based on their tier assignment. The default scheduler tier configuration allows for
 3 tiers:
+
  - `revocable`: The `revocable` tier requires the task to run with [revocable](resource-isolation.md#oversubscription)
  resources.
  - `preemptible`: Setting the task’s tier to `preemptible` allows for the possibility of that task
