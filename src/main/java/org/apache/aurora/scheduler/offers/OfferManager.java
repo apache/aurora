@@ -36,6 +36,7 @@ import com.google.common.eventbus.Subscribe;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stats;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
@@ -145,23 +146,27 @@ public interface OfferManager extends EventSubscriber {
     @VisibleForTesting
     static final Logger LOG = LoggerFactory.getLogger(OfferManagerImpl.class);
 
-    private final HostOffers hostOffers = new HostOffers();
+    private final HostOffers hostOffers;
     private final AtomicLong offerRaces = Stats.exportLong("offer_accept_races");
 
     private final Driver driver;
     private final OfferSettings offerSettings;
     private final DelayExecutor executor;
+    private final StatsProvider statsProvider;
 
     @Inject
     @VisibleForTesting
     public OfferManagerImpl(
         Driver driver,
         OfferSettings offerSettings,
+        StatsProvider statsProvider,
         @AsyncExecutor DelayExecutor executor) {
 
       this.driver = requireNonNull(driver);
       this.offerSettings = requireNonNull(offerSettings);
       this.executor = requireNonNull(executor);
+      this.statsProvider = requireNonNull(statsProvider);
+      this.hostOffers = new HostOffers(statsProvider);
     }
 
     @Override
@@ -281,10 +286,10 @@ public interface OfferManager extends EventSubscriber {
       // scheduling attempts. See VetoGroup for more details on static ban.
       private final Multimap<OfferID, TaskGroupKey> staticallyBannedOffers = HashMultimap.create();
 
-      HostOffers() {
+      HostOffers(StatsProvider statsProvider) {
         // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
         // Could track this separately if it turns out to pose problems.
-        Stats.exportSize("outstanding_offers", offers);
+        statsProvider.exportSize("outstanding_offers", offers);
       }
 
       synchronized Optional<HostOffer> get(SlaveID slaveId) {

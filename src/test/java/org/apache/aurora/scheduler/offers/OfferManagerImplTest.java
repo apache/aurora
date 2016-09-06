@@ -19,6 +19,7 @@ import com.google.common.collect.Iterables;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobKey;
@@ -34,6 +35,7 @@ import org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Filters;
 import org.apache.mesos.Protos.TaskInfo;
@@ -85,7 +87,8 @@ public class OfferManagerImplTest extends EasyMockTest {
     OfferSettings offerSettings = new OfferSettings(
         Amount.of(OFFER_FILTER_SECONDS, Time.SECONDS),
         () -> RETURN_DELAY);
-    offerManager = new OfferManagerImpl(driver, offerSettings, executorMock);
+    StatsProvider stats = new FakeStatsProvider();
+    offerManager = new OfferManagerImpl(driver, offerSettings, stats, executorMock);
   }
 
   @Test

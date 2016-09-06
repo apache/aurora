@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.common.stats;
 
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Supplier;
@@ -41,6 +42,16 @@ public interface StatsProvider {
    * @return A reference to the stat that was stored.
    */
   <T extends Number> Stat<T> makeGauge(String name, Supplier<T> gauge);
+
+  /**
+   * Exports a metric that tracks the size of a collection.
+   *
+   * @param name Name of the stat to export.
+   * @param collection Collection whose size should be tracked.
+   */
+  default void exportSize(String name, final Collection<?> collection) {
+    makeGauge(name, (Supplier<Number>) collection::size);
+  }
 
   /**
    * Gets a stats provider that does not track stats in an internal time series repository.

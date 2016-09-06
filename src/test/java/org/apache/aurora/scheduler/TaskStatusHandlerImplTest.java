@@ -68,6 +68,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     statusHandler = new TaskStatusHandlerImpl(
         storageUtil.storage,
         stateManager,
+        stats,
         driver,
         queue,
         1000,
@@ -261,6 +262,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     statusHandler = new TaskStatusHandlerImpl(
         storageUtil.storage,
         stateManager,
+        stats,
         driver,
         queue,
         1000,

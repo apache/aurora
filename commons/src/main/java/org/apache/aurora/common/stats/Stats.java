@@ -237,20 +237,6 @@ public class Stats {
   }
 
   /**
-   * Exports a metric that tracks the size of a collection.
-   *
-   * @param name Name of the stat to export.
-   * @param collection Collection whose size should be tracked.
-   */
-  public static void exportSize(String name, final Collection<?> collection) {
-    export(new StatImpl<Integer>(name) {
-      @Override public Integer read() {
-        return collection.size();
-      }
-    });
-  }
-
-  /**
    * Exports a 'static' statistic, which will not be registered for time series tracking.
    *
    * @param var Variable to statically export.
