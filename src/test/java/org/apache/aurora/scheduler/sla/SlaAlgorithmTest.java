@@ -43,6 +43,7 @@ import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.JOB_UPT
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.JOB_UPTIME_99;
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.MEDIAN_TIME_TO_ASSIGNED;
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.MEDIAN_TIME_TO_RUNNING;
+import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.MEDIAN_TIME_TO_STARTING;
 import static org.junit.Assert.assertEquals;
 
 public class SlaAlgorithmTest {
@@ -95,6 +96,62 @@ public class SlaAlgorithmTest {
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, ASSIGNED))),
         Range.closedOpen(0L, 300L));
+  }
+
+  @Test
+  public void testMedianTimeToStartingEven() {
+    Number actual = MEDIAN_TIME_TO_STARTING.getAlgorithm().calculate(
+        ImmutableSet.of(
+            makeTask(ImmutableMap.of(50L, PENDING)), // Ignored as not RUNNING
+            makeTask(ImmutableMap.of(50L, PENDING, 100L, ASSIGNED, 150L, STARTING)),
+            makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, STARTING, 400L, RUNNING)),
+            makeTask(ImmutableMap.of(
+                100L, PENDING,
+                200L, ASSIGNED,
+                300L, STARTING,
+                400L, KILLED)), // Ignored due to being terminal.
+            makeTask(ImmutableMap.of(
+                50L, PENDING,
+                100L, ASSIGNED,
+                150L, STARTING,
+                200L, RUNNING,
+                300L, KILLED))), // Ignored due to being terminal.
+        Range.closedOpen(0L, 500L));
+    assertEquals(100L, actual);
+  }
+
+  @Test
+  public void testMedianTimeToStartingOdd() {
+    Number actual = MEDIAN_TIME_TO_STARTING.getAlgorithm().calculate(
+        ImmutableSet.of(
+            makeTask(ImmutableMap.of(50L, PENDING)), // Ignored as not RUNNING
+            makeTask(ImmutableMap.of(50L, PENDING, 100L, ASSIGNED, 150L, STARTING)),
+            makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, STARTING, 400L, RUNNING)),
+            makeTask(ImmutableMap.of(50L, PENDING, 100L, ASSIGNED, 350L, STARTING)),
+            makeTask(ImmutableMap.of(
+                100L, PENDING,
+                200L, ASSIGNED,
+                300L, STARTING,
+                400L, KILLED)), // Ignored due to being terminal.
+            makeTask(ImmutableMap.of(
+                50L, PENDING,
+                100L, ASSIGNED,
+                150L, STARTING,
+                200L, RUNNING,
+                300L, KILLED))), // Ignored due to being terminal.
+        Range.closedOpen(0L, 500L));
+    assertEquals(200L, actual);
+  }
+
+  @Test
+  public void testMedianTimeToStartingZero() {
+    Number actual = MEDIAN_TIME_TO_STARTING.getAlgorithm().calculate(
+        ImmutableSet.of(
+            makeTask(ImmutableMap.of(50L, PENDING)),
+            makeTask(ImmutableMap.of(50L, PENDING, 100L, STARTING, 200L, RUNNING, 300L, KILLED)),
+            makeTask(ImmutableMap.of(50L, PENDING, 100L, STARTING, 200L, KILLED))),
+        Range.closedOpen(0L, 500L));
+    assertEquals(0L, actual);
   }
 
   @Test

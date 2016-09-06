@@ -43,6 +43,7 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 
 /**
  * Defines an SLA algorithm to be applied to a {@link IScheduledTask}
@@ -72,6 +73,7 @@ interface SlaAlgorithm {
     JOB_UPTIME_50(new JobUptime(50f), String.format(JobUptime.NAME_FORMAT, 50f)),
     AGGREGATE_PLATFORM_UPTIME(new AggregatePlatformUptime(), "platform_uptime_percent"),
     MEDIAN_TIME_TO_ASSIGNED(new MedianAlgorithm(ASSIGNED), "mtta_ms"),
+    MEDIAN_TIME_TO_STARTING(new MedianAlgorithm(STARTING), "mtts_ms"),
     MEDIAN_TIME_TO_RUNNING(new MedianAlgorithm(RUNNING), "mttr_ms");
 
     private final SlaAlgorithm algorithm;

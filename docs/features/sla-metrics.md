@@ -6,6 +6,7 @@ Aurora SLA Measurement
   - [Platform Uptime](#platform-uptime)
   - [Job Uptime](#job-uptime)
   - [Median Time To Assigned (MTTA)](#median-time-to-assigned-\(mtta\))
+  - [Median Time To Starting (MTTS)](#median-time-to-starting-\(mtts\))
   - [Median Time To Running (MTTR)](#median-time-to-running-\(mttr\))
 - [Limitations](#limitations)
 
@@ -109,7 +110,7 @@ metric that helps track the dependency of scheduling performance on the requeste
 * Per job - `sla_<job_key>_mtta_ms`
 * Per cluster - `sla_cluster_mtta_ms`
 * Per instance size (small, medium, large, x-large, xx-large). Size are defined in:
-[ResourceAggregates.java](../../src/main/java/org/apache/aurora/scheduler/base/ResourceAggregates.java)
+[ResourceBag.java](../../src/main/java/org/apache/aurora/scheduler/resources/ResourceBag.java)
   * By CPU:
     * `sla_cpu_small_mtta_ms`
     * `sla_cpu_medium_mtta_ms`
@@ -135,6 +136,42 @@ MTTA only considers instances that have already reached ASSIGNED state and ignor
 that are still PENDING. This ensures straggler instances (e.g. with unreasonable resource
 constraints) do not affect metric curves.
 
+### Median Time To Starting (MTTS)
+
+*Median time a job waits for its tasks to reach STARTING state. This is a comprehensive metric
+reflecting on the overall time it takes for the Aurora/Mesos to start initializing the sandbox
+for a task.*
+
+**Collection scope:**
+
+* Per job - `sla_<job_key>_mtts_ms`
+* Per cluster - `sla_cluster_mtts_ms`
+* Per instance size (small, medium, large, x-large, xx-large). Size are defined in:
+[ResourceBag.java](../../src/main/java/org/apache/aurora/scheduler/resources/ResourceBag.java)
+  * By CPU:
+    * `sla_cpu_small_mtts_ms`
+    * `sla_cpu_medium_mtts_ms`
+    * `sla_cpu_large_mtts_ms`
+    * `sla_cpu_xlarge_mtts_ms`
+    * `sla_cpu_xxlarge_mtts_ms`
+  * By RAM:
+    * `sla_ram_small_mtts_ms`
+    * `sla_ram_medium_mtts_ms`
+    * `sla_ram_large_mtts_ms`
+    * `sla_ram_xlarge_mtts_ms`
+    * `sla_ram_xxlarge_mtts_ms`
+  * By DISK:
+    * `sla_disk_small_mtts_ms`
+    * `sla_disk_medium_mtts_ms`
+    * `sla_disk_large_mtts_ms`
+    * `sla_disk_xlarge_mtts_ms`
+    * `sla_disk_xxlarge_mtts_ms`
+
+**Units:** milliseconds
+
+MTTS only considers instances in STARTING state. This ensures straggler instances (e.g. with
+unreasonable resource constraints) do not affect metric curves.
+
 ### Median Time To Running (MTTR)
 
 *Median time a job waits for its tasks to reach RUNNING state. This is a comprehensive metric
@@ -145,7 +182,7 @@ reflecting on the overall time it takes for the Aurora/Mesos to start executing 
 * Per job - `sla_<job_key>_mttr_ms`
 * Per cluster - `sla_cluster_mttr_ms`
 * Per instance size (small, medium, large, x-large, xx-large). Size are defined in:
-[ResourceAggregates.java](../../src/main/java/org/apache/aurora/scheduler/base/ResourceAggregates.java)
+[ResourceBag.java](../../src/main/java/org/apache/aurora/scheduler/resources/ResourceBag.java)
   * By CPU:
     * `sla_cpu_small_mttr_ms`
     * `sla_cpu_medium_mttr_ms`

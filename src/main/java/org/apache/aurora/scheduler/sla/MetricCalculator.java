@@ -54,6 +54,7 @@ import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.JOB_UPT
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.JOB_UPTIME_99;
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.MEDIAN_TIME_TO_ASSIGNED;
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.MEDIAN_TIME_TO_RUNNING;
+import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.MEDIAN_TIME_TO_STARTING;
 import static org.apache.aurora.scheduler.sla.SlaGroup.GroupType.CLUSTER;
 import static org.apache.aurora.scheduler.sla.SlaGroup.GroupType.JOB;
 import static org.apache.aurora.scheduler.sla.SlaGroup.GroupType.RESOURCE_CPU;
@@ -88,6 +89,7 @@ class MetricCalculator implements Runnable {
         .build()),
     MEDIANS(ImmutableMultimap.<AlgorithmType, GroupType>builder()
         .putAll(MEDIAN_TIME_TO_ASSIGNED, JOB, CLUSTER, RESOURCE_CPU, RESOURCE_RAM, RESOURCE_DISK)
+        .putAll(MEDIAN_TIME_TO_STARTING, JOB, CLUSTER, RESOURCE_CPU, RESOURCE_RAM, RESOURCE_DISK)
         .putAll(MEDIAN_TIME_TO_RUNNING, JOB, CLUSTER, RESOURCE_CPU, RESOURCE_RAM, RESOURCE_DISK)
         .build());
 
