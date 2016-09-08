@@ -1062,7 +1062,7 @@ public class JobUpdaterIT extends EasyMockTest {
     expectInvalid(update);
 
     update = makeJobUpdate().newBuilder();
-    update.getInstructions().getSettings().setMinWaitInInstanceRunningMs(0);
+    update.getInstructions().getSettings().setMinWaitInInstanceRunningMs(-1);
     expectInvalid(update);
   }
 

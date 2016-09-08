@@ -77,8 +77,8 @@ interface UpdateFactory {
       requireNonNull(instructions);
       IJobUpdateSettings settings = instructions.getSettings();
       checkArgument(
-          settings.getMinWaitInInstanceRunningMs() > 0,
-          "Min wait in running must be positive.");
+          settings.getMinWaitInInstanceRunningMs() >= 0,
+          "Min wait in running must be non-negative.");
       checkArgument(
           settings.getUpdateGroupSize() > 0,
           "Update group size must be positive.");

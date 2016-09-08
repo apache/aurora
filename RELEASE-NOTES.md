@@ -34,6 +34,7 @@
   scheduler upgrade should be performed by bringing all schedulers down, and then bringing upgraded
   schedulers up. A rolling upgrade would result in no leading scheduler for the duration of the
   roll which could be confusing to monitor and debug.
+- Add a new MTTS (Median Time To Starting) metric in addition to MTTA and MTTR.
 
 ### Deprecations and removals:
 
