@@ -104,8 +104,13 @@ jobs = [
     name = 'http_example_gpu'
   ).bind(profile=GpuProfile),
   job(
-    name = 'http_example_appc',
+    name = 'http_example_unified_appc',
     container = Mesos(image=AppcImage(name='http_example_netcat', image_id='{{appc_image_id}}')),
+    task = no_python_task
+  ).bind(profile=DefaultProfile()),
+  job(
+    name = 'http_example_unified_docker',
+    container = Mesos(image=DockerImage(name='http_example_netcat', tag='latest')),
     task = no_python_task
   ).bind(profile=DefaultProfile())
 ]

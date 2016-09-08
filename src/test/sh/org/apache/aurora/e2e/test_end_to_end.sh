@@ -33,7 +33,7 @@ _curl() { curl --silent --fail --retry 4 --retry-delay 10 "$@" ; }
 tear_down() {
   set +x  # Disable command echo, as this makes it more difficult see which command failed.
 
-  for job in http_example http_example_revocable http_example_docker; do
+  for job in http_example http_example_revocable http_example_docker http_example_unified_appc http_example_unified_docker; do
     aurora update abort devcluster/vagrant/test/$job || true >/dev/null 2>&1
     aurora job killall --no-batching devcluster/vagrant/test/$job >/dev/null 2>&1
   done
@@ -408,16 +408,23 @@ test_basic_auth_unauthenticated() {
   restore_netrc
 }
 
-test_appc() {
+setup_image_stores() {
   TEMP_PATH=$(mktemp -d)
   pushd "$TEMP_PATH"
 
-  # build the appc image from the docker image
+  # build the docker image and save it as a tarball.
   sudo docker build -t http_example_netcat -f "${TEST_ROOT}/Dockerfile.netcat" ${TEST_ROOT}
   docker save -o http_example_netcat-latest.tar http_example_netcat
+
+  DOCKER_IMAGE_DIRECTORY="/tmp/mesos/images/docker"
+  sudo mkdir -p "$DOCKER_IMAGE_DIRECTORY"
+  sudo cp http_example_netcat-latest.tar "$DOCKER_IMAGE_DIRECTORY/http_example_netcat:latest.tar"
+
+  # build the appc image from the docker image
   docker2aci http_example_netcat-latest.tar
 
   APPC_IMAGE_ID="sha512-$(sha512sum http_example_netcat-latest.aci | awk '{print $1}')"
+  export APPC_IMAGE_ID
   APPC_IMAGE_DIRECTORY="/tmp/mesos/images/appc/images/$APPC_IMAGE_ID"
 
   sudo mkdir -p "$APPC_IMAGE_DIRECTORY"
@@ -427,11 +434,24 @@ test_appc() {
 
   popd
   rm -rf "$TEMP_PATH"
+}
 
+test_appc_unified() {
   num_mounts_before=$(mount |wc -l |tr -d '\n')
 
-  TEST_JOB_APPC_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_APPC" "--bind appc_image_id=$APPC_IMAGE_ID")
+  TEST_JOB_APPC_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_UNIFIED_APPC" "--bind appc_image_id=$APPC_IMAGE_ID")
   test_http_example "${TEST_JOB_APPC_ARGS[@]}"
+
+  num_mounts_after=$(mount |wc -l |tr -d '\n')
+  # We want to be sure that running the isolated task did not leak any mounts.
+  [[ "$num_mounts_before" = "$num_mounts_after" ]]
+}
+
+test_docker_unified() {
+  num_mounts_before=$(mount |wc -l |tr -d '\n')
+
+  TEST_JOB_DOCKER_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_UNIFIED_DOCKER")
+  test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
 
   num_mounts_after=$(mount |wc -l |tr -d '\n')
   # We want to be sure that running the isolated task did not leak any mounts.
@@ -450,7 +470,8 @@ TEST_JOB=http_example
 TEST_JOB_REVOCABLE=http_example_revocable
 TEST_JOB_GPU=http_example_gpu
 TEST_JOB_DOCKER=http_example_docker
-TEST_JOB_APPC=http_example_appc
+TEST_JOB_UNIFIED_APPC=http_example_unified_appc
+TEST_JOB_UNIFIED_DOCKER=http_example_unified_docker
 TEST_CONFIG_FILE=$EXAMPLE_DIR/http_example.aurora
 TEST_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_updated.aurora
 TEST_BAD_HEALTHCHECK_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_bad_healthcheck.aurora
@@ -501,7 +522,9 @@ test_http_example_basic "${TEST_JOB_GPU_ARGS[@]}"
 sudo docker build -t http_example -f "${TEST_ROOT}/Dockerfile.python" ${TEST_ROOT}
 test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
 
-test_appc
+setup_image_stores
+test_appc_unified
+test_docker_unified
 
 test_admin "${TEST_ADMIN_ARGS[@]}"
 test_basic_auth_unauthenticated  "${TEST_JOB_ARGS[@]}"
