@@ -56,7 +56,6 @@ function build_scheduler {
   fi
   CLASSPATH_PREFIX=$hot_resources_dir ./gradlew installDist
 
-  export LD_LIBRARY_PATH=/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server
   sudo mkdir -p /var/db/aurora
   if sudo mesos-log initialize --path="/var/db/aurora"
   then
@@ -64,7 +63,6 @@ function build_scheduler {
   else
     echo "Replicated log initialization failed with code $? (likely already initialized)."
   fi
-  unset LD_LIBRARY_PATH
   upstart_update aurora-scheduler
 }
 

@@ -12,24 +12,28 @@
 # limitations under the License.
 #
 
-hello_world_proc = Process(
-    name="hello_process",
-    cmdline="""
-while true; do
-    echo -n "Hello world! The time is now: " && date
-    sleep 10
-done
-""")
 
-hello_world_docker = Task(
-  name = 'hello docker',
-  processes = [hello_world_proc],
-  resources = Resources(cpu = 1, ram = 1*MB, disk=8*MB))
+hello_loop = Process(
+  name = 'hello',
+  cmdline = """
+    while true; do
+      echo hello world
+      sleep 10
+    done
+  """)
+
+task = Task(
+  processes = [hello_loop],
+  resources = Resources(cpu=1, ram=1*MB, disk=8*MB)
+)
 
 jobs = [
-  Service(cluster = 'devcluster',
-          environment = 'devel',
-          role = 'docker-test',
-          name = 'hello_docker',
-          task = hello_world_docker,
-          container = Docker(image = 'python:2.7'))]
+  Service(
+    cluster = 'devcluster',
+    environment = 'devel',
+    role = 'www-data',
+    name = 'hello_docker_engine',
+    task = task,
+    container = Docker(image = 'python:2.7')
+  )
+]

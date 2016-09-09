@@ -451,37 +451,16 @@ tasks with the same static port allocations from being co-scheduled.
 External constraints such as agent attributes should be used to enforce such
 guarantees should they be needed.
 
+
 ### Container Objects
-
-*Note: Both Docker and Mesos unified-container support are currently EXPERIMENTAL.*
-*Note: In order to correctly execute processes inside a job, the Docker container must have python 2.7 installed.*
-
-*Note: For private docker registry, mesos mandates the docker credential file to be named as `.dockercfg`, even though docker may create a credential file with a different name on various platforms. Also, the `.dockercfg` file needs to be copied into the sandbox using the `-thermos_executor_resources` flag, specified while starting Aurora.*
 
 Describes the container the job's processes will run inside. If not using Docker or the Mesos
 unified-container, the container can be omitted from your job config.
 
   param          | type           | description
   -----          | :----:         | -----------
-  ```docker```   | Docker         | A docker container to use.
-  ```mesos```    | Mesos          | A mesos container to use.
-
-### Docker Object
-
-  param            | type            | description
-  -----            | :----:          | -----------
-  ```image```      | String          | The name of the docker image to execute.  If the image does not exist locally it will be pulled with ```docker pull```.
-  ```parameters``` | List(Parameter) | Additional parameters to pass to the docker containerizer.
-
-### Docker Parameter Object
-
-Docker CLI parameters. This needs to be enabled by the scheduler `allow_docker_parameters` option.
-See [Docker Command Line Reference](https://docs.docker.com/reference/commandline/run/) for valid parameters.
-
-  param            | type            | description
-  -----            | :----:          | -----------
-  ```name```       | String          | The name of the docker parameter. E.g. volume
-  ```value```      | String          | The value of the parameter. E.g. /usr/local/bin:/usr/bin:rw
+  ```mesos```    | Mesos          | A native Mesos container to use.
+  ```docker```   | Docker         | A Docker container to use (via Docker engine)
 
 ### Mesos Object
 
@@ -490,8 +469,6 @@ See [Docker Command Line Reference](https://docs.docker.com/reference/commandlin
   ```image```      | Choice(AppcImage, DockerImage) | An optional filesystem image to use within this container.
 
 ### AppcImage
-
-*Note: In order to correctly execute processes inside a job, the filesystem image must include python 2.7.*
 
 Describes an AppC filesystem image.
 
@@ -502,14 +479,34 @@ Describes an AppC filesystem image.
 
 ### DockerImage
 
-*Note: In order to correctly execute processes inside a job, the filesystem image must include python 2.7.*
-
 Describes a Docker filesystem image.
 
   param      | type   | description
   -----      | :----: | -----------
   ```name``` | String | The name of the docker image.
   ```tag```  | String | The tag that identifies the docker image.
+
+
+### Docker Object
+
+*Note: In order to correctly execute processes inside a job, the Docker container must have Python 2.7 installed.*
+*Note: For private docker registry, mesos mandates the docker credential file to be named as `.dockercfg`, even though docker may create a credential file with a different name on various platforms. Also, the `.dockercfg` file needs to be copied into the sandbox using the `-thermos_executor_resources` flag, specified while starting Aurora.*
+
+  param            | type            | description
+  -----            | :----:          | -----------
+  ```image```      | String          | The name of the docker image to execute.  If the image does not exist locally it will be pulled with ```docker pull```.
+  ```parameters``` | List(Parameter) | Additional parameters to pass to the Docker engine.
+
+### Docker Parameter Object
+
+Docker CLI parameters. This needs to be enabled by the scheduler `-allow_docker_parameters` option.
+See [Docker Command Line Reference](https://docs.docker.com/reference/commandline/run/) for valid parameters.
+
+  param            | type            | description
+  -----            | :----:          | -----------
+  ```name```       | String          | The name of the docker parameter. E.g. volume
+  ```value```      | String          | The value of the parameter. E.g. /usr/local/bin:/usr/bin:rw
+
 
 ### LifecycleConfig Objects
 
