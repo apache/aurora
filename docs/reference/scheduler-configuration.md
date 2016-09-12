@@ -22,6 +22,8 @@ Required flags:
 	Max number of idle connections to the database via MyBatis
 -framework_authentication_file
 	Properties file which contains framework credentials to authenticate with Mesosmaster. Must contain the properties 'aurora_authentication_principal' and 'aurora_authentication_secret'.
+-ip
+	The ip address to listen. If not set, the scheduler will listen on all interfaces.
 -mesos_master_address [not null]
 	Address for the mesos master, can be a socket address or zookeeper path.
 -mesos_role
@@ -34,12 +36,16 @@ Required flags:
 	Path to the thermos executor entry point.
 -tier_config [file must be readable]
 	Configuration file defining supported task tiers, task traits and behaviors.
+-webhook_config [file must exist, file must be readable]
+	Path to webhook configuration file.
 -zk_endpoints [must have at least 1 item]
 	Endpoint specification for the ZooKeeper servers.
 
 Optional flags:
 -allow_docker_parameters (default false)
 	Allow to pass docker container parameters in the job.
+-allow_gpu_resource (default false)
+	Allow jobs to request Mesos GPU resource.
 -allowed_container_types (default [MESOS])
 	Container types that are allowed to be used by jobs.
 -async_slot_stat_update_interval (default (1, mins))
@@ -76,10 +82,16 @@ Optional flags:
 	List of domains for which CORS support should be enabled.
 -enable_h2_console (default false)
 	Enable H2 DB management console.
+-enable_mesos_fetcher (default false)
+	Allow jobs to pass URIs to the Mesos Fetcher. Note that enabling this feature could pose a privilege escalation threat.
 -enable_preemptor (default true)
 	Enable the preemptor and preemption
+-enable_revocable_cpus (default true)
+	Treat CPUs as a revocable resource.
+-enable_revocable_ram (default false)
+	Treat RAM as a revocable resource.
 -executor_user (default root)
-	User to start the executor. Defaults to "root". Set this to an unprivileged user if the mesos master was started with "--no-root_submissions". If set to anything other than "root", the executor will ignore the "role" setting for jobs since it can't use setuid() anymore. This means that all your jobs will run under the specified user and the user has to exist on the mesos slaves.
+	User to start the executor. Defaults to "root". Set this to an unprivileged user if the mesos master was started with "--no-root_submissions". If set to anything other than "root", the executor will ignore the "role" setting for jobs since it can't use setuid() anymore. This means that all your jobs will run under the specified user and the user has to exist on the Mesos agents.
 -first_schedule_delay (default (1, ms))
 	Initial amount of time to wait before first attempting to schedule a PENDING task.
 -flapping_task_threshold (default (5, mins))
@@ -163,7 +175,7 @@ Optional flags:
 -offer_hold_jitter_window (default (1, mins))
 	Maximum amount of random jitter to add to the offer hold time window.
 -offer_reservation_duration (default (3, mins))
-	Time to reserve a slave's offers while trying to satisfy a task preempting another.
+	Time to reserve a agent's offers while trying to satisfy a task preempting another.
 -populate_discovery_info (default false)
 	If true, Aurora populates DiscoveryInfo field of Mesos TaskInfo.
 -preemption_delay (default (3, mins))
@@ -174,6 +186,10 @@ Optional flags:
 	Time interval between pending task preemption slot searches.
 -receive_revocable_resources (default false)
 	Allows receiving revocable resource offers from Mesos.
+-reconciliation_explicit_batch_interval (default (5, secs))
+	Interval between explicit batch reconciliation requests.
+-reconciliation_explicit_batch_size (default 1000) [must be > 0]
+	Number of tasks in a single batch request sent to Mesos for explicit reconciliation.
 -reconciliation_explicit_interval (default (60, mins))
 	Interval on which scheduler will ask Mesos for status updates of all non-terminal tasks known to scheduler.
 -reconciliation_implicit_interval (default (60, mins))
@@ -186,7 +202,7 @@ Optional flags:
 	If false, Docker tasks may run without an executor (EXPERIMENTAL)
 -shiro_ini_path
 	Path to shiro.ini for authentication and authorization configuration.
--shiro_realm_modules (default [org.apache.aurora.scheduler.app.MoreModules$1@13c9d689])
+-shiro_realm_modules (default [org.apache.aurora.scheduler.app.MoreModules$1@158a8276])
 	Guice modules for configuring Shiro Realms.
 -sla_non_prod_metrics (default [])
 	Metric categories collected for non production tasks.
@@ -218,8 +234,6 @@ Optional flags:
 	Whether to use the experimental database-backed task store.
 -viz_job_url_prefix (default )
 	URL prefix for job container stats.
--webhook_config [file must be readable]
-    File to configure a HTTP webhook to receive task state change events.
 -zk_chroot_path
 	chroot path to use for the ZooKeeper connections
 -zk_digest_credentials

@@ -126,6 +126,11 @@ and then set set this Aurora scheduler flag to allow receiving revocable Mesos o
 
     -receive_revocable_resources=true
 
+Both CPUs and RAM are supported as revocable resources. The former is enabled by the default,
+the latter needs to be enabled via:
+
+    -enable_revocable_ram=true
+
 Unless you want to use the [default](../../src/main/resources/org/apache/aurora/scheduler/tiers.json)
 tier configuration, you will also have to specify a file path:
 

@@ -168,9 +168,9 @@ via the concept of revocable tasks. In contrast to non-revocable tasks, revocabl
 Mesos reserves the right to throttle or even kill them if they might affect existing high-priority
 user-facing services.
 
-As of today, the only revocable resource supported by Aurora are CPU resources. A job can opt-in to
-use those by specifying the `revocable` [Configuration Tier](../features/multitenancy.md#configuration-tiers).
-A revocable job will only be scheduled using revocable CPU resources, even if there are plenty of
+As of today, the only revocable resource supported by Aurora are CPU and RAM resources. A job can
+opt-in to use those by specifying the `revocable` [Configuration Tier](../features/multitenancy.md#configuration-tiers).
+A revocable job will only be scheduled using revocable resources, even if there are plenty of
 non-revocable resources available.
 
 The Aurora scheduler must be [configured to receive revocable offers](../operations/configuration.md#resource-isolation)

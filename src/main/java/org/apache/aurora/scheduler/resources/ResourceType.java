@@ -36,6 +36,8 @@ import static org.apache.aurora.scheduler.resources.AuroraResourceConverter.STRI
 import static org.apache.aurora.scheduler.resources.MesosResourceConverter.RANGES;
 import static org.apache.aurora.scheduler.resources.MesosResourceConverter.SCALAR;
 import static org.apache.aurora.scheduler.resources.ResourceMapper.PORT_MAPPER;
+import static org.apache.aurora.scheduler.resources.ResourceSettings.ENABLE_REVOCABLE_CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceSettings.ENABLE_REVOCABLE_RAM;
 
 /**
  * Describes Mesos resource types and their Aurora traits.
@@ -55,7 +57,7 @@ public enum ResourceType implements TEnum {
       "core(s)",
       16,
       false,
-      true),
+      ENABLE_REVOCABLE_CPUS.get()),
 
   /**
    * RAM resource.
@@ -70,7 +72,7 @@ public enum ResourceType implements TEnum {
       "MB",
       Amount.of(24, GB).as(MB),
       false,
-      false),
+      ENABLE_REVOCABLE_RAM.get()),
 
   /**
    * DISK resource.
