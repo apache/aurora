@@ -63,6 +63,11 @@ public final class MoreModules {
       protected void configure() {
         install(getModule(moduleClass));
       }
+
+      @Override
+      public String toString() {
+        return moduleClass.toString();
+      }
     };
   }
 }

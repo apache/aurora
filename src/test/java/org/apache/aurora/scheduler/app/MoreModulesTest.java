@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.app;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Module;
 
 import org.junit.Test;
 
@@ -28,6 +29,12 @@ public class MoreModulesTest {
   public void testLazilyInstantiated() {
     Injector injector = Guice.createInjector(MoreModules.lazilyInstantiated(StringInstaller.class));
     assertEquals(STRING, injector.getInstance(String.class));
+  }
+
+  @Test
+  public void testToString() {
+    Module module = MoreModules.lazilyInstantiated(StringInstaller.class);
+    assertEquals(StringInstaller.class.toString(), module.toString());
   }
 
   static class StringInstaller extends AbstractModule {
