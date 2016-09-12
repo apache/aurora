@@ -56,6 +56,13 @@ must have access to commit to the dist.a.o repositories.
 
 1. Ensure that all issues resolved for this release candidate are tagged with the correct Fix
 Version in JIRA, the changelog script will use this to generate the CHANGELOG in step #2.
+To assign the fix version:
+
+    * Look up the [previous release date](https://issues.apache.org/jira/browse/aurora/?selectedTab=com.atlassian.jira.jira-projects-plugin:versions-panel).
+    * Query all issues resolved after that release date: `project = AURORA AND status in (resolved, Closed) and fixVersion is empty and resolutiondate >= "YYYY/MM/DD"`
+    * In the upper right corner of the query result, select Tools > Bulk Edit.
+    * Select all issues > edit issue > set 'Change Fix Version/s' to the release version.
+    * Make sure to uncheck 'Send mail for this update' at the bottom.
 
 2. Create a release candidate. This will automatically update the CHANGELOG and commit it, create a
 branch and update the current version within the trunk. To create a minor version update and publish
