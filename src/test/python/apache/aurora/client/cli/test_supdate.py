@@ -30,6 +30,7 @@ from apache.aurora.client.cli import (
 from apache.aurora.client.cli.diff_formatter import DiffFormatter
 from apache.aurora.client.cli.options import TaskInstanceKey
 from apache.aurora.client.cli.update import (
+    CLIENT_UPDATE_ID,
     AbortUpdate,
     ListUpdates,
     PauseUpdate,
@@ -60,6 +61,7 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateState,
     JobUpdateStatus,
     JobUpdateSummary,
+    Metadata,
     Response,
     ResponseCode,
     ResponseDetail,
@@ -122,9 +124,82 @@ class TestStartUpdate(AuroraClientCommandTest):
         self._command.execute(self._fake_context)
 
     assert self._mock_api.start_job_update.mock_calls == [
-        call(mock_config, None, self._mock_options.instance_spec.instance)
+        call(mock_config, None, self._mock_options.instance_spec.instance, ANY)
     ]
     self.assert_lock_message(self._fake_context)
+
+  def test_start_update_invalid_request(self):
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+
+    err_msg = "Error."
+    self._mock_api.start_job_update.return_value = AuroraClientCommandTest.create_blank_response(
+        ResponseCode.INVALID_REQUEST,
+        err_msg)
+
+    with patch('apache.aurora.client.cli.update.DiffFormatter'):
+      with pytest.raises(Context.CommandError):
+        self._command.execute(self._fake_context)
+
+    assert self._mock_api.start_job_update.mock_calls == [
+        call(mock_config, None, self._mock_options.instance_spec.instance, ANY)
+    ]
+    assert self._fake_context.get_err() == [
+      StartUpdate.FAILED_TO_START_UPDATE_ERROR_MSG, "\t%s" % err_msg
+    ]
+
+  def test_start_update_already_inprogress(self):
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+
+    update_id = 'some-mocked-uuid'
+
+    err_msg = "Active updates exist for this job."
+    return_value = AuroraClientCommandTest.create_start_job_update_result(
+      ResponseCode.INVALID_REQUEST, err_msg, UPDATE_KEY, {Metadata(CLIENT_UPDATE_ID, update_id)})
+    self._mock_api.start_job_update.return_value = return_value
+
+    with patch('apache.aurora.client.cli.update.DiffFormatter'):
+      with patch('apache.aurora.client.cli.update.uuid') as mock_uuid:
+        mock_uuid.uuid4.return_value = update_id
+        self._command.execute(self._fake_context)
+
+    assert self._mock_api.start_job_update.mock_calls == [
+        call(mock_config, None, self._mock_options.instance_spec.instance,
+             {CLIENT_UPDATE_ID: update_id})
+    ]
+    assert self._fake_context.get_out() == [
+      StartUpdate.UPDATE_MSG_TEMPLATE %
+      ('http://something_or_other/scheduler/bozo/test/hello/update/update_id'),
+    ]
+    assert self._fake_context.get_err() == []
+
+  def test_start_update_different_update_inprogress(self):
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+
+    update_id = 'some-mocked-uuid'
+    update_id_2 = 'some-other-mocked-uuid'
+
+    err_msg = "Active updates exist for this job."
+    return_value = AuroraClientCommandTest.create_start_job_update_result(
+      ResponseCode.INVALID_REQUEST, err_msg, UPDATE_KEY, {Metadata(CLIENT_UPDATE_ID, update_id)})
+    self._mock_api.start_job_update.return_value = return_value
+
+    with patch('apache.aurora.client.cli.update.DiffFormatter'):
+      with pytest.raises(Context.CommandError):
+        with patch('apache.aurora.client.cli.update.uuid') as mock_uuid:
+          mock_uuid.uuid4.return_value = update_id_2
+          self._command.execute(self._fake_context)
+
+    assert self._mock_api.start_job_update.mock_calls == [
+        call(mock_config, None, self._mock_options.instance_spec.instance,
+             {CLIENT_UPDATE_ID: update_id_2})
+    ]
+    assert self._fake_context.get_out() == []
+    assert self._fake_context.get_err() == [
+      StartUpdate.FAILED_TO_START_UPDATE_ERROR_MSG, "\t%s" % err_msg
+    ]
 
   def test_update_cron_job_fails(self):
     mock_config = self.create_mock_config(is_cron=True)
@@ -149,7 +224,7 @@ class TestStartUpdate(AuroraClientCommandTest):
       call(self._mock_options.instance_spec.instance)
     ]
     assert self._mock_api.start_job_update.mock_calls == [
-        call(mock_config, None, self._mock_options.instance_spec.instance)
+        call(mock_config, None, self._mock_options.instance_spec.instance, ANY)
     ]
 
   def test_start_update_command_line_succeeds(self):
@@ -170,7 +245,7 @@ class TestStartUpdate(AuroraClientCommandTest):
       call(self._mock_options.instance_spec.instance)
     ]
     assert self._mock_api.start_job_update.mock_calls == [
-        call(ANY, 'hello', None)
+        call(ANY, 'hello', None, ANY)
     ]
     assert self._fake_context.get_out() == [
       StartUpdate.UPDATE_MSG_TEMPLATE %
@@ -198,7 +273,7 @@ class TestStartUpdate(AuroraClientCommandTest):
     assert self._formatter.show_job_update_diff.mock_calls == [
       call(self._mock_options.instance_spec.instance)
     ]
-    assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None)]
+    assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None, ANY)]
     assert self._mock_api.query_job_updates.mock_calls == [
       call(update_key=resp.result.startJobUpdateResult.key)
     ]
@@ -256,7 +331,7 @@ class TestStartUpdate(AuroraClientCommandTest):
     assert self._formatter.show_job_update_diff.mock_calls == [
       call(self._mock_options.instance_spec.instance)
     ]
-    assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None)]
+    assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None, ANY)]
     assert self._fake_context.get_out() == [
       "Noop update."
     ]
@@ -274,7 +349,7 @@ class TestStartUpdate(AuroraClientCommandTest):
         self._command.execute(self._fake_context)
 
     assert e.value == error
-    assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None)]
+    assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None, ANY)]
 
 
 class TestListUpdates(AuroraClientCommandTest):

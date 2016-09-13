@@ -50,6 +50,7 @@ import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateSummary;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.PopulateJobResult;
 import org.apache.aurora.gen.Range;
@@ -121,6 +122,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ReadOnlySchedulerImplTest extends EasyMockTest {
+  private static final ImmutableSet<Metadata> METADATA =
+      ImmutableSet.of(new Metadata("k1", "v1"), new Metadata("k2", "v2"), new Metadata("k3", "v3"));
+
   private StorageTestUtil storageUtil;
   private NearestFit nearestFit;
   private CronPredictor cronPredictor;
@@ -630,7 +634,8 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     for (int i = 0; i < count; i++) {
       builder.add(new JobUpdateSummary()
           .setKey(new JobUpdateKey(JOB_KEY.newBuilder(), "id" + 1))
-          .setUser(USER));
+          .setUser(USER)
+          .setMetadata(METADATA));
     }
     return builder.build();
   }

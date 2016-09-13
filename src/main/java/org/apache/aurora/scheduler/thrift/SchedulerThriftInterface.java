@@ -108,6 +108,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
+import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -117,6 +118,7 @@ import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 import org.apache.aurora.scheduler.updater.JobDiff;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
 import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
+import org.apache.aurora.scheduler.updater.UpdateInProgressException;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -938,7 +940,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       IJobUpdate update = IJobUpdate.build(new JobUpdate()
           .setSummary(new JobUpdateSummary()
               .setKey(new JobUpdateKey(job.newBuilder(), updateId))
-              .setUser(remoteUserName))
+              .setUser(remoteUserName)
+              .setMetadata(IMetadata.toBuildersSet(request.getMetadata())))
           .setInstructions(instructions));
 
       Response response = empty();
@@ -953,7 +956,13 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
             new AuditData(remoteUserName, Optional.fromNullable(message)));
         return response.setResponseCode(OK)
             .setResult(Result.startJobUpdateResult(
-                new StartJobUpdateResult(update.getSummary().getKey().newBuilder())));
+                new StartJobUpdateResult(update.getSummary().getKey().newBuilder())
+                    .setUpdateSummary(update.getSummary().newBuilder())));
+      } catch (UpdateInProgressException e) {
+        return error(INVALID_REQUEST, e)
+            .setResult(Result.startJobUpdateResult(
+                new StartJobUpdateResult(e.getInProgressUpdateSummary().getKey().newBuilder())
+                    .setUpdateSummary(e.getInProgressUpdateSummary().newBuilder())));
       } catch (UpdateStateException | TaskValidationException e) {
         return error(INVALID_REQUEST, e);
       }

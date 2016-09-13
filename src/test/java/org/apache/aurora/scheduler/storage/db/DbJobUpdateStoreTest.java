@@ -42,6 +42,7 @@ import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
@@ -92,6 +93,8 @@ public class DbJobUpdateStoreTest {
   private static final long CREATED_MS = 111L;
   private static final IJobUpdateEvent FIRST_EVENT =
       makeJobUpdateEvent(ROLLING_FORWARD, CREATED_MS);
+  private static final ImmutableSet<Metadata> METADATA =
+      ImmutableSet.of(new Metadata("k1", "v1"), new Metadata("k2", "v2"), new Metadata("k3", "v3"));
 
   private Storage storage;
   private FakeStatsProvider stats;
@@ -603,6 +606,22 @@ public class DbJobUpdateStoreTest {
   }
 
   @Test
+  public void testSaveJobUpdateWithDuplicateMetadataKeys() {
+    IJobUpdateKey updateId = makeKey(JobKeys.from("role", "env", "name1"), "u1");
+
+    ImmutableSet<Metadata> duplicatedMetadata =
+        ImmutableSet.of(new Metadata("k1", "v1"), new Metadata("k1", "v2"));
+    JobUpdate builder = makeJobUpdate(updateId).newBuilder();
+    builder.getSummary().setMetadata(duplicatedMetadata);
+    IJobUpdate update = IJobUpdate.build(builder);
+
+    assertEquals(Optional.absent(), getUpdate(updateId));
+
+    saveUpdate(update, Optional.of("lock1"));
+    assertUpdate(update);
+  }
+
+  @Test
   public void testLockCleared() {
     IJobUpdate update = makeJobUpdate(makeKey("update1"));
     saveUpdate(update, Optional.of("lock1"));
@@ -987,7 +1006,8 @@ public class DbJobUpdateStoreTest {
   private static IJobUpdateSummary makeSummary(IJobUpdateKey key, String user) {
     return IJobUpdateSummary.build(new JobUpdateSummary()
         .setKey(key.newBuilder())
-        .setUser(user));
+        .setUser(user)
+        .setMetadata(METADATA));
   }
 
   private IJobUpdateSummary saveSummary(
@@ -999,7 +1019,8 @@ public class DbJobUpdateStoreTest {
 
     IJobUpdateSummary summary = IJobUpdateSummary.build(new JobUpdateSummary()
         .setKey(key.newBuilder())
-        .setUser(user));
+        .setUser(user)
+        .setMetadata(METADATA));
 
     IJobUpdate update = makeJobUpdate(summary);
     saveUpdate(update, lockToken);

@@ -168,9 +168,17 @@ class JobUpdateControllerImpl implements JobUpdateController {
       List<IJobUpdateSummary> activeJobUpdates =
           storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(queryActiveByJob(job));
       if (!activeJobUpdates.isEmpty()) {
-        throw new UpdateStateException("An active update already exists for this job, "
+        if (activeJobUpdates.size() > 1) {
+          LOG.error("Multiple active updates exist for this job. {}", activeJobUpdates);
+          throw new UpdateStateException(
+              String.format("Multiple active updates exist for this job. %s", activeJobUpdates));
+        }
+
+        IJobUpdateSummary activeJobUpdate = activeJobUpdates.get(0);
+        throw new UpdateInProgressException("An active update already exists for this job, "
             + "please terminate it before starting another. "
-            + "Active updates are those in states " + Updates.ACTIVE_JOB_UPDATE_STATES);
+            + "Active updates are those in states " + Updates.ACTIVE_JOB_UPDATE_STATES,
+            activeJobUpdate);
       }
 
       LOG.info("Starting update for job " + job);

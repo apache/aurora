@@ -309,6 +309,13 @@ CREATE TABLE job_updates(
   UNIQUE(update_id, job_key_id)
 );
 
+CREATE TABLE job_update_metadata(
+  id IDENTITY,
+  update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  key VARCHAR NOT NULL,
+  value VARCHAR NOT NULL
+);
+
 CREATE TABLE job_update_locks(
   id IDENTITY,
   update_row_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,

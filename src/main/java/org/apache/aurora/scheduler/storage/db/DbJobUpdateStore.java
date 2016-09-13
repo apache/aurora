@@ -41,6 +41,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
+import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 
 import static java.util.Objects.requireNonNull;
@@ -92,6 +93,12 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
 
     if (lockToken.isPresent()) {
       detailsMapper.insertLockToken(key, lockToken.get());
+    }
+
+    if (!update.getSummary().getMetadata().isEmpty()) {
+      detailsMapper.insertJobUpdateMetadata(
+          key,
+          IMetadata.toBuildersSet(update.getSummary().getMetadata()));
     }
 
     // Insert optional instance update overrides.

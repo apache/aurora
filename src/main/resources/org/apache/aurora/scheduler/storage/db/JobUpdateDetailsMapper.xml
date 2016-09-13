@@ -95,6 +95,19 @@
     )
   </insert>
 
+  <insert id="insertJobUpdateMetadata">
+    INSERT INTO job_update_metadata (
+      update_row_id,
+      key,
+      value
+    ) VALUES
+    <foreach item="element" collection="metadata" open="(" separator="),(" close=")">
+      <include refid="select_update_row_id"/>,
+      #{element.key},
+      #{element.value}
+    </foreach>
+  </insert>
+
   <sql id="insert_instance_ranges">
     <foreach item="element" collection="ranges" open="(" separator="),(" close=")">
       <include refid="select_update_row_id"/>,
@@ -149,6 +162,11 @@
     <association property="state"
                  resultMap="jobUpdateStateMap"
                  columnPrefix="just_" />
+    <collection property="metadata"
+                select="selectJobUpdateMetadata"
+                column="id"
+                foreignColumn="update_row_id">
+    </collection>
   </resultMap>
 
   <resultMap id="rangeMap" type="org.apache.aurora.gen.Range">
@@ -191,6 +209,10 @@
     <id column="u_id" />
     <association property="summary" resultMap="jobUpdateSummaryMap" columnPrefix="jusm_"/>
     <association property="instructions" resultMap="jobUpdateInstructionMap" columnPrefix="jui_"/>
+  </resultMap>
+
+  <resultMap id="metadataMap" type="org.apache.aurora.gen.Metadata">
+    <id column="id" />
   </resultMap>
 
   <resultMap id="jobInstanceUpdateMap" type="org.apache.aurora.gen.JobInstanceUpdateEvent">
@@ -308,6 +330,7 @@
 
   <select id="selectSummaries" resultMap="jobUpdateSummaryMap">
     SELECT
+      u.id AS id,
       u.update_id AS update_id,
       u.user AS user,
       max_status.status AS just_status,
@@ -328,6 +351,7 @@
     For example: jusm_just_status maps to JobUpdateSummary/JobUpdateState/status field.-->
   <sql id="job_update_columns">
       u.id AS u_id,
+      u.id AS jusm_id,
       u.update_id AS jusm_update_id,
       u.user AS jusm_user,
       max_status.status AS jusm_just_status,
@@ -488,6 +512,15 @@
     FROM job_instance_update_events as e
     WHERE update_row_id = #{id}
     ORDER BY e.timestamp_ms
+  </select>
+
+  <select id="selectJobUpdateMetadata" resultMap="metadataMap">
+    SELECT
+      m.id,
+      m.key,
+      m.value
+    FROM job_update_metadata as m
+    WHERE update_row_id = #{id}
   </select>
 
   <delete id="truncate">

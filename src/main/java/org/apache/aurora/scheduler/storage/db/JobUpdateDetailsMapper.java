@@ -22,6 +22,7 @@ import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSummary;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.scheduler.storage.db.views.DbJobUpdate;
 import org.apache.aurora.scheduler.storage.db.views.DbJobUpdateInstructions;
@@ -66,6 +67,16 @@ interface JobUpdateDetailsMapper {
       @Param("taskConfigRow") long taskConfigRow,
       @Param("isNew") boolean isNew,
       @Param("result") InsertResult result);
+
+  /**
+   * Inserts the job update metadata entries for an update.
+   *
+   * @param key Update to insert task configs for.
+   * @param metadata Set of metadata (key, value) pairs.
+   */
+  void insertJobUpdateMetadata(
+      @Param("key") IJobUpdateKey key,
+      @Param("metadata") Set<Metadata> metadata);
 
   /**
    * Maps inserted task config with a set of associated instance ranges.

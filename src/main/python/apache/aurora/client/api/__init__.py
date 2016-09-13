@@ -32,6 +32,7 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateKey,
     JobUpdateQuery,
     JobUpdateRequest,
+    Metadata,
     Resource,
     ResourceAggregate,
     TaskQuery
@@ -140,7 +141,7 @@ class AuroraClientAPI(object):
     except SchedulerProxy.ThriftInternalError as e:
       raise self.ThriftInternalError(e.args[0])
 
-  def _job_update_request(self, config, instances=None):
+  def _job_update_request(self, config, instances=None, metadata=None):
     try:
       settings = UpdaterConfig(**config.update_config().get()).to_thrift_update_settings(instances)
     except ValueError as e:
@@ -149,20 +150,22 @@ class AuroraClientAPI(object):
     return JobUpdateRequest(
         instanceCount=config.instances(),
         settings=settings,
-        taskConfig=config.job().taskConfig
+        taskConfig=config.job().taskConfig,
+        metadata={Metadata(k, v) for k, v in metadata.items()} if metadata else None
     )
 
-  def start_job_update(self, config, message, instances=None):
+  def start_job_update(self, config, message, instances=None, metadata=None):
     """Requests Scheduler to start job update process.
 
     Arguments:
     config -- AuroraConfig instance with update details.
     message -- Audit message to include with the change.
     instances -- Optional list of instances to restrict update to.
+    metadata -- Optional set of metadata (key, value) to associate with the update.
 
     Returns response object with update ID and acquired job lock.
     """
-    request = self._job_update_request(config, instances)
+    request = self._job_update_request(config, instances, metadata)
     log.info("Starting update for: %s" % config.name())
     return self._scheduler_proxy.startJobUpdate(request, message)
 

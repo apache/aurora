@@ -118,4 +118,44 @@ public class UpdateStoreBenchmarks {
           Iterables.getOnlyElement(keys)).get());
     }
   }
+
+  @BenchmarkMode(Mode.Throughput)
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  @Warmup(iterations = 1, time = 10, timeUnit = TimeUnit.SECONDS)
+  @Measurement(iterations = 5, time = 5, timeUnit = TimeUnit.SECONDS)
+  @Fork(1)
+  @State(Scope.Thread)
+  public static class JobUpdateMetadataBenchmark {
+    private Storage storage;
+    private Set<IJobUpdateKey> keys;
+
+    @Param({"10", "100", "1000", "10000"})
+    private int metadata;
+
+    @Setup(Level.Trial)
+    public void setUp() {
+      storage = DbUtil.createStorage();
+    }
+
+    @Setup(Level.Iteration)
+    public void setUpIteration() {
+      keys = JobUpdates.saveUpdates(
+          storage,
+          new JobUpdates.Builder().setNumUpdateMetadata(metadata).build(1));
+    }
+
+    @TearDown(Level.Iteration)
+    public void tearDownIteration() {
+      storage.write((NoResult.Quiet) storeProvider -> {
+        storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+        storeProvider.getLockStore().deleteLocks();
+      });
+    }
+
+    @Benchmark
+    public IJobUpdateDetails run() throws TException {
+      return storage.read(store -> store.getJobUpdateStore().fetchJobUpdateDetails(
+          Iterables.getOnlyElement(keys)).get());
+    }
+  }
 }

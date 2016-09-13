@@ -35,6 +35,7 @@ import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
@@ -96,6 +97,7 @@ final class JobUpdates {
     private int numEvents = 1;
     private int numInstanceEvents = 5000;
     private int numInstanceOverrides = 1;
+    private int numUpdateMetadata = 10;
 
     Builder setNumEvents(int newCount) {
       numEvents = newCount;
@@ -112,6 +114,11 @@ final class JobUpdates {
       return this;
     }
 
+    Builder setNumUpdateMetadata(int newCount) {
+      numUpdateMetadata = newCount;
+      return this;
+    }
+
     Set<IJobUpdateDetails> build(int count) {
       ImmutableSet.Builder<IJobUpdateDetails> result = ImmutableSet.builder();
       for (int i = 0; i < count; i++) {
@@ -121,10 +128,16 @@ final class JobUpdates {
         TaskConfig task = TaskTestUtil.makeConfig(IJobKey.build(job)).newBuilder();
         task.getExecutorConfig().setData(string(10000));
 
+        ImmutableSet.Builder<Metadata> metadata = ImmutableSet.builder();
+        for (int k = 0; k < numUpdateMetadata; k++) {
+          metadata.add(new Metadata("key-" + k, "value=" + k));
+        }
+
         JobUpdate update = new JobUpdate()
             .setSummary(new JobUpdateSummary()
                 .setKey(key)
-                .setUser(USER))
+                .setUser(USER)
+                .setMetadata(metadata.build()))
             .setInstructions(new JobUpdateInstructions()
                 .setSettings(new JobUpdateSettings()
                     .setUpdateGroupSize(100)

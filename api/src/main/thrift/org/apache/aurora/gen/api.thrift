@@ -770,6 +770,9 @@ struct JobUpdateSummary {
 
   /** Current job update state. */
   4: JobUpdateState state
+
+  /** Update metadata supplied by the client. */
+  6: optional set<Metadata> metadata
 }
 
 /** Update configuration and setting details. */
@@ -814,6 +817,9 @@ struct JobUpdateRequest {
 
   /** Update settings and limits. */
   3: JobUpdateSettings settings
+
+  /** Update metadata supplied by the client issuing the JobUpdateRequest. */
+  4: optional set<Metadata> metadata
 }
 
 /**
@@ -887,6 +893,9 @@ struct GetPendingReasonResult {
 struct StartJobUpdateResult {
   /** Unique identifier for the job update. */
   1: JobUpdateKey key
+
+  /** Summary of the update that is in progress for the given JobKey. */
+  2: optional JobUpdateSummary updateSummary
 }
 
 /** Result of the getJobUpdateSummaries call. */

@@ -31,6 +31,7 @@ from gen.apache.aurora.api.ttypes import (
     ExecutorConfig,
     GetTierConfigResult,
     JobKey,
+    JobUpdateSummary,
     Response,
     ResponseCode,
     ResponseDetail,
@@ -38,6 +39,7 @@ from gen.apache.aurora.api.ttypes import (
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
+    StartJobUpdateResult,
     TaskConfig,
     TaskEvent,
     TaskQuery,
@@ -189,6 +191,14 @@ class AuroraClientCommandTest(unittest.TestCase):
     else:
       status_response.result.scheduleStatusResult.tasks.append(task)
     return status_response
+
+  @classmethod
+  def create_start_job_update_result(cls, code, msg, key, metadata):
+    resp = cls.create_blank_response(code, msg)
+    resp.result = Result(
+      startJobUpdateResult=StartJobUpdateResult(key=key, updateSummary=JobUpdateSummary(
+        metadata=metadata)))
+    return resp
 
   @classmethod
   def create_empty_task_result(cls):

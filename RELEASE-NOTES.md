@@ -39,6 +39,7 @@
 - Add a new MTTS (Median Time To Starting) metric in addition to MTTA and MTTR.
 - In addition to CPU resources, RAM resources can now be treated as revocable via the scheduler
   commandline flag `-enable_revocable_ram`.
+- Introduce UpdateMetadata fields in JobUpdateRequest to allow clients to store metadata on update.
 
 ### Deprecations and removals:
 

@@ -18,6 +18,7 @@ import datetime
 import json
 import textwrap
 import time
+import uuid
 from collections import namedtuple
 
 from apache.aurora.client.api import AuroraClientAPI
@@ -50,7 +51,12 @@ from apache.aurora.client.cli.options import (
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.constants import ACTIVE_JOB_UPDATE_STATES
-from gen.apache.aurora.api.ttypes import JobUpdateAction, JobUpdateKey, JobUpdateStatus
+from gen.apache.aurora.api.ttypes import (
+    JobUpdateAction,
+    JobUpdateKey,
+    JobUpdateStatus,
+    ResponseCode
+)
 
 
 class UpdateController(object):
@@ -129,10 +135,14 @@ WAIT_OPTION = lambda help_msg: CommandOption(
     action='store_true',
     help=help_msg)
 
+CLIENT_UPDATE_ID = 'org.apache.aurora.client.update_id'
+
 
 class StartUpdate(Verb):
 
   UPDATE_MSG_TEMPLATE = "Job update has started. View your update progress at %s"
+
+  FAILED_TO_START_UPDATE_ERROR_MSG = """Failed to start update due to error:"""
 
   def __init__(self, clock=time):
     self._clock = clock
@@ -171,6 +181,7 @@ class StartUpdate(Verb):
     job = context.options.instance_spec.jobkey
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
+    update_id = str(uuid.uuid4())
     config = context.get_job_config(job, context.options.config_file)
     if config.raw().has_cron_schedule():
       raise context.CommandError(
@@ -180,13 +191,16 @@ class StartUpdate(Verb):
     api = context.get_api(config.cluster())
     formatter = DiffFormatter(context, config)
     formatter.show_job_update_diff(instances)
+
     try:
-      resp = api.start_job_update(config, context.options.message, instances)
+      resp = api.start_job_update(config, context.options.message, instances,
+          {CLIENT_UPDATE_ID: update_id})
     except AuroraClientAPI.UpdateConfigError as e:
       raise context.CommandError(EXIT_INVALID_CONFIGURATION, e.message)
 
-    context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
-        err_msg="Failed to start update due to error:")
+    if not self._is_update_already_in_progress(resp, update_id):
+      context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
+          err_msg=self.FAILED_TO_START_UPDATE_ERROR_MSG)
 
     if resp.result:
       update_key = resp.result.startJobUpdateResult.key
@@ -202,6 +216,26 @@ class StartUpdate(Verb):
       context.print_out(combine_messages(resp))
 
     return EXIT_OK
+
+  def _is_update_already_in_progress(self, resp, update_id):
+    """Returns True if the response indicates that there was an active update
+    already in progress that matches the requested update.
+
+    This can happen, if the client and scheduler have diverged state, where the scheduler
+    already accepted the update, while the client thinks it has not been accepted by
+    the scheduler and retries."""
+    if resp.responseCode == ResponseCode.INVALID_REQUEST and resp.result:
+      start_update_result = resp.result.startJobUpdateResult
+      if start_update_result and start_update_result.updateSummary:
+        in_progress_update_summary = start_update_result.updateSummary
+        if in_progress_update_summary.metadata:
+          active_update_id = [x.value for x in in_progress_update_summary.metadata if x.key ==
+                           CLIENT_UPDATE_ID]
+          if active_update_id and len(active_update_id) == 1:
+            if active_update_id[0] == update_id:
+              return True
+
+    return False
 
 
 def rollback_state_to_err_code(state):

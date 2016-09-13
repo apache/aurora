@@ -56,6 +56,7 @@ import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.MesosContainer;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.Range;
@@ -100,6 +101,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
+import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -107,6 +109,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
 import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
+import org.apache.aurora.scheduler.updater.UpdateInProgressException;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.thrift.TException;
 import org.easymock.EasyMock;
@@ -171,6 +174,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final AuditData AUDIT = new AuditData(USER, Optional.of(AUDIT_MESSAGE));
   private static final Thresholds THRESHOLDS = new Thresholds(1000, 2000);
   private static final String EXECUTOR_NAME = apiConstants.AURORA_EXECUTOR_NAME;
+  private static final ImmutableSet<Metadata> METADATA =
+      ImmutableSet.of(new Metadata("k1", "v1"), new Metadata("k2", "v2"));
 
   private StorageTestUtil storageUtil;
   private LockManager lockManager;
@@ -1482,8 +1487,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Response response =
         assertOkResponse(thrift.startJobUpdate(buildJobUpdateRequest(update), AUDIT_MESSAGE));
     assertEquals(
-        new StartJobUpdateResult(UPDATE_KEY.newBuilder()),
-        response.getResult().getStartJobUpdateResult());
+        new StartJobUpdateResult(UPDATE_KEY.newBuilder()).setUpdateSummary(
+        update.getSummary().newBuilder()), response.getResult().getStartJobUpdateResult());
   }
 
   private void expectJobUpdateQuotaCheck(QuotaCheckResult result) {
@@ -1530,7 +1535,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Response response = assertOkResponse(
         thrift.startJobUpdate(buildJobUpdateRequest(update), AUDIT_MESSAGE));
     assertEquals(
-        new StartJobUpdateResult(UPDATE_KEY.newBuilder()),
+        new StartJobUpdateResult(UPDATE_KEY.newBuilder()).setUpdateSummary(expected.getSummary()),
         response.getResult().getStartJobUpdateResult());
   }
 
@@ -1809,6 +1814,37 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartUpdateFailsInControllerWhenUpdateInProgress() throws Exception {
+    expectGetRemoteUser();
+    expectNoCronJob();
+
+    IScheduledTask oldTask = buildTaskForJobUpdate(0, "old");
+    ITaskConfig newTask = buildTaskForJobUpdate(0, "new").getAssignedTask().getTask();
+
+    IJobUpdate update = buildJobUpdate(
+        1,
+        newTask,
+        ImmutableMap.of(oldTask.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 0))));
+
+    expect(uuidGenerator.createNew()).andReturn(UU_ID);
+    expect(taskIdGenerator.generate(newTask, 1)).andReturn(TASK_ID);
+    expectJobUpdateQuotaCheck(ENOUGH_QUOTA);
+
+    storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
+    jobUpdateController.start(update, AUDIT);
+    expectLastCall().andThrow(new UpdateInProgressException("failed", update.getSummary()));
+
+    control.replay();
+
+    Response response = thrift.startJobUpdate(buildJobUpdateRequest(update), AUDIT_MESSAGE);
+
+    assertResponse(INVALID_REQUEST, response);
+    assertEquals(
+        new StartJobUpdateResult(UPDATE_KEY.newBuilder()).setUpdateSummary(
+            update.getSummary().newBuilder()), response.getResult().getStartJobUpdateResult());
+  }
+
+  @Test
   public void testPauseJobUpdateByCoordinator() throws Exception {
     expectGetRemoteUser();
     jobUpdateController.pause(UPDATE_KEY, AUDIT);
@@ -2011,7 +2047,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setInstanceCount(rangesToInstanceCount(
             update.getInstructions().getDesiredState().getInstances()))
         .setSettings(update.getInstructions().getSettings().newBuilder())
-        .setTaskConfig(update.getInstructions().getDesiredState().getTask().newBuilder());
+        .setTaskConfig(update.getInstructions().getDesiredState().getTask().newBuilder())
+        .setMetadata(IMetadata.toBuildersSet(update.getSummary().getMetadata()));
   }
 
   private static IJobUpdate buildJobUpdate(
@@ -2027,7 +2064,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return IJobUpdate.build(new JobUpdate()
         .setSummary(new JobUpdateSummary()
             .setKey(UPDATE_KEY.newBuilder())
-            .setUser(IDENTITY.getUser()))
+            .setUser(IDENTITY.getUser())
+            .setMetadata(METADATA))
         .setInstructions(new JobUpdateInstructions()
             .setSettings(buildJobUpdateSettings())
             .setDesiredState(new InstanceTaskConfig()
