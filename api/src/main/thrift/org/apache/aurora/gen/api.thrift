@@ -896,7 +896,9 @@ struct GetJobUpdateSummariesResult {
 
 /** Result of the getJobUpdateDetails call. */
 struct GetJobUpdateDetailsResult {
+  // TODO(zmanji): Remove this once we complete AURORA-1765
   1: JobUpdateDetails details
+  2: list<JobUpdateDetails> detailsList
 }
 
 /** Result of the pulseJobUpdate call. */
@@ -1022,7 +1024,8 @@ service ReadOnlyScheduler {
   Response getJobUpdateSummaries(1: JobUpdateQuery jobUpdateQuery)
 
   /** Gets job update details. */
-  Response getJobUpdateDetails(1: JobUpdateKey key)
+  // TODO(zmanji): `key` is deprecated, remove this with AURORA-1765
+  Response getJobUpdateDetails(1: JobUpdateKey key, 2: JobUpdateQuery query)
 
   /** Gets the diff between client (desired) and server (current) job states. */
   Response getJobUpdateDiff(1: JobUpdateRequest request)

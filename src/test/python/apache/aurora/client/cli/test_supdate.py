@@ -553,7 +553,8 @@ class TestUpdateInfo(AuroraClientCommandTest):
                 instanceId=2,
                 timestampMs=9000,
                 action=JobUpdateAction.INSTANCE_UPDATED)])
-    query_response.result.getJobUpdateDetailsResult = GetJobUpdateDetailsResult(details=details)
+    query_response.result.getJobUpdateDetailsResult = GetJobUpdateDetailsResult(
+            detailsList=[details])
     return query_response
 
   def test_active_update_info(self):

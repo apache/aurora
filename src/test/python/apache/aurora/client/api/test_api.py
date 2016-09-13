@@ -190,7 +190,8 @@ class TestJobUpdateApis(unittest.TestCase):
     api, mock_proxy = self.mock_api()
     key = JobUpdateKey(job=JobKey(role="role", environment="env", name="name"), id="id")
     api.get_job_update_details(key)
-    mock_proxy.getJobUpdateDetails.assert_called_once_with(key)
+    query = JobUpdateQuery(key=key)
+    mock_proxy.getJobUpdateDetails.assert_called_once_with(key, query)
 
   def test_set_quota(self):
     """Test setting quota."""

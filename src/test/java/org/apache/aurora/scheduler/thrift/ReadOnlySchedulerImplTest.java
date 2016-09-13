@@ -17,6 +17,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
@@ -601,10 +602,27 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    Response response = assertOkResponse(thrift.getJobUpdateDetails(UPDATE_KEY.newBuilder()));
+    Response response = assertOkResponse(thrift.getJobUpdateDetails(UPDATE_KEY.newBuilder(), null));
     assertEquals(
         IJobUpdateDetails.build(details),
         IJobUpdateDetails.build(response.getResult().getGetJobUpdateDetailsResult().getDetails()));
+    // Specifying the UPDATE_KEY alone is deprecated, so there should be a message.
+    assertEquals(1, response.getDetailsSize());
+  }
+
+  @Test
+  public void testGetJobUpdateDetailsQuery() throws Exception {
+    JobUpdateQuery query = new JobUpdateQuery().setRole(ROLE);
+    List<IJobUpdateDetails> details = IJobUpdateDetails.listFromBuilders(createJobUpdateDetails(5));
+    expect(storageUtil.jobUpdateStore.fetchJobUpdateDetails(IJobUpdateQuery.build(query)))
+        .andReturn(details);
+
+    control.replay();
+
+    Response response = assertOkResponse(thrift.getJobUpdateDetails(null, query));
+    assertEquals(
+        IJobUpdateDetails.toBuildersList(details),
+        response.getResult().getGetJobUpdateDetailsResult().getDetailsList());
   }
 
   private static List<JobUpdateSummary> createJobUpdateSummaries(int count) {
@@ -617,9 +635,16 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     return builder.build();
   }
 
+  private static List<JobUpdateDetails> createJobUpdateDetails(int count) {
+    List<JobUpdateSummary> summaries = createJobUpdateSummaries(count);
+    return summaries.stream()
+        .map(jobUpdateSummary ->
+            new JobUpdateDetails().setUpdate(new JobUpdate().setSummary(jobUpdateSummary)))
+        .collect(Collectors.toList());
+  }
+
   private static JobUpdateDetails createJobUpdateDetails() {
-    return new JobUpdateDetails()
-        .setUpdate(new JobUpdate().setSummary(createJobUpdateSummaries(1).get(0)));
+    return createJobUpdateDetails(1).get(0);
   }
 
   @Test
@@ -706,7 +731,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.getJobUpdateDetails(UPDATE_KEY.newBuilder()));
+    assertResponse(INVALID_REQUEST, thrift.getJobUpdateDetails(UPDATE_KEY.newBuilder(), null));
   }
 
   @Test

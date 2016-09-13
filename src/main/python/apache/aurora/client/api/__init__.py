@@ -261,7 +261,9 @@ class AuroraClientAPI(object):
     if not isinstance(key, JobUpdateKey):
       raise self.TypeError('Invalid key %r: expected %s but got %s'
                            % (key, JobUpdateKey.__name__, key.__class__.__name__))
-    return self._scheduler_proxy.getJobUpdateDetails(key)
+
+    query = JobUpdateQuery(key=key)
+    return self._scheduler_proxy.getJobUpdateDetails(key, query)
 
   def restart(self, job_key, instances, restart_settings):
     """Perform a rolling restart of the job.

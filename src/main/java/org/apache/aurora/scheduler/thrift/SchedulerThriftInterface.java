@@ -1003,8 +1003,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response getJobUpdateDetails(JobUpdateKey key) throws TException {
-    return readOnlyScheduler.getJobUpdateDetails(key);
+  public Response getJobUpdateDetails(JobUpdateKey key, JobUpdateQuery query) throws TException {
+    return readOnlyScheduler.getJobUpdateDetails(key, query);
   }
 
   private static IJobUpdateKey validateJobUpdateKey(JobUpdateKey mutableKey) {

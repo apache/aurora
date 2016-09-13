@@ -526,7 +526,16 @@ class UpdateInfo(Verb):
     api = context.get_api(context.options.jobspec.cluster)
     response = api.get_job_update_details(key)
     context.log_response_and_raise(response)
-    details = response.result.getJobUpdateDetailsResult.details
+    detailsList = response.result.getJobUpdateDetailsResult.detailsList
+    if detailsList is not None:
+      if len(detailsList) == 0:
+        context.print_err("There is no update for key: %s" % key)
+        return EXIT_INVALID_PARAMETER
+
+      details = detailsList[0]
+    else:
+      details = response.result.getJobUpdateDetailsResult.details
+
     if context.options.write_json:
       result = {
         "updateId": ("%s" % details.update.summary.key.id),

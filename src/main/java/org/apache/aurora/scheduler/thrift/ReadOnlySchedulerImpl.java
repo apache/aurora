@@ -108,6 +108,7 @@ import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
 import static org.apache.aurora.scheduler.resources.ResourceManager.aggregateFromBag;
+import static org.apache.aurora.scheduler.thrift.Responses.addMessage;
 import static org.apache.aurora.scheduler.thrift.Responses.error;
 import static org.apache.aurora.scheduler.thrift.Responses.invalidRequest;
 import static org.apache.aurora.scheduler.thrift.Responses.ok;
@@ -315,14 +316,30 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
   }
 
   @Override
-  public Response getJobUpdateDetails(JobUpdateKey mutableKey) {
+  public Response getJobUpdateDetails(JobUpdateKey mutableKey, JobUpdateQuery mutableQuery) {
+    if (mutableKey == null && mutableQuery == null)  {
+      return error("Either key or query must be set.");
+    }
+
+    if (mutableQuery != null) {
+      IJobUpdateQuery query = IJobUpdateQuery.build(mutableQuery);
+
+      List<IJobUpdateDetails> details = storage.read(storeProvider ->
+          storeProvider.getJobUpdateStore().fetchJobUpdateDetails(query));
+
+      return ok(Result.getJobUpdateDetailsResult(new GetJobUpdateDetailsResult()
+          .setDetailsList(IJobUpdateDetails.toBuildersList(details))));
+    }
+
+    // TODO(zmanji): Remove this code once `mutableKey` is removed in AURORA-1765
     IJobUpdateKey key = IJobUpdateKey.build(mutableKey);
-    Optional<IJobUpdateDetails> details =
-        storage.read(storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdateDetails(key));
+    Optional<IJobUpdateDetails> details = storage.read(storeProvider ->
+        storeProvider.getJobUpdateStore().fetchJobUpdateDetails(key));
 
     if (details.isPresent()) {
-      return ok(Result.getJobUpdateDetailsResult(
-          new GetJobUpdateDetailsResult().setDetails(details.get().newBuilder())));
+      return addMessage(ok(Result.getJobUpdateDetailsResult(
+          new GetJobUpdateDetailsResult().setDetails(details.get().newBuilder()))),
+          "The key argument is deprecated, use the query argument instead");
     } else {
       return invalidRequest("Invalid update: " + key);
     }

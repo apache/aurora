@@ -48,6 +48,7 @@
   It will be removed from Mesos in a future release.
 - The scheduler flag `-zk_use_curator` has been deprecated. If you have never set the flag and are
   upgrading you should take care as described in the [note](#zk_use_curator_upgrade) above.
+- The `key` argument of `getJobUpdateDetails` has been deprecated. Use the `query` argument instead.
 
 0.15.0
 ======
