@@ -21,6 +21,7 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -119,38 +120,56 @@ public class TaskReconciler extends AbstractIdleService {
     this.implicitRuns = stats.makeCounter(IMPLICIT_STAT_NAME);
   }
 
+  public void triggerExplicitReconciliation(Optional<Integer> batchSize) {
+    doExplicitReconcile(batchSize.or(settings.explicitBatchSize));
+  }
+
+  public void triggerImplicitReconciliation() {
+    doImplicitReconcile();
+  }
+
   @Override
   protected void startUp() {
-    // Schedule explicit reconciliation.
-    executor.scheduleAtFixedRate(
-        () -> {
-          ImmutableList<TaskStatus> active = FluentIterable
-              .from(Storage.Util.fetchTasks(
-                  storage,
-                  Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES)))
-              .transform(TASK_TO_PROTO)
-              .toList();
+    scheduleExplicitReconciliation();
+    scheduleImplicitReconciliation();
+  }
 
-          List<List<TaskStatus>> batches = Lists.partition(active, settings.explicitBatchSize);
-          long delay = 0;
-          for (List<TaskStatus> batch : batches) {
-            executor.schedule(() -> driver.reconcileTasks(batch), delay, SECONDS.getTimeUnit());
-            delay += settings.explicitBatchDelaySeconds;
-          }
-          explicitRuns.incrementAndGet();
-        },
+  private void scheduleExplicitReconciliation() {
+    executor.scheduleAtFixedRate(
+        () -> doExplicitReconcile(settings.explicitBatchSize),
         settings.explicitDelayMinutes,
         settings.explicitInterval.as(MINUTES),
         MINUTES.getTimeUnit());
-    // Schedule implicit reconciliation.
+  }
+
+  private void scheduleImplicitReconciliation() {
     executor.scheduleAtFixedRate(
-        () -> {
-          driver.reconcileTasks(ImmutableSet.of());
-          implicitRuns.incrementAndGet();
-        },
+        () -> doImplicitReconcile(),
         settings.implicitDelayMinutes,
         settings.implicitInterval.as(MINUTES),
         MINUTES.getTimeUnit());
+  }
+
+  private void doImplicitReconcile() {
+    driver.reconcileTasks(ImmutableSet.of());
+    implicitRuns.incrementAndGet();
+  }
+
+  private void doExplicitReconcile(int batchSize) {
+    ImmutableList<TaskStatus> active = FluentIterable
+        .from(Storage.Util.fetchTasks(
+            storage,
+            Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES)))
+        .transform(TASK_TO_PROTO)
+        .toList();
+
+    List<List<TaskStatus>> batches = Lists.partition(active, batchSize);
+    long delay = 0;
+    for (List<TaskStatus> batch : batches) {
+      executor.schedule(() -> driver.reconcileTasks(batch), delay, SECONDS.getTimeUnit());
+      delay += settings.explicitBatchDelaySeconds;
+    }
+    explicitRuns.incrementAndGet();
   }
 
   @Override

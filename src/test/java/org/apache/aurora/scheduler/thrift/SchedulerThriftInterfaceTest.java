@@ -34,6 +34,7 @@ import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ExecutorConfig;
+import org.apache.aurora.gen.ExplicitReconciliationSettings;
 import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.Hosts;
 import org.apache.aurora.gen.Identity;
@@ -83,6 +84,7 @@ import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaManager;
+import org.apache.aurora.scheduler.reconciliation.TaskReconciler;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -184,6 +186,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private JobUpdateController jobUpdateController;
   private ReadOnlyScheduler.Iface readOnlyScheduler;
   private AuditMessages auditMessages;
+  private TaskReconciler taskReconciler;
 
   @Before
   public void setUp() throws Exception {
@@ -201,6 +204,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     jobUpdateController = createMock(JobUpdateController.class);
     readOnlyScheduler = createMock(ReadOnlyScheduler.Iface.class);
     auditMessages = createMock(AuditMessages.class);
+    taskReconciler = createMock(TaskReconciler.class);
 
     thrift = getResponseProxy(
         new SchedulerThriftInterface(
@@ -218,7 +222,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             uuidGenerator,
             jobUpdateController,
             readOnlyScheduler,
-            auditMessages));
+            auditMessages,
+            taskReconciler));
   }
 
   private static AuroraAdmin.Iface getResponseProxy(AuroraAdmin.Iface realThrift) {
@@ -1247,6 +1252,58 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     } catch (StorageException e) {
       // Expected.
     }
+  }
+
+  @Test
+  public void testExplicitTaskReconciliationWithNoBatchSize() throws Exception {
+    ExplicitReconciliationSettings settings = new ExplicitReconciliationSettings();
+
+    taskReconciler.triggerExplicitReconciliation(Optional.absent());
+    expectLastCall();
+
+    control.replay();
+
+    assertOkResponse(thrift.triggerExplicitTaskReconciliation(settings));
+  }
+
+  @Test
+  public void testExplicitTaskReconciliationWithValidBatchSize() throws Exception {
+    ExplicitReconciliationSettings settings = new ExplicitReconciliationSettings();
+    settings.setBatchSize(10);
+
+    taskReconciler.triggerExplicitReconciliation(Optional.of(settings.getBatchSize()));
+    expectLastCall();
+
+    control.replay();
+    assertOkResponse(thrift.triggerExplicitTaskReconciliation(settings));
+  }
+
+  @Test
+  public void testExplicitTaskReconciliationWithNegativeBatchSize() throws Exception {
+    ExplicitReconciliationSettings settings = new ExplicitReconciliationSettings();
+    settings.setBatchSize(-1000);
+
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.triggerExplicitTaskReconciliation(settings));
+  }
+
+  @Test
+  public void testExplicitTaskReconciliationWithZeroBatchSize() throws Exception {
+    ExplicitReconciliationSettings settings = new ExplicitReconciliationSettings();
+    settings.setBatchSize(0);
+
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.triggerExplicitTaskReconciliation(settings));
+  }
+
+  @Test
+  public void testImplicitTaskReconciliation() throws Exception {
+    taskReconciler.triggerImplicitReconciliation();
+    expectLastCall();
+
+    control.replay();
+
+    assertOkResponse(thrift.triggerImplicitTaskReconciliation());
   }
 
   @Test

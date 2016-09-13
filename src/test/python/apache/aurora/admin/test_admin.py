@@ -14,9 +14,15 @@
 
 import contextlib
 
-from mock import PropertyMock, create_autospec, patch
+from mock import PropertyMock, call, create_autospec, patch
 
-from apache.aurora.admin.admin import get_scheduler, increase_quota, query, set_quota
+from apache.aurora.admin.admin import (
+    get_scheduler,
+    increase_quota,
+    query,
+    reconcile_tasks,
+    set_quota
+)
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.scheduler_client import SchedulerClient, SchedulerProxy
 
@@ -213,3 +219,73 @@ class TestGetSchedulerCommand(AuroraClientCommandTest):
       get_scheduler([self.TEST_CLUSTER])
 
       mock_raw_url.assert_called_once_with()
+
+
+class TestReconcileTaskCommand(AuroraClientCommandTest):
+
+  @classmethod
+  def setup_mock_options(cls, reconcile_type='explicit', batch_size=None):
+    mock_options = create_autospec(spec=['type', 'batch_size'], instance=True)
+    mock_options.type = reconcile_type
+    mock_options.batch_size = batch_size
+    return mock_options
+
+  def test_reconcile_implicit(self):
+    """Tests successful execution of the reconcile_tasks command."""
+    mock_options = self.setup_mock_options(reconcile_type='implicit')
+    mock_proxy = create_autospec(spec=SchedulerProxy, instance=True)
+    mock_scheduler_client = create_autospec(spec=SchedulerClient)
+    mock_proxy.scheduler_client.return_value = mock_scheduler_client
+
+    with contextlib.nested(
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.admin.admin.make_admin_client',
+              return_value=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+    ) as (_, mock_make_admin_client, _):
+
+      api = mock_make_admin_client.return_value
+      type(api).scheduler_proxy = PropertyMock(return_value=mock_proxy)
+      api.reconcile_implicit.return_value = self.create_simple_success_response()
+      reconcile_tasks([self.TEST_CLUSTER])
+      assert api.reconcile_implicit.mock_calls == [call()]
+
+  def test_reconcile_explicit(self):
+    """Tests successful execution of the reconcile_tasks command."""
+    mock_options = self.setup_mock_options()
+    mock_proxy = create_autospec(spec=SchedulerProxy, instance=True)
+    mock_scheduler_client = create_autospec(spec=SchedulerClient, instance=True)
+    mock_proxy.scheduler_client.return_value = mock_scheduler_client
+
+    with contextlib.nested(
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.admin.admin.make_admin_client',
+              return_value=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+    ) as (_, mock_make_admin_client, _):
+
+      api = mock_make_admin_client.return_value
+      type(api).scheduler_proxy = PropertyMock(return_value=mock_proxy)
+      api.reconcile_explicit.return_value = self.create_simple_success_response()
+      reconcile_tasks([self.TEST_CLUSTER])
+      assert api.reconcile_explicit.mock_calls == [call(None)]
+
+  def test_reconcile_explicit_batch_size(self):
+    """Tests successful execution of the reconcile_tasks command."""
+    mock_options = self.setup_mock_options(batch_size=500)
+    mock_proxy = create_autospec(spec=SchedulerProxy, instance=True)
+    mock_scheduler_client = create_autospec(spec=SchedulerClient, instance=True)
+    mock_proxy.scheduler_client.return_value = mock_scheduler_client
+
+    with contextlib.nested(
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.admin.admin.make_admin_client',
+              return_value=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+    ) as (_, mock_make_admin_client, _):
+
+      api = mock_make_admin_client.return_value
+      type(api).scheduler_proxy = PropertyMock(return_value=mock_proxy)
+      api.reconcile_explicit.return_value = self.create_simple_success_response()
+      reconcile_tasks([self.TEST_CLUSTER])
+      assert api.reconcile_explicit.mock_calls == [call(500)]

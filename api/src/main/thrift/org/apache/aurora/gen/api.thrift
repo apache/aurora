@@ -1150,6 +1150,10 @@ struct RewriteConfigsRequest {
   1: list<ConfigRewrite> rewriteCommands
 }
 
+struct ExplicitReconciliationSettings {
+  1: optional i32 batchSize
+}
+
 // It would be great to compose these services rather than extend, but that won't be possible until
 // https://issues.apache.org/jira/browse/THRIFT-66 is resolved.
 service AuroraAdmin extends AuroraSchedulerManager {
@@ -1209,6 +1213,12 @@ service AuroraAdmin extends AuroraSchedulerManager {
    * that the caller take care to provide valid input and alter only necessary fields.
    */
   Response rewriteConfigs(1: RewriteConfigsRequest request)
+
+  /** Tell scheduler to trigger an explicit task reconciliation with the given settings. */
+  Response triggerExplicitTaskReconciliation(1: ExplicitReconciliationSettings settings)
+
+  /** Tell scheduler to trigger an implicit task reconciliation. */
+  Response triggerImplicitTaskReconciliation()
 }
 
 // The name of the header that should be sent to bypass leader redirection in the Scheduler.

@@ -26,6 +26,7 @@ from .updater_util import UpdaterConfig
 
 from gen.apache.aurora.api.constants import LIVE_STATES
 from gen.apache.aurora.api.ttypes import (
+    ExplicitReconciliationSettings,
     InstanceKey,
     JobKey,
     JobUpdateKey,
@@ -351,6 +352,13 @@ class AuroraClientAPI(object):
         self._cluster,
         min_instance_count,
         hosts)
+
+  def reconcile_explicit(self, batch_size):
+    return self._scheduler_proxy.triggerExplicitTaskReconciliation(
+      ExplicitReconciliationSettings(batchSize=batch_size))
+
+  def reconcile_implicit(self):
+    return self._scheduler_proxy.triggerImplicitTaskReconciliation()
 
   def _assert_valid_job_key(self, job_key):
     if not isinstance(job_key, AuroraJobKey):

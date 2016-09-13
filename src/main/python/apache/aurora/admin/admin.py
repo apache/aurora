@@ -336,6 +336,33 @@ def scheduler_snapshot(cluster):
 
 
 @app.command
+@requires.exactly('cluster')
+@app.command_option('-t', '--type', default='explicit', choices=['implicit', 'explicit'],
+    help='Type of reconciliation to run - implicit or explicit')
+@app.command_option('-b', '--batch_size', default=None, type=int,
+    help='Batch size for explicit reconciliation')
+def reconcile_tasks(cluster):
+  """usage: reconcile_tasks
+            [--type=RECONCILIATION_TYPE]
+            [--batch_size=BATCHSIZE]
+            cluster
+
+  Reconcile the Mesos master and the scheduler. Default runs explicit
+  reconciliation with a batch size set in reconciliation_explicit_batch_size
+  scheduler configuration option.
+  """
+  options = app.get_options()
+  client = make_admin_client(cluster)
+  if options.type == 'implicit':
+    resp = client.reconcile_implicit()
+  elif options.type == 'explicit':
+    resp = client.reconcile_explicit(options.batch_size)
+  else:
+    die('Unexpected value for --type: %s' % options.type)
+  check_and_log_response(resp)
+
+
+@app.command
 @app.command_option('-X', '--exclude_file', dest='exclude_filename', default=None,
     help='Exclusion filter. An optional text file listing host names (one per line)'
          'to exclude from the result set if found.')

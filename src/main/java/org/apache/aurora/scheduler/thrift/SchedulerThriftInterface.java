@@ -23,6 +23,7 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.FluentIterable;
@@ -38,6 +39,7 @@ import com.google.common.collect.Range;
 import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
+import org.apache.aurora.gen.ExplicitReconciliationSettings;
 import org.apache.aurora.gen.Hosts;
 import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.InstanceTaskConfig;
@@ -79,6 +81,7 @@ import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
+import org.apache.aurora.scheduler.reconciliation.TaskReconciler;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -168,6 +171,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   private final JobUpdateController jobUpdateController;
   private final ReadOnlyScheduler.Iface readOnlyScheduler;
   private final AuditMessages auditMessages;
+  private final TaskReconciler taskReconciler;
 
   @Inject
   SchedulerThriftInterface(
@@ -185,7 +189,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       UUIDGenerator uuidGenerator,
       JobUpdateController jobUpdateController,
       ReadOnlyScheduler.Iface readOnlyScheduler,
-      AuditMessages auditMessages) {
+      AuditMessages auditMessages,
+      TaskReconciler taskReconciler) {
 
     this.configurationManager = requireNonNull(configurationManager);
     this.thresholds = requireNonNull(thresholds);
@@ -202,6 +207,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     this.jobUpdateController = requireNonNull(jobUpdateController);
     this.readOnlyScheduler = requireNonNull(readOnlyScheduler);
     this.auditMessages = requireNonNull(auditMessages);
+    this.taskReconciler = requireNonNull(taskReconciler);
   }
 
   @Override
@@ -625,6 +631,31 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       }
       return resp;
     });
+  }
+
+  @Override
+  public Response triggerExplicitTaskReconciliation(ExplicitReconciliationSettings settings)
+      throws TException {
+    try {
+      requireNonNull(settings);
+      Preconditions.checkArgument(!settings.isSetBatchSize() || settings.getBatchSize() > 0,
+          "Batch size must be greater than zero.");
+
+      Optional<Integer> batchSize = settings.isSetBatchSize()
+          ? Optional.of(settings.getBatchSize())
+          : Optional.absent();
+
+      taskReconciler.triggerExplicitReconciliation(batchSize);
+      return ok();
+    } catch (IllegalArgumentException e) {
+      return error(INVALID_REQUEST, e);
+    }
+  }
+
+  @Override
+  public Response triggerImplicitTaskReconciliation() throws TException {
+    taskReconciler.triggerImplicitReconciliation();
+    return ok();
   }
 
   private Optional<String> rewriteJob(IJobConfigRewrite jobRewrite, CronJobStore.Mutable jobStore) {

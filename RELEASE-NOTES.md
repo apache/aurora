@@ -34,6 +34,8 @@
   scheduler upgrade should be performed by bringing all schedulers down, and then bringing upgraded
   schedulers up. A rolling upgrade would result in no leading scheduler for the duration of the
   roll which could be confusing to monitor and debug.
+- A new command `aurora_admin reconcile_tasks` is now available on the Aurora admin client that can trigger
+  implicit and explicit task reconciliations.
 - Add a new MTTS (Median Time To Starting) metric in addition to MTTA and MTTR.
 - In addition to CPU resources, RAM resources can now be treated as revocable via the scheduler
   commandline flag `-enable_revocable_ram`.
