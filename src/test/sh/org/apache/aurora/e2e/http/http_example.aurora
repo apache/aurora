@@ -73,6 +73,12 @@ no_python_task = SequentialTask(
 
 update_config = UpdateConfig(watch_secs=10, batch_size=2)
 health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)
+shell_health_check_config = HealthCheckConfig(
+  health_checker = HealthCheckerConfig(
+    shell = ShellHealthChecker(shell_command='stat /usr/local/bin/run-server.sh')),
+  initial_interval_secs=5,
+  interval_secs=1,
+)
 
 job = Service(
   cluster = 'devcluster',
@@ -106,11 +112,13 @@ jobs = [
   job(
     name = 'http_example_unified_appc',
     container = Mesos(image=AppcImage(name='http_example_netcat', image_id='{{appc_image_id}}')),
-    task = no_python_task
+    task = no_python_task,
+    health_check_config=shell_health_check_config
   ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_unified_docker',
     container = Mesos(image=DockerImage(name='http_example_netcat', tag='latest')),
-    task = no_python_task
+    task = no_python_task,
+    health_check_config=shell_health_check_config
   ).bind(profile=DefaultProfile())
 ]

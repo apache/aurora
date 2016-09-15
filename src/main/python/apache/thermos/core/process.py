@@ -39,6 +39,8 @@ from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Data, Time
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
+from apache.thermos.common.process_util import wrap_with_mesos_containerizer
+
 from gen.apache.aurora.api.constants import TASK_FILESYSTEM_MOUNT_POINT
 from gen.apache.thermos.ttypes import ProcessState, ProcessStatus, RunnerCkpt
 
@@ -386,27 +388,8 @@ class Process(ProcessBase):
     if self._mesos_containerizer_path is None:
       return ['/bin/bash', '-c', cmdline]
 
-    # We're going to embed this in JSON, so we must escape quotes and newlines.
-    cmdline = cmdline.replace('"', '\\"').replace('\n', '\\n')
-
-    # We must wrap the command in single quotes otherwise the shell that executes
-    # mesos-containerizer will expand any bash variables in the cmdline. Escaping single quotes in
-    # bash is hard: https://github.com/koalaman/shellcheck/wiki/SC1003.
-    bash_wrapper = "/bin/bash -c '\\''%s'\\''"
-
-    wrapped = ('%s launch '
-               '--unshare_namespace_mnt '
-               '--working_directory=%s '
-               '--rootfs=%s '
-               '--user=%s '
-               '--command=\'{"shell":true,"value":"%s"}\'' % (
-                   self._mesos_containerizer_path,
-                   cwd,
-                   os.path.join(os.environ['MESOS_DIRECTORY'], TASK_FILESYSTEM_MOUNT_POINT),
-                   self._user,
-                   bash_wrapper % cmdline))
-
-    return shlex.split(wrapped)
+    return shlex.split(
+        wrap_with_mesos_containerizer(cmdline, self._user, cwd, self._mesos_containerizer_path))
 
   def execute(self):
     """Perform final initialization and launch target process commandline in a subprocess."""

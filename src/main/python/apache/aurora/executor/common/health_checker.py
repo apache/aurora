@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-import os.path
+import os
 import pwd
 import threading
 import time
@@ -27,6 +27,7 @@ from twitter.common.metrics import LambdaGauge
 from apache.aurora.common.health_check.http_signaler import HttpSignaler
 from apache.aurora.common.health_check.shell import ShellHealthCheck
 from apache.aurora.config.schema.base import MesosContext
+from apache.thermos.common.process_util import wrap_with_mesos_containerizer
 from apache.thermos.config.schema import ThermosContext
 
 from .status_checker import StatusChecker, StatusCheckerProvider, StatusResult
@@ -208,8 +209,9 @@ class HealthChecker(StatusChecker):
 
 class HealthCheckerProvider(StatusCheckerProvider):
 
-  def __init__(self, nosetuid_health_checks=False):
-    self.nosetuid_health_checks = nosetuid_health_checks
+  def __init__(self, nosetuid_health_checks=False, mesos_containerizer_path=None):
+    self._nosetuid_health_checks = nosetuid_health_checks
+    self._mesos_containerizer_path = mesos_containerizer_path
 
   @staticmethod
   def interpolate_cmd(task, cmd):
@@ -241,24 +243,41 @@ class HealthCheckerProvider(StatusCheckerProvider):
     timeout_secs = health_check_config.get('timeout_secs')
     if SHELL_HEALTH_CHECK in health_checker:
       shell_command = health_checker.get(SHELL_HEALTH_CHECK, {}).get('shell_command')
-      # Filling in variables eg thermos.ports[http] that could have been passed in as part of
+
+      # Filling in variables e.g. thermos.ports[http] that could have been passed in as part of
       # shell_command.
       interpolated_command = HealthCheckerProvider.interpolate_cmd(
         task=assigned_task,
-        cmd=shell_command
-      )
-      # If we do not want user which is job's role to execute the health shell check
-      # --nosetuid-health-checks should be passed in as an argument to the executor.
+        cmd=shell_command)
+
+      # If we do not want the health check to execute as the user from the job's role
+      # --nosetuid-health-checks should be passed as an argument to the executor.
       demote_to_job_role_user = None
-      if not self.nosetuid_health_checks:
+      if not self._nosetuid_health_checks and not sandbox.is_filesystem_image:
         pw_entry = pwd.getpwnam(assigned_task.task.job.role)
         def demote_to_job_role_user():
           os.setgid(pw_entry.pw_gid)
           os.setuid(pw_entry.pw_uid)
 
-      shell_signaler = ShellHealthCheck(cmd=interpolated_command,
+      # If the task is executing in an isolated filesystem we'll want to wrap the health check
+      # command within a mesos-containerizer invocation so that it's executed within that
+      # filesystem.
+      wrapper = None
+      if sandbox.is_filesystem_image:
+        health_check_user = (os.getusername() if self._nosetuid_health_checks
+            else assigned_task.task.job.role)
+        def wrapper(cmd):
+          return wrap_with_mesos_containerizer(
+              cmd,
+              health_check_user,
+              sandbox.container_root,
+              self._mesos_containerizer_path)
+
+      shell_signaler = ShellHealthCheck(
+        cmd=interpolated_command,
         preexec_fn=demote_to_job_role_user,
-        timeout_secs=timeout_secs)
+        timeout_secs=timeout_secs,
+        wrapper_fn=wrapper)
       a_health_checker = lambda: shell_signaler()
     else:
       portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)

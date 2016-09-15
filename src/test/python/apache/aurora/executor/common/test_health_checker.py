@@ -275,7 +275,12 @@ class TestHealthCheckerProvider(unittest.TestCase):
     execconfig_data = json.loads(assigned_task.task.executorConfig.data)
     assert execconfig_data[
              'health_check_config']['health_checker']['shell']['shell_command'] == 'failed command'
-    health_checker = HealthCheckerProvider().from_assigned_task(assigned_task, None)
+
+    mock_sandbox = mock.Mock(spec_set=SandboxInterface)
+    type(mock_sandbox).root = mock.PropertyMock(return_value='/some/path')
+    type(mock_sandbox).is_filesystem_image = mock.PropertyMock(return_value=False)
+
+    health_checker = HealthCheckerProvider().from_assigned_task(assigned_task, mock_sandbox)
     assert health_checker.threaded_health_checker.interval == interval_secs
     assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs
     hct_max_fail = health_checker.threaded_health_checker.max_consecutive_failures
@@ -309,14 +314,66 @@ class TestHealthCheckerProvider(unittest.TestCase):
     execconfig_data = json.loads(assigned_task.task.executorConfig.data)
     assert execconfig_data[
              'health_check_config']['health_checker']['shell']['shell_command'] == 'failed command'
+
+    mock_sandbox = mock.Mock(spec_set=SandboxInterface)
+    type(mock_sandbox).root = mock.PropertyMock(return_value='/some/path')
+    type(mock_sandbox).is_filesystem_image = mock.PropertyMock(return_value=False)
+
     health_checker = HealthCheckerProvider(nosetuid_health_checks=True).from_assigned_task(
-      assigned_task, None)
+        assigned_task,
+        mock_sandbox)
     assert health_checker.threaded_health_checker.interval == interval_secs
     assert health_checker.threaded_health_checker.initial_interval == initial_interval_secs
     hct_max_fail = health_checker.threaded_health_checker.max_consecutive_failures
     assert hct_max_fail == max_consecutive_failures
     # Should not be trying to access role's user info.
     assert not mock_getpwnam.called
+
+  @mock.patch('pwd.getpwnam')
+  def test_from_assigned_task_shell_filesystem_image(self, mock_getpwnam):
+    interval_secs = 17
+    initial_interval_secs = 3
+    max_consecutive_failures = 2
+    timeout_secs = 5
+    shell_config = ShellHealthChecker(shell_command='failed command')
+    task_config = TaskConfig(
+            job=JobKey(role='role', environment='env', name='name'),
+            executorConfig=ExecutorConfig(
+                    name='thermos-generic',
+                    data=MESOS_JOB(
+                            task=HELLO_WORLD,
+                            health_check_config=HealthCheckConfig(
+                                    health_checker=HealthCheckerConfig(shell=shell_config),
+                                    interval_secs=interval_secs,
+                                    initial_interval_secs=initial_interval_secs,
+                                    max_consecutive_failures=max_consecutive_failures,
+                                    timeout_secs=timeout_secs,
+                            )
+                    ).json_dumps()
+            )
+    )
+    assigned_task = AssignedTask(task=task_config, instanceId=1, assignedPorts={'foo': 9001})
+    execconfig_data = json.loads(assigned_task.task.executorConfig.data)
+    assert execconfig_data[
+             'health_check_config']['health_checker']['shell']['shell_command'] == 'failed command'
+
+    mock_sandbox = mock.Mock(spec_set=SandboxInterface)
+    type(mock_sandbox).root = mock.PropertyMock(return_value='/some/path')
+    type(mock_sandbox).is_filesystem_image = mock.PropertyMock(return_value=True)
+
+    with mock.patch('apache.aurora.executor.common.health_checker.ShellHealthCheck') as mock_shell:
+      HealthCheckerProvider(
+          nosetuid_health_checks=False,
+          mesos_containerizer_path='/some/path/mesos-containerizer').from_assigned_task(
+              assigned_task,
+              mock_sandbox)
+
+      class NotNone(object):
+        def __eq__(self, other):
+          return other is not None
+
+      assert mock_shell.mock_calls == [
+          mock.call(cmd='failed command', wrapper_fn=NotNone(), preexec_fn=None, timeout_secs=5.0)]
 
   def test_interpolate_cmd(self):
     """Making sure thermos.ports[foo] gets correctly substituted with assignedPorts info."""

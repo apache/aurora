@@ -218,7 +218,9 @@ def initialize(options):
 
   # status providers:
   status_providers = [
-      HealthCheckerProvider(nosetuid_health_checks=options.nosetuid_health_checks),
+      HealthCheckerProvider(
+          nosetuid_health_checks=options.nosetuid_health_checks,
+          mesos_containerizer_path=options.mesos_containerizer_path),
       ResourceManagerProvider(checkpoint_root=checkpoint_root)
   ]
 
