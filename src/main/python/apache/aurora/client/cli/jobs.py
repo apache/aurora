@@ -513,10 +513,7 @@ class RestartCommand(Verb):
         WATCH_OPTION,
         CommandOption("--max-per-instance-failures", type=int, default=0,
              help="Maximum number of restarts per instance during restart. Increments total "
-                  "failure count when this limit is exceeded."),
-        CommandOption("--restart-threshold", type=int, default=0,
-             help="This setting is DEPRECATED, will not have any effect if provided and will be "
-                  "removed in the next release.")]
+                  "failure count when this limit is exceeded.")]
 
   @property
   def help(self):
@@ -531,10 +528,6 @@ class RestartCommand(Verb):
       context.print_err("max_total_failures option must be >0, but you specified %s" %
           context.options.max_total_failures)
       return EXIT_INVALID_PARAMETER
-
-    if context.options.restart_threshold:
-      context.print_out("WARNING: '--restart-threshold' option is no longer supported and will be "
-                        "removed in the next release.")
 
     job = context.options.instance_spec.jobkey
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
