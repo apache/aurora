@@ -78,9 +78,8 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
   private static final Arg<Boolean> FRAMEWORK_ANNOUNCE_PRINCIPAL = Arg.create(false);
 
   @CmdLine(name = "framework_name",
-      help = "Name used to register the Aurora framework with Mesos. Changing this value can be "
-          + "backwards incompatible. For details, see MESOS-703.")
-  private static final Arg<String> FRAMEWORK_NAME = Arg.create("TwitterScheduler");
+      help = "Name used to register the Aurora framework with Mesos.")
+  private static final Arg<String> FRAMEWORK_NAME = Arg.create("Aurora");
 
   @CmdLine(name = "executor_user",
       help = "User to start the executor. Defaults to \"root\". "

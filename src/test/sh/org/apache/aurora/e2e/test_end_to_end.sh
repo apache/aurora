@@ -287,7 +287,7 @@ test_discovery_info() {
     return 0
   fi
 
-  framework_info=$(curl --silent '192.168.33.7:5050/state' | jq '.frameworks | map(select(.name == "TwitterScheduler"))')
+  framework_info=$(curl --silent '192.168.33.7:5050/state' | jq '.frameworks | map(select(.name == "Aurora"))')
   if [[ -z $framework_info ]]; then
     echo "Cannot get framework info for $framework"
     exit 1
