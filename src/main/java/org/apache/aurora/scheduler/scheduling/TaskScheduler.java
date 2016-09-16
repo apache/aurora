@@ -38,7 +38,6 @@ import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.preemptor.Preemptor;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.state.TaskAssigner;
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -63,11 +62,12 @@ public interface TaskScheduler extends EventSubscriber {
   /**
    * Attempts to schedule a task, possibly performing irreversible actions.
    *
+   * @param storeProvider {@code MutableStoreProvider} instance to access data store.
    * @param taskId The task to attempt to schedule.
    * @return {@code true} if the task was scheduled, {@code false} otherwise. The caller should
    *         call schedule again if {@code false} is returned.
    */
-  boolean schedule(String taskId);
+  boolean schedule(MutableStoreProvider storeProvider, String taskId);
 
   /**
    * An asynchronous task scheduler.  Scheduling of tasks is performed on a delay, where each task
@@ -86,7 +86,6 @@ public interface TaskScheduler extends EventSubscriber {
 
     private static final Logger LOG = LoggerFactory.getLogger(TaskSchedulerImpl.class);
 
-    private final Storage storage;
     private final TaskAssigner assigner;
     private final Preemptor preemptor;
     private final ExecutorSettings executorSettings;
@@ -98,25 +97,22 @@ public interface TaskScheduler extends EventSubscriber {
 
     @Inject
     TaskSchedulerImpl(
-        Storage storage,
         TaskAssigner assigner,
         Preemptor preemptor,
         ExecutorSettings executorSettings,
         BiCache<String, TaskGroupKey> reservations) {
 
-      this.storage = requireNonNull(storage);
       this.assigner = requireNonNull(assigner);
       this.preemptor = requireNonNull(preemptor);
       this.executorSettings = requireNonNull(executorSettings);
       this.reservations = requireNonNull(reservations);
     }
 
-    @Timed("task_schedule_attempt")
-    @Override
-    public boolean schedule(final String taskId) {
+    @Timed ("task_schedule_attempt")
+    public boolean schedule(MutableStoreProvider store, String taskId) {
       attemptsFired.incrementAndGet();
       try {
-        return storage.write(store -> scheduleTask(store, taskId));
+        return scheduleTask(store, taskId);
       } catch (RuntimeException e) {
         // We catch the generic unchecked exception here to ensure tasks are not abandoned
         // if there is a transient issue resulting in an unchecked exception.
@@ -126,8 +122,7 @@ public interface TaskScheduler extends EventSubscriber {
       }
     }
 
-    @Timed("task_schedule_attempt_locked")
-    protected boolean scheduleTask(MutableStoreProvider store, String taskId) {
+    private boolean scheduleTask(MutableStoreProvider store, String taskId) {
       LOG.debug("Attempting to schedule task " + taskId);
       IAssignedTask assignedTask = Iterables.getOnlyElement(
           Iterables.transform(

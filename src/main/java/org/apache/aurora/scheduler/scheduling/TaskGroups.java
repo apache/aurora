@@ -13,12 +13,19 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -28,7 +35,9 @@ import com.google.common.util.concurrent.RateLimiter;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.SlidingStats;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.BackoffStrategy;
+import org.apache.aurora.scheduler.BatchWorker;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
@@ -36,9 +45,14 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
+import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
@@ -61,11 +75,37 @@ public class TaskGroups implements EventSubscriber {
   private final long firstScheduleDelay;
   private final BackoffStrategy backoff;
   private final RescheduleCalculator rescheduleCalculator;
+  private final BatchWorker<Boolean> batchWorker;
 
   // Track the penalties of tasks at the time they were scheduled. This is to provide data that
   // may influence the selection of a different backoff strategy.
   private final SlidingStats scheduledTaskPenalties =
       new SlidingStats("scheduled_task_penalty", "ms");
+
+  /**
+   * Annotation for the max scheduling batch size.
+   */
+  @VisibleForTesting
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  public @interface SchedulingMaxBatchSize { }
+
+  @VisibleForTesting
+  public static class TaskGroupBatchWorker extends BatchWorker<Boolean> {
+    @Inject
+    TaskGroupBatchWorker(
+        Storage storage,
+        StatsProvider statsProvider,
+        @SchedulingMaxBatchSize int maxBatchSize) {
+
+      super(storage, statsProvider, maxBatchSize);
+    }
+
+    @Override
+    protected String serviceName() {
+      return "TaskGroupBatchWorker";
+    }
+  }
 
   public static class TaskGroupsSettings {
     private final Amount<Long, Time> firstScheduleDelay;
@@ -88,7 +128,8 @@ public class TaskGroups implements EventSubscriber {
       @AsyncExecutor DelayExecutor executor,
       TaskGroupsSettings settings,
       TaskScheduler taskScheduler,
-      RescheduleCalculator rescheduleCalculator) {
+      RescheduleCalculator rescheduleCalculator,
+      TaskGroupBatchWorker batchWorker) {
 
     requireNonNull(settings.firstScheduleDelay);
     Preconditions.checkArgument(settings.firstScheduleDelay.getValue() > 0);
@@ -99,10 +140,11 @@ public class TaskGroups implements EventSubscriber {
     this.firstScheduleDelay = settings.firstScheduleDelay.as(Time.MILLISECONDS);
     this.backoff = requireNonNull(settings.taskGroupBackoff);
     this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
+    this.batchWorker = requireNonNull(batchWorker);
 
-    this.taskScheduler = taskId -> {
+    this.taskScheduler = (store, taskId) -> {
       settings.rateLimiter.acquire();
-      return taskScheduler.schedule(taskId);
+      return taskScheduler.schedule(store, taskId);
     };
   }
 
@@ -120,10 +162,20 @@ public class TaskGroups implements EventSubscriber {
     Runnable monitor = new Runnable() {
       @Override
       public void run() {
-        Optional<String> taskId = group.peek();
+        final Optional<String> taskId = group.peek();
         long penaltyMs = 0;
         if (taskId.isPresent()) {
-          if (taskScheduler.schedule(taskId.get())) {
+          CompletableFuture<Boolean> result = batchWorker.execute(storeProvider ->
+              taskScheduler.schedule(storeProvider, taskId.get()));
+          boolean isScheduled = false;
+          try {
+            isScheduled = result.get();
+          } catch (ExecutionException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            Throwables.propagate(e);
+          }
+
+          if (isScheduled) {
             scheduledTaskPenalties.accumulate(group.getPenaltyMs());
             group.remove(taskId.get());
             if (group.hasMore()) {

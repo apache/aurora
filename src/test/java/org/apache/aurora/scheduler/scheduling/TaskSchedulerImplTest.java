@@ -157,7 +157,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(scheduler.schedule("a"));
+    assertTrue(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
   }
 
   @Test
@@ -169,7 +169,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(scheduler.schedule("a"));
+    assertTrue(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
   }
 
   @Test
@@ -201,9 +201,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(scheduler.schedule("a"));
-    assertFalse(scheduler.schedule("a"));
-    assertTrue(scheduler.schedule("a"));
+    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
+    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
+    assertTrue(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
   }
 
   @Test
@@ -218,7 +218,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(scheduler.schedule("a"));
+    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
   }
 
   @Test
@@ -233,7 +233,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(scheduler.schedule("a"));
+    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
   }
 
   @Test
@@ -281,7 +281,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(scheduler.schedule(Tasks.id(taskA)));
+    memStorage.write((NoResult.Quiet)
+        store -> assertTrue(scheduler.schedule(store, Tasks.id(taskA))));
   }
 
   @Test
@@ -295,7 +296,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(scheduler.schedule("a"));
+    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
   }
 
   private void expectPreemptorCall(IScheduledTask task, Optional<String> result) {

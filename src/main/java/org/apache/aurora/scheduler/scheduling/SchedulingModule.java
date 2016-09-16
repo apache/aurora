@@ -31,6 +31,8 @@ import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator.RescheduleCalculatorImpl;
 
+import static org.apache.aurora.scheduler.SchedulerServicesModule.addSchedulerActiveServiceBinding;
+
 /**
  * Binding module for task scheduling logic.
  */
@@ -83,6 +85,11 @@ public class SchedulingModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> RESERVATION_DURATION =
       Arg.create(Amount.of(3L, Time.MINUTES));
 
+  @Positive
+  @CmdLine(name = "scheduling_max_batch_size",
+      help = "The maximum number of scheduling attempts that can be processed in a batch.")
+  private static final Arg<Integer> SCHEDULING_MAX_BATCH_SIZE = Arg.create(3);
+
   @Override
   protected void configure() {
     install(new PrivateModule() {
@@ -108,6 +115,12 @@ public class SchedulingModule extends AbstractModule {
       }
     });
     PubsubEventModule.bindSubscriber(binder(), TaskGroups.class);
+
+    bind(new TypeLiteral<Integer>() { })
+        .annotatedWith(TaskGroups.SchedulingMaxBatchSize.class)
+        .toInstance(SCHEDULING_MAX_BATCH_SIZE.get());
+    bind(TaskGroups.TaskGroupBatchWorker.class).in(Singleton.class);
+    addSchedulerActiveServiceBinding(binder()).to(TaskGroups.TaskGroupBatchWorker.class);
 
     install(new PrivateModule() {
       @Override

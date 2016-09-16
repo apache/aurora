@@ -190,9 +190,11 @@ public class SchedulingBenchmarks {
     private void fillUpCluster(int numOffers) {
       Set<IScheduledTask> tasksToAssign = buildClusterTasks(numOffers);
       saveTasks(tasksToAssign);
-      for (IScheduledTask scheduledTask : tasksToAssign) {
-        taskScheduler.schedule(scheduledTask.getAssignedTask().getTaskId());
-      }
+      storage.write((NoResult.Quiet) store -> {
+        for (IScheduledTask scheduledTask : tasksToAssign) {
+          taskScheduler.schedule(store, scheduledTask.getAssignedTask().getTaskId());
+        }
+      });
     }
 
     private void saveTasks(final Set<IScheduledTask> tasks) {
@@ -219,11 +221,13 @@ public class SchedulingBenchmarks {
      */
     @Benchmark
     public boolean runBenchmark() {
-      boolean result = false;
-      for (IScheduledTask task : settings.getTasks()) {
-        result = taskScheduler.schedule(task.getAssignedTask().getTaskId());
-      }
-      return result;
+      return storage.write((Storage.MutateWork.Quiet<Boolean>) store -> {
+        boolean result = false;
+        for (IScheduledTask task : settings.getTasks()) {
+          result = taskScheduler.schedule(store, task.getAssignedTask().getTaskId());
+        }
+        return result;
+      });
     }
   }
 
