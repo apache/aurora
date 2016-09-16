@@ -44,6 +44,8 @@ import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.scheduler.BatchWorker;
+import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
@@ -120,6 +122,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   private final Clock clock;
   private final PulseHandler pulseHandler;
   private final Lifecycle lifecycle;
+  private final TaskEventBatchWorker batchWorker;
 
   // Currently-active updaters. An active updater is one that is rolling forward or back. Paused
   // and completed updates are represented only in storage, not here.
@@ -134,7 +137,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
       ScheduledExecutorService executor,
       StateManager stateManager,
       Clock clock,
-      Lifecycle lifecycle) {
+      Lifecycle lifecycle,
+      TaskEventBatchWorker batchWorker) {
 
     this.updateFactory = requireNonNull(updateFactory);
     this.lockManager = requireNonNull(lockManager);
@@ -143,6 +147,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     this.stateManager = requireNonNull(stateManager);
     this.clock = requireNonNull(clock);
     this.lifecycle = requireNonNull(lifecycle);
+    this.batchWorker = requireNonNull(batchWorker);
     this.pulseHandler = new PulseHandler(clock);
   }
 
@@ -346,7 +351,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   private void instanceChanged(final IInstanceKey instance, final Optional<IScheduledTask> state) {
-    storage.write((NoResult.Quiet) storeProvider -> {
+    batchWorker.execute(storeProvider -> {
       IJobKey job = instance.getJobKey();
       UpdateFactory.Update update = updates.get(job);
       if (update != null) {
@@ -366,6 +371,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
               + JobKeys.canonicalString(job));
         }
       }
+      return BatchWorker.NO_RESULT;
     });
   }
 

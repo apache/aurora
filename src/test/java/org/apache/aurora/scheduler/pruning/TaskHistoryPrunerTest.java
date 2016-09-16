@@ -27,6 +27,7 @@ import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
@@ -48,6 +49,7 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
+import static org.apache.aurora.scheduler.testing.BatchWorkerUtil.expectBatchExecute;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
 
@@ -68,20 +70,24 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
   private Command shutdownCommand;
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
     executor = createMock(DelayExecutor.class);
     clock = new FakeClock();
     stateManager = createMock(StateManager.class);
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     shutdownCommand = createMock(Command.class);
+    TaskEventBatchWorker batchWorker = createMock(TaskEventBatchWorker.class);
+    expectBatchExecute(batchWorker, storageUtil.storage, control).anyTimes();
+
     pruner = new TaskHistoryPruner(
         executor,
         stateManager,
         clock,
         new HistoryPrunnerSettings(ONE_DAY, ONE_MINUTE, PER_JOB_HISTORY),
         storageUtil.storage,
-        new Lifecycle(shutdownCommand));
+        new Lifecycle(shutdownCommand),
+        batchWorker);
     closer = Closer.create();
   }
 

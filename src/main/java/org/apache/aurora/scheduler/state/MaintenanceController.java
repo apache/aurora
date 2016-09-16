@@ -30,6 +30,8 @@ import com.google.common.eventbus.Subscribe;
 import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.scheduler.BatchWorker;
+import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -37,7 +39,6 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IHostStatus;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -106,11 +107,17 @@ public interface MaintenanceController {
     private static final Logger LOG = LoggerFactory.getLogger(MaintenanceControllerImpl.class);
     private final Storage storage;
     private final StateManager stateManager;
+    private final TaskEventBatchWorker batchWorker;
 
     @Inject
-    public MaintenanceControllerImpl(Storage storage, StateManager stateManager) {
+    public MaintenanceControllerImpl(
+        Storage storage,
+        StateManager stateManager,
+        TaskEventBatchWorker batchWorker) {
+
       this.storage = requireNonNull(storage);
       this.stateManager = requireNonNull(stateManager);
+      this.batchWorker = requireNonNull(batchWorker);
     }
 
     private Set<IHostStatus> watchDrainingTasks(MutableStoreProvider store, Set<String> hosts) {
@@ -153,7 +160,7 @@ public interface MaintenanceController {
     public void taskChangedState(final TaskStateChange change) {
       if (Tasks.isTerminated(change.getNewState())) {
         final String host = change.getTask().getAssignedTask().getSlaveHost();
-        storage.write((NoResult.Quiet) (MutableStoreProvider store) -> {
+        batchWorker.execute(store -> {
           // If the task _was_ associated with a draining host, and it was the last task on the
           // host.
           Optional<IHostAttributes> attributes =
@@ -168,6 +175,7 @@ public interface MaintenanceController {
               LOG.info("Host {} is DRAINING with active tasks: {}", host, Tasks.ids(activeTasks));
             }
           }
+          return BatchWorker.NO_RESULT;
         });
       }
     }

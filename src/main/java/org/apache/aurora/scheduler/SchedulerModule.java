@@ -16,6 +16,8 @@ package org.apache.aurora.scheduler;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+
+import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
@@ -27,10 +29,13 @@ import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.scheduler.BatchWorker.NoResult;
 import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.mesos.Protos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +63,11 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "max_status_update_batch_size",
       help = "The maximum number of status updates that can be processed in a batch.")
   private static final Arg<Integer> MAX_STATUS_UPDATE_BATCH_SIZE = Arg.create(1000);
+
+  @Positive
+  @CmdLine(name = "max_task_event_batch_size",
+      help = "The maximum number of task state change events that can be processed in a batch.")
+  private static final Arg<Integer> MAX_TASK_EVENT_BATCH_SIZE = Arg.create(300);
 
   @Override
   protected void configure() {
@@ -93,6 +103,21 @@ public class SchedulerModule extends AbstractModule {
     bind(TaskStatusHandler.class).to(TaskStatusHandlerImpl.class);
     bind(TaskStatusHandlerImpl.class).in(Singleton.class);
     addSchedulerActiveServiceBinding(binder()).to(TaskStatusHandlerImpl.class);
+
+    bind(TaskEventBatchWorker.class).in(Singleton.class);
+    addSchedulerActiveServiceBinding(binder()).to(TaskEventBatchWorker.class);
   }
 
+  public static class TaskEventBatchWorker extends BatchWorker<NoResult> {
+    @Inject
+    TaskEventBatchWorker(Storage storage, StatsProvider statsProvider) {
+
+      super(storage, statsProvider, MAX_TASK_EVENT_BATCH_SIZE.get());
+    }
+
+    @Override
+    protected String serviceName() {
+      return "TaskEventBatchWorker";
+    }
+  }
 }

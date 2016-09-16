@@ -30,6 +30,7 @@ import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
@@ -53,6 +54,7 @@ import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
+import static org.apache.aurora.scheduler.testing.BatchWorkerUtil.expectBatchExecute;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
@@ -71,6 +73,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
+    TaskEventBatchWorker batchWorker = createMock(TaskEventBatchWorker.class);
+    expectBatchExecute(batchWorker, storageUtil.storage, control).anyTimes();
 
     Injector injector = Guice.createInjector(
         new PubsubEventModule(),
@@ -83,6 +87,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(Executor.class).annotatedWith(AsyncExecutor.class)
                 .toInstance(MoreExecutors.directExecutor());
+            bind(TaskEventBatchWorker.class).toInstance(batchWorker);
           }
         });
     maintenance = injector.getInstance(MaintenanceController.class);

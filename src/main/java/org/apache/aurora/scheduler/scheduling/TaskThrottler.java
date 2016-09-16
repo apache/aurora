@@ -22,13 +22,14 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.SlidingStats;
 import org.apache.aurora.common.util.Clock;
+import org.apache.aurora.scheduler.BatchWorker;
+import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.storage.Storage;
 
 import static java.util.Objects.requireNonNull;
 
@@ -46,8 +47,8 @@ class TaskThrottler implements EventSubscriber {
   private final RescheduleCalculator rescheduleCalculator;
   private final Clock clock;
   private final DelayExecutor executor;
-  private final Storage storage;
   private final StateManager stateManager;
+  private final TaskEventBatchWorker batchWorker;
 
   private final SlidingStats throttleStats = new SlidingStats("task_throttle", "ms");
 
@@ -56,14 +57,14 @@ class TaskThrottler implements EventSubscriber {
       RescheduleCalculator rescheduleCalculator,
       Clock clock,
       @AsyncExecutor DelayExecutor executor,
-      Storage storage,
-      StateManager stateManager) {
+      StateManager stateManager,
+      TaskEventBatchWorker batchWorker) {
 
     this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
     this.clock = requireNonNull(clock);
     this.executor = requireNonNull(executor);
-    this.storage = requireNonNull(storage);
     this.stateManager = requireNonNull(stateManager);
+    this.batchWorker = requireNonNull(batchWorker);
   }
 
   @Subscribe
@@ -73,13 +74,16 @@ class TaskThrottler implements EventSubscriber {
           + rescheduleCalculator.getFlappingPenaltyMs(stateChange.getTask());
       long delayMs = Math.max(0, readyAtMs - clock.nowMillis());
       throttleStats.accumulate(delayMs);
-      executor.execute(
-          () -> storage.write(storeProvider -> stateManager.changeState(
-              storeProvider,
-              stateChange.getTaskId(),
-              Optional.of(THROTTLED),
-              PENDING,
-              Optional.absent())),
+      executor.execute(() ->
+              batchWorker.execute(storeProvider -> {
+                stateManager.changeState(
+                    storeProvider,
+                    stateChange.getTaskId(),
+                    Optional.of(THROTTLED),
+                    PENDING,
+                    Optional.absent());
+                return BatchWorker.NO_RESULT;
+              }),
           Amount.of(delayMs, Time.MILLISECONDS));
     }
   }

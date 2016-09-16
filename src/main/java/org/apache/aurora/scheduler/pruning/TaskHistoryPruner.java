@@ -29,13 +29,14 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.apiConstants;
+import org.apache.aurora.scheduler.BatchWorker;
+import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.slf4j.Logger;
@@ -62,6 +63,7 @@ public class TaskHistoryPruner implements EventSubscriber {
   private final HistoryPrunnerSettings settings;
   private final Storage storage;
   private final Lifecycle lifecycle;
+  private final TaskEventBatchWorker batchWorker;
 
   private final Predicate<IScheduledTask> safeToDelete = new Predicate<IScheduledTask>() {
     @Override
@@ -94,7 +96,8 @@ public class TaskHistoryPruner implements EventSubscriber {
       Clock clock,
       HistoryPrunnerSettings settings,
       Storage storage,
-      Lifecycle lifecycle) {
+      Lifecycle lifecycle,
+      TaskEventBatchWorker batchWorker) {
 
     this.executor = requireNonNull(executor);
     this.stateManager = requireNonNull(stateManager);
@@ -102,6 +105,7 @@ public class TaskHistoryPruner implements EventSubscriber {
     this.settings = requireNonNull(settings);
     this.storage = requireNonNull(storage);
     this.lifecycle = requireNonNull(lifecycle);
+    this.batchWorker = requireNonNull(batchWorker);
   }
 
   @VisibleForTesting
@@ -131,8 +135,10 @@ public class TaskHistoryPruner implements EventSubscriber {
 
   private void deleteTasks(final Set<String> taskIds) {
     LOG.info("Pruning inactive tasks " + taskIds);
-    storage.write(
-        (NoResult.Quiet) storeProvider -> stateManager.deleteTasks(storeProvider, taskIds));
+    batchWorker.execute(storeProvider -> {
+      stateManager.deleteTasks(storeProvider, taskIds);
+      return BatchWorker.NO_RESULT;
+    });
   }
 
   @VisibleForTesting
