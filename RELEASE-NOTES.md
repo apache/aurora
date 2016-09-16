@@ -40,6 +40,7 @@
 - In addition to CPU resources, RAM resources can now be treated as revocable via the scheduler
   commandline flag `-enable_revocable_ram`.
 - Introduce UpdateMetadata fields in JobUpdateRequest to allow clients to store metadata on update.
+- Changed cronSchedule field inside of JobConfiguration schema to be optional for compatibility with Go.
 
 ### Deprecations and removals:
 

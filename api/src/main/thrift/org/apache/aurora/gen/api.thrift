@@ -325,7 +325,7 @@ struct JobConfiguration {
   /**
    * If present, the job will be handled as a cron job with this crontab-syntax schedule.
    */
-  4: string cronSchedule
+  4: optional string cronSchedule
   /** Collision policy to use when handling overlapping cron runs.  Default is KILL_EXISTING. */
   5: CronCollisionPolicy cronCollisionPolicy
   /** Task configuration for this job. */
