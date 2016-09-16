@@ -90,6 +90,14 @@ public class BackoffHelper {
   }
 
   /**
+   * Gets {@link BackoffStrategy} instance the BackoffHelper is initialized with.
+   * @return instance of {@link BackoffStrategy} used by BackoffHelper.
+   */
+  public BackoffStrategy getBackoffStrategy() {
+    return backoffStrategy;
+  }
+
+  /**
    * Executes the given task using the configured backoff strategy until the task succeeds as
    * indicated by returning a non-null value.
    *

@@ -41,6 +41,13 @@ public class BackoffHelperTest extends EasyMockTest {
   }
 
   @Test
+  public void testGetBackoffStrategy() {
+    control.replay();
+
+    assertEquals(backoffStrategy, backoffHelper.getBackoffStrategy());
+  }
+
+  @Test
   public void testDoUntilSuccess() throws Exception {
     ExceptionalSupplier<Boolean, RuntimeException> task =
         createMock(new Clazz<ExceptionalSupplier<Boolean, RuntimeException>>() { });

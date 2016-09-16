@@ -21,6 +21,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.util.Modules;
 
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.Container;
@@ -34,6 +35,7 @@ import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
@@ -95,6 +97,8 @@ public class CronIT extends EasyMockTest {
             bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
             bind(StateManager.class).toInstance(stateManager);
             bind(Storage.class).toInstance(storage);
+            bind(StatsProvider.class).toInstance(createMock(StatsProvider.class));
+            bind(EventSink.class).toInstance(createMock(EventSink.class));
           }
         });
   }
