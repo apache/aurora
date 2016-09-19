@@ -42,6 +42,9 @@
 - Introduce UpdateMetadata fields in JobUpdateRequest to allow clients to store metadata on update.
 - Changed cronSchedule field inside of JobConfiguration schema to be optional for compatibility with Go.
 - Update default value of command line option `-framework_name` to 'Aurora'.
+- Tasks launched with filesystem images and the Mesos unified containerizer are now fully isolated from
+  the host's filesystem. As such they are no longer required to include any of the executor's
+  dependencies (e.g. Python 2.7) within the task's filesystem.
 
 ### Deprecations and removals:
 
