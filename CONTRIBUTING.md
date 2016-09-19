@@ -16,8 +16,10 @@ both languages.
 
 There are issues in [Jira](https://issues.apache.org/jira/browse/AURORA) with the
 ["newbie" label](https://issues.apache.org/jira/issues/?jql=project%20%3D%20AURORA%20AND%20labels%20%3D%20newbie%20and%20resolution%3Dunresolved)
-that are good starting places for new Aurora contributors; pick one of these and dive in! Once
-you've got a patch, the next step is to post a review.
+that are good starting places for new Aurora contributors; pick one of these and dive in! To assign
+a task to yourself, first ask for your JIRA id to be whitelisted by either asking in IRC/Slack or by
+emailing dev@apache.aurora.org. Once your JIRA account has been whitelisted you can assign tickets
+to yourself. The next step is to prepare your patch and finally post it for review.
 
 ## Getting your ReviewBoard Account
 
