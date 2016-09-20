@@ -18,10 +18,19 @@ import unittest
 import mock
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.admin.admin_util import parse_script
+from apache.aurora.admin.admin_util import make_admin_client, parse_script
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import Clusters
 
 
 class TestAdminUtil(unittest.TestCase):
+  TEST_CLUSTER_NAME = 'west'
+  TEST_CLUSTER = Cluster(
+          name=TEST_CLUSTER_NAME,
+          zk='zookeeper.example.com',
+          scheduler_zk_path='/foo/bar',
+          auth_mechanism='UNAUTHENTICATED')
+  TEST_CLUSTERS = Clusters([TEST_CLUSTER])
 
   @mock.patch("apache.aurora.admin.admin_util.subprocess", spec=subprocess)
   def test_parse_script(self, mock_subprocess):
@@ -34,3 +43,15 @@ class TestAdminUtil(unittest.TestCase):
 
   def test_parse_script_invalid_filename(self):
     self.assertRaises(SystemExit, parse_script, "invalid filename")
+
+  def test_make_admin_client_cluster_string(self):
+    with mock.patch('apache.aurora.admin.admin_util.CLUSTERS', new=self.TEST_CLUSTERS):
+      self.assertIsNotNone(make_admin_client(self.TEST_CLUSTER_NAME))
+
+  def test_make_admin_client_cluster_object(self):
+    with mock.patch('apache.aurora.admin.admin_util.CLUSTERS', new=self.TEST_CLUSTERS):
+      self.assertIsNotNone(make_admin_client(self.TEST_CLUSTER))
+
+  def test_make_admin_client_cluster_unknown(self):
+    with mock.patch('apache.aurora.admin.admin_util.CLUSTERS', new=self.TEST_CLUSTERS):
+      self.assertRaises(SystemExit, make_admin_client, 'east')

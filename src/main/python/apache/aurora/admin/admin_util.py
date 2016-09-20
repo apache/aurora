@@ -22,7 +22,10 @@ from uuid import uuid1
 from twitter.common.quantity import Amount, Time
 from twitter.common.quantity.parse_simple import parse_time
 
-from apache.aurora.client.base import die
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.base import AURORA_ADMIN_USER_AGENT_NAME, die
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import CLUSTERS
 
 """Admin client utility functions shared between admin and maintenance modules."""
 
@@ -264,3 +267,27 @@ def format_sla_results(host_groups, unsafe_only=False):
         results.append(host_details)
         hostnames.add(host)
   return results, hostnames
+
+
+def make_admin_client(cluster, verbose=False, bypass_leader_redirect=False):
+  """Creates an API client with the specified options for use in admin commands.
+
+  :param cluster: The cluster to connect with.
+  :type cluster: Either a string cluster name or a Cluster object.
+  :param verbose: Should the client emit verbose output.
+  :type verbose: bool
+  :type bypass_leader_redirect: Should the client bypass the scheduler's leader redirect filter.
+  :type bypass_leader_redirect: bool
+  :rtype: an AuroraClientAPI instance.
+  """
+
+  is_cluster_object = isinstance(cluster, Cluster)
+
+  if not is_cluster_object and cluster not in CLUSTERS:
+    die('Unknown cluster: %s. Known clusters: %s' % (cluster, ", ".join(CLUSTERS.keys())))
+
+  return AuroraClientAPI(
+      cluster if is_cluster_object else CLUSTERS[cluster],
+      AURORA_ADMIN_USER_AGENT_NAME,
+      verbose=verbose,
+      bypass_leader_redirect=bypass_leader_redirect)

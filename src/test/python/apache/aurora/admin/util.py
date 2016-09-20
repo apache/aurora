@@ -81,4 +81,5 @@ class AuroraClientCommandTest(unittest.TestCase):
   def setup_mock_options(cls):
     mock_options = create_autospec(spec=['verbosity'], instance=True)
     mock_options.verbosity = 'verbose'
+    mock_options.bypass_leader_redirect = False
     return mock_options

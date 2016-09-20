@@ -48,6 +48,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
     mock_options.disable_all_hooks = False
     mock_options.min_instance_count = MIN_INSTANCE_COUNT
     mock_options.grouping = grouping or DEFAULT_GROUPING
+    mock_options.bypass_leader_redirect = False
     return mock_options
 
   @classmethod
@@ -308,6 +309,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
     mock_options.verbosity = False
     mock_options.grouping = grouping or DEFAULT_GROUPING
     mock_options.min_instance_count = 1
+    mock_options.bypass_leader_redirect = False
     return mock_options
 
   @classmethod

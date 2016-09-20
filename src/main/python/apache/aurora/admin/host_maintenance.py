@@ -16,8 +16,7 @@ from threading import Event
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
 
-from apache.aurora.admin.admin_util import format_sla_results, print_results
-from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.admin.admin_util import format_sla_results, make_admin_client, print_results
 from apache.aurora.client.base import DEFAULT_GROUPING, check_and_log_response, group_hosts
 
 from gen.apache.aurora.api.ttypes import Hosts, MaintenanceMode
@@ -47,8 +46,11 @@ class HostMaintenance(object):
     for group in groups:
       yield Hosts(group[1])
 
-  def __init__(self, cluster, verbosity, wait_event=None):
-    self._client = AuroraClientAPI(cluster, verbosity == 'verbose')
+  def __init__(self, cluster, verbosity, wait_event=None, bypass_leader_redirect=False):
+    self._client = make_admin_client(
+        cluster=cluster,
+        verbose=verbosity == 'verbose',
+        bypass_leader_redirect=bypass_leader_redirect)
     self._wait_event = wait_event or Event()
 
   def _drain_hosts(self, drainable_hosts):

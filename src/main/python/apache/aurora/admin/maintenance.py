@@ -51,8 +51,11 @@ def host_deactivate(cluster):
   future hosts that will be drained shortly in subsequent batches.
   """
   options = app.get_options()
-  HostMaintenance(CLUSTERS[cluster], options.verbosity).start_maintenance(
-      parse_hostnames(options.filename, options.hosts))
+  HostMaintenance(
+      cluster=CLUSTERS[cluster],
+      verbosity=options.verbosity,
+      bypass_leader_redirect=options.bypass_leader_redirect).start_maintenance(
+          parse_hostnames(options.filename, options.hosts))
 
 
 @app.command
@@ -69,8 +72,11 @@ def host_activate(cluster):
   allow normal scheduling to resume on the given list of hosts.
   """
   options = app.get_options()
-  HostMaintenance(CLUSTERS[cluster], options.verbosity).end_maintenance(
-      parse_hostnames(options.filename, options.hosts))
+  HostMaintenance(
+      cluster=CLUSTERS[cluster],
+      verbosity=options.verbosity,
+      bypass_leader_redirect=options.bypass_leader_redirect).end_maintenance(
+          parse_hostnames(options.filename, options.hosts))
 
 
 @app.command
@@ -113,13 +119,16 @@ def host_drain(cluster):
 
   post_drain_callback = parse_script(options.post_drain_script)
 
-  HostMaintenance(CLUSTERS[cluster], options.verbosity).perform_maintenance(
-      drainable_hosts,
-      grouping_function=options.grouping,
-      percentage=override_percentage,
-      duration=override_duration,
-      output_file=options.unsafe_hosts_filename,
-      callback=post_drain_callback)
+  HostMaintenance(
+      cluster=CLUSTERS[cluster],
+      verbosity=options.verbosity,
+      bypass_leader_redirect=options.bypass_leader_redirect).perform_maintenance(
+          drainable_hosts,
+          grouping_function=options.grouping,
+          percentage=override_percentage,
+          duration=override_duration,
+          output_file=options.unsafe_hosts_filename,
+          callback=post_drain_callback)
 
 
 @app.command
@@ -134,6 +143,10 @@ def host_status(cluster):
   """
   options = app.get_options()
   checkable_hosts = parse_hostnames(options.filename, options.hosts)
-  statuses = HostMaintenance(CLUSTERS[cluster], options.verbosity).check_status(checkable_hosts)
+  statuses = HostMaintenance(
+      cluster=CLUSTERS[cluster],
+      verbosity=options.verbosity,
+      bypass_leader_redirect=options.bypass_leader_redirect).check_status(checkable_hosts)
+
   for pair in statuses:
     log.info("%s is in state: %s" % pair)

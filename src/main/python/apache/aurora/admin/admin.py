@@ -22,10 +22,9 @@ from twitter.common import app, log
 from twitter.common.quantity import Data, Time
 from twitter.common.quantity.parse_simple import parse_data, parse_time
 
-from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.admin.admin_util import make_admin_client
 from apache.aurora.client.api.sla import JobUpTimeLimit
 from apache.aurora.client.base import (
-    AURORA_ADMIN_USER_AGENT_NAME,
     GROUPING_OPTION,
     check_and_log_response,
     combine_messages,
@@ -63,17 +62,12 @@ MIN_SLA_INSTANCE_COUNT = optparse.Option(
 )
 
 
-def make_admin_client(cluster):
-  if cluster not in CLUSTERS:
-    die('Unknown cluster: %s. Known clusters: %s' % (cluster, ", ".join(CLUSTERS.keys())))
-
+def make_admin_client_with_options(cluster):
   options = app.get_options()
-  verbose = getattr(options, 'verbosity', 'normal') == 'verbose'
 
-  return AuroraClientAPI(
-      CLUSTERS[cluster],
-      AURORA_ADMIN_USER_AGENT_NAME,
-      verbose=verbose,
+  return make_admin_client(
+      cluster=cluster,
+      verbose=getattr(options, 'verbosity', 'normal') == 'verbose',
       bypass_leader_redirect=options.bypass_leader_redirect)
 
 
@@ -158,7 +152,7 @@ def query(args, options):
   if not (states <= ACTIVE_STATES) and not options.force:
     die('--force is required for expensive queries (states outside ACTIVE states')
 
-  api = make_admin_client(cluster)
+  api = make_admin_client_with_options(cluster)
 
   query_info = api.query(TaskQuery(role=role, jobName=job, instanceIds=instances, statuses=states))
   if query_info.responseCode != ResponseCode.OK:
@@ -198,7 +192,7 @@ def set_quota(cluster, role, cpu_str, ram, disk):
   except ValueError as e:
     die(str(e))
 
-  resp = make_admin_client(cluster).set_quota(role, cpu, ram_mb, disk_mb)
+  resp = make_admin_client_with_options(cluster).set_quota(role, cpu, ram_mb, disk_mb)
   check_and_log_response(resp)
 
 
@@ -213,7 +207,7 @@ def increase_quota(cluster, role, cpu_str, ram_str, disk_str):
   ram = parse_data(ram_str).as_(Data.MB)
   disk = parse_data(disk_str).as_(Data.MB)
 
-  client = make_admin_client(cluster)
+  client = make_admin_client_with_options(cluster)
   resp = client.get_quota(role)
   quota = resp.result.getQuotaResult.quota
   resource_details = ResourceManager.resource_details_from_quota(quota)
@@ -245,7 +239,7 @@ def scheduler_backup_now(cluster):
 
   Immediately initiates a full storage backup.
   """
-  check_and_log_response(make_admin_client(cluster).perform_backup())
+  check_and_log_response(make_admin_client_with_options(cluster).perform_backup())
 
 
 @app.command
@@ -255,7 +249,7 @@ def scheduler_list_backups(cluster):
 
   Lists backups available for recovery.
   """
-  resp = make_admin_client(cluster).list_backups()
+  resp = make_admin_client_with_options(cluster).list_backups()
   check_and_log_response(resp)
   backups = resp.result.listBackupsResult.backups
   print('%s available backups:' % len(backups))
@@ -270,7 +264,7 @@ def scheduler_stage_recovery(cluster, backup_id):
 
   Stages a backup for recovery.
   """
-  check_and_log_response(make_admin_client(cluster).stage_recovery(backup_id))
+  check_and_log_response(make_admin_client_with_options(cluster).stage_recovery(backup_id))
 
 
 @app.command
@@ -280,7 +274,7 @@ def scheduler_print_recovery_tasks(cluster):
 
   Prints all active tasks in a staged recovery.
   """
-  resp = make_admin_client(cluster).query_recovery(
+  resp = make_admin_client_with_options(cluster).query_recovery(
       TaskQuery(statuses=ACTIVE_STATES))
   check_and_log_response(resp)
   log.info('Role\tJob\tShard\tStatus\tTask ID')
@@ -302,7 +296,8 @@ def scheduler_delete_recovery_tasks(cluster, task_ids):
   Deletes a comma-separated list of task IDs from a staged recovery.
   """
   ids = set(task_ids.split(','))
-  check_and_log_response(make_admin_client(cluster).delete_recovery_tasks(TaskQuery(taskIds=ids)))
+  check_and_log_response(make_admin_client_with_options(cluster).delete_recovery_tasks(
+      TaskQuery(taskIds=ids)))
 
 
 @app.command
@@ -312,7 +307,7 @@ def scheduler_commit_recovery(cluster):
 
   Commits a staged recovery.
   """
-  check_and_log_response(make_admin_client(cluster).commit_recovery())
+  check_and_log_response(make_admin_client_with_options(cluster).commit_recovery())
 
 
 @app.command
@@ -322,7 +317,7 @@ def scheduler_unload_recovery(cluster):
 
   Unloads a staged recovery.
   """
-  check_and_log_response(make_admin_client(cluster).unload_recovery())
+  check_and_log_response(make_admin_client_with_options(cluster).unload_recovery())
 
 
 @app.command
@@ -332,7 +327,7 @@ def scheduler_snapshot(cluster):
 
   Request that the scheduler perform a storage snapshot and block until complete.
   """
-  check_and_log_response(make_admin_client(cluster).snapshot())
+  check_and_log_response(make_admin_client_with_options(cluster).snapshot())
 
 
 @app.command
@@ -352,7 +347,7 @@ def reconcile_tasks(cluster):
   scheduler configuration option.
   """
   options = app.get_options()
-  client = make_admin_client(cluster)
+  client = make_admin_client_with_options(cluster)
   if options.type == 'implicit':
     resp = client.reconcile_implicit()
   elif options.type == 'explicit':
@@ -445,7 +440,7 @@ def sla_list_safe_domain(cluster, percentage, duration):
   override_jobs = parse_jobs_file(options.override_filename) if options.override_filename else {}
   get_grouping_or_die(options.grouping)
 
-  vector = make_admin_client(cluster).sla_get_safe_domain_vector(
+  vector = make_admin_client_with_options(cluster).sla_get_safe_domain_vector(
       options.min_instance_count,
       include_hosts)
   groups = vector.get_safe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS),
@@ -502,7 +497,9 @@ def sla_probe_hosts(cluster, percentage, duration):
   hosts = parse_hostnames(options.filename, options.hosts)
   get_grouping_or_die(options.grouping)
 
-  vector = make_admin_client(cluster).sla_get_safe_domain_vector(options.min_instance_count, hosts)
+  vector = make_admin_client_with_options(cluster).sla_get_safe_domain_vector(
+      options.min_instance_count,
+      hosts)
   groups = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), options.grouping)
 
   output, _ = format_sla_results(groups)
@@ -539,4 +536,4 @@ def get_scheduler(cluster):
   Dumps the leading scheduler endpoint URL.
   """
   print("Found leading scheduler at: %s" %
-      make_admin_client(cluster).scheduler_proxy.scheduler_client().raw_url)
+      make_admin_client_with_options(cluster).scheduler_proxy.scheduler_client().raw_url)

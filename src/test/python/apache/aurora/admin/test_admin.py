@@ -58,6 +58,7 @@ class TestQueryCommand(AuroraClientCommandTest):
     mock_options.states = states
     mock_options.listformat = listformat or '%role%/%name%/%instanceId% %status%'
     mock_options.verbosity = False
+    mock_options.bypass_leader_redirect = False
     return mock_options
 
   @classmethod
@@ -228,6 +229,7 @@ class TestReconcileTaskCommand(AuroraClientCommandTest):
     mock_options = create_autospec(spec=['type', 'batch_size'], instance=True)
     mock_options.type = reconcile_type
     mock_options.batch_size = batch_size
+    mock_options.bypass_leader_redirect = False
     return mock_options
 
   def test_reconcile_implicit(self):

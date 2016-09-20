@@ -26,7 +26,7 @@ fi
 set -u -e -x
 set -o pipefail
 
-readonly TEST_SCHEDULER_IP=192.168.33.7
+readonly TEST_SLAVE_IP=192.168.33.7
 
 _curl() { curl --silent --fail --retry 4 --retry-delay 10 "$@" ; }
 
@@ -371,6 +371,10 @@ test_admin() {
   echo '== Testing admin commands'
   echo '== Getting leading scheduler'
   aurora_admin get_scheduler $_cluster | grep ":8081"
+
+  # host maintenance commands currently have a separate entry point and use their own api client.
+  # Until we address that, at least verify that the command group still works.
+  aurora_admin host_status --hosts=$TEST_SLAVE_IP $_cluster
 }
 
 test_ephemeral_daemon_with_final() {
