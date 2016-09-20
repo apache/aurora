@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.events;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 
 import com.google.common.base.MoreObjects;
@@ -28,9 +30,9 @@ import static java.util.Objects.requireNonNull;
  * Defines configuration for Webhook.
  */
 public class WebhookInfo {
-  private final Integer connectTimeout;
+  private final Integer connectTimeoutMsec;
   private final Map<String, String> headers;
-  private final String targetURL;
+  private final URI targetURI;
 
   /**
    * Return key:value pairs of headers to set for every connection.
@@ -42,12 +44,12 @@ public class WebhookInfo {
   }
 
   /**
-   * Returns URL to post events to.
+   * Returns URI where to post events.
    *
-   * @return String
+   * @return URI
    */
-  public String getTargetURL() {
-    return this.targetURL;
+  URI getTargetURI() {
+    return targetURI;
   }
 
   /**
@@ -55,28 +57,27 @@ public class WebhookInfo {
    *
    * @return Integer value.
    */
-  public Integer getConnectonTimeout() {
-    return this.connectTimeout;
+  Integer getConnectonTimeoutMsec() {
+    return connectTimeoutMsec;
   }
 
   @JsonCreator
   public WebhookInfo(
        @JsonProperty("headers") Map<String, String> headers,
        @JsonProperty("targetURL") String targetURL,
-       @JsonProperty("timeoutMsec") Integer timeout) {
+       @JsonProperty("timeoutMsec") Integer timeout) throws URISyntaxException {
 
-    requireNonNull(targetURL);
     this.headers = ImmutableMap.copyOf(headers);
-    this.targetURL = requireNonNull(targetURL);
-    this.connectTimeout = requireNonNull(timeout);
+    this.targetURI = new URI(requireNonNull(targetURL));
+    this.connectTimeoutMsec = requireNonNull(timeout);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
       .add("headers", headers.toString())
-      .add("targetURL", targetURL)
-      .add("connectTimeout", connectTimeout)
+      .add("targetURI", targetURI.toString())
+      .add("connectTimeoutMsec", connectTimeoutMsec)
       .toString();
   }
 }

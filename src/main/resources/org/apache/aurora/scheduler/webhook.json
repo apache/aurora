@@ -4,5 +4,5 @@
     "Producer-Type": "reliable"
   },
   "targetURL": "http://localhost:5000/",
-  "timeoutMsec": 5
+  "timeoutMsec": 50
 }

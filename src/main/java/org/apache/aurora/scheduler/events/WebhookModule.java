@@ -30,6 +30,11 @@ import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.CanRead;
 import org.apache.aurora.common.args.constraints.Exists;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.conn.ConnectionKeepAliveStrategy;
+import org.apache.http.impl.client.DefaultConnectionKeepAliveStrategy;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +70,23 @@ public class WebhookModule extends AbstractModule {
   @Override
   protected void configure() {
     if (enableWebhook) {
-      bind(WebhookInfo.class).toInstance(parseWebhookConfig(readWebhookFile()));
+      WebhookInfo webhookInfo = parseWebhookConfig(readWebhookFile());
+      int timeout = webhookInfo.getConnectonTimeoutMsec();
+      RequestConfig config = RequestConfig.custom()
+          .setConnectTimeout(timeout) // establish connection with server eg time to TCP handshake.
+          .setConnectionRequestTimeout(timeout)  // get a connection from internal pool.
+          .setSocketTimeout(timeout) // wait for data after connection was established.
+          .build();
+      ConnectionKeepAliveStrategy connectionStrategy = new DefaultConnectionKeepAliveStrategy();
+      HttpClient client =
+          HttpClientBuilder.create()
+              .setDefaultRequestConfig(config)
+              // being explicit about using default Keep-Alive strategy.
+              .setKeepAliveStrategy(connectionStrategy)
+              .build();
+
+      bind(WebhookInfo.class).toInstance(webhookInfo);
+      bind(HttpClient.class).toInstance(client);
       PubsubEventModule.bindSubscriber(binder(), Webhook.class);
       bind(Webhook.class).in(Singleton.class);
     }
