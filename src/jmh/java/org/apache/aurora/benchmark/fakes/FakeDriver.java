@@ -27,7 +27,8 @@ public class FakeDriver extends AbstractIdleService implements Driver {
   }
 
   @Override
-  public void launchTask(Protos.OfferID offerId, Protos.TaskInfo task, Protos.Filters filter) {
+  public void acceptOffers(Protos.OfferID offerId, Collection<Protos.Offer.Operation> operations,
+      Protos.Filters filter) {
     // no-op
   }
 

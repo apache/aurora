@@ -30,6 +30,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.FrameworkInfo;
+import org.apache.mesos.Protos.Offer.Operation;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 import org.slf4j.Logger;
@@ -116,10 +117,14 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
   }
 
   @Override
-  public void launchTask(Protos.OfferID offerId, Protos.TaskInfo task, Protos.Filters filter) {
+  public void acceptOffers(
+      Protos.OfferID offerId,
+      Collection<Operation> operations,
+      Protos.Filters filter) {
     ensureRunning();
+
     Futures.getUnchecked(driverFuture)
-        .launchTasks(ImmutableList.of(offerId), ImmutableList.of(task), filter);
+        .acceptOffers(ImmutableList.of(offerId), operations, filter);
   }
 
   @Override

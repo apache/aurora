@@ -26,6 +26,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -47,6 +48,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.Offer.Operation;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.slf4j.Logger;
@@ -362,7 +364,11 @@ public interface OfferManager extends EventSubscriber {
       // which is a feature of ConcurrentSkipListSet.
       if (hostOffers.remove(offerId)) {
         try {
-          driver.launchTask(offerId, task, getOfferFilter());
+          Operation launch = Operation.newBuilder()
+              .setType(Operation.Type.LAUNCH)
+              .setLaunch(Operation.Launch.newBuilder().addTaskInfos(task))
+              .build();
+          driver.acceptOffers(offerId, ImmutableList.of(launch), getOfferFilter());
         } catch (IllegalStateException e) {
           // TODO(William Farner): Catch only the checked exception produced by Driver
           // once it changes from throwing IllegalStateException when the driver is not yet
