@@ -128,7 +128,11 @@ public class BatchWorker<T> extends AbstractExecutionThreadService {
   }
 
   @Inject
-  protected BatchWorker(Storage storage, StatsProvider statsProvider, int maxBatchSize) {
+  protected BatchWorker(
+      Storage storage,
+      StatsProvider statsProvider,
+      int maxBatchSize) {
+
     this.storage = requireNonNull(storage);
     this.maxBatchSize = maxBatchSize;
 
@@ -185,9 +189,15 @@ public class BatchWorker<T> extends AbstractExecutionThreadService {
   protected void run() throws Exception {
     while (isRunning()) {
       List<WorkItem<T>> batch = new LinkedList<>();
-      batch.add(workQueue.take());
-      workQueue.drainTo(batch, maxBatchSize - batch.size());
-      processBatch(batch);
+
+      // Make the loop responsive to shutdown under light load by using
+      // a short non-configurable timeout in poll().
+      Optional<WorkItem<T>> head = Optional.ofNullable(workQueue.poll(3, TimeUnit.SECONDS));
+      if (head.isPresent()) {
+        workQueue.add(head.get());
+        workQueue.drainTo(batch, maxBatchSize - batch.size());
+        processBatch(batch);
+      }
     }
   }
 
@@ -197,25 +207,20 @@ public class BatchWorker<T> extends AbstractExecutionThreadService {
       storage.write((Storage.MutateWork.NoResult.Quiet) storeProvider -> {
         long lockedStart = System.nanoTime();
         for (WorkItem<T> item : batch) {
-          try {
-            Result<T> itemResult = item.work.apply(storeProvider);
-            if (itemResult.isCompleted) {
-              item.result.complete(itemResult.value);
-            } else {
-              // Work not finished yet - re-queue for a followup later.
-              long backoffMsec = backoffFor(item);
-              scheduledExecutor.schedule(
-                  () -> workQueue.add(new WorkItem<>(
-                      item.work,
-                      item.result,
-                      item.backoffStrategy,
-                      Optional.of(backoffMsec))),
-                  backoffMsec,
-                  TimeUnit.MILLISECONDS);
-            }
-          } catch (RuntimeException e) {
-            LOG.error("{}: Failed to process batch item. Error: {}", serviceName(), e);
-            item.result.completeExceptionally(e);
+          Result<T> itemResult = item.work.apply(storeProvider);
+          if (itemResult.isCompleted) {
+            item.result.complete(itemResult.value);
+          } else {
+            // Work not finished yet - re-queue for a followup later.
+            long backoffMsec = backoffFor(item);
+            scheduledExecutor.schedule(
+                () -> workQueue.add(new WorkItem<>(
+                    item.work,
+                    item.result,
+                    item.backoffStrategy,
+                    Optional.of(backoffMsec))),
+                backoffMsec,
+                TimeUnit.MILLISECONDS);
           }
         }
         batchLocked.accumulate(System.nanoTime() - lockedStart);

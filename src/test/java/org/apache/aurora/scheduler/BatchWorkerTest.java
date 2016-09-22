@@ -15,8 +15,10 @@ package org.apache.aurora.scheduler;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.Service;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.BackoffStrategy;
@@ -63,15 +65,27 @@ public class BatchWorkerTest extends EasyMockTest {
     assertTrue(result3.get());
   }
 
-  @Test(expected = ExecutionException.class)
+  @Test
   public void testExecuteThrows() throws Exception {
     control.replay();
 
-    CompletableFuture<Boolean> result =
-        batchWorker.execute(store -> { throw new IllegalArgumentException(); });
-    batchWorker.startAsync().awaitRunning();
+    // Make sure BatchWorker service fails on unhandled error during batch processing.
+    CountDownLatch shutdownLatch = new CountDownLatch(1);
+    batchWorker.addListener(
+        new Service.Listener() {
+          @Override
+          public void failed(Service.State from, Throwable failure) {
+            shutdownLatch.countDown();
+          }
+        },
+        MoreExecutors.newDirectExecutorService());
 
-    result.get();
+    batchWorker.startAsync().awaitRunning();
+    batchWorker.execute(store -> {
+      throw new IllegalArgumentException();
+    });
+
+    assertTrue(shutdownLatch.await(10L, TimeUnit.SECONDS));
   }
 
   @Test
