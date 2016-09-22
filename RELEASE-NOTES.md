@@ -1,4 +1,4 @@
-0.16.0 (Not yet released)
+0.16.0
 ======
 
 ### New/updated:
