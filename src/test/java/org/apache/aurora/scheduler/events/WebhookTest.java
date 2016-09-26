@@ -26,8 +26,10 @@ import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.http.Header;
-import org.apache.http.client.HttpClient;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.easymock.Capture;
 import org.junit.Before;
@@ -35,6 +37,7 @@ import org.junit.Test;
 
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -47,13 +50,13 @@ public class WebhookTest extends EasyMockTest {
       .transition(TASK, ScheduleStatus.FAILED);
   private final String changeJson = changeWithOldState.toJson();
 
-  private HttpClient httpClient;
+  private CloseableHttpClient httpClient;
   private Webhook webhook;
 
   @Before
   public void setUp() {
     WebhookInfo webhookInfo = WebhookModule.parseWebhookConfig(WebhookModule.readWebhookFile());
-    httpClient = createMock(HttpClient.class);
+    httpClient = createMock(CloseableHttpClient.class);
     webhook = new Webhook(httpClient, webhookInfo);
   }
 
@@ -67,8 +70,15 @@ public class WebhookTest extends EasyMockTest {
 
   @Test
   public void testTaskChangedWithOldState() throws Exception {
+    CloseableHttpResponse httpResponse = createMock(CloseableHttpResponse.class);
+    HttpEntity entity = createMock(HttpEntity.class);
+
     Capture<HttpPost> httpPostCapture = createCapture();
-    expect(httpClient.execute(capture(httpPostCapture))).andReturn(null);
+    expect(entity.isStreaming()).andReturn(false);
+    expect(httpResponse.getEntity()).andReturn(entity);
+    httpResponse.close();
+    expectLastCall().once();
+    expect(httpClient.execute(capture(httpPostCapture))).andReturn(httpResponse);
 
     control.replay();
 
