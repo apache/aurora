@@ -15,14 +15,21 @@ package org.apache.aurora.scheduler.scheduling;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
@@ -51,6 +58,8 @@ import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
+import static java.util.stream.Collectors.toMap;
+
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromResources;
 
@@ -63,11 +72,11 @@ public interface TaskScheduler extends EventSubscriber {
    * Attempts to schedule a task, possibly performing irreversible actions.
    *
    * @param storeProvider {@code MutableStoreProvider} instance to access data store.
-   * @param taskId The task to attempt to schedule.
-   * @return {@code true} if the task was scheduled, {@code false} otherwise. The caller should
-   *         call schedule again if {@code false} is returned.
+   * @param taskIds The tasks to attempt to schedule.
+   * @return Successfully scheduled task IDs. The caller should call schedule again if a given
+   *         task ID was not present in the result.
    */
-  boolean schedule(MutableStoreProvider storeProvider, String taskId);
+  Set<String> schedule(MutableStoreProvider storeProvider, Iterable<String> taskIds);
 
   /**
    * An asynchronous task scheduler.  Scheduling of tasks is performed on a delay, where each task
@@ -109,62 +118,84 @@ public interface TaskScheduler extends EventSubscriber {
     }
 
     @Timed ("task_schedule_attempt")
-    public boolean schedule(MutableStoreProvider store, String taskId) {
-      attemptsFired.incrementAndGet();
+    public Set<String> schedule(MutableStoreProvider store, Iterable<String> taskIds) {
       try {
-        return scheduleTask(store, taskId);
+        return scheduleTasks(store, taskIds);
       } catch (RuntimeException e) {
         // We catch the generic unchecked exception here to ensure tasks are not abandoned
         // if there is a transient issue resulting in an unchecked exception.
         LOG.warn("Task scheduling unexpectedly failed, will be retried", e);
         attemptsFailed.incrementAndGet();
-        return false;
+        // Return empty set for all task IDs to be retried later.
+        // It's ok if some tasks were already assigned, those will be ignored in the next round.
+        return ImmutableSet.of();
       }
     }
 
-    private boolean scheduleTask(MutableStoreProvider store, String taskId) {
-      LOG.debug("Attempting to schedule task " + taskId);
-      IAssignedTask assignedTask = Iterables.getOnlyElement(
-          Iterables.transform(
-              store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
-              IScheduledTask::getAssignedTask),
-          null);
+    private Set<String> scheduleTasks(MutableStoreProvider store, Iterable<String> tasks) {
+      ImmutableSet<String> taskIds = ImmutableSet.copyOf(tasks);
+      String taskIdValues = Joiner.on(",").join(taskIds);
+      LOG.debug("Attempting to schedule tasks " + taskIdValues);
+      ImmutableSet<IAssignedTask> assignedTasks =
+          ImmutableSet.copyOf(Iterables.transform(
+              store.getTaskStore().fetchTasks(Query.taskScoped(taskIds).byStatus(PENDING)),
+              IScheduledTask::getAssignedTask));
 
-      if (assignedTask == null) {
-        LOG.warn("Failed to look up task " + taskId + ", it may have been deleted.");
-      } else {
-        ITaskConfig task = assignedTask.getTask();
-        AttributeAggregate aggregate = AttributeAggregate.getJobActiveState(store, task.getJob());
-
-        // Valid Docker tasks can have a container but no executor config
-        ResourceBag overhead = ResourceBag.EMPTY;
-        if (task.isSetExecutorConfig()) {
-          overhead = executorSettings.getExecutorOverhead(task.getExecutorConfig().getName())
-              .orElseThrow(
-                  () -> new IllegalArgumentException("Cannot find executor configuration"));
-        }
-
-        boolean launched = assigner.maybeAssign(
-            store,
-            new ResourceRequest(
-                task,
-                bagFromResources(task.getResources()).add(overhead), aggregate),
-            TaskGroupKey.from(task),
-            taskId,
-            reservations.asMap());
-
-        if (!launched) {
-          // Task could not be scheduled.
-          // TODO(maxim): Now that preemption slots are searched asynchronously, consider
-          // retrying a launch attempt within the current scheduling round IFF a reservation is
-          // available.
-          maybePreemptFor(assignedTask, aggregate, store);
-          attemptsNoMatch.incrementAndGet();
-          return false;
-        }
+      if (Iterables.isEmpty(assignedTasks)) {
+        LOG.warn("Failed to look up all tasks in a scheduling round: " + taskIdValues);
+        return taskIds;
       }
 
-      return true;
+      Preconditions.checkState(
+          assignedTasks.stream()
+              .collect(Collectors.groupingBy(t -> t.getTask()))
+              .entrySet()
+              .size() == 1,
+          "Found multiple task groups for " + taskIdValues);
+
+      Map<String, IAssignedTask> assignableTaskMap =
+          assignedTasks.stream().collect(toMap(t -> t.getTaskId(), t -> t));
+
+      if (taskIds.size() != assignedTasks.size()) {
+        LOG.warn("Failed to look up tasks "
+            + Joiner.on(", ").join(Sets.difference(taskIds, assignableTaskMap.keySet())));
+      }
+
+      // This is safe after all checks above.
+      ITaskConfig task = assignedTasks.stream().findFirst().get().getTask();
+      AttributeAggregate aggregate = AttributeAggregate.getJobActiveState(store, task.getJob());
+
+      // Valid Docker tasks can have a container but no executor config
+      ResourceBag overhead = ResourceBag.EMPTY;
+      if (task.isSetExecutorConfig()) {
+        overhead = executorSettings.getExecutorOverhead(task.getExecutorConfig().getName())
+            .orElseThrow(
+                () -> new IllegalArgumentException("Cannot find executor configuration"));
+      }
+
+      Set<String> launched = assigner.maybeAssign(
+          store,
+          new ResourceRequest(
+              task,
+              bagFromResources(task.getResources()).add(overhead), aggregate),
+          TaskGroupKey.from(task),
+          assignableTaskMap.keySet(),
+          reservations.asMap());
+
+      attemptsFired.addAndGet(assignableTaskMap.size());
+      Set<String> failedToLaunch = Sets.difference(assignableTaskMap.keySet(), launched);
+
+      failedToLaunch.forEach(taskId -> {
+        // Task could not be scheduled.
+        // TODO(maxim): Now that preemption slots are searched asynchronously, consider
+        // retrying a launch attempt within the current scheduling round IFF a reservation is
+        // available.
+        maybePreemptFor(assignableTaskMap.get(taskId), aggregate, store);
+      });
+      attemptsNoMatch.addAndGet(failedToLaunch.size());
+
+      // Return all successfully launched tasks as well as those weren't tried (not in PENDING).
+      return Sets.union(launched, Sets.difference(taskIds, assignableTaskMap.keySet()));
     }
 
     private void maybePreemptFor(

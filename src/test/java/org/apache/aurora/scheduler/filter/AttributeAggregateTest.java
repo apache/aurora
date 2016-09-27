@@ -133,6 +133,38 @@ public class AttributeAggregateTest extends EasyMockTest {
     assertAggregate(aggregate, "hostc", "2", 0L);
   }
 
+  @Test
+  public void testUpdateAttributeAggregate() {
+    expectGetAttributes(
+        "a1",
+        attribute("host", "a1"),
+        attribute("rack", "a"),
+        attribute("pdu", "p1"));
+
+    control.replay();
+
+    Multiset<Pair<String, String>> expected = ImmutableMultiset.<Pair<String, String>>builder()
+        .add(Pair.of("rack", "a"))
+        .add(Pair.of("host", "a1"))
+        .add(Pair.of("pdu", "p1"))
+        .build();
+
+    AttributeAggregate aggregate = aggregate(task("1", "a1"));
+    assertEquals(expected, aggregate.getAggregates());
+
+    aggregate.updateAttributeAggregate(IHostAttributes.build(new HostAttributes()
+        .setHost("a2")
+        .setAttributes(ImmutableSet.of(attribute("host", "a2"), attribute("rack", "b")))));
+
+    expected = ImmutableMultiset.<Pair<String, String>>builder()
+        .addAll(expected)
+        .add(Pair.of("rack", "b"))
+        .add(Pair.of("host", "a2"))
+        .build();
+
+    assertEquals(expected, aggregate.getAggregates());
+  }
+
   private AttributeAggregate aggregate(IScheduledTask... activeTasks) {
     return AttributeAggregate.create(
         Suppliers.ofInstance(ImmutableSet.copyOf(activeTasks)),

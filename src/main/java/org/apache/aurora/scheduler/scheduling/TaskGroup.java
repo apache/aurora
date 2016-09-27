@@ -13,14 +13,16 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
+import java.util.Collection;
 import java.util.Queue;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+
+import static org.apache.aurora.GuavaUtils.toImmutableSet;
 
 /**
  * A group of task IDs that are eligible for scheduling, but may be waiting for a backoff to expire.
@@ -41,16 +43,16 @@ class TaskGroup {
     return key;
   }
 
-  synchronized Optional<String> peek() {
-    return Optional.fromNullable(tasks.peek());
+  synchronized Set<String> peek(int maxTasks) {
+    return tasks.stream().limit(Math.min(tasks.size(), maxTasks)).collect(toImmutableSet());
   }
 
   synchronized boolean hasMore() {
     return !tasks.isEmpty();
   }
 
-  synchronized void remove(String taskId) {
-    tasks.remove(taskId);
+  synchronized void remove(Collection<String> taskIdsToRemove) {
+    tasks.removeAll(taskIdsToRemove);
   }
 
   synchronized void offer(String taskId) {

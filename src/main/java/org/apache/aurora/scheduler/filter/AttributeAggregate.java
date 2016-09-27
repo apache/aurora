@@ -27,6 +27,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -46,7 +47,7 @@ public final class AttributeAggregate {
    * A mapping from attribute name and value to the count of tasks with that name/value combination.
    * See doc for {@link #getNumTasksWithAttribute(String, String)} for further details.
    */
-  private final Supplier<Multiset<Pair<String, String>>> aggregate;
+  private Supplier<Multiset<Pair<String, String>>> aggregate;
 
   private AttributeAggregate(Supplier<Multiset<Pair<String, String>>> aggregate) {
     this.aggregate = Suppliers.memoize(aggregate);
@@ -92,25 +93,35 @@ public final class AttributeAggregate {
   @VisibleForTesting
   static AttributeAggregate create(Supplier<Iterable<IAttribute>> attributes) {
     Supplier<Multiset<Pair<String, String>>> aggregator = Suppliers.compose(
-        attributes1 -> {
-          ImmutableMultiset.Builder<Pair<String, String>> builder = ImmutableMultiset.builder();
-          for (IAttribute attribute : attributes1) {
-            for (String value : attribute.getValues()) {
-              builder.add(Pair.of(attribute.getName(), value));
-            }
-          }
-
-          return builder.build();
-        },
-        attributes
-    );
+        attributes1 -> addAttributes(ImmutableMultiset.builder(), attributes1).build(),
+        attributes);
 
     return new AttributeAggregate(aggregator);
   }
 
+  static ImmutableMultiset.Builder<Pair<String, String>> addAttributes(
+      ImmutableMultiset.Builder<Pair<String, String>> builder,
+      Iterable<IAttribute> attributes) {
+
+    for (IAttribute attribute : attributes) {
+      for (String value : attribute.getValues()) {
+        builder.add(Pair.of(attribute.getName(), value));
+      }
+    }
+    return builder;
+  }
+
+  public void updateAttributeAggregate(IHostAttributes attributes) {
+    ImmutableMultiset.Builder<Pair<String, String>> builder = new ImmutableMultiset.Builder<>();
+    builder.addAll(aggregate.get());
+    addAttributes(builder, attributes.getAttributes());
+    aggregate = Suppliers.memoize(() -> builder.build());
+  }
+
   @VisibleForTesting
-  public static final AttributeAggregate EMPTY =
-      new AttributeAggregate(Suppliers.ofInstance(ImmutableMultiset.of()));
+  public static AttributeAggregate empty() {
+    return new AttributeAggregate(Suppliers.ofInstance(ImmutableMultiset.of()));
+  }
 
   /**
    * Gets the total number of tasks with a given attribute name and value combination.

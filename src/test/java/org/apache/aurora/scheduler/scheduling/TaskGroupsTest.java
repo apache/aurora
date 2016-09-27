@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
+import java.util.Set;
+
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
 
@@ -27,8 +29,8 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.scheduling.TaskGroups.TaskGroupBatchWorker;
 import org.apache.aurora.scheduler.scheduling.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -50,6 +52,7 @@ public class TaskGroupsTest extends EasyMockTest {
   private static final Amount<Long, Time> RESCHEDULE_DELAY = FIRST_SCHEDULE_DELAY;
   private static final IJobKey JOB_A = IJobKey.build(new JobKey("role", "test", "jobA"));
   private static final String TASK_A_ID = "a";
+  private static final Set<String> SCHEDULED_RESULT = ImmutableSet.of(TASK_A_ID);
 
   private BackoffStrategy backoffStrategy;
   private TaskScheduler taskScheduler;
@@ -73,7 +76,7 @@ public class TaskGroupsTest extends EasyMockTest {
     batchWorker = createMock(TaskGroupBatchWorker.class);
     taskGroups = new TaskGroups(
         executor,
-        new TaskGroupsSettings(FIRST_SCHEDULE_DELAY, backoffStrategy, rateLimiter),
+        new TaskGroupsSettings(FIRST_SCHEDULE_DELAY, backoffStrategy, rateLimiter, 2),
         taskScheduler,
         rescheduleCalculator,
         batchWorker);
@@ -82,8 +85,10 @@ public class TaskGroupsTest extends EasyMockTest {
   @Test
   public void testEvaluatedAfterFirstSchedulePenalty() throws Exception {
     expect(rateLimiter.acquire()).andReturn(0D);
-    expect(taskScheduler.schedule(anyObject(), eq(TASK_A_ID))).andReturn(true);
-    expectBatchExecute(batchWorker, storageUtil.storage, control, true).anyTimes();
+    expect(taskScheduler.schedule(anyObject(), eq(ImmutableSet.of(TASK_A_ID))))
+        .andReturn(SCHEDULED_RESULT);
+    expectBatchExecute(batchWorker, storageUtil.storage, control, SCHEDULED_RESULT)
+        .anyTimes();
 
     control.replay();
 
@@ -95,15 +100,17 @@ public class TaskGroupsTest extends EasyMockTest {
   public void testTaskDeletedBeforeEvaluating() throws Exception {
     final IScheduledTask task = makeTask(TASK_A_ID);
     expect(rateLimiter.acquire()).andReturn(0D);
-    expect(taskScheduler.schedule(anyObject(), eq(Tasks.id(task)))).andAnswer(() -> {
-      // Test a corner case where a task is deleted while it is being evaluated by the task
-      // scheduler.  If not handled carefully, this could result in the scheduler trying again
-      // later to satisfy the deleted task.
-      taskGroups.tasksDeleted(new TasksDeleted(ImmutableSet.of(task)));
+    expect(taskScheduler.schedule(anyObject(), eq(ImmutableSet.of(TASK_A_ID))))
+        .andAnswer(() -> {
+          // Test a corner case where a task is deleted while it is being evaluated by the task
+          // scheduler.  If not handled carefully, this could result in the scheduler trying again
+          // later to satisfy the deleted task.
+          taskGroups.tasksDeleted(new PubsubEvent.TasksDeleted(ImmutableSet.of(task)));
 
-      return false;
-    });
-    expectBatchExecute(batchWorker, storageUtil.storage, control, false).anyTimes();
+          return ImmutableSet.of();
+        });
+    expectBatchExecute(batchWorker, storageUtil.storage, control, ImmutableSet.of())
+        .anyTimes();
     expect(backoffStrategy.calculateBackoffMs(FIRST_SCHEDULE_DELAY.as(Time.MILLISECONDS)))
         .andReturn(0L);
 
@@ -117,8 +124,10 @@ public class TaskGroupsTest extends EasyMockTest {
   public void testEvaluatedOnStartup() throws Exception {
     expect(rateLimiter.acquire()).andReturn(0D);
     expect(rescheduleCalculator.getStartupScheduleDelayMs(makeTask(TASK_A_ID))).andReturn(1L);
-    expect(taskScheduler.schedule(anyObject(), eq(TASK_A_ID))).andReturn(true);
-    expectBatchExecute(batchWorker, storageUtil.storage, control, true).anyTimes();
+    expect(taskScheduler.schedule(anyObject(), eq(ImmutableSet.of(TASK_A_ID))))
+        .andReturn(ImmutableSet.of(TASK_A_ID));
+    expectBatchExecute(batchWorker, storageUtil.storage, control, SCHEDULED_RESULT)
+        .anyTimes();
 
     control.replay();
 
@@ -128,11 +137,19 @@ public class TaskGroupsTest extends EasyMockTest {
   }
 
   @Test
-  public void testResistStarvation() throws Exception {
+  public void testMultipleTasksAndResistStarvation() throws Exception {
     expect(rateLimiter.acquire()).andReturn(0D).times(2);
-    expect(taskScheduler.schedule(anyObject(), eq("a0"))).andReturn(true);
-    expect(taskScheduler.schedule(anyObject(), eq("b0"))).andReturn(true);
-    expectBatchExecute(batchWorker, storageUtil.storage, control, true).anyTimes();
+    expect(taskScheduler.schedule(anyObject(), eq(ImmutableSet.of("a0", "a1"))))
+        .andReturn(ImmutableSet.of("a0", "a1"));
+    expect(taskScheduler.schedule(anyObject(), eq(ImmutableSet.of("b0"))))
+        .andReturn(ImmutableSet.of("b0"));
+    expectBatchExecute(
+        batchWorker,
+        storageUtil.storage,
+        control,
+        ImmutableSet.of("a0", "a1")).anyTimes();
+    expectBatchExecute(batchWorker, storageUtil.storage, control, ImmutableSet.of("b0"))
+        .anyTimes();
 
     control.replay();
 

@@ -120,7 +120,8 @@ public abstract class AbstractJettyTest extends EasyMockTest {
                 new TaskGroupsSettings(
                     Amount.of(1L, Time.MILLISECONDS),
                     bindMock(BackoffStrategy.class),
-                    RateLimiter.create(1000)));
+                    RateLimiter.create(1000),
+                    5));
             bind(ServiceGroupMonitor.class).toInstance(serviceGroupMonitor);
             bindMock(CronJobManager.class);
             bindMock(LockManager.class);

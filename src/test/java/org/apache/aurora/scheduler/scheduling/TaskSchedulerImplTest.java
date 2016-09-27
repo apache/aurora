@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.scheduling;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 import com.google.common.base.Function;
@@ -63,21 +64,23 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
-import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
+import static org.apache.aurora.scheduler.filter.AttributeAggregate.empty;
 import static org.apache.aurora.scheduler.mesos.TestExecutorSettings.THERMOS_EXECUTOR;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 public class TaskSchedulerImplTest extends EasyMockTest {
-
+  private static final String TASK_ID = "a";
   private static final IScheduledTask TASK_A =
-      TaskTestUtil.makeTask("a", JobKeys.from("a", "a", "a"));
+      TaskTestUtil.makeTask(TASK_ID, JobKeys.from("a", "a", "a"));
   private static final TaskGroupKey GROUP_KEY =
       TaskGroupKey.from(TASK_A.getAssignedTask().getTask());
   private static final String SLAVE_ID = "HOST_A";
   private static final Map<String, TaskGroupKey> NO_RESERVATION = ImmutableMap.of();
+  private static final ImmutableSet<String> SINGLE_TASK = ImmutableSet.of(TASK_ID);
+  private static final Set<String> SCHEDULED_RESULT = ImmutableSet.of(TASK_ID);
+  private static final Set<String> NOT_SCHEDULED_RESULT = ImmutableSet.of();
 
   private StorageTestUtil storageUtil;
   private TaskAssigner assigner;
@@ -134,15 +137,15 @@ public class TaskSchedulerImplTest extends EasyMockTest {
             .getName()).get());
   }
 
-  private IExpectationSetters<Boolean> expectAssigned(
+  private IExpectationSetters<Set<String>> expectAssigned(
       IScheduledTask task,
       Map<String, TaskGroupKey> reservationMap) {
 
     return expect(assigner.maybeAssign(
         storageUtil.mutableStoreProvider,
-        new ResourceRequest(task.getAssignedTask().getTask(), bag(task), EMPTY),
+        new ResourceRequest(task.getAssignedTask().getTask(), bag(task), empty()),
         TaskGroupKey.from(task.getAssignedTask().getTask()),
-        Tasks.id(task),
+        ImmutableSet.of(Tasks.id(task)),
         reservationMap));
   }
 
@@ -153,11 +156,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectAsMap(NO_RESERVATION);
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    expectAssigned(TASK_A, NO_RESERVATION).andReturn(true);
+    expectAssigned(TASK_A, NO_RESERVATION).andReturn(SCHEDULED_RESULT);
 
     control.replay();
 
-    assertTrue(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
+    assertEquals(
+        SCHEDULED_RESULT,
+        scheduler.schedule(storageUtil.mutableStoreProvider, SINGLE_TASK));
   }
 
   @Test
@@ -169,7 +174,45 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
+    assertEquals(
+        SCHEDULED_RESULT,
+        scheduler.schedule(storageUtil.mutableStoreProvider, SINGLE_TASK));
+  }
+
+  @Test
+  public void testSchedulePartial() throws Exception {
+    storageUtil.expectOperations();
+
+    String taskB = "b";
+    expectAsMap(NO_RESERVATION);
+    storageUtil.expectTaskFetch(
+        Query.taskScoped(Tasks.id(TASK_A), taskB).byStatus(PENDING),
+        ImmutableSet.of(TASK_A));
+    expectActiveJobFetch(TASK_A);
+    expectAssigned(TASK_A, NO_RESERVATION).andReturn(SCHEDULED_RESULT);
+
+    control.replay();
+
+    // Task b should be returned as well to be purged from its TaskGroup.
+    assertEquals(
+        ImmutableSet.of(TASK_ID, taskB),
+        scheduler.schedule(storageUtil.mutableStoreProvider, ImmutableSet.of(TASK_ID, taskB)));
+  }
+
+  @Test
+  public void testMultipleGroupsRejected() {
+    storageUtil.expectOperations();
+
+    String taskB = "b";
+    storageUtil.expectTaskFetch(
+        Query.taskScoped(Tasks.id(TASK_A), taskB).byStatus(PENDING),
+        ImmutableSet.of(TASK_A, TaskTestUtil.makeTask(taskB, JobKeys.from("b", "b", "b"))));
+
+    control.replay();
+
+    assertEquals(
+        NOT_SCHEDULED_RESULT,
+        scheduler.schedule(storageUtil.mutableStoreProvider, ImmutableSet.of(TASK_ID, taskB)));
   }
 
   @Test
@@ -179,15 +222,15 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     // No reservation available in preemptor
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    expectAssigned(TASK_A, NO_RESERVATION).andReturn(false);
+    expectAssigned(TASK_A, NO_RESERVATION).andReturn(NOT_SCHEDULED_RESULT);
     expectAsMap(NO_RESERVATION);
     expectNoReservation(TASK_A);
-    expectPreemptorCall(TASK_A, Optional.<String>absent());
+    expectPreemptorCall(TASK_A, Optional.absent());
 
     // Slave is reserved.
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    expectAssigned(TASK_A, NO_RESERVATION).andReturn(false);
+    expectAssigned(TASK_A, NO_RESERVATION).andReturn(NOT_SCHEDULED_RESULT);
     expectAsMap(NO_RESERVATION);
     expectNoReservation(TASK_A);
     expectPreemptorCall(TASK_A, Optional.of(SLAVE_ID));
@@ -197,13 +240,19 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
     expectAsMap(ImmutableMap.of(SLAVE_ID, GROUP_KEY));
-    expectAssigned(TASK_A, ImmutableMap.of(SLAVE_ID, GROUP_KEY)).andReturn(true);
+    expectAssigned(TASK_A, ImmutableMap.of(SLAVE_ID, GROUP_KEY)).andReturn(SCHEDULED_RESULT);
 
     control.replay();
 
-    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
-    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
-    assertTrue(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
+    assertEquals(
+        NOT_SCHEDULED_RESULT,
+        scheduler.schedule(storageUtil.mutableStoreProvider, SINGLE_TASK));
+    assertEquals(
+        NOT_SCHEDULED_RESULT,
+        scheduler.schedule(storageUtil.mutableStoreProvider, SINGLE_TASK));
+    assertEquals(
+        SCHEDULED_RESULT,
+        scheduler.schedule(storageUtil.mutableStoreProvider, SINGLE_TASK));
   }
 
   @Test
@@ -213,12 +262,14 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
     expectAsMap(NO_RESERVATION);
-    expectAssigned(TASK_A, NO_RESERVATION).andReturn(false);
+    expectAssigned(TASK_A, NO_RESERVATION).andReturn(NOT_SCHEDULED_RESULT);
     expectGetReservation(TASK_A, SLAVE_ID);
 
     control.replay();
 
-    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
+    assertEquals(
+        NOT_SCHEDULED_RESULT,
+        scheduler.schedule(storageUtil.mutableStoreProvider, SINGLE_TASK));
   }
 
   @Test
@@ -228,12 +279,14 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
     expectAsMap(NO_RESERVATION);
-    expectAssigned(TASK_A, NO_RESERVATION).andReturn(false);
+    expectAssigned(TASK_A, NO_RESERVATION).andReturn(NOT_SCHEDULED_RESULT);
     expectGetReservation(TASK_A, SLAVE_ID);
 
     control.replay();
 
-    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
+    assertEquals(
+        NOT_SCHEDULED_RESULT,
+        scheduler.schedule(storageUtil.mutableStoreProvider, SINGLE_TASK));
   }
 
   @Test
@@ -274,15 +327,15 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectAsMap(NO_RESERVATION);
     expect(assigner.maybeAssign(
         EasyMock.anyObject(),
-        eq(new ResourceRequest(taskA.getAssignedTask().getTask(), bag(taskA), EMPTY)),
+        eq(new ResourceRequest(taskA.getAssignedTask().getTask(), bag(taskA), empty())),
         eq(TaskGroupKey.from(taskA.getAssignedTask().getTask())),
-        eq(Tasks.id(taskA)),
-        eq(NO_RESERVATION))).andReturn(true);
+        eq(SINGLE_TASK),
+        eq(NO_RESERVATION))).andReturn(SCHEDULED_RESULT);
 
     control.replay();
 
     memStorage.write((NoResult.Quiet)
-        store -> assertTrue(scheduler.schedule(store, Tasks.id(taskA))));
+        store -> assertEquals(SCHEDULED_RESULT, scheduler.schedule(store, SINGLE_TASK)));
   }
 
   @Test
@@ -296,13 +349,15 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(scheduler.schedule(storageUtil.mutableStoreProvider, "a"));
+    assertEquals(
+        NOT_SCHEDULED_RESULT,
+        scheduler.schedule(storageUtil.mutableStoreProvider, SINGLE_TASK));
   }
 
   private void expectPreemptorCall(IScheduledTask task, Optional<String> result) {
     expect(preemptor.attemptPreemptionFor(
         task.getAssignedTask(),
-        EMPTY,
+        empty(),
         storageUtil.mutableStoreProvider)).andReturn(result);
   }
 

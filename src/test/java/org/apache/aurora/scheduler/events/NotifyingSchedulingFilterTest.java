@@ -49,7 +49,7 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
       ResourceManager.bagFromResources(TASK.getResources()),
       IHostAttributes.build(new HostAttributes().setHost("host").setMode(MaintenanceMode.NONE)));
   private static final ResourceRequest REQUEST =
-      new ResourceRequest(TASK, ResourceBag.EMPTY, AttributeAggregate.EMPTY);
+      new ResourceRequest(TASK, ResourceBag.EMPTY, AttributeAggregate.empty());
 
   private static final Veto VETO_1 = Veto.insufficientResources("ram", 1);
   private static final Veto VETO_2 = Veto.insufficientResources("ram", 2);

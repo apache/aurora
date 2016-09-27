@@ -90,6 +90,11 @@ public class SchedulingModule extends AbstractModule {
       help = "The maximum number of scheduling attempts that can be processed in a batch.")
   private static final Arg<Integer> SCHEDULING_MAX_BATCH_SIZE = Arg.create(3);
 
+  @Positive
+  @CmdLine(name = "max_tasks_per_schedule_attempt",
+      help = "The maximum number of tasks to pick in a single scheduling attempt.")
+  private static final Arg<Integer> MAX_TASKS_PER_SCHEDULE_ATTEMPT = Arg.create(5);
+
   @Override
   protected void configure() {
     install(new PrivateModule() {
@@ -100,7 +105,8 @@ public class SchedulingModule extends AbstractModule {
             new TruncatedBinaryBackoff(
                 INITIAL_SCHEDULE_PENALTY.get(),
                 MAX_SCHEDULE_PENALTY.get()),
-            RateLimiter.create(MAX_SCHEDULE_ATTEMPTS_PER_SEC.get())));
+            RateLimiter.create(MAX_SCHEDULE_ATTEMPTS_PER_SEC.get()),
+            MAX_TASKS_PER_SCHEDULE_ATTEMPT.get()));
 
         bind(RescheduleCalculatorImpl.RescheduleCalculatorSettings.class)
             .toInstance(new RescheduleCalculatorImpl.RescheduleCalculatorSettings(

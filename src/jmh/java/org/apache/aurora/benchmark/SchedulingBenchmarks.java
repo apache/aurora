@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.EventBus;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -192,7 +193,9 @@ public class SchedulingBenchmarks {
       saveTasks(tasksToAssign);
       storage.write((NoResult.Quiet) store -> {
         for (IScheduledTask scheduledTask : tasksToAssign) {
-          taskScheduler.schedule(store, scheduledTask.getAssignedTask().getTaskId());
+          taskScheduler.schedule(
+              store,
+              ImmutableSet.of(scheduledTask.getAssignedTask().getTaskId()));
         }
       });
     }
@@ -220,11 +223,13 @@ public class SchedulingBenchmarks {
      * See {@see http://openjdk.java.net/projects/code-tools/jmh/} for more info.
      */
     @Benchmark
-    public boolean runBenchmark() {
-      return storage.write((Storage.MutateWork.Quiet<Boolean>) store -> {
-        boolean result = false;
+    public Set<String> runBenchmark() {
+      return storage.write((Storage.MutateWork.Quiet<Set<String>>) store -> {
+        Set<String> result = null;
         for (IScheduledTask task : settings.getTasks()) {
-          result = taskScheduler.schedule(store, task.getAssignedTask().getTaskId());
+          result = taskScheduler.schedule(
+              store,
+              ImmutableSet.of(task.getAssignedTask().getTaskId()));
         }
         return result;
       });
@@ -313,10 +318,10 @@ public class SchedulingBenchmarks {
     }
 
     @Override
-    public boolean runBenchmark() {
+    public Set<String> runBenchmark() {
       pendingTaskProcessor.run();
       // Return non-guessable result to satisfy "blackhole" requirement.
-      return System.currentTimeMillis() % 5 == 0;
+      return ImmutableSet.of("" + System.currentTimeMillis());
     }
   }
 }

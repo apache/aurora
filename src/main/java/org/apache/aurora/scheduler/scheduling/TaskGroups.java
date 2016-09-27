@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.scheduling;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -23,7 +24,6 @@ import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
@@ -71,11 +71,10 @@ public class TaskGroups implements EventSubscriber {
 
   private final ConcurrentMap<TaskGroupKey, TaskGroup> groups = Maps.newConcurrentMap();
   private final DelayExecutor executor;
+  private final TaskGroupsSettings settings;
   private final TaskScheduler taskScheduler;
-  private final long firstScheduleDelay;
-  private final BackoffStrategy backoff;
   private final RescheduleCalculator rescheduleCalculator;
-  private final BatchWorker<Boolean> batchWorker;
+  private final BatchWorker<Set<String>> batchWorker;
 
   // Track the penalties of tasks at the time they were scheduled. This is to provide data that
   // may influence the selection of a different backoff strategy.
@@ -91,7 +90,7 @@ public class TaskGroups implements EventSubscriber {
   public @interface SchedulingMaxBatchSize { }
 
   @VisibleForTesting
-  public static class TaskGroupBatchWorker extends BatchWorker<Boolean> {
+  public static class TaskGroupBatchWorker extends BatchWorker<Set<String>> {
     @Inject
     TaskGroupBatchWorker(
         Storage storage,
@@ -111,15 +110,20 @@ public class TaskGroups implements EventSubscriber {
     private final Amount<Long, Time> firstScheduleDelay;
     private final BackoffStrategy taskGroupBackoff;
     private final RateLimiter rateLimiter;
+    private final int maxTasksPerSchedule;
 
     public TaskGroupsSettings(
         Amount<Long, Time> firstScheduleDelay,
         BackoffStrategy taskGroupBackoff,
-        RateLimiter rateLimiter) {
+        RateLimiter rateLimiter,
+        int maxTasksPerSchedule) {
 
       this.firstScheduleDelay = requireNonNull(firstScheduleDelay);
+      Preconditions.checkArgument(firstScheduleDelay.getValue() > 0);
       this.taskGroupBackoff = requireNonNull(taskGroupBackoff);
       this.rateLimiter = requireNonNull(rateLimiter);
+      this.maxTasksPerSchedule = maxTasksPerSchedule;
+      Preconditions.checkArgument(maxTasksPerSchedule > 0);
     }
   }
 
@@ -131,21 +135,11 @@ public class TaskGroups implements EventSubscriber {
       RescheduleCalculator rescheduleCalculator,
       TaskGroupBatchWorker batchWorker) {
 
-    requireNonNull(settings.firstScheduleDelay);
-    Preconditions.checkArgument(settings.firstScheduleDelay.getValue() > 0);
-
     this.executor = requireNonNull(executor);
-    requireNonNull(settings.rateLimiter);
-    requireNonNull(taskScheduler);
-    this.firstScheduleDelay = settings.firstScheduleDelay.as(Time.MILLISECONDS);
-    this.backoff = requireNonNull(settings.taskGroupBackoff);
+    this.settings = requireNonNull(settings);
+    this.taskScheduler = requireNonNull(taskScheduler);
     this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
     this.batchWorker = requireNonNull(batchWorker);
-
-    this.taskScheduler = (store, taskId) -> {
-      settings.rateLimiter.acquire();
-      return taskScheduler.schedule(store, taskId);
-    };
   }
 
   private synchronized void evaluateGroupLater(Runnable evaluate, TaskGroup group) {
@@ -162,27 +156,29 @@ public class TaskGroups implements EventSubscriber {
     Runnable monitor = new Runnable() {
       @Override
       public void run() {
-        final Optional<String> taskId = group.peek();
+        final Set<String> taskIds = group.peek(settings.maxTasksPerSchedule);
         long penaltyMs = 0;
-        if (taskId.isPresent()) {
-          CompletableFuture<Boolean> result = batchWorker.execute(storeProvider ->
-              taskScheduler.schedule(storeProvider, taskId.get()));
-          boolean isScheduled = false;
+        if (!taskIds.isEmpty()) {
+          settings.rateLimiter.acquire();
+          CompletableFuture<Set<String>> result = batchWorker.execute(storeProvider ->
+              taskScheduler.schedule(storeProvider, taskIds));
+
+          Set<String> scheduled = null;
           try {
-            isScheduled = result.get();
+            scheduled = result.get();
           } catch (ExecutionException | InterruptedException e) {
             Thread.currentThread().interrupt();
             Throwables.propagate(e);
           }
 
-          if (isScheduled) {
-            scheduledTaskPenalties.accumulate(group.getPenaltyMs());
-            group.remove(taskId.get());
-            if (group.hasMore()) {
-              penaltyMs = firstScheduleDelay;
-            }
+          if (scheduled.isEmpty()) {
+            penaltyMs = settings.taskGroupBackoff.calculateBackoffMs(group.getPenaltyMs());
           } else {
-            penaltyMs = backoff.calculateBackoffMs(group.getPenaltyMs());
+            scheduledTaskPenalties.accumulate(group.getPenaltyMs());
+            group.remove(scheduled);
+            if (group.hasMore()) {
+              penaltyMs = settings.firstScheduleDelay.as(Time.MILLISECONDS);
+            }
           }
         }
 
@@ -211,7 +207,7 @@ public class TaskGroups implements EventSubscriber {
       if (existing == null) {
         long penaltyMs;
         if (stateChange.isTransition()) {
-          penaltyMs = firstScheduleDelay;
+          penaltyMs = settings.firstScheduleDelay.as(Time.MILLISECONDS);
         } else {
           penaltyMs = rescheduleCalculator.getStartupScheduleDelayMs(task);
         }
@@ -234,7 +230,7 @@ public class TaskGroups implements EventSubscriber {
         : Iterables.transform(deleted.getTasks(), IScheduledTask::getAssignedTask)) {
       TaskGroup group = groups.get(TaskGroupKey.from(task.getTask()));
       if (group != null) {
-        group.remove(task.getTaskId());
+        group.remove(ImmutableSet.of(task.getTaskId()));
       }
     }
   }

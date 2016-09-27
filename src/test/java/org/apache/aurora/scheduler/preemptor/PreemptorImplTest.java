@@ -45,7 +45,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.scheduler.filter.AttributeAggregate.EMPTY;
+import static org.apache.aurora.scheduler.filter.AttributeAggregate.empty;
 import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.slotValidationStatName;
 import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.successStatName;
 import static org.easymock.EasyMock.anyObject;
@@ -133,7 +133,7 @@ public class PreemptorImplTest extends EasyMockTest {
   }
 
   private Optional<String> callPreemptor() {
-    return preemptor.attemptPreemptionFor(TASK.getAssignedTask(), EMPTY, storeProvider);
+    return preemptor.attemptPreemptionFor(TASK.getAssignedTask(), empty(), storeProvider);
   }
 
   private void expectSlotValidation(
@@ -143,7 +143,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expect(preemptionVictimFilter.filterPreemptionVictims(
         TASK.getAssignedTask().getTask(),
         slot.getVictims(),
-        EMPTY,
+        empty(),
         Optional.of(OFFER),
         storeProvider)).andReturn(victims);
   }
