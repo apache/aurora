@@ -38,7 +38,10 @@ import org.apache.aurora.common.thrift.Status;
 
 import static java.util.Objects.requireNonNull;
 
-class JsonCodec implements Codec<ServiceInstance> {
+/**
+ * Encodes a {@link ServiceInstance} as a JSON object.
+ */
+public class JsonCodec implements Codec<ServiceInstance> {
 
   private static void assertRequiredField(String fieldName, Object fieldValue) {
     if (fieldValue == null) {
@@ -100,11 +103,16 @@ class JsonCodec implements Codec<ServiceInstance> {
     }
   }
 
+  /**
+   * The encoding for service instance data in ZooKeeper expected by Aurora clients.
+   */
+  public static final Codec<ServiceInstance> INSTANCE = new JsonCodec();
+
   private static final Charset ENCODING = Charsets.UTF_8;
 
   private final Gson gson;
 
-  JsonCodec() {
+  private JsonCodec() {
     this(new Gson());
   }
 

@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import com.google.gson.JsonIOException;
 
-import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
@@ -42,35 +41,44 @@ import static org.junit.Assert.fail;
 @PrepareForTest(Gson.class)
 public class JsonCodecTest {
 
-  private static final Codec<ServiceInstance> STANDARD_JSON_CODEC = new JsonCodec();
+  private static byte[] serializeServiceInstance(ServiceInstance serviceInstance)
+      throws IOException {
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    JsonCodec.INSTANCE.serialize(serviceInstance, output);
+    return output.toByteArray();
+  }
+
+  private static ServiceInstance deserializeServiceInstance(byte[] data) throws IOException {
+    return JsonCodec.INSTANCE.deserialize(new ByteArrayInputStream(data));
+  }
 
   @Test
   public void testJsonCodecRoundtrip() throws Exception {
-    Codec<ServiceInstance> codec = STANDARD_JSON_CODEC;
     ServiceInstance instance1 = new ServiceInstance(
         new Endpoint("foo", 1000),
         ImmutableMap.of("http", new Endpoint("foo", 8080)),
         Status.ALIVE)
         .setShard(0);
-    byte[] data = ServerSets.serializeServiceInstance(instance1, codec);
-    assertTrue(ServerSets.deserializeServiceInstance(data, codec).getServiceEndpoint().isSetPort());
-    assertTrue(ServerSets.deserializeServiceInstance(data, codec).isSetShard());
+    byte[] data = serializeServiceInstance(instance1);
+    assertTrue(deserializeServiceInstance(data).getServiceEndpoint().isSetPort());
+    assertTrue(deserializeServiceInstance(data).isSetShard());
 
     ServiceInstance instance2 = new ServiceInstance(
         new Endpoint("foo", 1000),
         ImmutableMap.of("http-admin1", new Endpoint("foo", 8080)),
         Status.ALIVE);
-    data = ServerSets.serializeServiceInstance(instance2, codec);
-    assertTrue(ServerSets.deserializeServiceInstance(data, codec).getServiceEndpoint().isSetPort());
-    assertFalse(ServerSets.deserializeServiceInstance(data, codec).isSetShard());
+    data = serializeServiceInstance(instance2);
+    assertTrue(deserializeServiceInstance(data).getServiceEndpoint().isSetPort());
+    assertFalse(deserializeServiceInstance(data).isSetShard());
 
     ServiceInstance instance3 = new ServiceInstance(
         new Endpoint("foo", 1000),
         ImmutableMap.<String, Endpoint>of(),
         Status.ALIVE);
-    data = ServerSets.serializeServiceInstance(instance3, codec);
-    assertTrue(ServerSets.deserializeServiceInstance(data, codec).getServiceEndpoint().isSetPort());
-    assertFalse(ServerSets.deserializeServiceInstance(data, codec).isSetShard());
+    data = serializeServiceInstance(instance3);
+    assertTrue(deserializeServiceInstance(data).getServiceEndpoint().isSetPort());
+    assertFalse(deserializeServiceInstance(data).isSetShard());
   }
 
   @Test
@@ -81,7 +89,7 @@ public class JsonCodecTest {
         Status.ALIVE).setShard(42);
 
     ByteArrayOutputStream results = new ByteArrayOutputStream();
-    STANDARD_JSON_CODEC.serialize(instance, results);
+    JsonCodec.INSTANCE.serialize(instance, results);
     assertEquals(
         "{\"serviceEndpoint\":{\"host\":\"foo\",\"port\":1000},"
             + "\"additionalEndpoints\":{\"http\":{\"host\":\"foo\",\"port\":8080}},"
@@ -115,7 +123,7 @@ public class JsonCodecTest {
   public void testDeserializeMinimal() throws IOException {
     String minimal = "{\"serviceEndpoint\":{\"host\":\"foo\",\"port\":1000},\"status\":\"ALIVE\"}";
     ByteArrayInputStream source = new ByteArrayInputStream(minimal.getBytes(Charsets.UTF_8));
-    ServiceInstance actual = STANDARD_JSON_CODEC.deserialize(source);
+    ServiceInstance actual = JsonCodec.INSTANCE.deserialize(source);
     ServiceInstance expected =
         new ServiceInstance(new Endpoint("foo", 1000), ImmutableMap.of(), Status.ALIVE);
     assertEquals(expected, actual);
@@ -142,7 +150,7 @@ public class JsonCodecTest {
 
   private void assertInvalidDeserialize(byte[] data) {
     try {
-      STANDARD_JSON_CODEC.deserialize(new ByteArrayInputStream(data));
+      JsonCodec.INSTANCE.deserialize(new ByteArrayInputStream(data));
       fail();
     } catch (IOException e) {
       // Expected.
