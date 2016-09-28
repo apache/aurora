@@ -51,6 +51,7 @@ Are you using Aurora too?  Let us know, or submit a patch to join the list!
 
 - [Blue Yonder](http://www.blue-yonder.com)
 - [Boxever](http://www.boxever.com)
+- [Criteo](http://www.criteo.com)
 - [Fitbit](https://fitbit.com)
 - [Foursquare](https://foursquare.com)
 - [Gutefrage.net](https://www.gutefrage.net)
