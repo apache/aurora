@@ -36,6 +36,7 @@ function install_base_packages {
       jq \
       libapr1-dev \
       libcurl4-nss-dev \
+      libffi-dev \
       libsasl2-dev \
       libsvn-dev \
       openjdk-8-jdk-headless \
