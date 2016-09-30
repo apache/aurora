@@ -152,6 +152,33 @@ class TestSshCommand(AuroraClientCommandTest):
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])
 
+  def test_successful_ssh_no_instance(self):
+    """Test the ssh command when the instance id is not specified."""
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
+    sandbox_args = {'slave_root': '/slaveroot', 'slave_run_directory': 'slaverun'}
+    with contextlib.nested(
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
+            return_value=sandbox_args),
+        patch('subprocess.call', return_value=0)) as (
+            mock_scheduler_proxy_class,
+            mock_runner_args_patch,
+            mock_subprocess):
+      cmd = AuroraCommandLine()
+      cmd.execute(['task', 'ssh', '--ssh-options=-v', 'west/bozo/test/hello'])
+
+      # The status command sends a getTasksStatus query to the scheduler,
+      # and then prints the result.
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(
+          jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
+          instanceIds=None,
+          statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
+              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING])))
+      mock_subprocess.assert_called_with(['ssh', '-t', '-v', 'bozo@slavehost',
+          'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
+          'slaverun/sandbox;bash'])
+
   def test_ssh_job_not_found(self):
     """Test the ssh command when the jobkey parameter specifies a job that isn't running."""
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
@@ -163,5 +190,19 @@ class TestSshCommand(AuroraClientCommandTest):
             mock_subprocess):
       cmd = AuroraCommandLine()
       result = cmd.execute(['task', 'ssh', 'west/bozo/test/hello/1', '--command=ls'])
+      assert result == EXIT_INVALID_PARAMETER
+      assert mock_subprocess.call_count == 0
+
+  def test_ssh_no_instance_command(self):
+    """Test the ssh command when the jobkey parameter doesn't specify an instance."""
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_nojob_status_response()
+    with contextlib.nested(
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('subprocess.call', return_value=0)) as (
+            mock_scheduler_proxy_class,
+            mock_subprocess):
+      cmd = AuroraCommandLine()
+      result = cmd.execute(['task', 'ssh', 'west/bozo/test/hello', '--command=ls'])
       assert result == EXIT_INVALID_PARAMETER
       assert mock_subprocess.call_count == 0

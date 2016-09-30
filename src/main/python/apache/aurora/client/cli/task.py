@@ -27,11 +27,12 @@ from apache.aurora.client.base import combine_messages
 from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
+    ALL_INSTANCES,
     EXECUTOR_SANDBOX_OPTION,
     INSTANCES_SPEC_ARGUMENT,
+    SSH_INSTANCE_ARGUMENT,
     SSH_OPTIONS,
     SSH_USER_OPTION,
-    TASK_INSTANCE_ARGUMENT,
     CommandOption
 )
 from apache.aurora.common.clusters import CLUSTERS
@@ -89,6 +90,7 @@ class SshCommand(Verb):
 
   def get_options(self):
     return [
+        SSH_INSTANCE_ARGUMENT,
         SSH_USER_OPTION,
         SSH_OPTIONS,
         EXECUTOR_SANDBOX_OPTION,
@@ -98,21 +100,23 @@ class SshCommand(Verb):
         CommandOption('--command', '-c', dest='command', type=str, default=None,
             metavar="unix_command_line",
             help="Command to execute through the ssh connection."),
-        TASK_INSTANCE_ARGUMENT
     ]
 
   def execute(self, context):
-    (cluster, role, env, name) = context.options.task_instance.jobkey
-    instance = context.options.task_instance.instance
-
+    (cluster, role, env, name) = context.options.instance_spec.jobkey
+    instance = (None if context.options.instance_spec.instance == ALL_INSTANCES else
+        set(context.options.instance_spec.instance))
+    if instance is None and context.options.command:
+      raise context.CommandError(EXIT_INVALID_PARAMETER,
+          'INSTANCE must be specified when --command option is given')
     api = context.get_api(cluster)
-    resp = api.query(api.build_query(role, name, env=env, instances=set([int(instance)])))
+    resp = api.query(api.build_query(role, name, env=env, instances=instance))
     context.log_response_and_raise(resp,
         err_msg=('Unable to get information about instance: %s' % combine_messages(resp)))
     if (resp.result.scheduleStatusResult.tasks is None or
         len(resp.result.scheduleStatusResult.tasks) == 0):
       raise context.CommandError(EXIT_INVALID_PARAMETER,
-          "Job %s not found" % context.options.task_instance.jobkey)
+          "Job %s not found" % context.options.instance_spec.jobkey)
     first_task = resp.result.scheduleStatusResult.tasks[0]
     remote_cmd = context.options.command or 'bash'
     command = DistributedCommandRunner.substitute(
