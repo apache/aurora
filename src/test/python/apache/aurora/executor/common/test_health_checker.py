@@ -20,7 +20,7 @@ import unittest
 
 import mock
 import pytest
-from mesos.interface.mesos_pb2 import TaskState
+from mesos.interface import mesos_pb2
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.testing.clock import ThreadedClock
 
@@ -59,23 +59,28 @@ class TestHealthChecker(unittest.TestCase):
       self.fake_health_checks.append((status, 'reason'))
 
   def test_initial_interval_2x(self):
-    self.append_health_checks(False)
+    self.append_health_checks(False, 2)
+    self.append_health_checks(True, 1)
+    self.append_health_checks(False, 1)
     hct = HealthChecker(self._checker.health, interval_secs=5, clock=self._clock)
     hct.start()
     assert self._clock.converge(threads=[hct.threaded_health_checker])
-    self._clock.assert_waiting(hct.threaded_health_checker, 10)
-    assert hct.status is None
-    self._clock.tick(6)
-    assert self._clock.converge(threads=[hct.threaded_health_checker])
-    assert hct.status is None
-    self._clock.tick(3)
-    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=5)
     assert hct.status is None
     self._clock.tick(5)
     assert self._clock.converge(threads=[hct.threaded_health_checker])
-    assert hct.status.status == TaskState.Value('TASK_FAILED')
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=5)
+    assert hct.status is None
+    self._clock.tick(5)
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=5)
+    assert hct.status.status == mesos_pb2.TASK_RUNNING
+    self._clock.tick(5)
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=5)
+    assert hct.status.status == mesos_pb2.TASK_FAILED
     hct.stop()
-    assert self._checker.health.call_count == 1
+    assert self._checker.health.call_count == 4
 
   def test_initial_interval_whatev(self):
     self.append_health_checks(False, 2)
@@ -87,7 +92,11 @@ class TestHealthChecker(unittest.TestCase):
     hct.start()
     self._clock.converge(threads=[hct.threaded_health_checker])
     self._clock.assert_waiting(hct.threaded_health_checker, amount=5)
-    assert hct.status.status == TaskState.Value('TASK_FAILED')
+    assert hct.status is None
+    self._clock.tick(5)
+    self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, amount=5)
+    assert hct.status.status == mesos_pb2.TASK_FAILED
     hct.stop()
     # this is an implementation detail -- we healthcheck in the initializer and
     # healthcheck in the run loop.  if we ever change the implementation, expect
@@ -111,38 +120,36 @@ class TestHealthChecker(unittest.TestCase):
     self._clock.converge(threads=[hct.threaded_health_checker])
 
     # 2 consecutive health check failures followed by a successful health check.
-    epsilon = 0.001
-    self._clock.tick(initial_interval_secs + epsilon)
     self._clock.converge(threads=[hct.threaded_health_checker])
     self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
     assert hct.status is None
     assert hct.metrics.sample()['consecutive_failures'] == 1
-    self._clock.tick(interval_secs + epsilon)
+    self._clock.tick(interval_secs)
     self._clock.converge(threads=[hct.threaded_health_checker])
     self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
     assert hct.status is None
     assert hct.metrics.sample()['consecutive_failures'] == 2
-    self._clock.tick(interval_secs + epsilon)
+    self._clock.tick(interval_secs)
     self._clock.converge(threads=[hct.threaded_health_checker])
     self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
-    assert hct.status is None
+    assert hct.status.status == mesos_pb2.TASK_RUNNING
     assert hct.metrics.sample()['consecutive_failures'] == 0
 
     # 3 consecutive health check failures.
-    self._clock.tick(interval_secs + epsilon)
+    self._clock.tick(interval_secs)
     self._clock.converge(threads=[hct.threaded_health_checker])
     self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
-    assert hct.status is None
+    assert hct.status.status == mesos_pb2.TASK_RUNNING
     assert hct.metrics.sample()['consecutive_failures'] == 1
-    self._clock.tick(interval_secs + epsilon)
+    self._clock.tick(interval_secs)
     self._clock.converge(threads=[hct.threaded_health_checker])
     self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
-    assert hct.status is None
+    assert hct.status.status == mesos_pb2.TASK_RUNNING
     assert hct.metrics.sample()['consecutive_failures'] == 2
-    self._clock.tick(interval_secs + epsilon)
+    self._clock.tick(interval_secs)
     self._clock.converge(threads=[hct.threaded_health_checker])
     self._clock.assert_waiting(hct.threaded_health_checker, amount=1)
-    assert hct.status.status == TaskState.Value('TASK_FAILED')
+    assert hct.status.status == mesos_pb2.TASK_FAILED
     assert hct.metrics.sample()['consecutive_failures'] == 3
     hct.stop()
     assert self._checker.health.call_count == 6
@@ -439,9 +446,10 @@ class TestThreadedHealthChecker(unittest.TestCase):
     self.sandbox.exists.return_value = True
     self.sandbox.root = '/root'
 
-    self.initial_interval_secs = 1
-    self.interval_secs = 5
+    self.initial_interval_secs = 2
+    self.interval_secs = 1
     self.max_consecutive_failures = 2
+    self.min_consecutive_successes = 1
     self.clock = mock.Mock(spec=time)
     self.clock.time.return_value = 1.0
     self.health_checker = HealthChecker(
@@ -450,6 +458,7 @@ class TestThreadedHealthChecker(unittest.TestCase):
         self.interval_secs,
         self.initial_interval_secs,
         self.max_consecutive_failures,
+        self.min_consecutive_successes,
         self.clock)
     self.health_checker_sandbox_exists = HealthChecker(
         self.health,
@@ -457,6 +466,7 @@ class TestThreadedHealthChecker(unittest.TestCase):
         self.interval_secs,
         self.initial_interval_secs,
         self.max_consecutive_failures,
+        self.min_consecutive_successes,
         self.clock)
 
   def test_perform_check_if_not_disabled_snooze_file_is_none(self):
@@ -491,17 +501,28 @@ class TestThreadedHealthChecker(unittest.TestCase):
     hc = self.health_checker.threaded_health_checker
 
     assert hc.current_consecutive_failures == 0
+    assert hc.current_consecutive_successes == 0
+    assert hc.healthy is True
+
+    hc._maybe_update_failure_count(False, 'reason')
+    assert hc.current_consecutive_failures == 1
+    assert hc.current_consecutive_successes == 0
     assert hc.healthy is True
 
     hc._maybe_update_failure_count(True, 'reason')
     assert hc.current_consecutive_failures == 0
+    assert hc.current_consecutive_successes == 1
+    assert hc.healthy is True
 
+    hc._expired = True
     hc._maybe_update_failure_count(False, 'reason')
     assert hc.current_consecutive_failures == 1
+    assert hc.current_consecutive_successes == 0
     assert hc.healthy is True
 
     hc._maybe_update_failure_count(False, 'reason')
     assert hc.current_consecutive_failures == 2
+    assert hc.current_consecutive_successes == 0
     assert hc.healthy is True
 
     hc._maybe_update_failure_count(False, 'reason')
@@ -517,7 +538,7 @@ class TestThreadedHealthChecker(unittest.TestCase):
     liveness = [False, False, True]
     self.health_checker.threaded_health_checker.dead.is_set.side_effect = lambda: liveness.pop(0)
     self.health_checker.threaded_health_checker.run()
-    assert self.clock.sleep.call_count == 3
+    assert self.clock.sleep.call_count == 2
     assert mock_maybe_update_failure_count.call_count == 2
 
   @mock.patch('apache.aurora.executor.common.health_checker.ExceptionalThread.start',

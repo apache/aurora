@@ -14,7 +14,7 @@
 
 from abc import abstractmethod, abstractproperty
 
-from mesos.interface.mesos_pb2 import TaskState
+from mesos.interface import mesos_pb2
 from twitter.common import log
 from twitter.common.lang import Interface
 from twitter.common.metrics import Observable
@@ -31,7 +31,7 @@ class StatusResult(object):
 
   def __init__(self, reason, status):
     self._reason = reason
-    if status not in TaskState.values():
+    if status not in mesos_pb2.TaskState.values():
       raise ValueError('Unknown task state: %r' % status)
     self._status = status
 
@@ -47,7 +47,7 @@ class StatusResult(object):
     return '%s(%r, status=%r)' % (
         self.__class__.__name__,
         self._reason,
-        TaskState.Name(self._status))
+        mesos_pb2.TaskState.Name(self._status))
 
 
 class StatusChecker(Observable, Interface):
@@ -85,24 +85,25 @@ class Healthy(StatusChecker):
 class ChainedStatusChecker(StatusChecker):
   def __init__(self, status_checkers):
     self._status_checkers = status_checkers
-    self._status = None
     if not all(isinstance(h_i, StatusChecker) for h_i in status_checkers):
       raise TypeError('ChainedStatusChecker must take an iterable of StatusCheckers.')
     super(ChainedStatusChecker, self).__init__()
 
   @property
   def status(self):
-    if self._status is None:
-      for status_checker in self._status_checkers:
-        status_checker_status = status_checker.status
-        if status_checker_status is not None:
-          log.info('%s reported %s' % (status_checker.__class__.__name__, status_checker_status))
-          if not isinstance(status_checker_status, StatusResult):
-            raise TypeError('StatusChecker returned something other than a StatusResult: got %s' %
-                type(status_checker_status))
-          self._status = status_checker_status
+    # Do not memoize the status so that faluires occur in RUNNING state won't be masked.
+    status = None
+    for status_checker in self._status_checkers:
+      status_checker_status = status_checker.status
+      if status_checker_status is not None:
+        log.info('%s reported %s' % (status_checker.__class__.__name__, status_checker_status))
+        if not isinstance(status_checker_status, StatusResult):
+          raise TypeError('StatusChecker returned something other than a StatusResult: got %s' %
+              type(status_checker_status))
+        status = status_checker_status
+        if status_checker_status.status is not mesos_pb2.TASK_RUNNING:
           break
-    return self._status
+    return status
 
   def start(self):
     for status_checker in self._status_checkers:

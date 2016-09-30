@@ -44,9 +44,9 @@ from apache.aurora.config.schema.base import (
 )
 from apache.aurora.executor.aurora_executor import AuroraExecutor
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
-from apache.aurora.executor.common.health_checker import HealthCheckerProvider
+from apache.aurora.executor.common.health_checker import HealthChecker, HealthCheckerProvider
 from apache.aurora.executor.common.sandbox import DirectorySandbox, SandboxProvider
-from apache.aurora.executor.common.status_checker import ChainedStatusChecker
+from apache.aurora.executor.common.status_checker import ChainedStatusChecker, StatusCheckerProvider
 from apache.aurora.executor.common.task_runner import TaskError
 from apache.aurora.executor.status_manager import StatusManager
 from apache.aurora.executor.thermos_task_runner import (
@@ -98,6 +98,14 @@ class FailingSandboxProvider(SandboxProvider):
 
   def from_assigned_task(self, assigned_task, **kwargs):
     return FailingSandbox(safe_mkdtemp(), exception_type=self._exception_type, **kwargs)
+
+
+class FailingStatusCheckerProvider(StatusCheckerProvider):
+  def __init__(self, exception_type):
+    self._exception_type = exception_type
+
+  def from_assigned_task(self, assigned_task, sandbox):
+    raise self._exception_type('Could not create status checker!')
 
 
 class SlowSandbox(DirectorySandbox):
@@ -217,18 +225,25 @@ def make_executor(
   ExecutorTimeout(te.launched, proxy_driver, timeout=Amount(100, Time.MILLISECONDS)).start()
   task_description = make_task(task, assigned_ports=ports, instanceId=0)
   te.launchTask(proxy_driver, task_description)
-
   te.status_manager_started.wait()
 
-  while len(proxy_driver.method_calls['sendStatusUpdate']) < 2:
+  is_health_check_enabled = False
+  for status_checker in te._chained_checker._status_checkers:
+    if isinstance(status_checker, HealthChecker):
+      is_health_check_enabled = True
+      break
+
+  status_update_nums = 1 if is_health_check_enabled else 2
+  while len(proxy_driver.method_calls['sendStatusUpdate']) < status_update_nums:
     time.sleep(0.1)
 
   # make sure startup was kosher
   updates = proxy_driver.method_calls['sendStatusUpdate']
-  assert len(updates) == 2
+  assert len(updates) == status_update_nums
   status_updates = [arg_tuple[0][0] for arg_tuple in updates]
   assert status_updates[0].state == mesos_pb2.TASK_STARTING
-  assert status_updates[1].state == mesos_pb2.TASK_RUNNING
+  if not is_health_check_enabled:
+    assert status_updates[1].state == mesos_pb2.TASK_RUNNING
 
   # wait for the runner to bind to a task
   while True:
@@ -236,7 +251,6 @@ def make_executor(
     if runner:
       break
     time.sleep(0.1)
-
   assert te.launched.is_set()
   return runner, te
 
@@ -438,7 +452,7 @@ class TestThermosExecutor(object):
         executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
-    assert len(updates) == 3
+    assert len(updates) == 2
     assert updates[-1][0][0].state == mesos_pb2.TASK_FAILED
 
   def test_task_health_ok(self):
@@ -571,6 +585,20 @@ class TestThermosExecutor(object):
     assert len(updates) == 2
     assert updates[0][0][0].state == mesos_pb2.TASK_STARTING
     assert updates[1][0][0].state == mesos_pb2.TASK_FAILED
+
+  def test_failing_status_provider_initialize_unknown_exception(self):
+    proxy_driver = ProxyDriver()
+
+    with temporary_dir() as td:
+      te = FastThermosExecutor(
+              runner_provider=make_provider(td),
+              sandbox_provider=DefaultTestSandboxProvider(),
+              status_providers=(FailingStatusCheckerProvider(exception_type=Exception),))
+      te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
+      proxy_driver.wait_stopped()
+
+      updates = proxy_driver.method_calls['sendStatusUpdate']
+      assert updates[-1][0][0].state == mesos_pb2.TASK_FAILED
 
 
 def test_waiting_executor():

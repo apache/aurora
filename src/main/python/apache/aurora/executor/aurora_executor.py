@@ -22,6 +22,8 @@ from twitter.common.concurrent import Timeout, deadline, defer
 from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
 
+from apache.aurora.executor.common.health_checker import HealthChecker
+
 from .common.kill_manager import KillManager
 from .common.sandbox import DefaultSandboxProvider
 from .common.status_checker import ChainedStatusChecker
@@ -94,7 +96,7 @@ class AuroraExecutor(ExecutorBase, Observable):
         - Set up necessary HealthCheckers
         - Set up StatusManager, and attach HealthCheckers
     """
-    self.send_update(driver, self._task_id, mesos_pb2.TASK_STARTING, 'Initializing sandbox.')
+    self.send_update(driver, self._task_id, mesos_pb2.TASK_STARTING, 'Starting task execution.')
 
     if not self._initialize_sandbox(driver, assigned_task, mounted_volume_paths):
       return
@@ -115,10 +117,27 @@ class AuroraExecutor(ExecutorBase, Observable):
     if not self._start_runner(driver, assigned_task):
       return
 
-    self.send_update(driver, self._task_id, mesos_pb2.TASK_RUNNING)
+    is_health_check_enabled = False
+    status_checkers = []
+    try:
+      for status_provider in self._status_providers:
+        status_checker = status_provider.from_assigned_task(assigned_task, self._sandbox)
+        if status_checker is None:
+          continue
+        else:
+          if isinstance(status_checker, HealthChecker):
+            is_health_check_enabled = True
+          status_checkers.append(status_checker)
+    except Exception as e:
+      log.error(traceback.format_exc())
+      self._die(driver, mesos_pb2.TASK_FAILED, "Failed to set up status checker: %s" % e)
+      return
+
+    if not is_health_check_enabled:
+      self.send_update(driver, self._task_id, mesos_pb2.TASK_RUNNING)
 
     try:
-      self._start_status_manager(driver, assigned_task)
+      self._start_status_manager(status_checkers)
     except Exception:
       log.error(traceback.format_exc())
       self._die(driver, mesos_pb2.TASK_FAILED, "Internal error")
@@ -162,15 +181,9 @@ class AuroraExecutor(ExecutorBase, Observable):
 
     return True
 
-  def _start_status_manager(self, driver, assigned_task):
-    status_checkers = [self._kill_manager]
-    self.metrics.register_observable(self._kill_manager.name(), self._kill_manager)
-
-    for status_provider in self._status_providers:
-      status_checker = status_provider.from_assigned_task(assigned_task, self._sandbox)
-      if status_checker is None:
-        continue
-      status_checkers.append(status_checker)
+  def _start_status_manager(self, status_checkers):
+    status_checkers = [self._kill_manager] + status_checkers
+    for status_checker in status_checkers:
       self.metrics.register_observable(status_checker.name(), status_checker)
 
     self._chained_checker = ChainedStatusChecker(status_checkers)
@@ -178,8 +191,12 @@ class AuroraExecutor(ExecutorBase, Observable):
 
     # chain the runner to the other checkers, but do not chain .start()/.stop()
     complete_checker = ChainedStatusChecker([self._runner, self._chained_checker])
+
     self._status_manager = self._status_manager_class(
-        complete_checker, self._shutdown, clock=self._clock)
+        complete_checker,
+        running=self._running,
+        shutdown=self._shutdown,
+        clock=self._clock)
     self._status_manager.start()
     self.status_manager_started.set()
 
@@ -196,6 +213,9 @@ class AuroraExecutor(ExecutorBase, Observable):
       return
     self.log('Activating kill manager.')
     self._kill_manager.kill(reason)
+
+  def _running(self, status_result):
+    self.send_update(self._driver, self._task_id, status_result.status, status_result.reason)
 
   def _shutdown(self, status_result):
     runner_status = self._runner.status

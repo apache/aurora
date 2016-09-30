@@ -14,6 +14,7 @@
 
 import time
 
+from mesos.interface import mesos_pb2
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
@@ -31,23 +32,43 @@ class StatusManager(ExceptionalThread):
   """
   POLL_WAIT = Amount(500, Time.MILLISECONDS)
 
-  def __init__(self, status_checker, callback, clock=time):
+  def __init__(self, status_checker, running, shutdown, clock=time):
+    """
+    :param status_checker: status checker to check the task status
+    :type status_checker: ChainedStatusChecker
+    :param running: callback function that handles the RUNNING task status
+    :type running: callable
+    :param shutdown: callback function that handles the terminal task status
+    :type shutdown: callable
+    :param clock: time module available to be mocked for testing
+    :type clock: time modulet
+    """
     if not isinstance(status_checker, StatusChecker):
       raise TypeError('status_checker must be a StatusChecker, got %s' % type(status_checker))
-    if not callable(callback):
-      raise TypeError('callback needs to be callable!')
+    if not callable(running):
+      raise TypeError('running callback needs to be callable!')
+    if not callable(shutdown):
+      raise TypeError('shutdown callback needs to be callable!')
     self._status_checker = status_checker
-    self._callback = callback
+    self._running = running
+    self._shutdown = shutdown
     self._clock = clock
     super(StatusManager, self).__init__()
     self.daemon = True
+    self.is_task_running = False
 
   def run(self):
     while True:
       status_result = self._status_checker.status
       if status_result is not None:
         log.info('Status manager got %s' % status_result)
-        self._callback(status_result)
-        break
+        if status_result.status is mesos_pb2.TASK_RUNNING:
+          if not self.is_task_running:
+            self._running(status_result)
+            self.is_task_running = True
+          self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
+        else:
+          self._shutdown(status_result)
+          break
       else:
         self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
