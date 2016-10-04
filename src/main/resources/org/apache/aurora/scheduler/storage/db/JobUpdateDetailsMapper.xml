@@ -500,7 +500,7 @@
       message
     FROM job_update_events as e
     WHERE update_row_id = #{id}
-    ORDER BY e.timestamp_ms
+    ORDER BY e.id
   </select>
 
   <select id="selectInstanceEvents" resultMap="jobInstanceUpdateMap">
@@ -511,7 +511,7 @@
       action
     FROM job_instance_update_events as e
     WHERE update_row_id = #{id}
-    ORDER BY e.timestamp_ms
+    ORDER BY e.id
   </select>
 
   <select id="selectJobUpdateMetadata" resultMap="metadataMap">
