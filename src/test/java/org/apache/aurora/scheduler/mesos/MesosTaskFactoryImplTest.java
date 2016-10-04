@@ -63,10 +63,13 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.apiConstants.TASK_FILESYSTEM_MOUNT_POINT;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.PREFERRED_TIER;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.PROD_TIER_NAME;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.REVOCABLE_TIER;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.DEFAULT_PORT_PROTOCOL;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.METADATA_LABEL_PREFIX;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.SOURCE_LABEL;
+import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.TIER_LABEL;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.getInstanceSourceName;
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.getInverseJobSourceName;
 import static org.apache.aurora.scheduler.mesos.TaskExecutors.NO_OVERHEAD_EXECUTOR;
@@ -375,6 +378,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
     TaskInfo task = taskFactory.createFrom(TASK, OFFER_THERMOS_EXECUTOR);
     ImmutableSet<String> labels = task.getLabels().getLabelsList().stream()
+        .filter(l -> l.getKey().startsWith(METADATA_LABEL_PREFIX))
         .map(l -> l.getKey() + l.getValue())
         .collect(GuavaUtils.toImmutableSet());
 
@@ -384,6 +388,19 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
 
     assertEquals(labels, metadata);
     checkDiscoveryInfoUnset(task);
+  }
+
+  @Test
+  public void testTierLabel() {
+    expect(tierManager.getTier(TASK.getTask())).andReturn(PREFERRED_TIER);
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
+
+    control.replay();
+
+    TaskInfo task = taskFactory.createFrom(TASK, OFFER_THERMOS_EXECUTOR);
+
+    assertTrue(task.getLabels().getLabelsList().stream().anyMatch(
+        l -> l.getKey().equals(TIER_LABEL) && l.getValue().equals(PROD_TIER_NAME)));
   }
 
   @Test

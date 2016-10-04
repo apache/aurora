@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.mesos;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
@@ -23,11 +22,9 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
 
-import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.scheduler.TierManager;
@@ -45,7 +42,6 @@ import org.apache.aurora.scheduler.storage.entities.IDockerImage;
 import org.apache.aurora.scheduler.storage.entities.IImage;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IMesosContainer;
-import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
@@ -87,14 +83,21 @@ public interface MesosTaskFactory {
   class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = LoggerFactory.getLogger(MesosTaskFactoryImpl.class);
 
+    private static final String AURORA_LABEL_PREFIX = "org.apache.aurora";
+
     @VisibleForTesting
-    static final String METADATA_LABEL_PREFIX = "org.apache.aurora.metadata.";
+    static final String METADATA_LABEL_PREFIX = AURORA_LABEL_PREFIX + ".metadata.";
 
     @VisibleForTesting
     static final String DEFAULT_PORT_PROTOCOL = "TCP";
 
+    // N.B. We intentionally do not prefix this label. It was added when the explicit source field
+    // was removed from the ExecutorInfo proto and named "source" per guidance from Mesos devs.
     @VisibleForTesting
     static final String SOURCE_LABEL = "source";
+
+    @VisibleForTesting
+    static final String TIER_LABEL = AURORA_LABEL_PREFIX + ".tier";
 
     private final ExecutorSettings executorSettings;
     private final TierManager tierManager;
@@ -184,7 +187,7 @@ public interface MesosTaskFactory {
           .setSlaveId(offer.getSlaveId())
           .addAllResources(resources);
 
-      configureTaskLabels(config.getMetadata(), taskBuilder);
+      configureTaskLabels(config, taskBuilder);
 
       if (executorSettings.shouldPopulateDiscoverInfo()) {
         configureDiscoveryInfos(task, taskBuilder);
@@ -330,17 +333,16 @@ public interface MesosTaskFactory {
       return builder;
     }
 
-    private void configureTaskLabels(Set<IMetadata> metadata, TaskInfo.Builder taskBuilder) {
-      ImmutableSet<Label> labels = metadata.stream()
-          .map(m -> Label.newBuilder()
-              .setKey(METADATA_LABEL_PREFIX + m.getKey())
-              .setValue(m.getValue())
-              .build())
-          .collect(GuavaUtils.toImmutableSet());
+    private void configureTaskLabels(ITaskConfig config, TaskInfo.Builder taskBuilder) {
+      Labels.Builder labelsBuilder = Labels.newBuilder();
+      labelsBuilder.addLabels(Label.newBuilder().setKey(TIER_LABEL).setValue(config.getTier()));
 
-      if (!labels.isEmpty()) {
-        taskBuilder.setLabels(Labels.newBuilder().addAllLabels(labels));
-      }
+      config.getMetadata().stream().forEach(m -> labelsBuilder.addLabels(Label.newBuilder()
+          .setKey(METADATA_LABEL_PREFIX + m.getKey())
+          .setValue(m.getValue())
+          .build()));
+
+      taskBuilder.setLabels(labelsBuilder);
     }
 
     private void configureDiscoveryInfos(IAssignedTask task, TaskInfo.Builder taskBuilder) {

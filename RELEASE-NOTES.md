@@ -1,6 +1,9 @@
 0.17.0 (Not yet released)
 =========================
 
+### New/updated:
+- A task's tier is now mapped to a label on the Mesos `TaskInfo` proto.
+
 ### Deprecations and removals:
 
 - The scheduler flag `-zk_use_curator` has been removed. If you have never set the flag and are
