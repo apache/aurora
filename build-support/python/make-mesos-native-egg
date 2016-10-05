@@ -12,7 +12,7 @@ Usage: make-mesos-native-egg.sh TARGET_DISTRIBUTION MESOS_VERSION AURORA_3RDPART
 
 Build a mesos Python egg in a pristine Vagrant environment.
 
-TARGET_DISTRIBUTION is one of (trusty64, centos6, centos7).
+TARGET_DISTRIBUTION is one of (centos6, centos7, jessie64, trusty64, xenial64).
 MESOS_VERSION is a released version of mesos available on archive.apache.org.
 AURORA_3RDPARTY_ROOT is the path to a sparse checkout of the Aurora 3rdparty repo.
 EOF
@@ -54,10 +54,41 @@ fetch_and_build_mesos() {
       wget --progress=dot "$MESOS_BASEURL/$mesos_version/mesos-${mesos_version}.tar.gz"
       tar zxvf mesos-${mesos_version}.tar.gz
       cd mesos-$mesos_version
-      ./configure --disable-java
+      ./configure --disable-java --enable-optimize
       make
       find . -name '*.egg' -exec cp -v {} /vagrant \\;
 EOF
+}
+
+DEBIAN_JESSIE64_DEPENDENCIES=(
+  g++
+  make
+  libapr1-dev
+  libcurl4-nss-dev
+  libsasl2-dev
+  libsvn-dev
+  python-dev
+  python-virtualenv
+  zlib1g-dev
+)
+build_debian_jessie64() {
+  local mesos_version=$1 output_basedir=$2
+  local python_outdir=$output_basedir/debian/jessie64/python
+  pushd "$TMPDIR"
+    # Using bento debian box due to debian/jessie64 not having
+    # guest additions installed. No guest additions = no /vagrant.
+    init_vagrant_box bento/debian-8.6
+    vagrant up
+    vagrant ssh <<EOF
+      set -e -u
+
+      sudo apt-get update
+      sudo apt-get -y install ${DEBIAN_JESSIE64_DEPENDENCIES[*]}
+      $(fetch_and_build_mesos "$mesos_version")
+EOF
+    mkdir -pv "$python_outdir"
+    cp -v mesos.executor*.egg "$python_outdir"
+  popd
 }
 
 UBUNTU_TRUSTY64_DEPENDENCIES=(
@@ -81,6 +112,36 @@ build_ubuntu_trusty64() {
 
       sudo apt-get update
       sudo apt-get -y install ${UBUNTU_TRUSTY64_DEPENDENCIES[*]}
+      $(fetch_and_build_mesos "$mesos_version")
+EOF
+    mkdir -pv "$python_outdir"
+    cp -v mesos.executor*.egg "$python_outdir"
+  popd
+}
+
+UBUNTU_XENIAL64_DEPENDENCIES=(
+  g++
+  libapr1-dev
+  libcurl4-nss-dev
+  libsasl2-dev
+  libsvn-dev
+  python-dev
+  python-virtualenv
+  zlib1g-dev
+)
+build_ubuntu_xenial64() {
+  local mesos_version=$1 output_basedir=$2
+  local python_outdir=$output_basedir/ubuntu/xenial64/python
+  pushd "$TMPDIR"
+    # Using bento box due to ubuntu/xenial64
+    # not being configured properly for Vagrant
+    init_vagrant_box bento/ubuntu-16.04
+    vagrant up
+    vagrant ssh <<EOF
+      set -e -u
+
+      sudo apt-get update
+      sudo apt-get -y install ${UBUNTU_XENIAL64_DEPENDENCIES[*]}
       $(fetch_and_build_mesos "$mesos_version")
 EOF
     mkdir -pv "$python_outdir"
@@ -171,8 +232,14 @@ main() {
   setup_tempdir
   pushd "$TMPDIR"
     case "$target_distribution" in
+      jessie64)
+        build_debian_jessie64 "$mesos_version" "$output_basedir"
+        ;;
       trusty64)
         build_ubuntu_trusty64 "$mesos_version" "$output_basedir"
+        ;;
+      xenial64)
+        build_ubuntu_xenial64 "$mesos_version" "$output_basedir"
         ;;
       centos6)
         build_centos6 "$mesos_version" "$output_basedir"
