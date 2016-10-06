@@ -49,9 +49,29 @@ and performing these operations:
   the new config instance.
 
 The Aurora client continues through the instance list until all tasks are
-updated, in `RUNNING,` and healthy for a configurable amount of time.
-If the client determines the update is not going well (a percentage of health
-checks have failed), it cancels the update.
+updated. If the client determines the update is not going well (a percentage
+of health checks have failed), it cancels the update.
+
+Currently, the scheduler job updater uses two mechanisms to determine when
+to stop monitoring instance update state: a time-based grace interval and health
+check status.
+
+Job updates with health checks disabled (e.g. no ‘health’ port is defined
+in .aurora portmap) will rely on a time-based grace interval called [watch_secs]
+(../reference/configuration.md#updateconfig-objects).
+An instance will start executing task content when reaching `STARTING`
+state. Once the task sandbox is created, the instance is moved into `RUNNING`
+state. Afterward, the job updater will start the watch_secs countdown to ensure
+an instance is healthy, and then complete the update.
+
+Job updates with health check enabled will rely on health check status. When instance
+reaching `STARTING` state, health checks are performed periodically by the executor
+to ensure the instance is healthy. An instance is moved into `RUNNING` state only if
+a minimum number of consecutive successful health checks are performed
+during the initial warmup period (defined by [initial_interval_secs]
+(../reference/configuration.md#healthcheckconfig-objects)). If watch_secs is
+set as zero, the scheduler job updater will complete the update immediately.
+Otherwise, it will complete the update after the watch_secs expires.
 
 Update cancellation runs a procedure similar to the described above
 update sequence, but in reverse order. New instance configs are swapped

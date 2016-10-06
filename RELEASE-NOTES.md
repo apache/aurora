@@ -2,6 +2,11 @@
 =========================
 
 ### New/updated:
+
+- Aurora scheduler job updater can now rely on health check status rather than `watch_secs` timeout
+  when deciding an individual instance update state. This will potentially speed up updates as the
+  `minWaitInInstanceRunningMs` will no longer have to be chosen based on the worst observed instance
+  startup/warmup delay but rather as a desired health check duration.
 - A task's tier is now mapped to a label on the Mesos `TaskInfo` proto.
 
 ### Deprecations and removals:

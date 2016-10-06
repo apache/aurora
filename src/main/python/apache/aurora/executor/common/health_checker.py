@@ -331,6 +331,7 @@ class HealthCheckerProvider(StatusCheckerProvider):
       sandbox,
       interval_secs=health_check_config.get('interval_secs'),
       initial_interval_secs=health_check_config.get('initial_interval_secs'),
-      max_consecutive_failures=health_check_config.get('max_consecutive_failures'))
+      max_consecutive_failures=health_check_config.get('max_consecutive_failures'),
+      min_consecutive_successes=health_check_config.get('min_consecutive_successes'))
 
     return health_checker
