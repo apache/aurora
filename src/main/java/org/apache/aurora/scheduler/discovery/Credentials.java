@@ -11,7 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.common.zookeeper;
+package org.apache.aurora.scheduler.discovery;
+
+import java.util.Arrays;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -44,12 +46,18 @@ public final class Credentials {
     return new Credentials("digest", (username + ":" + password).getBytes());
   }
 
-  private final String scheme;
+  private final String authScheme;
   private final byte[] authToken;
 
-  public Credentials(String scheme, byte[] authToken) {
-    this.scheme = MorePreconditions.checkNotBlank(scheme);
-    this.authToken = requireNonNull(authToken);
+  /**
+   * Creates a new set of credentials for the given ZooKeeper authentication scheme.
+   *
+   * @param scheme The name of the authentication scheme the {@code token} is valid in.
+   * @param token The authentication token for the given {@code scheme}.
+   */
+  public Credentials(String scheme, byte[] token) {
+    authScheme = MorePreconditions.checkNotBlank(scheme);
+    authToken = requireNonNull(token);
   }
 
   /**
@@ -58,7 +66,7 @@ public final class Credentials {
    * @return the scheme these credentials are for.
    */
   public String scheme() {
-    return scheme;
+    return authScheme;
   }
 
   /**
@@ -66,8 +74,8 @@ public final class Credentials {
    *
    * @return the authentication token.
    */
-  public byte[] authToken() {
-    return authToken;
+  public byte[] token() {
+    return Arrays.copyOf(authToken, authToken.length);
   }
 
   @Override
@@ -78,13 +86,13 @@ public final class Credentials {
 
     Credentials other = (Credentials) o;
     return new EqualsBuilder()
-        .append(scheme, other.scheme())
-        .append(authToken, other.authToken())
+        .append(authScheme, other.scheme())
+        .append(authToken, other.token())
         .isEquals();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(scheme, authToken);
+    return Objects.hashCode(authScheme, authToken);
   }
 }

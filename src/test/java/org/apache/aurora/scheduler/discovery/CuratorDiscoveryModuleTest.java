@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -26,10 +26,6 @@ import org.apache.aurora.common.application.ShutdownRegistry.ShutdownRegistryImp
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.TearDownTestCase;
-import org.apache.aurora.common.zookeeper.Credentials;
-import org.apache.aurora.common.zookeeper.SingletonService;
-import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
-import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.curator.framework.api.ACLProvider;
 import org.apache.zookeeper.data.ACL;
 import org.junit.Test;

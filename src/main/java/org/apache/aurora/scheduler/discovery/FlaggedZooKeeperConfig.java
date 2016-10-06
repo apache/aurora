@@ -15,10 +15,10 @@ package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.Optional;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 
@@ -27,8 +27,6 @@ import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.zookeeper.Credentials;
-import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 
 /**
  * A factory that creates a {@link ZooKeeperConfig} instance based on command line argument
@@ -67,7 +65,7 @@ public final class FlaggedZooKeeperConfig {
   public static ZooKeeperConfig create() {
     return new ZooKeeperConfig(
         ZK_ENDPOINTS.get(),
-        Optional.fromNullable(CHROOT_PATH.get()),
+        Optional.ofNullable(CHROOT_PATH.get()),
         IN_PROCESS.get(),
         SESSION_TIMEOUT.get(),
         getCredentials(DIGEST_CREDENTIALS.get()));
@@ -75,7 +73,7 @@ public final class FlaggedZooKeeperConfig {
 
   private static Optional<Credentials> getCredentials(@Nullable String userAndPass) {
     if (userAndPass == null) {
-      return Optional.absent();
+      return Optional.empty();
     }
 
     List<String> parts = ImmutableList.copyOf(Splitter.on(":").split(userAndPass));

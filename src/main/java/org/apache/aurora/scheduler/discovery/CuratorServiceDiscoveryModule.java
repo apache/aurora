@@ -33,10 +33,6 @@ import org.apache.aurora.common.net.InetSocketAddressHelper;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.common.zookeeper.Credentials;
-import org.apache.aurora.common.zookeeper.JsonCodec;
-import org.apache.aurora.common.zookeeper.SingletonService;
-import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -106,7 +102,7 @@ class CuratorServiceDiscoveryModule extends PrivateModule {
 
     if (zooKeeperConfig.getCredentials().isPresent()) {
       Credentials credentials = zooKeeperConfig.getCredentials().get();
-      builder.authorization(credentials.scheme(), credentials.authToken());
+      builder.authorization(credentials.scheme(), credentials.token());
     }
 
     CuratorFramework curatorFramework = builder.build();

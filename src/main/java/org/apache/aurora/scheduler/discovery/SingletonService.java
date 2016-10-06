@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.common.zookeeper;
+package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
 import java.util.Map;
@@ -26,7 +26,7 @@ public interface SingletonService {
    * Indicates an error attempting to lead a group of servers.
    */
   class LeadException extends Exception {
-    public LeadException(String message, Throwable cause) {
+    LeadException(String message, Throwable cause) {
       super(message, cause);
     }
   }
@@ -35,11 +35,11 @@ public interface SingletonService {
    * Indicates an error attempting to advertise leadership of a group of servers.
    */
   class AdvertiseException extends Exception {
-    public AdvertiseException(String message) {
+    AdvertiseException(String message) {
       super(message);
     }
 
-    public AdvertiseException(String message, Throwable cause) {
+    AdvertiseException(String message, Throwable cause) {
       super(message, cause);
     }
   }
@@ -48,7 +48,7 @@ public interface SingletonService {
    * Indicates an error attempting to leave a group of servers, abdicating leadership of the group.
    */
   class LeaveException extends Exception {
-    public LeaveException(String message, Throwable cause) {
+    LeaveException(String message, Throwable cause) {
       super(message, cause);
     }
   }

@@ -32,9 +32,8 @@ import com.google.inject.binder.LinkedBindingBuilder;
 
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.base.MorePreconditions;
-import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
-import org.apache.aurora.common.zookeeper.testing.ZooKeeperTestServer;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.discovery.testing.ZooKeeperTestServer;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,8 +52,8 @@ public class ServiceDiscoveryModule extends AbstractModule {
 
   /**
    * Creates a Guice module that will bind a
-   * {@link org.apache.aurora.common.zookeeper.SingletonService} for scheduler leader election and a
-   * {@link org.apache.aurora.scheduler.app.ServiceGroupMonitor} that can be used to find the
+   * {@link SingletonService} for scheduler leader election and a
+   * {@link ServiceGroupMonitor} that can be used to find the
    * leading scheduler.
    *
    * @param zooKeeperConfig The ZooKeeper client configuration to use to interact with ZooKeeper.

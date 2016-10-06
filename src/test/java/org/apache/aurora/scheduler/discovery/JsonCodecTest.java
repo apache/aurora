@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.common.zookeeper;
+package org.apache.aurora.scheduler.discovery;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -74,7 +74,7 @@ public class JsonCodecTest {
 
     ServiceInstance instance3 = new ServiceInstance(
         new Endpoint("foo", 1000),
-        ImmutableMap.<String, Endpoint>of(),
+        ImmutableMap.of(),
         Status.ALIVE);
     data = serializeServiceInstance(instance3);
     assertTrue(deserializeServiceInstance(data).getServiceEndpoint().isSetPort());
@@ -95,7 +95,7 @@ public class JsonCodecTest {
             + "\"additionalEndpoints\":{\"http\":{\"host\":\"foo\",\"port\":8080}},"
             + "\"status\":\"ALIVE\","
             + "\"shard\":42}",
-        results.toString());
+        results.toString(Charsets.UTF_8.name()));
   }
 
   @Test

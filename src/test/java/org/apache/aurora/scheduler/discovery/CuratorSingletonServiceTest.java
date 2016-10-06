@@ -19,8 +19,6 @@ import java.util.concurrent.CountDownLatch;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.common.zookeeper.JsonCodec;
-import org.apache.aurora.common.zookeeper.SingletonService;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.easymock.Capture;

@@ -44,8 +44,6 @@ import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.stats.Stats;
-import org.apache.aurora.common.zookeeper.Credentials;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -62,8 +60,11 @@ import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
+import org.apache.aurora.scheduler.discovery.Credentials;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryModule;
+import org.apache.aurora.scheduler.discovery.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
+import org.apache.aurora.scheduler.discovery.testing.BaseZooKeeperTest;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
@@ -108,7 +109,7 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class SchedulerIT extends BaseZooKeeperClientTest {
+public class SchedulerIT extends BaseZooKeeperTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchedulerIT.class);
 
