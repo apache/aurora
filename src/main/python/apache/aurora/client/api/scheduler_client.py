@@ -19,7 +19,7 @@ import traceback
 
 import requests
 from pystachio import Default, Integer, String
-from thrift.protocol import TJSONProtocol
+from thrift.protocol import TBinaryProtocol
 from thrift.transport import TTransport
 from twitter.common import log
 from twitter.common.concurrent import Timeout, deadline
@@ -111,7 +111,7 @@ class SchedulerClient(object):
             _bypass_leader_redirect_session_factory,
             should_bypass=self._bypass_leader_redirect))
 
-    protocol = TJSONProtocol.TJSONProtocol(transport)
+    protocol = TBinaryProtocol.TBinaryProtocolAccelerated(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
     for _ in range(self.THRIFT_RETRIES):
       try:

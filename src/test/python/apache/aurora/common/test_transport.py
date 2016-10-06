@@ -19,7 +19,7 @@ import pytest
 import requests
 from mock import ANY, Mock, call, create_autospec
 from requests import exceptions as request_exceptions
-from thrift.protocol import TJSONProtocol
+from thrift.protocol import TBinaryProtocol
 from thrift.server import THttpServer
 from thrift.transport import TTransport
 
@@ -38,7 +38,7 @@ class ReadOnlySchedulerHandler(object):
 def test_request_transport_integration():
   handler = ReadOnlySchedulerHandler()
   processor = ReadOnlyScheduler.Processor(handler)
-  pfactory = TJSONProtocol.TJSONProtocolFactory()
+  pfactory = TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
   server = THttpServer.THttpServer(processor, ('localhost', 0), pfactory)
   server_thread = Thread(target=server.serve)
   server_thread.start()
@@ -46,7 +46,7 @@ def test_request_transport_integration():
 
   try:
     transport = TRequestsTransport('http://localhost:%d' % server_port)
-    protocol = TJSONProtocol.TJSONProtocol(transport)
+    protocol = TBinaryProtocol.TBinaryProtocolAccelerated(transport)
     client = ReadOnlyScheduler.Client(protocol)
     response = client.getRoleSummary()
   finally:
@@ -64,7 +64,7 @@ def test_request_transport_timeout():
   session.headers = {}
   session.post = Mock(side_effect=request_exceptions.Timeout())
   transport = TRequestsTransport('http://localhost:12345', session_factory=lambda: session)
-  protocol = TJSONProtocol.TJSONProtocol(transport)
+  protocol = TBinaryProtocol.TBinaryProtocolAccelerated(transport)
   client = ReadOnlyScheduler.Client(protocol)
 
   with pytest.raises(TTransport.TTransportException) as execinfo:
@@ -84,7 +84,7 @@ def test_raise_for_status_causes_exception():
   session.post.return_value = response
 
   transport = TRequestsTransport('http://localhost:12345', session_factory=lambda: session)
-  protocol = TJSONProtocol.TJSONProtocol(transport)
+  protocol = TBinaryProtocol.TBinaryProtocolAccelerated(transport)
   client = ReadOnlyScheduler.Client(protocol)
 
   with pytest.raises(TTransport.TTransportException) as excinfo:
@@ -105,7 +105,7 @@ def test_raises_auth_error():
   session.post.return_value = response
 
   transport = TRequestsTransport('http://localhost:12345', session_factory=lambda: session)
-  protocol = TJSONProtocol.TJSONProtocol(transport)
+  protocol = TBinaryProtocol.TBinaryProtocolAccelerated(transport)
   client = ReadOnlyScheduler.Client(protocol)
 
   with pytest.raises(TRequestsTransport.AuthError):
@@ -119,7 +119,7 @@ def test_request_any_other_exception():
   session.headers = {}
   session.post = Mock(side_effect=request_exceptions.ConnectionError())
   transport = TRequestsTransport('http://localhost:12345', session_factory=lambda: session)
-  protocol = TJSONProtocol.TJSONProtocol(transport)
+  protocol = TBinaryProtocol.TBinaryProtocolAccelerated(transport)
   client = ReadOnlyScheduler.Client(protocol)
 
   with pytest.raises(TTransport.TTransportException):
@@ -161,7 +161,7 @@ def test_auth_type_valid():
 
   auth = requests.auth.AuthBase()
   transport = TRequestsTransport('http://localhost:1', auth=auth, session_factory=lambda: session)
-  protocol = TJSONProtocol.TJSONProtocol(transport)
+  protocol = TBinaryProtocol.TBinaryProtocolAccelerated(transport)
   client = ReadOnlyScheduler.Client(protocol)
 
   with pytest.raises(TTransport.TTransportException):
@@ -181,7 +181,7 @@ def test_auth_type_invalid():
 def test_requests_transport_session_reuse():
   handler = ReadOnlySchedulerHandler()
   processor = ReadOnlyScheduler.Processor(handler)
-  pfactory = TJSONProtocol.TJSONProtocolFactory()
+  pfactory = TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
   server = THttpServer.THttpServer(processor, ('localhost', 0), pfactory)
   server_thread = Thread(target=server.serve)
   server_thread.start()
@@ -189,7 +189,7 @@ def test_requests_transport_session_reuse():
 
   try:
     transport = TRequestsTransport('http://localhost:%d' % server_port)
-    protocol = TJSONProtocol.TJSONProtocol(transport)
+    protocol = TBinaryProtocol.TBinaryProtocolAccelerated(transport)
     client = ReadOnlyScheduler.Client(protocol)
     client.getRoleSummary()
     old_session = transport._session

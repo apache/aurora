@@ -8,6 +8,7 @@
   `minWaitInInstanceRunningMs` will no longer have to be chosen based on the worst observed instance
   startup/warmup delay but rather as a desired health check duration.
 - A task's tier is now mapped to a label on the Mesos `TaskInfo` proto.
+- The Aurora client is now using the Thrift binary protocol to communicate with the scheduler.
 
 ### Deprecations and removals:
 

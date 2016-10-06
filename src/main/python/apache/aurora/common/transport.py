@@ -117,7 +117,8 @@ class TRequestsTransport(TTransportBase):
     data = self.__wbuf.getvalue()
     self.__wbuf = BytesIO()
 
-    self._session.headers['Content-Type'] = 'application/x-thrift'
+    self._session.headers['Accept'] = 'application/vnd.apache.thrift.binary'
+    self._session.headers['Content-Type'] = 'application/vnd.apache.thrift.binary'
     self._session.headers['Content-Length'] = str(len(data))
     self._session.headers['Host'] = self.__urlparse.hostname
 
