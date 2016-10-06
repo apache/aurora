@@ -28,7 +28,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.box_version = "0.0.9"
 
   config.vm.define "devcluster" do |dev|
-    dev.vm.network :private_network, ip: "192.168.33.7"
+    dev.vm.network :private_network, ip: "192.168.33.7", :auto_config => false
+    dev.vm.provision "shell", run: "always", inline: "ifconfig eth1 192.168.33.7 netmask 255.255.255.0 up"
     dev.vm.provider :virtualbox do |vb|
       vb.customize ["modifyvm", :id, "--memory", "3072"]
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
