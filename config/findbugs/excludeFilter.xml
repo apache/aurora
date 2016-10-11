@@ -34,6 +34,7 @@ limitations under the License.
       <Bug pattern="DLS_DEAD_LOCAL_STORE" />
       <Bug pattern="NM_CLASS_NAMING_CONVENTION" />
       <Bug pattern="UUF_UNUSED_FIELD" />
+      <Bug pattern="URF_UNREAD_FIELD" />
     </Or>
   </Match>
 

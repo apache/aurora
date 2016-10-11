@@ -91,7 +91,7 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.jsrRev = '3.0.1'
   ext.junitRev = '4.12'
   ext.logbackRev = '1.1.3'
-  ext.mybatisRev = '3.3.1'
+  ext.mybatisRev = '3.4.1'
   ext.protobufRev = '2.6.1'
   ext.servletRev = '3.1.0'
   ext.slf4jRev = '1.7.12'
@@ -355,7 +355,7 @@ dependencies {
   compile "com.google.inject:guice:${guiceRev}"
   compile "com.google.inject.extensions:guice-assistedinject:${guiceRev}"
   compile "com.google.protobuf:protobuf-java:${protobufRev}"
-  compile 'com.h2database:h2:1.4.190'
+  compile 'com.h2database:h2:1.4.192'
   compile 'com.hubspot.jackson:jackson-datatype-protobuf:0.9.3'
   compile "com.fasterxml.jackson.core:jackson-core:${jacksonRev}"
   compile "com.sun.jersey:jersey-core:${jerseyRev}"
@@ -629,7 +629,7 @@ jmh {
   if (project.hasProperty('benchmarks')) {
     include = project.getProperty('benchmarks')
   }
-  jmhVersion = '1.11.3'
+  jmhVersion = '1.15'
   jvmArgsPrepend = '-Xmx3g'
   humanOutputFile = project.file("$jmhHumanOutputPath")
   resultsFile = project.file("$buildDir/reports/jmh/results.txt")
