@@ -35,8 +35,8 @@ class UpdaterConfig(object):
 
     if batch_size <= 0:
       raise ValueError('Batch size should be greater than 0')
-    if watch_secs < 0:
-      raise ValueError('Watch seconds should not be negative')
+    if watch_secs <= 0:
+      raise ValueError('Watch seconds should be greater than 0')
     if pulse_interval_secs is not None and pulse_interval_secs < self.MIN_PULSE_INTERVAL_SECONDS:
       raise ValueError('Pulse interval seconds must be at least %s seconds.'
                        % self.MIN_PULSE_INTERVAL_SECONDS)

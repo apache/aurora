@@ -24,7 +24,15 @@ from apache.aurora.client.config import get_config as get_aurora_config
 from apache.aurora.client.config import PRODUCTION_DEPRECATED_WARNING
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
-from apache.aurora.config.schema.base import MB, Announcer, HealthCheckConfig, Job, Resources, Task
+from apache.aurora.config.schema.base import (
+    MB,
+    Announcer,
+    HealthCheckConfig,
+    Job,
+    Resources,
+    Task,
+    UpdateConfig
+)
 from apache.thermos.config.schema_base import Process
 
 MESOS_CONFIG_BASE = """
@@ -184,37 +192,38 @@ def test_update_config_passes_with_default_values():
   config._validate_update_config(AuroraConfig(base_job))
 
 
-def test_health_check_config_fails_insufficient_initital_interval_secs_less_than_target():
+def test_update_config_passes_with_min_requirement_values():
   base_job = Job(
     name='hello_world', role='john_doe', cluster='test-cluster',
-    health_check_config=HealthCheckConfig(initial_interval_secs=5),
-    task=Task(name='main', processes=[],
-              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-
-  with pytest.raises(SystemExit):
-    config._validate_update_config(AuroraConfig(base_job))
-
-
-def test_health_check_config_fails_insufficient_initital_interval_secs_equal_to_target():
-  base_job = Job(
-    name='hello_world', role='john_doe', cluster='test-cluster',
-    health_check_config=HealthCheckConfig(initial_interval_secs=10),
-    task=Task(name='main', processes=[],
-              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-
-  with pytest.raises(SystemExit):
-    config._validate_update_config(AuroraConfig(base_job))
-
-
-def test_health_check_config_passes_with_min_requirement_values():
-  base_job = Job(
-    name='hello_world', role='john_doe', cluster='test-cluster',
-    health_check_config=HealthCheckConfig(initial_interval_secs=21,
-                                          min_consecutive_successes=2),
+    update_config=UpdateConfig(watch_secs=26),
+    health_check_config=HealthCheckConfig(max_consecutive_failures=1),
     task=Task(name='main', processes=[],
               resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 
   config._validate_update_config(AuroraConfig(base_job))
+
+
+def test_update_config_fails_insufficient_watch_secs_less_than_target():
+  base_job = Job(
+    name='hello_world', role='john_doe', cluster='test-cluster',
+    update_config=UpdateConfig(watch_secs=10),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+
+  with pytest.raises(SystemExit):
+    config._validate_update_config(AuroraConfig(base_job))
+
+
+def test_update_config_fails_insufficient_watch_secs_equal_to_target():
+  base_job = Job(
+    name='hello_world', role='john_doe', cluster='test-cluster',
+    update_config=UpdateConfig(watch_secs=25),
+    health_check_config=HealthCheckConfig(max_consecutive_failures=1),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+
+  with pytest.raises(SystemExit):
+    config._validate_update_config(AuroraConfig(base_job))
 
 
 def test_validate_deprecated_config_adds_warning_for_production():

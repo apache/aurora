@@ -92,31 +92,15 @@ health check interval (%d seconds) plus %d consecutive failures at a check inter
 '''
 
 
-INITIAL_INTERVAL_SECS_INSUFFICIENT_ERROR_FORMAT = '''
-You have specified an insufficiently short initial interval period (%d seconds)
-in your health check configuration. Your health check will always fail. In order for
-the health check to pass, HealthCheckConfig.initial_interval_secs must be greater
-than the duration of %d consecutive successful health checks at a check interval
-of %d seconds. You can either increase initial_interval_secs, decrease interval_secs
-or decrease min_consecutive_successes.
-'''
-
-
-INVALID_MIN_CONSECUTIVE_SUCCESSES_ERROR = '''
-You have specified an invalid min_consecutive_successes value (%d) in your health check
-configuration. Your health check will always succeed. In order for the updater to detect
-health check failures, HealthCheckConfig.min_consecutive_successes must be a positive value.
-'''
-
-
 def _validate_update_config(config):
   job_size = config.instances()
   update_config = config.update_config()
   health_check_config = config.health_check_config()
 
   max_failures = update_config.max_total_failures().get()
+  watch_secs = update_config.watch_secs().get()
   initial_interval_secs = health_check_config.initial_interval_secs().get()
-  min_consecutive_successes = health_check_config.min_consecutive_successes().get()
+  max_consecutive_failures = health_check_config.max_consecutive_failures().get()
   interval_secs = health_check_config.interval_secs().get()
 
   if max_failures >= job_size:
@@ -127,13 +111,10 @@ def _validate_update_config(config):
     if max_failures < min_failure_threshold:
       die(UPDATE_CONFIG_DEDICATED_THRESHOLD_ERROR % (job_size, min_failure_threshold))
 
-  if min_consecutive_successes <= 0:
-    die(INVALID_MIN_CONSECUTIVE_SUCCESSES_ERROR % min_consecutive_successes)
-
-  target_initial_interval_secs = interval_secs * min_consecutive_successes
-  if initial_interval_secs <= target_initial_interval_secs:
-    die(INITIAL_INTERVAL_SECS_INSUFFICIENT_ERROR_FORMAT %
-        (initial_interval_secs, min_consecutive_successes, interval_secs))
+  target_watch = initial_interval_secs + (max_consecutive_failures * interval_secs)
+  if watch_secs <= target_watch:
+    die(WATCH_SECS_INSUFFICIENT_ERROR_FORMAT %
+        (watch_secs, target_watch, initial_interval_secs, max_consecutive_failures, interval_secs))
 
 
 PRODUCTION_DEPRECATED_WARNING = (

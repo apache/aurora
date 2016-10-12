@@ -18,7 +18,7 @@ import threading
 import time
 import traceback
 
-from mesos.interface import mesos_pb2
+from mesos.interface.mesos_pb2 import TaskState
 from pystachio import Environment, String
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
@@ -51,7 +51,6 @@ class ThreadedHealthChecker(ExceptionalThread):
       interval_secs,
       initial_interval_secs,
       max_consecutive_failures,
-      min_consecutive_successes,
       clock):
     """
     :param health_checker: health checker to confirm service health
@@ -60,12 +59,10 @@ class ThreadedHealthChecker(ExceptionalThread):
     :type sandbox: DirectorySandbox
     :param interval_secs: delay between checks
     :type interval_secs: int
-    :param initial_interval_secs: seconds to wait before marking health check passed
+    :param initial_interval_secs: seconds to wait before starting checks
     :type initial_interval_secs: int
     :param max_consecutive_failures: number of failures to allow before marking dead
     :type max_consecutive_failures: int
-    :param min_consecutive_successes: number of successes before marking health check passed
-    :type min_consecutive_successes: int
     :param clock: time module available to be mocked for testing
     :type clock: time module
     """
@@ -73,16 +70,11 @@ class ThreadedHealthChecker(ExceptionalThread):
     self.sandbox = sandbox
     self.clock = clock
     self.current_consecutive_failures = 0
-    self.current_consecutive_successes = 0
     self.dead = threading.Event()
     self.interval = interval_secs
     self.max_consecutive_failures = max_consecutive_failures
-    self.min_consecutive_successes = min_consecutive_successes
     self.snooze_file = None
     self.snoozed = False
-    self._expired = False
-    self.start_time = 0
-    self.health_check_passed = False
 
     if self.sandbox and self.sandbox.exists():
       self.snooze_file = os.path.join(self.sandbox.root, '.healthchecksnooze')
@@ -92,8 +84,10 @@ class ThreadedHealthChecker(ExceptionalThread):
     else:
       self.initial_interval = interval_secs * 2
 
-    self.healthy, self.reason = True, None
-
+    if self.initial_interval > 0:
+      self.healthy, self.reason = True, None
+    else:
+      self.healthy, self.reason = self._perform_check_if_not_disabled()
     super(ThreadedHealthChecker, self).__init__()
     self.daemon = True
 
@@ -116,35 +110,21 @@ class ThreadedHealthChecker(ExceptionalThread):
   def _maybe_update_failure_count(self, is_healthy, reason):
     if not is_healthy:
       log.warning('Health check failure: %s' % reason)
-      self.reason = reason
-      if self.current_consecutive_successes > 0:
-        log.debug('Reset consecutive successes counter.')
-      self.current_consecutive_successes = 0
       self.current_consecutive_failures += 1
+      if self.current_consecutive_failures > self.max_consecutive_failures:
+        log.warning('Reached consecutive failure limit.')
+        self.healthy = False
+        self.reason = reason
     else:
       if self.current_consecutive_failures > 0:
         log.debug('Reset consecutive failures counter.')
       self.current_consecutive_failures = 0
-      self.current_consecutive_successes += 1
-
-    if not self._expired:
-      if self.clock.time() - self.start_time > self.initial_interval:
-        log.debug('Initial interval expired.')
-        self._expired = True
-        if not self.health_check_passed:
-          log.warning('Failed to reach minimum consecutive successes.')
-          self.healthy = False
-      else:
-        if self.current_consecutive_successes >= self.min_consecutive_successes:
-          log.info('Reached minimum consecutive successes.')
-          self.health_check_passed = True
-
-    if self._expired and self.healthy:
-      self.healthy = self.current_consecutive_failures <= self.max_consecutive_failures
 
   def run(self):
     log.debug('Health checker thread started.')
-    self.start_time = self.clock.time()
+    if self.initial_interval > 0:
+      self.clock.sleep(self.initial_interval)
+    log.debug('Initial interval expired.')
     while not self.dead.is_set():
       is_healthy, reason = self._perform_check_if_not_disabled()
       self._maybe_update_failure_count(is_healthy, reason)
@@ -168,8 +148,6 @@ class HealthChecker(StatusChecker):
     Exported metrics:
       health_checker.consecutive_failures: Number of consecutive failures observed.  Resets
         to zero on successful health check.
-      health_checker.consecutive_successes: Number of consecutive successes observed.  Resets
-        to zero on failed health check.
       health_checker.snoozed: Returns 1 if the health checker is snoozed, 0 if not.
       health_checker.total_latency_secs: Total time waiting for the health checker to respond in
         seconds. To get average latency, use health_checker.total_latency / health_checker.checks.
@@ -182,7 +160,6 @@ class HealthChecker(StatusChecker):
                interval_secs=10,
                initial_interval_secs=None,
                max_consecutive_failures=0,
-               min_consecutive_successes=1,
                clock=time):
     self._health_checks = 0
     self._total_latency = 0
@@ -194,12 +171,9 @@ class HealthChecker(StatusChecker):
         interval_secs,
         initial_interval_secs,
         max_consecutive_failures,
-        min_consecutive_successes,
         clock)
     self.metrics.register(LambdaGauge('consecutive_failures',
         lambda: self.threaded_health_checker.current_consecutive_failures))
-    self.metrics.register(LambdaGauge('consecutive_successes',
-        lambda: self.threaded_health_checker.current_consecutive_successes))
     self.metrics.register(LambdaGauge('snoozed', lambda: int(self.threaded_health_checker.snoozed)))
     self.metrics.register(LambdaGauge('total_latency_secs', lambda: self._total_latency))
     self.metrics.register(LambdaGauge('checks', lambda: self._health_checks))
@@ -218,12 +192,9 @@ class HealthChecker(StatusChecker):
 
   @property
   def status(self):
-    if self.threaded_health_checker.healthy:
-      if self.threaded_health_checker.health_check_passed:
-        return StatusResult('Task is healthy.', mesos_pb2.TASK_RUNNING)
-    else:
+    if not self.threaded_health_checker.healthy:
       return StatusResult('Failed health check! %s' % self.threaded_health_checker.reason,
-          mesos_pb2.TASK_FAILED)
+          TaskState.Value('TASK_FAILED'))
 
   def name(self):
     return 'health_checker'
@@ -331,7 +302,6 @@ class HealthCheckerProvider(StatusCheckerProvider):
       sandbox,
       interval_secs=health_check_config.get('interval_secs'),
       initial_interval_secs=health_check_config.get('initial_interval_secs'),
-      max_consecutive_failures=health_check_config.get('max_consecutive_failures'),
-      min_consecutive_successes=health_check_config.get('min_consecutive_successes'))
+      max_consecutive_failures=health_check_config.get('max_consecutive_failures'))
 
     return health_checker

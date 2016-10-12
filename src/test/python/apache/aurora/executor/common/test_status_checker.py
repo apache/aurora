@@ -14,7 +14,7 @@
 
 import threading
 
-from mesos.interface import mesos_pb2
+from mesos.interface.mesos_pb2 import TaskState
 
 from apache.aurora.executor.common.status_checker import (
     ChainedStatusChecker,
@@ -62,42 +62,11 @@ def test_chained_health_interface():
     assert si.started.is_set()
 
   assert chained_si.status is None
-  reason = StatusResult('derp', mesos_pb2.TASK_FAILED)
+  reason = StatusResult('derp', TaskState.Value('TASK_FAILED'))
   si2.set_status(reason)
   assert chained_si.status == reason
   assert chained_si.status.reason == 'derp'
-  assert mesos_pb2.TaskState.Name(chained_si.status.status) == 'TASK_FAILED'
-
-  for si in (si1, si2):
-    assert not si.stopped.is_set()
-  chained_si.stop()
-  for si in (si1, si2):
-    assert si.stopped.is_set()
-
-  # A task may fail after transition into RUNNING state. We need to test
-  # the status is not memoized in ChainedStatusChecker.
-  si1 = EventHealth()
-  si2 = EventHealth()
-  chained_si = ChainedStatusChecker([si1, si2])
-
-  for si in (si1, si2):
-    assert not si.started.is_set()
-  chained_si.start()
-  for si in (si1, si2):
-    assert si.started.is_set()
-
-  assert chained_si.status is None
-  reason2 = StatusResult('Task is healthy.', mesos_pb2.TASK_RUNNING)
-  si2.set_status(reason2)
-  assert chained_si.status == reason2
-  assert chained_si.status.reason == 'Task is healthy.'
-  assert mesos_pb2.TaskState.Name(chained_si.status.status) == 'TASK_RUNNING'
-
-  reason1 = StatusResult('derp', mesos_pb2.TASK_FAILED)
-  si1.set_status(reason1)
-  assert chained_si.status == reason1
-  assert chained_si.status.reason == 'derp'
-  assert mesos_pb2.TaskState.Name(chained_si.status.status) == 'TASK_FAILED'
+  assert TaskState.Name(chained_si.status.status) == 'TASK_FAILED'
 
   for si in (si1, si2):
     assert not si.stopped.is_set()

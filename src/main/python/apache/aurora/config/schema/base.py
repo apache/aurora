@@ -60,7 +60,6 @@ class HealthCheckConfig(Struct):
   initial_interval_secs    = Default(Float, 15.0)
   interval_secs            = Default(Float, 10.0)
   max_consecutive_failures = Default(Integer, 0)
-  min_consecutive_successes = Default(Integer, 1)
   timeout_secs             = Default(Float, 1.0)
 
 

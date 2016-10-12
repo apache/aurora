@@ -16,9 +16,9 @@ import time
 from unittest import TestCase
 
 import mock
-from mesos.interface import mesos_pb2
+from mesos.interface.mesos_pb2 import TaskState
 
-from apache.aurora.executor.common.status_checker import StatusChecker, StatusResult
+from apache.aurora.executor.common.status_checker import StatusChecker
 from apache.aurora.executor.status_manager import StatusManager
 
 
@@ -28,29 +28,23 @@ class FakeStatusChecker(StatusChecker):
 
   @property
   def status(self):
-    status_result = None
-    if self.call_count == 1:
-      status_result = StatusResult('Task is healthy.', mesos_pb2.TASK_RUNNING)
     if self.call_count == 2:
-      status_result = StatusResult('Task is healthy.', mesos_pb2.TASK_RUNNING)
-    if self.call_count == 3:
-      status_result = StatusResult('Reason why a task failed.', mesos_pb2.TASK_KILLED)
+      return TaskState.Value('TASK_KILLED')
     self.call_count += 1
-    return status_result
+    return None
 
 
 class TestStatusManager(TestCase):
   def setUp(self):
-    self.callback_call_count = 0
+    self.callback_called = False
 
   def test_run(self):
     checker = FakeStatusChecker()
-    def running(result):
-      self.callback_call_count += 1
-    def shutdown(result):
-      self.callback_call_count += 1
+    def callback(result):
+      assert result == TaskState.Value('TASK_KILLED')
+      self.callback_called = True
     mock_time = mock.create_autospec(spec=time, instance=True)
-    status_manager = StatusManager(checker, running, shutdown, mock_time)
+    status_manager = StatusManager(checker, callback, mock_time)
     status_manager.run()
-    assert mock_time.sleep.call_count == 3
-    assert self.callback_call_count == 2
+    assert mock_time.sleep.call_count == 2
+    assert self.callback_called is True
