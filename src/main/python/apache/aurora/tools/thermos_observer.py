@@ -34,6 +34,14 @@ app.add_option(
 
 
 app.add_option(
+    '--ip',
+    dest='ip',
+    type='string',
+    default='0.0.0.0',
+    help='The IP address the observer will bind to.')
+
+
+app.add_option(
     '--port',
     dest='port',
     type='int',
@@ -66,7 +74,7 @@ def main(_, options):
   observer.start()
   root_server = configure_server(observer)
 
-  thread = ExceptionalThread(target=lambda: root_server.run('0.0.0.0', options.port, 'cherrypy'))
+  thread = ExceptionalThread(target=lambda: root_server.run(options.ip, options.port, 'cherrypy'))
   thread.daemon = True
   thread.start()
 

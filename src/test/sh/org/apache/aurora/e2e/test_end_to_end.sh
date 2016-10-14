@@ -78,7 +78,7 @@ test_version() {
 }
 
 test_health_check() {
-  [[ $(_curl "localhost:8081/health") == 'OK' ]]
+  [[ $(_curl "$TEST_SLAVE_IP:8081/health") == 'OK' ]]
 }
 
 test_config() {
@@ -117,7 +117,7 @@ test_scheduler_ui() {
   local _role=$1 _env=$2 _job=$3
 
   # Check that scheduler UI pages shown
-  base_url="localhost:8081"
+  base_url="$TEST_SLAVE_IP:8081"
   check_url_live "$base_url/leaderhealth"
   check_url_live "$base_url/scheduler"
   check_url_live "$base_url/scheduler/$_role"
@@ -128,7 +128,7 @@ test_observer_ui() {
   local _cluster=$1 _role=$2 _job=$3
 
   # Check the observer page
-  observer_url="localhost:1338"
+  observer_url="$TEST_SLAVE_IP:1338"
   check_url_live "$observer_url"
 
   # Poll the observer, waiting for it to receive and show information about the task.

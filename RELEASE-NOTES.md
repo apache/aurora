@@ -4,6 +4,8 @@
 ### New/updated:
 - A task's tier is now mapped to a label on the Mesos `TaskInfo` proto.
 - The Aurora client is now using the Thrift binary protocol to communicate with the scheduler.
+- Introduce a new `--ip` option to bind the Thermos observer to a specific rather than all
+  interfaces.
 
 ### Deprecations and removals:
 
