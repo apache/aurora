@@ -218,6 +218,9 @@ public final class %(name)s {
 
   @Override
   public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
     if (!(o instanceof %(name)s)) {
       return false;
     }
