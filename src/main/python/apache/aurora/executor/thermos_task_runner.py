@@ -389,9 +389,16 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
     return None if assigned_task.task.container.docker else assigned_task.task.job.role
 
   def from_assigned_task(self, assigned_task, sandbox):
-    if sandbox.is_filesystem_image and self._mesos_containerizer_path is None:
-      raise TaskError('Cannot launch task using a filesystem image: no mesos_containerizer_path '
-          'was set.')
+    if sandbox.is_filesystem_image:
+      if self._mesos_containerizer_path is None:
+        raise TaskError('Cannot launch task using a filesystem image: no mesos_containerizer_path '
+            'was set.')
+      if not os.path.isfile(self._mesos_containerizer_path):
+        raise TaskError('Cannot launch task using a filesystem image: mesos_containerizer_path '
+            ' %s does not exist.' % self._mesos_containerizer_path)
+      if not os.access(self._mesos_containerizer_path, os.X_OK):
+        raise TaskError('Cannot launch task using a filesystem image: mesos_containerizer_path '
+                        ' %s is not marked as executable.' % self._mesos_containerizer_path)
 
     task_id = assigned_task.taskId
     role = self._get_role(assigned_task)
