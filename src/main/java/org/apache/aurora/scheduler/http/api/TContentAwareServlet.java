@@ -119,8 +119,8 @@ public class TContentAwareServlet extends HttpServlet {
   protected void doPost(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
 
-    Optional<ContentFactoryPair> factoryOptional =
-        inputConfig.getFactory(Optional.of(request.getContentType()).map(MediaType::valueOf));
+    Optional<ContentFactoryPair> factoryOptional = inputConfig
+        .getFactory(Optional.ofNullable(request.getContentType()).map(MediaType::valueOf));
 
     if (!factoryOptional.isPresent()) {
       response.setStatus(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
