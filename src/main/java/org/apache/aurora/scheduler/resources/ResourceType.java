@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.resources;
 
 import java.util.EnumSet;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -38,6 +39,7 @@ import static org.apache.aurora.scheduler.resources.MesosResourceConverter.SCALA
 import static org.apache.aurora.scheduler.resources.ResourceMapper.PORT_MAPPER;
 import static org.apache.aurora.scheduler.resources.ResourceSettings.ENABLE_REVOCABLE_CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceSettings.ENABLE_REVOCABLE_RAM;
+import static org.apache.aurora.scheduler.resources.ResourceSettings.NOT_REVOCABLE;
 
 /**
  * Describes Mesos resource types and their Aurora traits.
@@ -57,7 +59,7 @@ public enum ResourceType implements TEnum {
       "core(s)",
       16,
       false,
-      ENABLE_REVOCABLE_CPUS.get()),
+      ENABLE_REVOCABLE_CPUS),
 
   /**
    * RAM resource.
@@ -72,7 +74,7 @@ public enum ResourceType implements TEnum {
       "MB",
       Amount.of(24, GB).as(MB),
       false,
-      ENABLE_REVOCABLE_RAM.get()),
+      ENABLE_REVOCABLE_RAM),
 
   /**
    * DISK resource.
@@ -87,7 +89,7 @@ public enum ResourceType implements TEnum {
       "MB",
       Amount.of(450, GB).as(MB),
       false,
-      false),
+      NOT_REVOCABLE),
 
   /**
    * Port resource.
@@ -102,7 +104,7 @@ public enum ResourceType implements TEnum {
       "count",
       1000,
       true,
-      false),
+      NOT_REVOCABLE),
 
   /**
    * GPU resource.
@@ -117,7 +119,7 @@ public enum ResourceType implements TEnum {
       "core(s)",
       4,
       false,
-      false);
+      NOT_REVOCABLE);
 
   /**
    * Correspondent thrift {@link org.apache.aurora.gen.Resource} enum value.
@@ -167,7 +169,7 @@ public enum ResourceType implements TEnum {
   /**
    * Indicates if a resource can be Mesos-revocable.
    */
-  private final boolean isMesosRevocable;
+  private final Supplier<Boolean> isMesosRevocable;
 
   private static ImmutableMap<Integer, ResourceType> byField =
       Maps.uniqueIndex(EnumSet.allOf(ResourceType.class),  ResourceType::getValue);
@@ -199,7 +201,7 @@ public enum ResourceType implements TEnum {
       String auroraUnit,
       int scalingRange,
       boolean isMultipleAllowed,
-      boolean isMesosRevocable) {
+      Supplier<Boolean> isMesosRevocable) {
 
     this.value = value;
     this.mesosResourceConverter = requireNonNull(mesosResourceConverter);
@@ -320,7 +322,7 @@ public enum ResourceType implements TEnum {
    * @return True if a resource can be Mesos-revocable, false otherwise.
    */
   public boolean isMesosRevocable() {
-    return isMesosRevocable;
+    return isMesosRevocable.get();
   }
 
   /**

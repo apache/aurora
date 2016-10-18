@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.resources;
 
+import java.util.function.Supplier;
+
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
 
@@ -30,6 +32,8 @@ final class ResourceSettings {
 
   @CmdLine(name = "enable_revocable_ram", help = "Treat RAM as a revocable resource.")
   static final Arg<Boolean> ENABLE_REVOCABLE_RAM = Arg.create(false);
+
+  static final Supplier<Boolean> NOT_REVOCABLE = () -> false;
 
   private ResourceSettings() {
 

@@ -14,6 +14,7 @@
 package org.apache.aurora.common.args;
 
 import javax.annotation.Nullable;
+import java.util.function.Supplier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -22,7 +23,7 @@ import com.google.common.base.Preconditions;
  * Wrapper class for the value of an argument.  For proper behavior, an {@code Arg} should always
  * be annotated with {@link CmdLine}, which will define the command line interface to the argument.
  */
-public class Arg<T> {
+public class Arg<T> implements Supplier<T> {
 
   @Nullable private final T defaultValue;
   @Nullable private T value;

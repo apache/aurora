@@ -6,6 +6,7 @@
 - The Aurora client is now using the Thrift binary protocol to communicate with the scheduler.
 - Introduce a new `--ip` option to bind the Thermos observer to a specific rather than all
   interfaces.
+- Fix error that prevents the scheduler from being launched with `-enable_revocable_ram`.
 
 ### Deprecations and removals:
 
