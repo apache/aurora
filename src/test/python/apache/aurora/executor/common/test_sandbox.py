@@ -178,6 +178,27 @@ def test_verify_group_match(mock_check_output):
       sandbox._verify_group_match_in_taskfs(2, 'test-group')
 
 
+def test_verify_network_files():
+  with temporary_dir() as d:
+    task_fs_path = os.path.join(d, 'taskfs')
+    os.makedirs(os.path.join(task_fs_path, 'etc'))
+
+    with mock.patch.dict(os.environ, {'MESOS_DIRECTORY': d}):
+      sandbox = FileSystemImageSandbox(
+          os.path.join(d, 'sandbox'),
+          sandbox_mount_point='/some/sandbox/path')
+
+      sandbox._copy_files()
+
+    def verify_copy(path):
+      if os.path.exists(path):
+        assert os.path.exists(os.path.join(task_fs_path, path.lstrip('/')))
+
+    verify_copy('/etc/resolv.conf')
+    verify_copy('/etc/hostname')
+    verify_copy('/etc/hosts')
+
+
 @mock.patch('subprocess.check_output')
 @mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
 def test_verify_user_match(mock_check_output):

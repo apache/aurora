@@ -16,6 +16,7 @@ import getpass
 import grp
 import os
 import pwd
+import shutil
 import subprocess
 from abc import abstractmethod, abstractproperty
 
@@ -298,6 +299,19 @@ class FileSystemImageSandbox(DirectorySandbox):
 
     do_mount(self.root, os.path.join(self._task_fs_root, self._sandbox_mount_point.lstrip('/')))
 
+  def _copy_files(self):
+    def copy_if_exists(source, destination):
+      if os.path.exists(source):
+        shutil.copy(source, destination)
+        log.info('Copying %s into task filesystem at %s.' % (source, destination))
+
+    # TODO(jpinkul): In Mesos the network/cni isolator is responsible for copying these network
+    # files but this logic is being bypassed at the moment due to shelling out to
+    # mesos-containerizer. Once this is no longer necessary this copy should be removed.
+    copy_if_exists('/etc/resolv.conf', os.path.join(self._task_fs_root, 'etc/resolv.conf'))
+    copy_if_exists('/etc/hosts', os.path.join(self._task_fs_root, 'etc/hosts'))
+    copy_if_exists('/etc/hostname', os.path.join(self._task_fs_root, 'etc/hostname'))
+
   @property
   def container_root(self):
     return self._sandbox_mount_point
@@ -313,3 +327,4 @@ class FileSystemImageSandbox(DirectorySandbox):
     super(FileSystemImageSandbox, self).create()
 
     self._mount_paths()
+    self._copy_files()
