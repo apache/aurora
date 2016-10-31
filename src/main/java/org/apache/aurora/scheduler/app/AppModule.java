@@ -99,6 +99,11 @@ public class AppModule extends AbstractModule {
       + "a privilege escalation threat.")
   private static final Arg<Boolean> ENABLE_MESOS_FETCHER = Arg.create(false);
 
+  @CmdLine(name = "allow_container_volumes",
+      help = "Allow passing in volumes in the job. Enabling this could pose a privilege "
+          + "escalation threat.")
+  private static final Arg<Boolean> ALLOW_CONTAINER_VOLUMES = Arg.create(false);
+
   private final ConfigurationManagerSettings configurationManagerSettings;
 
   @VisibleForTesting
@@ -113,7 +118,8 @@ public class AppModule extends AbstractModule {
         DEFAULT_DOCKER_PARAMETERS.get(),
         REQUIRE_DOCKER_USE_EXECUTOR.get(),
         allowGpuResource,
-        ENABLE_MESOS_FETCHER.get()));
+        ENABLE_MESOS_FETCHER.get(),
+        ALLOW_CONTAINER_VOLUMES.get()));
   }
 
   @Override

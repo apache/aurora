@@ -30,6 +30,7 @@ import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.Mode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.GatedWorkQueue;
@@ -237,6 +238,10 @@ class DbStorage extends AbstractIdleService implements Storage {
 
     for (ResourceType resourceType : ResourceType.values()) {
       enumValueMapper.addEnumValue("resource_types", resourceType.getValue(), resourceType.name());
+    }
+
+    for (Mode mode : Mode.values()) {
+      enumValueMapper.addEnumValue("volume_modes", mode.getValue(), mode.name());
     }
 
     createPoolMetrics();

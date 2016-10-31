@@ -222,6 +222,23 @@ CREATE TABLE task_config_appc_images(
   UNIQUE(task_config_id)
 );
 
+CREATE TABLE volume_modes(
+  id INT PRIMARY KEY,
+  name VARCHAR NOT NULL,
+
+  UNIQUE(name)
+);
+
+CREATE TABLE task_config_volumes(
+  id IDENTITY,
+  task_config_id BIGINT NOT NULL REFERENCES task_configs(id) ON DELETE CASCADE,
+  host_path VARCHAR NOT NULL,
+  container_path VARCHAR NOT NULL,
+  mode INT NOT NULL REFERENCES volume_modes(id),
+
+  UNIQUE(task_config_id)
+);
+
 CREATE TABLE task_states(
   id INT PRIMARY KEY,
   name VARCHAR NOT NULL,

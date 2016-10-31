@@ -27,6 +27,7 @@ import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
 import org.apache.aurora.scheduler.storage.entities.IDockerImage;
 import org.apache.aurora.scheduler.storage.entities.IImage;
+import org.apache.aurora.scheduler.storage.entities.IMesosContainer;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 
@@ -128,7 +129,8 @@ class TaskConfigManager {
     } else if (config.getContainer().isSetMesos()
         && config.getContainer().getMesos().isSetImage()) {
 
-      IImage image = config.getContainer().getMesos().getImage();
+      IMesosContainer container = config.getContainer().getMesos();
+      IImage image = container.getImage();
 
       switch (image.getSetField()) {
         case DOCKER:
@@ -147,6 +149,10 @@ class TaskConfigManager {
           break;
         default:
           throw new IllegalStateException("Unexpected image type: " + image.getSetField());
+      }
+
+      if (!container.getVolumes().isEmpty()) {
+        configMapper.insertVolumes(configInsert.getId(), container.getVolumes());
       }
     }
 

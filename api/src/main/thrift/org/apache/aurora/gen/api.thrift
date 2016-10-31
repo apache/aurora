@@ -203,6 +203,8 @@ union Image {
 struct MesosContainer {
   /** the optional filesystem image to use when launching this task. */
   1: optional Image image
+  /** the optional list of volumes to mount into the task. */
+  2: optional list<Volume> volumes
 }
 
 /** Describes a parameter passed to docker cli */

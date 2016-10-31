@@ -21,6 +21,7 @@ import java.util.UUID;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -115,7 +116,7 @@ final class Fixtures {
         .setConstraints(ImmutableSet.of())
         .setMetadata(ImmutableSet.of())
         .setMesosFetcherUris(ImmutableSet.of())
-        .setContainer(Container.mesos(new MesosContainer()))
+        .setContainer(Container.mesos(new MesosContainer().setVolumes(ImmutableList.of())))
         .setResources(ImmutableSet.of(
             Resource.numCpus(1),
             Resource.ramMb(1024),

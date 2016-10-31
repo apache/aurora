@@ -35,6 +35,7 @@ public final class TypeHandlers {
         .add(MaintenanceModeTypeHandler.class)
         .add(ScheduleStatusTypeHandler.class)
         .add(ResourceTypeHandler.class)
+        .add(VolumeModeTypeHandler.class)
         .build();
   }
 }

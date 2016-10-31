@@ -258,6 +258,13 @@ public interface MesosTaskFactory {
         ContainerInfo.MesosInfo.Builder mesosContainerBuilder =
             ContainerInfo.MesosInfo.newBuilder();
 
+        Iterable<Protos.Volume> containerVolumes = Iterables.transform(mesosContainer.getVolumes(),
+            input -> Protos.Volume.newBuilder()
+            .setMode(Protos.Volume.Mode.valueOf(input.getMode().name()))
+            .setHostPath(input.getHostPath())
+            .setContainerPath(input.getContainerPath())
+            .build());
+
         Protos.Volume volume = Protos.Volume.newBuilder()
             .setImage(imageBuilder)
             .setContainerPath(TASK_FILESYSTEM_MOUNT_POINT)
@@ -268,6 +275,7 @@ public interface MesosTaskFactory {
             .setType(ContainerInfo.Type.MESOS)
             .setMesos(mesosContainerBuilder)
             .addAllVolumes(executorSettings.getExecutorConfig(executorName).get().getVolumeMounts())
+            .addAllVolumes(containerVolumes)
             .addVolumes(volume));
       }
 

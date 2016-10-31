@@ -28,6 +28,7 @@ import org.apache.aurora.scheduler.storage.entities.IMesosFetcherURI;
 import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
+import org.apache.aurora.scheduler.storage.entities.IVolume;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -196,4 +197,14 @@ interface TaskConfigMapper extends GarbageCollectedTableMapper {
   void insertResources(
       @Param("configId") long configId,
       @Param("values") List<Pair<Integer, String>> values);
+
+  /**
+   * Inserts a task's volume mounts.
+   *
+   * @param configId Task config ID.
+   * @param volumes Volumes to insert.
+   */
+  void insertVolumes(
+      @Param("configId") long configId,
+      @Param("volumes") List<IVolume> volumes);
 }

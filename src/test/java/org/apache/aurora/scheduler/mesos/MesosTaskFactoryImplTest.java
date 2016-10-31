@@ -370,6 +370,45 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testContainerVolumes() {
+    String imageName = "some-image-name";
+    String imageTag = "some-image-tag";
+    org.apache.aurora.gen.Volume volume =
+        new org.apache.aurora.gen.Volume("container", "/host", org.apache.aurora.gen.Mode.RO);
+    IAssignedTask taskWithImageAndVolumes = IAssignedTask.build(TASK.newBuilder()
+        .setTask(
+            new TaskConfig(TASK.getTask().newBuilder()
+                .setContainer(Container.mesos(
+                    new MesosContainer()
+                        .setImage(Image.docker(new DockerImage(imageName, imageTag)))
+                        .setVolumes(ImmutableList.of(volume)))))));
+
+    expect(tierManager.getTier(taskWithImageAndVolumes.getTask())).andReturn(DEV_TIER);
+    control.replay();
+
+    taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);
+    TaskInfo task = taskFactory.createFrom(taskWithImageAndVolumes, OFFER_THERMOS_EXECUTOR);
+
+    assertEquals(
+        ContainerInfo.newBuilder()
+            .setType(Type.MESOS)
+            .setMesos(MesosInfo.newBuilder())
+            .addVolumes(Volume.newBuilder()
+                .setContainerPath("container")
+                .setHostPath("/host")
+                .setMode(Mode.RO))
+            .addVolumes(Volume.newBuilder()
+                .setContainerPath(TASK_FILESYSTEM_MOUNT_POINT)
+                .setImage(Protos.Image.newBuilder()
+                    .setType(Protos.Image.Type.DOCKER)
+                    .setDocker(Protos.Image.Docker.newBuilder()
+                        .setName(imageName + ":" + imageTag)))
+                .setMode(Mode.RO))
+            .build(),
+        task.getExecutor().getContainer());
+  }
+
+  @Test
   public void testMetadataLabelMapping() {
     expect(tierManager.getTier(TASK.getTask())).andReturn(DEV_TIER);
     taskFactory = new MesosTaskFactoryImpl(config, tierManager, SERVER_INFO);

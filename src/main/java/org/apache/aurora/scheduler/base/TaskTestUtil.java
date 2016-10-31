@@ -85,6 +85,7 @@ public final class TaskTestUtil {
           ImmutableMultimap.of(),
           true,
           true,
+          true,
           true);
   public static final ExecutorID EXECUTOR_ID = ExecutorID.newBuilder()
       .setValue("PLACEHOLDER")

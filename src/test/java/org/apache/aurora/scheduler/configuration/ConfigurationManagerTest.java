@@ -20,19 +20,24 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.gen.AppcImage;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.Image;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.MesosFetcherURI;
+import org.apache.aurora.gen.Mode;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.gen.Volume;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
@@ -54,6 +59,7 @@ import static org.apache.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
 import static org.apache.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
 import static org.apache.aurora.scheduler.base.UserProvidedStrings.isGoodIdentifier;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static org.apache.aurora.scheduler.configuration.ConfigurationManager.NO_CONTAINER_VOLUMES;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -122,6 +128,7 @@ public class ConfigurationManagerTest {
           ImmutableMultimap.of(),
           true,
           false,
+          true,
           false),
       TaskTestUtil.TIER_MANAGER,
       TaskTestUtil.THRIFT_BACKFILL,
@@ -132,6 +139,7 @@ public class ConfigurationManagerTest {
           true,
           ImmutableMultimap.of("foo", "bar"),
           false,
+          true,
           true,
           true),
       TaskTestUtil.TIER_MANAGER,
@@ -296,6 +304,7 @@ public class ConfigurationManagerTest {
             ImmutableMultimap.of("foo", "bar"),
             false,
             false,
+            false,
             false),
         TaskTestUtil.TIER_MANAGER,
         TaskTestUtil.THRIFT_BACKFILL,
@@ -318,10 +327,24 @@ public class ConfigurationManagerTest {
                     ImmutableMultimap.of("foo", "bar"),
                     false,
                     false,
+                    false,
                     false),
             TaskTestUtil.TIER_MANAGER,
             TaskTestUtil.THRIFT_BACKFILL,
             TestExecutorSettings.THERMOS_EXECUTOR).validateAndPopulate(ITaskConfig.build(builder));
+  }
+
+  @Test
+  public void testContainerVolumesDisabled() throws Exception {
+    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
+    MesosContainer container = new MesosContainer()
+        .setImage(Image.appc(new AppcImage("name", "id")))
+        .setVolumes(ImmutableList.of(new Volume("container", "host", Mode.RO)));
+    builder.setContainer(Container.mesos(container));
+
+    expectTaskDescriptionException(NO_CONTAINER_VOLUMES);
+
+    CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
   }
 
   @Test

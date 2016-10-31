@@ -13,13 +13,17 @@
  */
 package org.apache.aurora.scheduler.storage.db.views;
 
+import java.util.List;
+
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.MesosContainer;
+import org.apache.aurora.gen.Volume;
 
 public final class DbContainer {
   private DockerContainer docker;
   private DbImage image;
+  private List<Volume> volumes;
 
   private DbContainer() {
   }
@@ -30,7 +34,7 @@ public final class DbContainer {
     }
 
     if (image != null) {
-      return Container.mesos(new MesosContainer().setImage(image.toThrift()));
+      return Container.mesos(new MesosContainer().setImage(image.toThrift()).setVolumes(volumes));
     }
 
     return Container.mesos(new MesosContainer());

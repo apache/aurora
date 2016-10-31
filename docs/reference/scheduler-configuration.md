@@ -42,6 +42,8 @@ Required flags:
 	Endpoint specification for the ZooKeeper servers.
 
 Optional flags:
+-allow_container_volumes (default false)
+	Allow passing in volumes in the job. Enabling this could pose a privilege escalation threat.
 -allow_docker_parameters (default false)
 	Allow to pass docker container parameters in the job.
 -allow_gpu_resource (default false)
@@ -56,9 +58,11 @@ Optional flags:
 	The number of worker threads to process async task operations with.
 -backup_interval (default (1, hrs))
 	Minimum interval on which to write a storage backup.
--cron_scheduler_num_threads (default 100)
+-cron_scheduler_num_threads (default 10)
 	Number of threads to use for the cron scheduler thread pool.
--cron_start_initial_backoff (default (1, secs))
+-cron_scheduling_max_batch_size (default 10) [must be > 0]
+	The maximum number of triggered cron jobs that can be processed in a batch.
+-cron_start_initial_backoff (default (5, secs))
 	Initial backoff delay while waiting for a previous cron run to be killed.
 -cron_start_max_backoff (default (1, mins))
 	Max backoff delay while waiting for a previous cron run to be killed.
@@ -100,8 +104,8 @@ Optional flags:
 	When 'framework_authentication_file' flag is set, the FrameworkInfo registered with the mesos master will also contain the principal. This is necessary if you intend to use mesos authorization via mesos ACLs. The default will change in a future release. Changing this value is backwards incompatible. For details, see MESOS-703.
 -framework_failover_timeout (default (21, days))
 	Time after which a framework is considered deleted.  SHOULD BE VERY HIGH.
--framework_name (default TwitterScheduler)
-	Name used to register the Aurora framework with Mesos. Changing this value can be backwards incompatible. For details, see MESOS-703.
+-framework_name (default Aurora)
+	Name used to register the Aurora framework with Mesos.
 -global_container_mounts (default [])
 	A comma separated list of mount points (in host:container form) to mount into all (non-mesos) containers.
 -history_max_per_job_threshold (default 100)
@@ -150,8 +154,12 @@ Optional flags:
 	Maximum delay between attempts to schedule a PENDING tasks.
 -max_status_update_batch_size (default 1000) [must be > 0]
 	The maximum number of status updates that can be processed in a batch.
+-max_task_event_batch_size (default 300) [must be > 0]
+	The maximum number of task state change events that can be processed in a batch.
 -max_tasks_per_job (default 4000) [must be > 0]
 	Maximum number of allowed tasks in a single job.
+-max_tasks_per_schedule_attempt (default 5) [must be > 0]
+	The maximum number of tasks to pick in a single scheduling attempt.
 -max_update_instance_failures (default 20000) [must be > 0]
 	Upper limit on the number of failures allowed during a job update. This helps cap potentially unbounded entries into storage.
 -min_offer_hold_time (default (5, mins))
@@ -200,9 +208,11 @@ Optional flags:
 	Difference between explicit and implicit reconciliation intervals intended to create a non-overlapping task reconciliation schedule.
 -require_docker_use_executor (default true)
 	If false, Docker tasks may run without an executor (EXPERIMENTAL)
+-scheduling_max_batch_size (default 3) [must be > 0]
+	The maximum number of scheduling attempts that can be processed in a batch.
 -shiro_ini_path
 	Path to shiro.ini for authentication and authorization configuration.
--shiro_realm_modules (default [org.apache.aurora.scheduler.app.MoreModules$1@158a8276])
+-shiro_realm_modules (default [class org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule])
 	Guice modules for configuring Shiro Realms.
 -sla_non_prod_metrics (default [])
 	Metric categories collected for non production tasks.

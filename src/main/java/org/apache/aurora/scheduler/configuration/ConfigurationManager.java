@@ -44,6 +44,7 @@ import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IContainer;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IMesosContainer;
 import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
@@ -118,6 +119,7 @@ public class ConfigurationManager {
     private final boolean requireDockerUseExecutor;
     private final boolean allowGpuResource;
     private final boolean enableMesosFetcher;
+    private final boolean allowContainerVolumes;
 
     public ConfigurationManagerSettings(
         ImmutableSet<Container._Fields> allowedContainerTypes,
@@ -125,7 +127,8 @@ public class ConfigurationManager {
         Multimap<String, String> defaultDockerParameters,
         boolean requireDockerUseExecutor,
         boolean allowGpuResource,
-        boolean enableMesosFetcher) {
+        boolean enableMesosFetcher,
+        boolean allowContainerVolumes) {
 
       this.allowedContainerTypes = requireNonNull(allowedContainerTypes);
       this.allowDockerParameters = allowDockerParameters;
@@ -133,6 +136,7 @@ public class ConfigurationManager {
       this.requireDockerUseExecutor = requireDockerUseExecutor;
       this.allowGpuResource = allowGpuResource;
       this.enableMesosFetcher = enableMesosFetcher;
+      this.allowContainerVolumes = allowContainerVolumes;
     }
   }
 
@@ -233,6 +237,10 @@ public class ConfigurationManager {
 
   @VisibleForTesting
   static final String INVALID_EXECUTOR_CONFIG = "Executor name may not be left unset.";
+
+  @VisibleForTesting
+  static final String NO_CONTAINER_VOLUMES =
+      "This scheduler is configured to disallow container volumes.";
 
   /**
    * Check validity of and populates defaults in a task configuration.  This will return a deep copy
@@ -371,6 +379,13 @@ public class ConfigurationManager {
 
     if (!settings.enableMesosFetcher && !config.getMesosFetcherUris().isEmpty()) {
       throw new TaskDescriptionException(MESOS_FETCHER_DISABLED);
+    }
+
+    if (config.getContainer().isSetMesos()) {
+      IMesosContainer container = config.getContainer().getMesos();
+      if (!settings.allowContainerVolumes && !container.getVolumes().isEmpty()) {
+        throw new TaskDescriptionException(NO_CONTAINER_VOLUMES);
+      }
     }
 
     maybeFillLinks(builder);

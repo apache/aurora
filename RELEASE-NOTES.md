@@ -7,6 +7,9 @@
 - Introduce a new `--ip` option to bind the Thermos observer to a specific rather than all
   interfaces.
 - Fix error that prevents the scheduler from being launched with `-enable_revocable_ram`.
+- The Aurora Scheduler API supports volume mounts per task for the Mesos
+  Containerizer if the scheduler is running with the `-allow_container_volumes`
+  flag.
 
 ### Deprecations and removals:
 

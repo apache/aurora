@@ -120,6 +120,7 @@
   <resultMap id="containerMap" type="org.apache.aurora.scheduler.storage.db.views.DbContainer">
     <association property="docker" resultMap="dockerContainerMap" />
     <association property="image" columnPrefix="image_" resultMap="imageMap" />
+    <collection property="volumes" columnPrefix="volume_" resultMap="volumeMap" notNullColumn="id" />
   </resultMap>
 
   <resultMap id="metadataMap" type="org.apache.aurora.gen.Metadata">
@@ -128,6 +129,11 @@
 
   <resultMap id="mesosFetcherUrisMap" type="org.apache.aurora.gen.MesosFetcherURI">
     <id column="id" />
+  </resultMap>
+
+  <resultMap id="volumeMap" type="org.apache.aurora.gen.Volume">
+    <id column="id" />
+    <result property="mode" column="mode" typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.VolumeModeTypeHandler" />
   </resultMap>
 
   <resultMap id="resourceMap" type="org.apache.aurora.scheduler.storage.db.views.DBResource">
@@ -201,6 +207,10 @@
       di.tag as c_image_docker_tag,
       ai.name as c_image_appc_name,
       ai.image_id as c_image_appc_image_id,
+      v.id as c_volume_id,
+      v.host_path as c_volume_host_path,
+      v.container_path as c_volume_container_path,
+      v.mode as c_volume_mode,
       tc.id AS constraint_id,
       tc.name AS constraint_name,
       tlc.id AS constraint_l_id,
@@ -216,6 +226,7 @@
     LEFT OUTER JOIN task_config_mesos_fetcher_uris AS u ON u.task_config_id = c.id
     LEFT OUTER JOIN task_config_docker_images AS di ON di.task_config_id = c.id
     LEFT OUTER JOIN task_config_appc_images AS ai ON ai.task_config_id = c.id
+    LEFT OUTER JOIN task_config_volumes AS v ON v.task_config_id = c.id
     LEFT OUTER JOIN task_constraints AS tc ON tc.task_config_id = c.id
     LEFT OUTER JOIN limit_constraints as tlc ON tlc.constraint_id = tc.id
     LEFT OUTER JOIN value_constraints as tvc ON tvc.constraint_id = tc.id
@@ -415,6 +426,22 @@
       #{entry.value},
       #{entry.extract},
       #{entry.cache}
+    </foreach>
+    )
+  </insert>
+
+  <insert id="insertVolumes">
+    INSERT INTO task_config_volumes (
+      task_config_id,
+      host_path,
+      container_path,
+      mode
+    ) VALUES (
+    <foreach item="volume" collection="volumes" separator="),(">
+      #{configId},
+      #{volume.hostPath},
+      #{volume.containerPath},
+      #{volume.mode, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.VolumeModeTypeHandler}
     </foreach>
     )
   </insert>
