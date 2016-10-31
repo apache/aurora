@@ -243,6 +243,26 @@ The template for this Process is:
 
 Note: Be sure the extracted code archive has an executable.
 
+## Getting Environment Variables Into The Sandbox
+
+Every time a process is forked the Thermos executor checks for the existence of the
+`.thermos_profile` file, if the `.thermos_profile` file exists it will be sourced.
+You can utilize this process to pass environment variables to the sandbox.
+
+An example for this Process is:
+
+    setup_env = Process(
+      name = 'setup'
+      cmdline = '''cat <<EOF > .thermos_profile
+                   export RESULT=hello
+                   EOF'''
+    )
+
+    read_env = Process(
+      name = 'read'
+      cmdline = 'echo $RESULT'
+    )
+
 ## Defining Task Objects
 
 Tasks are handled by Mesos. A task is a collection of processes that
