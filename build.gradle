@@ -355,7 +355,7 @@ dependencies {
   compile "com.google.inject:guice:${guiceRev}"
   compile "com.google.inject.extensions:guice-assistedinject:${guiceRev}"
   compile "com.google.protobuf:protobuf-java:${protobufRev}"
-  compile 'com.h2database:h2:1.4.192'
+  compile 'com.h2database:h2:1.4.193'
   compile 'com.hubspot.jackson:jackson-datatype-protobuf:0.9.3'
   compile "com.fasterxml.jackson.core:jackson-core:${jacksonRev}"
   compile "com.sun.jersey:jersey-core:${jerseyRev}"
