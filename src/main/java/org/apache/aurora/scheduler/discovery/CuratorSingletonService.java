@@ -117,8 +117,8 @@ class CuratorSingletonService implements SingletonService {
     }
   }
 
-  private final LeaderLatch leaderLatch;
   private final Advertiser advertiser;
+  private final CuratorFramework client;
   private final String groupPath;
 
   /**
@@ -134,9 +134,8 @@ class CuratorSingletonService implements SingletonService {
       String groupPath,
       String memberToken,
       Codec<ServiceInstance> codec) {
-
-    leaderLatch = new LeaderLatch(client, groupPath);
     advertiser = new Advertiser(client, groupPath, memberToken, codec);
+    this.client = client;
     this.groupPath = PathUtils.validatePath(groupPath);
   }
 
@@ -151,6 +150,7 @@ class CuratorSingletonService implements SingletonService {
     requireNonNull(additionalEndpoints);
     requireNonNull(listener);
 
+    LeaderLatch leaderLatch = new LeaderLatch(client, groupPath, endpoint.getHostName());
     Closer closer = Closer.create();
     leaderLatch.addListener(new LeaderLatchListener() {
       @Override
