@@ -873,6 +873,8 @@ class TaskRunner(object):
     return len(launched) > 0
 
   def _terminate_plan(self, plan):
+    TaskRunnerHelper.terminate_orphans(self.state)
+
     for process in plan.running:
       last_run = self._current_process_run(process)
       if last_run and last_run.state in (ProcessState.FORKED, ProcessState.RUNNING):

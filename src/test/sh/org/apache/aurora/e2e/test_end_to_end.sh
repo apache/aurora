@@ -58,7 +58,7 @@ check_url_live() {
 test_file_removed() {
   local _file=$1
   local _success=0
-  for i in $(seq 1 10); do
+  for i in {1..10}; do
     if [[ ! -e $_file ]]; then
       _success=1
       break
@@ -66,7 +66,7 @@ test_file_removed() {
     sleep 1
   done
 
-  if [[ "$_success" -ne "1" ]]; then
+  if [[ $_success -ne 1 ]]; then
     echo "File was not removed."
     exit 1
   fi
@@ -391,6 +391,19 @@ test_ephemeral_daemon_with_final() {
   test_file_removed $_stop_file  # Removed by 'final_process'.
 }
 
+test_daemonizing_process() {
+  local _cluster=$1 _role=$2 _env=$3 _job=$4 _config=$5
+  local _jobkey="$_cluster/$_role/$_env/$_job"
+  local _term_file=$(mktemp)
+  local _extra_args="--bind term_file=$_term_file"
+
+  test_create $_jobkey $_config $_extra_args
+  test_observer_ui $_cluster $_role $_job
+  test_job_status $_cluster $_role $_env $_job
+  test_kill $_jobkey
+  test_file_removed $_term_file
+}
+
 restore_netrc() {
   mv ~/.netrc.bak ~/.netrc >/dev/null 2>&1 || true
 }
@@ -481,6 +494,8 @@ TEST_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_updated.aurora
 TEST_BAD_HEALTHCHECK_CONFIG_UPDATED_FILE=$EXAMPLE_DIR/http_example_bad_healthcheck.aurora
 TEST_EPHEMERAL_DAEMON_WITH_FINAL_JOB=ephemeral_daemon_with_final
 TEST_EPHEMERAL_DAEMON_WITH_FINAL_CONFIG_FILE=$TEST_ROOT/ephemeral_daemon_with_final.aurora
+TEST_DAEMONIZING_PROCESS_JOB=daemonize
+TEST_DAEMONIZING_PROCESS_CONFIG_FILE=$TEST_ROOT/test_daemonizing_process.aurora
 
 BASE_ARGS=(
   $TEST_CLUSTER
@@ -509,6 +524,14 @@ TEST_JOB_EPHEMERAL_DAEMON_WITH_FINAL_ARGS=(
   $TEST_EPHEMERAL_DAEMON_WITH_FINAL_CONFIG_FILE
 )
 
+TEST_DAEMONIZING_PROCESS_ARGS=(
+  $TEST_CLUSTER
+  $TEST_ROLE
+  $TEST_ENV
+  $TEST_DAEMONIZING_PROCESS_JOB
+  $TEST_DAEMONIZING_PROCESS_CONFIG_FILE
+)
+
 trap collect_result EXIT
 
 aurorabuild all
@@ -534,6 +557,8 @@ test_admin "${TEST_ADMIN_ARGS[@]}"
 test_basic_auth_unauthenticated  "${TEST_JOB_ARGS[@]}"
 
 test_ephemeral_daemon_with_final "${TEST_JOB_EPHEMERAL_DAEMON_WITH_FINAL_ARGS[@]}"
+
+test_daemonizing_process "${TEST_DAEMONIZING_PROCESS_ARGS[@]}"
 
 /vagrant/src/test/sh/org/apache/aurora/e2e/test_kerberos_end_to_end.sh
 /vagrant/src/test/sh/org/apache/aurora/e2e/test_bypass_leader_redirect_end_to_end.sh

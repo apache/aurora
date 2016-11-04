@@ -10,6 +10,8 @@
 - The Aurora Scheduler API supports volume mounts per task for the Mesos
   Containerizer if the scheduler is running with the `-allow_container_volumes`
   flag.
+* The executor will send SIGTERM to processes that self daemonize via double forking.
+* The executor now requires Linux kernel 3.4 or later.
 
 ### Deprecations and removals:
 

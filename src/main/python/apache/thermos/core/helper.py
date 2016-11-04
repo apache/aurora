@@ -219,6 +219,26 @@ class TaskRunnerHelper(object):
     return state.processes[process_name][-1].coordinator_pid
 
   @classmethod
+  def terminate_orphans(cls, state):
+    """
+    Given the state, send SIGTERM to children that are orphaned processes.
+
+    The direct children of the runner will always be coordinators or orphans.
+    """
+    log.debug('TaskRunnerHelper.terminate_orphans()')
+    process_tree = cls.scan_tree(state)
+
+    coordinator_pids = {p[0] for p in process_tree.values() if p[0]}
+    children_pids = {c.pid for c in psutil.Process().children()}
+    orphaned_pids = children_pids - coordinator_pids
+
+    if len(orphaned_pids) > 0:
+      log.info("Orphaned pids detected: %s", orphaned_pids)
+      for p in orphaned_pids:
+        log.debug("SIGTERM pid %s", p)
+        cls.terminate_pid(p)
+
+  @classmethod
   def terminate_process(cls, state, process_name):
     log.debug('TaskRunnerHelper.terminate_process(%s)' % process_name)
     _, pid, _ = cls._get_process_tuple(state, process_name)

@@ -39,7 +39,7 @@ from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Data, Time
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
-from apache.thermos.common.process_util import wrap_with_mesos_containerizer
+from apache.thermos.common.process_util import setup_child_subreaping, wrap_with_mesos_containerizer
 
 from gen.apache.aurora.api.constants import TASK_FILESYSTEM_MOUNT_POINT
 from gen.apache.thermos.ttypes import ProcessState, ProcessStatus, RunnerCkpt
@@ -94,6 +94,7 @@ class ProcessBase(object):
   class CheckpointError(Error): pass
   class UnspecifiedSandbox(Error): pass
   class PermissionError(Error): pass
+  class ForkError(Error): pass
 
   CONTROL_WAIT_CHECK_INTERVAL = Amount(100, Time.MILLISECONDS)
   MAXIMUM_CONTROL_WAIT = Amount(1, Time.MINUTES)
@@ -151,8 +152,9 @@ class ProcessBase(object):
       if self._rotate_log_backups <= 0:
         raise ValueError('Log backups cannot be less than one.')
 
-  def _log(self, msg):
-    log.debug('[process:%5s=%s]: %s' % (self._pid, self.name(), msg))
+  def _log(self, msg, exc_info=None):
+    log.debug('[process:%5s=%s]: %s' % (self._pid, self.name(), msg),
+            exc_info=exc_info)
 
   def _getpwuid(self):
     """Returns a tuple of the user (i.e. --user) and current user."""
@@ -283,7 +285,16 @@ class ProcessBase(object):
                           # calls _getpwuid which can raise:
                           #    UnknownUserError
                           #    PermissionError
-    self._pid = self._platform.fork()
+    try:
+      self._pid = self._platform.fork()  # calls setup_child_subreaping which can
+                                         # raise OSError or RuntimeError
+    except (OSError, RuntimeError) as e:
+      # Reraise the exceptions possible from the fork as Process.Error
+      # Note only Python 3 has nice exception chaining, so we do our best here
+      # by logging the original exception and raising ForkError
+      msg = 'Error trying to fork process %s'.format(self._name)
+      self._log(msg, exc_info=True)
+      raise self.ForkError(msg)
     if self._pid == 0:
       self._pid = self._platform.getpid()
       self._wait_for_control()  # can raise CheckpointError
@@ -312,6 +323,9 @@ class RealPlatform(Platform):
     self._fork = fork
 
   def fork(self):
+    # Before we fork, ensure we become the parent of any processes that escape
+    # the cordinator.
+    setup_child_subreaping()
     pid = self._fork()
     if pid == 0:
       self._sanitize()
