@@ -17,6 +17,73 @@ are:
 If you want to build a source distribution of the client, you need to run `./build-support/release/make-python-sdists`.
 
 
+Creating Custom Builds
+----------------------
+
+There are situations where you may want to plug in custom logic to the Client that may not be
+applicable to the open source codebase. Rather than create a whole CLI from scratch, you can
+easily create your own custom, drop-in replacement aurora.pex using the pants build tool.
+
+First, create an AuroraCommandLine implementation as an entry-point for registering customizations:
+
+    from apache.aurora.client.cli.client import AuroraCommandLine
+
+    class CustomAuroraCommandLine(AuroraCommandLine):
+    """Custom AuroraCommandLine for your needs"""
+
+    @property
+    def name(self):
+      return "your-company-aurora"
+
+    @classmethod
+    def get_description(cls):
+      return 'Your Company internal Aurora client command line'
+
+    def __init__(self):
+      super(CustomAuroraCommandLine, self).__init__()
+      # Add custom plugins..
+      self.register_plugin(YourCustomPlugin())
+
+    def register_nouns(self):
+      super(CustomAuroraCommandLine, self).register_nouns()
+      # You can even add new commands / sub-commands!
+      self.register_noun(YourStartUpdateProxy())
+      self.register_noun(YourDeployWorkflowCommand())
+
+Secondly, create a main entry point:
+
+    def proxy_main():
+      client = CustomAuroraCommandLine()
+      if len(sys.argv) == 1:
+        sys.argv.append("-h")
+      sys.exit(client.execute(sys.argv[1:]))
+
+Finally, you can wire everything up with a pants BUILD file in your project directory:
+
+    python_binary(
+      name='aurora',
+      entry_point='your_company.aurora.client:proxy_main',
+      dependencies=[
+        ':client_lib'
+      ]
+    )
+
+    python_library(
+      name='client_lib',
+      sources = [
+        'client.py',
+        'custom_plugin.py',
+        'custom_command.py',
+      ],
+      dependencies = [
+        # The Apache Aurora client
+        # Any other dependencies for your custom code
+      ],
+    )
+
+Using the same commands to build the client as above (but obviously pointing to this BUILD file
+instead), you will have a drop-in replacement aurora.pex file with your customizations.
+
 Running/Debugging
 ------------------
 
