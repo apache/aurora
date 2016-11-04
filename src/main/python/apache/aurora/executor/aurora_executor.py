@@ -255,6 +255,7 @@ class AuroraExecutor(ExecutorBase, Observable):
       however, no other callbacks will be invoked on this executor until this callback has returned.
     """
     self.launched.set()
+    self.log('TaskInfo: %s' % task)
     self.log('launchTask got task: %s:%s' % (task.name, task.task_id.value))
 
     # TODO(wickman)  Update the tests to call registered(), then remove this line and issue
@@ -271,6 +272,7 @@ class AuroraExecutor(ExecutorBase, Observable):
     self._task_id = task.task_id.value
 
     assigned_task = self.validate_task(task)
+    self.log("Assigned task: %s" % assigned_task)
     if not assigned_task:
       self.send_update(driver, self._task_id, mesos_pb2.TASK_FAILED,
           'Could not deserialize task.')
