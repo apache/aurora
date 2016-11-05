@@ -57,18 +57,23 @@ def setup_child_subreaping():
   and here: https://lwn.net/Articles/474787/
 
   Callers should reap terminal children to prevent zombies.
-
-  raises OSError if the underlying prctl call fails.
-  raises RuntimeError if libc cannot be found.
   """
   log.debug("Calling prctl(2) with PR_SET_CHILD_SUBREAPER")
   # This constant is taken from prctl.h
   PR_SET_CHILD_SUBREAPER = 36
-  library_name = ctypes.util.find_library('c')
-  if library_name is None:
-    raise RuntimeError("libc not found")
-  libc = ctypes.CDLL(library_name, use_errno=True)
-  ret = libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
-  if ret != 0:
-    errno = ctypes.get_errno()
-    raise OSError(errno, os.strerror(errno))
+  try:
+    library_name = ctypes.util.find_library('c')
+    if library_name is None:
+      log.warning("libc is not found. Unable to call prctl!")
+      log.warning("Children subreaping is disabled!")
+      return
+    libc = ctypes.CDLL(library_name, use_errno=True)
+    # If we are on a system where prctl doesn't exist, this will throw an
+    # attribute error.
+    ret = libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
+    if ret != 0:
+      errno = ctypes.get_errno()
+      raise OSError(errno, os.strerror(errno))
+  except Exception as e:
+    log.error("Unable to call prctl %s" % e)
+    log.error("Children subreaping is disabled!")

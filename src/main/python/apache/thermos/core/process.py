@@ -94,7 +94,6 @@ class ProcessBase(object):
   class CheckpointError(Error): pass
   class UnspecifiedSandbox(Error): pass
   class PermissionError(Error): pass
-  class ForkError(Error): pass
 
   CONTROL_WAIT_CHECK_INTERVAL = Amount(100, Time.MILLISECONDS)
   MAXIMUM_CONTROL_WAIT = Amount(1, Time.MINUTES)
@@ -285,16 +284,7 @@ class ProcessBase(object):
                           # calls _getpwuid which can raise:
                           #    UnknownUserError
                           #    PermissionError
-    try:
-      self._pid = self._platform.fork()  # calls setup_child_subreaping which can
-                                         # raise OSError or RuntimeError
-    except (OSError, RuntimeError) as e:
-      # Reraise the exceptions possible from the fork as Process.Error
-      # Note only Python 3 has nice exception chaining, so we do our best here
-      # by logging the original exception and raising ForkError
-      msg = 'Error trying to fork process %s'.format(self._name)
-      self._log(msg, exc_info=True)
-      raise self.ForkError(msg)
+    self._pid = self._platform.fork()
     if self._pid == 0:
       self._pid = self._platform.getpid()
       self._wait_for_control()  # can raise CheckpointError

@@ -248,6 +248,7 @@ class TestRunnerKillProcessGroup(RunnerBase):
     task = Task(name="task", processes=[Process(name="process", cmdline=SIMPLEFORK_SCRIPT)])
     return task.interpolate()[0]
 
+  @pytest.mark.skipif('True', reason='Flaky test (AURORA-1809)')
   def test_pg_is_killed(self):
     runner = self.start_runner()
     tm = TaskMonitor(runner.tempdir, runner.task_id)
