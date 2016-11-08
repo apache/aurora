@@ -18,6 +18,8 @@ import sys
 
 from twitter.common.log.formatters.plain import PlainFormatter
 
+from apache.aurora.client.binding_helper import BindingHelper
+from apache.aurora.client.binding_helpers.docker_helper import DockerBindingHelper
 from apache.aurora.client.cli import CommandLine, ConfigurationPlugin
 from apache.aurora.client.cli.options import CommandOption
 from apache.aurora.common.auth.auth_module_manager import register_auth_module
@@ -87,6 +89,22 @@ class AuroraAuthConfigurationPlugin(ConfigurationPlugin):
     pass
 
 
+class AuroraHelpersPlugin(ConfigurationPlugin):
+  """Plugin for configuring binding helpers."""
+
+  def get_options(self):
+    return []
+
+  def before_dispatch(self, raw_args):
+    return raw_args
+
+  def before_execution(self, context):
+    BindingHelper.register(DockerBindingHelper())
+
+  def after_execution(self, context, result_code):
+    pass
+
+
 class AuroraCommandLine(CommandLine):
   """The CommandLine implementation for the Aurora client command line."""
 
@@ -94,6 +112,7 @@ class AuroraCommandLine(CommandLine):
     super(AuroraCommandLine, self).__init__()
     self.register_plugin(AuroraLogConfigurationPlugin())
     self.register_plugin(AuroraAuthConfigurationPlugin())
+    self.register_plugin(AuroraHelpersPlugin())
 
   @property
   def name(self):

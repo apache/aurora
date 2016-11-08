@@ -104,7 +104,7 @@ jobs = [
   ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_docker',
-    container = Container(docker=Docker(image = 'http_example'))
+    container = Docker(image='{{docker.image[http_example][latest]}}'),
   ).bind(profile=ContainerProfile),
   job(
     name = 'http_example_gpu'

@@ -58,6 +58,7 @@ function install_docker {
     linux-image-extra-$(uname -r) \
     apparmor \
     docker-engine
+  docker run -d -p 5000:5000 --restart=always --name registry registry:2
 }
 
 function install_docker2aci {

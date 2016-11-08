@@ -66,7 +66,12 @@ Docker Containerizer
 
 The Docker containerizer launches container images using the Docker engine. It may often provide
 more advanced features than the native Mesos containerizer, but has to be installed separately to
-Mesos on each agent host,
+Mesos on each agent host.
+
+Starting with the 0.17.0 release, `image` can be specified with a `{{docker.image[name][tag]}}` binder so that
+the tag can be resolved to a concrete image digest. This ensures that the job always uses the same image
+across restarts, even if the version identified by the tag has been updated, guaranteeing that only job
+updates can mutate configuration.
 
 Example (available in the [Vagrant environment](../getting-started/vagrant.md)):
 
@@ -93,8 +98,27 @@ Example (available in the [Vagrant environment](../getting-started/vagrant.md)):
         name = 'hello_docker',
         task = task,
         container = Docker(image = 'python:2.7')
+      ), Service(
+        cluster = 'devcluster',
+        environment = 'devel',
+        role = 'www-data',
+        name = 'hello_docker_engine_binding',
+        task = task,
+        container = Docker(image = '{{docker.image[library/python][2.7]}}')
       )
     ]
+
+Note, this feature requires a v2 Docker registry. If using a private Docker registry its url
+must be specified in the `clusters.json` configuration file under the key `docker_registry`.
+If not specified `docker_registry` defaults to `https://registry-1.docker.io` (Docker Hub).
+
+Example:
+    # clusters.json
+    [{
+      "name": "devcluster",
+      ...
+      "docker_registry": "https://registry.example.com"
+    }]
 
 Details of how to use Docker via the Docker engine can be found in the
 [Reference Documentation](../reference/configuration.md#docker-object). Please note that in order to

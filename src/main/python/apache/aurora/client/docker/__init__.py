@@ -11,19 +11,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-python_tests(
-  name = 'config',
-  sources = globs('*py'),
-  dependencies = [
-    '3rdparty/python:requests-mock',
-    '3rdparty/python:twitter.common.contextutil',
-    'api/src/main/thrift/org/apache/aurora/gen',
-    'src/main/python/apache/aurora/config',
-    'src/main/python/apache/aurora/client',
-  ],
-  coverage = [
-    'apache.aurora.config',
-    'apache.thermos.config'
-  ]
-)

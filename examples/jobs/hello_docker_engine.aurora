@@ -35,5 +35,13 @@ jobs = [
     name = 'hello_docker_engine',
     task = task,
     container = Docker(image = 'python:2.7')
+  ),
+  Service(
+    cluster = 'devcluster',
+    environment = 'devel',
+    role = 'www-data',
+    name = 'hello_docker_engine_binding',
+    task = task,
+    container = Docker(image = '{{docker.image[library/python][2.7]}}')
   )
 ]

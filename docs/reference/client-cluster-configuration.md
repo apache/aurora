@@ -35,6 +35,7 @@ The following properties may be set:
    **scheduler_uri**       | String   | URI of Aurora scheduler instance.
    **proxy_url**           | String   | Used by the client to format URLs for display.
    **auth_mechanism**      | String   | The authentication mechanism to use when communicating with the scheduler. (Default: UNAUTHENTICATED)
+   **docker_registry**     | String   | Used by the client to resolve docker tags.
 
 
 ## Details
@@ -91,3 +92,8 @@ URL of your VIP in a loadbalancer or a roundrobin DNS name.
 The identifier of an authentication mechanism that the client should use when communicating with the
 scheduler. Support for values other than `UNAUTHENTICATED` requires a matching scheduler-side
 [security configuration](../operations/security.md).
+
+### `docker_registry`
+
+The URI of the Docker Registry that will be used by the Aurora client to resolve docker tags to concrete
+image ids, when using the docker binding helper, like `{{docker.image[name][tag]}}`.

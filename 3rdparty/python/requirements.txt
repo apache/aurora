@@ -25,6 +25,7 @@ psutil==4.3.0
 pystachio==0.8.3
 requests==2.11.1
 requests-kerberos==0.10.0
+requests-mock==1.1.0
 subprocess32==3.2.7
 thrift==0.9.1
 twitter.common.app==0.3.7

@@ -11,6 +11,11 @@
   Containerizer if the scheduler is running with the `-allow_container_volumes`
   flag.
 * The executor will send SIGTERM to processes that self daemonize via double forking.
+- Resolve docker tags to concrete identifiers for DockerContainerizer, so that job configuration
+  is immutable across restarts. The feature introduces a new `{{docker.image[name][tag]}}` binder that
+  can be used in the Aurora job configuration to resolve a docker image specified by its `name:tag`
+  to a concrete identifier specified by its `registry/name@digest`. It requires version 2 of the
+  Docker Registry.
 
 ### Deprecations and removals:
 

@@ -37,6 +37,8 @@ tear_down() {
     aurora update abort devcluster/vagrant/test/$job || true >/dev/null 2>&1
     aurora job killall --no-batching devcluster/vagrant/test/$job >/dev/null 2>&1
   done
+
+  sudo mv /etc/aurora/clusters.json.old /etc/aurora/clusters.json || true > /dev/null 2>&1
 }
 
 collect_result() {
@@ -45,9 +47,9 @@ collect_result() {
     echo "OK (all tests passed)"
   else
     echo "!!! FAIL (something returned non-zero) for $BASH_COMMAND"
-    # Attempt to clean up any state we left behind.
-    tear_down
   fi
+  # Attempt to clean up any state we left behind.
+  tear_down
   exit $RETCODE
 }
 
@@ -453,6 +455,16 @@ setup_image_stores() {
   rm -rf "$TEMP_PATH"
 }
 
+setup_docker_registry() {
+  # build the test docker image
+  sudo docker build -t http_example -f "${TEST_ROOT}/Dockerfile.python" ${TEST_ROOT}
+  docker tag http_example:latest aurora.local:5000/http_example:latest
+  docker login -p testpassword -u testuser http://aurora.local:5000
+  docker push aurora.local:5000/http_example:latest
+  sudo mv /etc/aurora/clusters.json /etc/aurora/clusters.json.old
+  sudo sh -c "cat /etc/aurora/clusters.json.old | jq 'map(. + {docker_registry:\"http://aurora.local:5000\"})' > /etc/aurora/clusters.json"
+}
+
 test_appc_unified() {
   num_mounts_before=$(mount |wc -l |tr -d '\n')
 
@@ -536,6 +548,7 @@ trap collect_result EXIT
 
 aurorabuild all
 setup_ssh
+setup_docker_registry
 
 test_version
 test_http_example "${TEST_JOB_ARGS[@]}"
@@ -545,8 +558,6 @@ test_http_example_basic "${TEST_JOB_REVOCABLE_ARGS[@]}"
 
 test_http_example_basic "${TEST_JOB_GPU_ARGS[@]}"
 
-# build the test docker image
-sudo docker build -t http_example -f "${TEST_ROOT}/Dockerfile.python" ${TEST_ROOT}
 test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
 
 setup_image_stores
