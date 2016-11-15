@@ -230,23 +230,20 @@ class InspectCommand(Verb):
     return "inspect"
 
   def get_options(self):
-    return [BIND_OPTION, JSON_READ_OPTION,
+    return [BIND_OPTION, JSON_READ_OPTION, JSON_WRITE_OPTION,
         CommandOption("--raw", dest="raw", default=False, action="store_true",
             help="Show the raw configuration."),
         JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
-  def execute(self, context):
-    config = context.get_job_config(context.options.jobspec, context.options.config_file)
-    if context.options.raw:
-      context.print_out(str(config.job()))
-      return EXIT_OK
-
+  def _render_config_pretty(self, config, context):
+    """Render the config description in human-friendly format"""
     job = config.raw()
     job_thrift = config.job()
     context.print_out("Job level information")
     context.print_out("name:       '%s'" % job.name(), indent=2)
     context.print_out("role:       '%s'" % job.role(), indent=2)
-    context.print_out("contact:    '%s'" % job.contact(), indent=2)
+    if job.has_contact():
+      context.print_out("contact:    '%s'" % job.contact(), indent=2)
     context.print_out("cluster:    '%s'" % job.cluster(), indent=2)
     context.print_out("instances:  '%s'" % job.instances(), indent=2)
     if job.has_cron_schedule():
@@ -286,6 +283,18 @@ class InspectCommand(Verb):
         context.print_out(line, indent=4)
       context.print_out("")
     return EXIT_OK
+
+  def execute(self, context):
+    config = context.get_job_config(context.options.jobspec, context.options.config_file)
+    if context.options.raw:
+      context.print_out(str(config.job()))
+      return EXIT_OK
+
+    if context.options.write_json:
+      context.print_out(config.raw().json_dumps())
+      return EXIT_OK
+    else:
+      return self._render_config_pretty(config, context)
 
 
 class AbstractKillCommand(Verb):

@@ -13,6 +13,7 @@
 #
 
 import contextlib
+import json
 
 from mock import patch
 
@@ -74,6 +75,77 @@ Process 'process':
   cmdline:
     ls -la
 '''
+
+  def test_inspect_job_in_json(self):
+    mock_stdout = []
+    def mock_print_out(msg):
+      mock_stdout.append("%s" % msg)
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_out',
+            side_effect=mock_print_out),
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.get_job_config',
+            return_value=self.get_job_config())):
+      cmd = AuroraCommandLine()
+      assert cmd.execute([
+          'job', 'inspect', '--write-json', 'west/bozo/test/hello', 'config.aurora']) == 0
+    output = {
+        "environment": "test",
+        "health_check_config": {
+            "initial_interval_secs": 15.0,
+            "health_checker": {
+                "http": {
+                    "expected_response_code": 0,
+                    "endpoint": "/health",
+                    "expected_response": "ok"}},
+            "interval_secs": 10.0,
+            "timeout_secs": 1.0,
+            "max_consecutive_failures": 0},
+        "cluster": "west",
+        "cron_schedule": "* * * * *",
+        "service": False,
+        "update_config": {
+            "wait_for_batch_completion": False,
+            "batch_size": 1,
+            "watch_secs": 45,
+            "rollback_on_failure": True,
+            "max_per_shard_failures": 0,
+            "max_total_failures": 0},
+        "name": "the_job",
+        "max_task_failures": 1,
+        "cron_collision_policy": "KILL_EXISTING",
+        "enable_hooks": False,
+        "instances": 3,
+        "task": {
+            "processes": [{
+                "daemon": False,
+                "name": "process",
+                "ephemeral": False,
+                "max_failures": 1,
+                "min_duration": 5,
+                "cmdline": "ls -la",
+                "final": False}],
+            "name": "task",
+            "finalization_wait": 30,
+            "max_failures": 1,
+            "max_concurrency": 0,
+            "resources": {
+                 "gpu": 0,
+                 "disk": 1073741824,
+                 "ram": 1073741824,
+                 "cpu": 1.0},
+            "constraints": []},
+        "production": False,
+        "role": "bozo",
+        "contact": "bozo@the.clown",
+        "lifecycle": {
+            "http": {
+                "graceful_shutdown_endpoint": "/quitquitquit",
+                "port": "health",
+                "shutdown_endpoint": "/abortabortabort"}},
+        "priority": 0}
+
+    mock_output = "\n".join(mock_stdout)
+    assert output == json.loads(mock_output)
 
   def test_inspect_job_raw(self):
     mock_stdout = []
