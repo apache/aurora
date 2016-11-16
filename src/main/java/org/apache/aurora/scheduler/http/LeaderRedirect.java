@@ -99,7 +99,7 @@ class LeaderRedirect implements Closeable {
   private Optional<HostAndPort> getLocalHttp() {
     HostAndPort localHttp = httpService.getAddress();
     return (localHttp == null) ? Optional.absent()
-        : Optional.of(HostAndPort.fromParts(localHttp.getHostText(), localHttp.getPort()));
+        : Optional.of(HostAndPort.fromParts(localHttp.getHost(), localHttp.getPort()));
   }
 
   /**
@@ -166,7 +166,7 @@ class LeaderRedirect implements Closeable {
       StringBuilder redirect = new StringBuilder()
           .append(req.getScheme())
           .append("://")
-          .append(target.getHostText())
+          .append(target.getHost())
           .append(':')
           .append(target.getPort())
           .append(

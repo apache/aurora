@@ -20,7 +20,6 @@ import java.util.List;
 
 import javax.inject.Singleton;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.AbstractIdleService;
@@ -135,7 +134,7 @@ public class ServiceDiscoveryModule extends AbstractModule {
       try {
         testServer.startNetwork();
       } catch (IOException | InterruptedException e) {
-        throw Throwables.propagate(e);
+        throw new RuntimeException(e);
       }
       return ImmutableList.of(
           InetSocketAddress.createUnresolved("localhost", testServer.getPort()));

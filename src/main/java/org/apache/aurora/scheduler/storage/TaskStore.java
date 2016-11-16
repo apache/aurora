@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.storage;
 
 import java.util.Set;
 
+import com.google.common.base.CharMatcher;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
@@ -25,8 +26,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskQuery;
-
-import static com.google.common.base.CharMatcher.WHITESPACE;
 
 /**
  * Stores all tasks configured with the scheduler.
@@ -128,7 +127,7 @@ public interface TaskStore {
         ITaskConfig config = task.getAssignedTask().getTask();
         // TODO(wfarner): Investigate why blank inputs are treated specially for the role field.
         if (query.getRole() != null
-            && !WHITESPACE.matchesAllOf(query.getRole())
+            && !CharMatcher.whitespace().matchesAllOf(query.getRole())
             && !query.getRole().equals(config.getJob().getRole())) {
           return false;
         }

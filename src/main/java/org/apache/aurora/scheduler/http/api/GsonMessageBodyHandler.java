@@ -35,7 +35,6 @@ import javax.ws.rs.ext.MessageBodyReader;
 import javax.ws.rs.ext.MessageBodyWriter;
 import javax.ws.rs.ext.Provider;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -230,7 +229,7 @@ public class GsonMessageBodyHandler
 
                 throw new RuntimeException("Failed to deserialize " + typeOfT);
               } catch (NoSuchFieldException | IllegalAccessException | InstantiationException e) {
-                throw Throwables.propagate(e);
+                throw new RuntimeException(e);
               }
             } else {
               throw new RuntimeException("Unable to deserialize " + typeOfT);

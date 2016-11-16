@@ -26,7 +26,6 @@ import javax.security.auth.login.LoginException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
 import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
@@ -168,7 +167,7 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
                   new Oid[] {new Oid(GSS_SPNEGO_MECH_OID), new Oid(GSS_KRB5_MECH_OID)},
                   GSSCredential.ACCEPT_ONLY);
             } catch (GSSException e) {
-              throw Throwables.propagate(e);
+              throw new RuntimeException(e);
             }
           });
     } catch (LoginException e) {

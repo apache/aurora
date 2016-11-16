@@ -31,7 +31,6 @@ import javax.sql.DataSource;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -122,7 +121,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
               }
             }
           } catch (SQLException e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
           }
         }
 
@@ -145,13 +144,13 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
                 }
               }
             } catch (SQLException e) {
-              Throwables.propagate(e);
+              throw new RuntimeException(e);
             }
 
             try {
               migrationManager.migrate();
             } catch (SQLException e) {
-              Throwables.propagate(e);
+              throw new RuntimeException(e);
             }
           }
         }

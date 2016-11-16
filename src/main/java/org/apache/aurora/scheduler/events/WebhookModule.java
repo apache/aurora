@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.inject.AbstractModule;
@@ -102,7 +101,7 @@ public class WebhookModule extends AbstractModule {
               StandardCharsets.UTF_8);
     } catch (IOException e) {
       LOG.error("Error loading webhook configuration file.");
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -113,7 +112,7 @@ public class WebhookModule extends AbstractModule {
       return new ObjectMapper().readValue(config, WebhookInfo.class);
     } catch (IOException e) {
       LOG.error("Error parsing Webhook configuration file.");
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 }

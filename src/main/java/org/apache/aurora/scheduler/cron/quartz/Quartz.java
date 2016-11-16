@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.TimeZone;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.Lists;
@@ -81,7 +80,7 @@ final class Quartz {
     try {
       cronExpression = new CronExpression(rawCronExpresion);
     } catch (ParseException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
     cronExpression.setTimeZone(timeZone);
     return cronExpression;

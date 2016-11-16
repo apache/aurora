@@ -84,7 +84,7 @@ class LoggingInterceptor implements MethodInterceptor {
     } catch (RuntimeException e) {
       // We need shiro's exceptions to bubble up to the Shiro servlet filter so we intentionally
       // do not swallow them here.
-      Throwables.propagateIfInstanceOf(e, ShiroException.class);
+      Throwables.throwIfInstanceOf(e, ShiroException.class);
       LOG.warn("Uncaught exception while handling " + message, e);
       return Responses.addMessage(Responses.empty(), ResponseCode.ERROR, e);
     }

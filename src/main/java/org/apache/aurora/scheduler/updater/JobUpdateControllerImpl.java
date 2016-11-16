@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -294,7 +293,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
           try {
             changeJobUpdateStatus(storeProvider, key, newEvent(status), false);
           } catch (UpdateStateException e) {
-            throw Throwables.propagate(e);
+            throw new RuntimeException(e);
           }
         }
       }
@@ -364,7 +363,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
                 getOnlyMatch(storeProvider.getJobUpdateStore(), queryActiveByJob(job)),
                 ImmutableMap.of(instance.getInstanceId(), state));
           } catch (UpdateStateException e) {
-            throw Throwables.propagate(e);
+            throw new RuntimeException(e);
           }
         } else {
           LOG.info("Instance " + instance + " is not part of active update for "
@@ -750,7 +749,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
                           instance.getInstanceId())));
             } catch (UpdateStateException e) {
               LOG.error(String.format("Error running deferred evaluation for %s: %s", instance, e));
-              Throwables.propagate(e);
+              throw new RuntimeException(e);
             }
           }
         }));

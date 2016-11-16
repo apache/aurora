@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.storage.log;
 
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -109,7 +110,7 @@ public class LogManagerTest extends EasyMockTest {
 
   @Test
   public void testStreamManagerReadFromUnknownNone() throws CodingException {
-    expect(stream.readAll()).andReturn(Iterators.emptyIterator());
+    expect(stream.readAll()).andReturn(Collections.emptyIterator());
 
     Consumer<LogEntry> reader = createMock(new Clazz<Consumer<LogEntry>>() { });
 

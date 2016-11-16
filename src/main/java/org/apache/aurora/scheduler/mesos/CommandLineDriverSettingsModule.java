@@ -23,7 +23,6 @@ import java.util.Properties;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import com.google.inject.AbstractModule;
 
 import org.apache.aurora.common.args.Arg;
@@ -136,7 +135,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
         properties = parseCredentials(new FileInputStream(FRAMEWORK_AUTHENTICATION_FILE.get()));
       } catch (FileNotFoundException e) {
         LOG.error("Authentication File not Found");
-        throw Throwables.propagate(e);
+        throw new RuntimeException(e);
       }
 
       LOG.info(
@@ -194,7 +193,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       properties.load(credentialsStream);
     } catch (IOException e) {
       LOG.error("Unable to load authentication file");
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
     Preconditions.checkState(properties.containsKey(PRINCIPAL_KEY),
         "The framework authentication file is missing the key: %s", PRINCIPAL_KEY);

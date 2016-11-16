@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.inject.AbstractModule;
@@ -76,7 +75,7 @@ public class TierModule extends AbstractModule {
               StandardCharsets.UTF_8);
     } catch (IOException e) {
       LOG.error("Error loading tier configuration file.");
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -87,7 +86,7 @@ public class TierModule extends AbstractModule {
       return new ObjectMapper().readValue(config, TierConfig.class);
     } catch (IOException e) {
       LOG.error("Error parsing tier configuration file.");
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
   }
 }

@@ -19,7 +19,6 @@ import java.util.Iterator;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Throwables;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.HashFunction;
@@ -99,7 +98,7 @@ public interface EntrySerializer {
             try {
               result = encode(Frame.chunk(new FrameChunk(chunk)));
             } catch (CodingException e) {
-              throw Throwables.propagate(e);
+              throw new RuntimeException(e);
             }
           } else {
             return endOfData();

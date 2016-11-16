@@ -116,7 +116,7 @@ public class SchedulerMain {
 
     HostAndPort httpAddress = httpService.getAddress();
     InetSocketAddress httpSocketAddress =
-        InetSocketAddress.createUnresolved(httpAddress.getHostText(), httpAddress.getPort());
+        InetSocketAddress.createUnresolved(httpAddress.getHost(), httpAddress.getPort());
     try {
       schedulerService.lead(
           httpSocketAddress,

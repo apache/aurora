@@ -19,7 +19,6 @@ import java.util.TimeZone;
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
@@ -206,7 +205,7 @@ class CronJobManagerImpl implements CronJobManager {
         }
       }
     } catch (SchedulerException e) {
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
     return scheduledJobs.build();
   }
