@@ -80,7 +80,7 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   }
 
   ext.commonsLangRev = '2.6'
-  ext.curatorRev = '2.10.0'
+  ext.curatorRev = '2.11.1'
   ext.gsonRev = '2.3.1'
   ext.guavaRev = '19.0'
   ext.guiceRev = '3.0'
