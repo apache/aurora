@@ -51,13 +51,14 @@ final class Tasks {
    */
   static final class Builder {
     private JobKey jobKey = new JobKey("jmh", "dev", "benchmark");
-    private int uuidStart = 0;
     private boolean isProduction = false;
     private double cpu = 6.0;
     private Amount<Long, Data> ram = Amount.of(8L, Data.GB);
     private Amount<Long, Data> disk = Amount.of(128L, Data.GB);
     private ScheduleStatus scheduleStatus = ScheduleStatus.PENDING;
     private ImmutableSet.Builder<Constraint> constraints = ImmutableSet.builder();
+
+    private static int uuid = 0;
 
     Builder setRole(String newRole) {
       jobKey.setRole(newRole);
@@ -71,11 +72,6 @@ final class Tasks {
 
     Builder setJob(String job) {
       jobKey.setName(job);
-      return this;
-    }
-
-    Builder setUuidStart(int uuidStart) {
-      this.uuidStart = uuidStart;
       return this;
     }
 
@@ -134,7 +130,7 @@ final class Tasks {
 
       for (int i = 0; i < count; i++) {
         String taskId =
-            jobKey.getRole() + "-" + jobKey.getEnvironment() + "-" + i + "-" + (uuidStart + i);
+            jobKey.getRole() + "-" + jobKey.getEnvironment() + "-" + i + "-" + uuid++;
 
         ScheduledTask builder = TaskTestUtil.makeTask(taskId, IJobKey.build(jobKey))
             .newBuilder()

@@ -181,7 +181,6 @@ public class ThriftApiBenchmarks {
                 .setEnv(env)
                 .setJob(job)
                 .setScheduleStatus(ScheduleStatus.FINISHED)
-                .setUuidStart(1)
                 .build(config.deadTasks));
             storeProvider.getUnsafeTaskStore().saveTasks(tasks.build());
           }

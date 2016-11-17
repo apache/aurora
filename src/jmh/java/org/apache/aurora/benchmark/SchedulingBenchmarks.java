@@ -106,7 +106,7 @@ public class SchedulingBenchmarks {
      */
     @Setup(Level.Trial)
     public void setUpBenchmark() {
-      storage = DbUtil.createStorage();
+      storage = DbUtil.createFlaggedStorage();
       eventBus = new EventBus();
       final FakeClock clock = new FakeClock();
       clock.setNowMillis(System.currentTimeMillis());
@@ -196,16 +196,10 @@ public class SchedulingBenchmarks {
     private void fillUpCluster(int numOffers) {
       Set<IScheduledTask> tasksToAssign = buildClusterTasks(numOffers);
       saveTasks(tasksToAssign);
-      storage.write((NoResult.Quiet) store -> {
-        for (IScheduledTask scheduledTask : tasksToAssign) {
-          taskScheduler.schedule(
-              store,
-              ImmutableSet.of(scheduledTask.getAssignedTask().getTaskId()));
-        }
-      });
+      schedule(tasksToAssign);
     }
 
-    private void saveTasks(final Set<IScheduledTask> tasks) {
+    protected void saveTasks(final Set<IScheduledTask> tasks) {
       storage.write(
           (NoResult.Quiet) storeProvider -> storeProvider.getUnsafeTaskStore().saveTasks(tasks));
     }
@@ -221,23 +215,51 @@ public class SchedulingBenchmarks {
     protected abstract BenchmarkSettings getSettings();
 
     /**
-     * Benchmark entry point. All settings (e.g. iterations, benchmarkMode and etc.) are defined
-     * in build.gradle.
+     * Benchmark entry point.
      *
      * @return A "blackhole" to make sure the result is not optimized out.
      * See {@see http://openjdk.java.net/projects/code-tools/jmh/} for more info.
      */
     @Benchmark
     public Set<String> runBenchmark() {
+      return schedule(settings.getTasks());
+    }
+
+    protected Set<String> schedule(Set<IScheduledTask> tasks) {
       return storage.write((Storage.MutateWork.Quiet<Set<String>>) store -> {
         Set<String> result = null;
-        for (IScheduledTask task : settings.getTasks()) {
+        for (IScheduledTask task : tasks) {
           result = taskScheduler.schedule(
               store,
               ImmutableSet.of(task.getAssignedTask().getTaskId()));
         }
         return result;
       });
+    }
+  }
+
+  /**
+   * Tests the successful scheduling of tasks in an almost empty cluster.
+   * The cluster will be filled progressively over benchmark repetitions.
+   */
+  public static class FillClusterBenchmark extends AbstractBase {
+    @Override
+    protected BenchmarkSettings getSettings() {
+      return new BenchmarkSettings.Builder()
+          .setSiblingClusterUtilization(0.01)
+          .setVictimClusterUtilization(0.01)
+          .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(100000))
+          .setTasks(new Tasks.Builder().build(0))
+          .build();
+    }
+
+    @Override
+    public Set<String> runBenchmark() {
+      // In contrast to the other tests in this file we have to create new tasks for each
+      // benchmark repetition to make sure they can actually be scheduled.
+      Set<IScheduledTask> tasks = new Tasks.Builder().build(10);
+      saveTasks(tasks);
+      return schedule(tasks);
     }
   }
 
