@@ -174,7 +174,7 @@ public enum ResourceType implements TEnum {
   private static ImmutableMap<Integer, ResourceType> byField =
       Maps.uniqueIndex(EnumSet.allOf(ResourceType.class),  ResourceType::getValue);
 
-  private static ImmutableMap<String, ResourceType> byMesosName =
+  public static final ImmutableMap<String, ResourceType> BY_MESOS_NAME =
       Maps.uniqueIndex(EnumSet.allOf(ResourceType.class), ResourceType::getMesosName);
 
   /**
@@ -355,7 +355,7 @@ public enum ResourceType implements TEnum {
    */
   public static ResourceType fromResource(Resource resource) {
     return requireNonNull(
-        byMesosName.get(resource.getName()),
+        BY_MESOS_NAME.get(resource.getName()),
         "Unknown Mesos resource: " + resource);
   }
 }

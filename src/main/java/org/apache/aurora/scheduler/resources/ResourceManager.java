@@ -69,6 +69,8 @@ public final class ResourceManager {
 
   private static final BinaryOperator<Double> REDUCE_VALUES = (l, r) -> l + r;
 
+  private static final Predicate<Resource> SUPPORTED_RESOURCE =
+      r -> ResourceType.BY_MESOS_NAME.containsKey(r.getName());
   /**
    * Gets offer resources matching specified {@link ResourceType}.
    *
@@ -236,7 +238,12 @@ public final class ResourceManager {
    * @return A {@link ResourceBag} instance.
    */
   public static ResourceBag bagFromMesosResources(Iterable<Resource> resources) {
-    return bagFromResources(resources, MESOS_RESOURCE_TO_TYPE, QUANTIFY_MESOS_RESOURCE);
+    // Filter out resources that Aurora does not yet support in order to avoid crashes
+    // TODO(rdelvalle): Remove filter when arbitrary resources are fully supported (AURORA-1328)
+    return bagFromResources(
+        Iterables.filter(resources, SUPPORTED_RESOURCE),
+        MESOS_RESOURCE_TO_TYPE,
+        QUANTIFY_MESOS_RESOURCE);
   }
 
   /**
@@ -289,4 +296,5 @@ public final class ResourceManager {
       super(message);
     }
   }
+
 }

@@ -177,6 +177,18 @@ public class ResourceManagerTest {
   }
 
   @Test
+  public void testBagFromMesosResourcesUnsupportedResources() {
+    Protos.Resource unsupported = Protos.Resource.newBuilder()
+        .setName("unknown")
+        .setType(SCALAR)
+        .setScalar(Scalar.newBuilder().setValue(1.0).build()).build();
+    assertEquals(
+        new ResourceBag(ImmutableMap.of(CPUS, 3.0)),
+        ResourceManager.bagFromMesosResources(
+            ImmutableSet.of(mesosScalar(CPUS, 3.0), unsupported)));
+  }
+
+  @Test
   public void testBagFromAggregate() {
     assertEquals(bag(1.0, 32, 64), ResourceManager.bagFromAggregate(aggregate(1.0, 32, 64)));
   }
