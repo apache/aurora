@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import javax.inject.Singleton;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.common.eventbus.EventBus;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -181,11 +182,15 @@ public class SchedulingBenchmarks {
     }
 
     private Set<IScheduledTask> buildClusterTasks(int numOffers) {
-      int numOffersToFill = (int) Math.round(numOffers * settings.getClusterUtilization());
-      return new Tasks.Builder()
+      int numSiblingTasks = (int) Math.round(numOffers * settings.getSiblingClusterUtilization());
+      int numVictimTasks = (int) Math.round(numOffers * settings.getVictimClusterUtilization());
+      return Sets.union(
+        new Tasks.Builder()
+          .build(numSiblingTasks),
+        new Tasks.Builder()
           .setRole("victim")
           .setProduction(!settings.areAllVictimsEligibleForPreemption())
-          .build(numOffersToFill);
+          .build(numVictimTasks));
     }
 
     private void fillUpCluster(int numOffers) {
@@ -289,7 +294,8 @@ public class SchedulingBenchmarks {
     @Override
     protected BenchmarkSettings getSettings() {
       return new BenchmarkSettings.Builder()
-          .setClusterUtilization(1.0)
+          .setSiblingClusterUtilization(0.1)
+          .setVictimClusterUtilization(0.9)
           .setVictimPreemptionEligibilty(true)
           .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(10000))
           .setTasks(new Tasks.Builder()
@@ -309,7 +315,8 @@ public class SchedulingBenchmarks {
     @Override
     protected BenchmarkSettings getSettings() {
       return new BenchmarkSettings.Builder()
-          .setClusterUtilization(1.0)
+          .setSiblingClusterUtilization(0.1)
+          .setVictimClusterUtilization(0.9)
           .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(10000))
           .setTasks(new Tasks.Builder()
               .setProduction(true)

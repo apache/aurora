@@ -25,17 +25,20 @@ import static java.util.Objects.requireNonNull;
  */
 final class BenchmarkSettings {
   private final Set<IHostAttributes> hostAttributes;
-  private final double clusterUtilization;
+  private final double siblingClusterUtilization;
+  private final double victimClusterUtilization;
   private final boolean allVictimsEligibleForPreemption;
   private final Set<IScheduledTask> tasks;
 
   private BenchmarkSettings(
-      double clusterUtilization,
+      double siblingClusterUtilization,
+      double victimClusterUtilization,
       boolean allVictimsEligibleForPreemption,
       Set<IHostAttributes> hostAttributes,
       Set<IScheduledTask> tasks) {
 
-    this.clusterUtilization = clusterUtilization;
+    this.siblingClusterUtilization = siblingClusterUtilization;
+    this.victimClusterUtilization = victimClusterUtilization;
     this.allVictimsEligibleForPreemption = allVictimsEligibleForPreemption;
     this.hostAttributes = requireNonNull(hostAttributes);
     this.tasks = requireNonNull(tasks);
@@ -43,12 +46,22 @@ final class BenchmarkSettings {
 
   /**
    * Gets the cluster utilization factor specifying what percentage of hosts in the cluster
-   * already have tasks assigned to them.
+   * already have a job instance assigned to them as used during the scheduling benchmark.
    *
-   * @return Cluster utilization (default: 0.9).
+   * @return Cluster utilization (default: 0.25).
    */
-  double getClusterUtilization() {
-    return clusterUtilization;
+  double getSiblingClusterUtilization() {
+    return siblingClusterUtilization;
+  }
+
+  /**
+   * Gets the cluster utilization factor specifying what percentage of hosts in the cluster
+   * have a task of a foreign job assigned to them, i.e. potential preemption victims.
+   *
+   * @return Cluster utilization (default: 0.25).
+   */
+  double getVictimClusterUtilization() {
+    return victimClusterUtilization;
   }
 
   /**
@@ -79,13 +92,19 @@ final class BenchmarkSettings {
   }
 
   static class Builder {
-    private double clusterUtilization = 0.9;
+    private double siblingClusterUtilization = 0.25;
+    private double victimClusterUtilization = 0.25;
     private boolean allVictimsEligibleForPreemption;
     private Set<IHostAttributes> hostAttributes;
     private Set<IScheduledTask> tasks;
 
-    Builder setClusterUtilization(double newClusterUtilization) {
-      clusterUtilization = newClusterUtilization;
+    Builder setSiblingClusterUtilization(double newClusterUtilization) {
+      siblingClusterUtilization = newClusterUtilization;
+      return this;
+    }
+
+    Builder setVictimClusterUtilization(double newClusterUtilization) {
+      victimClusterUtilization = newClusterUtilization;
       return this;
     }
 
@@ -106,7 +125,8 @@ final class BenchmarkSettings {
 
     BenchmarkSettings build() {
       return new BenchmarkSettings(
-          clusterUtilization,
+          siblingClusterUtilization,
+          victimClusterUtilization,
           allVictimsEligibleForPreemption,
           hostAttributes,
           tasks);
