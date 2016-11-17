@@ -30,12 +30,12 @@ GpuProfile = DefaultProfile(
 
 echo_ports = Process(
   name = 'echo_ports',
-  cmdline = 'echo "tcp port: {{thermos.ports[tcp]}}; http port: {{thermos.ports[http]}}; alias: {{thermos.ports[alias]}}"'
+  cmdline = 'echo "tcp port: {{thermos.ports[tcp]}}; http port: {{thermos.ports[http]}}; alias: {{thermos.ports[alias]}}; health: {{thermos.ports[health]}}"'
 )
 
 run_server = Process(
   name = 'run_server',
-  cmdline = 'python http_example.py {{thermos.ports[http]}}')
+  cmdline = 'python http_example.py {{thermos.ports[http]}} {{thermos.ports[health]}}')
 
 stage_server = Process(
   name = 'stage_server',
@@ -71,13 +71,15 @@ no_python_task = SequentialTask(
   ]
 )
 
-update_config = UpdateConfig(watch_secs=10, batch_size=2)
+update_config = UpdateConfig(watch_secs=0, batch_size=2)
+update_config_watch_secs = UpdateConfig(watch_secs=10, batch_size=2)
 health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)
 shell_health_check_config = HealthCheckConfig(
   health_checker = HealthCheckerConfig(
     shell = ShellHealthChecker(shell_command='stat /usr/local/bin/run-server.sh')),
   initial_interval_secs=5,
   interval_secs=1,
+  min_consecutive_successes=5
 )
 
 job = Service(
@@ -99,12 +101,16 @@ jobs = [
     name = 'http_example'
   ).bind(profile=DefaultProfile()),
   job(
+    name = 'http_example_watch_secs',
+    update_config = update_config_watch_secs
+  ).bind(profile=DefaultProfile()),
+  job(
     name = 'http_example_revocable',
     tier = 'revocable'
   ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_docker',
-    container = Docker(image='{{docker.image[http_example][latest]}}'),
+    container = Docker(image='{{docker.image[http_example][latest]}}')
   ).bind(profile=ContainerProfile),
   job(
     name = 'http_example_gpu'

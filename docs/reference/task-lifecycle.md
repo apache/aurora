@@ -35,7 +35,9 @@ the `Task` goes into `STARTING` state.
 `STARTING` state initializes a `Task` sandbox. When the sandbox is fully
 initialized, Thermos begins to invoke `Process`es. Also, the agent
 machine sends an update to the scheduler that the `Task` is
-in `RUNNING` state.
+in `RUNNING` state, only after the task satisfies the liveness requirements.
+See [Health Checking](../features/services#health-checking) for more details
+for how to configure health checks.
 
 
 

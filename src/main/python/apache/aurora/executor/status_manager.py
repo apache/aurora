@@ -14,6 +14,7 @@
 
 import time
 
+from mesos.interface.mesos_pb2 import TaskState
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
@@ -26,18 +27,24 @@ class StatusManager(ExceptionalThread):
     An agent that periodically checks the health of a task via StatusCheckers that
     provide HTTP health checking, resource consumption, etc.
 
-    If any of the status interfaces return a status, the Status Manager
-    invokes the user-supplied callback with the status.
+    Invokes the user-supplied `running_callback` with the status, if the StatusChecker
+    returns `TASK_RUNNING` as the status. `running_callback` is invoked only once during
+    the first time `TASK_RUNNING` is reported. For any other non-None statuses other than
+    `TASK_STARTING`, invokes the `unhealthy_callback` and terminates.
   """
   POLL_WAIT = Amount(500, Time.MILLISECONDS)
 
-  def __init__(self, status_checker, callback, clock=time):
+  def __init__(self, status_checker, running_callback, unhealthy_callback, clock=time):
     if not isinstance(status_checker, StatusChecker):
       raise TypeError('status_checker must be a StatusChecker, got %s' % type(status_checker))
-    if not callable(callback):
-      raise TypeError('callback needs to be callable!')
+    if not callable(running_callback):
+      raise TypeError('running_callback needs to be callable!')
+    if not callable(unhealthy_callback):
+      raise TypeError('unhealthy_callback needs to be callable!')
     self._status_checker = status_checker
-    self._callback = callback
+    self._running_callback = running_callback
+    self._running_callback_dispatched = False
+    self._unhealthy_callback = unhealthy_callback
     self._clock = clock
     super(StatusManager, self).__init__()
     self.daemon = True
@@ -47,7 +54,11 @@ class StatusManager(ExceptionalThread):
       status_result = self._status_checker.status
       if status_result is not None:
         log.info('Status manager got %s' % status_result)
-        self._callback(status_result)
-        break
-      else:
-        self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
+        if status_result.status == TaskState.Value('TASK_RUNNING'):
+          if not self._running_callback_dispatched:
+            self._running_callback(status_result)
+            self._running_callback_dispatched = True
+        elif status_result.status != TaskState.Value('TASK_STARTING'):
+          self._unhealthy_callback(status_result)
+          break
+      self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))

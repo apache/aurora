@@ -49,6 +49,11 @@ class StatusResult(object):
         self._reason,
         TaskState.Name(self._status))
 
+  def __eq__(self, other):
+    if isinstance(other, StatusResult):
+      return self._status == other._status and self._reason == other._reason
+    return False
+
 
 class StatusChecker(Observable, Interface):
   """Interface to pluggable status checkers for the Aurora Executor."""
@@ -73,6 +78,13 @@ class StatusChecker(Observable, Interface):
 class StatusCheckerProvider(Interface):
   @abstractmethod
   def from_assigned_task(self, assigned_task, sandbox):
+    """
+    :param assigned_task:
+    :type assigned_task: AssignedTask
+    :param sandbox: Sandbox of the task corresponding to this status check.
+    :type sandbox: DirectorySandbox
+    :return: Instance of a HealthChecker.
+    """
     pass
 
 
@@ -92,17 +104,42 @@ class ChainedStatusChecker(StatusChecker):
 
   @property
   def status(self):
-    if self._status is None:
+    """
+      Return status that is computed from the statuses of the StatusCheckers. The computed status
+      is based on the priority given below (in increasing order of priority).
+
+      None             -> healthy (lowest-priority)
+      TASK_RUNNING     -> healthy and running
+      TASK_STARTING    -> healthy but still in starting
+      Otherwise        -> unhealthy (highest-priority)
+    """
+    if not self._in_terminal_state():
+      cur_status = None
       for status_checker in self._status_checkers:
-        status_checker_status = status_checker.status
-        if status_checker_status is not None:
-          log.info('%s reported %s' % (status_checker.__class__.__name__, status_checker_status))
-          if not isinstance(status_checker_status, StatusResult):
+        status_result = status_checker.status
+        if status_result is not None:
+          log.info('%s reported %s' % (status_checker.__class__.__name__, status_result))
+          if not isinstance(status_result, StatusResult):
             raise TypeError('StatusChecker returned something other than a StatusResult: got %s' %
-                type(status_checker_status))
-          self._status = status_checker_status
-          break
+                type(status_result))
+          if status_result.status == TaskState.Value('TASK_STARTING'):
+            # TASK_STARTING overrides other statuses
+            cur_status = status_result
+          elif status_result.status == TaskState.Value('TASK_RUNNING'):
+            if cur_status is None or cur_status == TaskState.Value('TASK_RUNNING'):
+              # TASK_RUNNING needs consensus (None is also included)
+              cur_status = status_result
+          else:
+            # Any other status leads to a terminal state
+            self._status = status_result
+            return self._status
+      self._status = cur_status
     return self._status
+
+  def _in_terminal_state(self):
+    return (self._status is not None and
+        self._status.status != TaskState.Value('TASK_RUNNING') and
+        self._status.status != TaskState.Value('TASK_STARTING'))
 
   def start(self):
     for status_checker in self._status_checkers:

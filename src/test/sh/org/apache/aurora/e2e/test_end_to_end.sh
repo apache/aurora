@@ -33,7 +33,7 @@ _curl() { curl --silent --fail --retry 4 --retry-delay 10 "$@" ; }
 tear_down() {
   set +x  # Disable command echo, as this makes it more difficult see which command failed.
 
-  for job in http_example http_example_revocable http_example_docker http_example_unified_appc http_example_unified_docker; do
+  for job in http_example http_example_watch_secs http_example_revocable http_example_docker http_example_unified_appc http_example_unified_docker; do
     aurora update abort devcluster/vagrant/test/$job || true >/dev/null 2>&1
     aurora job killall --no-batching devcluster/vagrant/test/$job >/dev/null 2>&1
   done
@@ -496,6 +496,7 @@ TEST_CLUSTER=devcluster
 TEST_ROLE=vagrant
 TEST_ENV=test
 TEST_JOB=http_example
+TEST_JOB_WATCH_SECS=http_example_watch_secs
 TEST_JOB_REVOCABLE=http_example_revocable
 TEST_JOB_GPU=http_example_gpu
 TEST_JOB_DOCKER=http_example_docker
@@ -519,6 +520,8 @@ BASE_ARGS=(
 )
 
 TEST_JOB_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB")
+
+TEST_JOB_WATCH_SECS_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_WATCH_SECS")
 
 TEST_JOB_REVOCABLE_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_REVOCABLE")
 
@@ -552,6 +555,7 @@ setup_docker_registry
 
 test_version
 test_http_example "${TEST_JOB_ARGS[@]}"
+test_http_example "${TEST_JOB_WATCH_SECS_ARGS[@]}"
 test_health_check
 
 test_http_example_basic "${TEST_JOB_REVOCABLE_ARGS[@]}"

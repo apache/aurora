@@ -30,7 +30,7 @@ GpuProfile = DefaultProfile(
 
 run_server = Process(
   name = 'run_server',
-  cmdline = 'python http_example.py {{thermos.ports[http]}}'
+  cmdline = 'python http_example.py {{thermos.ports[http]}} {{thermos.ports[health]}}'
 )
 
 stage_server = Process(
@@ -50,7 +50,8 @@ no_python_task = Task(
   resources = Resources(cpu=0.4, ram=32*MB, disk=64*MB),
   processes = [Process(name='run_server', cmdline='run-server.sh {{thermos.ports[http]}}')])
 
-update_config = UpdateConfig(watch_secs=10, batch_size=2)
+update_config = UpdateConfig(watch_secs=0, batch_size=2)
+update_config_watch_secs = UpdateConfig(watch_secs=10, batch_size=2)
 # "I am going to fail" config.
 shell_config = ShellHealthChecker(
   # This shell validates two things:
@@ -62,6 +63,7 @@ health_check_config = HealthCheckConfig(
   health_checker=HealthCheckerConfig(shell=shell_config),
   initial_interval_secs=5,
   interval_secs=1,
+  min_consecutive_successes=5
 )
 
 job = Service(
@@ -79,6 +81,10 @@ job = Service(
 jobs = [
   job(
     name = 'http_example'
+  ).bind(profile=DefaultProfile()),
+  job(
+    name = 'http_example_watch_secs',
+    update_config = update_config_watch_secs
   ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_revocable',

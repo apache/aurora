@@ -14,7 +14,9 @@
 from __future__ import print_function
 
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from SocketServer import ThreadingMixIn
 from sys import argv
+from threading import Thread
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -25,6 +27,25 @@ class RequestHandler(BaseHTTPRequestHandler):
     self.wfile.write('Hello!\n')
 
 
-server = HTTPServer(('', int(argv[1])), RequestHandler)
-print('Listening on port %s' % argv[1])
-server.serve_forever()
+class HealthHandler(BaseHTTPRequestHandler):
+  def do_GET(self):
+    if self.path == '/health':
+      self.send_response(200)
+      self.send_header('Content-Type', 'text/plain')
+      self.end_headers()
+      self.wfile.write('ok')
+
+
+def start_server(port, handler_class):
+  server = HTTPServer(('', port), handler_class)
+  print('Listening on port %s' % port)
+  server.serve_forever()
+
+request_thread = Thread(target=start_server, args=[int(argv[1]), RequestHandler])
+health_thread = Thread(target=start_server, args=[int(argv[2]), HealthHandler])
+
+for thread in [request_thread, health_thread]:
+  thread.start()
+
+for thread in [request_thread, health_thread]:
+  thread.join()

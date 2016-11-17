@@ -217,7 +217,8 @@ def make_executor(
     ports={},
     fast_status=False,
     runner_class=ThermosTaskRunner,
-    status_providers=()):
+    status_providers=[HealthCheckerProvider()],
+    assert_task_is_running=True):
 
   status_manager_class = FastStatusManager if fast_status else StatusManager
   runner_provider = make_provider(checkpoint_root, runner_class)
@@ -242,14 +243,16 @@ def make_executor(
   assert len(updates) == 2
   status_updates = [arg_tuple[0][0] for arg_tuple in updates]
   assert status_updates[0].state == mesos_pb2.TASK_STARTING
-  assert status_updates[1].state == mesos_pb2.TASK_RUNNING
 
-  # wait for the runner to bind to a task
-  while True:
-    runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
-    if runner:
-      break
-    time.sleep(0.1)
+  runner = None
+  if assert_task_is_running:
+    assert status_updates[1].state == mesos_pb2.TASK_RUNNING
+    # wait for the runner to bind to a task
+    while True:
+      runner = TaskRunner.get(task_description.task_id.value, checkpoint_root)
+      if runner:
+        break
+      time.sleep(0.1)
 
   assert te.launched.is_set()
   return runner, te
@@ -318,7 +321,8 @@ class TestThermosExecutor(object):
     with temporary_dir() as tempdir:
       te = AuroraExecutor(
           runner_provider=make_provider(tempdir),
-          sandbox_provider=DefaultTestSandboxProvider())
+          sandbox_provider=DefaultTestSandboxProvider(),
+          status_providers=[HealthCheckerProvider()])
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
       te.terminated.wait()
       tm = TaskMonitor(tempdir, task_id=HELLO_WORLD_TASK_ID)
@@ -340,7 +344,8 @@ class TestThermosExecutor(object):
     with temporary_dir() as tempdir:
       te = AuroraExecutor(
           runner_provider=make_provider(tempdir),
-          sandbox_provider=DefaultTestSandboxProvider())
+          sandbox_provider=DefaultTestSandboxProvider(),
+          status_providers=[HealthCheckerProvider()])
       te.launchTask(proxy_driver, make_task(MESOS_JOB(task=HELLO_WORLD), instanceId=0))
       te.runner_started.wait()
       while te._status_manager is None:
@@ -448,11 +453,12 @@ class TestThermosExecutor(object):
             MESOS_JOB(task=SLEEP60, health_check_config=health_check_config),
             ports={'health': port},
             fast_status=True,
-            status_providers=(HealthCheckerProvider(),))
+            status_providers=(HealthCheckerProvider(),),
+            assert_task_is_running=False)
         executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
-    assert len(updates) == 3
+    assert len(updates) == 2
     assert updates[-1][0][0].state == mesos_pb2.TASK_FAILED
 
   def test_task_health_ok(self):

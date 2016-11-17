@@ -115,8 +115,6 @@ class AuroraExecutor(ExecutorBase, Observable):
     if not self._start_runner(driver, assigned_task):
       return
 
-    self.send_update(driver, self._task_id, mesos_pb2.TASK_RUNNING)
-
     try:
       self._start_status_manager(driver, assigned_task)
     except Exception:
@@ -179,9 +177,16 @@ class AuroraExecutor(ExecutorBase, Observable):
     # chain the runner to the other checkers, but do not chain .start()/.stop()
     complete_checker = ChainedStatusChecker([self._runner, self._chained_checker])
     self._status_manager = self._status_manager_class(
-        complete_checker, self._shutdown, clock=self._clock)
+        complete_checker,
+        self._signal_running,
+        self._shutdown,
+        clock=self._clock)
     self._status_manager.start()
     self.status_manager_started.set()
+
+  def _signal_running(self, reason):
+    log.info('Send TASK_RUNNING status update. reason: %s' % reason)
+    self.send_update(self._driver, self._task_id, mesos_pb2.TASK_RUNNING, reason)
 
   def _signal_kill_manager(self, driver, task_id, reason):
     if self._task_id is None:

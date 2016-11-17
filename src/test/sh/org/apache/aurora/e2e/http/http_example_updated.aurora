@@ -30,7 +30,7 @@ GpuProfile = DefaultProfile(
 
 run_server = Process(
   name = 'run_server',
-  cmdline = 'python http_example.py {{thermos.ports[http]}}')
+  cmdline = 'python http_example.py {{thermos.ports[http]}} {{thermos.ports[health]}}')
 
 stage_server = Process(
   name = 'stage_server',
@@ -47,8 +47,16 @@ no_python_task = Task(
   resources = Resources(cpu=0.4, ram=32*MB, disk=64*MB),
   processes = [Process(name='run_server', cmdline='run-server.sh {{thermos.ports[http]}}')])
 
-update_config = UpdateConfig(watch_secs=10, batch_size=3)
-health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)
+update_config = UpdateConfig(watch_secs=0, batch_size=3)
+update_config_watch_secs = UpdateConfig(watch_secs=10, batch_size=3)
+health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=2, min_consecutive_successes=15)
+shell_health_check_config = HealthCheckConfig(
+  health_checker = HealthCheckerConfig(
+    shell = ShellHealthChecker(shell_command='stat /usr/local/bin/run-server.sh')),
+  initial_interval_secs=5,
+  interval_secs=2,
+  min_consecutive_successes=15
+)
 
 job = Service(
   cluster = 'devcluster',
@@ -67,12 +75,16 @@ jobs = [
     name = 'http_example'
   ).bind(profile=DefaultProfile()),
   job(
+    name = 'http_example_watch_secs',
+    update_config = update_config_watch_secs
+  ).bind(profile=DefaultProfile()),
+  job(
     name = 'http_example_revocable',
     tier = 'revocable'
   ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_docker',
-    container = Docker(image='{{docker.image[http_example][latest]}}'),
+    container = Docker(image='{{docker.image[http_example][latest]}}')
   ).bind(profile=ContainerProfile),
   job(
     name = 'http_example_gpu'
@@ -80,11 +92,13 @@ jobs = [
   job(
     name = 'http_example_unified_appc',
     container = Mesos(image=AppcImage(name='http_example_netcat', image_id='{{appc_image_id}}')),
-    task = no_python_task
+    task = no_python_task,
+    health_check_config=shell_health_check_config
   ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_unified_docker',
     container = Mesos(image=DockerImage(name='http_example_netcat', tag='latest')),
-    task = no_python_task
+    task = no_python_task,
+    health_check_config=shell_health_check_config
   ).bind(profile=DefaultProfile())
 ]

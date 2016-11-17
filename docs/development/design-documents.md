@@ -11,7 +11,7 @@ Current and past documents:
 * [Command Hooks for the Aurora Client](design/command-hooks.md)
 * [Dynamic Reservations](https://docs.google.com/document/d/19gV8Po6DIHO14tOC7Qouk8RnboY8UCfRTninwn_5-7c/edit)
 * [GPU Resources in Aurora](https://docs.google.com/document/d/1J9SIswRMpVKQpnlvJAMAJtKfPP7ZARFknuyXl-2aZ-M/edit)
-* [Health Checks for Updates](https://docs.google.com/document/d/1ZdgW8S4xMhvKW7iQUX99xZm10NXSxEWR0a-21FP5d94/edit)
+* [Health Checks for Updates](https://docs.google.com/document/d/1KOO0LC046k75TqQqJ4c0FQcVGbxvrn71E10wAjMorVY/edit)
 * [JobUpdateDiff thrift API](https://docs.google.com/document/d/1Fc_YhhV7fc4D9Xv6gJzpfooxbK4YWZcvzw6Bd3qVTL8/edit)
 * [REST API RFC](https://docs.google.com/document/d/11_lAsYIRlD5ETRzF2eSd3oa8LXAHYFD8rSetspYXaf4/edit)
 * [Revocable Mesos offers in Aurora](https://docs.google.com/document/d/1r1WCHgmPJp5wbrqSZLsgtxPNj3sULfHrSFmxp2GyPTo/edit)

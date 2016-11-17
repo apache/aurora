@@ -84,11 +84,8 @@ Based on your job size (%s) you should use max_total_failures >= %s.
 '''
 
 
-WATCH_SECS_INSUFFICIENT_ERROR_FORMAT = '''
-You have specified an insufficiently short watch period (%d seconds) in your update configuration.
-Your update will always succeed. In order for the updater to detect health check failures,
-UpdateConfig.watch_secs must be greater than %d seconds to account for an initial
-health check interval (%d seconds) plus %d consecutive failures at a check interval of %d seconds.
+INVALID_VALUE_ERROR_FORMAT = '''
+Invalid value (%s) specified for %s. Value cannot be less than 0.
 '''
 
 
@@ -101,6 +98,7 @@ def _validate_update_config(config):
   watch_secs = update_config.watch_secs().get()
   initial_interval_secs = health_check_config.initial_interval_secs().get()
   max_consecutive_failures = health_check_config.max_consecutive_failures().get()
+  min_consecutive_successes = health_check_config.min_consecutive_successes().get()
   interval_secs = health_check_config.interval_secs().get()
 
   if max_failures >= job_size:
@@ -111,10 +109,17 @@ def _validate_update_config(config):
     if max_failures < min_failure_threshold:
       die(UPDATE_CONFIG_DEDICATED_THRESHOLD_ERROR % (job_size, min_failure_threshold))
 
-  target_watch = initial_interval_secs + (max_consecutive_failures * interval_secs)
-  if watch_secs <= target_watch:
-    die(WATCH_SECS_INSUFFICIENT_ERROR_FORMAT %
-        (watch_secs, target_watch, initial_interval_secs, max_consecutive_failures, interval_secs))
+  params = [
+        (watch_secs, 'watch_secs'),
+        (max_consecutive_failures, 'max_consecutive_failures'),
+        (min_consecutive_successes, 'min_consecutive_successes'),
+        (initial_interval_secs, 'initial_interval_secs'),
+        (interval_secs, 'interval_secs')
+      ]
+
+  for value, name in params:
+    if value < 0:
+      die(INVALID_VALUE_ERROR_FORMAT % (value, name))
 
 
 PRODUCTION_DEPRECATED_WARNING = (

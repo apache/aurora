@@ -16,6 +16,10 @@
   can be used in the Aurora job configuration to resolve a docker image specified by its `name:tag`
   to a concrete identifier specified by its `registry/name@digest`. It requires version 2 of the
   Docker Registry.
+- Use `RUNNING` state to indicate that the task is healthy and behaving as expected. Job updates
+  can now rely purely on health checks rather than `watch_secs` timeout when deciding an individial
+  instance update state, by setting `watch_secs` to 0. A service will remain in `STARTING` state
+  util `min_consecutive_successes` consecutive health checks have passed.
 
 ### Deprecations and removals:
 

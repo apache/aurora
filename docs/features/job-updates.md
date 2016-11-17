@@ -34,7 +34,7 @@ You may `abort` a job update regardless of the state it is in. This will
 instruct the scheduler to completely abandon the job update and leave the job
 in the current (possibly partially-updated) state.
 
-For a configuration update, the Aurora Client calculates required changes
+For a configuration update, the Aurora Scheduler calculates required changes
 by examining the current job config state and the new desired job config.
 It then starts a *rolling batched update process* by going through every batch
 and performing these operations:
@@ -44,14 +44,13 @@ and performing these operations:
 - If an instance is not present in the scheduler but is present in
   the new config, then the instance is created.
 - If an instance is present in both the scheduler and the new config, then
-  the client diffs both task configs. If it detects any changes, it
+  the scheduler diffs both task configs. If it detects any changes, it
   performs an instance update by killing the old config instance and adds
   the new config instance.
 
-The Aurora client continues through the instance list until all tasks are
-updated, in `RUNNING,` and healthy for a configurable amount of time.
-If the client determines the update is not going well (a percentage of health
-checks have failed), it cancels the update.
+The Aurora Scheduler continues through the instance list until all tasks are
+updated and in `RUNNING`. If the scheduler determines the update is not going
+well (based on the criteria specified in the UpdateConfig), it cancels the update.
 
 Update cancellation runs a procedure similar to the described above
 update sequence, but in reverse order. New instance configs are swapped
@@ -59,7 +58,7 @@ with old instance configs and batch updates proceed backwards
 from the point where the update failed. E.g.; (0,1,2) (3,4,5) (6,7,
 8-FAIL) results in a rollback in order (8,7,6) (5,4,3) (2,1,0).
 
-For details how to control a job update, please see the
+For details on how to control a job update, please see the
 [UpdateConfig](../reference/configuration.md#updateconfig-objects) configuration object.
 
 

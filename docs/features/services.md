@@ -90,6 +90,23 @@ Please see the
 [configuration reference](../reference/configuration.md#user-content-healthcheckconfig-objects)
 for configuration options for this feature.
 
+Starting with the 0.17.0 release, job updates rely only on task health-checks by introducing
+a `min_consecutive_successes` parameter on the HealthCheckConfig object. This parameter represents
+the number of successful health checks needed before a task is moved into the `RUNNING` state. Tasks
+that do not have enough successful health checks within the first `n` attempts, are moved to the
+`FAILED` state, where `n = ceil(initial_interval_secs/interval_secs) + min_consecutive_successes`.
+In order to accommodate variability during task warm up, `initial_interval_secs` will
+act as a grace period. Any health-check failures during the first `m` attempts are ignored and
+do not count towards `max_consecutive_failures`, where `m = ceil(initial_interval_secs/interval_secs)`.
+
+As [job updates](job-updates.md) are based only on health-checks, it is not necessary to set
+`watch_secs` to the worst-case update time, it can instead be set to 0. The scheduler considers a
+task that is in the `RUNNING` to be healthy and proceeds to updating the next batch of instances.
+For details on how to control health checks, please see the
+[HealthCheckConfig](../reference/configuration.md#healthcheckconfig-objects) configuration object.
+Existing jobs that do not configure a health-check can fall-back to using `watch_secs` to
+monitor a task before considering it healthy.
+
 You can pause health checking by touching a file inside of your sandbox, named `.healthchecksnooze`.
 As long as that file is present, health checks will be disabled, enabling users to gather core
 dumps or other performance measurements without worrying about Aurora's health check killing
