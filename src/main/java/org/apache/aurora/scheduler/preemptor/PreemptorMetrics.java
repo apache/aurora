@@ -97,7 +97,7 @@ public class PreemptorMetrics {
 
   @VisibleForTesting
   static String slotSearchStatName(boolean success, boolean production) {
-    return String.format("preemptor_slot_search_%s_for_%s", result(success), prod(production));
+    return "preemptor_slot_search_" + result(success) + "_for_" + prod(production);
   }
 
   @VisibleForTesting

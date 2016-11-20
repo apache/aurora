@@ -25,7 +25,6 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.codehaus.jackson.annotate.JsonCreator;
 import org.codehaus.jackson.annotate.JsonProperty;
 
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -101,7 +100,7 @@ public interface TierManager {
     public TierInfo getTier(ITaskConfig taskConfig) {
       checkArgument(
           !taskConfig.isSetTier() || tierConfig.tiers.containsKey(taskConfig.getTier()),
-          format("Invalid tier '%s' in TaskConfig.", taskConfig.getTier()));
+          "Invalid tier '%s' in TaskConfig.", taskConfig.getTier());
 
       return tierConfig.tiers.get(taskConfig.getTier());
     }
