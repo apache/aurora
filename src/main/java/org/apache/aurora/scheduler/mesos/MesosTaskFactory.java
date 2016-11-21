@@ -120,7 +120,7 @@ public interface MesosTaskFactory {
     }
 
     private static String getJobSourceName(IJobKey jobkey) {
-      return String.format("%s.%s.%s", jobkey.getRole(), jobkey.getEnvironment(), jobkey.getName());
+      return String.join(".", jobkey.getRole(), jobkey.getEnvironment(), jobkey.getName());
     }
 
     private static String getJobSourceName(ITaskConfig task) {
@@ -133,12 +133,12 @@ public interface MesosTaskFactory {
 
     @VisibleForTesting
     static String getInstanceSourceName(ITaskConfig task, int instanceId) {
-      return String.format("%s.%s", getJobSourceName(task), instanceId);
+      return String.join(".", getJobSourceName(task), Integer.toString(instanceId));
     }
 
     @VisibleForTesting
     static String getInverseJobSourceName(IJobKey job) {
-      return String.format("%s.%s.%s", job.getName(), job.getEnvironment(), job.getRole());
+      return String.join(".", job.getName(), job.getEnvironment(), job.getRole());
     }
 
     private static byte[] serializeTask(IAssignedTask task) throws SchedulerException {

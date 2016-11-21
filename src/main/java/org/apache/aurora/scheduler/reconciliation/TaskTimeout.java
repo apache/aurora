@@ -131,7 +131,7 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
       } else {
         // Our service is not yet started.  We don't want to lose track of the task, so
         // we will try again later.
-        LOG.debug("Retrying timeout of task " + taskId + " in " + NOT_STARTED_RETRY);
+        LOG.debug("Retrying timeout of task {} in {}", taskId, NOT_STARTED_RETRY);
         // TODO(wfarner): This execution should not wait for a transaction, but a second executor
         // would be weird.
         executor.execute(this, NOT_STARTED_RETRY);

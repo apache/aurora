@@ -70,7 +70,7 @@ public class Webhook implements EventSubscriber {
    */
   @Subscribe
   public void taskChangedState(TaskStateChange stateChange) {
-    LOG.debug("Got an event: " + stateChange.toString());
+    LOG.debug("Got an event: {}", stateChange.toString());
     // Old state is not present because a scheduler just failed over. In that case we do not want to
     // resend the entire state.
     if (stateChange.getOldState().isPresent()) {

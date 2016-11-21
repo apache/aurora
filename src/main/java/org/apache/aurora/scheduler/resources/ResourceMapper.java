@@ -80,7 +80,9 @@ public interface ResourceMapper<T> {
 
       checkState(
           availablePorts.size() >= requestedPorts.size(),
-          String.format("Insufficient ports %d when matching %s", availablePorts.size(), task));
+          "Insufficient ports %d when matching %s",
+          availablePorts.size(),
+          task);
 
       Iterator<Integer> ports = availablePorts.iterator();
       Map<String, Integer> portMap =

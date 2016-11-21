@@ -203,8 +203,7 @@ public interface TaskAssigner {
             // Never attempt to match this offer/groupKey pair again.
             offerManager.banOffer(offer.getOffer().getId(), groupKey);
           }
-          LOG.debug("Agent " + offer.getOffer().getHostname()
-              + " vetoed task " + taskId + ": " + vetoes);
+          LOG.debug("Agent {} vetoed task {}: {}", offer.getOffer().getHostname(), taskId, vetoes);
         }
       }
 

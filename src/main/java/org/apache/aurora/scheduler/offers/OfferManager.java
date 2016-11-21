@@ -201,7 +201,7 @@ public interface OfferManager extends EventSubscriber {
     }
 
     void decline(OfferID id) {
-      LOG.debug("Declining offer " + id);
+      LOG.debug("Declining offer {}", id);
       driver.declineOffer(id, getOfferFilter());
     }
 

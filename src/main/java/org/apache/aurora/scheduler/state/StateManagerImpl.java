@@ -190,7 +190,9 @@ public class StateManagerImpl implements StateManager {
 
     Preconditions.checkState(
         changeResult == SUCCESS,
-        "Attempt to assign task " + taskId + " to " + slaveHost + " failed");
+        "Attempt to assign task %s to %s failed",
+        taskId,
+        slaveHost);
 
     return mutated.getAssignedTask();
   }
@@ -285,7 +287,8 @@ public class StateManagerImpl implements StateManager {
         case SAVE_STATE:
           Preconditions.checkState(
               upToDateTask.isPresent(),
-              "Operation expected task " + taskId + " to be present.");
+              "Operation expected task %s to be present.",
+              taskId);
 
           Optional<IScheduledTask> mutated = taskStore.mutateTask(taskId, task1 -> {
             ScheduledTask mutableTask = task1.newBuilder();
@@ -303,7 +306,8 @@ public class StateManagerImpl implements StateManager {
         case RESCHEDULE:
           Preconditions.checkState(
               upToDateTask.isPresent(),
-              "Operation expected task " + taskId + " to be present.");
+              "Operation expected task %s to be present.",
+              taskId);
           LOG.info("Task being rescheduled: " + taskId);
 
           ScheduleStatus newState;
@@ -340,7 +344,8 @@ public class StateManagerImpl implements StateManager {
         case DELETE:
           Preconditions.checkState(
               upToDateTask.isPresent(),
-              "Operation expected task " + taskId + " to be present.");
+              "Operation expected task %s to be present.",
+              taskId);
 
           events.add(deleteTasks(taskStore, ImmutableSet.of(taskId)));
           break;

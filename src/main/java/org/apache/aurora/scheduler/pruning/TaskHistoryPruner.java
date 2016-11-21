@@ -151,7 +151,7 @@ public class TaskHistoryPruner implements EventSubscriber {
       final String taskId,
       long timeRemaining) {
 
-    LOG.debug("Prune task " + taskId + " in " + timeRemaining + " ms.");
+    LOG.debug("Prune task {} in {} ms.", taskId, timeRemaining);
 
     executor.execute(
         shutdownOnError(

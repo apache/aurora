@@ -74,18 +74,18 @@ class LoggingInterceptor implements MethodInterceptor {
       }
     }
     String methodName = invocation.getMethod().getName();
-    String message = String.format("%s(%s)", methodName, String.join(", ", argStrings));
-    LOG.info(message);
+    String messageArgs = String.join(", ", argStrings);
+    LOG.info("{}({})", methodName, messageArgs);
     try {
       return invocation.proceed();
     } catch (Storage.TransientStorageException e) {
-      LOG.warn("Uncaught transient exception while handling " + message, e);
+      LOG.warn("Uncaught transient exception while handling {}({})", methodName, messageArgs, e);
       return Responses.addMessage(Responses.empty(), ResponseCode.ERROR_TRANSIENT, e);
     } catch (RuntimeException e) {
       // We need shiro's exceptions to bubble up to the Shiro servlet filter so we intentionally
       // do not swallow them here.
       Throwables.throwIfInstanceOf(e, ShiroException.class);
-      LOG.warn("Uncaught exception while handling " + message, e);
+      LOG.warn("Uncaught exception while handling {}({})", methodName, messageArgs, e);
       return Responses.addMessage(Responses.empty(), ResponseCode.ERROR, e);
     }
   }

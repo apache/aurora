@@ -135,14 +135,14 @@ public interface TaskScheduler extends EventSubscriber {
     private Set<String> scheduleTasks(MutableStoreProvider store, Iterable<String> tasks) {
       ImmutableSet<String> taskIds = ImmutableSet.copyOf(tasks);
       String taskIdValues = Joiner.on(",").join(taskIds);
-      LOG.debug("Attempting to schedule tasks " + taskIdValues);
+      LOG.debug("Attempting to schedule tasks {}", taskIdValues);
       ImmutableSet<IAssignedTask> assignedTasks =
           ImmutableSet.copyOf(Iterables.transform(
               store.getTaskStore().fetchTasks(Query.taskScoped(taskIds).byStatus(PENDING)),
               IScheduledTask::getAssignedTask));
 
       if (Iterables.isEmpty(assignedTasks)) {
-        LOG.warn("Failed to look up all tasks in a scheduling round: " + taskIdValues);
+        LOG.warn("Failed to look up all tasks in a scheduling round: {}", taskIdValues);
         return taskIds;
       }
 
@@ -151,7 +151,8 @@ public interface TaskScheduler extends EventSubscriber {
               .collect(Collectors.groupingBy(t -> t.getTask()))
               .entrySet()
               .size() == 1,
-          "Found multiple task groups for " + taskIdValues);
+          "Found multiple task groups for %s",
+          taskIdValues);
 
       Map<String, IAssignedTask> assignableTaskMap =
           assignedTasks.stream().collect(toMap(t -> t.getTaskId(), t -> t));

@@ -488,7 +488,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       if (action == ROLL_BACK) {
         updates.remove(job);
       } else {
-        checkState(!updates.containsKey(job), "Updater already exists for " + job);
+        checkState(!updates.containsKey(job), "Updater already exists for %s", job);
       }
 
       IJobUpdate jobUpdate = updateStore.fetchJobUpdate(key).get();
