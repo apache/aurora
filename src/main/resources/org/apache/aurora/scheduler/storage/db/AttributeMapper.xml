@@ -67,7 +67,6 @@
       a.host AS a_host,
       a.mode AS a_mode,
       a.slave_id AS a_slave_id,
-      a.slave_id AS v_slave_id,
       v.id AS v_id,
       v.name AS v_name,
       v.value AS v_value

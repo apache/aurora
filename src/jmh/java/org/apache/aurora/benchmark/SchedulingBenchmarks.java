@@ -13,12 +13,15 @@
  */
 package org.apache.aurora.benchmark;
 
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.EventBus;
 import com.google.inject.AbstractModule;
@@ -228,10 +231,14 @@ public class SchedulingBenchmarks {
     protected Set<String> schedule(Set<IScheduledTask> tasks) {
       return storage.write((Storage.MutateWork.Quiet<Set<String>>) store -> {
         Set<String> result = null;
-        for (IScheduledTask task : tasks) {
+
+        List<List<IScheduledTask>> partitionedTasks = Lists.newArrayList(
+            Iterators.partition(tasks.iterator(), 5));
+
+        for (List<IScheduledTask> partition : partitionedTasks) {
           result = taskScheduler.schedule(
               store,
-              ImmutableSet.of(task.getAssignedTask().getTaskId()));
+              org.apache.aurora.scheduler.base.Tasks.ids(partition));
         }
         return result;
       });
@@ -248,7 +255,7 @@ public class SchedulingBenchmarks {
       return new BenchmarkSettings.Builder()
           .setSiblingClusterUtilization(0.01)
           .setVictimClusterUtilization(0.01)
-          .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(100000))
+          .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(200000))
           .setTasks(new Tasks.Builder().build(0))
           .build();
     }
