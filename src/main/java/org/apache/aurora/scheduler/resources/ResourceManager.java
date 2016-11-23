@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.ResourceAggregate;
@@ -34,6 +35,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
 import org.apache.mesos.Protos.Resource;
 
+import static org.apache.aurora.scheduler.resources.ResourceType.BY_MESOS_NAME;
 import static org.apache.aurora.scheduler.resources.ResourceType.fromResource;
 import static org.apache.mesos.Protos.Offer;
 
@@ -69,8 +71,12 @@ public final class ResourceManager {
 
   private static final BinaryOperator<Double> REDUCE_VALUES = (l, r) -> l + r;
 
+  /**
+   * TODO(rdelvalle): Remove filters when arbitrary resources are fully supported (AURORA-1328).
+   */
   private static final Predicate<Resource> SUPPORTED_RESOURCE =
-      r -> ResourceType.BY_MESOS_NAME.containsKey(r.getName());
+      r -> BY_MESOS_NAME.containsKey(r.getName());
+
   /**
    * Gets offer resources matching specified {@link ResourceType}.
    *
@@ -79,7 +85,9 @@ public final class ResourceManager {
    * @return Offer resources matching {@link ResourceType}.
    */
   public static Iterable<Resource> getOfferResources(Offer offer, ResourceType type) {
-    return Iterables.filter(offer.getResourcesList(), r -> fromResource(r).equals(type));
+    return Iterables.filter(
+        Iterables.filter(offer.getResourcesList(), SUPPORTED_RESOURCE),
+        r -> fromResource(r).equals(type));
   }
 
   /**
@@ -89,7 +97,9 @@ public final class ResourceManager {
    * @return Mesos-revocable offer resources.
    */
   public static Iterable<Resource> getRevocableOfferResources(Offer offer) {
-    return Iterables.filter(offer.getResourcesList(), REVOCABLE);
+    return Iterables.filter(
+        offer.getResourcesList(),
+        Predicates.and(SUPPORTED_RESOURCE, REVOCABLE));
   }
 
   /**
@@ -99,7 +109,9 @@ public final class ResourceManager {
    * @return Non-Mesos-revocable offer resources.
    */
   public static Iterable<Resource> getNonRevocableOfferResources(Offer offer) {
-    return Iterables.filter(offer.getResourcesList(), NON_REVOCABLE);
+    return Iterables.filter(
+        offer.getResourcesList(),
+        Predicates.and(SUPPORTED_RESOURCE, NON_REVOCABLE));
   }
 
   /**
@@ -189,6 +201,7 @@ public final class ResourceManager {
    */
   public static Double quantityOfMesosResource(Iterable<Resource> resources, ResourceType type) {
     return StreamSupport.stream(resources.spliterator(), false)
+        .filter(r -> SUPPORTED_RESOURCE.apply(r))
         .filter(r -> fromResource(r).equals(type))
         .map(QUANTIFY_MESOS_RESOURCE)
         .reduce(REDUCE_VALUES)
@@ -238,8 +251,6 @@ public final class ResourceManager {
    * @return A {@link ResourceBag} instance.
    */
   public static ResourceBag bagFromMesosResources(Iterable<Resource> resources) {
-    // Filter out resources that Aurora does not yet support in order to avoid crashes
-    // TODO(rdelvalle): Remove filter when arbitrary resources are fully supported (AURORA-1328)
     return bagFromResources(
         Iterables.filter(resources, SUPPORTED_RESOURCE),
         MESOS_RESOURCE_TO_TYPE,
