@@ -14,9 +14,12 @@
 
 """A Mesos-customized entry point to the thermos_observer webserver."""
 
+import sys
+import thread
+import threading
 import time
 
-from twitter.common import app
+from twitter.common import app, log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
@@ -69,17 +72,30 @@ def initialize(options):
   return TaskObserver(path_detector, interval=polling_interval)
 
 
+def handle_error(exc_type, value, traceback):
+  """ Tear down the observer in case of unhandled errors.
+
+  By using ExceptionalThread throughout the observer we have ensured that sys.excepthook will
+  be called for every unhandled exception, even for those not originating in the main thread.
+  """
+  log.error("An unhandled error occured. Tearing down.", exc_info=(exc_type, value, traceback))
+  # TODO: In Python 3.4 we will be able to use threading.main_thread()
+  if not isinstance(threading.current_thread(), threading._MainThread):
+    thread.interrupt_main()
+
+
 def main(_, options):
   observer = initialize(options)
   observer.start()
   root_server = configure_server(observer)
 
-  thread = ExceptionalThread(target=lambda: root_server.run(options.ip, options.port, 'cherrypy'))
-  thread.daemon = True
-  thread.start()
+  server = ExceptionalThread(target=lambda: root_server.run(options.ip, options.port, 'cherrypy'))
+  server.daemon = True
+  server.start()
 
   sleep_forever()
 
 
+sys.excepthook = handle_error
 LogOptions.set_stderr_log_level('google:INFO')
 app.main()
