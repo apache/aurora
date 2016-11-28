@@ -126,8 +126,9 @@ public class TaskGroups implements EventSubscriber {
     }
   }
 
+  @VisibleForTesting
   @Inject
-  TaskGroups(
+  public TaskGroups(
       @AsyncExecutor DelayExecutor executor,
       TaskGroupsSettings settings,
       TaskScheduler taskScheduler,

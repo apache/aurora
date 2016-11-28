@@ -152,5 +152,4 @@ public class OffersTest extends EasyMockTest {
   private static List toList(String json) {
     return new Gson().fromJson(json, List.class);
   }
-
 }

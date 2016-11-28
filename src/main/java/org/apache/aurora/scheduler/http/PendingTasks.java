@@ -13,6 +13,10 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import javax.inject.Inject;
@@ -22,7 +26,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.aurora.scheduler.metadata.NearestFit;
 import org.apache.aurora.scheduler.scheduling.TaskGroups;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.node.ObjectNode;
 
 /**
  * Servlet that exposes detailed information about tasks that are pending.
@@ -31,10 +39,12 @@ import org.apache.aurora.scheduler.scheduling.TaskGroups;
 public class PendingTasks {
 
   private final TaskGroups taskGroups;
+  private final NearestFit nearestFit;
 
   @Inject
-  PendingTasks(TaskGroups taskGroups) {
+  PendingTasks(TaskGroups taskGroups, NearestFit nearestFit) {
     this.taskGroups = Objects.requireNonNull(taskGroups);
+    this.nearestFit = Objects.requireNonNull(nearestFit);
   }
 
   /**
@@ -44,7 +54,24 @@ public class PendingTasks {
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  public Response getOffers() {
-    return Response.ok(taskGroups.getGroups()).build();
+  public Response getOffers() throws IOException {
+    // Adding reason, received from NearestFit#getPendingReasons() to the JSON Object.
+    Map<String, List<String>> taskGroupReasonMap =
+        nearestFit.getPendingReasons(taskGroups.getGroups());
+    // Adding the attribute "reason" to each of the JSON Objects in the JsonNode.
+    ObjectMapper mapper = new ObjectMapper();
+    JsonNode jsonNode = mapper.valueToTree(taskGroups.getGroups());
+    Iterator<JsonNode> jsonNodeIterator = jsonNode.iterator();
+
+    while (jsonNodeIterator.hasNext()) {
+      JsonNode pendingTask = jsonNodeIterator.next();
+
+      // Retrieving the reasons corresponding to this pendingTask.
+      List<String> reasons = taskGroupReasonMap.get(pendingTask.get("name").asText());
+      // Adding the reasons corresponding to the pendingTask.
+      ((ObjectNode) pendingTask).put("reason", reasons.toString());
+    }
+    return Response.ok(jsonNode).build();
   }
+
 }

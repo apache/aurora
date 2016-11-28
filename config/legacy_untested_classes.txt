@@ -25,7 +25,6 @@ org/apache/aurora/scheduler/http/Offers$2
 org/apache/aurora/scheduler/http/Offers$3
 org/apache/aurora/scheduler/http/Offers$4
 org/apache/aurora/scheduler/http/Offers$5
-org/apache/aurora/scheduler/http/PendingTasks
 org/apache/aurora/scheduler/http/Quotas
 org/apache/aurora/scheduler/http/Quotas$1
 org/apache/aurora/scheduler/http/Quotas$2

@@ -17,29 +17,34 @@ import java.util.Collection;
 import java.util.Queue;
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.codehaus.jackson.annotate.JsonIgnore;
 
 import static org.apache.aurora.GuavaUtils.toImmutableSet;
 
 /**
  * A group of task IDs that are eligible for scheduling, but may be waiting for a backoff to expire.
  */
-class TaskGroup {
+public class TaskGroup {
   private final TaskGroupKey key;
   private long penaltyMs;
   private final Queue<String> tasks;
 
-  TaskGroup(TaskGroupKey key, String initialTaskId) {
+  @VisibleForTesting
+  public TaskGroup(TaskGroupKey key, String initialTaskId) {
     this.key = key;
     this.penaltyMs = 0;
     this.tasks = Lists.newLinkedList();
     this.tasks.add(initialTaskId);
   }
 
-  synchronized TaskGroupKey getKey() {
+  // This class is serialized by the PendingTasks endpoint, but the key is exposed via getName().
+  @JsonIgnore
+  public synchronized TaskGroupKey getKey() {
     return key;
   }
 
@@ -76,4 +81,5 @@ class TaskGroup {
   public synchronized long getPenaltyMs() {
     return penaltyMs;
   }
+
 }

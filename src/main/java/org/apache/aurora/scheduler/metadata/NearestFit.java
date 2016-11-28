@@ -13,8 +13,13 @@
  */
 package org.apache.aurora.scheduler.metadata;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import javax.inject.Inject;
 
@@ -28,6 +33,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
 
+import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -38,6 +44,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.scheduling.TaskGroup;
 
 /**
  * Tracks vetoes against scheduling decisions and maintains the closest fit among all the vetoes
@@ -52,8 +59,7 @@ public class NearestFit implements EventSubscriber {
 
   private final LoadingCache<TaskGroupKey, Fit> fitByGroupKey;
 
-  @VisibleForTesting
-  NearestFit(Ticker ticker) {
+  public NearestFit(Ticker ticker) {
     fitByGroupKey = CacheBuilder.newBuilder()
         .expireAfterWrite(EXPIRATION.getValue(), EXPIRATION.getUnit().getTimeUnit())
         .ticker(ticker)
@@ -116,6 +122,20 @@ public class NearestFit implements EventSubscriber {
   public synchronized void vetoed(Vetoed vetoEvent) {
     Objects.requireNonNull(vetoEvent);
     fitByGroupKey.getUnchecked(vetoEvent.getGroupKey()).maybeUpdate(vetoEvent.getVetoes());
+  }
+
+  /**
+   * Determine the pending reason, for each of the given tasks in taskGroups.
+   *
+   * @param taskGroups Group of pending tasks.
+   * @return A map with key=String (the taskgroup key) and value=List of reasons.
+   */
+  public synchronized Map<String, List<String>> getPendingReasons(Iterable<TaskGroup> taskGroups) {
+    return StreamSupport.stream(taskGroups.spliterator(), false).map(t -> {
+      List<String> reasons = getNearestFit(t.getKey()).stream()
+          .map(Veto::getReason).collect(Collectors.toList());
+      return new HashMap.SimpleEntry<>(t.getKey().toString(), reasons);
+    }).collect(GuavaUtils.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   private static class Fit {
