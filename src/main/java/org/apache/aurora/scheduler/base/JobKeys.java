@@ -144,7 +144,7 @@ public final class JobKeys {
       throws IllegalArgumentException {
 
     for (IJobKey jobKey : jobKeys) {
-      checkArgument(isValid(jobKey), "Invalid job key format:" + jobKey);
+      checkArgument(isValid(jobKey), "Invalid job key format: %s", jobKey);
     }
 
     return jobKeys;

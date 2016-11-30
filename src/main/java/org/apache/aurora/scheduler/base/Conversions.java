@@ -74,7 +74,7 @@ public final class Conversions {
    */
   public static ScheduleStatus convertProtoState(TaskState taskState) {
     ScheduleStatus status = STATE_TRANSLATION.get(taskState);
-    Preconditions.checkArgument(status != null, "Unrecognized task state " + taskState);
+    Preconditions.checkArgument(status != null, "Unrecognized task state %s", taskState);
     return status;
   }
 

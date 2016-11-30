@@ -93,13 +93,13 @@ public class TaskReconciler extends AbstractIdleService {
 
       checkArgument(
           explicitDelayMinutes >= 0,
-          "Invalid explicit reconciliation delay: " + explicitDelayMinutes);
+          "Invalid explicit reconciliation delay: %s", explicitDelayMinutes);
       checkArgument(
           implicitDelayMinutes >= 0L,
-          "Invalid implicit reconciliation delay: " + implicitDelayMinutes);
+          "Invalid implicit reconciliation delay: %s", implicitDelayMinutes);
       checkArgument(
           explicitBatchDelaySeconds >= 0L,
-          "Invalid explicit batch reconciliation delay: " + explicitBatchDelaySeconds
+          "Invalid explicit batch reconciliation delay: %s", explicitBatchDelaySeconds
       );
     }
   }

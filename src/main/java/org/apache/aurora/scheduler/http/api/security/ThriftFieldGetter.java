@@ -44,12 +44,10 @@ class ThriftFieldGetter<T extends TBase<T, F>, F extends TFieldIdEnum, V extends
     StructMetaData structMetaData = (StructMetaData) fieldValueMetaData;
     checkArgument(
         valueClass.equals(structMetaData.structClass),
-        "Value class "
-            + valueClass.getName()
-            + " does not match field metadata for "
-            + fieldId
-            + " (expected " + structMetaData.structClass
-            + ").");
+        "Value class %s does not match field metadata for %s (expected %s)",
+        valueClass.getName(),
+        fieldId,
+        structMetaData.structClass);
 
     this.fieldId = fieldId;
   }

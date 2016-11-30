@@ -149,7 +149,7 @@ public final class GuiceUtils {
         ImmutableList.copyOf(wrapInterface.getMethods()),
         Predicates.and(Predicates.not(IS_WHITELISTED), Predicates.not(VOID_METHOD))));
     Preconditions.checkArgument(disallowed.isEmpty(),
-        "Non-void methods must be explicitly whitelisted with @AllowUnchecked: " + disallowed);
+        "Non-void methods must be explicitly whitelisted with @AllowUnchecked: %s", disallowed);
 
     Matcher<Method> matcher =
         Matchers.not(WHITELIST_MATCHER).and(interfaceMatcher(wrapInterface, false));

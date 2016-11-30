@@ -40,8 +40,8 @@ class AuroraCronJobFactory implements JobFactory {
   @Override
   public Job newJob(TriggerFiredBundle bundle, Scheduler scheduler) throws SchedulerException {
     checkState(AuroraCronJob.class.equals(bundle.getJobDetail().getJobClass()),
-        "Quartz tried to run a type of job we don't know about: "
-            + bundle.getJobDetail().getJobClass());
+        "Quartz tried to run a type of job we don't know about: %s",
+        bundle.getJobDetail().getJobClass());
 
     return auroraCronJobProvider.get();
   }

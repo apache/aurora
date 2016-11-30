@@ -348,7 +348,7 @@ public final class CrontabEntry {
 
     Parser(String schedule) throws IllegalArgumentException {
       Matcher matcher = CRONTAB_ENTRY.matcher(schedule);
-      checkArgument(matcher.matches(), "Invalid cron schedule " + schedule);
+      checkArgument(matcher.matches(), "Invalid cron schedule %s", schedule);
 
       rawMinute = requireNonNull(matcher.group("minute"));
       rawHour = requireNonNull(matcher.group("hour"));
@@ -393,7 +393,7 @@ public final class CrontabEntry {
         int number = Integer.parseInt(matcher.group("number"));
         Range<Integer> range = Range.singleton(number).canonical(DiscreteDomain.integers());
 
-        checkArgument(enclosure.encloses(range), enclosure + " does not enclose " + range);
+        checkArgument(enclosure.encloses(range), "%s does not enclose %s", enclosure, range);
 
         return ImmutableRangeSet.of(range);
       }
@@ -404,7 +404,7 @@ public final class CrontabEntry {
         int upper = Integer.parseInt(matcher.group("upper"));
         Range<Integer> range = Range.closed(lower, upper).canonical(DiscreteDomain.integers());
 
-        checkArgument(enclosure.encloses(range), enclosure + " does not enclose " + range);
+        checkArgument(enclosure.encloses(range), "%s does not enclose %s", enclosure, range);
 
         return ImmutableRangeSet.of(range);
       }
@@ -430,9 +430,9 @@ public final class CrontabEntry {
         final int skip = Integer.parseInt(matcher.group("skip"));
         Range<Integer> range = Range.closed(lower, upper).canonical(DiscreteDomain.integers());
 
-        checkArgument(enclosure.encloses(range), enclosure + " does not enclose " + range);
-        checkArgument(skip > 0, "skip value " + skip + " must be >0");
-        checkArgument(skip < upper, "skip value " + skip + " must be smaller than " + upper);
+        checkArgument(enclosure.encloses(range), "%s does not enclose %s", enclosure, range);
+        checkArgument(skip > 0, "skip value %s must be >0", skip);
+        checkArgument(skip < upper, "skip value %s must be smaller than %s", skip, upper);
 
         ImmutableRangeSet.Builder<Integer> rangeSet = ImmutableRangeSet.builder();
         for (int i = lower; range.contains(i); i += skip) {
