@@ -414,7 +414,7 @@ codeQualityTasks.each {
 
 checkstyle {
   sourceSets = [sourceSets.main , sourceSets.test, sourceSets.jmh]
-  toolVersion = '6.13'
+  toolVersion = '7.3'
 }
 
 findbugs {
@@ -432,7 +432,7 @@ tasks.withType(FindBugs) {
 }
 
 pmd {
-  toolVersion = '5.4.1'
+  toolVersion = '5.5.2'
   consoleOutput = true
 }
 
