@@ -56,7 +56,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, RUNNING)),
             makeTask(ImmutableMap.of(200L, PENDING, 250L, ASSIGNED, 350L, STARTING))),
         Range.closedOpen(0L, 300L));
-    assertEquals(50L, actual);
+    assertEquals(75.0, actual);
   }
 
   @Test
@@ -67,7 +67,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, RUNNING)),
             makeTask(ImmutableMap.of(200L, PENDING, 250L, ASSIGNED, 350L, STARTING))),
         Range.closedOpen(0L, 300L));
-    assertEquals(100L, actual);
+    assertEquals(100.0, actual);
   }
 
   @Test
@@ -77,7 +77,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(50L, PENDING)),
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, KILLED))),
         Range.closedOpen(0L, 300L));
-    assertEquals(0L, actual);
+    assertEquals(0.0, actual);
   }
 
   @Test
@@ -87,7 +87,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(50L, PENDING)),
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED))),
         Range.closedOpen(0L, 300L));
-    assertEquals(100L, actual);
+    assertEquals(100.0, actual);
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -117,7 +117,7 @@ public class SlaAlgorithmTest {
                 200L, RUNNING,
                 300L, KILLED))), // Ignored due to being terminal.
         Range.closedOpen(0L, 500L));
-    assertEquals(100L, actual);
+    assertEquals(150.0, actual);
   }
 
   @Test
@@ -140,7 +140,7 @@ public class SlaAlgorithmTest {
                 200L, RUNNING,
                 300L, KILLED))), // Ignored due to being terminal.
         Range.closedOpen(0L, 500L));
-    assertEquals(200L, actual);
+    assertEquals(200.0, actual);
   }
 
   @Test
@@ -151,7 +151,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(50L, PENDING, 100L, STARTING, 200L, RUNNING, 300L, KILLED)),
             makeTask(ImmutableMap.of(50L, PENDING, 100L, STARTING, 200L, KILLED))),
         Range.closedOpen(0L, 500L));
-    assertEquals(0L, actual);
+    assertEquals(0.0, actual);
   }
 
   @Test
@@ -168,7 +168,7 @@ public class SlaAlgorithmTest {
                 200L, RUNNING,
                 300L, KILLED))), // Ignored due to being terminal.
         Range.closedOpen(0L, 500L));
-    assertEquals(130L, actual);
+    assertEquals(215.0, actual);
   }
 
   @Test
@@ -180,7 +180,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, STARTING, 400L, RUNNING)),
             makeTask(ImmutableMap.of(50L, PENDING, 100L, ASSIGNED, 150L, STARTING, 200L, RUNNING))),
         Range.closedOpen(0L, 500L));
-    assertEquals(150L, actual);
+    assertEquals(150.0, actual);
   }
 
   @Test
@@ -190,7 +190,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(50L, PENDING)),
             makeTask(ImmutableMap.of(50L, PENDING, 100L, RUNNING, 200L, KILLED))),
         Range.closedOpen(0L, 500L));
-    assertEquals(0L, actual);
+    assertEquals(0.0, actual);
   }
 
   @Test
@@ -204,7 +204,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(100L, PENDING, 260L, ASSIGNED)),
             makeTask(ImmutableMap.of(100L, PENDING, 400L, ASSIGNED))),
         Range.closedOpen(200L, 300L));
-    assertEquals(100L, actual);
+    assertEquals(130.0, actual);
   }
 
   @Test
@@ -213,7 +213,7 @@ public class SlaAlgorithmTest {
     Number actual = JOB_UPTIME_50.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
         Range.closed(0L, now));
-    assertEquals(50, actual);
+    assertEquals(50.5, actual);
   }
 
   @Test
@@ -222,7 +222,7 @@ public class SlaAlgorithmTest {
     Number actual = JOB_UPTIME_75.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
         Range.closed(0L, now));
-    assertEquals(25, actual);
+    assertEquals(25.75, actual);
   }
 
   @Test
@@ -231,7 +231,7 @@ public class SlaAlgorithmTest {
     Number actual = JOB_UPTIME_90.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
         Range.closed(0L, now));
-    assertEquals(10, actual);
+    assertEquals(10.9, actual);
   }
 
   @Test
@@ -240,7 +240,7 @@ public class SlaAlgorithmTest {
     Number actual = JOB_UPTIME_95.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
         Range.closed(0L, now));
-    assertEquals(5, actual);
+    assertEquals(5.95, actual);
   }
 
   @Test
@@ -249,7 +249,7 @@ public class SlaAlgorithmTest {
     Number actual = JOB_UPTIME_99.getAlgorithm().calculate(
         makeUptimeTasks(100, now),
         Range.closed(0L, now));
-    assertEquals(1, actual);
+    assertEquals(1.99, actual);
   }
 
   @Test
@@ -258,7 +258,7 @@ public class SlaAlgorithmTest {
     Number actual = JOB_UPTIME_99.getAlgorithm().calculate(
         new LinkedList<IScheduledTask>(),
         Range.closed(0L, now));
-    assertEquals(0, actual);
+    assertEquals(0.0, actual);
   }
 
   @Test
@@ -267,7 +267,7 @@ public class SlaAlgorithmTest {
     Set<IScheduledTask> instances = makeUptimeTasks(100, now);
     instances.add(makeTask(ImmutableMap.of(now - 5000, RUNNING, now - 3000, KILLED)));
     Number actual = JOB_UPTIME_99.getAlgorithm().calculate(instances, Range.closed(0L, now));
-    assertEquals(1, actual);
+    assertEquals(1.99, actual);
   }
 
   @Test
@@ -276,7 +276,7 @@ public class SlaAlgorithmTest {
     Set<IScheduledTask> instances = makeUptimeTasks(100, now);
     instances.add(makeTask(ImmutableMap.of(now - 5000, RUNNING, now - 3000, RESTARTING)));
     Number actual = JOB_UPTIME_99.getAlgorithm().calculate(instances, Range.closed(0L, now));
-    assertEquals(1, actual);
+    assertEquals(1.99, actual);
   }
 
   @Test

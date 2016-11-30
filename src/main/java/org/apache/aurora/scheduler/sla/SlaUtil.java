@@ -15,7 +15,7 @@ package org.apache.aurora.scheduler.sla;
 
 import java.util.List;
 
-import com.google.common.collect.Ordering;
+import com.google.common.math.Quantiles;
 
 /**
  * Utility methods for the SLA calculations.
@@ -27,22 +27,34 @@ final class SlaUtil {
   }
 
   /**
-   * Reports the percentile value from the given list ordered in a non-descending order.
-   * Example: [30, 60, 70, 90], the 75 percentile is 30 (i.e. 75% of elements are greater).
+   * Reports the percentile value from the continuous distribution described by a given list of
+   * samples.
+   *
+   * Example: [30, 60, 70, 90], the 50 percentile is 65.0 (i.e. larger values cover 50% of the PDF
+   * (Probability Density Function)).
+   * Example: [30, 60, 70, 90], the 75 percentile is 52.5 (i.e. larger values cover 75% of the PDF).
+   * Example: [30, 60, 70, 90], the 90 percentile is 39.0 (i.e. larger values cover 85% of the PDF).
+   * Example: [30, 60, 70, 90], the 99 percentile is 30.9 (i.e. larger values cover 95% of the PDF).
    *
    * @param list List to calculate percentile for.
    * @param percentile Percentile value to apply.
    * @return Element at the given percentile.
    */
-  static Long percentile(List<Long> list, double percentile) {
+  static Number percentile(List<Long> list, double percentile) {
     if (list.isEmpty()) {
-      return 0L;
+      return 0.0;
     }
 
-    List<Long> sorted = Ordering.natural().immutableSortedCopy(list);
-    int total = sorted.size();
-    int percentileElements = (int) Math.floor(percentile / 100 * total);
-    int index = total - percentileElements - 1;
-    return index >= 0 && index < total ? sorted.get(index) : 0L;
+    // index should be a full integer. use quantile scale to allow reporting of percentile values
+    // such as p99.9.
+    double percentileCopy = percentile;
+    int quantileScale = 100;
+    while ((percentileCopy - Math.floor(percentileCopy)) > 0) {
+      quantileScale *= 10;
+      percentileCopy *= 10;
+    }
+
+    return Quantiles.scale(quantileScale).index((int) Math.floor(quantileScale - percentileCopy))
+        .compute(list);
   }
 }

@@ -176,7 +176,7 @@ interface SlaAlgorithm {
               event -> timeFrame.upperEndpoint() - event.getTimestamp(),
               TASK_TO_EVENT)).toList();
 
-      return (int) Math.floor((double) SlaUtil.percentile(uptimes, percentile) / 1000);
+      return (double) SlaUtil.percentile(uptimes, percentile) / 1000;
     }
   }
 
