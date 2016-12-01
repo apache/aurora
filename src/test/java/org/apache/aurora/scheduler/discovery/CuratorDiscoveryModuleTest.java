@@ -13,27 +13,37 @@
  */
 package org.apache.aurora.scheduler.discovery;
 
-import java.net.InetSocketAddress;
-import java.util.Optional;
-
 import com.google.common.collect.ImmutableList;
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
+import com.google.inject.Binder;
+import com.google.inject.Module;
 
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.application.ShutdownRegistry.ShutdownRegistryImpl;
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.testing.TearDownTestCase;
+import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 import org.apache.curator.framework.api.ACLProvider;
 import org.apache.zookeeper.data.ACL;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
-public class CuratorDiscoveryModuleTest extends TearDownTestCase {
+public class CuratorDiscoveryModuleTest extends AbstractDiscoveryModuleTest {
+
+  @Override
+  void bindExtraRequirements(Binder binder) {
+    ShutdownRegistryImpl shutdownRegistry = new ShutdownRegistryImpl();
+    binder.bind(ShutdownRegistry.class).toInstance(shutdownRegistry);
+    addTearDown(shutdownRegistry::execute);
+  }
+
+  @Override
+  Module createModule(String discoveryPath, ZooKeeperConfig zooKeeperConfig) {
+    return new CuratorServiceDiscoveryModule(discoveryPath, zooKeeperConfig);
+  }
+
+  @Override
+  boolean isCurator() {
+    return false;
+  }
 
   @Test
   public void testSingleACLProvider() {
@@ -53,37 +63,5 @@ public class CuratorDiscoveryModuleTest extends TearDownTestCase {
   @Test(expected = IllegalArgumentException.class)
   public void testSingleACLProviderEmpty() {
     new CuratorServiceDiscoveryModule.SingleACLProvider(ImmutableList.of());
-  }
-
-  @Test
-  public void testBindingContract() {
-    ZooKeeperConfig zooKeeperConfig =
-        new ZooKeeperConfig(
-            ImmutableList.of(InetSocketAddress.createUnresolved("localhost", 42)),
-            Optional.of("/chroot"),
-            false, // inProcess
-            Amount.of(1, Time.DAYS),
-            Optional.of(Credentials.digestCredentials("test", "user")));
-
-    Injector injector =
-        Guice.createInjector(
-            new AbstractModule() {
-              @Override
-              protected void configure() {
-                bind(ServiceDiscoveryBindings.ZOO_KEEPER_CLUSTER_KEY)
-                    .toInstance(
-                        ImmutableList.of(InetSocketAddress.createUnresolved("localhost", 42)));
-                bind(ServiceDiscoveryBindings.ZOO_KEEPER_ACL_KEY)
-                    .toInstance(ZooKeeperUtils.OPEN_ACL_UNSAFE);
-
-                ShutdownRegistryImpl shutdownRegistry = new ShutdownRegistryImpl();
-                binder().bind(ShutdownRegistry.class).toInstance(shutdownRegistry);
-                addTearDown(shutdownRegistry::execute);
-              }
-            },
-            new CuratorServiceDiscoveryModule("/discovery/path", zooKeeperConfig));
-
-    assertNotNull(injector.getBinding(SingletonService.class).getProvider().get());
-    assertNotNull(injector.getBinding(ServiceGroupMonitor.class).getProvider().get());
   }
 }

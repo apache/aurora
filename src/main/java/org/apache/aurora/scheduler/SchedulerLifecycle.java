@@ -46,8 +46,8 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.StateMachine;
 import org.apache.aurora.common.util.StateMachine.Transition;
-import org.apache.aurora.scheduler.discovery.SingletonService;
-import org.apache.aurora.scheduler.discovery.SingletonService.LeaderControl;
+import org.apache.aurora.common.zookeeper.SingletonService;
+import org.apache.aurora.common.zookeeper.SingletonService.LeaderControl;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.discovery.SingletonService.LeadershipListener;
+import static org.apache.aurora.common.zookeeper.SingletonService.LeadershipListener;
 
 /**
  * The central driver of the scheduler runtime lifecycle.  Handles the transitions from startup and

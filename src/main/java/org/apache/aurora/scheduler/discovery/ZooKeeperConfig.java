@@ -14,11 +14,14 @@
 package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
-import java.util.Optional;
+
+import com.google.common.base.Optional;
 
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.zookeeper.Credentials;
+import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 
 import static java.util.Objects.requireNonNull;
 
@@ -32,18 +35,21 @@ public class ZooKeeperConfig {
   /**
    * Creates a new client configuration with defaults for the session timeout and credentials.
    *
+   * @param useCurator {@code true} to use Apache Curator; otherwise commons/zookeeper is used.
    * @param servers ZooKeeper server addresses.
    * @return A new configuration.
    */
-  public static ZooKeeperConfig create(Iterable<InetSocketAddress> servers) {
+  public static ZooKeeperConfig create(boolean useCurator, Iterable<InetSocketAddress> servers) {
     return new ZooKeeperConfig(
+        useCurator,
         servers,
-        Optional.empty(), // chrootPath
+        Optional.absent(), // chrootPath
         false,
         ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT,
-        Optional.empty()); // credentials
+        Optional.absent()); // credentials
   }
 
+  private final boolean useCurator;
   private final Iterable<InetSocketAddress> servers;
   private final boolean inProcess;
   private final Amount<Integer, Time> sessionTimeout;
@@ -60,12 +66,14 @@ public class ZooKeeperConfig {
    * @param credentials ZooKeeper authentication credentials.
    */
   ZooKeeperConfig(
+      boolean useCurator,
       Iterable<InetSocketAddress> servers,
       Optional<String> chrootPath,
       boolean inProcess,
       Amount<Integer, Time> sessionTimeout,
       Optional<Credentials> credentials) {
 
+    this.useCurator = useCurator;
     this.servers = MorePreconditions.checkNotBlank(servers);
     this.chrootPath = requireNonNull(chrootPath);
     this.inProcess = inProcess;
@@ -82,11 +90,16 @@ public class ZooKeeperConfig {
    */
   public ZooKeeperConfig withCredentials(Credentials newCredentials) {
     return new ZooKeeperConfig(
+        useCurator,
         servers,
         chrootPath,
         inProcess,
         sessionTimeout,
         Optional.of(newCredentials));
+  }
+
+  boolean isUseCurator() {
+    return useCurator;
   }
 
   public Iterable<InetSocketAddress> getServers() {

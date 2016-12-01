@@ -15,10 +15,10 @@ package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
 import java.util.List;
-import java.util.Optional;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 
@@ -27,12 +27,23 @@ import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.zookeeper.Credentials;
+import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A factory that creates a {@link ZooKeeperConfig} instance based on command line argument
  * values.
  */
 public final class FlaggedZooKeeperConfig {
+  private static final Logger LOG = LoggerFactory.getLogger(FlaggedZooKeeperConfig.class);
+
+  @CmdLine(name = "zk_use_curator",
+      help = "DEPRECATED: Uses Apache Curator as the zookeeper client; otherwise a copy of Twitter "
+          + "commons/zookeeper (the legacy library) is used.")
+  private static final Arg<Boolean> USE_CURATOR = Arg.create(true);
+
   @CmdLine(name = "zk_in_proc",
       help = "Launches an embedded zookeeper server for local testing causing -zk_endpoints "
           + "to be ignored if specified.")
@@ -63,9 +74,13 @@ public final class FlaggedZooKeeperConfig {
    * @return Configuration instance.
    */
   public static ZooKeeperConfig create() {
+    if (USE_CURATOR.hasAppliedValue()) {
+      LOG.warn("The -zk_use_curator flag is deprecated and will be removed in a future release.");
+    }
     return new ZooKeeperConfig(
+        USE_CURATOR.get(),
         ZK_ENDPOINTS.get(),
-        Optional.ofNullable(CHROOT_PATH.get()),
+        Optional.fromNullable(CHROOT_PATH.get()),
         IN_PROCESS.get(),
         SESSION_TIMEOUT.get(),
         getCredentials(DIGEST_CREDENTIALS.get()));
@@ -73,7 +88,7 @@ public final class FlaggedZooKeeperConfig {
 
   private static Optional<Credentials> getCredentials(@Nullable String userAndPass) {
     if (userAndPass == null) {
-      return Optional.empty();
+      return Optional.absent();
     }
 
     List<String> parts = ImmutableList.copyOf(Splitter.on(":").split(userAndPass));

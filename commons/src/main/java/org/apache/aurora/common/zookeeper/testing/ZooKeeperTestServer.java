@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.discovery.testing;
+package org.apache.aurora.common.zookeeper.testing;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,6 +19,8 @@ import java.net.InetSocketAddress;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.zookeeper.server.NIOServerCnxnFactory;
 import org.apache.zookeeper.server.ServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
@@ -31,6 +33,8 @@ import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
  * <p>This is ONLY meant to be used for testing.
  */
 public class ZooKeeperTestServer {
+
+  static final Amount<Integer, Time> DEFAULT_SESSION_TIMEOUT = Amount.of(100, Time.MILLISECONDS);
 
   private final File dataDir;
   private final File snapDir;
@@ -72,6 +76,22 @@ public class ZooKeeperTestServer {
    * Stops the zookeeper server.
    */
   public void stop() {
+    shutdownNetwork();
+  }
+
+  /**
+   * Starts zookeeper back up on the last used port.
+   */
+  final void restartNetwork() throws IOException, InterruptedException {
+    checkEphemeralPortAssigned();
+    Preconditions.checkState(connectionFactory == null);
+    startNetwork();
+  }
+
+  /**
+   * Shuts down the in-process zookeeper network server.
+   */
+  final void shutdownNetwork() {
     if (connectionFactory != null) {
       connectionFactory.shutdown(); // Also shuts down zooKeeperServer.
       connectionFactory = null;

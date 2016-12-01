@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.discovery;
+package org.apache.aurora.common.zookeeper;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,9 +38,6 @@ import org.apache.aurora.common.thrift.Status;
 
 import static java.util.Objects.requireNonNull;
 
-/**
- * Encodes a {@link ServiceInstance} as a JSON object.
- */
 class JsonCodec implements Codec<ServiceInstance> {
 
   private static void assertRequiredField(String fieldName, Object fieldValue) {
@@ -70,7 +67,7 @@ class JsonCodec implements Codec<ServiceInstance> {
     private final EndpointSchema serviceEndpoint;
     private final Map<String, EndpointSchema> additionalEndpoints;
     private final Status status;
-    @Nullable private final Integer shard;
+    private final @Nullable Integer shard;
 
     ServiceInstanceSchema(ServiceInstance instance) {
       serviceEndpoint = new EndpointSchema(instance.getServiceEndpoint());
@@ -103,16 +100,11 @@ class JsonCodec implements Codec<ServiceInstance> {
     }
   }
 
-  /**
-   * The encoding for service instance data in ZooKeeper expected by Aurora clients.
-   */
-  static final Codec<ServiceInstance> INSTANCE = new JsonCodec();
-
   private static final Charset ENCODING = Charsets.UTF_8;
 
   private final Gson gson;
 
-  private JsonCodec() {
+  JsonCodec() {
     this(new Gson());
   }
 

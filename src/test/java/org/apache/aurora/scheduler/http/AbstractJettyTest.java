@@ -48,9 +48,9 @@ import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.app.LifecycleModule;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.cron.CronJobManager;
-import org.apache.aurora.scheduler.discovery.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
@@ -132,8 +132,9 @@ public abstract class AbstractJettyTest extends EasyMockTest {
             bindMock(Thread.UncaughtExceptionHandler.class);
             bindMock(TaskGroups.TaskGroupBatchWorker.class);
 
-            bind(ServletContextListener.class)
-                .toProvider(() -> makeServletContextListener(injector, getChildServletModule()));
+            bind(ServletContextListener.class).toProvider(() -> {
+              return makeServletContextListener(injector, getChildServletModule());
+            });
           }
         },
         new JettyServerModule(false));
@@ -146,12 +147,12 @@ public abstract class AbstractJettyTest extends EasyMockTest {
     expect(serviceGroupMonitor.get()).andAnswer(schedulers::get).anyTimes();
   }
 
-  void setLeadingScheduler(String host, int port) {
+  protected void setLeadingScheduler(String host, int port) {
     schedulers.set(
         ImmutableSet.of(new ServiceInstance().setServiceEndpoint(new Endpoint(host, port))));
   }
 
-  void unsetLeadingSchduler() {
+  protected void unsetLeadingSchduler() {
     schedulers.set(ImmutableSet.of());
   }
 
@@ -161,7 +162,9 @@ public abstract class AbstractJettyTest extends EasyMockTest {
       ServiceManagerIface service =
           injector.getInstance(Key.get(ServiceManagerIface.class, AppStartup.class));
       service.startAsync().awaitHealthy();
-      addTearDown(() -> service.stopAsync().awaitStopped(5L, TimeUnit.SECONDS));
+      addTearDown(() -> {
+        service.stopAsync().awaitStopped(5L, TimeUnit.SECONDS);
+      });
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }

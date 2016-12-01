@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.discovery;
+package org.apache.aurora.scheduler.app;
 
 import java.io.Closeable;
 import java.util.function.Supplier;
@@ -29,7 +29,7 @@ public interface ServiceGroupMonitor extends Supplier<ImmutableSet<ServiceInstan
    * Indicates a problem initiating monitoring of a service group.
    */
   class MonitorException extends Exception {
-    MonitorException(String message, Throwable cause) {
+    public MonitorException(String message, Throwable cause) {
       super(message, cause);
     }
   }

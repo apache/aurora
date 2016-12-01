@@ -21,10 +21,13 @@ import java.util.function.Predicate;
 
 import com.google.common.collect.ImmutableMap;
 
+import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
-import org.apache.aurora.scheduler.discovery.testing.BaseZooKeeperTest;
+import org.apache.aurora.common.zookeeper.ServerSet;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
@@ -35,6 +38,7 @@ class BaseCuratorDiscoveryTest extends BaseZooKeeperTest {
 
   static final String GROUP_PATH = "/group/root";
   static final String MEMBER_TOKEN = "member_";
+  static final Codec<ServiceInstance> CODEC = ServerSet.JSON_CODEC;
   static final int PRIMARY_PORT = 42;
 
   private CuratorFramework client;
@@ -51,7 +55,7 @@ class BaseCuratorDiscoveryTest extends BaseZooKeeperTest {
     groupCache.getListenable().addListener((c, event) -> groupEvents.put(event));
 
     Predicate<String> memberSelector = name -> name.contains(MEMBER_TOKEN);
-    groupMonitor = new CuratorServiceGroupMonitor(groupCache, memberSelector, JsonCodec.INSTANCE);
+    groupMonitor = new CuratorServiceGroupMonitor(groupCache, memberSelector, ServerSet.JSON_CODEC);
   }
 
   final CuratorFramework startNewClient() {
@@ -97,7 +101,7 @@ class BaseCuratorDiscoveryTest extends BaseZooKeeperTest {
 
   final byte[] serialize(ServiceInstance serviceInstance) throws IOException {
     ByteArrayOutputStream sink = new ByteArrayOutputStream();
-    JsonCodec.INSTANCE.serialize(serviceInstance, sink);
+    CODEC.serialize(serviceInstance, sink);
     return sink.toByteArray();
   }
 

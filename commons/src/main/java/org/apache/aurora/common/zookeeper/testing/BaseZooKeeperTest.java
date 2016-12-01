@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.discovery.testing;
+package org.apache.aurora.common.zookeeper.testing;
 
 import org.apache.aurora.common.testing.TearDownTestCase;
 import org.junit.Before;
@@ -42,12 +42,5 @@ public abstract class BaseZooKeeperTest extends TearDownTestCase {
    */
   protected final ZooKeeperTestServer getServer() {
     return zkTestServer;
-  }
-
-  /**
-   * Returns the current port to connect to the in-process zookeeper instance.
-   */
-  protected final int getPort() {
-    return getServer().getPort();
   }
 }

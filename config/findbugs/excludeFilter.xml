@@ -74,14 +74,6 @@ limitations under the License.
     <Bug pattern="UMAC_UNCALLABLE_METHOD_OF_ANONYMOUS_CLASS" />
   </Match>
 
-  <!-- We're forced to use the platform default encoding to generate a byte array from digest
-       credentials because the underlying ZooKeeper API dictates this - also noted in the
-       offending code. -->
-  <Match>
-    <Class name="org.apache.aurora.scheduler.discovery.Credentials" />
-    <Bug pattern="DM_DEFAULT_ENCODING" />
-  </Match>
-
   <!-- Technical debt. -->
   <Match>
     <Class name="org.apache.aurora.scheduler.log.mesos.MesosLog$LogStream" />

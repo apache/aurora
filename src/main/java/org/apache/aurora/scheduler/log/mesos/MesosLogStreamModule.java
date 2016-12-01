@@ -33,8 +33,8 @@ import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.net.InetSocketAddressHelper;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.gen.storage.LogEntry;
-import org.apache.aurora.scheduler.discovery.Credentials;
 import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
@@ -157,7 +157,7 @@ public class MesosLogStreamModule extends PrivateModule {
           zkClientConfig.getSessionTimeout().getUnit().getTimeUnit(),
           zkLogGroupPath,
           zkCredentials.scheme(),
-          zkCredentials.token());
+          zkCredentials.authToken());
     } else {
       return new Log(
           QUORUM_SIZE.get(),

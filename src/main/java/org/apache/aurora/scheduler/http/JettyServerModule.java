@@ -64,7 +64,7 @@ import org.apache.aurora.common.net.http.handlers.TimeSeriesDataSource;
 import org.apache.aurora.common.net.http.handlers.VarsHandler;
 import org.apache.aurora.common.net.http.handlers.VarsJsonHandler;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
-import org.apache.aurora.scheduler.discovery.ServiceGroupMonitor.MonitorException;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor.MonitorException;
 import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.aurora.scheduler.http.api.security.HttpSecurityModule;
 import org.apache.aurora.scheduler.thrift.ThriftModule;

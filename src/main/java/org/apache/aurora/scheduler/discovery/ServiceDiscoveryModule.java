@@ -25,14 +25,16 @@ import com.google.common.io.Files;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
+import com.google.inject.Module;
 import com.google.inject.Provider;
 import com.google.inject.Provides;
 import com.google.inject.binder.LinkedBindingBuilder;
 
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.base.MorePreconditions;
+import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
+import org.apache.aurora.common.zookeeper.testing.ZooKeeperTestServer;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
-import org.apache.aurora.scheduler.discovery.testing.ZooKeeperTestServer;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,15 +46,15 @@ import static java.util.Objects.requireNonNull;
  */
 public class ServiceDiscoveryModule extends AbstractModule {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ServiceDiscoveryModule.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CommonsServiceDiscoveryModule.class);
 
   private final ZooKeeperConfig zooKeeperConfig;
   private final String discoveryPath;
 
   /**
    * Creates a Guice module that will bind a
-   * {@link SingletonService} for scheduler leader election and a
-   * {@link ServiceGroupMonitor} that can be used to find the
+   * {@link org.apache.aurora.common.zookeeper.SingletonService} for scheduler leader election and a
+   * {@link org.apache.aurora.scheduler.app.ServiceGroupMonitor} that can be used to find the
    * leading scheduler.
    *
    * @param zooKeeperConfig The ZooKeeper client configuration to use to interact with ZooKeeper.
@@ -80,7 +82,15 @@ public class ServiceDiscoveryModule extends AbstractModule {
       clusterBinder.toInstance(zooKeeperConfig.getServers());
     }
 
-    install(new CuratorServiceDiscoveryModule(discoveryPath, zooKeeperConfig));
+    install(discoveryModule());
+  }
+
+  private Module discoveryModule() {
+    if (zooKeeperConfig.isUseCurator()) {
+      return new CuratorServiceDiscoveryModule(discoveryPath, zooKeeperConfig);
+    } else {
+      return new CommonsServiceDiscoveryModule(discoveryPath, zooKeeperConfig);
+    }
   }
 
   @Provides

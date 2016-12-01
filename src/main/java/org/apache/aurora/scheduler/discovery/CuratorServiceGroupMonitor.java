@@ -24,6 +24,7 @@ import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.scheduler.app.SchedulerMain;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
 import org.apache.curator.utils.ZKPaths;

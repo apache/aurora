@@ -27,8 +27,8 @@ import com.google.common.net.HostAndPort;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.scheduler.discovery.ServiceGroupMonitor;
-import org.apache.aurora.scheduler.discovery.ServiceGroupMonitor.MonitorException;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor.MonitorException;
 import org.junit.Before;
 import org.junit.Test;
 

@@ -17,7 +17,6 @@ import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,6 +43,10 @@ import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.stats.Stats;
+import org.apache.aurora.common.zookeeper.Credentials;
+import org.apache.aurora.common.zookeeper.ServerSetImpl;
+import org.apache.aurora.common.zookeeper.ZooKeeperClient;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -60,11 +63,8 @@ import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
-import org.apache.aurora.scheduler.discovery.Credentials;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryModule;
-import org.apache.aurora.scheduler.discovery.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
-import org.apache.aurora.scheduler.discovery.testing.BaseZooKeeperTest;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
@@ -107,9 +107,10 @@ import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-public class SchedulerIT extends BaseZooKeeperTest {
+public class SchedulerIT extends BaseZooKeeperClientTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchedulerIT.class);
 
@@ -144,6 +145,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private Stream logStream;
   private StreamMatcher streamMatcher;
   private EntrySerializer entrySerializer;
+  private ZooKeeperClient zkClient;
   private File backupDir;
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -171,9 +173,11 @@ public class SchedulerIT extends BaseZooKeeperTest {
     entrySerializer = new EntrySerializer.EntrySerializerImpl(
         LogStorageModule.MAX_LOG_ENTRY_SIZE.get(),
         Hashing.md5());
+
+    zkClient = createZkClient();
   }
 
-  private Callable<Void> startScheduler() throws Exception {
+  private void startScheduler() throws Exception {
     // TODO(wfarner): Try to accomplish all this by subclassing SchedulerMain and actually using
     // AppLauncher.
     Module testModule = new AbstractModule() {
@@ -198,8 +202,10 @@ public class SchedulerIT extends BaseZooKeeperTest {
     };
     ZooKeeperConfig zkClientConfig =
         ZooKeeperConfig.create(
+            true, // useCurator
             ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
             .withCredentials(Credentials.digestCredentials("mesos", "mesos"));
+    SchedulerMain main = SchedulerMain.class.newInstance();
     Injector injector = Guice.createInjector(
         ImmutableList.<Module>builder()
             .add(SchedulerMain.getUniversalModule())
@@ -209,8 +215,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
             .add(testModule)
             .build()
     );
-    SchedulerMain main = new SchedulerMain();
     injector.injectMembers(main);
+    Lifecycle lifecycle = injector.getInstance(Lifecycle.class);
 
     executor.submit(() -> {
       try {
@@ -220,32 +226,28 @@ public class SchedulerIT extends BaseZooKeeperTest {
         executor.shutdownNow();
       }
     });
-
-    Lifecycle lifecycle = injector.getInstance(Lifecycle.class);
     addTearDown(() -> {
       lifecycle.shutdown();
       MoreExecutors.shutdownAndAwaitTermination(executor, 10, TimeUnit.SECONDS);
     });
-
     injector.getInstance(Key.get(GuavaUtils.ServiceManagerIface.class, AppStartup.class))
         .awaitHealthy();
+  }
 
-    ServiceGroupMonitor schedulerMonitor = injector.getInstance(ServiceGroupMonitor.class);
-    CountDownLatch schedulerReady = new CountDownLatch(1);
+  private void awaitSchedulerReady() throws Exception {
     executor.submit(() -> {
-      while (schedulerMonitor.get().isEmpty()) {
-        try {
-          Thread.sleep(10);
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
+      ServerSetImpl schedulerService = new ServerSetImpl(zkClient, SERVERSET_PATH);
+      final CountDownLatch schedulerReady = new CountDownLatch(1);
+      schedulerService.watch(hostSet -> {
+        if (!hostSet.isEmpty()) {
+          schedulerReady.countDown();
         }
-      }
-      schedulerReady.countDown();
-    });
-    return () -> {
-      schedulerReady.await();
+      });
+      // A timeout is used because certain types of assertion errors (mocks) will not surface
+      // until the main test thread exits this body of code.
+      assertTrue(schedulerReady.await(5L, TimeUnit.MINUTES));
       return null;
-    };
+    }).get();
   }
 
   private final AtomicInteger curPosition = new AtomicInteger();
@@ -330,14 +332,14 @@ public class SchedulerIT extends BaseZooKeeperTest {
     expect(driver.stop(true)).andReturn(Status.DRIVER_STOPPED).anyTimes();
 
     control.replay();
-    Callable<Void> awaitSchedulerReady = startScheduler();
+    startScheduler();
 
     driverStarted.await();
     scheduler.getValue().registered(driver,
         FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
         MasterInfo.getDefaultInstance());
 
-    awaitSchedulerReady.call();
+    awaitSchedulerReady();
 
     assertEquals(0L, Stats.<Long>getVariable("task_store_PENDING").read().longValue());
     assertEquals(1L, Stats.<Long>getVariable("task_store_ASSIGNED").read().longValue());

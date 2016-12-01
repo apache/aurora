@@ -14,12 +14,14 @@
 package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
-import java.util.Optional;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.zookeeper.Credentials;
+import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -35,22 +37,24 @@ public class ZooKeeperConfigTest {
   @Test(expected = IllegalArgumentException.class)
   public void testEmptyServers() {
     new ZooKeeperConfig(
+        false,
         ImmutableList.of(),
-        Optional.empty(),
+        Optional.absent(),
         false,
         Amount.of(1, Time.DAYS),
-        Optional.empty());
+        Optional.absent());
   }
 
   @Test
   public void testWithCredentials() {
     ZooKeeperConfig config =
         new ZooKeeperConfig(
+            false,
             SERVERS,
-            Optional.empty(),
+            Optional.absent(),
             false,
             Amount.of(1, Time.HOURS),
-            Optional.empty()); // credentials
+            Optional.absent()); // credentials
     assertFalse(config.getCredentials().isPresent());
 
     Credentials joeCreds = Credentials.digestCredentials("Joe", "Schmoe");
@@ -66,8 +70,9 @@ public class ZooKeeperConfigTest {
 
   @Test
   public void testCreateFactory() {
-    ZooKeeperConfig config = ZooKeeperConfig.create(SERVERS);
+    ZooKeeperConfig config = ZooKeeperConfig.create(true, SERVERS);
 
+    assertTrue(config.isUseCurator());
     assertEquals(SERVERS, ImmutableList.copyOf(config.getServers()));
     assertFalse(config.getChrootPath().isPresent());
     assertFalse(config.isInProcess());

@@ -164,7 +164,6 @@ project(':commons') {
   dependencies {
     compile project(':commons-args')
 
-    compile "ch.qos.logback:logback-classic:${logbackRev}"
     compile "com.google.code.findbugs:jsr305:${jsrRev}"
     compile "com.google.code.gson:gson:${gsonRev}"
     compile "com.google.guava:guava:${guavaRev}"
@@ -175,13 +174,17 @@ project(':commons') {
     compile "javax.servlet:javax.servlet-api:${servletRev}"
     compile "joda-time:joda-time:2.9.1"
     compile "org.antlr:stringtemplate:${stringTemplateRev}"
+    compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"
     compile "org.easymock:easymock:3.4"
 
     // There are a few testing support libs in the src/main/java trees that use junit - currently:
+    //   src/main/java/org/apache/aurora/common/zookeeper/testing
     //   src/main/java/org/apache/aurora/common/testing
     compile "junit:junit:${junitRev}"
 
     testCompile "junit:junit:${junitRev}"
+    testCompile "org.powermock:powermock-module-junit4:1.6.4"
+    testCompile "org.powermock:powermock-api-easymock:1.6.4"
   }
 }
 
@@ -347,11 +350,9 @@ dependencies {
   compile project(':commons')
   compile project(':commons-args')
 
-
   compile 'aopalliance:aopalliance:1.0'
-  compile "ch.qos.logback:logback-classic:${logbackRev}"
+  compile 'ch.qos.logback:logback-classic:1.1.3'
   compile "com.google.code.findbugs:jsr305:${jsrRev}"
-  compile "com.google.code.gson:gson:${gsonRev}"
   compile "com.google.inject:guice:${guiceRev}"
   compile "com.google.inject.extensions:guice-assistedinject:${guiceRev}"
   compile "com.google.protobuf:protobuf-java:${protobufRev}"
@@ -385,15 +386,8 @@ dependencies {
   compile 'org.quartz-scheduler:quartz:2.2.2'
   compile "uno.perk:forward:1.0.0"
 
-  // There are a few testing support libs in the src/main/java trees that use junit - currently:
-  //   src/main/java/org/apache/aurora/common/zookeeper/testing
-  compile "junit:junit:${junitRev}"
-
   testCompile "com.sun.jersey:jersey-client:${jerseyRev}"
   testCompile "junit:junit:${junitRev}"
-  testCompile "org.powermock:powermock-module-junit4:1.6.4"
-  testCompile "org.powermock:powermock-api-easymock:1.6.4"
-
 }
 
 // For normal developer builds, avoid running the often-time-consuming code quality checks.

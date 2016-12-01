@@ -26,6 +26,7 @@
 - The scheduler flag `-zk_use_curator` has been removed. If you have never set the flag and are
   upgrading you should take care as described in the [note](#zk_use_curator_upgrade) below.
 
+=======
 0.16.0
 ======
 

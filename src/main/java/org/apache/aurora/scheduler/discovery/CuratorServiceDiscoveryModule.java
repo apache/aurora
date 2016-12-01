@@ -33,6 +33,10 @@ import org.apache.aurora.common.net.InetSocketAddressHelper;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.thrift.ServiceInstance;
+import org.apache.aurora.common.zookeeper.Credentials;
+import org.apache.aurora.common.zookeeper.ServerSet;
+import org.apache.aurora.common.zookeeper.SingletonService;
+import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -64,7 +68,7 @@ class CuratorServiceDiscoveryModule extends PrivateModule {
     requireBinding(ServiceDiscoveryBindings.ZOO_KEEPER_CLUSTER_KEY);
     requireBinding(ServiceDiscoveryBindings.ZOO_KEEPER_ACL_KEY);
 
-    bind(new TypeLiteral<Codec<ServiceInstance>>() { }).toInstance(JsonCodec.INSTANCE);
+    bind(new TypeLiteral<Codec<ServiceInstance>>() { }).toInstance(ServerSet.JSON_CODEC);
   }
 
   @Provides
@@ -102,7 +106,7 @@ class CuratorServiceDiscoveryModule extends PrivateModule {
 
     if (zooKeeperConfig.getCredentials().isPresent()) {
       Credentials credentials = zooKeeperConfig.getCredentials().get();
-      builder.authorization(credentials.scheme(), credentials.token());
+      builder.authorization(credentials.scheme(), credentials.authToken());
     }
 
     CuratorFramework curatorFramework = builder.build();

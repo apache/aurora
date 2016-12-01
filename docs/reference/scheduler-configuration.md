@@ -252,5 +252,7 @@ Optional flags:
 	Launches an embedded zookeeper server for local testing causing -zk_endpoints to be ignored if specified.
 -zk_session_timeout (default (4, secs))
 	The ZooKeeper session timeout.
+-zk_use_curator (default true)
+	DEPRECATED: Uses Apache Curator as the zookeeper client; otherwise a copy of Twitter commons/zookeeper (the legacy library) is used.
 -------------------------------------------------------------------------
 ```
