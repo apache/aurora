@@ -471,7 +471,7 @@ class TaskStateMachine {
   }
 
   private void addFollowup(SideEffect sideEffect) {
-    LOG.info("Adding work command " + sideEffect + " for " + this);
+    LOG.debug("Adding work command {} for {}", sideEffect, this);
     sideEffects.add(sideEffect);
   }
 

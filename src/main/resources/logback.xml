@@ -22,8 +22,11 @@ limitations under the License.
   <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
     <target>System.err</target>
     <encoder>
+      <!-- Before changing this, consult http://logback.qos.ch/manual/layouts.html and make sure
+      the parameter is not expensive. Once changed, run benchmarks to ensure that throughput is
+      the same !-->
       <pattern>
-        %.-1level%date{MMdd HH:mm:ss.SSS} [%thread, %class{0}:%line] %message %xThrowable%n
+        %.-1level%date{MMdd HH:mm:ss.SSS} [%thread, %logger{0}] %message %xThrowable%n
       </pattern>
     </encoder>
   </appender>
