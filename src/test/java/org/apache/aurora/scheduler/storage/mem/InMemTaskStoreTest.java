@@ -19,16 +19,20 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
 
+import org.apache.aurora.common.stats.SlidingStats;
 import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.db.DbModule;
+import org.apache.aurora.scheduler.storage.db.InstrumentingInterceptor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
 import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
+import static org.easymock.EasyMock.createMock;
 import static org.junit.Assert.assertEquals;
 
 public class InMemTaskStoreTest extends AbstractTaskStoreTest {
@@ -44,14 +48,20 @@ public class InMemTaskStoreTest extends AbstractTaskStoreTest {
           @Override
           protected void configure() {
             bind(StatsProvider.class).toInstance(statsProvider);
+
+            // bindings for mybatis interceptor
+            SlidingStats slidingStats = createMock(SlidingStats.class);
+            bind(InstrumentingInterceptor.class).toInstance(new InstrumentingInterceptor(
+                Clock.SYSTEM_CLOCK, s -> slidingStats
+            ));
           }
         });
   }
 
   @Test
   public void testSecondaryIndexConsistency() {
-    // Test for regression of AURORA-1305.
     storage.write((NoResult.Quiet) storeProvider -> {
+    // Test for regression of AURORA-1305.
       TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
       taskStore.saveTasks(ImmutableSet.of(TASK_A));
       taskStore.deleteTasks(Tasks.ids(TASK_A));

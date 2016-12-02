@@ -73,6 +73,10 @@ public final class DbModule extends PrivateModule {
       help = "Whether to use the experimental database-backed task store.")
   public static final Arg<Boolean> USE_DB_TASK_STORE = Arg.create(false);
 
+  @CmdLine(name = "enable_db_metrics",
+      help = "Whether to use MyBatis interceptor to measure the timing of intercepted Statements.")
+  private static final Arg<Boolean> ENABLE_DB_METRICS = Arg.create(true);
+
   @CmdLine(name = "slow_query_log_threshold",
       help = "Log all queries that take at least this long to execute.")
   private static final Arg<Amount<Long, Time>> SLOW_QUERY_LOG_THRESHOLD =
@@ -247,6 +251,10 @@ public final class DbModule extends PrivateModule {
     install(new MyBatisModule() {
       @Override
       protected void initialize() {
+        if (ENABLE_DB_METRICS.get()) {
+          addInterceptorClass(InstrumentingInterceptor.class);
+        }
+
         bindProperties(binder(), ImmutableMap.of("JDBC.schema", jdbcSchema));
         install(JdbcHelper.H2_IN_MEMORY_NAMED);
 
