@@ -154,9 +154,9 @@ class AuroraCronJob implements Job, EventSubscriber {
       if (killFollowups.contains(key)) {
         context.getJobDetail().getJobDataMap().remove(path);
         killFollowups.remove(key);
-        LOG.info("Resetting job context for cron " + path);
+        LOG.info("Resetting job context for cron {}", path);
       } else {
-        LOG.info("Ignoring trigger as another concurrent run is active for cron " + path);
+        LOG.info("Ignoring trigger as another concurrent run is active for cron {}", path);
         return;
       }
     }
