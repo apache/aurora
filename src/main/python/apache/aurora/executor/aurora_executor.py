@@ -184,9 +184,9 @@ class AuroraExecutor(ExecutorBase, Observable):
     self._status_manager.start()
     self.status_manager_started.set()
 
-  def _signal_running(self, reason):
-    log.info('Send TASK_RUNNING status update. reason: %s' % reason)
-    self.send_update(self._driver, self._task_id, mesos_pb2.TASK_RUNNING, reason)
+  def _signal_running(self, status_result):
+    log.info('Send TASK_RUNNING status update. status: %s' % status_result)
+    self.send_update(self._driver, self._task_id, mesos_pb2.TASK_RUNNING, status_result.reason)
 
   def _signal_kill_manager(self, driver, task_id, reason):
     if self._task_id is None:

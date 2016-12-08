@@ -94,9 +94,9 @@ Starting with the 0.17.0 release, job updates rely only on task health-checks by
 a `min_consecutive_successes` parameter on the HealthCheckConfig object. This parameter represents
 the number of successful health checks needed before a task is moved into the `RUNNING` state. Tasks
 that do not have enough successful health checks within the first `n` attempts, are moved to the
-`FAILED` state, where `n = ceil(initial_interval_secs/interval_secs) + min_consecutive_successes`.
-In order to accommodate variability during task warm up, `initial_interval_secs` will
-act as a grace period. Any health-check failures during the first `m` attempts are ignored and
+`FAILED` state, where `n = ceil(initial_interval_secs/interval_secs) + max_consecutive_failures +
+min_consecutive_successes`. In order to accommodate variability during task warm up, `initial_interval_secs`
+will act as a grace period. Any health-check failures during the first `m` attempts are ignored and
 do not count towards `max_consecutive_failures`, where `m = ceil(initial_interval_secs/interval_secs)`.
 
 As [job updates](job-updates.md) are based only on health-checks, it is not necessary to set

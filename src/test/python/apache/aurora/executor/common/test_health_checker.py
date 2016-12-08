@@ -98,6 +98,60 @@ class TestHealthChecker(unittest.TestCase):
     hct.stop()
     assert self._checker.health.call_count == 2
 
+  def test_ignore_failures_after_running_inside_grace_period(self):
+    '''Grace period is 2 x interval and health checks succeed then fail.'''
+
+    self.append_health_checks(True)
+    self.append_health_checks(False)
+    hct = HealthChecker(
+              self._checker.health,
+              interval_secs=self.interval_secs,
+              clock=self._clock)
+    hct.start()
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+    assert hct.status == StatusResult('Task is healthy.', TaskState.Value('TASK_RUNNING'))
+    assert hct.threaded_health_checker.running is True
+    assert hct.threaded_health_checker.current_consecutive_failures == 0
+    self._clock.tick(self.interval_secs)
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+    assert hct.status == StatusResult('Task is healthy.', TaskState.Value('TASK_RUNNING'))
+    assert hct.threaded_health_checker.running is True
+    assert hct.threaded_health_checker.current_consecutive_failures == 0
+    hct.stop()
+    assert self._checker.health.call_count == 2
+
+  def test_does_not_ignores_failures_after_running_outside_grace_period(self):
+    '''Grace period is 2 x interval and health checks succeed then fail.'''
+
+    self.append_health_checks(True)
+    self.append_health_checks(False, num_calls=2)
+    hct = HealthChecker(
+              self._checker.health,
+              interval_secs=self.interval_secs,
+              clock=self._clock)
+    hct.start()
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+    assert hct.status == StatusResult('Task is healthy.', TaskState.Value('TASK_RUNNING'))
+    assert hct.threaded_health_checker.running is True
+    assert hct.threaded_health_checker.current_consecutive_failures == 0
+    self._clock.tick(self.interval_secs)
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+    assert hct.status == StatusResult('Task is healthy.', TaskState.Value('TASK_RUNNING'))
+    assert hct.threaded_health_checker.running is True
+    assert hct.threaded_health_checker.current_consecutive_failures == 0
+    self._clock.tick(self.interval_secs)
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+    assert hct.status == StatusResult('Failed health check! reason', TaskState.Value('TASK_FAILED'))
+    assert hct.threaded_health_checker.running is True
+    assert hct.threaded_health_checker.current_consecutive_failures == 1
+    hct.stop()
+    assert self._checker.health.call_count == 3
+
   def test_grace_period_2x_failure(self):
     '''
       Grace period is 2 x interval and all health checks fail.
@@ -155,6 +209,68 @@ class TestHealthChecker(unittest.TestCase):
     assert hct.threaded_health_checker.running is True
     hct.stop()
     assert self._checker.health.call_count == 3
+
+  def test_include_max_failure_to_forgiving_attempts(self):
+    '''
+    Health checks fail but never breaches `max_consecutive_failures`
+    '''
+    max_consecutive_failures = 4
+
+    # health checks fail within grace period
+    self.append_health_checks(False, num_calls=2)
+
+    # health checks fails max_consecutive_failures times and then succeeds
+    self.append_health_checks(False, num_calls=max_consecutive_failures)
+    self.append_health_checks(True)
+
+    # health checks fails max_consecutive_failures times and then succeeds
+    self.append_health_checks(False, num_calls=max_consecutive_failures)
+    self.append_health_checks(False)
+
+    hct = HealthChecker(
+              self._checker.health,
+              interval_secs=self.interval_secs,
+              max_consecutive_failures=max_consecutive_failures,
+              clock=self._clock)
+    hct.start()
+
+    # failures ignored inside grace period
+    for _ in range(2):
+      assert self._clock.converge(threads=[hct.threaded_health_checker])
+      self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+      assert hct.status == StatusResult(None, TaskState.Value('TASK_STARTING'))
+      assert hct.threaded_health_checker.running is False
+      self._clock.tick(self.interval_secs)
+
+    # failures never breach max
+    for _ in range(max_consecutive_failures):
+      assert self._clock.converge(threads=[hct.threaded_health_checker])
+      self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+      assert hct.status == StatusResult(None, TaskState.Value('TASK_STARTING'))
+      assert hct.threaded_health_checker.running is False
+      self._clock.tick(self.interval_secs)
+
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+    assert hct.status == StatusResult('Task is healthy.', TaskState.Value('TASK_RUNNING'))
+    assert hct.threaded_health_checker.running is True
+    self._clock.tick(self.interval_secs)
+
+    # failures breach max, causes task failure
+    for _ in range(max_consecutive_failures):
+      assert self._clock.converge(threads=[hct.threaded_health_checker])
+      self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+      assert hct.status == StatusResult('Task is healthy.', TaskState.Value('TASK_RUNNING'))
+      assert hct.threaded_health_checker.running is True
+      self._clock.tick(self.interval_secs)
+
+    assert self._clock.converge(threads=[hct.threaded_health_checker])
+    self._clock.assert_waiting(hct.threaded_health_checker, self.interval_secs)
+    assert hct.status == StatusResult('Failed health check! reason', TaskState.Value('TASK_FAILED'))
+    assert hct.threaded_health_checker.running is True
+
+    hct.stop()
+    assert self._checker.health.call_count == 12
 
   def test_initial_interval_whatev(self):
     self.append_health_checks(False, 2)
@@ -217,29 +333,39 @@ class TestHealthChecker(unittest.TestCase):
     '''Verify that health check is failed fast'''
     grace_period_secs = self.initial_interval_secs
     interval_secs = self.interval_secs
-    self.append_health_checks(False, num_calls=3)
+    self.append_health_checks(False, num_calls=5)
     hct = HealthChecker(
         self._checker.health,
         interval_secs=interval_secs,
         grace_period_secs=grace_period_secs,
         max_consecutive_failures=2,
-        min_consecutive_successes=2,
+        min_consecutive_successes=4,
         clock=self._clock)
     hct.start()
 
-    # 3 consecutive health check failures causes fail-fast
-    self._clock.converge(threads=[hct.threaded_health_checker])
-    self._clock.assert_waiting(hct.threaded_health_checker, interval_secs)
-    assert hct.status == StatusResult(None, TaskState.Value('TASK_STARTING'))
     # failure is ignored inside grace_period_secs
-    assert hct.metrics.sample()['consecutive_failures'] == 0
-    self._clock.tick(interval_secs)
+    for _ in range(2):
+      self._clock.converge(threads=[hct.threaded_health_checker])
+      self._clock.assert_waiting(hct.threaded_health_checker, interval_secs)
+      assert hct.status == StatusResult(None, TaskState.Value('TASK_STARTING'))
+      assert hct.metrics.sample()['consecutive_failures'] == 0
+      self._clock.tick(interval_secs)
+
+    # 3 consecutive health check failures causes fail-fast
+    for attempt in range(2):
+      self._clock.converge(threads=[hct.threaded_health_checker])
+      self._clock.assert_waiting(hct.threaded_health_checker, interval_secs)
+      assert hct.status == StatusResult(None, TaskState.Value('TASK_STARTING'))
+      # failure is not ignored outside grace_period_secs
+      assert hct.metrics.sample()['consecutive_failures'] == (attempt + 1)
+      self._clock.tick(interval_secs)
+
     self._clock.converge(threads=[hct.threaded_health_checker])
     self._clock.assert_waiting(hct.threaded_health_checker, interval_secs)
     assert hct.status == StatusResult('Failed health check! reason', TaskState.Value('TASK_FAILED'))
-    assert hct.metrics.sample()['consecutive_failures'] == 1
+    assert hct.metrics.sample()['consecutive_failures'] == 3
     hct.stop()
-    assert self._checker.health.call_count == 2
+    assert self._checker.health.call_count == 5
 
   @pytest.mark.skipif('True', reason='Flaky test (AURORA-1182)')
   def test_health_checker_metrics(self):
@@ -607,48 +733,65 @@ class TestThreadedHealthChecker(unittest.TestCase):
 
   def test_maybe_update_health_check_count_reset_count(self):
     hc = self.health_checker.threaded_health_checker
-    hc.running = True
+    hc.attempts = hc.forgiving_attempts
 
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(True, 'reason-1')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 1
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-2')
     assert hc.current_consecutive_failures == 1
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(True, 'reason-3')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 1
 
-  def test_maybe_update_health_check_count_ignore_failures_before_callback(self):
+  def test_maybe_update_health_check_count_ignore_failures_within_grace_period(self):
     hc = self.health_checker.threaded_health_checker
-    hc.running = False
+
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-1')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-2')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
-  def test_maybe_update_health_check_count_dont_ignore_failures_after_callback(self):
+    hc.attempts += 1
+    hc._maybe_update_health_check_count(False, 'reason-3')
+    assert hc.current_consecutive_failures == 1
+    assert hc.current_consecutive_successes == 0
+
+    hc.attempts += 1
+    hc._maybe_update_health_check_count(False, 'reason-4')
+    assert hc.current_consecutive_failures == 2
+    assert hc.current_consecutive_successes == 0
+
+  def test_maybe_update_health_check_count_dont_ignore_failures_after_grace_period(self):
     hc = self.health_checker.threaded_health_checker
-    hc.running = True
+    hc.attempts = hc.forgiving_attempts
 
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-1')
     assert hc.current_consecutive_failures == 1
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-2')
     assert hc.current_consecutive_failures == 2
     assert hc.current_consecutive_successes == 0
@@ -668,25 +811,40 @@ class TestThreadedHealthChecker(unittest.TestCase):
 
     hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-2')
+    assert hc.current_consecutive_failures == 0
+    assert hc.current_consecutive_successes == 0
+    assert hc.running is False
+
+    hc.attempts += 1
+    hc._maybe_update_health_check_count(False, 'reason-3')
     assert hc.current_consecutive_failures == 1
     assert hc.current_consecutive_successes == 0
     assert hc.running is False
-    assert hc.healthy is False
-    assert hc.reason == 'reason-2'
 
-  def test_maybe_update_health_check_count_max_failures(self):
+    hc.attempts += 1
+    hc._maybe_update_health_check_count(False, 'reason-4')
+    assert hc.current_consecutive_failures == 2
+    assert hc.current_consecutive_successes == 0
+    assert hc.running is False
+    assert hc.healthy is False
+    assert hc.reason == 'reason-4'
+
+  def test_maybe_update_health_check_count_max_failures_1(self):
     hc = self.health_checker.threaded_health_checker
-    hc.running = True
+    hc.current_consecutive_successes = 1
+    hc.attempts = hc.forgiving_attempts
 
     assert hc.current_consecutive_failures == 0
-    assert hc.current_consecutive_successes == 0
+    assert hc.current_consecutive_successes == 1
     assert hc.healthy is True
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-1')
     assert hc.current_consecutive_failures == 1
     assert hc.current_consecutive_successes == 0
     assert hc.healthy is True
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-2')
     assert hc.current_consecutive_failures == 2
     assert hc.current_consecutive_successes == 0
@@ -700,18 +858,21 @@ class TestThreadedHealthChecker(unittest.TestCase):
     assert hc.running is False
     assert hc.healthy is True
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(True, 'reason')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 1
     assert hc.running is False
     assert hc.healthy is True
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(True, 'reason')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 2
     assert hc.running is True
     assert hc.healthy is True
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(True, 'reason')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 3
@@ -735,11 +896,11 @@ class TestThreadedHealthChecker(unittest.TestCase):
   def test_run_failure(self):
     self.health.return_value = (False, 'failure')
     mock_is_set = mock.Mock(spec=threading._Event.is_set)
-    liveness = [False, False, False, True]
+    liveness = [False, False, False, False, True]
     mock_is_set.side_effect = lambda: liveness.pop(0)
     self.health_checker.threaded_health_checker.dead.is_set = mock_is_set
     self.health_checker.threaded_health_checker.run()
-    assert self.clock.sleep.call_count == 3
+    assert self.clock.sleep.call_count == 4
     assert self.health_checker.threaded_health_checker.current_consecutive_failures == 2
     assert self.health_checker.threaded_health_checker.current_consecutive_successes == 0
     assert self.health_checker.threaded_health_checker.running is False
@@ -747,19 +908,19 @@ class TestThreadedHealthChecker(unittest.TestCase):
     assert self.health_checker.threaded_health_checker.reason == 'failure'
 
   def test_run_failure_unhealthy_when_failfast(self):
-    health_status = [(False, 'failure-1'), (True, None), (False, 'failure-3')]
+    health_status = [(False, 'failure-1'), (True, None), (False, 'failure-3'), (False, 'failure-4')]
     self.health.side_effect = lambda: health_status.pop(0)
     mock_is_set = mock.Mock(spec=threading._Event.is_set)
-    liveness = [False, False, False, True]
+    liveness = [False, False, False, False, True]
     mock_is_set.side_effect = lambda: liveness.pop(0)
     self.health_checker.threaded_health_checker.dead.is_set = mock_is_set
     self.health_checker.threaded_health_checker.run()
-    assert self.clock.sleep.call_count == 3
-    assert self.health_checker.threaded_health_checker.current_consecutive_failures == 1
+    assert self.clock.sleep.call_count == 4
+    assert self.health_checker.threaded_health_checker.current_consecutive_failures == 2
     assert self.health_checker.threaded_health_checker.current_consecutive_successes == 0
     assert self.health_checker.threaded_health_checker.running is False
     assert self.health_checker.threaded_health_checker.healthy is False
-    assert self.health_checker.threaded_health_checker.reason == 'failure-3'
+    assert self.health_checker.threaded_health_checker.reason == 'failure-4'
 
   def test_run_unhealthy_after_callback(self):
     health_status = [(True, None), (True, None), (False, 'failure-4'), (False, 'failure-5')]
@@ -845,48 +1006,55 @@ class TestThreadedHealthCheckerWithDefaults(unittest.TestCase):
 
   def test_maybe_update_health_check_count_reset_count(self):
     hc = self.health_checker.threaded_health_checker
-    hc.running = True
+    hc.attempts = hc.forgiving_attempts
 
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(True, 'reason-1')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 1
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-2')
     assert hc.current_consecutive_failures == 1
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(True, 'reason-3')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 1
 
-  def test_maybe_update_health_check_count_ignore_failures_before_callback(self):
+  def test_maybe_update_health_check_count_ignore_failures_inside_grace_period(self):
     hc = self.health_checker.threaded_health_checker
-    hc.running = False
+
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-1')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-2')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
-  def test_maybe_update_health_check_count_dont_ignore_failures_after_callback(self):
+  def test_maybe_update_health_check_count_dont_ignore_failures_after_grace_period(self):
     hc = self.health_checker.threaded_health_checker
-    hc.running = True
+    hc.attempts = hc.forgiving_attempts
 
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-1')
     assert hc.current_consecutive_failures == 1
     assert hc.current_consecutive_successes == 0
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-2')
     assert hc.current_consecutive_failures == 2
     assert hc.current_consecutive_successes == 0
@@ -920,12 +1088,14 @@ class TestThreadedHealthCheckerWithDefaults(unittest.TestCase):
 
   def test_maybe_update_health_check_count_max_failures(self):
     hc = self.health_checker.threaded_health_checker
-    hc.running = True
+    hc.attempts = hc.forgiving_attempts
+    hc.current_consecutive_successes = 1
 
     assert hc.current_consecutive_failures == 0
-    assert hc.current_consecutive_successes == 0
+    assert hc.current_consecutive_successes == 1
     assert hc.healthy is True
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(False, 'reason-1')
     assert hc.current_consecutive_failures == 1
     assert hc.current_consecutive_successes == 0
@@ -939,6 +1109,7 @@ class TestThreadedHealthCheckerWithDefaults(unittest.TestCase):
     assert hc.healthy is True
     assert hc.running is False
 
+    hc.attempts += 1
     hc._maybe_update_health_check_count(True, 'reason')
     assert hc.current_consecutive_failures == 0
     assert hc.current_consecutive_successes == 1
@@ -976,6 +1147,40 @@ class TestThreadedHealthCheckerWithDefaults(unittest.TestCase):
     assert self.health_checker.threaded_health_checker.running is False
     assert self.health_checker.threaded_health_checker.healthy is False
     assert self.health_checker.threaded_health_checker.reason == 'failure'
+
+  @mock.patch('apache.aurora.executor.common.health_checker.time.sleep', spec=time.sleep)
+  def test_first_success_after_grace_period_and_max_consecutive_failures(self, mock_sleep):
+    mock_sleep.return_value = None
+    health_status = [(False, 'failure-1'), (False, 'failure-2'), (True, None)]
+    self.health.side_effect = lambda: health_status.pop(0)
+    mock_is_set = mock.Mock(spec=threading._Event.is_set)
+    liveness = [False, False, False, True]
+    mock_is_set.side_effect = lambda: liveness.pop(0)
+    self.health_checker.threaded_health_checker.dead.is_set = mock_is_set
+    self.health_checker.threaded_health_checker.run()
+    assert mock_sleep.call_count == 3
+    assert self.health_checker.threaded_health_checker.current_consecutive_failures == 0
+    assert self.health_checker.threaded_health_checker.current_consecutive_successes == 1
+    assert self.health_checker.threaded_health_checker.running is True
+    assert self.health_checker.threaded_health_checker.healthy is True
+    assert self.health_checker.threaded_health_checker.reason is None
+
+  @mock.patch('apache.aurora.executor.common.health_checker.time.sleep', spec=time.sleep)
+  def test_success_then_failures_ignored_till_grace_period_ends(self, mock_sleep):
+    mock_sleep.return_value = None
+    health_status = [(True, None), (False, 'failure-2'), (False, 'failure-3')]
+    self.health.side_effect = lambda: health_status.pop(0)
+    mock_is_set = mock.Mock(spec=threading._Event.is_set)
+    liveness = [False, False, False, True]
+    mock_is_set.side_effect = lambda: liveness.pop(0)
+    self.health_checker.threaded_health_checker.dead.is_set = mock_is_set
+    self.health_checker.threaded_health_checker.run()
+    assert mock_sleep.call_count == 3
+    assert self.health_checker.threaded_health_checker.current_consecutive_failures == 1
+    assert self.health_checker.threaded_health_checker.current_consecutive_successes == 0
+    assert self.health_checker.threaded_health_checker.running is True
+    assert self.health_checker.threaded_health_checker.healthy is False
+    assert self.health_checker.threaded_health_checker.reason == 'failure-3'
 
   @mock.patch('apache.aurora.executor.common.health_checker.time.sleep', spec=time.sleep)
   def test_run_failure_unhealthy_when_failfast(self, mock_sleep):

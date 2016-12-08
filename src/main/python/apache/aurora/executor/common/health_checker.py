@@ -102,9 +102,19 @@ class ThreadedHealthChecker(ExceptionalThread):
     # to guarantee the number of health checks during the grace period.
     # Relying on time might cause non-deterministic behavior since the
     # health checks can be spaced apart by interval_secs + epsilon.
-    self.forgiving_attempts = math.ceil(self.grace_period_secs / self.interval)
+    self.forgiving_attempts = math.ceil(self.grace_period_secs / float(self.interval))
 
-    self.max_attempts_to_running = self.forgiving_attempts + self.min_consecutive_successes
+    # In the older version (without min_consecutive_successes) it is possible for a task
+    # to make limping progress where the health checks fail all the time but never breach
+    # the max_consecutive_failures limit and end up updated successfully.
+    # Also a task can survive failures during initial_interval_secs and an additional
+    # max_consecutive_failures and still update successfully.
+
+    # Although initial_interval_secs is supposed to count for the task warm up time, to be
+    # backward compatible add max_consecutive_failures to the max_attempts_to_running.
+    self.max_attempts_to_running = (self.forgiving_attempts
+        + self.max_consecutive_failures
+        + self.min_consecutive_successes)
     self.running = False
     self.healthy, self.reason = True, None
 
@@ -164,15 +174,14 @@ class ThreadedHealthChecker(ExceptionalThread):
     if not self.running:
       attempts_remaining = self.max_attempts_to_running - self.attempts
       successes_needed = self.min_consecutive_successes - self.current_consecutive_successes
-      if successes_needed > attempts_remaining:
+      if attempts_remaining > 1 and successes_needed > attempts_remaining:
         return True
     return False
 
   def _should_ignore_failure(self):
-    if not self.running:
-      if self.attempts <= self.forgiving_attempts:
-        log.warning('Ignoring failure of attempt: %s' % self.attempts)
-        return True
+    if self.attempts <= self.forgiving_attempts:
+      log.warning('Ignoring failure of attempt: %s' % self.attempts)
+      return True
     return False
 
   def _should_enforce_deadline(self):
@@ -192,7 +201,7 @@ class ThreadedHealthChecker(ExceptionalThread):
       return self.healthy, self.reason
 
     is_healthy, reason = self._perform_check_if_not_disabled()
-    if not self.running:
+    if self.attempts <= self.max_attempts_to_running:
       self.attempts += 1
     self._maybe_update_health_check_count(is_healthy, reason)
     return is_healthy, reason
