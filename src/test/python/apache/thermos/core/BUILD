@@ -13,6 +13,8 @@
 #
 
 python_tests(
+  name = 'core',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:psutil',

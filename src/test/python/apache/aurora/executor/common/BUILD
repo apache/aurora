@@ -13,6 +13,8 @@
 #
 
 python_tests(
+  name = 'common',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mesos.interface',
     '3rdparty/python:mock',

@@ -13,6 +13,8 @@
 #
 
 python_tests(
+  name = 'common',
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:twitter.common.testing',
     'src/main/python/apache/thermos/common',

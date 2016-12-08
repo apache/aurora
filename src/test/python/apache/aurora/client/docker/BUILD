@@ -13,6 +13,8 @@
 #
 
 python_tests(
+  name = 'docker',
+  sources = globs('*py'),
   dependencies = [
     '3rdparty/python:requests',
     '3rdparty/python:requests-mock',

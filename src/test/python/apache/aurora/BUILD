@@ -13,6 +13,7 @@
 #
 
 python_library(
+  name = 'aurora',
   sources = [ 'api_util.py' ],
   dependencies = [
     'api/src/main/thrift/org/apache/aurora/gen',

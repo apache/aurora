@@ -15,6 +15,7 @@ import os
 
 
 python_library(
+  name = 'common',
   sources = rglobs('*.py'),
   dependencies = [
     '3rdparty/python:pex',
