@@ -45,7 +45,6 @@ python_binary(
 )
 
 python_library(
-  name = 'client',
   dependencies = [
     ':_client',
   ],

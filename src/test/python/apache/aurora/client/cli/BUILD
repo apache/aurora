@@ -13,8 +13,6 @@
 #
 
 python_tests(
-  name = 'cli',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',

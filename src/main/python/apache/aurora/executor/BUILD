@@ -59,7 +59,6 @@ python_binary(
 )
 
 python_library(
-  name = 'executor',
   dependencies = [
     ':_executor',
   ],

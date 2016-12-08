@@ -22,7 +22,7 @@ python_thrift_library(
     'api.thrift',
   ],
   dependencies = [
-    '3rdparty/python:thrift',
+    'build-support/thrift',
   ],
 )
 
@@ -30,7 +30,7 @@ python_thrift_library(
   name = '_test',
   sources = TEST_DATA,
   dependencies = [
-    '3rdparty/python:thrift',
+    'build-support/thrift',
   ],
 )
 
@@ -38,13 +38,12 @@ python_thrift_library(
   name = '_storage',
   sources = ['storage.thrift'],
   dependencies = [
-    '3rdparty/python:thrift',
+    'build-support/thrift',
     ':_api',
   ],
 )
 
 python_library(
-  name = 'gen',
   dependencies = [
     ':_api',
     ':_test',

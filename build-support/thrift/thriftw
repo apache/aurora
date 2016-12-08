@@ -29,7 +29,11 @@ HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
 if which thrift >/dev/null 2>&1; then
   if [[ $(thrift --version) = "Thrift version $expected_version" ]]; then
-    exec thrift "$@"
+    if [[ "$@" == "--which" ]]; then
+      exec which thrift
+    else
+      exec thrift "$@"
+    fi
   fi
 fi
 
@@ -37,4 +41,8 @@ thrift="$HERE"/thrift-$expected_version/compiler/cpp/thrift
 if [[ ! -x "$thrift" ]]; then
   make -C "$HERE"
 fi
-exec "$thrift" "$@"
+if [[ "$@" == "--which" ]]; then
+  echo "$thrift"
+else
+  exec "$thrift" "$@"
+fi

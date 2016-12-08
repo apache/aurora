@@ -16,7 +16,6 @@ import os
 
 
 python_library(
-  name = 'observer',
   sources = rglobs('*.py'),
   resources = zglobs('**/assets/*', '**/*.tpl'),
   dependencies = [

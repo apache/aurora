@@ -16,7 +16,6 @@ import os
 
 
 python_library(
-  name = 'monitoring',
   sources = rglobs('*.py'),
   dependencies = [
     '3rdparty/python:psutil',

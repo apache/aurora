@@ -1,0 +1,45 @@
+--- thrift-0.9.1/lib/py/setup.py	2013-08-18 09:40:36.000000000 -0600
++++ thrift-0.9.1/lib/py/setup.py.fix	2016-10-12 16:53:48.917117240 -0600
+@@ -19,6 +19,8 @@
+ # under the License.
+ #
+ 
++from __future__ import print_function
++
+ import sys
+ try:
+     from setuptools import setup, Extension
+@@ -42,13 +44,13 @@
+     def run(self):
+         try:
+             build_ext.run(self)
+-        except DistutilsPlatformError, x:
++        except DistutilsPlatformError:
+             raise BuildFailed()
+ 
+     def build_extension(self, ext):
+         try:
+             build_ext.build_extension(self, ext)
+-        except ext_errors, x:
++        except ext_errors:
+             raise BuildFailed()
+ 
+ def run_setup(with_binary):
+@@ -94,11 +96,11 @@
+ try:
+     run_setup(True)
+ except BuildFailed:
+-    print
+-    print '*' * 80
+-    print "An error occured while trying to compile with the C extension enabled" 
+-    print "Attempting to build without the extension now"
+-    print '*' * 80
+-    print
++    print()
++    print('*' * 80)
++    print("An error occured while trying to compile with the C extension enabled")
++    print("Attempting to build without the extension now")
++    print('*' * 80)
++    print()
+ 
+     run_setup(False)

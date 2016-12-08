@@ -1,6 +1,6 @@
---- thrift-0.9.1/compiler/cpp/Makefile.in	2013-08-18 10:01:01.000000000 -0600
-+++ thrift-0.9.1/compiler/cpp/Makefile.in.fix	2016-07-01 13:08:46.928563056 -0600
-@@ -96,27 +96,9 @@
+--- thrift-0.9.1/compiler/cpp/Makefile.in	2016-10-12 11:08:49.012927396 -0600
++++ thrift-0.9.1/compiler/cpp/Makefile.in.fix	2016-10-12 11:11:25.600812386 -0600
+@@ -96,27 +96,10 @@
  PROGRAMS = $(bin_PROGRAMS)
  am_thrift_OBJECTS = thrift-main.$(OBJEXT) thrift-md5.$(OBJEXT) \
  	thrift-t_generator.$(OBJEXT) thrift-parse.$(OBJEXT) \
@@ -9,7 +9,7 @@
  	thrift-t_java_generator.$(OBJEXT) \
 -	thrift-t_as3_generator.$(OBJEXT) \
 -	thrift-t_csharp_generator.$(OBJEXT) \
--	thrift-t_py_generator.$(OBJEXT) \
+ 	thrift-t_py_generator.$(OBJEXT) \
 -	thrift-t_rb_generator.$(OBJEXT) \
 -	thrift-t_perl_generator.$(OBJEXT) \
 -	thrift-t_php_generator.$(OBJEXT) \
@@ -29,7 +29,7 @@
  thrift_OBJECTS = $(am_thrift_OBJECTS)
  thrift_DEPENDENCIES = libparse.a
  thrift_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
-@@ -377,25 +359,10 @@
+@@ -377,25 +360,11 @@
  	src/parse/t_const_value.h src/parse/parse.cc \
  	src/generate/t_generator.h src/generate/t_oop_generator.h \
  	src/generate/t_html_generator.h src/windows/config.h \
@@ -47,6 +47,7 @@
 -	src/generate/t_st_generator.cc \
 -	src/generate/t_ocaml_generator.cc \
 -	src/generate/t_hs_generator.cc src/generate/t_xsd_generator.cc \
++	src/generate/t_py_generator.cc \
  	src/generate/t_html_generator.cc \
 -	src/generate/t_js_generator.cc \
 -	src/generate/t_javame_generator.cc \
@@ -57,7 +58,7 @@
  thrift_CPPFLAGS = -I$(srcdir)/src
  thrift_CXXFLAGS = -Wall
  thrift_LDADD = @LEXLIB@ libparse.a
-@@ -518,29 +485,10 @@
+@@ -518,29 +487,11 @@
  @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-main.Po@am__quote@
  @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-md5.Po@am__quote@
  @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-parse.Po@am__quote@
@@ -80,14 +81,14 @@
 -@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-t_ocaml_generator.Po@am__quote@
 -@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-t_perl_generator.Po@am__quote@
 -@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-t_php_generator.Po@am__quote@
--@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-t_py_generator.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-t_py_generator.Po@am__quote@
 -@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-t_rb_generator.Po@am__quote@
 -@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-t_st_generator.Po@am__quote@
 -@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thrift-t_xsd_generator.Po@am__quote@
  
  .c.o:
  @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@@ -668,34 +616,6 @@
+@@ -668,34 +619,6 @@
  @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
  @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -c -o thrift-parse.obj `if test -f 'src/parse/parse.cc'; then $(CYGPATH_W) 'src/parse/parse.cc'; else $(CYGPATH_W) '$(srcdir)/src/parse/parse.cc'; fi`
  
@@ -122,7 +123,7 @@
  thrift-t_java_generator.o: src/generate/t_java_generator.cc
  @am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -MT thrift-t_java_generator.o -MD -MP -MF $(DEPDIR)/thrift-t_java_generator.Tpo -c -o thrift-t_java_generator.o `test -f 'src/generate/t_java_generator.cc' || echo '$(srcdir)/'`src/generate/t_java_generator.cc
  @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/thrift-t_java_generator.Tpo $(DEPDIR)/thrift-t_java_generator.Po
-@@ -710,174 +630,6 @@
+@@ -710,34 +633,6 @@
  @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
  @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -c -o thrift-t_java_generator.obj `if test -f 'src/generate/t_java_generator.cc'; then $(CYGPATH_W) 'src/generate/t_java_generator.cc'; else $(CYGPATH_W) '$(srcdir)/src/generate/t_java_generator.cc'; fi`
  
@@ -154,20 +155,13 @@
 -@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 -@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -c -o thrift-t_csharp_generator.obj `if test -f 'src/generate/t_csharp_generator.cc'; then $(CYGPATH_W) 'src/generate/t_csharp_generator.cc'; else $(CYGPATH_W) '$(srcdir)/src/generate/t_csharp_generator.cc'; fi`
 -
--thrift-t_py_generator.o: src/generate/t_py_generator.cc
--@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -MT thrift-t_py_generator.o -MD -MP -MF $(DEPDIR)/thrift-t_py_generator.Tpo -c -o thrift-t_py_generator.o `test -f 'src/generate/t_py_generator.cc' || echo '$(srcdir)/'`src/generate/t_py_generator.cc
--@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/thrift-t_py_generator.Tpo $(DEPDIR)/thrift-t_py_generator.Po
--@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/generate/t_py_generator.cc' object='thrift-t_py_generator.o' libtool=no @AMDEPBACKSLASH@
--@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
--@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -c -o thrift-t_py_generator.o `test -f 'src/generate/t_py_generator.cc' || echo '$(srcdir)/'`src/generate/t_py_generator.cc
--
--thrift-t_py_generator.obj: src/generate/t_py_generator.cc
--@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -MT thrift-t_py_generator.obj -MD -MP -MF $(DEPDIR)/thrift-t_py_generator.Tpo -c -o thrift-t_py_generator.obj `if test -f 'src/generate/t_py_generator.cc'; then $(CYGPATH_W) 'src/generate/t_py_generator.cc'; else $(CYGPATH_W) '$(srcdir)/src/generate/t_py_generator.cc'; fi`
--@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/thrift-t_py_generator.Tpo $(DEPDIR)/thrift-t_py_generator.Po
--@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='src/generate/t_py_generator.cc' object='thrift-t_py_generator.obj' libtool=no @AMDEPBACKSLASH@
--@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
--@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -c -o thrift-t_py_generator.obj `if test -f 'src/generate/t_py_generator.cc'; then $(CYGPATH_W) 'src/generate/t_py_generator.cc'; else $(CYGPATH_W) '$(srcdir)/src/generate/t_py_generator.cc'; fi`
--
+ thrift-t_py_generator.o: src/generate/t_py_generator.cc
+ @am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -MT thrift-t_py_generator.o -MD -MP -MF $(DEPDIR)/thrift-t_py_generator.Tpo -c -o thrift-t_py_generator.o `test -f 'src/generate/t_py_generator.cc' || echo '$(srcdir)/'`src/generate/t_py_generator.cc
+ @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/thrift-t_py_generator.Tpo $(DEPDIR)/thrift-t_py_generator.Po
+@@ -752,132 +647,6 @@
+ @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -c -o thrift-t_py_generator.obj `if test -f 'src/generate/t_py_generator.cc'; then $(CYGPATH_W) 'src/generate/t_py_generator.cc'; else $(CYGPATH_W) '$(srcdir)/src/generate/t_py_generator.cc'; fi`
+ 
 -thrift-t_rb_generator.o: src/generate/t_rb_generator.cc
 -@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -MT thrift-t_rb_generator.o -MD -MP -MF $(DEPDIR)/thrift-t_rb_generator.Tpo -c -o thrift-t_rb_generator.o `test -f 'src/generate/t_rb_generator.cc' || echo '$(srcdir)/'`src/generate/t_rb_generator.cc
 -@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/thrift-t_rb_generator.Tpo $(DEPDIR)/thrift-t_rb_generator.Po
@@ -297,7 +291,7 @@
  thrift-t_html_generator.o: src/generate/t_html_generator.cc
  @am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -MT thrift-t_html_generator.o -MD -MP -MF $(DEPDIR)/thrift-t_html_generator.Tpo -c -o thrift-t_html_generator.o `test -f 'src/generate/t_html_generator.cc' || echo '$(srcdir)/'`src/generate/t_html_generator.cc
  @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/thrift-t_html_generator.Tpo $(DEPDIR)/thrift-t_html_generator.Po
-@@ -906,76 +658,6 @@
+@@ -906,76 +675,6 @@
  @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
  @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(thrift_CPPFLAGS) $(CPPFLAGS) $(thrift_CXXFLAGS) $(CXXFLAGS) -c -o thrift-t_js_generator.obj `if test -f 'src/generate/t_js_generator.cc'; then $(CYGPATH_W) 'src/generate/t_js_generator.cc'; else $(CYGPATH_W) '$(srcdir)/src/generate/t_js_generator.cc'; fi`
  

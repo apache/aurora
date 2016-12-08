@@ -13,8 +13,6 @@
 #
 
 python_tests(
-  name = 'cli',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/thermos/cli',

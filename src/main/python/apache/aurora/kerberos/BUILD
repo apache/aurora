@@ -49,7 +49,6 @@ python_binary(
 )
 
 python_library(
-  name = 'kerberos',
   dependencies = [
     ':_kerberos',
   ],

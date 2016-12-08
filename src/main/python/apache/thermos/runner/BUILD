@@ -27,7 +27,6 @@ python_library(
 )
 
 python_library(
-  name = 'runner',
   dependencies = [
     ':_runner',
   ],

@@ -12,8 +12,7 @@
 # limitations under the License.
 #
 
-python_tests(name = 'hooks',
-  sources = globs('*.py'),
+python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/common',

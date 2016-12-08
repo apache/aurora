@@ -13,8 +13,6 @@
 #
 
 python_tests(
-  name = 'executor',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mesos.interface',
     '3rdparty/python:mock',

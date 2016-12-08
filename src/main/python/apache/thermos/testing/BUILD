@@ -13,7 +13,6 @@
 #
 
 python_library(
-  name = 'testing',
   sources = rglobs('*.py'),
   dependencies = [
     '3rdparty/python:thrift',

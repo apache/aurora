@@ -13,8 +13,6 @@
 #
 
 python_tests(
-  name = 'tools',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/tools:thermos_observer',

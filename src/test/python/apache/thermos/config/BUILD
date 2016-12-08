@@ -13,8 +13,6 @@
 #
 
 python_tests(
-  name = 'config',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:twitter.common.collections',
     'src/main/python/apache/thermos/config',

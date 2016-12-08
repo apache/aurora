@@ -15,7 +15,6 @@ import os
 
 
 python_library(
-  name = 'cli',
   sources = rglobs('*.py'),
   dependencies = [
     '3rdparty/python:pystachio',

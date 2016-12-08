@@ -13,8 +13,6 @@
 #
 
 python_tests(
-  name = 'bin',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/executor',

@@ -12,21 +12,16 @@
 # limitations under the License.
 #
 
-import os
+target(
+  dependencies=[
+    '3rdparty/python:thrift',
+    ':prepare_binary',
+  ]
+)
 
-
-python_library(
-  sources = rglobs('*.py'),
-  dependencies = [
-    '3rdparty/python:pystachio',
-    '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.recordio',
-    'api/src/main/thrift/org/apache/aurora/gen',
-    'api/src/main/thrift/org/apache/thermos'
-  ],
-  provides = setup_py(
-    name = 'apache.thermos.common',
-    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
-    description = 'Thermos common libraries.',
-  )
+prep_command(
+  name='prepare_binary',
+  goals=['compile', 'binary', 'test'],
+  prep_environ=False,
+  prep_executable='build-support/thrift/prepare_binary.sh',
 )

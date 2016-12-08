@@ -36,7 +36,6 @@ python_binary(
 )
 
 python_library(
-  name = 'admin',
   dependencies = [
     ':_admin',
   ],

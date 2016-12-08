@@ -13,8 +13,6 @@
 #
 
 python_tests(
-  name = 'http',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/thermos/monitoring',

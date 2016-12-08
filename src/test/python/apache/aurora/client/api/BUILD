@@ -13,8 +13,6 @@
 #
 
 python_tests(
-  name = 'api',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:mox',

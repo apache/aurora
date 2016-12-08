@@ -68,7 +68,6 @@ python_binary(
 )
 
 python_library(
-  name = 'tools',
   dependencies = [
     ':_thermos',
     ':_thermos_observer',
