@@ -24,9 +24,10 @@ readonly KNOWN_OS_IDS=(
 
 # Runs pants safely as an indirect pants subprocess.
 function run_pants() {
-  pushd "${HERE}/../.."
-  ./pants --no-colors --no-lock "$@"
-  popd
+  (
+    cd "${HERE}/../.."
+    ./pants --no-colors --no-lock "$@"
+  )
 }
 
 # Returns the pants option value for the given scope and name.
