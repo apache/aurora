@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -o xtrace
 set -o errexit
 set -o nounset
 
@@ -23,7 +24,9 @@ readonly KNOWN_OS_IDS=(
 
 # Runs pants safely as an indirect pants subprocess.
 function run_pants() {
-  ${HERE}/../../pants --no-colors --no-lock "$@"
+  pushd "${HERE}/../.."
+  ./pants --no-colors --no-lock "$@"
+  popd
 }
 
 # Returns the pants option value for the given scope and name.
@@ -32,7 +35,7 @@ function get_pants_option() {
   readonly name=$2
 
   run_pants options --scope=${scope} --name=${name} --output-format=json 2>/dev/null | \
-    python -c "import json, sys; print(json.load(sys.stdin)['${scope}.${name}']['value'])"
+    python2.7 -c "import json, sys; print(json.load(sys.stdin)['${scope}.${name}']['value'])"
 }
 
 # Ensures the thrift binary of the given version is built for the current machine and returns its
