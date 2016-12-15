@@ -495,7 +495,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
           + ", cron jobs: " + snapshot.getCronJobsSize()
           + ", locks: " + snapshot.getLocksSize()
           + ", quota confs: " + snapshot.getQuotaConfigurationsSize()
-          + ", tasks: " + snapshot.getTasksSize());
+          + ", tasks: " + snapshot.getTasksSize()
+          + ", updates: " + snapshot.getJobUpdateDetailsSize());
     });
   }
 
