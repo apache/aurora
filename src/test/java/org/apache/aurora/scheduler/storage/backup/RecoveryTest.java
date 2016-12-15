@@ -170,12 +170,8 @@ public class RecoveryTest extends EasyMockTest {
             FakeBuildInfo.GIT_TAG, FakeBuildInfo.GIT_TAG));
 
     return new Snapshot()
-        .setHostAttributes(ImmutableSet.of())
         .setCronJobs(ImmutableSet.of())
         .setSchedulerMetadata(metadata)
-        .setQuotaConfigurations(ImmutableSet.of())
-        .setTasks(IScheduledTask.toBuildersSet(ImmutableSet.copyOf(tasks)))
-        .setLocks(ImmutableSet.of())
-        .setJobUpdateDetails(ImmutableSet.of());
+        .setTasks(IScheduledTask.toBuildersSet(ImmutableSet.copyOf(tasks)));
   }
 }

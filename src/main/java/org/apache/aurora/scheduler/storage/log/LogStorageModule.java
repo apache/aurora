@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
+import java.util.Set;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -35,6 +36,7 @@ import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
 import org.apache.aurora.scheduler.storage.log.LogStorage.Settings;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.ExperimentalTaskStore;
+import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.HydrateSnapshotFields;
 
 import static org.apache.aurora.scheduler.storage.log.EntrySerializer.EntrySerializerImpl;
 import static org.apache.aurora.scheduler.storage.log.LogManager.LogEntryHashFunction;
@@ -64,6 +66,11 @@ public class LogStorageModule extends PrivateModule {
   public static final Arg<Amount<Integer, Data>> MAX_LOG_ENTRY_SIZE =
       Arg.create(Amount.of(512, Data.KB));
 
+  @CmdLine(name = "snapshot_hydrate_stores",
+      help = "Which H2-backed stores to fully hydrate on the Snapshot.")
+  private static final Arg<Set<String>> HYDRATE_SNAPSHOT_FIELDS =
+      Arg.create(SnapshotStoreImpl.ALL_H2_STORE_FIELDS);
+
   @Override
   protected void configure() {
     bind(Settings.class)
@@ -77,12 +84,16 @@ public class LogStorageModule extends PrivateModule {
     bind(LogManager.class).in(Singleton.class);
     bind(LogStorage.class).in(Singleton.class);
 
+    bind(new TypeLiteral<Set<String>>() { }).annotatedWith(HydrateSnapshotFields.class)
+        .toInstance(HYDRATE_SNAPSHOT_FIELDS.get());
+
     install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));
     bind(DistributedSnapshotStore.class).to(LogStorage.class);
     expose(Storage.class);
     expose(NonVolatileStorage.class);
     expose(DistributedSnapshotStore.class);
     expose(new TypeLiteral<Boolean>() { }).annotatedWith(ExperimentalTaskStore.class);
+    expose(new TypeLiteral<Set<String>>() { }).annotatedWith(HydrateSnapshotFields.class);
 
     bind(EntrySerializer.class).to(EntrySerializerImpl.class);
     // TODO(ksweeney): We don't need a cryptographic checksum here - assess performance of MD5

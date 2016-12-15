@@ -17,6 +17,7 @@ import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.util.BuildInfo;
@@ -89,6 +90,9 @@ interface TemporaryStorage {
           // Safe to pass false here to default to the non-experimental task store
           // during restore from backup procedure.
           false /** useDbSnapshotForTaskStore */,
+          // Safe to pass empty set here because during backup restore we are not deciding which
+          // fields to write to the snapshot.
+          ImmutableSet.of() /** hydrateFields */,
           // We can just pass an empty lambda for the MigrationManager as migration is a no-op
           // when restoring from backup.
           () -> { } /** migrationManager */,

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -74,8 +75,10 @@ import static org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import static org.apache.aurora.scheduler.storage.db.DbModule.testModuleWithWorkQueue;
 import static org.apache.aurora.scheduler.storage.db.DbUtil.createStorage;
 import static org.apache.aurora.scheduler.storage.db.DbUtil.createStorageInjector;
+import static org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.ALL_H2_STORE_FIELDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class SnapshotStoreImplIT {
@@ -86,7 +89,7 @@ public class SnapshotStoreImplIT {
   private Storage storage;
   private SnapshotStore<Snapshot> snapshotStore;
 
-  private void setUpStore(boolean dbTaskStore) {
+  private void setUpStore(boolean dbTaskStore, Set<String> hydrateFields) {
     storage = dbTaskStore
         ? createStorage()
         : createStorageInjector(
@@ -100,6 +103,7 @@ public class SnapshotStoreImplIT {
         clock,
         storage,
         dbTaskStore,
+        hydrateFields,
         createStorageInjector(testModuleWithWorkQueue()).getInstance(MigrationManager.class),
         TaskTestUtil.THRIFT_BACKFILL);
   }
@@ -114,7 +118,7 @@ public class SnapshotStoreImplIT {
 
   @Test
   public void testNoDBTaskStore() {
-    setUpStore(false);
+    setUpStore(false, ALL_H2_STORE_FIELDS);
     populateStore();
 
     Snapshot snapshot1 = snapshotStore.createSnapshot();
@@ -129,14 +133,14 @@ public class SnapshotStoreImplIT {
 
   @Test
   public void testMigrateToDBTaskStore() {
-    setUpStore(false);
+    setUpStore(false, ALL_H2_STORE_FIELDS);
     populateStore();
 
     Snapshot snapshot1 = snapshotStore.createSnapshot();
     assertEquals(expected(), makeComparable(snapshot1));
     assertFalse(snapshot1.isExperimentalTaskStore());
 
-    setUpStore(true);
+    setUpStore(true, ALL_H2_STORE_FIELDS);
     snapshotStore.applySnapshot(snapshot1);
     Snapshot snapshot2 = snapshotStore.createSnapshot();
     assertTrue(snapshot2.isExperimentalTaskStore());
@@ -146,14 +150,14 @@ public class SnapshotStoreImplIT {
 
   @Test
   public void testMigrateFromDBTaskStore() {
-    setUpStore(true);
+    setUpStore(true, ALL_H2_STORE_FIELDS);
     populateStore();
 
     Snapshot snapshot1 = snapshotStore.createSnapshot();
     assertEquals(expected(), makeComparable(snapshot1));
     assertTrue(snapshot1.isExperimentalTaskStore());
 
-    setUpStore(false);
+    setUpStore(false, ALL_H2_STORE_FIELDS);
     snapshotStore.applySnapshot(snapshot1);
     Snapshot snapshot2 = snapshotStore.createSnapshot();
     assertFalse(snapshot2.isExperimentalTaskStore());
@@ -162,8 +166,21 @@ public class SnapshotStoreImplIT {
   }
 
   @Test
+  public void testNonDefaultHydrateOptions() {
+    setUpStore(false, ImmutableSet.of());
+    populateStore();
+
+    Snapshot snapshot = snapshotStore.createSnapshot();
+
+    assertNull(snapshot.getHostAttributes());
+    assertNull(snapshot.getJobUpdateDetails());
+    assertNull(snapshot.getLocks());
+    assertNull(snapshot.getQuotaConfigurations());
+  }
+
+  @Test
   public void testDBTaskStore() {
-    setUpStore(true);
+    setUpStore(true, ALL_H2_STORE_FIELDS);
     populateStore();
 
     Snapshot snapshot1 = snapshotStore.createSnapshot();
@@ -178,7 +195,7 @@ public class SnapshotStoreImplIT {
 
   @Test
   public void testBackfill() {
-    setUpStore(false);
+    setUpStore(false, ALL_H2_STORE_FIELDS);
     snapshotStore.applySnapshot(makeNonBackfilled());
 
     Snapshot backfilled = snapshotStore.createSnapshot();

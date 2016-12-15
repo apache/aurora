@@ -2,6 +2,11 @@
 =========================
 
 ### New/updated:
+- Added a new flag --snapshot_hydrate_stores that controls which H2-backed stores to write fully
+  hydrated into the Scheduler snapshot. Can lead to significantly lower snapshot times for large
+  clusters if you set this flag to an empty list. Old behavior is preserved by default, but see
+  org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl for which stores we currently have
+  duplicate writes for.
 - A task's tier is now mapped to a label on the Mesos `TaskInfo` proto.
 - The Aurora client is now using the Thrift binary protocol to communicate with the scheduler.
 - Introduce a new `--ip` option to bind the Thermos observer to a specific rather than all
