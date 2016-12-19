@@ -130,7 +130,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_save_db")
         public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           LOG.info("Saving dbsnapshot");
           // Note: we don't use mybatis mapped statements for performance reasons and to avoid
@@ -152,7 +151,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_restore_db")
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (snapshot.isSetDbScript()) {
             try (Connection c = ((DataSource) store.getUnsafeStoreAccess()).getConnection()) {
@@ -191,7 +189,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         // It's important for locks to be replayed first, since there are relations that expect
         // references to be valid on insertion.
         @Override
-        @Timed("snapshot_save_lock_store")
         public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hydrateSnapshotFields.contains(getName())) {
             snapshot.setLocks(ILock.toBuildersSet(store.getLockStore().fetchLocks()));
@@ -199,7 +196,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_restore_lock_store")
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hasDbSnapshot(snapshot)) {
             LOG.info("Deferring lock restore to dbsnapshot");
@@ -222,7 +218,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_save_host_attributes")
         public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hydrateSnapshotFields.contains(getName())) {
             snapshot.setHostAttributes(
@@ -231,7 +226,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_restore_host_attributes")
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hasDbSnapshot(snapshot)) {
             LOG.info("Deferring attribute restore to dbsnapshot");
@@ -254,7 +248,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_save_task_store")
         public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           snapshot.setTasks(
               IScheduledTask.toBuildersSet(store.getTaskStore().fetchTasks(Query.unscoped())));
@@ -262,7 +255,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_restore_task_store")
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hasDbTaskStore(snapshot)) {
             LOG.info("Deferring task restore to dbsnapshot");
@@ -284,7 +276,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_save_cron_store")
         public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<StoredCronJob> jobs = ImmutableSet.builder();
 
@@ -296,7 +287,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_restore_cron_store")
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hasDbTaskStore(snapshot)) {
             LOG.info("Deferring cron job restore to dbsnapshot");
@@ -347,7 +337,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_save_quota_store")
         public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hydrateSnapshotFields.contains(getName())) {
             ImmutableSet.Builder<QuotaConfiguration> quotas = ImmutableSet.builder();
@@ -362,7 +351,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_restore_quota_store")
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hasDbSnapshot(snapshot)) {
             LOG.info("Deferring quota restore to dbsnapshot");
@@ -386,7 +374,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_save_update_store")
         public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hydrateSnapshotFields.contains(getName())) {
             snapshot.setJobUpdateDetails(store.getJobUpdateStore().fetchAllJobUpdateDetails());
@@ -394,7 +381,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        @Timed("snapshot_restore_update_store")
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (hasDbSnapshot(snapshot)) {
             LOG.info("Deferring job update restore to dbsnapshot");

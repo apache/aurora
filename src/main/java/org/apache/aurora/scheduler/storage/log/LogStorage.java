@@ -396,6 +396,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   }
 
   @Override
+  @Timed("scheduler_storage_prepare")
   public synchronized void prepare() {
     writeBehindStorage.prepare();
     // Open the log to make a log replica available to the scheduler group.
@@ -407,6 +408,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   }
 
   @Override
+  @Timed("scheduler_storage_start")
   public synchronized void start(final MutateWork.NoResult.Quiet initializationLogic) {
     write((NoResult.Quiet) unused -> {
       // Must have the underlying storage started so we can query it for the last checkpoint.
