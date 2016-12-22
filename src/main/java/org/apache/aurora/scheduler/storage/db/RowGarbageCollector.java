@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractScheduledService;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.ibatis.exceptions.PersistenceException;
@@ -44,6 +46,7 @@ class RowGarbageCollector extends AbstractScheduledService {
   private static final List<Class<? extends GarbageCollectedTableMapper>> TABLES =
       ImmutableList.of(TaskConfigMapper.class, JobKeyMapper.class);
 
+  private final AtomicLong deletedCount;
   private final Scheduler iterationScheduler;
   private final SqlSessionFactory sessionFactory;
 
@@ -55,11 +58,13 @@ class RowGarbageCollector extends AbstractScheduledService {
   RowGarbageCollector(
       Scheduler iterationScheduler,
       SqlSessionFactory sessionFactory,
-      Storage storage) {
+      Storage storage,
+      StatsProvider statsProvider) {
 
     this.iterationScheduler = requireNonNull(iterationScheduler);
     this.sessionFactory = requireNonNull(sessionFactory);
     this.storage = requireNonNull(storage);
+    this.deletedCount = statsProvider.makeCounter("row_garbage_collector_deleted");
   }
 
   @Override
@@ -67,12 +72,13 @@ class RowGarbageCollector extends AbstractScheduledService {
     return iterationScheduler;
   }
 
+  @Timed("row_garbage_collector_run")
   @VisibleForTesting
   @Override
   public void runOneIteration() {
     LOG.info("Scanning database tables for unreferenced rows.");
 
-    final AtomicLong deletedCount = new AtomicLong();
+    long startCount = deletedCount.get();
     for (Class<? extends GarbageCollectedTableMapper> tableClass : TABLES) {
       storage.write((NoResult.Quiet) storeProvider -> {
         try (SqlSession session = sessionFactory.openSession(true)) {
@@ -88,6 +94,6 @@ class RowGarbageCollector extends AbstractScheduledService {
         }
       });
     }
-    LOG.info("Deleted " + deletedCount.get() + " unreferenced rows.");
+    LOG.info("Deleted {} unreferenced rows.", Long.valueOf(deletedCount.get() - startCount));
   }
 }
