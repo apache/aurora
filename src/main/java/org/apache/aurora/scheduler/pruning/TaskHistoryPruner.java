@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.pruning;
 
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
 
@@ -27,6 +28,7 @@ import com.google.common.eventbus.Subscribe;
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.BatchWorker;
@@ -56,6 +58,8 @@ public class TaskHistoryPruner implements EventSubscriber {
   private static final Logger LOG = LoggerFactory.getLogger(TaskHistoryPruner.class);
   private static final String FATAL_ERROR_FORMAT =
       "Unexpected problem pruning task history for %s. Triggering shutdown";
+  @VisibleForTesting
+  static final String TASKS_PRUNED = "tasks_pruned";
 
   private final DelayExecutor executor;
   private final StateManager stateManager;
@@ -64,6 +68,7 @@ public class TaskHistoryPruner implements EventSubscriber {
   private final Storage storage;
   private final Lifecycle lifecycle;
   private final TaskEventBatchWorker batchWorker;
+  private final AtomicLong prunedTasksCount;
 
   private final Predicate<IScheduledTask> safeToDelete = new Predicate<IScheduledTask>() {
     @Override
@@ -97,7 +102,8 @@ public class TaskHistoryPruner implements EventSubscriber {
       HistoryPrunnerSettings settings,
       Storage storage,
       Lifecycle lifecycle,
-      TaskEventBatchWorker batchWorker) {
+      TaskEventBatchWorker batchWorker,
+      StatsProvider statsProvider) {
 
     this.executor = requireNonNull(executor);
     this.stateManager = requireNonNull(stateManager);
@@ -106,6 +112,7 @@ public class TaskHistoryPruner implements EventSubscriber {
     this.storage = requireNonNull(storage);
     this.lifecycle = requireNonNull(lifecycle);
     this.batchWorker = requireNonNull(batchWorker);
+    this.prunedTasksCount = statsProvider.makeCounter(TASKS_PRUNED);
   }
 
   @VisibleForTesting
@@ -139,6 +146,7 @@ public class TaskHistoryPruner implements EventSubscriber {
       stateManager.deleteTasks(storeProvider, taskIds);
       return BatchWorker.NO_RESULT;
     });
+    prunedTasksCount.addAndGet(taskIds.size());
   }
 
   @VisibleForTesting
