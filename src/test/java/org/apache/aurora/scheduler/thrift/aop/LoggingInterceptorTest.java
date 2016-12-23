@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
@@ -29,6 +30,7 @@ import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -70,9 +72,11 @@ public class LoggingInterceptorTest extends EasyMockTest {
 
     control.replay();
 
+    assertNull(Stats.getVariable("scheduler_thrift_response_ERROR_TRANSIENT"));
     assertEquals(
         ResponseCode.ERROR_TRANSIENT,
         ((Response) loggingInterceptor.invoke(methodInvocation)).getResponseCode());
+    assertEquals(1L, Stats.getVariable("scheduler_thrift_response_ERROR_TRANSIENT").read());
   }
 
   @Test
@@ -84,14 +88,17 @@ public class LoggingInterceptorTest extends EasyMockTest {
 
     control.replay();
 
+    assertNull(Stats.getVariable("scheduler_thrift_response_ERROR"));
     assertEquals(
         ResponseCode.ERROR,
         ((Response) loggingInterceptor.invoke(methodInvocation)).getResponseCode());
+    assertEquals(1L, Stats.getVariable("scheduler_thrift_response_ERROR").read());
   }
 
   @Test
   public void testInvokePrintsArgs() throws Throwable {
     Response response = new Response();
+    response.setResponseCode(ResponseCode.OK);
 
     expect(methodInvocation.getMethod())
         .andReturn(InterceptedClass.class.getDeclaredMethod("respond", Object.class, Object.class));
@@ -110,13 +117,17 @@ public class LoggingInterceptorTest extends EasyMockTest {
 
     control.replay();
 
+    assertNull(Stats.getVariable("scheduler_thrift_response_OK"));
     assertSame(response, loggingInterceptor.invoke(methodInvocation));
     assertTrue(calledAtLeastOnce.get());
+    assertEquals(1L, Stats.getVariable("scheduler_thrift_response_OK").read());
   }
 
   @Test
   public void testInvokePrintsBlankedJobConfiguration() throws Throwable {
     Response response = new Response();
+    response.setResponseCode(ResponseCode.INVALID_REQUEST);
+
     expect(methodInvocation.getMethod())
         .andReturn(InterceptedClass.class.getDeclaredMethod("respond", JobConfiguration.class));
     expect(methodInvocation.getArguments())
@@ -125,12 +136,16 @@ public class LoggingInterceptorTest extends EasyMockTest {
 
     control.replay();
 
+    assertNull(Stats.getVariable("scheduler_thrift_response_INVALID_REQUEST"));
     assertSame(response, loggingInterceptor.invoke(methodInvocation));
+    assertEquals(1L, Stats.getVariable("scheduler_thrift_response_INVALID_REQUEST").read());
   }
 
   @Test
   public void testInvokePrintsJobConfiguration() throws Throwable {
     Response response = new Response();
+    response.setResponseCode(ResponseCode.WARNING);
+
     expect(methodInvocation.getMethod())
         .andReturn(InterceptedClass.class.getDeclaredMethod("respond", JobConfiguration.class));
     expect(methodInvocation.getArguments()).andReturn(new Object[] {new JobConfiguration()});
@@ -138,6 +153,8 @@ public class LoggingInterceptorTest extends EasyMockTest {
 
     control.replay();
 
+    assertNull(Stats.getVariable("scheduler_thrift_response_WARNING"));
     assertSame(response, loggingInterceptor.invoke(methodInvocation));
+    assertEquals(1L, Stats.getVariable("scheduler_thrift_response_WARNING").read());
   }
 }
