@@ -43,6 +43,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
@@ -113,6 +114,7 @@ public class PendingTaskProcessor implements Runnable {
     this.clock = requireNonNull(clock);
   }
 
+  @Timed("pending_task_processor_run")
   @Override
   public void run() {
     metrics.recordTaskProcessorRun();
