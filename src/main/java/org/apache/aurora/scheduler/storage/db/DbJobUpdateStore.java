@@ -15,19 +15,24 @@ package org.apache.aurora.scheduler.storage.db;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.base.MorePreconditions;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
-import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.db.views.DbJobUpdate;
 import org.apache.aurora.scheduler.storage.db.views.DbJobUpdateInstructions;
@@ -58,7 +63,8 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
   private final JobUpdateEventMapper jobEventMapper;
   private final JobInstanceUpdateEventMapper instanceEventMapper;
   private final TaskConfigManager taskConfigManager;
-  private final CachedCounters stats;
+  private final LoadingCache<JobUpdateStatus, AtomicLong> jobUpdateEventStats;
+  private final LoadingCache<JobUpdateAction, AtomicLong> jobUpdateActionStats;
 
   @Inject
   DbJobUpdateStore(
@@ -67,14 +73,33 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
       JobUpdateEventMapper jobEventMapper,
       JobInstanceUpdateEventMapper instanceEventMapper,
       TaskConfigManager taskConfigManager,
-      CachedCounters stats) {
+      StatsProvider statsProvider) {
 
     this.jobKeyMapper = requireNonNull(jobKeyMapper);
     this.detailsMapper = requireNonNull(detailsMapper);
     this.jobEventMapper = requireNonNull(jobEventMapper);
     this.instanceEventMapper = requireNonNull(instanceEventMapper);
     this.taskConfigManager = requireNonNull(taskConfigManager);
-    this.stats = requireNonNull(stats);
+    this.jobUpdateEventStats = CacheBuilder.newBuilder()
+        .build(new CacheLoader<JobUpdateStatus, AtomicLong>() {
+          @Override
+          public AtomicLong load(JobUpdateStatus status) {
+            return statsProvider.makeCounter(jobUpdateStatusStatName(status));
+          }
+        });
+    for (JobUpdateStatus status : JobUpdateStatus.values()) {
+      jobUpdateEventStats.getUnchecked(status).get();
+    }
+    this.jobUpdateActionStats = CacheBuilder.newBuilder()
+        .build(new CacheLoader<JobUpdateAction, AtomicLong>() {
+          @Override
+          public AtomicLong load(JobUpdateAction action) {
+            return statsProvider.makeCounter(jobUpdateActionStatName(action));
+          }
+        });
+    for (JobUpdateAction action : JobUpdateAction.values()) {
+      jobUpdateActionStats.getUnchecked(action).get();
+    }
   }
 
   @Timed("job_update_store_save_update")
@@ -141,21 +166,27 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
   }
 
   @VisibleForTesting
-  static String statName(JobUpdateStatus status) {
+  static String jobUpdateStatusStatName(JobUpdateStatus status) {
     return "update_transition_" + status;
   }
 
   @Timed("job_update_store_save_event")
   @Override
   public void saveJobUpdateEvent(IJobUpdateKey key, IJobUpdateEvent event) {
-    stats.get(statName(event.getStatus())).incrementAndGet();
     jobEventMapper.insert(key, event.newBuilder());
+    jobUpdateEventStats.getUnchecked(event.getStatus()).incrementAndGet();
+  }
+
+  @VisibleForTesting
+  static String jobUpdateActionStatName(JobUpdateAction action) {
+    return "update_instance_transition_" + action;
   }
 
   @Timed("job_update_store_save_instance_event")
   @Override
   public void saveJobInstanceUpdateEvent(IJobUpdateKey key, IJobInstanceUpdateEvent event) {
     instanceEventMapper.insert(key, event.newBuilder());
+    jobUpdateActionStats.getUnchecked(event.getAction()).incrementAndGet();
   }
 
   @Timed("job_update_store_delete_all")

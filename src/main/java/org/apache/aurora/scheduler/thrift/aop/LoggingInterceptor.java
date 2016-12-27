@@ -72,7 +72,7 @@ class LoggingInterceptor implements MethodInterceptor {
       CacheBuilder.newBuilder()
           .build(new CacheLoader<ResponseCode, AtomicLong>() {
             @Override
-            public AtomicLong load(ResponseCode code) throws Exception {
+            public AtomicLong load(ResponseCode code) {
               return Stats.exportLong("scheduler_thrift_response_" + code.name());
             }
           });

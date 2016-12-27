@@ -80,6 +80,7 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
+import static org.apache.aurora.scheduler.storage.db.DbJobUpdateStore.jobUpdateActionStatName;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -328,7 +329,7 @@ public class DbJobUpdateStoreTest {
     for (Map.Entry<JobUpdateStatus, T> entry : expected.entrySet()) {
       assertEquals(
           entry.getValue().longValue(),
-          stats.getLongValue(DbJobUpdateStore.statName(entry.getKey())));
+          stats.getLongValue(DbJobUpdateStore.jobUpdateStatusStatName(entry.getKey())));
     }
   }
 
@@ -350,6 +351,7 @@ public class DbJobUpdateStoreTest {
     assertEquals(
         event1,
         Iterables.getOnlyElement(getUpdateDetails(updateId).get().getInstanceEvents()));
+    assertEquals(1L, stats.getLongValue(jobUpdateActionStatName(INSTANCE_UPDATED)));
 
     saveJobInstanceEvent(event2, updateId);
     assertEquals(
@@ -357,6 +359,7 @@ public class DbJobUpdateStoreTest {
         getUpdateDetails(updateId).get().getUpdate());
     assertEquals(event1, getUpdateDetails(updateId).get().getInstanceEvents().get(0));
     assertEquals(event2, getUpdateDetails(updateId).get().getInstanceEvents().get(1));
+    assertEquals(1L, stats.getLongValue(jobUpdateActionStatName(INSTANCE_ROLLING_BACK)));
   }
 
   @Test(expected = StorageException.class)
@@ -420,16 +423,20 @@ public class DbJobUpdateStoreTest {
     saveJobEvent(jEvent11, updateId1);
     saveJobEvent(jEvent12, updateId1);
     saveJobInstanceEvent(iEvent11, updateId1);
+    assertEquals(1L, stats.getLongValue(jobUpdateActionStatName(INSTANCE_UPDATED)));
     saveJobInstanceEvent(iEvent12, updateId1);
+    assertEquals(1L, stats.getLongValue(jobUpdateActionStatName(INSTANCE_UPDATING)));
 
     saveJobEvent(jEvent21, updateId2);
     saveJobEvent(jEvent22, updateId2);
     assertEquals(ImmutableList.of(), getInstanceEvents(updateId2, 3));
     saveJobInstanceEvent(iEvent21, updateId2);
+    assertEquals(2L, stats.getLongValue(jobUpdateActionStatName(INSTANCE_UPDATING)));
 
     assertEquals(ImmutableList.of(iEvent21), getInstanceEvents(updateId2, 3));
     saveJobInstanceEvent(iEvent22, updateId2);
     assertEquals(ImmutableList.of(iEvent21, iEvent22), getInstanceEvents(updateId2, 3));
+    assertEquals(2L, stats.getLongValue(jobUpdateActionStatName(INSTANCE_UPDATING)));
 
     details1 = updateJobDetails(
         populateExpected(details1.getUpdate(), ERROR, CREATED_MS, 457L),
@@ -463,6 +470,7 @@ public class DbJobUpdateStoreTest {
     saveUpdate(update, Optional.of("lock"));
     saveJobEvent(makeJobUpdateEvent(ROLLING_FORWARD, 123L), updateId);
     saveJobInstanceEvent(instanceEvent, updateId);
+    assertEquals(1L, stats.getLongValue(jobUpdateActionStatName(INSTANCE_ROLLBACK_FAILED)));
     assertEquals(
         populateExpected(update, ROLLING_FORWARD, CREATED_MS, 125L),
         getUpdate(updateId).get());
