@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
-import com.google.protobuf.UninitializedMessageException;
 import com.hubspot.jackson.datatype.protobuf.ProtobufModule;
 
 import org.apache.aurora.GuavaUtils;
@@ -92,7 +91,7 @@ public final class ExecutorSettingsLoader {
                   Optional.fromNullable(m.volumeMounts).or(ImmutableList.of()),
                   m.taskPrefix)));
 
-    } catch (UninitializedMessageException e) {
+    } catch (RuntimeException e) {
       throw new ExecutorConfigException(e);
     }
 

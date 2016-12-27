@@ -2,6 +2,7 @@
 =========================
 
 ### New/updated:
+- Upgraded Mesos to 1.1.0.
 - Added a new flag --snapshot_hydrate_stores that controls which H2-backed stores to write fully
   hydrated into the Scheduler snapshot. Can lead to significantly lower snapshot times for large
   clusters if you set this flag to an empty list. Old behavior is preserved by default, but see

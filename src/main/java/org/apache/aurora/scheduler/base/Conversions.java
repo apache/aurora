@@ -64,6 +64,13 @@ public final class Conversions {
           .put(TaskState.TASK_KILLED, ScheduleStatus.KILLED)
           .put(TaskState.TASK_LOST, ScheduleStatus.LOST)
           .put(TaskState.TASK_ERROR, ScheduleStatus.LOST)
+          // Task states send to partition-aware Mesos frameworks. Aurora does not advertise the
+          // PARTITION_AWARE capability yet (AURORA-1814). We still map the task states to be safe.
+          .put(TaskState.TASK_UNREACHABLE, ScheduleStatus.LOST)
+          .put(TaskState.TASK_DROPPED, ScheduleStatus.LOST)
+          .put(TaskState.TASK_GONE, ScheduleStatus.LOST)
+          .put(TaskState.TASK_GONE_BY_OPERATOR, ScheduleStatus.LOST)
+          .put(TaskState.TASK_UNKNOWN, ScheduleStatus.LOST)
           .build();
 
   /**
