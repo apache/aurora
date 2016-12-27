@@ -52,6 +52,8 @@ public final class PubsubEventModule extends AbstractModule {
 
   @VisibleForTesting
   static final String EXCEPTIONS_STAT = "event_bus_exceptions";
+  @VisibleForTesting
+  static final String EVENT_BUS_DEAD_EVENTS = "event_bus_dead_events";
 
   @VisibleForTesting
   PubsubEventModule(Logger log) {
@@ -87,7 +89,14 @@ public final class PubsubEventModule extends AbstractModule {
         }
     );
 
-    eventBus.register(new DeadEventHandler());
+    final AtomicLong deadEventCounter = statsProvider.makeCounter(EVENT_BUS_DEAD_EVENTS);
+    eventBus.register(new Object() {
+      @Subscribe
+      public void logDeadEvent(DeadEvent event) {
+        deadEventCounter.incrementAndGet();
+        log.warn(String.format(DEAD_EVENT_MESSAGE, event.getEvent()));
+      }
+    });
     return eventBus;
   }
 
@@ -95,13 +104,6 @@ public final class PubsubEventModule extends AbstractModule {
   @Singleton
   EventSink provideEventSink(EventBus eventBus) {
     return eventBus::post;
-  }
-
-  private class DeadEventHandler {
-    @Subscribe
-    public void logDeadEvent(DeadEvent event) {
-      log.warn(String.format(DEAD_EVENT_MESSAGE, event.getEvent()));
-    }
   }
 
   static class RegisterSubscribers extends AbstractIdleService {

@@ -64,6 +64,7 @@ public class PubsubEventModuleTest extends EasyMockTest {
     control.replay();
 
     getInjector().getInstance(EventBus.class).post("hello");
+    assertEquals(1L, statsProvider.getLongValue(PubsubEventModule.EVENT_BUS_DEAD_EVENTS));
   }
 
   @Test
@@ -84,6 +85,7 @@ public class PubsubEventModuleTest extends EasyMockTest {
     assertEquals(0L, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
     injector.getInstance(EventBus.class).post("hello");
     assertEquals(1L, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
+    assertEquals(0L, statsProvider.getLongValue(PubsubEventModule.EVENT_BUS_DEAD_EVENTS));
   }
 
   static class ThrowingSubscriber implements PubsubEvent.EventSubscriber {
