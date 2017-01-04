@@ -70,7 +70,6 @@ public class TaskTimeoutTest extends EasyMockTest {
   public void setUp() {
     executor = createMock(DelayExecutor.class);
     storageUtil = new StorageTestUtil(this);
-    storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
     clock = new FakeClock();
     statsProvider = createMock(StatsProvider.class);
@@ -130,24 +129,25 @@ public class TaskTimeoutTest extends EasyMockTest {
   public void testTransientToTransient() {
     expectTaskWatch();
     Capture<Runnable> killingTimeout = expectTaskWatch();
-    expect(stateManager.changeState(
-        storageUtil.mutableStoreProvider,
-        TASK_ID,
-        Optional.of(KILLING),
-        LOST,
-        TaskTimeout.TIMEOUT_MESSAGE))
-        .andReturn(StateChangeResult.SUCCESS);
+    expect(storageUtil.storeProvider.getTaskStore()).andReturn(storageUtil.taskStore);
+    storageUtil.expectRead();
+    storageUtil.expectTaskFetch(TASK_ID, makeTask(TASK_ID, ASSIGNED));
 
     replayAndCreate();
 
     changeState(PENDING, ASSIGNED);
     changeState(ASSIGNED, KILLING);
     killingTimeout.getValue().run();
+    assertEquals(0, timedOutTaskCounter.intValue());
   }
 
   @Test
   public void testTimeout() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
+    expect(storageUtil.storeProvider.getTaskStore()).andReturn(storageUtil.taskStore);
+    storageUtil.expectRead();
+    storageUtil.expectTaskFetch(TASK_ID, makeTask(TASK_ID, ASSIGNED));
+    storageUtil.expectWrite();
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID,
@@ -161,26 +161,26 @@ public class TaskTimeoutTest extends EasyMockTest {
     changeState(INIT, PENDING);
     changeState(PENDING, ASSIGNED);
     assignedTimeout.getValue().run();
-    assertEquals(timedOutTaskCounter.intValue(), 1);
+    assertEquals(1, timedOutTaskCounter.intValue());
   }
 
   @Test
   public void testTaskDeleted() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
-    expect(stateManager.changeState(
-        storageUtil.mutableStoreProvider,
-        TASK_ID,
-        Optional.of(KILLING),
-        LOST,
-        TaskTimeout.TIMEOUT_MESSAGE))
-        .andReturn(StateChangeResult.ILLEGAL);
+    expect(storageUtil.storeProvider.getTaskStore()).andReturn(storageUtil.taskStore);
+    storageUtil.expectRead();
+    storageUtil.expectTaskFetch(TASK_ID);
 
     replayAndCreate();
 
     changeState(INIT, PENDING);
     changeState(PENDING, KILLING);
     assignedTimeout.getValue().run();
-    assertEquals(timedOutTaskCounter.intValue(), 0);
+    assertEquals(0, timedOutTaskCounter.intValue());
+  }
+
+  private static IScheduledTask makeTask(String taskId, ScheduleStatus status) {
+    return makeTask(taskId, status, 0L);
   }
 
   private static IScheduledTask makeTask(
@@ -231,6 +231,6 @@ public class TaskTimeoutTest extends EasyMockTest {
     changeState(INIT, PENDING);
     changeState(PENDING, ASSIGNED);
     assignedTimeout.getValue().run();
-    assertEquals(timedOutTaskCounter.intValue(), 0);
+    assertEquals(0, timedOutTaskCounter.intValue());
   }
 }
