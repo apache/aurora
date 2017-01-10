@@ -323,10 +323,11 @@ def test_group_name_exists(mock_check_call, mock_verify):
   assert_create_user_and_group(mock_check_call, mock_verify, True, False, True, False)
 
 
+@mock.patch('os.path.isfile')
 @mock.patch('subprocess.check_call')
 @mock.patch('apache.aurora.executor.common.sandbox.safe_mkdir')
 @mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
-def test_filesystem_sandbox_mounts_paths(mock_safe_mkdir, mock_check_call):
+def test_filesystem_sandbox_mounts_paths(mock_safe_mkdir, mock_check_call, mock_isfile):
   sandbox_mount_point = '/some/mount/point'
   sandbox_directory = os.path.join(MOCK_MESOS_DIRECTORY, 'sandbox')
 
@@ -336,6 +337,8 @@ def test_filesystem_sandbox_mounts_paths(mock_safe_mkdir, mock_check_call):
       no_create_user=True,
       mounted_volume_paths=['/some/container/path', '/some/other/container/path'],
       sandbox_mount_point=sandbox_mount_point)
+
+  mock_isfile.return_value = False
 
   sandbox._mount_paths()
 
@@ -366,10 +369,11 @@ def test_filesystem_sandbox_mounts_paths(mock_safe_mkdir, mock_check_call):
   ]
 
 
+@mock.patch('os.path.isfile')
 @mock.patch('subprocess.check_call')
 @mock.patch('apache.aurora.executor.common.sandbox.safe_mkdir')
 @mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
-def test_filesystem_sandbox_no_volumes(mock_safe_mkdir, mock_check_call):
+def test_filesystem_sandbox_no_volumes(mock_safe_mkdir, mock_check_call, mock_isfile):
   sandbox_mount_point = '/some/mount/point'
   sandbox_directory = os.path.join(MOCK_MESOS_DIRECTORY, 'sandbox'),
 
@@ -380,11 +384,78 @@ def test_filesystem_sandbox_no_volumes(mock_safe_mkdir, mock_check_call):
       mounted_volume_paths=None,
       sandbox_mount_point=sandbox_mount_point)
 
+  mock_isfile.return_value = False
+
   sandbox._mount_paths()
 
   task_fs_path = os.path.join(MOCK_MESOS_DIRECTORY, 'taskfs')
 
   assert mock_check_call.mock_calls == [
+    mock.call([
+      'mount',
+      '-n',
+      '--rbind',
+      sandbox_directory,
+      os.path.join(task_fs_path, sandbox_mount_point[1:])
+    ])
+  ]
+
+
+@mock.patch('apache.aurora.executor.common.sandbox.touch')
+@mock.patch('os.path.exists')
+@mock.patch('os.path.isfile')
+@mock.patch('subprocess.check_call')
+@mock.patch('apache.aurora.executor.common.sandbox.safe_mkdir')
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': MOCK_MESOS_DIRECTORY})
+def test_filesystem_sandbox_mounts_paths_source_is_file(
+    mock_safe_mkdir,
+    mock_check_call,
+    mock_isfile,
+    mock_exists,
+    mock_touch):
+
+  sandbox_mount_point = '/some/mount/point'
+  sandbox_directory = os.path.join(MOCK_MESOS_DIRECTORY, 'sandbox')
+
+  sandbox = FileSystemImageSandbox(
+      sandbox_directory,
+      user='someuser',
+      no_create_user=True,
+      mounted_volume_paths=['/some/path/to/file', '/some/path/to/directory'],
+      sandbox_mount_point=sandbox_mount_point)
+
+  def is_file_side_effect(arg):
+    return arg.endswith('file')
+
+  mock_isfile.side_effect = is_file_side_effect
+  mock_exists.return_value = False
+
+  sandbox._mount_paths()
+
+  task_fs_path = os.path.join(MOCK_MESOS_DIRECTORY, 'taskfs')
+  destination_path = os.path.join(task_fs_path, 'some/path/to/file')
+
+  # we should `touch` the mount point, but only for the file mount, not the directory mount.
+  assert mock_touch.mock_calls == [
+    mock.call(destination_path)
+  ]
+
+  # we should have mounted the file path we passed in as well as the sandbox directory itself.
+  assert mock_check_call.mock_calls == [
+    mock.call([
+      'mount',
+      '-n',
+      '--rbind',
+      '/some/path/to/file',
+      destination_path
+    ]),
+    mock.call([
+      'mount',
+      '-n',
+      '--rbind',
+      '/some/path/to/directory',
+      os.path.join(task_fs_path, 'some/path/to/directory')
+    ]),
     mock.call([
       'mount',
       '-n',

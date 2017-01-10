@@ -21,7 +21,7 @@ import subprocess
 from abc import abstractmethod, abstractproperty
 
 from twitter.common import log
-from twitter.common.dirutil import safe_mkdir, safe_rmtree
+from twitter.common.dirutil import safe_mkdir, safe_rmtree, touch
 from twitter.common.lang import Interface
 
 from gen.apache.aurora.api.constants import TASK_FILESYSTEM_MOUNT_POINT
@@ -279,8 +279,15 @@ class FileSystemImageSandbox(DirectorySandbox):
 
   def _mount_paths(self):
     def do_mount(source, destination):
-      safe_mkdir(destination)
       log.info('Mounting %s into task filesystem at %s.' % (source, destination))
+
+      # If we're mounting a file into the task filesystem, the mount call will fail if the mount
+      # point doesn't exist. In that case we'll create an empty file to mount over.
+      if os.path.isfile(source) and not os.path.exists(destination):
+        safe_mkdir(os.path.dirname(destination))
+        touch(destination)
+      else:
+        safe_mkdir(destination)
 
       # This mount call is meant to mimic what mesos does when mounting into the container. C.f.
       # https://github.com/apache/mesos/blob/c3228f3c3d1a1b2c145d1377185cfe22da6079eb/src/slave/containerizer/mesos/isolators/filesystem/linux.cpp#L521-L528
