@@ -25,11 +25,13 @@ import com.google.inject.Module;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.TearDownTestCase;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.SingletonService;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
 import static org.junit.Assert.assertNotNull;
@@ -57,6 +59,8 @@ abstract class AbstractDiscoveryModuleTest extends TearDownTestCase {
                         ImmutableList.of(InetSocketAddress.createUnresolved("localhost", 42)));
                 bind(ServiceDiscoveryBindings.ZOO_KEEPER_ACL_KEY)
                     .toInstance(ZooKeeperUtils.OPEN_ACL_UNSAFE);
+
+                bind(StatsProvider.class).toInstance(new FakeStatsProvider());
 
                 bindExtraRequirements(binder());
               }
