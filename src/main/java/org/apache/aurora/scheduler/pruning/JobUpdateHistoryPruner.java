@@ -16,14 +16,17 @@ package org.apache.aurora.scheduler.pruning;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.util.concurrent.AbstractIdleService;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
@@ -38,11 +41,14 @@ import static java.util.Objects.requireNonNull;
  */
 class JobUpdateHistoryPruner extends AbstractIdleService {
   private static final Logger LOG = LoggerFactory.getLogger(JobUpdateHistoryPruner.class);
+  @VisibleForTesting
+  static final String JOB_UPDATES_PRUNED = "job_updates_pruned";
 
   private final Clock clock;
   private final ScheduledExecutorService executor;
   private final Storage storage;
   private final HistoryPrunerSettings settings;
+  private final AtomicLong prunedUpdatesCount;
 
   static class HistoryPrunerSettings {
     private final Amount<Long, Time> pruneInterval;
@@ -65,12 +71,14 @@ class JobUpdateHistoryPruner extends AbstractIdleService {
       Clock clock,
       ScheduledExecutorService executor,
       Storage storage,
-      HistoryPrunerSettings settings) {
+      HistoryPrunerSettings settings,
+      StatsProvider statsProvider) {
 
     this.clock = requireNonNull(clock);
     this.executor = requireNonNull(executor);
     this.storage = requireNonNull(storage);
     this.settings = requireNonNull(settings);
+    this.prunedUpdatesCount = statsProvider.makeCounter(JOB_UPDATES_PRUNED);
   }
 
   @Override
@@ -81,6 +89,7 @@ class JobUpdateHistoryPruner extends AbstractIdleService {
               settings.maxUpdatesPerJob,
               clock.nowMillis() - settings.maxHistorySize.as(Time.MILLISECONDS));
 
+          prunedUpdatesCount.addAndGet(prunedUpdates.size());
           LOG.info(prunedUpdates.isEmpty()
               ? "No job update history to prune."
               : "Pruned job update history: " + Joiner.on(",").join(prunedUpdates));

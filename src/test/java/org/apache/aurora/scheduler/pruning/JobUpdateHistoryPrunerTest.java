@@ -27,15 +27,20 @@ import org.apache.aurora.scheduler.pruning.JobUpdateHistoryPruner.HistoryPrunerS
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.pruning.JobUpdateHistoryPruner.JOB_UPDATES_PRUNED;
 import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertEquals;
 
 public class JobUpdateHistoryPrunerTest extends EasyMockTest {
   @Test
   public void testExecution() throws Exception {
     StorageTestUtil storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
+
+    final FakeStatsProvider statsProvider = new FakeStatsProvider();
 
     final ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
     FakeScheduledExecutor executorClock =
@@ -60,10 +65,15 @@ public class JobUpdateHistoryPrunerTest extends EasyMockTest {
         new HistoryPrunerSettings(
             Amount.of(1L, Time.MILLISECONDS),
             Amount.of(1L, Time.MILLISECONDS),
-            1));
+            1),
+        statsProvider);
 
     pruner.startAsync().awaitRunning();
+
+    assertEquals(0L, statsProvider.getValue(JOB_UPDATES_PRUNED));
     executorClock.advance(Amount.of(1L, Time.MILLISECONDS));
+    assertEquals(1L, statsProvider.getValue(JOB_UPDATES_PRUNED));
     executorClock.advance(Amount.of(1L, Time.MILLISECONDS));
+    assertEquals(1L, statsProvider.getValue(JOB_UPDATES_PRUNED));
   }
 }
