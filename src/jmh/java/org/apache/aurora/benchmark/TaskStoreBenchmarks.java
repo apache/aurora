@@ -22,6 +22,8 @@ import com.google.inject.Guice;
 import com.google.inject.util.Modules;
 
 import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.Clock;
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
@@ -88,6 +90,7 @@ public class TaskStoreBenchmarks {
                 @Override
                 protected void configure() {
                   bind(StatsProvider.class).toInstance(new FakeStatsProvider());
+                  bind(Clock.class).toInstance(new FakeClock());
                 }
               }))
           .getInstance(Storage.class);

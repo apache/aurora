@@ -95,8 +95,8 @@ class MemTaskStore implements TaskStore.Mutable {
   // slave host.  This is deemed acceptable due to the fact that secondary key values are rarely
   // mutated in practice, and mutated in ways that are not impacted by this behavior.
   private final Map<String, Task> tasks = Maps.newConcurrentMap();
+  private final SecondaryIndex<IJobKey> jobIndex;
   private final List<SecondaryIndex<?>> secondaryIndices;
-
   // An interner is used here to collapse equivalent TaskConfig instances into canonical instances.
   // Ideally this would fall out of the object hierarchy (TaskConfig being associated with the job
   // rather than the task), but we intuit this detail here for performance reasons.
@@ -110,12 +110,9 @@ class MemTaskStore implements TaskStore.Mutable {
       StatsProvider statsProvider,
       @SlowQueryThreshold Amount<Long, Time> slowQueryThreshold) {
 
+    jobIndex = new SecondaryIndex<>(Tasks::getJob, QUERY_TO_JOB_KEY, statsProvider, "job");
     secondaryIndices = ImmutableList.of(
-        new SecondaryIndex<>(
-            Tasks::getJob,
-            QUERY_TO_JOB_KEY,
-            statsProvider,
-            "job"),
+        jobIndex,
         new SecondaryIndex<>(
             Tasks::scheduledToSlaveHost,
             QUERY_TO_SLAVE_HOST,
@@ -156,9 +153,7 @@ class MemTaskStore implements TaskStore.Mutable {
   @Timed("mem_storage_get_job_keys")
   @Override
   public Set<IJobKey> getJobKeys() {
-    return FluentIterable.from(fetchTasks(Query.unscoped()))
-        .transform(Tasks::getJob)
-        .toSet();
+    return jobIndex.keySet();
   }
 
   private final Function<IScheduledTask, Task> toTask = task -> new Task(task, configInterner);
@@ -370,6 +365,10 @@ class MemTaskStore implements TaskStore.Mutable {
               return index.size();
             }
           });
+    }
+
+    Set<K> keySet() {
+      return ImmutableSet.copyOf(index.keySet());
     }
 
     void insert(Iterable<IScheduledTask> tasks) {
