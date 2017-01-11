@@ -36,7 +36,6 @@ import com.google.common.eventbus.Subscribe;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
@@ -147,14 +146,19 @@ public interface OfferManager extends EventSubscriber {
   class OfferManagerImpl implements OfferManager {
     @VisibleForTesting
     static final Logger LOG = LoggerFactory.getLogger(OfferManagerImpl.class);
+    @VisibleForTesting
+    static final String OFFER_ACCEPT_RACES = "offer_accept_races";
+    @VisibleForTesting
+    static final String OUTSTANDING_OFFERS = "outstanding_offers";
+    @VisibleForTesting
+    static final String STATICALLY_BANNED_OFFERS = "statically_banned_offers_size";
 
     private final HostOffers hostOffers;
-    private final AtomicLong offerRaces = Stats.exportLong("offer_accept_races");
+    private final AtomicLong offerRaces;
 
     private final Driver driver;
     private final OfferSettings offerSettings;
     private final DelayExecutor executor;
-    private final StatsProvider statsProvider;
 
     @Inject
     @VisibleForTesting
@@ -167,8 +171,8 @@ public interface OfferManager extends EventSubscriber {
       this.driver = requireNonNull(driver);
       this.offerSettings = requireNonNull(offerSettings);
       this.executor = requireNonNull(executor);
-      this.statsProvider = requireNonNull(statsProvider);
       this.hostOffers = new HostOffers(statsProvider);
+      this.offerRaces = statsProvider.makeCounter(OFFER_ACCEPT_RACES);
     }
 
     @Override
@@ -291,7 +295,8 @@ public interface OfferManager extends EventSubscriber {
       HostOffers(StatsProvider statsProvider) {
         // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
         // Could track this separately if it turns out to pose problems.
-        statsProvider.exportSize("outstanding_offers", offers);
+        statsProvider.exportSize(OUTSTANDING_OFFERS, offers);
+        statsProvider.makeGauge(STATICALLY_BANNED_OFFERS, () -> staticallyBannedOffers.size());
       }
 
       synchronized Optional<HostOffer> get(SlaveID slaveId) {

@@ -22,7 +22,6 @@ import com.google.common.collect.Iterables;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
@@ -49,12 +48,16 @@ import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
+import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.OFFER_ACCEPT_RACES;
+import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.OUTSTANDING_OFFERS;
+import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.STATICALLY_BANNED_OFFERS;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.offer;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class OfferManagerImplTest extends EasyMockTest {
 
@@ -96,6 +99,7 @@ public class OfferManagerImplTest extends EasyMockTest {
   private Driver driver;
   private FakeScheduledExecutor clock;
   private OfferManagerImpl offerManager;
+  private FakeStatsProvider statsProvider;
 
   @Before
   public void setUp() {
@@ -106,8 +110,8 @@ public class OfferManagerImplTest extends EasyMockTest {
     OfferSettings offerSettings = new OfferSettings(
         Amount.of(OFFER_FILTER_SECONDS, Time.SECONDS),
         () -> RETURN_DELAY);
-    StatsProvider stats = new FakeStatsProvider();
-    offerManager = new OfferManagerImpl(driver, offerSettings, stats, executorMock);
+    statsProvider = new FakeStatsProvider();
+    offerManager = new OfferManagerImpl(driver, offerSettings, statsProvider, executorMock);
   }
 
   @Test
@@ -118,26 +122,36 @@ public class OfferManagerImplTest extends EasyMockTest {
     HostOffer offerC = setMode(OFFER_C, DRAINING);
 
     driver.acceptOffers(OFFER_B.getOffer().getId(), OPERATIONS, OFFER_FILTER);
+    expectLastCall();
 
     driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
+    expectLastCall();
     driver.declineOffer(offerC.getOffer().getId(), OFFER_FILTER);
+    expectLastCall();
 
     control.replay();
 
     offerManager.addOffer(offerA);
+    assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     offerManager.addOffer(OFFER_B);
+    assertEquals(2L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     offerManager.addOffer(offerC);
+    assertEquals(3L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     assertEquals(
         ImmutableSet.of(OFFER_B, offerA, offerC),
         ImmutableSet.copyOf(offerManager.getOffers()));
     offerManager.launchTask(OFFER_B.getOffer().getId(), TASK_INFO);
+    assertEquals(2L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     clock.advance(RETURN_DELAY);
+    assertEquals(0L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
   }
 
   @Test
   public void hostAttributeChangeUpdatesOfferSorting() throws Exception {
     driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
+    expectLastCall();
     driver.declineOffer(OFFER_B.getOffer().getId(), OFFER_FILTER);
+    expectLastCall();
 
     control.replay();
 
@@ -168,7 +182,9 @@ public class OfferManagerImplTest extends EasyMockTest {
     control.replay();
 
     offerManager.addOffer(OFFER_A);
+    assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     offerManager.addOffer(OFFER_A);
+    assertEquals(0L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
 
     clock.advance(RETURN_DELAY);
   }
@@ -179,9 +195,11 @@ public class OfferManagerImplTest extends EasyMockTest {
 
     offerManager.addOffer(OFFER_A);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
+    assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
 
     offerManager.cancelOffer(OFFER_A_ID);
     assertTrue(Iterables.isEmpty(offerManager.getOffers()));
+    assertEquals(0L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
 
     clock.advance(RETURN_DELAY);
   }
@@ -189,22 +207,25 @@ public class OfferManagerImplTest extends EasyMockTest {
   @Test
   public void testOfferFilteringDueToStaticBan() throws Exception {
     driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
+    expectLastCall();
 
     control.replay();
 
     // Static ban ignored when now offers.
     offerManager.banOffer(OFFER_A_ID, GROUP_KEY);
+    assertEquals(0L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     offerManager.addOffer(OFFER_A);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers(GROUP_KEY)));
-
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
 
     // Add static ban.
     offerManager.banOffer(OFFER_A_ID, GROUP_KEY);
+    assertEquals(1L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
     assertTrue(Iterables.isEmpty(offerManager.getOffers(GROUP_KEY)));
 
     clock.advance(RETURN_DELAY);
+    assertEquals(0L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
   }
 
   @Test
@@ -218,11 +239,13 @@ public class OfferManagerImplTest extends EasyMockTest {
     offerManager.banOffer(OFFER_A_ID, GROUP_KEY);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
     assertTrue(Iterables.isEmpty(offerManager.getOffers(GROUP_KEY)));
+    assertEquals(1L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
 
     // Make sure the static ban is cleared when the offers are returned.
     clock.advance(RETURN_DELAY);
     offerManager.addOffer(OFFER_A);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers(GROUP_KEY)));
+    assertEquals(0L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
 
     clock.advance(RETURN_DELAY);
   }
@@ -230,6 +253,7 @@ public class OfferManagerImplTest extends EasyMockTest {
   @Test
   public void testStaticBanIsClearedOnDriverDisconnect() throws Exception {
     driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
+    expectLastCall();
 
     control.replay();
 
@@ -237,9 +261,11 @@ public class OfferManagerImplTest extends EasyMockTest {
     offerManager.banOffer(OFFER_A_ID, GROUP_KEY);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
     assertTrue(Iterables.isEmpty(offerManager.getOffers(GROUP_KEY)));
+    assertEquals(1L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
 
     // Make sure the static ban is cleared when driver is disconnected.
     offerManager.driverDisconnected(new DriverDisconnected());
+    assertEquals(0L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     offerManager.addOffer(OFFER_A);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers(GROUP_KEY)));
 
@@ -249,11 +275,13 @@ public class OfferManagerImplTest extends EasyMockTest {
   @Test
   public void getOffer() {
     driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
+    expectLastCall();
 
     control.replay();
 
     offerManager.addOffer(OFFER_A);
     assertEquals(Optional.of(OFFER_A), offerManager.getOffer(OFFER_A.getOffer().getSlaveId()));
+    assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     clock.advance(RETURN_DELAY);
   }
 
@@ -273,10 +301,15 @@ public class OfferManagerImplTest extends EasyMockTest {
     }
   }
 
-  @Test(expected = OfferManager.LaunchException.class)
-  public void testLaunchTaskOfferRaceThrows() throws OfferManager.LaunchException {
+  @Test
+  public void testLaunchTaskOfferRaceThrows() {
     control.replay();
-    offerManager.launchTask(OFFER_A_ID, TASK_INFO);
+    try {
+      offerManager.launchTask(OFFER_A_ID, TASK_INFO);
+      fail("Method invocation is expected to throw exception.");
+    } catch (OfferManager.LaunchException e) {
+      assertEquals(1L, statsProvider.getLongValue(OFFER_ACCEPT_RACES));
+    }
   }
 
   @Test
@@ -285,18 +318,23 @@ public class OfferManagerImplTest extends EasyMockTest {
 
     offerManager.addOffer(OFFER_A);
     offerManager.addOffer(OFFER_B);
+    assertEquals(2L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     offerManager.driverDisconnected(new DriverDisconnected());
+    assertEquals(0L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     clock.advance(RETURN_DELAY);
   }
 
   @Test
   public void testDeclineOffer() throws Exception {
     driver.declineOffer(OFFER_A.getOffer().getId(), OFFER_FILTER);
+    expectLastCall();
 
     control.replay();
 
     offerManager.addOffer(OFFER_A);
+    assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     clock.advance(RETURN_DELAY);
+    assertEquals(0L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
   }
 
   private static HostOffer setMode(HostOffer offer, MaintenanceMode mode) {
