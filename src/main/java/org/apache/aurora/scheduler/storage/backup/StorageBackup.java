@@ -70,7 +70,7 @@ public interface StorageBackup {
   void backupNow();
 
   class StorageBackupImpl implements StorageBackup, SnapshotStore<Snapshot> {
-    private static final Logger LOG = LoggerFactory.getLogger(StorageBackup.class);
+    private static final Logger LOG = LoggerFactory.getLogger(StorageBackupImpl.class);
 
     private static final String FILE_PREFIX = "scheduler-backup-";
     private final BackupConfig config;

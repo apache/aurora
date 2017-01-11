@@ -69,7 +69,7 @@ public interface RescheduleCalculator {
 
   class RescheduleCalculatorImpl implements RescheduleCalculator {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TaskGroups.class);
+    private static final Logger LOG = LoggerFactory.getLogger(RescheduleCalculatorImpl.class);
 
     private final Storage storage;
     private final RescheduleCalculatorSettings settings;

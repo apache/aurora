@@ -45,7 +45,7 @@ public interface ShutdownRegistry {
    * Implementation of a shutdown registry.
    */
   public static class ShutdownRegistryImpl implements ShutdownRegistry, Command {
-    private static final Logger LOG = LoggerFactory.getLogger(ShutdownRegistry.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ShutdownRegistryImpl.class);
 
     private final List<ExceptionalCommand<? extends Exception>> actions = Lists.newLinkedList();
 

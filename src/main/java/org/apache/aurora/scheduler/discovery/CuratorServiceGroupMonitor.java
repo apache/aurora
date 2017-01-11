@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
@@ -34,7 +33,7 @@ import org.slf4j.LoggerFactory;
 import static java.util.Objects.requireNonNull;
 
 class CuratorServiceGroupMonitor implements ServiceGroupMonitor {
-  private static final Logger LOG = LoggerFactory.getLogger(SchedulerMain.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CuratorServiceGroupMonitor.class);
 
   private final PathChildrenCache groupCache;
   private final Predicate<String> memberSelector;

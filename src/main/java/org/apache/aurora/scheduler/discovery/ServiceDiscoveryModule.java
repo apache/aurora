@@ -46,7 +46,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class ServiceDiscoveryModule extends AbstractModule {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CommonsServiceDiscoveryModule.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ServiceDiscoveryModule.class);
 
   private final ZooKeeperConfig zooKeeperConfig;
   private final String discoveryPath;
