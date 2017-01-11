@@ -53,12 +53,13 @@ class StatusManager(ExceptionalThread):
     while True:
       status_result = self._status_checker.status
       if status_result is not None:
-        log.info('Status manager got %s' % status_result)
         if status_result.status == TaskState.Value('TASK_RUNNING'):
           if not self._running_callback_dispatched:
             self._running_callback(status_result)
             self._running_callback_dispatched = True
         elif status_result.status != TaskState.Value('TASK_STARTING'):
+          log.info('Status manager got unhealthy status: %s' % status_result)
           self._unhealthy_callback(status_result)
           break
+
       self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))

@@ -118,7 +118,6 @@ class ChainedStatusChecker(StatusChecker):
       for status_checker in self._status_checkers:
         status_result = status_checker.status
         if status_result is not None:
-          log.info('%s reported %s' % (status_checker.__class__.__name__, status_result))
           if not isinstance(status_result, StatusResult):
             raise TypeError('StatusChecker returned something other than a StatusResult: got %s' %
                 type(status_result))
@@ -131,6 +130,7 @@ class ChainedStatusChecker(StatusChecker):
               cur_status = status_result
           else:
             # Any other status leads to a terminal state
+            log.info('%s reported %s', status_checker.__class__.__name__, status_result)
             self._status = status_result
             return self._status
       self._status = cur_status
