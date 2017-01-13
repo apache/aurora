@@ -62,6 +62,7 @@ import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.anyString;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class MesosSchedulerImplTest extends EasyMockTest {
@@ -137,6 +138,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   private OfferManager offerManager;
   private SchedulerDriver driver;
   private EventSink eventSink;
+  private FakeStatsProvider statsProvider;
 
   private MesosSchedulerImpl scheduler;
 
@@ -152,6 +154,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     statusHandler = createMock(TaskStatusHandler.class);
     offerManager = createMock(OfferManager.class);
     eventSink = createMock(EventSink.class);
+    statsProvider = new FakeStatsProvider();
 
     scheduler = new MesosSchedulerImpl(
         storageUtil.storage,
@@ -161,7 +164,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         eventSink,
         MoreExecutors.sameThreadExecutor(),
         new CachedCounters(new FakeStatsProvider()),
-        logger);
+        logger,
+        statsProvider);
     driver = createMock(SchedulerDriver.class);
   }
 
@@ -310,6 +314,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     control.replay();
 
     scheduler.slaveLost(driver, SLAVE_ID);
+    assertEquals(1L, statsProvider.getLongValue("slaves_lost"));
   }
 
   @Test
@@ -326,6 +331,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     control.replay();
 
     scheduler.offerRescinded(driver, OFFER_ID);
+    assertEquals(1L, statsProvider.getLongValue("offers_rescinded"));
   }
 
   @Test

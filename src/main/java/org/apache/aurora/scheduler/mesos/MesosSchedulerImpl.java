@@ -17,6 +17,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -29,6 +30,7 @@ import com.google.common.base.Preconditions;
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskStatusHandler;
 import org.apache.aurora.scheduler.base.SchedulerException;
@@ -76,6 +78,8 @@ public class MesosSchedulerImpl implements Scheduler {
   private final Logger log;
   private final CachedCounters counters;
   private volatile boolean isRegistered = false;
+  private final AtomicLong offersRescinded;
+  private final AtomicLong slavesLost;
 
   /**
    * Binding annotation for the executor the incoming Mesos message handler uses.
@@ -103,7 +107,8 @@ public class MesosSchedulerImpl implements Scheduler {
       OfferManager offerManager,
       EventSink eventSink,
       @SchedulerExecutor Executor executor,
-      CachedCounters counters) {
+      CachedCounters counters,
+      StatsProvider statsProvider) {
 
     this(
         storage,
@@ -113,7 +118,8 @@ public class MesosSchedulerImpl implements Scheduler {
         eventSink,
         executor,
         counters,
-        LoggerFactory.getLogger(MesosSchedulerImpl.class));
+        LoggerFactory.getLogger(MesosSchedulerImpl.class),
+        statsProvider);
   }
 
   @VisibleForTesting
@@ -125,7 +131,8 @@ public class MesosSchedulerImpl implements Scheduler {
       EventSink eventSink,
       Executor executor,
       CachedCounters counters,
-      Logger log) {
+      Logger log,
+      StatsProvider statsProvider) {
 
     this.storage = requireNonNull(storage);
     this.lifecycle = requireNonNull(lifecycle);
@@ -135,11 +142,14 @@ public class MesosSchedulerImpl implements Scheduler {
     this.executor = requireNonNull(executor);
     this.counters = requireNonNull(counters);
     this.log = requireNonNull(log);
+    this.offersRescinded = statsProvider.makeCounter("offers_rescinded");
+    this.slavesLost = statsProvider.makeCounter("slaves_lost");
   }
 
   @Override
   public void slaveLost(SchedulerDriver schedulerDriver, SlaveID slaveId) {
     log.info("Received notification of lost agent: " + slaveId);
+    slavesLost.incrementAndGet();
   }
 
   @Override
@@ -195,6 +205,7 @@ public class MesosSchedulerImpl implements Scheduler {
   public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerId) {
     log.info("Offer rescinded: " + offerId);
     offerManager.cancelOffer(offerId);
+    offersRescinded.incrementAndGet();
   }
 
   private static void logStatusUpdate(Logger logger, TaskStatus status) {
