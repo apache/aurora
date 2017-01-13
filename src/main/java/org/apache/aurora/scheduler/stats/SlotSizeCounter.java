@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Ordering;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 
 import static java.util.Objects.requireNonNull;
@@ -163,6 +164,7 @@ class SlotSizeCounter implements Runnable {
     }
   }
 
+  @Timed("slot_size_counter_run")
   @Override
   public void run() {
     Iterable<MachineResource> slots = machineResourceProvider.get();
