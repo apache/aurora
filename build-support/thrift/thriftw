@@ -46,6 +46,8 @@ function compatible_thrift() {
   [[ -x "${thrift}" ]] && \
   check_thrift_version "${thrift}" && \
   check_thrift_gen_lang "${thrift}" "java (Java)" && \
+  check_thrift_gen_lang "${thrift}" "js (Javascript)" && \
+  check_thrift_gen_lang "${thrift}" "html (HTML)" && \
   check_thrift_gen_lang "${thrift}" "py (Python)"
 }
 
