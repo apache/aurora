@@ -27,22 +27,52 @@ shift
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
-if which thrift >/dev/null 2>&1; then
-  if [[ $(thrift --version) = "Thrift version $expected_version" ]]; then
-    if [[ "$@" == "--which" ]]; then
-      exec which thrift
-    else
-      exec thrift "$@"
+function check_thrift_version() {
+  local readonly thrift="$1"
+
+  [[ $("${thrift}" --version) = "Thrift version ${expected_version}" ]]
+}
+
+function check_thrift_gen_lang() {
+  local readonly thrift="$1"
+  local readonly gen_identifier="$2"
+
+  "${thrift}" -help 2>&1 | grep -q "${gen_identifier}:"
+}
+
+function compatible_thrift() {
+  local readonly thrift="$1"
+
+  [[ -x "${thrift}" ]] && \
+  check_thrift_version "${thrift}" && \
+  check_thrift_gen_lang "${thrift}" "java (Java)" && \
+  check_thrift_gen_lang "${thrift}" "py (Python)"
+}
+
+function compatible_system_thrift() {
+  which -a thrift | while read thrift; do
+    if compatible_thrift "${thrift}"; then
+       echo "${thrift}"
+       return
+    fi
+  done
+}
+
+thrift="$(compatible_system_thrift)"
+if [[ -z "${thrift}" ]]; then
+  thrift="${HERE}/thrift-${expected_version}/compiler/cpp/thrift"
+  if ! compatible_thrift "${thrift}"; then
+    make -C "${HERE}" clean
+    make -C "${HERE}"
+    if ! compatible_thrift "${thrift}"; then
+      echo "Failed to find or build a thrift binary compatible with Aurora requirements!"
+      exit 1
     fi
   fi
 fi
 
-thrift="$HERE"/thrift-$expected_version/compiler/cpp/thrift
-if [[ ! -x "$thrift" ]]; then
-  make -C "$HERE"
-fi
 if [[ "$@" == "--which" ]]; then
-  echo "$thrift"
+  echo "${thrift}"
 else
-  exec "$thrift" "$@"
+  exec "${thrift}" "$@"
 fi
