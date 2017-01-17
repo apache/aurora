@@ -39,7 +39,7 @@ def process_to_sample(process):
     threads = process.num_threads()
     return ProcessSample(rate, user, system, rss, vms, nice, status, threads)
   except (AccessDenied, NoSuchProcess) as e:
-    log.warning('Error during process sampling [pid=%s]: %s' % (process.pid, e))
+    log.debug('Error during process sampling [pid=%s]: %s' % (process.pid, e))
     return ProcessSample.empty()
 
 
@@ -72,7 +72,7 @@ class ProcessTreeCollector(object):
       new_samples[self._pid] = parent_sample
 
     except (IOError, PsutilError) as e:
-      log.warning('Error during process sampling: %s' % e)
+      log.debug('Error during process sampling: %s' % e)
       self._sample = ProcessSample.empty()
       self._rate = 0.0
 
