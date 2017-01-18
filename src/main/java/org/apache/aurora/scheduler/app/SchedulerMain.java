@@ -82,6 +82,10 @@ public class SchedulerMain {
   @CmdLine(name = "serverset_path", help = "ZooKeeper ServerSet path to register at.")
   private static final Arg<String> SERVERSET_PATH = Arg.create();
 
+  @CmdLine(name = "serverset_endpoint_name",
+      help = "Name of the scheduler endpoint published in ZooKeeper.")
+  private static final Arg<String> SERVERSET_ENDPOINT_NAME = Arg.create("http");
+
   // TODO(Suman Karumuri): Rename viz_job_url_prefix to stats_job_url_prefix for consistency.
   @CmdLine(name = "viz_job_url_prefix", help = "URL prefix for job container stats.")
   private static final Arg<String> STATS_URL_PREFIX = Arg.create("");
@@ -120,7 +124,7 @@ public class SchedulerMain {
     try {
       schedulerService.lead(
           httpSocketAddress,
-          ImmutableMap.of("http", httpSocketAddress),
+          ImmutableMap.of(SERVERSET_ENDPOINT_NAME.get(), httpSocketAddress),
           leaderListener);
     } catch (SingletonService.LeadException e) {
       throw new IllegalStateException("Failed to lead service.", e);

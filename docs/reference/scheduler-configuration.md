@@ -84,6 +84,8 @@ Optional flags:
 	Specifies the frequency at which snapshots of local storage are taken and written to the log.
 -enable_cors_for
 	List of domains for which CORS support should be enabled.
+-enable_db_metrics (default true)
+	Whether to use MyBatis interceptor to measure the timing of intercepted Statements.
 -enable_h2_console (default false)
 	Enable H2 DB management console.
 -enable_mesos_fetcher (default false)
@@ -210,6 +212,8 @@ Optional flags:
 	If false, Docker tasks may run without an executor (EXPERIMENTAL)
 -scheduling_max_batch_size (default 3) [must be > 0]
 	The maximum number of scheduling attempts that can be processed in a batch.
+-serverset_endpoint_name (default http)
+	Name of the scheduler endpoint published in ZooKeeper.
 -shiro_ini_path
 	Path to shiro.ini for authentication and authorization configuration.
 -shiro_realm_modules (default [class org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule])
@@ -224,6 +228,8 @@ Optional flags:
 	Log all queries that take at least this long to execute.
 -slow_query_log_threshold (default (25, ms))
 	Log all queries that take at least this long to execute.
+-snapshot_hydrate_stores (default [locks, hosts, quota, job_updates])
+	Which H2-backed stores to fully hydrate on the Snapshot.
 -stat_retention_period (default (1, hrs))
 	Time for a stat to be retained in memory before expiring.
 -stat_sampling_interval (default (1, secs))

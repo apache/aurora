@@ -28,6 +28,9 @@
   util `min_consecutive_successes` consecutive health checks have passed.
 - The default logging output has been changed to remove line numbers and inner class information in
   exchange for faster logging.
+- Support the deployment of the Aurora scheduler behind HTTPS-enabled reverse proxies: By launching
+  scheduler via `-serverset_endpoint_name=https` you can ensure the Aurora client will correctly
+  discover HTTPS support via the ZooKeeper-based discovery mechanism.
 
 ### Deprecations and removals:
 

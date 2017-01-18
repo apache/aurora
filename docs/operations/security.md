@@ -21,10 +21,11 @@ controls for talking to ZooKeeper.
 		- [Caveats](#caveats)
 - [Implementing a Custom Realm](#implementing-a-custom-realm)
 	- [Packaging a realm module](#packaging-a-realm-module)
-- [Known Issues](#known-issues)
 - [Announcer Authentication](#announcer-authentication)
     - [ZooKeeper authentication configuration](#zookeeper-authentication-configuration)
     - [Executor settings](#executor-settings)
+- [Scheduler HTTPS](#scheduler-https)
+- [Known Issues](#known-issues)
 
 # Enabling Security
 
@@ -275,18 +276,6 @@ class name:
 -shiro_realm_modules=KERBEROS5_AUTHN,INI_AUTHNZ,com.example.MyRealmModule
 ```
 
-# Known Issues
-
-While the APIs and SPIs we ship with are stable as of 0.8.0, we are aware of several incremental
-improvements. Please follow, vote, or send patches.
-
-Relevant tickets:
-* [AURORA-343](https://issues.apache.org/jira/browse/AURORA-343): HTTPS support
-* [AURORA-1248](https://issues.apache.org/jira/browse/AURORA-1248): Client retries 4xx errors
-* [AURORA-1279](https://issues.apache.org/jira/browse/AURORA-1279): Remove kerberos-specific build targets
-* [AURORA-1293](https://issues.apache.org/jira/browse/AURORA-1291): Consider defining a JSON format in place of INI
-* [AURORA-1179](https://issues.apache.org/jira/browse/AURORA-1179): Supported hashed passwords in security.ini
-* [AURORA-1295](https://issues.apache.org/jira/browse/AURORA-1295): Support security for the ReadOnlyScheduler service
 
 # Announcer Authentication
 The Thermos executor can be configured to authenticate with ZooKeeper and include
@@ -338,3 +327,36 @@ All properties of the `permissions` object will default to False if not provided
 ## Executor settings
 To enable the executor to authenticate against ZK, `--announcer-zookeeper-auth-config` should be
 set to the configuration file.
+
+
+# Scheduler HTTPS
+
+The Aurora scheduler does not provide native HTTPS support ([AURORA-343](https://issues.apache.org/jira/browse/AURORA-343)).
+It is therefore recommended to deploy it behind an HTTPS capable reverse proxy such as nginx or Apache2.
+
+A simple setup is to launch both the reverse proxy and the Aurora scheduler on the same port, but
+bind the reverse proxy to the public IP of the host and the scheduler to localhost:
+
+    -ip=127.0.0.1
+    -http_port=8081
+
+If your clients connect to the scheduler via [`proxy_url`](../reference/scheduler-configuration.md),
+you can update it to `https`. If you use the ZooKeeper based discovery instead, the scheduler
+needs to be launched via
+
+    -serverset_endpoint_name=https
+
+in order to announce its HTTPS support within ZooKeeper.
+
+
+# Known Issues
+
+While the APIs and SPIs we ship with are stable as of 0.8.0, we are aware of several incremental
+improvements. Please follow, vote, or send patches.
+
+Relevant tickets:
+* [AURORA-1248](https://issues.apache.org/jira/browse/AURORA-1248): Client retries 4xx errors
+* [AURORA-1279](https://issues.apache.org/jira/browse/AURORA-1279): Remove kerberos-specific build targets
+* [AURORA-1293](https://issues.apache.org/jira/browse/AURORA-1291): Consider defining a JSON format in place of INI
+* [AURORA-1179](https://issues.apache.org/jira/browse/AURORA-1179): Supported hashed passwords in security.ini
+* [AURORA-1295](https://issues.apache.org/jira/browse/AURORA-1295): Support security for the ReadOnlyScheduler service
