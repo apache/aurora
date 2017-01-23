@@ -82,7 +82,7 @@ public class ZooKeeperTestServer {
   /**
    * Starts zookeeper back up on the last used port.
    */
-  final void restartNetwork() throws IOException, InterruptedException {
+  public final void restartNetwork() throws IOException, InterruptedException {
     checkEphemeralPortAssigned();
     Preconditions.checkState(connectionFactory == null);
     startNetwork();

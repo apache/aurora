@@ -17,6 +17,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.Maps;
@@ -28,17 +30,24 @@ import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
 import org.apache.aurora.common.zookeeper.SingletonService;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.recipes.leader.LeaderLatch;
-import org.apache.curator.framework.recipes.leader.LeaderLatchListener;
+import org.apache.curator.framework.recipes.leader.CancelLeadershipException;
+import org.apache.curator.framework.recipes.leader.LeaderSelector;
+import org.apache.curator.framework.recipes.leader.LeaderSelectorListener;
 import org.apache.curator.framework.recipes.nodes.PersistentNode;
+import org.apache.curator.framework.state.ConnectionState;
 import org.apache.curator.utils.PathUtils;
 import org.apache.curator.utils.ZKPaths;
 import org.apache.zookeeper.CreateMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
 class CuratorSingletonService implements SingletonService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(CuratorSingletonService.class);
 
   // This is the complement of the CuratorServiceGroupMonitor, it allows advertisement of a leader
   // in a service group.
@@ -151,11 +160,22 @@ class CuratorSingletonService implements SingletonService {
     requireNonNull(additionalEndpoints);
     requireNonNull(listener);
 
-    LeaderLatch leaderLatch = new LeaderLatch(client, groupPath, endpoint.getHostName());
     Closer closer = Closer.create();
-    leaderLatch.addListener(new LeaderLatchListener() {
+
+    CountDownLatch giveUpLeadership = new CountDownLatch(1);
+
+    // We do not use the suggested `LeaderSelectorListenerAdapter` or the LeaderLatch class
+    // because we want to have precise control over state changes. By default the listener and the
+    // latch class treat `SUSPENDED` (connection loss) as fatal and a reason to lose leadership.
+    // To make the scheduler resilient to connection blips and long GC pauses, we only treat
+    // `LOST` (session loss) as fatal.
+
+    ExecutorService executor =
+        AsyncUtil.singleThreadLoggingScheduledExecutor("LeaderSelector-%d", LOG);
+
+    LeaderSelectorListener leaderSelectorListener = new LeaderSelectorListener() {
       @Override
-      public void isLeader() {
+      public void takeLeadership(CuratorFramework curatorFramework) throws Exception {
         listener.onLeading(new LeaderControl() {
           @Override
           public void advertise() throws AdvertiseException, InterruptedException {
@@ -165,27 +185,43 @@ class CuratorSingletonService implements SingletonService {
           @Override
           public void leave() throws LeaveException {
             try {
+              giveUpLeadership.countDown();
               closer.close();
             } catch (IOException e) {
               throw new LeaveException("Failed to abdicate leadership of group at " + groupPath, e);
             }
           }
         });
+
+        // The contract is to block as long as we want leadership. The leader never gives up
+        // leadership voluntarily, only when asked to shutdown so we block until our shutdown
+        // callback has been executed or we have lost our ZK connection.
+        giveUpLeadership.await();
       }
 
       @Override
-      public void notLeader() {
-        listener.onDefeated();
+      public void stateChanged(CuratorFramework curatorFramework, ConnectionState newState) {
+        if (newState == ConnectionState.LOST) {
+          giveUpLeadership.countDown();
+          listener.onDefeated();
+          throw new CancelLeadershipException();
+        }
+
       }
-    });
+    };
+
+    LeaderSelector leaderSelector =
+        new LeaderSelector(client, groupPath, executor, leaderSelectorListener);
+
+    leaderSelector.setId(endpoint.getHostName());
 
     try {
-      leaderLatch.start();
+      leaderSelector.start();
     } catch (Exception e) {
       // NB: We failed to lead; so we never could have advertised and there is no need to close the
       // closer.
       throw new LeadException("Failed to begin awaiting leadership of group " + groupPath, e);
     }
-    closer.register(leaderLatch);
+    closer.register(leaderSelector);
   }
 }

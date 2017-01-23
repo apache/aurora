@@ -15,6 +15,8 @@ package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -23,10 +25,11 @@ import org.apache.aurora.common.zookeeper.SingletonService;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.easymock.Capture;
-import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
@@ -39,6 +42,13 @@ import static org.junit.Assert.assertTrue;
 public class CuratorSingletonServiceTest extends BaseCuratorDiscoveryTest {
 
   private IMocksControl control;
+  // This test has a lot of blocking, this ensures we don't deadlock.
+  private final Timeout timeout = new Timeout(1, TimeUnit.MINUTES);
+
+  @Rule
+  public Timeout getTimeout() {
+    return timeout;
+  }
 
   @Before
   public void setUpSingletonService() throws Exception {
@@ -80,7 +90,7 @@ public class CuratorSingletonServiceTest extends BaseCuratorDiscoveryTest {
 
     // Wait to become leader.
     expectGroupEvent(PathChildrenCacheEvent.Type.CHILD_ADDED);
-    assertTrue(capture.hasCaptured());
+    awaitCapture(capture);
 
     // Leadership nodes should not be seen as service group nodes.
     assertEquals(ImmutableSet.of(), getGroupMonitor().get());
@@ -111,7 +121,7 @@ public class CuratorSingletonServiceTest extends BaseCuratorDiscoveryTest {
     // Have host1 become leader.
     newLeader(getClient(), "host1", host1Listener);
     expectGroupEvent(PathChildrenCacheEvent.Type.CHILD_ADDED);
-    assertTrue(host1OnLeadingCapture.hasCaptured());
+    awaitCapture(host1OnLeadingCapture);
 
     host1OnLeadingCapture.getValue().advertise();
     expectGroupEvent(PathChildrenCacheEvent.Type.CHILD_ADDED);
@@ -140,7 +150,7 @@ public class CuratorSingletonServiceTest extends BaseCuratorDiscoveryTest {
 
     CountDownLatch host1Defeated = new CountDownLatch(1);
     host1Listener.onDefeated();
-    expectLastCall().andAnswer((IAnswer<Void>) () -> {
+    expectLastCall().andAnswer(() -> {
       host1Defeated.countDown();
       return null;
     });
@@ -157,7 +167,7 @@ public class CuratorSingletonServiceTest extends BaseCuratorDiscoveryTest {
     // Have host1 become leader.
     newLeader(getClient(), "host1", host1Listener);
     expectGroupEvent(PathChildrenCacheEvent.Type.CHILD_ADDED);
-    assertTrue(host1OnLeadingCapture.hasCaptured());
+    awaitCapture(host1OnLeadingCapture);
 
     host1OnLeadingCapture.getValue().advertise();
     expectGroupEvent(PathChildrenCacheEvent.Type.CHILD_ADDED);
@@ -184,6 +194,46 @@ public class CuratorSingletonServiceTest extends BaseCuratorDiscoveryTest {
 
     // Eventually host1 should notice its been defeated.
     host1Defeated.await();
+  }
+
+  @Test
+  public void testZKDisconnection() throws Exception {
+    CountDownLatch leading = new CountDownLatch(1);
+    AtomicBoolean leader = new AtomicBoolean(false);
+    CountDownLatch defeated = new CountDownLatch(1);
+
+    // The listener is executed in an internal thread of Curator, where it executes the leader
+    // listener callbacks. The exceptions there are not propagated out, so we have our own
+    // listener to validate behaviour.
+    SingletonService.LeadershipListener listener = new SingletonService.LeadershipListener() {
+      @Override
+      public void onLeading(SingletonService.LeaderControl leaderControl) {
+        leader.set(true);
+        leading.countDown();
+      }
+
+      @Override
+      public void onDefeated() {
+        leader.set(false);
+        defeated.countDown();
+      }
+    };
+
+    control.replay();
+
+    startGroupMonitor();
+
+    CuratorFramework client = getClient();
+    newLeader(client, "host1", listener);
+    leading.await();
+
+    causeDisconnection();
+    assertTrue(leader.get());
+
+    expireSession(client);
+    defeated.await();
+
+    assertFalse(leader.get());
   }
 
   private void awaitCapture(Capture<?> capture) throws InterruptedException {

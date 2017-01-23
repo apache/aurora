@@ -73,6 +73,11 @@ class BaseCuratorDiscoveryTest extends BaseZooKeeperTest {
     getServer().expireClientSession(curator.getZookeeperClient().getZooKeeper().getSessionId());
   }
 
+  final void causeDisconnection() throws Exception {
+    getServer().stop();
+    getServer().restartNetwork();
+  }
+
   final CuratorFramework getClient() {
     return client;
   }
