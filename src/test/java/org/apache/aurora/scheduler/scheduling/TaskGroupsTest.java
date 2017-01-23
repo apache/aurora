@@ -37,6 +37,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -46,6 +47,7 @@ import static org.apache.aurora.scheduler.testing.BatchWorkerUtil.expectBatchExe
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertEquals;
 
 public class TaskGroupsTest extends EasyMockTest {
   private static final Amount<Long, Time> FIRST_SCHEDULE_DELAY = Amount.of(1L, Time.MILLISECONDS);
@@ -62,6 +64,7 @@ public class TaskGroupsTest extends EasyMockTest {
   private TaskGroups taskGroups;
   private TaskGroupBatchWorker batchWorker;
   private StorageTestUtil storageUtil;
+  private FakeStatsProvider statsProvider;
 
   @Before
   public void setUp() throws Exception {
@@ -74,12 +77,14 @@ public class TaskGroupsTest extends EasyMockTest {
     rateLimiter = createMock(RateLimiter.class);
     rescheduleCalculator = createMock(RescheduleCalculator.class);
     batchWorker = createMock(TaskGroupBatchWorker.class);
+    statsProvider = new FakeStatsProvider();
     taskGroups = new TaskGroups(
         executor,
         new TaskGroupsSettings(FIRST_SCHEDULE_DELAY, backoffStrategy, rateLimiter, 2),
         taskScheduler,
         rescheduleCalculator,
-        batchWorker);
+        batchWorker,
+        statsProvider);
   }
 
   @Test
@@ -94,12 +99,13 @@ public class TaskGroupsTest extends EasyMockTest {
 
     taskGroups.taskChangedState(TaskStateChange.transition(makeTask(TASK_A_ID), INIT));
     clock.advance(FIRST_SCHEDULE_DELAY);
+    assertEquals(0L, statsProvider.getLongValue(TaskGroups.SCHEDULE_ATTEMPTS_BLOCKS));
   }
 
   @Test
   public void testTaskDeletedBeforeEvaluating() throws Exception {
     final IScheduledTask task = makeTask(TASK_A_ID);
-    expect(rateLimiter.acquire()).andReturn(0D);
+    expect(rateLimiter.acquire()).andReturn(0.5D);
     expect(taskScheduler.schedule(anyObject(), eq(ImmutableSet.of(TASK_A_ID))))
         .andAnswer(() -> {
           // Test a corner case where a task is deleted while it is being evaluated by the task
@@ -118,11 +124,12 @@ public class TaskGroupsTest extends EasyMockTest {
 
     taskGroups.taskChangedState(TaskStateChange.transition(makeTask(Tasks.id(task)), INIT));
     clock.advance(FIRST_SCHEDULE_DELAY);
+    assertEquals(1L, statsProvider.getLongValue(TaskGroups.SCHEDULE_ATTEMPTS_BLOCKS));
   }
 
   @Test
   public void testEvaluatedOnStartup() throws Exception {
-    expect(rateLimiter.acquire()).andReturn(0D);
+    expect(rateLimiter.acquire()).andReturn(0.000000001D);
     expect(rescheduleCalculator.getStartupScheduleDelayMs(makeTask(TASK_A_ID))).andReturn(1L);
     expect(taskScheduler.schedule(anyObject(), eq(ImmutableSet.of(TASK_A_ID))))
         .andReturn(ImmutableSet.of(TASK_A_ID));
@@ -134,11 +141,12 @@ public class TaskGroupsTest extends EasyMockTest {
     taskGroups.taskChangedState(TaskStateChange.initialized(makeTask(TASK_A_ID)));
     clock.advance(FIRST_SCHEDULE_DELAY);
     clock.advance(RESCHEDULE_DELAY);
+    assertEquals(1L, statsProvider.getLongValue(TaskGroups.SCHEDULE_ATTEMPTS_BLOCKS));
   }
 
   @Test
   public void testMultipleTasksAndResistStarvation() throws Exception {
-    expect(rateLimiter.acquire()).andReturn(0D).times(2);
+    expect(rateLimiter.acquire()).andReturn(0.001D).times(2);
     expect(taskScheduler.schedule(anyObject(), eq(ImmutableSet.of("a0", "a1"))))
         .andReturn(ImmutableSet.of("a0", "a1"));
     expect(taskScheduler.schedule(anyObject(), eq(ImmutableSet.of("b0"))))
@@ -160,6 +168,7 @@ public class TaskGroupsTest extends EasyMockTest {
         makeTask(IJobKey.build(JOB_A.newBuilder().setName("jobB")), "b0", 0), INIT));
 
     clock.advance(FIRST_SCHEDULE_DELAY);
+    assertEquals(2L, statsProvider.getLongValue(TaskGroups.SCHEDULE_ATTEMPTS_BLOCKS));
   }
 
   @Test

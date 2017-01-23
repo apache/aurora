@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -68,6 +69,9 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
  */
 public class TaskGroups implements EventSubscriber {
 
+  @VisibleForTesting
+  static final String SCHEDULE_ATTEMPTS_BLOCKS = "schedule_attempts_blocks";
+
   private final ConcurrentMap<TaskGroupKey, TaskGroup> groups = Maps.newConcurrentMap();
   private final DelayExecutor executor;
   private final TaskGroupsSettings settings;
@@ -79,6 +83,7 @@ public class TaskGroups implements EventSubscriber {
   // may influence the selection of a different backoff strategy.
   private final SlidingStats scheduledTaskPenalties =
       new SlidingStats("scheduled_task_penalty", "ms");
+  private final AtomicLong scheduleAttemptsBlocks;
 
   /**
    * Annotation for the max scheduling batch size.
@@ -133,13 +138,15 @@ public class TaskGroups implements EventSubscriber {
       TaskGroupsSettings settings,
       TaskScheduler taskScheduler,
       RescheduleCalculator rescheduleCalculator,
-      TaskGroupBatchWorker batchWorker) {
+      TaskGroupBatchWorker batchWorker,
+      StatsProvider statsProvider) {
 
     this.executor = requireNonNull(executor);
     this.settings = requireNonNull(settings);
     this.taskScheduler = requireNonNull(taskScheduler);
     this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
     this.batchWorker = requireNonNull(batchWorker);
+    this.scheduleAttemptsBlocks = statsProvider.makeCounter(SCHEDULE_ATTEMPTS_BLOCKS);
   }
 
   private synchronized void evaluateGroupLater(Runnable evaluate, TaskGroup group) {
@@ -159,7 +166,9 @@ public class TaskGroups implements EventSubscriber {
         final Set<String> taskIds = group.peek(settings.maxTasksPerSchedule);
         long penaltyMs = 0;
         if (!taskIds.isEmpty()) {
-          settings.rateLimiter.acquire();
+          if (settings.rateLimiter.acquire() > 0) {
+            scheduleAttemptsBlocks.incrementAndGet();
+          }
           CompletableFuture<Set<String>> result = batchWorker.execute(storeProvider ->
               taskScheduler.schedule(storeProvider, taskIds));
 
