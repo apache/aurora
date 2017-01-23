@@ -366,22 +366,22 @@ class HealthCheckerProvider(StatusCheckerProvider):
       # If the task is executing in an isolated filesystem we'll want to wrap the health check
       # command within a mesos-containerizer invocation so that it's executed within that
       # filesystem.
-      wrapper = None
       if sandbox.is_filesystem_image:
         health_check_user = (os.getusername() if self._nosetuid_health_checks
             else assigned_task.task.job.role)
-        def wrapper(cmd):
-          return wrap_with_mesos_containerizer(
-              cmd,
-              health_check_user,
-              sandbox.container_root,
-              self._mesos_containerizer_path)
+        wrapped_cmd = wrap_with_mesos_containerizer(
+            interpolated_command,
+            health_check_user,
+            sandbox.container_root,
+            self._mesos_containerizer_path)
+      else:
+        wrapped_cmd = ['/bin/bash', '-c', interpolated_command]
 
       shell_signaler = ShellHealthCheck(
-        cmd=interpolated_command,
+        raw_cmd=interpolated_command,
+        wrapped_cmd=wrapped_cmd,
         preexec_fn=demote_to_job_role_user,
-        timeout_secs=timeout_secs,
-        wrapper_fn=wrapper)
+        timeout_secs=timeout_secs)
       a_health_checker = lambda: shell_signaler()
     else:
       portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)

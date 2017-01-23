@@ -33,35 +33,22 @@ class TestHealthChecker(unittest.TestCase):
 
   @mock.patch('subprocess32.check_call', autospec=True)
   def test_health_check_ok(self, mock_popen):
-    shell = ShellHealthCheck('cmd', timeout_secs=30)
+    shell = ShellHealthCheck(raw_cmd='cmd', wrapped_cmd='wrapped-cmd', timeout_secs=30)
     success, msg = shell()
     self.assertTrue(success)
     self.assertIsNone(msg)
-    mock_popen.assert_called_once_with('cmd', shell=True, timeout=30, preexec_fn=mock.ANY)
+    mock_popen.assert_called_once_with('wrapped-cmd', timeout=30, preexec_fn=mock.ANY)
 
   @mock.patch('subprocess32.check_call', autospec=True)
   def test_health_check_failed(self, mock_popen):
     cmd = 'failed'
+    wrapped_cmd = 'wrapped-failed'
     # Fail due to command returning a non-0 exit status.
-    mock_popen.side_effect = subprocess.CalledProcessError(1, cmd)
+    mock_popen.side_effect = subprocess.CalledProcessError(1, wrapped_cmd)
 
-    shell = ShellHealthCheck(cmd, timeout_secs=30)
+    shell = ShellHealthCheck(raw_cmd=cmd, wrapped_cmd=wrapped_cmd, timeout_secs=30)
     success, msg = shell()
-    mock_popen.assert_called_once_with(cmd, shell=True, timeout=30, preexec_fn=mock.ANY)
-
-    self.assertFalse(success)
-    self.assertEqual(msg, "Command 'failed' returned non-zero exit status 1")
-
-  @mock.patch('subprocess32.check_call', autospec=True)
-  def test_health_check_failed_with_wrapper(self, mock_popen):
-    cmd = 'failed'
-    mock_popen.side_effect = subprocess.CalledProcessError(1, cmd)
-
-    shell = ShellHealthCheck(cmd, timeout_secs=30, wrapper_fn=lambda c: 'wrapped: %s' % c)
-    success, msg = shell()
-    self.assertEqual(
-        mock_popen.mock_calls,
-        [mock.call('wrapped: %s' % cmd, shell=True, timeout=30, preexec_fn=mock.ANY)])
+    mock_popen.assert_called_once_with(wrapped_cmd, timeout=30, preexec_fn=mock.ANY)
 
     self.assertFalse(success)
     self.assertEqual(msg, "Command 'failed' returned non-zero exit status 1")
@@ -71,9 +58,9 @@ class TestHealthChecker(unittest.TestCase):
     # Fail due to command returning a non-0 exit status.
     mock_popen.side_effect = subprocess.TimeoutExpired('failed', timeout=30)
 
-    shell = ShellHealthCheck('cmd', timeout_secs=30)
+    shell = ShellHealthCheck(raw_cmd='cmd', wrapped_cmd='wrapped-cmd', timeout_secs=30)
     success, msg = shell()
-    mock_popen.assert_called_once_with('cmd', shell=True, timeout=30, preexec_fn=mock.ANY)
+    mock_popen.assert_called_once_with('wrapped-cmd', timeout=30, preexec_fn=mock.ANY)
 
     self.assertFalse(success)
     self.assertEqual(msg, 'Health check timed out.')
@@ -83,9 +70,9 @@ class TestHealthChecker(unittest.TestCase):
     # Fail due to command not existing.
     mock_popen.side_effect = OSError(1, 'failed')
 
-    shell = ShellHealthCheck('cmd', timeout_secs=30)
+    shell = ShellHealthCheck(raw_cmd='cmd', wrapped_cmd='wrapped-cmd', timeout_secs=30)
     success, msg = shell()
-    mock_popen.assert_called_once_with('cmd', shell=True, timeout=30, preexec_fn=mock.ANY)
+    mock_popen.assert_called_once_with('wrapped-cmd', timeout=30, preexec_fn=mock.ANY)
     self.assertFalse(success)
     self.assertEqual(msg, 'OSError: failed')
 
@@ -94,8 +81,8 @@ class TestHealthChecker(unittest.TestCase):
     # Invalid commmand passed in raises ValueError.
     mock_popen.side_effect = ValueError('Could not read command.')
     timeout = 10
-    shell = ShellHealthCheck('cmd', timeout_secs=timeout)
+    shell = ShellHealthCheck(raw_cmd='cmd', wrapped_cmd='wrapped-cmd', timeout_secs=timeout)
     success, msg = shell()
-    mock_popen.assert_called_once_with('cmd', shell=True, timeout=10, preexec_fn=mock.ANY)
+    mock_popen.assert_called_once_with('wrapped-cmd', timeout=timeout, preexec_fn=mock.ANY)
     self.assertFalse(success)
     self.assertEqual(msg, 'Invalid commmand.')

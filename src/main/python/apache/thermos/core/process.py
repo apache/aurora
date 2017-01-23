@@ -25,7 +25,6 @@ import grp
 import os
 import pwd
 import select
-import shlex
 import signal
 import subprocess
 import sys
@@ -391,9 +390,8 @@ class Process(ProcessBase):
     # If mesos-containerizer is not set, we only need to wrap the cmdline in a bash invocation.
     if self._mesos_containerizer_path is None:
       return ['/bin/bash', '-c', cmdline]
-
-    return shlex.split(
-        wrap_with_mesos_containerizer(cmdline, self._user, cwd, self._mesos_containerizer_path))
+    else:
+      return wrap_with_mesos_containerizer(cmdline, self._user, cwd, self._mesos_containerizer_path)
 
   def execute(self):
     """Perform final initialization and launch target process commandline in a subprocess."""

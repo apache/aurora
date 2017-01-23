@@ -563,6 +563,7 @@ class TestHealthCheckerProvider(unittest.TestCase):
     # Should not be trying to access role's user info.
     assert not mock_getpwnam.called
 
+  @mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
   @mock.patch('pwd.getpwnam')
   def test_from_assigned_task_shell_filesystem_image(self, mock_getpwnam):
     interval_secs = 17
@@ -609,7 +610,13 @@ class TestHealthCheckerProvider(unittest.TestCase):
           return other is not None
 
       assert mock_shell.mock_calls == [
-          mock.call(cmd='failed command', wrapper_fn=NotNone(), preexec_fn=None, timeout_secs=5.0)]
+          mock.call(
+              raw_cmd='failed command',
+              wrapped_cmd=NotNone(),
+              preexec_fn=None,
+              timeout_secs=5.0
+          )
+      ]
 
   def test_interpolate_cmd(self):
     """Making sure thermos.ports[foo] gets correctly substituted with assignedPorts info."""

@@ -40,24 +40,24 @@ class ShellHealthCheck(object):
 
   def __init__(
         self,
-        cmd,
+        raw_cmd,
+        wrapped_cmd,
         preexec_fn=None,
-        timeout_secs=None,
-        wrapper_fn=None):
+        timeout_secs=None):
 
     """
     Initialize with the command we would like to call.
-    :param cmd: Command to execute that is expected to have a 0 return code on success.
-    :type cmd: str
+    :param raw_cmd: Command to execute as passed by the user. Supposed to 0 return code on success.
+    :type raw_cmd: str
+    :param wrapped_cmd: Wrapped form of the user command including executing shell.
+    :type wrapped_cmd: list(str)
     :param preexec_fn: Callable to invoke just before the child shell process is executed.
     :type preexec_fn: callable
     :param timeout_secs: Timeout in seconds.
     :type timeout_secs: int
-    :param wrapper_fn: Callable to invoke that wraps the shell command for filesystem isolation.
-    :type wrapper_fn: callable
     """
-    self._original_cmd = cmd
-    self._cmd = cmd if wrapper_fn is None else wrapper_fn(cmd)
+    self._raw_cmd = raw_cmd
+    self._wrapped_cmd = wrapped_cmd
     self._preexec_fn = preexec_fn
     self._timeout_secs = timeout_secs
 
@@ -70,14 +70,13 @@ class ShellHealthCheck(object):
     """
     try:
       subprocess.check_call(
-          self._cmd,
+          self._wrapped_cmd,
           timeout=self._timeout_secs,
-          shell=True,
           preexec_fn=self._preexec_fn)
       return True, None
     except subprocess.CalledProcessError as reason:
       # The command didn't return a 0 so provide reason for failure.
-      return False, str(WrappedCalledProcessError(self._original_cmd, reason))
+      return False, str(WrappedCalledProcessError(self._raw_cmd, reason))
     except subprocess.TimeoutExpired:
       return False, 'Health check timed out.'
     except OSError as e:

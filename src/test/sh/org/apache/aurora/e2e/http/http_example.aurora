@@ -59,10 +59,28 @@ verify_file_mount = Process(
   cmdline = 'cat /home/vagrant/aurora/.auroraversion'
 )
 
+# Regression test for quotation mark usage (AURORA-1782)
+verify_command_escaping = Process(
+  name = 'verify_command_escaping',
+  cmdline = """
+python -c 'import sys
+
+if __name__ == "__main__":
+  sys.exit(0)'
+"""
+)
+
 test_task = SequentialTask(
   name = 'http_example',
   resources = Resources(cpu=0.5, ram=32*MB, disk=64*MB, gpu='{{profile.gpu}}'),
-  processes = [setup_env, read_env, echo_ports, stage_server, run_server]
+  processes = [
+      setup_env,
+      read_env,
+      echo_ports,
+      verify_command_escaping,
+      stage_server,
+      run_server
+  ]
 )
 
 no_python_task = SequentialTask(
@@ -72,6 +90,7 @@ no_python_task = SequentialTask(
       setup_env,
       read_env,
       echo_ports,
+      verify_command_escaping,
       verify_file_mount,
       Process(name='run_server', cmdline='run-server.sh {{thermos.ports[http]}}'),
   ]

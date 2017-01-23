@@ -135,8 +135,8 @@ def test_simple_process_filesystem_isolator():
         taskpath,
         'stdout',
         'launch --unshare_namespace_mnt --working_directory=%s --rootfs=/some/path/taskfs '
-        '--user=None --command={"shell":true,"value":"/bin/bash -c \'echo hello world\'"}\n' % (
-            sandbox))
+        '--user=None --command={"shell": false, "arguments": ["/bin/bash", "-c", '
+        '"echo hello world"], "value": "/bin/bash"}\n' % (sandbox))
 
 
 @mock.patch('os.chown')
