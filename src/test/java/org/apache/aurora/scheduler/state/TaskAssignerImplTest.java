@@ -43,6 +43,7 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
@@ -65,6 +66,8 @@ import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesos
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.offer;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.ASSIGNER_EVALUATED_OFFERS;
+import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.ASSIGNER_LAUNCH_FAILURES;
 import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.LAUNCH_FAILED_MSG;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.mesos.Protos.Offer;
@@ -121,6 +124,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
   private OfferManager offerManager;
   private TaskAssignerImpl assigner;
   private TierManager tierManager;
+  private FakeStatsProvider statsProvider;
 
   @Before
   public void setUp() throws Exception {
@@ -130,7 +134,14 @@ public class TaskAssignerImplTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
     offerManager = createMock(OfferManager.class);
     tierManager = createMock(TierManager.class);
-    assigner = new TaskAssignerImpl(stateManager, filter, taskFactory, offerManager, tierManager);
+    statsProvider = new FakeStatsProvider();
+    assigner = new TaskAssignerImpl(
+        stateManager,
+        filter,
+        taskFactory,
+        offerManager,
+        tierManager,
+        statsProvider);
     resourceRequest = new ResourceRequest(
         TASK.getAssignedTask().getTask(),
         ResourceBag.EMPTY,
@@ -159,6 +170,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     control.replay();
 
     AttributeAggregate aggregate = empty();
+    assertEquals(0L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
     assertEquals(
         ImmutableSet.of(Tasks.id(TASK)),
         assigner.maybeAssign(
@@ -168,6 +180,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
             ImmutableSet.of(Tasks.id(TASK), "id2", "id3"),
             ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
     assertNotEquals(empty(), aggregate);
+    assertEquals(1L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
   }
 
   @Test
@@ -180,6 +193,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
+    assertEquals(0L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
     assertEquals(
         NO_ASSIGNMENT,
         assigner.maybeAssign(
@@ -188,6 +202,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
             TaskGroupKey.from(TASK.getAssignedTask().getTask()),
             ImmutableSet.of(Tasks.id(TASK)),
             NO_RESERVATION));
+    assertEquals(1L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
   }
 
   @Test
@@ -199,6 +214,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
+    assertEquals(0L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
     assertEquals(
         NO_ASSIGNMENT,
         assigner.maybeAssign(
@@ -207,6 +223,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
             TaskGroupKey.from(TASK.getAssignedTask().getTask()),
             ImmutableSet.of(Tasks.id(TASK)),
             NO_RESERVATION));
+    assertEquals(1L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
   }
 
   @Test
@@ -229,6 +246,8 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
+    assertEquals(0L, statsProvider.getLongValue(ASSIGNER_LAUNCH_FAILURES));
+    assertEquals(0L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
     // Ensures scheduling loop terminates on the first launch failure.
     assertEquals(
         NO_ASSIGNMENT,
@@ -238,6 +257,8 @@ public class TaskAssignerImplTest extends EasyMockTest {
             TaskGroupKey.from(TASK.getAssignedTask().getTask()),
             ImmutableSet.of(Tasks.id(TASK), "id2", "id3"),
             NO_RESERVATION));
+    assertEquals(1L, statsProvider.getLongValue(ASSIGNER_LAUNCH_FAILURES));
+    assertEquals(1L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
   }
 
   @Test
@@ -247,6 +268,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
+    assertEquals(0L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
     assertEquals(
         NO_ASSIGNMENT,
         assigner.maybeAssign(
@@ -256,6 +278,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
             ImmutableSet.of(Tasks.id(TASK)),
             ImmutableMap.of(SLAVE_ID, TaskGroupKey.from(
                 ITaskConfig.build(new TaskConfig().setJob(new JobKey("other", "e", "n")))))));
+    assertEquals(1L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
   }
 
   @Test
@@ -277,6 +300,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
+    assertEquals(0L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
     assertEquals(
         ImmutableSet.of(Tasks.id(TASK)),
         assigner.maybeAssign(
@@ -285,6 +309,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
             TaskGroupKey.from(TASK.getAssignedTask().getTask()),
             ImmutableSet.of(Tasks.id(TASK)),
             ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
+    assertEquals(1L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
   }
 
   @Test
@@ -326,6 +351,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
+    assertEquals(0L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
     assertEquals(
         ImmutableSet.of(Tasks.id(TASK)),
         assigner.maybeAssign(
@@ -334,6 +360,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
             TaskGroupKey.from(TASK.getAssignedTask().getTask()),
             ImmutableSet.of(Tasks.id(TASK)),
             ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
+    assertEquals(2L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
   }
 
   @Test

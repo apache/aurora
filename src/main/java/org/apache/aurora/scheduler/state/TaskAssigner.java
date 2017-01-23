@@ -26,7 +26,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
-import org.apache.aurora.common.stats.Stats;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.TierManager;
@@ -80,8 +80,13 @@ public interface TaskAssigner {
     @VisibleForTesting
     static final Optional<String> LAUNCH_FAILED_MSG =
         Optional.of("Unknown exception attempting to schedule task.");
+    @VisibleForTesting
+    static final String ASSIGNER_LAUNCH_FAILURES = "assigner_launch_failures";
+    @VisibleForTesting
+    static final String ASSIGNER_EVALUATED_OFFERS = "assigner_evaluated_offers";
 
-    private final AtomicLong launchFailures = Stats.exportLong("assigner_launch_failures");
+    private final AtomicLong launchFailures;
+    private final AtomicLong evaluatedOffers;
 
     private final StateManager stateManager;
     private final SchedulingFilter filter;
@@ -95,13 +100,16 @@ public interface TaskAssigner {
         SchedulingFilter filter,
         MesosTaskFactory taskFactory,
         OfferManager offerManager,
-        TierManager tierManager) {
+        TierManager tierManager,
+        StatsProvider statsProvider) {
 
       this.stateManager = requireNonNull(stateManager);
       this.filter = requireNonNull(filter);
       this.taskFactory = requireNonNull(taskFactory);
       this.offerManager = requireNonNull(offerManager);
       this.tierManager = requireNonNull(tierManager);
+      this.launchFailures = statsProvider.makeCounter(ASSIGNER_LAUNCH_FAILURES);
+      this.evaluatedOffers = statsProvider.makeCounter(ASSIGNER_EVALUATED_OFFERS);
     }
 
     @VisibleForTesting
@@ -152,6 +160,8 @@ public interface TaskAssigner {
       String taskId = remainingTasks.next();
 
       for (HostOffer offer : offerManager.getOffers(groupKey)) {
+        evaluatedOffers.incrementAndGet();
+
         Optional<TaskGroupKey> reservedGroup = Optional.fromNullable(
             slaveReservations.get(offer.getOffer().getSlaveId().getValue()));
 
