@@ -25,6 +25,7 @@ import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
@@ -59,23 +60,35 @@ public class PreemptorModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> PREEMPTION_SLOT_SEARCH_INTERVAL =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
+  @Positive
+  @CmdLine(name = "preemption_reservation_max_batch_size",
+      help = "The maximum number of reservations for a task group to be made in a batch.")
+  private static final Arg<Integer> RESERVATION_MAX_BATCH_SIZE = Arg.create(5);
+
   private final boolean enablePreemptor;
   private final Amount<Long, Time> preemptionDelay;
   private final Amount<Long, Time> slotSearchInterval;
+  private final Integer reservationBatchSize;
 
   @VisibleForTesting
   public PreemptorModule(
       boolean enablePreemptor,
       Amount<Long, Time> preemptionDelay,
-      Amount<Long, Time> slotSearchInterval) {
+      Amount<Long, Time> slotSearchInterval,
+      Integer reservationBatchSize) {
 
     this.enablePreemptor = enablePreemptor;
     this.preemptionDelay = requireNonNull(preemptionDelay);
     this.slotSearchInterval = requireNonNull(slotSearchInterval);
+    this.reservationBatchSize = requireNonNull(reservationBatchSize);
   }
 
   public PreemptorModule() {
-    this(ENABLE_PREEMPTOR.get(), PREEMPTION_DELAY.get(), PREEMPTION_SLOT_SEARCH_INTERVAL.get());
+    this(
+        ENABLE_PREEMPTOR.get(),
+        PREEMPTION_DELAY.get(),
+        PREEMPTION_SLOT_SEARCH_INTERVAL.get(),
+        RESERVATION_MAX_BATCH_SIZE.get());
   }
 
   @Override
@@ -98,6 +111,9 @@ public class PreemptorModule extends AbstractModule {
               new BiCacheSettings(PREEMPTION_SLOT_HOLD_TIME.get(), "preemption_slot_cache_size"));
           bind(new TypeLiteral<BiCache<PreemptionProposal, TaskGroupKey>>() { })
               .in(Singleton.class);
+          bind(new TypeLiteral<Integer>() { })
+              .annotatedWith(PendingTaskProcessor.ReservationBatchSize.class)
+              .toInstance(reservationBatchSize);
           bind(PendingTaskProcessor.class).in(Singleton.class);
           bind(ClusterState.class).to(ClusterStateImpl.class);
           bind(ClusterStateImpl.class).in(Singleton.class);

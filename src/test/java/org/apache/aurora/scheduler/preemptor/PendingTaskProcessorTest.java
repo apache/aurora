@@ -18,6 +18,8 @@ import java.util.Arrays;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -51,6 +53,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.TASK_PROCESSOR_RUN_NAME;
+import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.UNMATCHED_TASKS;
 import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.attemptsStatName;
 import static org.apache.aurora.scheduler.preemptor.PreemptorMetrics.slotSearchStatName;
 import static org.easymock.EasyMock.anyObject;
@@ -66,11 +69,14 @@ public class PendingTaskProcessorTest extends EasyMockTest {
   private static final String SLAVE_ID_2 = "slave_id_2";
   private static final IJobKey JOB_A = JobKeys.from("role_a", "env", "job_a");
   private static final IJobKey JOB_B = JobKeys.from("role_b", "env", "job_b");
+  private static final IJobKey JOB_C = JobKeys.from("role_c", "env", "job_c");
   private static final IScheduledTask TASK_A = makeTask(JOB_A, SLAVE_ID_1, "id1");
   private static final IScheduledTask TASK_B = makeTask(JOB_B, SLAVE_ID_2, "id2");
+  private static final IScheduledTask TASK_C = makeTask(JOB_C, SLAVE_ID_2, "id3");
   private static final PreemptionProposal SLOT_A = createPreemptionProposal(TASK_A, SLAVE_ID_1);
   private static final Amount<Long, Time> PREEMPTION_DELAY = Amount.of(30L, Time.SECONDS);
   private static final Amount<Long, Time> EXPIRATION = Amount.of(10L, Time.MINUTES);
+  private static final Integer RESERVATION_BATCH_SIZE = 5;
 
   private StorageTestUtil storageUtil;
   private OfferManager offerManager;
@@ -103,7 +109,8 @@ public class PendingTaskProcessorTest extends EasyMockTest {
         PREEMPTION_DELAY,
         slotCache,
         clusterState,
-        clock);
+        clock,
+        RESERVATION_BATCH_SIZE);
   }
 
   @Test
@@ -125,6 +132,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     assertEquals(2L, statsProvider.getLongValue(attemptsStatName(true)));
     assertEquals(2L, statsProvider.getLongValue(slotSearchStatName(true, true)));
     assertEquals(0L, statsProvider.getLongValue(slotSearchStatName(false, true)));
+    assertEquals(0L, statsProvider.getLongValue(UNMATCHED_TASKS));
     assertEquals(2L, statsProvider.getLongValue(CACHE_STAT));
   }
 
@@ -145,6 +153,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     assertEquals(1L, statsProvider.getLongValue(attemptsStatName(true)));
     assertEquals(0L, statsProvider.getLongValue(slotSearchStatName(true, true)));
     assertEquals(1L, statsProvider.getLongValue(slotSearchStatName(false, true)));
+    assertEquals(1L, statsProvider.getLongValue(UNMATCHED_TASKS));
   }
 
   @Test
@@ -164,6 +173,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
     assertEquals(0L, statsProvider.getLongValue(slotSearchStatName(true, true)));
     assertEquals(0L, statsProvider.getLongValue(slotSearchStatName(false, true)));
+    assertEquals(0L, statsProvider.getLongValue(UNMATCHED_TASKS));
   }
 
   @Test
@@ -197,10 +207,11 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     assertEquals(2L, statsProvider.getLongValue(slotSearchStatName(true, true)));
 
     // TODO(wfarner): This test depends on the iteration order of a hash set (the set containing
-    // task groups), and as a result this stat could be 1 or 2 depending on which group is
+    // task groups), and as a result this stat could be 0 or 2 depending on which group is
     // evaluated first.
-    assertTrue(ImmutableSet.of(1L, 2L).contains(
+    assertTrue(ImmutableSet.of(0L, 2L).contains(
         statsProvider.getLongValue(slotSearchStatName(false, true))));
+    assertEquals(1L, statsProvider.getLongValue(UNMATCHED_TASKS));
     assertEquals(2L, statsProvider.getLongValue(CACHE_STAT));
   }
 
@@ -216,6 +227,57 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     assertEquals(0L, statsProvider.getLongValue(attemptsStatName(true)));
     assertEquals(0L, statsProvider.getLongValue(slotSearchStatName(true, true)));
     assertEquals(0L, statsProvider.getLongValue(slotSearchStatName(false, true)));
+    assertEquals(0L, statsProvider.getLongValue(UNMATCHED_TASKS));
+  }
+
+  @Test
+  public void testGetPreemptionSequence() {
+    TaskGroupKey a = group(TASK_A);
+    TaskGroupKey b = group(TASK_B);
+    TaskGroupKey c = group(TASK_C);
+
+    control.replay();
+
+    assertEquals(
+        ImmutableList.of(),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(), 2));
+    assertEquals(
+        ImmutableList.of(a),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a), 3));
+    assertEquals(
+        ImmutableList.of(a, a, a),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a, a, a), 5));
+    assertEquals(
+        ImmutableList.of(a, a, a),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a, a, a), 2));
+    assertEquals(
+        ImmutableList.of(a, b, a, b, a),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a, a, a, b, b), 1));
+    assertEquals(
+        ImmutableList.of(a, a, b, b, a),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a, a, a, b, b), 2));
+    assertEquals(
+        ImmutableList.of(a, a, a, b, b),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a, a, a, b, b), 3));
+    assertEquals(
+        ImmutableList.of(a, a, a, b, b),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a, a, a, b, b), 5));
+    assertEquals(
+        ImmutableList.of(a, a, b, b, a, a, a),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a, a, a, a, a, b, b), 2));
+    assertEquals(
+        ImmutableList.of(a, b, c, b, c),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a, b, b, c, c), 1));
+    assertEquals(
+        ImmutableList.of(a, b, b, c, c),
+        PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(a, b, b, c, c), 2));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testGetPreemptionSequenceInvalidArgument() {
+    control.replay();
+
+    PendingTaskProcessor.getPreemptionSequence(ImmutableMultiset.of(), 0);
   }
 
   private Multimap<String, PreemptionVictim> getVictims(IScheduledTask... tasks) {

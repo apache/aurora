@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.preemptor;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.cache.CacheBuilder;
@@ -81,6 +83,7 @@ public class PendingTaskProcessor implements Runnable {
   private final BiCache<PreemptionProposal, TaskGroupKey> slotCache;
   private final ClusterState clusterState;
   private final Clock clock;
+  private final Integer reservationBatchSize;
 
   /**
    * Binding annotation for the time interval after which a pending task becomes eligible to
@@ -93,6 +96,15 @@ public class PendingTaskProcessor implements Runnable {
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface PreemptionDelay { }
 
+  /**
+   * Binding annotation for the maximum number of reservations for a task group to be processed in
+   * a batch. Performing more reservations per task group improves preemption performance at the
+   * cost of reduced preemption fairness.
+   */
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  @interface ReservationBatchSize { }
+
   @Inject
   PendingTaskProcessor(
       Storage storage,
@@ -102,7 +114,8 @@ public class PendingTaskProcessor implements Runnable {
       @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
       BiCache<PreemptionProposal, TaskGroupKey> slotCache,
       ClusterState clusterState,
-      Clock clock) {
+      Clock clock,
+      @ReservationBatchSize Integer reservationBatchSize) {
 
     this.storage = requireNonNull(storage);
     this.offerManager = requireNonNull(offerManager);
@@ -112,6 +125,7 @@ public class PendingTaskProcessor implements Runnable {
     this.slotCache = requireNonNull(slotCache);
     this.clusterState = requireNonNull(clusterState);
     this.clock = requireNonNull(clock);
+    this.reservationBatchSize = requireNonNull(reservationBatchSize);
   }
 
   @Timed("pending_task_processor_run")
@@ -145,13 +159,19 @@ public class PendingTaskProcessor implements Runnable {
       LoadingCache<IJobKey, AttributeAggregate> jobStates = attributeCache(store);
       List<TaskGroupKey> pendingGroups = fetchIdlePendingGroups(store);
       Iterator<TaskGroupKey> groups = Iterators.consumingIterator(pendingGroups.iterator());
+      TaskGroupKey lastGroup = null;
+      Iterator<String> slaveIterator = allSlaves.iterator();
+
       while (!pendingGroups.isEmpty()) {
         boolean matched = false;
         TaskGroupKey group = groups.next();
         ITaskConfig task = group.getTask();
 
         metrics.recordPreemptionAttemptFor(task);
-        Iterator<String> slaveIterator = allSlaves.iterator();
+        // start over only if a different task group is being processed
+        if (!group.equals(lastGroup)) {
+          slaveIterator = allSlaves.iterator();
+        }
         while (slaveIterator.hasNext()) {
           String slaveId = slaveIterator.next();
           Optional<ImmutableSet<PreemptionVictim>> candidates =
@@ -175,7 +195,9 @@ public class PendingTaskProcessor implements Runnable {
           // No slot found for the group -> remove group and reset group iterator.
           pendingGroups.removeAll(ImmutableSet.of(group));
           groups = Iterators.consumingIterator(pendingGroups.iterator());
+          metrics.recordUnmatchedTask();
         }
+        lastGroup = group;
       }
       return null;
     });
@@ -187,25 +209,34 @@ public class PendingTaskProcessor implements Runnable {
             .filter(Predicates.and(isIdleTask, Predicates.not(hasCachedSlot)))
             .transform(Functions.compose(ASSIGNED_TO_GROUP_KEY, IScheduledTask::getAssignedTask)));
 
-    return getPreemptionSequence(taskGroupCounts);
+    return getPreemptionSequence(taskGroupCounts, reservationBatchSize);
   }
 
   /**
-   * Creates execution sequence for pending task groups by interleaving their unique occurrences.
-   * For example: {G1, G1, G1, G2, G2} will be converted into {G1, G2, G1, G2, G1}.
+   * Creates execution sequence for pending task groups by interleaving batches of requested size of
+   * their occurrences. For example: {G1, G1, G1, G2, G2} with batch size of 2 task per group will
+   * be converted into {G1, G1, G2, G2, G1}.
    *
    * @param groups Multiset of task groups.
+   * @param batchSize The batch size of tasks from each group to sequence together.
    * @return A task group execution sequence.
    */
-  private static List<TaskGroupKey> getPreemptionSequence(Multiset<TaskGroupKey> groups) {
+  @VisibleForTesting
+  static List<TaskGroupKey> getPreemptionSequence(
+      Multiset<TaskGroupKey> groups,
+      int batchSize) {
+
+    Preconditions.checkArgument(batchSize > 0, "batchSize should be positive.");
+
     Multiset<TaskGroupKey> mutableGroups = HashMultiset.create(groups);
     List<TaskGroupKey> instructions = Lists.newLinkedList();
     Set<TaskGroupKey> keys = ImmutableSet.copyOf(groups.elementSet());
     while (!mutableGroups.isEmpty()) {
       for (TaskGroupKey key : keys) {
         if (mutableGroups.contains(key)) {
-          instructions.add(key);
-          mutableGroups.remove(key);
+          int elementCount = mutableGroups.remove(key, batchSize);
+          int removedCount = Math.min(elementCount, batchSize);
+          instructions.addAll(Collections.nCopies(removedCount, key));
         }
       }
     }

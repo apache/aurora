@@ -97,6 +97,7 @@ public class SchedulingBenchmarks {
   public abstract static class AbstractBase {
     private static final Amount<Long, Time> NO_DELAY = Amount.of(1L, Time.MILLISECONDS);
     private static final Amount<Long, Time> DELAY_FOREVER = Amount.of(30L, Time.DAYS);
+    private static final Integer BATCH_SIZE = 5;
     protected Storage storage;
     protected PendingTaskProcessor pendingTaskProcessor;
     private TaskScheduler taskScheduler;
@@ -117,7 +118,7 @@ public class SchedulingBenchmarks {
       // TODO(maxim): Find a way to DRY it and reuse existing modules instead.
       Injector injector = Guice.createInjector(
           new StateModule(),
-          new PreemptorModule(true, NO_DELAY, NO_DELAY),
+          new PreemptorModule(true, NO_DELAY, NO_DELAY, BATCH_SIZE),
           new TierModule(TaskTestUtil.TIER_CONFIG),
           new PrivateModule() {
             @Override

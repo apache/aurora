@@ -37,6 +37,9 @@ public class PreemptorMetrics {
   @VisibleForTesting
   static final String TASK_PROCESSOR_RUN_NAME = "preemptor_task_processor_runs";
 
+  @VisibleForTesting
+  static final String UNMATCHED_TASKS = "preemptor_unmatched_tasks";
+
   private volatile boolean exported = false;
   private final CachedCounters counters;
 
@@ -72,7 +75,8 @@ public class PreemptorMetrics {
         slotValidationStatName(true),
         slotValidationStatName(false),
         MISSING_ATTRIBUTES_NAME,
-        TASK_PROCESSOR_RUN_NAME);
+        TASK_PROCESSOR_RUN_NAME,
+        UNMATCHED_TASKS);
     for (String stat : allStats) {
       counters.get(stat);
     }
@@ -115,6 +119,10 @@ public class PreemptorMetrics {
 
   void recordSlotSearchResult(Optional<?> result, ITaskConfig task) {
     increment(slotSearchStatName(result.isPresent(), task.isProduction()));
+  }
+
+  void recordUnmatchedTask() {
+    increment(UNMATCHED_TASKS);
   }
 
   void recordSlotValidationResult(Optional<?> result) {
