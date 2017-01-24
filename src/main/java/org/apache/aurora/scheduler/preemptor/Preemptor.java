@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
-import java.util.Set;
+import java.util.Iterator;
 
 import javax.inject.Inject;
 
@@ -79,12 +79,12 @@ public interface Preemptor {
         MutableStoreProvider store) {
 
       TaskGroupKey groupKey = TaskGroupKey.from(pendingTask.getTask());
-      Set<PreemptionProposal> preemptionProposals = slotCache.getByValue(groupKey);
+      Iterator<PreemptionProposal> proposalIterator = slotCache.getByValue(groupKey).iterator();
 
       // A preemption slot is available -> attempt to preempt tasks.
-      if (!preemptionProposals.isEmpty()) {
+      while (proposalIterator.hasNext()) {
         // Get the next available preemption slot.
-        PreemptionProposal slot = preemptionProposals.iterator().next();
+        PreemptionProposal slot = proposalIterator.next();
         slotCache.remove(slot, groupKey);
 
         // Validate PreemptionProposal is still valid for the given task.
@@ -98,21 +98,18 @@ public interface Preemptor {
                 store);
 
         metrics.recordSlotValidationResult(validatedVictims);
-        if (!validatedVictims.isPresent()) {
-          // Previously found victims are no longer valid -> let the next run find a new slot.
-          return Optional.absent();
+        if (validatedVictims.isPresent()) {
+          for (PreemptionVictim toPreempt : validatedVictims.get()) {
+            metrics.recordTaskPreemption(toPreempt);
+            stateManager.changeState(
+                store,
+                toPreempt.getTaskId(),
+                Optional.absent(),
+                PREEMPTING,
+                Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
+          }
+          return Optional.of(slot.getSlaveId());
         }
-
-        for (PreemptionVictim toPreempt : validatedVictims.get()) {
-          metrics.recordTaskPreemption(toPreempt);
-          stateManager.changeState(
-              store,
-              toPreempt.getTaskId(),
-              Optional.absent(),
-              PREEMPTING,
-              Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
-        }
-        return Optional.of(slot.getSlaveId());
       }
 
       return Optional.absent();

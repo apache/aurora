@@ -54,9 +54,11 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class PreemptorImplTest extends EasyMockTest {
-  private static final String SLAVE_ID = "slave_id";
+  private static final String SLAVE_ID_1 = "slave_id_1";
+  private static final String SLAVE_ID_2 = "slave_id_2";
   private static final IScheduledTask TASK = IScheduledTask.build(makeTask());
-  private static final PreemptionProposal PROPOSAL = createPreemptionProposal(TASK);
+  private static final PreemptionProposal PROPOSAL_1 = createPreemptionProposal(TASK, SLAVE_ID_1);
+  private static final PreemptionProposal PROPOSAL_2 = createPreemptionProposal(TASK, SLAVE_ID_2);
   private static final TaskGroupKey GROUP_KEY =
       TaskGroupKey.from(ITaskConfig.build(makeTask().getAssignedTask().getTask()));
 
@@ -94,30 +96,67 @@ public class PreemptorImplTest extends EasyMockTest {
 
   @Test
   public void testPreemptTasksSuccessful() throws Exception {
-    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL));
-    slotCache.remove(PROPOSAL, GROUP_KEY);
-    expectSlotValidation(PROPOSAL, Optional.of(ImmutableSet.of(
+    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL_1, PROPOSAL_2));
+    slotCache.remove(PROPOSAL_1, GROUP_KEY);
+    expectSlotValidation(PROPOSAL_1, Optional.of(ImmutableSet.of(
         PreemptionVictim.fromTask(TASK.getAssignedTask()))));
 
     expectPreempted(TASK);
 
     control.replay();
 
-    assertEquals(Optional.of(SLAVE_ID), callPreemptor());
+    assertEquals(Optional.of(SLAVE_ID_1), callPreemptor());
+    assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(false)));
     assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(true)));
     assertEquals(1L, statsProvider.getLongValue(successStatName(true)));
   }
 
   @Test
   public void testPreemptTasksValidationFailed() throws Exception {
-    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL));
-    slotCache.remove(PROPOSAL, GROUP_KEY);
-    expectSlotValidation(PROPOSAL, Optional.absent());
+    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL_1));
+    slotCache.remove(PROPOSAL_1, GROUP_KEY);
+    expectSlotValidation(PROPOSAL_1, Optional.absent());
 
     control.replay();
 
     assertEquals(EMPTY_RESULT, callPreemptor());
     assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(true)));
+    assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
+  }
+
+  @Test
+  public void testMultiplePreemptionProposalsSuccessful() throws Exception {
+    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL_1, PROPOSAL_2));
+    slotCache.remove(PROPOSAL_1, GROUP_KEY);
+    expectSlotValidation(PROPOSAL_1, Optional.absent());
+    slotCache.remove(PROPOSAL_2, GROUP_KEY);
+    expectSlotValidation(PROPOSAL_2, Optional.of(ImmutableSet.of(
+        PreemptionVictim.fromTask(TASK.getAssignedTask()))));
+
+    expectPreempted(TASK);
+
+    control.replay();
+
+    assertEquals(Optional.of(SLAVE_ID_2), callPreemptor());
+    assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(false)));
+    assertEquals(1L, statsProvider.getLongValue(slotValidationStatName(true)));
+    assertEquals(1L, statsProvider.getLongValue(successStatName(true)));
+  }
+
+  @Test
+  public void testMultiplePreemptionProposalsFailed() throws Exception {
+    expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL_1, PROPOSAL_2));
+    slotCache.remove(PROPOSAL_1, GROUP_KEY);
+    expectSlotValidation(PROPOSAL_1, Optional.absent());
+    slotCache.remove(PROPOSAL_2, GROUP_KEY);
+    expectSlotValidation(PROPOSAL_2, Optional.absent());
+
+    control.replay();
+
+    assertEquals(EMPTY_RESULT, callPreemptor());
+    assertEquals(2L, statsProvider.getLongValue(slotValidationStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(true)));
     assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
   }
 
@@ -129,6 +168,7 @@ public class PreemptorImplTest extends EasyMockTest {
 
     assertEquals(EMPTY_RESULT, callPreemptor());
     assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(false)));
+    assertEquals(0L, statsProvider.getLongValue(slotValidationStatName(true)));
     assertEquals(0L, statsProvider.getLongValue(successStatName(true)));
   }
 
@@ -158,9 +198,9 @@ public class PreemptorImplTest extends EasyMockTest {
         .andReturn(StateChangeResult.SUCCESS);
   }
 
-  private static PreemptionProposal createPreemptionProposal(IScheduledTask task) {
+  private static PreemptionProposal createPreemptionProposal(IScheduledTask task, String slaveId) {
     IAssignedTask assigned = task.getAssignedTask();
-    return new PreemptionProposal(ImmutableSet.of(PreemptionVictim.fromTask(assigned)), SLAVE_ID);
+    return new PreemptionProposal(ImmutableSet.of(PreemptionVictim.fromTask(assigned)), slaveId);
   }
 
   private static ScheduledTask makeTask() {
