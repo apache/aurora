@@ -15,6 +15,8 @@
 import os
 import sys
 
+from subprocess32 import STDOUT
+
 # Recommended pattern for Python 2 and 3 support from https://github.com/google/python-subprocess32
 # Backport which adds bug fixes and timeout support for Python 2.7
 if os.name == 'posix' and sys.version_info[0] < 3:
@@ -34,6 +36,10 @@ class WrappedCalledProcessError(subprocess.CalledProcessError):
     self.cmd = original_command
     self.returncode = error.returncode
     self.output = error.output
+
+  def __str__(self):
+    return "Command '%s' returned non-zero exit status %d with output '%s'" % (
+      self.cmd, self.returncode, self.output)
 
 
 class ShellHealthCheck(object):
@@ -69,10 +75,11 @@ class ShellHealthCheck(object):
     :rtype tuple:
     """
     try:
-      subprocess.check_call(
+      subprocess.check_output(
           self._wrapped_cmd,
           timeout=self._timeout_secs,
-          preexec_fn=self._preexec_fn)
+          preexec_fn=self._preexec_fn,
+          stderr=STDOUT)
       return True, None
     except subprocess.CalledProcessError as reason:
       # The command didn't return a 0 so provide reason for failure.
