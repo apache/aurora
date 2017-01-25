@@ -36,6 +36,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -53,6 +54,7 @@ import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.TaskVars.VETO_GROUPS_TO_COUNTERS;
+import static org.apache.aurora.scheduler.TaskVars.VETO_TYPE_TO_COUNTERS;
 import static org.apache.aurora.scheduler.TaskVars.jobStatName;
 import static org.apache.aurora.scheduler.TaskVars.rackStatName;
 import static org.easymock.EasyMock.expect;
@@ -68,6 +70,10 @@ public class TaskVarsTest extends EasyMockTest {
   private static final String STATIC_COUNTER = VETO_GROUPS_TO_COUNTERS.get(VetoGroup.STATIC);
   private static final String DYNAMIC_COUNTER = VETO_GROUPS_TO_COUNTERS.get(VetoGroup.DYNAMIC);
   private static final String MIXED_COUNTER = VETO_GROUPS_TO_COUNTERS.get(VetoGroup.MIXED);
+  private static final String INSUFFICIENT_RESOURCES_COUNTER = VETO_TYPE_TO_COUNTERS.get(
+      VetoType.INSUFFICIENT_RESOURCES);
+  private static final String LIMIT_NOT_SATISFIED_COUNTER = VETO_TYPE_TO_COUNTERS.get(
+      VetoType.LIMIT_NOT_SATISFIED);
 
   private StorageTestUtil storageUtil;
   private StatsProvider trackedProvider;
@@ -211,6 +217,7 @@ public class TaskVarsTest extends EasyMockTest {
   public void testStaticVetoGroup() {
     expectStatusCountersInitialized();
     expectStatExport(STATIC_COUNTER);
+    expectStatExport(INSUFFICIENT_RESOURCES_COUNTER);
 
     replayAndBuild();
     schedulerActivated();
@@ -221,24 +228,29 @@ public class TaskVarsTest extends EasyMockTest {
         Veto.insufficientResources("cpu", 500));
 
     assertEquals(1, getValue(STATIC_COUNTER));
+    assertEquals(2, getValue(INSUFFICIENT_RESOURCES_COUNTER));
   }
 
   @Test
   public void testDynamicVetoGroup() {
     expectStatusCountersInitialized();
     expectStatExport(DYNAMIC_COUNTER);
+    expectStatExport(LIMIT_NOT_SATISFIED_COUNTER);
 
     replayAndBuild();
     schedulerActivated();
 
     applyVeto(makeTask(JOB_A, PENDING), Veto.unsatisfiedLimit("constraint"));
     assertEquals(1, getValue(DYNAMIC_COUNTER));
+    assertEquals(1, getValue(LIMIT_NOT_SATISFIED_COUNTER));
   }
 
   @Test
   public void testMixedVetoGroup() {
     expectStatusCountersInitialized();
     expectStatExport(MIXED_COUNTER);
+    expectStatExport(LIMIT_NOT_SATISFIED_COUNTER);
+    expectStatExport(INSUFFICIENT_RESOURCES_COUNTER);
 
     replayAndBuild();
     schedulerActivated();
@@ -248,6 +260,8 @@ public class TaskVarsTest extends EasyMockTest {
         Veto.insufficientResources("ram", 500));
 
     assertEquals(1, getValue(MIXED_COUNTER));
+    assertEquals(1, getValue(LIMIT_NOT_SATISFIED_COUNTER));
+    assertEquals(1, getValue(INSUFFICIENT_RESOURCES_COUNTER));
   }
 
   @Test

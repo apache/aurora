@@ -43,6 +43,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
@@ -65,6 +66,15 @@ class TaskVars extends AbstractIdleService implements EventSubscriber {
       VetoGroup.STATIC, "scheduling_veto_static",
       VetoGroup.DYNAMIC, "scheduling_veto_dynamic",
       VetoGroup.MIXED, "scheduling_veto_mixed"
+  );
+
+  @VisibleForTesting
+  static final Map<VetoType, String> VETO_TYPE_TO_COUNTERS = ImmutableMap.of(
+      VetoType.CONSTRAINT_MISMATCH, "scheduling_veto_constraint_mismatch",
+      VetoType.DEDICATED_CONSTRAINT_MISMATCH, "scheduling_veto_dedicated_constraint_mismatch",
+      VetoType.INSUFFICIENT_RESOURCES, "scheduling_veto_insufficient_resources",
+      VetoType.LIMIT_NOT_SATISFIED, "scheduling_veto_limit_not_satisfied",
+      VetoType.MAINTENANCE, "scheduling_veto_maintenance"
   );
 
   private final LoadingCache<String, Counter> counters;
@@ -216,6 +226,9 @@ class TaskVars extends AbstractIdleService implements EventSubscriber {
     VetoGroup vetoGroup = Veto.identifyGroup(event.getVetoes());
     if (vetoGroup != VetoGroup.EMPTY) {
       counters.getUnchecked(VETO_GROUPS_TO_COUNTERS.get(vetoGroup)).increment();
+    }
+    for (Veto veto : event.getVetoes()) {
+      counters.getUnchecked(VETO_TYPE_TO_COUNTERS.get(veto.getVetoType())).increment();
     }
   }
 
