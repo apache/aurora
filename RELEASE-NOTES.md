@@ -31,6 +31,10 @@
 - Support the deployment of the Aurora scheduler behind HTTPS-enabled reverse proxies: By launching
   scheduler via `-serverset_endpoint_name=https` you can ensure the Aurora client will correctly
   discover HTTPS support via the ZooKeeper-based discovery mechanism.
+- Preemption slot search logic is modified to improve its performance.
+  - Multiple reservations are made per task group per round.
+  - Multiple reservations are evaluated per round.
+- New scheduler metrics are added to facilitate monitoring and performance studies (AURORA-1832).
 
 ### Deprecations and removals:
 
