@@ -139,11 +139,11 @@ public class NearestFitTest {
     nearest.vetoed(new Vetoed(taskGroupKey, vetoes(SEVERITY_4_CPU, SEVERITY_4_RAM)));
 
     // Testing.
-    Map<String, List<String>> mimicPendingReasons = new LinkedHashMap<>();
+    Map<TaskGroupKey, List<String>> mimicPendingReasons = new LinkedHashMap<>();
     List<String> reasons = Arrays.stream(
         new String[]{SEVERITY_4_CPU.getReason(), SEVERITY_4_RAM.getReason()})
             .collect(Collectors.toList());
-    mimicPendingReasons.put("role/test/jobA",  reasons);
+    mimicPendingReasons.put(taskGroupKey, reasons);
     assertPendingReasons(nearest.getPendingReasons(pendingTaskGroups), mimicPendingReasons);
   }
 
@@ -159,8 +159,8 @@ public class NearestFitTest {
     assertEquals(vetoes(vetoes), nearest.getNearestFit(GROUP_KEY));
   }
 
-  private void assertPendingReasons(Map<String, List<String>> actualPendingReasons,
-      Map<String, List<String>> mimicPendingReasons) {
+  private void assertPendingReasons(Map<TaskGroupKey, List<String>> actualPendingReasons,
+      Map<TaskGroupKey, List<String>> mimicPendingReasons) {
     assertEquals(actualPendingReasons, mimicPendingReasons);
   }
 }

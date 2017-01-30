@@ -114,28 +114,38 @@ public class PendingTasksTest extends EasyMockTest {
     // Making pending tasks.
     IJobKey jobKey0 = IJobKey.build(new JobKey("role", "test", "jobA"));
     IJobKey jobKey1 = IJobKey.build(new JobKey("role", "test", "jobB"));
+    // Task of jobA
     IScheduledTask task0 = TestUtils.makeTask(jobKey0, "task0", 0,
         ScheduleStatus.PENDING, 1000, 1000000, 10);
+    // Tasks of jobB with two different TaskConfigs and thus two different TaskGroupKeys
     IScheduledTask task1 = TestUtils.makeTask(jobKey1, "task1", 0,
         ScheduleStatus.PENDING, 1000, 10, 1000000);
+    IScheduledTask task2 = TestUtils.makeTask(jobKey1, "task2", 1,
+        ScheduleStatus.PENDING, 100, 1, 100000);
 
     PubsubEvent.TaskStateChange taskStateChange0 = PubsubEvent.TaskStateChange.transition(
         task0, ScheduleStatus.INIT);
     PubsubEvent.TaskStateChange taskStateChange1 = PubsubEvent.TaskStateChange.transition(
         task1, ScheduleStatus.INIT);
+    PubsubEvent.TaskStateChange taskStateChange2 = PubsubEvent.TaskStateChange.transition(
+        task2, ScheduleStatus.INIT);
 
     pendingTaskGroups.taskChangedState(taskStateChange0);
     pendingTaskGroups.taskChangedState(taskStateChange1);
+    pendingTaskGroups.taskChangedState(taskStateChange2);
     expectLastCall();
 
     // Recording the return value of pendingTaskGroups.getGroups().
     TaskGroupKey taskGroupKey0 = TaskGroupKey.from(task0.getAssignedTask().getTask());
     TaskGroupKey taskGroupKey1 = TaskGroupKey.from(task1.getAssignedTask().getTask());
+    TaskGroupKey taskGroupKey2 = TaskGroupKey.from(task2.getAssignedTask().getTask());
     TaskGroup taskGroup0 = new TaskGroup(taskGroupKey0, "task0");
     TaskGroup taskGroup1 = new TaskGroup(taskGroupKey1, "task1");
+    TaskGroup taskGroup2 = new TaskGroup(taskGroupKey2, "task2");
     List<TaskGroup> taskGroupList = new ArrayList<>();
     taskGroupList.add(taskGroup0);
     taskGroupList.add(taskGroup1);
+    taskGroupList.add(taskGroup2);
     expect(pendingTaskGroups.getGroups()).andReturn(taskGroupList).anyTimes();
 
     // Creating vetoes for CPU and RAM, corresponding to task0.
@@ -148,25 +158,39 @@ public class PendingTasksTest extends EasyMockTest {
         .add(Veto.insufficientResources("CPU", 1))
         .add(Veto.insufficientResources("DISK", 1)).build();
     nearestFit.vetoed(new PubsubEvent.Vetoed(taskGroupKey1, vetoes1));
+      // Creating vetoes for CPU, corresponding to task2.
+    ImmutableSet<Veto> vetoes2 = ImmutableSet.<Veto>builder()
+        .add(Veto.insufficientResources("CPU", 1)).build();
+    nearestFit.vetoed(new PubsubEvent.Vetoed(taskGroupKey2, vetoes2));
     replay(pendingTaskGroups);
 
     // Testing.
     pendingTaskGroups.taskChangedState(taskStateChange0);
     pendingTaskGroups.taskChangedState(taskStateChange1);
-    PendingTasks pendingTasks0 = new PendingTasks(pendingTaskGroups, nearestFit);
+    pendingTaskGroups.taskChangedState(taskStateChange2);
+
+    PendingTasks pendingTasks = new PendingTasks(pendingTaskGroups, nearestFit);
     String[] taskIds0 = {"task0"};
     String[] taskIds1 = {"task1"};
+    String[] taskIds2 = {"task2"};
     String[] reasonsArr0 = {"Insufficient: CPU", "Insufficient: RAM"};
     String[] reasonsArr1 = {"Insufficient: CPU", "Insufficient: DISK"};
+    String[] reasonsArr2 = {"Insufficient: CPU"};
     List<String> reasons0 = Arrays.stream(reasonsArr0).collect(Collectors.toList());
     List<String> reasons1 = Arrays.stream(reasonsArr1).collect(Collectors.toList());
+    List<String> reasons2 = Arrays.stream(reasonsArr2).collect(Collectors.toList());
+
     JsonNode mimicResponseTwoPendingTasksJson = new ObjectMapper().createArrayNode();
     JsonNode mimicJson0 = getMimicResponseJson(0, taskIds0, "role/test/jobA", reasons0);
     JsonNode mimicJson1 = getMimicResponseJson(0, taskIds1, "role/test/jobB", reasons1);
+    JsonNode mimicJson2 = getMimicResponseJson(0, taskIds2, "role/test/jobB", reasons2);
     ((ArrayNode) mimicResponseTwoPendingTasksJson).add(mimicJson0);
     ((ArrayNode) mimicResponseTwoPendingTasksJson).add(mimicJson1);
+    ((ArrayNode) mimicResponseTwoPendingTasksJson).add(mimicJson2);
+
     JsonNode actualResponseJson = new ObjectMapper().valueToTree(
-        pendingTasks0.getOffers().getEntity());
+        pendingTasks.getOffers().getEntity());
+
     assertEquals(mimicResponseTwoPendingTasksJson, actualResponseJson);
   }
 }

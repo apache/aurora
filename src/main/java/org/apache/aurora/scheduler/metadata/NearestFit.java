@@ -128,13 +128,14 @@ public class NearestFit implements EventSubscriber {
    * Determine the pending reason, for each of the given tasks in taskGroups.
    *
    * @param taskGroups Group of pending tasks.
-   * @return A map with key=String (the taskgroup key) and value=List of reasons.
+   * @return A map with key=TaskGroupKey and value=List of reasons.
    */
-  public synchronized Map<String, List<String>> getPendingReasons(Iterable<TaskGroup> taskGroups) {
+  public synchronized Map<TaskGroupKey, List<String>> getPendingReasons(
+        Iterable<TaskGroup> taskGroups) {
     return StreamSupport.stream(taskGroups.spliterator(), false).map(t -> {
       List<String> reasons = getNearestFit(t.getKey()).stream()
           .map(Veto::getReason).collect(Collectors.toList());
-      return new HashMap.SimpleEntry<>(t.getKey().toString(), reasons);
+      return new HashMap.SimpleEntry<>(t.getKey(), reasons);
     }).collect(GuavaUtils.toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
