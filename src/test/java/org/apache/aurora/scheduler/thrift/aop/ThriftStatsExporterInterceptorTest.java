@@ -19,9 +19,11 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.matcher.Matchers;
 
+import org.aopalliance.intercept.MethodInvocation;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.GetJobsResult;
+import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
@@ -29,9 +31,14 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ResponseCode.OK;
+import static org.apache.aurora.scheduler.thrift.Responses.error;
+import static org.apache.aurora.scheduler.thrift.Responses.ok;
 import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.fail;
 
 public class ThriftStatsExporterInterceptorTest extends EasyMockTest {
 
@@ -56,6 +63,7 @@ public class ThriftStatsExporterInterceptorTest extends EasyMockTest {
       }
     });
     decoratedThrift = injector.getInstance(AnnotatedAuroraAdmin.class);
+    addTearDown(Stats::flush);
   }
 
   @Test
@@ -68,10 +76,97 @@ public class ThriftStatsExporterInterceptorTest extends EasyMockTest {
     control.replay();
 
     assertSame(response, decoratedThrift.getJobs(ROLE));
-    assertNotNull(Stats.getVariable("scheduler_thrift_getJobs_events"));
-    assertNotNull(Stats.getVariable("scheduler_thrift_getJobs_events_per_sec"));
-    assertNotNull(Stats.getVariable("scheduler_thrift_getJobs_nanos_per_event"));
-    assertNotNull(Stats.getVariable("scheduler_thrift_getJobs_nanos_total"));
-    assertNotNull(Stats.getVariable("scheduler_thrift_getJobs_nanos_total_per_sec"));
+    String statName = timingStatName("getJobs");
+    assertEquals(1L, Stats.getVariable(statName + "_events").read());
+    assertNotNull(Stats.getVariable(statName + "_events_per_sec"));
+    assertNotNull(Stats.getVariable(statName + "_nanos_per_event"));
+    assertNotNull(Stats.getVariable(statName + "_nanos_total"));
+    assertNotNull(Stats.getVariable(statName + "_nanos_total_per_sec"));
   }
+
+  @Test
+  public void testMeasuredMethod() throws Throwable {
+    MethodInvocation invocation = createMock(MethodInvocation.class);
+
+    expect(invocation.getMethod())
+        .andReturn(InterceptedClass.class.getDeclaredMethod("measuredMethod"));
+    expect(invocation.proceed()).andReturn(ok().setResult(Result.getJobsResult(
+        new GetJobsResult(ImmutableSet.of(new JobConfiguration())))));
+
+    control.replay();
+
+    new ThriftStatsExporterInterceptor().invoke(invocation);
+    assertEquals(1L, Stats.getVariable(workloadStatName("measuredMethod")).read());
+  }
+
+  @Test
+  public void testUnmeasuredMethod() throws Throwable {
+    MethodInvocation invocation = createMock(MethodInvocation.class);
+
+    expect(invocation.getMethod())
+        .andReturn(InterceptedClass.class.getDeclaredMethod("unmeasuredMethod"));
+    expect(invocation.proceed()).andReturn(ok().setResult(Result.getJobsResult(
+        new GetJobsResult(ImmutableSet.of(new JobConfiguration())))));
+
+    control.replay();
+
+    new ThriftStatsExporterInterceptor().invoke(invocation);
+    assertNull(Stats.getVariable(workloadStatName("unmeasuredMethod")));
+  }
+
+  @Test
+  public void testExceptionalMeasuredMethod() throws Throwable {
+    MethodInvocation invocation = createMock(MethodInvocation.class);
+
+    expect(invocation.getMethod())
+        .andReturn(InterceptedClass.class.getDeclaredMethod("measuredMethod"));
+    expect(invocation.proceed()).andThrow(new Exception());
+
+    control.replay();
+
+    try {
+      new ThriftStatsExporterInterceptor().invoke(invocation);
+      fail("Should not be reached");
+    } catch (Exception e) {
+      assertNull(Stats.getVariable(workloadStatName("measuredMethod")));
+    }
+  }
+
+  @Test
+  public void testMeasuredMethodWithErrorResponse() throws Throwable {
+    MethodInvocation invocation = createMock(MethodInvocation.class);
+
+    expect(invocation.getMethod())
+        .andReturn(InterceptedClass.class.getDeclaredMethod("measuredMethod"));
+    expect(invocation.proceed()).andReturn(error("ERROR"));
+
+    control.replay();
+
+    new ThriftStatsExporterInterceptor().invoke(invocation);
+    assertNull(Stats.getVariable(workloadStatName("measuredMethod")));
+  }
+
+  private static class InterceptedClass {
+    @ThriftWorkload
+    public Response measuredMethod() {
+      throw new UnsupportedOperationException("Should not be called.");
+    }
+
+    public Response unmeasuredMethod() {
+      throw new UnsupportedOperationException("Should not be called.");
+    }
+  }
+
+  private static String timingStatName(String methodName) {
+    return statName(ThriftStatsExporterInterceptor.TIMING_STATS_NAME_TEMPLATE, methodName);
+  }
+
+  private static String workloadStatName(String methodName) {
+    return statName(ThriftStatsExporterInterceptor.WORKLOAD_STATS_NAME_TEMPLATE, methodName);
+  }
+
+  private static String statName(String template, String methodName) {
+    return String.format(template, methodName);
+  }
+
 }
