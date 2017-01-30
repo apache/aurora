@@ -494,8 +494,19 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     task.setNumCpus(0);
     task.setRamMb(0);
     task.setDiskMb(0);
+    task.unsetResources();
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
     assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testCreateJobMissingResources() throws Exception {
+    control.replay();
+    TaskConfig task = productionTask();
+    task.unsetResources();
+    task.setResources(ImmutableSet.of(numCpus(1.0)));
+
+    thrift.createJob(makeJob(task));
   }
 
   @Test
@@ -503,6 +514,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TaskConfig task = productionTask().setNumCpus(0.0);
+    task.unsetResources();
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
     assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
   }
@@ -512,6 +524,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TaskConfig task = productionTask().setRamMb(-123);
+    task.unsetResources();
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
     assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
   }
@@ -521,8 +534,56 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TaskConfig task = productionTask().setDiskMb(0);
+    task.unsetResources();
+    assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
+  }
+
+  @Test
+  public void testCreateJobBadResources() throws Exception {
+    control.replay();
+
+    TaskConfig task = productionTask()
+            .setResources(ImmutableSet.of(
+            numCpus(-1),
+            ramMb(1024),
+            diskMb(1024)))
+            .setNumCpus(0)
+            .setRamMb(0)
+            .setDiskMb(0);
+
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
     assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
+  }
+
+  @Test
+  public void testCreateJobGoodResources() throws Exception {
+
+    TaskConfig task = productionTask()
+            .setResources(ImmutableSet.of(
+                    numCpus(1.0),
+                    ramMb(1024),
+                    diskMb(1024)))
+            .setNumCpus(0)
+            .setRamMb(0)
+            .setDiskMb(0);
+
+    IJobConfiguration job = IJobConfiguration.build(makeJob(task));
+    SanitizedConfiguration sanitized = fromUnsanitized(job);
+    lockManager.assertNotLocked(LOCK_KEY);
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
+    expectNoCronJob();
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+            .andReturn(TASK_ID);
+    expectInstanceQuotaCheck(sanitized, ENOUGH_QUOTA);
+
+    stateManager.insertPendingTasks(
+            storageUtil.mutableStoreProvider,
+            sanitized.getJobConfig().getTaskConfig(),
+            sanitized.getInstanceIds());
+
+    control.replay();
+
+    assertOkResponse(thrift.createJob(job.newBuilder()));
   }
 
   @Test

@@ -294,11 +294,6 @@ public class ConfigurationManager {
               + "' doesn't exist."));
     }
 
-    // Maximize the usefulness of any thrown error message by checking required fields first.
-    for (RequiredFieldValidator<?> validator : REQUIRED_FIELDS_VALIDATORS) {
-      validator.validate(builder);
-    }
-
     IConstraint constraint = getDedicatedConstraint(config);
     if (constraint != null) {
       if (!isValueConstraint(constraint.getConstraint())) {
@@ -356,6 +351,10 @@ public class ConfigurationManager {
     }
 
     thriftBackfill.backfillTask(builder);
+
+    for (RequiredFieldValidator<?> validator : REQUIRED_FIELDS_VALIDATORS) {
+      validator.validate(builder);
+    }
 
     String types = config.getResources().stream()
         .collect(Collectors.groupingBy(e -> ResourceType.fromResource(e)))
