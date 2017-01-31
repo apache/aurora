@@ -28,7 +28,6 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.BatchWorker;
 import org.apache.aurora.scheduler.BatchWorker.RepeatableWork;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.cron.quartz.AuroraCronJob.CronBatchWorker;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -80,7 +79,6 @@ public class AuroraCronJobTest extends EasyMockTest {
     expectBatchExecute(batchWorker, storage, control).anyTimes();
 
     auroraCronJob = new AuroraCronJob(
-        TaskTestUtil.CONFIGURATION_MANAGER,
         new AuroraCronJob.Config(backoffHelper),
         stateManager,
         batchWorker);
