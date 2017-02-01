@@ -1,3 +1,65 @@
+Aurora 0.17.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1782] - Thermos Executor is not handling apostrophe gracefully
+    * [AURORA-1802] - AttributeAggregate slows down scheduling of jobs with many instances
+    * [AURORA-1801] - TaskObserver thread stops refreshing after filesystem race condition
+    * [AURORA-1840] - Issue with Curator-backed discovery under heavy load
+    * [AURORA-1809] - Investigate flaky test TestRunnerKillProcessGroup.test_pg_is_killed
+    * [AURORA-1780] - Offers with unknown resources types to Aurora crash the scheduler
+    * [AURORA-1783] - Probable http connection leak
+    * [AURORA-1879] - /pendingTasks endpoint shows 500 HTTP Error when there are multiple pending tasks with the same key
+    * [AURORA-1795] - Internal server error in scheduler Thrift API on missing Content-Type
+    * [AURORA-1788] - vagrant up does not properly configure network adapters
+    * [AURORA-1789] - Incorrect --mesos_containerizer_path value results in thermos failure loop
+    * [AURORA-1798] - resolv.conf is not copied when using the Mesos containerizer with a Docker image
+    * [AURORA-1541] - Observer logs are noisy
+    * [AURORA-1793] - Revert Commit ca683 which is not backwards compatible
+    * [AURORA-1784] - e2e tests fail in http_example_unified_appc due to slow image copies
+    * [AURORA-1684] - Cron tasks are sanitized multiple times (once when being created via the API, and again when actually being triggered)
+    * [AURORA-1808] - Thermos executor should send SIGTERM to daemonized processes 
+    * [AURORA-1792] - Executor does not log full task information.
+    * [AURORA-1791] - Commit ca683 is not backwards compatible.
+    * [AURORA-1875] - The thriftw compatibility thrift binary check is too loose
+
+## Epic
+    * [AURORA-894] - Server updater should watch healthy instances
+
+## Story
+    * [AURORA-1504] - aurora job inspect should have a --write-json option
+    * [AURORA-1847] - Eliminate sequential scan in MemTaskStore.getJobKeys()
+    * [AURORA-1867] - Consider reserving for multiple tasks per preemption round
+    * [AURORA-1868] - Evaluate multiple preemption proposals per round
+    * [AURORA-1815] - Fix checksums for packages on bintray
+    * [AURORA-1014] - Client binding_helper to resolve docker label to a stable ID at create
+    * [AURORA-1794] - Scheduler fails to start if -enable_revocable_ram is toggled
+    * [AURORA-655] - Order job update events and instance events by ID rather than timestamp
+    * [AURORA-1826] - Expose Thrift server request workload stats
+
+## Task
+    * [AURORA-1762] - /pendingtasks endpoint should show reason tasks are pending
+    * [AURORA-1785] - Populate curator latches with scheduler information
+    * [AURORA-1834] - Expose stats on undelivered event bus events
+    * [AURORA-1828] - Expose stats on the number of offers evaluated before a task is assigned
+    * [AURORA-1857] - Expose timing stats on PendingTaskProcessor runs
+    * [AURORA-1851] - Expose stats on JobUpdateAction transitions
+    * [AURORA-1859] - Expose stats on statically banned offers
+    * [AURORA-1876] - Expose stats on scheduler rate limiter
+    * [AURORA-1874] - Expose stats on SlotSizeCounter runs
+    * [AURORA-1838] - Expose stats on ZooKeeper connection state
+    * [AURORA-1813] - Bump Mesos support to 1.1.0
+    * [AURORA-1820] - Reduce storage write lock contention by adopting Double-Checked Locking pattern in TimedOutTaskHandler
+    * [AURORA-1835] - Expose finer grained offer veto stats
+    * [AURORA-1878] - Increased executor logs can lead to task's running out of disk space
+    * [AURORA-1821] - Bump Guava to 20
+    * [AURORA-1856] - Expose stats on deleted job updates in JobUpdateHistoryPruner
+    * [AURORA-1861] - Remove duplicate Snapshot fields for DB stores
+    * [AURORA-1831] - Tweak logging pattern to improve performance
+    * [AURORA-1224] - Add a new "min_consecutive_health_checks" setting in .aurora config
+    * [AURORA-1225] - Modify executor state transition logic to rely on health checks (if enabled)
+    * [AURORA-1881] - Capture stderr from output for shell health check failures.
+
+
 Aurora 0.16.0
 --------------------------------------------------------------------------------
 ## Bug
