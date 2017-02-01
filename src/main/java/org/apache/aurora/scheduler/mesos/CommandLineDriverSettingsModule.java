@@ -152,6 +152,10 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
   }
 
   @VisibleForTesting
+  // See: https://github.com/apache/mesos/commit/d06d05c76eca13745ca73039b93ad684b9d07196
+  // The role field has been deprecated but the replacement is not ready. We'll also have to
+  // turn on MULTI_ROLES capability before we can use the roles field.
+  @SuppressWarnings("deprecation")
   static FrameworkInfo buildFrameworkInfo(
       String frameworkName,
       String executorUser,
