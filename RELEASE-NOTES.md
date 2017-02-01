@@ -1,9 +1,9 @@
-0.17.0 (Not yet released)
-=========================
+0.17.0
+======
 
 ### New/updated:
 - Upgraded Mesos to 1.1.0.
-- Added a new flag --snapshot_hydrate_stores that controls which H2-backed stores to write fully
+- Added a new flag `--snapshot_hydrate_stores` that controls which H2-backed stores to write fully
   hydrated into the Scheduler snapshot. Can lead to significantly lower snapshot times for large
   clusters if you set this flag to an empty list. Old behavior is preserved by default, but see
   org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl for which stores we currently have
@@ -31,17 +31,12 @@
 - Support the deployment of the Aurora scheduler behind HTTPS-enabled reverse proxies: By launching
   scheduler via `-serverset_endpoint_name=https` you can ensure the Aurora client will correctly
   discover HTTPS support via the ZooKeeper-based discovery mechanism.
+- Scheduling performance has been improved by scheduling multiple tasks per scheduling round.
 - Preemption slot search logic is modified to improve its performance.
   - Multiple reservations are made per task group per round.
   - Multiple reservations are evaluated per round.
 - New scheduler metrics are added to facilitate monitoring and performance studies (AURORA-1832).
 
-### Deprecations and removals:
-
-- The scheduler flag `-zk_use_curator` has been removed. If you have never set the flag and are
-  upgrading you should take care as described in the [note](#zk_use_curator_upgrade) below.
-
-=======
 0.16.0
 ======
 
