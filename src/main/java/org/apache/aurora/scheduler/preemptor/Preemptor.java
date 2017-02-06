@@ -26,7 +26,7 @@ import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.v1.Protos.AgentID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -88,7 +88,7 @@ public interface Preemptor {
         slotCache.remove(slot, groupKey);
 
         // Validate PreemptionProposal is still valid for the given task.
-        SlaveID slaveId = SlaveID.newBuilder().setValue(slot.getSlaveId()).build();
+        AgentID slaveId = AgentID.newBuilder().setValue(slot.getSlaveId()).build();
         Optional<ImmutableSet<PreemptionVictim>> validatedVictims =
             preemptionVictimFilter.filterPreemptionVictims(
                 pendingTask.getTask(),

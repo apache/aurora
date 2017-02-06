@@ -82,11 +82,10 @@ import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.MasterInfo;
-import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.mesos.v1.Protos.FrameworkInfo;
+import org.apache.mesos.v1.Protos.Resource;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IMocksControl;
@@ -101,7 +100,6 @@ import static org.apache.aurora.common.testing.easymock.EasyMockTest.createCaptu
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
-import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.eq;
@@ -186,7 +184,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
         bind(DriverFactory.class).toInstance(driverFactory);
         bind(DriverSettings.class).toInstance(SETTINGS);
         bind(Log.class).toInstance(log);
-        Set<Protos.Resource> overhead = ImmutableSet.of(
+        Set<Resource> overhead = ImmutableSet.of(
             mesosScalar(CPUS, 0.1),
             mesosScalar(RAM_MB, 1));
         bind(ExecutorSettings.class)
@@ -319,25 +317,26 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     CountDownLatch driverStarted = new CountDownLatch(1);
     expect(driver.start()).andAnswer(() -> {
       driverStarted.countDown();
-      return Status.DRIVER_RUNNING;
+      return Protos.Status.DRIVER_RUNNING;
     });
 
     // Try to be a good test suite citizen by releasing the blocked thread when the test case exits.
     CountDownLatch testCompleted = new CountDownLatch(1);
     expect(driver.join()).andAnswer(() -> {
       testCompleted.await();
-      return Status.DRIVER_STOPPED;
+      return Protos.Status.DRIVER_STOPPED;
     });
     addTearDown(testCompleted::countDown);
-    expect(driver.stop(true)).andReturn(Status.DRIVER_STOPPED).anyTimes();
+    expect(driver.stop(true)).andReturn(Protos.Status.DRIVER_STOPPED).anyTimes();
 
     control.replay();
     startScheduler();
 
     driverStarted.await();
-    scheduler.getValue().registered(driver,
-        FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
-        MasterInfo.getDefaultInstance());
+    scheduler.getValue().registered(
+        driver,
+        Protos.FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
+        Protos.MasterInfo.getDefaultInstance());
 
     awaitSchedulerReady();
 

@@ -22,7 +22,7 @@ import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.mesos.Protos;
+import org.apache.mesos.v1.Protos;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
@@ -41,7 +41,7 @@ public class AsyncStatsModuleTest extends EasyMockTest {
         new HostOffer(Protos.Offer.newBuilder()
             .setId(Protos.OfferID.newBuilder().setValue("offerId"))
             .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("frameworkId"))
-            .setSlaveId(Protos.SlaveID.newBuilder().setValue("slaveId"))
+            .setAgentId(Protos.AgentID.newBuilder().setValue("slaveId"))
             .setHostname("hostName")
             .addResources(mesosScalar(CPUS, 2.0, true))
             .addResources(mesosScalar(CPUS, 4.0, false))

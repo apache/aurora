@@ -54,7 +54,7 @@ import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.v1.Protos.AgentID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -163,7 +163,7 @@ public class StateManagerImpl implements StateManager {
       MutableStoreProvider storeProvider,
       String taskId,
       String slaveHost,
-      SlaveID slaveId,
+      AgentID slaveId,
       Function<IAssignedTask, IAssignedTask> resourceAssigner) {
 
     checkNotBlank(taskId);

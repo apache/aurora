@@ -62,7 +62,7 @@ import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
-import org.apache.mesos.Protos.FrameworkInfo;
+import org.apache.mesos.v1.Protos.FrameworkInfo;
 import org.apache.shiro.subject.Subject;
 import org.junit.Test;
 

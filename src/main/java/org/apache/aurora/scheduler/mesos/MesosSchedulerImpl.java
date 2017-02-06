@@ -47,6 +47,7 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
+import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskStatus;
@@ -61,7 +62,6 @@ import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.mesos.Protos.Offer;
 import static org.apache.mesos.Protos.TaskStatus.Reason.REASON_RECONCILIATION;
 
 /**
@@ -190,12 +190,13 @@ public class MesosSchedulerImpl implements Scheduler {
       //                offers when the host attributes cannot be found. (AURORA-137)
       storage.write((NoResult.Quiet) storeProvider -> {
         for (Offer offer : offers) {
+          org.apache.mesos.v1.Protos.Offer o = ProtosConversion.convert(offer);
           IHostAttributes attributes =
-              AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);
+              AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), o);
           storeProvider.getAttributeStore().saveHostAttributes(attributes);
           log.debug("Received offer: {}", offer);
           counters.get("scheduler_resource_offers").incrementAndGet();
-          offerManager.addOffer(new HostOffer(offer, attributes));
+          offerManager.addOffer(new HostOffer(o, attributes));
         }
       });
     });
@@ -204,7 +205,7 @@ public class MesosSchedulerImpl implements Scheduler {
   @Override
   public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerId) {
     log.info("Offer rescinded: " + offerId);
-    offerManager.cancelOffer(offerId);
+    offerManager.cancelOffer(ProtosConversion.convert(offerId));
     offersRescinded.incrementAndGet();
   }
 
@@ -240,15 +241,16 @@ public class MesosSchedulerImpl implements Scheduler {
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
     logStatusUpdate(log, status);
+    org.apache.mesos.v1.Protos.TaskStatus converted = ProtosConversion.convert(status);
     eventSink.post(new TaskStatusReceived(
-        status.getState(),
-        Optional.fromNullable(status.getSource()),
-        status.hasReason() ? Optional.of(status.getReason()) : Optional.absent(),
-        Optional.fromNullable(status.getTimestamp()).transform(SECONDS_TO_MICROS)));
+        converted.getState(),
+        Optional.fromNullable(converted.getSource()),
+        converted.hasReason() ? Optional.of(converted.getReason()) : Optional.absent(),
+        Optional.fromNullable(converted.getTimestamp()).transform(SECONDS_TO_MICROS)));
 
     try {
       // The status handler is responsible for acknowledging the update.
-      taskStatusHandler.statusUpdate(status);
+      taskStatusHandler.statusUpdate(converted);
     } catch (SchedulerException e) {
       log.error("Status update failed due to scheduler exception: " + e, e);
       // We re-throw the exception here to trigger an abort of the driver.

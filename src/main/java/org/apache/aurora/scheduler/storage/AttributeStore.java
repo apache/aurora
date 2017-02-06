@@ -23,7 +23,7 @@ import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.mesos.Protos;
+import org.apache.mesos.v1.Protos;
 
 /**
  * Storage interface for host attributes.

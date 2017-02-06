@@ -33,11 +33,11 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
-import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.v1.Protos.Resource;
 
 import static org.apache.aurora.scheduler.resources.ResourceType.BY_MESOS_NAME;
 import static org.apache.aurora.scheduler.resources.ResourceType.fromResource;
-import static org.apache.mesos.Protos.Offer;
+import static org.apache.mesos.v1.Protos.Offer;
 
 /**
  * Manages resources and provides Aurora/Mesos translation.

@@ -47,7 +47,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
-import org.apache.mesos.Protos;
+import org.apache.mesos.v1.Protos;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -291,7 +291,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     Protos.Offer.Builder builder = Protos.Offer.newBuilder();
     builder.getIdBuilder().setValue("id");
     builder.getFrameworkIdBuilder().setValue("framework-id");
-    builder.getSlaveIdBuilder().setValue(slaveId);
+    builder.getAgentIdBuilder().setValue(slaveId);
     builder.setHostname(slaveId);
     return new HostOffer(
         builder.build(),

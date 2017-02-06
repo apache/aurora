@@ -56,7 +56,7 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.v1.Protos.AgentID;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IArgumentMatcher;
@@ -564,7 +564,7 @@ public class StateManagerImplTest extends EasyMockTest {
         storeProvider,
         taskId,
         host.getHost(),
-        SlaveID.newBuilder().setValue(host.getSlaveId()).build(),
+        AgentID.newBuilder().setValue(host.getSlaveId()).build(),
         e -> IAssignedTask.build(e.newBuilder().setAssignedPorts(ports))));
   }
 }

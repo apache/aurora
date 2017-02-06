@@ -41,7 +41,7 @@ import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.v1.Protos.TaskInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +50,7 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import static org.apache.mesos.Protos.Offer;
+import static org.apache.mesos.v1.Protos.Offer;
 
 /**
  * Responsible for matching a task against an offer and launching it.
@@ -133,11 +133,11 @@ public interface TaskAssigner {
           storeProvider,
           taskId,
           host,
-          offer.getSlaveId(),
+          offer.getAgentId(),
           task -> mapAndAssignResources(offer, task));
       LOG.info(
           "Offer on agent {} (id {}) is being assigned task for {}.",
-          host, offer.getSlaveId().getValue(), taskId);
+          host, offer.getAgentId().getValue(), taskId);
       return taskFactory.createFrom(assigned, offer);
     }
 
@@ -163,7 +163,7 @@ public interface TaskAssigner {
         evaluatedOffers.incrementAndGet();
 
         Optional<TaskGroupKey> reservedGroup = Optional.fromNullable(
-            slaveReservations.get(offer.getOffer().getSlaveId().getValue()));
+            slaveReservations.get(offer.getOffer().getAgentId().getValue()));
 
         if (reservedGroup.isPresent() && !reservedGroup.get().equals(groupKey)) {
           // This slave is reserved for a different task group -> skip.

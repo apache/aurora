@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.configuration.executor;
 
-import org.apache.mesos.Protos.ExecutorID;
+import org.apache.mesos.v1.Protos.ExecutorID;
 
 /**
  * Utility class for executor-related fields.

@@ -24,8 +24,8 @@ import com.google.inject.AbstractModule;
 import com.google.inject.multibindings.Multibinder;
 
 import org.apache.aurora.scheduler.SchedulerServicesModule;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.Offer;
 
 import static java.util.Objects.requireNonNull;
 
@@ -34,8 +34,8 @@ import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
-import static org.apache.mesos.Protos.Value.Type.RANGES;
-import static org.apache.mesos.Protos.Value.Type.SCALAR;
+import static org.apache.mesos.v1.Protos.Value.Type.RANGES;
+import static org.apache.mesos.v1.Protos.Value.Type.SCALAR;
 
 /**
  * Module that sets up bindings to simulate fake cluster resources.
@@ -108,7 +108,7 @@ public class ClusterSimulatorModule extends AbstractModule {
         .addAttributes(Protos.Attribute.newBuilder().setType(Protos.Value.Type.TEXT)
             .setName("rack")
             .setText(Protos.Value.Text.newBuilder().setValue(rack)))
-        .setSlaveId(Protos.SlaveID.newBuilder().setValue(slaveId))
+        .setAgentId(Protos.AgentID.newBuilder().setValue(slaveId))
         .setHostname(host)
         .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("frameworkId").build())
         .setId(Protos.OfferID.newBuilder().setValue(UUID.randomUUID().toString()))

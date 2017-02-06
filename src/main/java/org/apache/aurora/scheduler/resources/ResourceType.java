@@ -24,7 +24,7 @@ import com.google.common.collect.Maps;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.gen.Resource._Fields;
 import org.apache.aurora.scheduler.storage.entities.IResource;
-import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.v1.Protos.Resource;
 import org.apache.thrift.TEnum;
 
 import static java.util.Objects.requireNonNull;

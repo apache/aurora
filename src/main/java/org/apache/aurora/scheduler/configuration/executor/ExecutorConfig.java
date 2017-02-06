@@ -18,8 +18,8 @@ import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
 
-import org.apache.mesos.Protos.ExecutorInfo;
-import org.apache.mesos.Protos.Volume;
+import org.apache.mesos.v1.Protos.ExecutorInfo;
+import org.apache.mesos.v1.Protos.Volume;
 
 import static java.util.Objects.requireNonNull;
 

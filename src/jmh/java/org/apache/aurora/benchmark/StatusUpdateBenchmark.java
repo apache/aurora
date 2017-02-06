@@ -62,6 +62,7 @@ import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.MesosSchedulerImpl;
+import org.apache.aurora.scheduler.mesos.ProtosConversion;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
@@ -72,8 +73,8 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
-import org.apache.mesos.Protos;
 import org.apache.mesos.Scheduler;
+import org.apache.mesos.v1.Protos;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -278,7 +279,7 @@ public class StatusUpdateBenchmark {
           .setTaskId(Protos.TaskID.newBuilder().setValue(taskId).build())
           .build();
 
-      scheduler.statusUpdate(new FakeSchedulerDriver(), status);
+      scheduler.statusUpdate(new FakeSchedulerDriver(), ProtosConversion.convert(status));
     }
 
     // Wait for all task transitions to complete.

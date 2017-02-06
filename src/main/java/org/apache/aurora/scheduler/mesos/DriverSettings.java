@@ -16,7 +16,7 @@ package org.apache.aurora.scheduler.mesos;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 
-import org.apache.mesos.Protos;
+import org.apache.mesos.v1.Protos;
 
 import static java.util.Objects.requireNonNull;
 

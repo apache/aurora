@@ -27,9 +27,9 @@ import org.apache.aurora.common.stats.StatsProvider.RequestTimer;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStatusReceived;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.TaskStatus.Reason;
-import org.apache.mesos.Protos.TaskStatus.Source;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.TaskStatus.Reason;
+import org.apache.mesos.v1.Protos.TaskStatus.Source;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

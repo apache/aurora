@@ -16,11 +16,13 @@ package org.apache.aurora.scheduler.mesos;
 import com.google.common.base.Optional;
 
 import org.apache.mesos.MesosSchedulerDriver;
-import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.Credential;
+import org.apache.mesos.Protos.FrameworkInfo;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.mesos.v1.Protos;
 
-import static org.apache.mesos.Protos.FrameworkInfo;
+import static org.apache.aurora.scheduler.mesos.ProtosConversion.convert;
 
 /**
  * A minimal shim over the constructor to {@link MesosSchedulerDriver} to minimize code that
@@ -32,19 +34,23 @@ class DriverFactoryImpl implements DriverFactory {
   public SchedulerDriver create(
       Scheduler scheduler,
       Optional<Protos.Credential> credentials,
-      FrameworkInfo frameworkInfo,
+      Protos.FrameworkInfo frameworkInfo,
       String master) {
+
+    FrameworkInfo convertedFrameworkInfo = convert(frameworkInfo);
+    Optional<Credential> convertedCredentials = credentials.transform(ProtosConversion::convert);
+
     if (credentials.isPresent()) {
       return new MesosSchedulerDriver(
           scheduler,
-          frameworkInfo,
+          convertedFrameworkInfo,
           master,
           false, // Disable implicit acknowledgements.
-          credentials.get());
+          convertedCredentials.get());
     } else {
       return new MesosSchedulerDriver(
           scheduler,
-          frameworkInfo,
+          convertedFrameworkInfo,
           master,
           false); // Disable implicit acknowledgements.
     }

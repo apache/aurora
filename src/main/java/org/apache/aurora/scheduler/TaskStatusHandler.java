@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler;
 
-import org.apache.mesos.Protos.TaskStatus;
+import org.apache.mesos.v1.Protos.TaskStatus;
 
 /**
  * A handler of task status updates.

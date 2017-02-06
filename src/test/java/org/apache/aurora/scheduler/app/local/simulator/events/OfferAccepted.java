@@ -13,8 +13,8 @@
  */
 package org.apache.aurora.scheduler.app.local.simulator.events;
 
-import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.v1.Protos.OfferID;
+import org.apache.mesos.v1.Protos.TaskInfo;
 
 import static java.util.Objects.requireNonNull;
 

@@ -15,9 +15,9 @@ package org.apache.aurora.scheduler.mesos;
 
 import com.google.common.base.Optional;
 
-import org.apache.mesos.Protos;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.mesos.v1.Protos;
 
 /**
  * A layer over the constructor for {@link org.apache.mesos.MesosSchedulerDriver}. This is needed

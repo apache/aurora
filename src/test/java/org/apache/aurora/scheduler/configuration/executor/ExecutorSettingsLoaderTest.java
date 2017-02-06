@@ -24,8 +24,8 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettingsLoader.ExecutorConfigException;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
-import org.apache.mesos.Protos.Volume;
-import org.apache.mesos.Protos.Volume.Mode;
+import org.apache.mesos.v1.Protos.Volume;
+import org.apache.mesos.v1.Protos.Volume.Mode;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

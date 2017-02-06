@@ -19,7 +19,7 @@ import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.offers.OfferManager;
-import org.apache.mesos.Protos;
+import org.apache.mesos.v1.Protos;
 
 public class FakeOfferManager implements OfferManager {
   @Override
@@ -58,7 +58,7 @@ public class FakeOfferManager implements OfferManager {
   }
 
   @Override
-  public Optional<HostOffer> getOffer(Protos.SlaveID slaveId) {
+  public Optional<HostOffer> getOffer(Protos.AgentID agentId) {
     return Optional.absent();
   }
 }

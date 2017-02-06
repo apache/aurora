@@ -19,7 +19,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.v1.Protos.Resource;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.resources.MesosResourceConverter.RANGES;

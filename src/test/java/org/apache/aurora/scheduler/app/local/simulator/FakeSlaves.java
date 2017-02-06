@@ -26,6 +26,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.aurora.scheduler.app.local.FakeMaster;
 import org.apache.aurora.scheduler.app.local.simulator.events.OfferAccepted;
 import org.apache.aurora.scheduler.app.local.simulator.events.Started;
+import org.apache.aurora.scheduler.mesos.ProtosConversion;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskState;
 
@@ -58,10 +59,12 @@ class FakeSlaves {
     // Move the task to starting after a delay.
     executor.schedule(
         () -> {
-          master.changeState(accepted.task.getTaskId(), TaskState.TASK_STARTING);
+          master.changeState(
+              ProtosConversion.convert(accepted.task.getTaskId()), TaskState.TASK_STARTING);
 
           executor.schedule(
-              () -> master.changeState(accepted.task.getTaskId(), TaskState.TASK_RUNNING),
+              () -> master.changeState(
+                  ProtosConversion.convert(accepted.task.getTaskId()), TaskState.TASK_RUNNING),
               1,
               TimeUnit.SECONDS);
         },

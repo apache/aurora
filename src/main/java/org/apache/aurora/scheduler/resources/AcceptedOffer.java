@@ -22,8 +22,8 @@ import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.v1.Protos.Offer;
+import org.apache.mesos.v1.Protos.Resource;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;

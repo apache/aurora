@@ -13,10 +13,10 @@
  */
 package org.apache.aurora.scheduler.offers;
 
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.v1.Protos.AgentID;
+import org.apache.mesos.v1.Protos.FrameworkID;
+import org.apache.mesos.v1.Protos.Offer;
+import org.apache.mesos.v1.Protos.OfferID;
 
 /**
  * Utility class for creating resource offers in unit tests.
@@ -36,7 +36,7 @@ public final class Offers {
     return Offer.newBuilder()
         .setId(OfferID.newBuilder().setValue(offerId))
         .setFrameworkId(FrameworkID.newBuilder().setValue("framework_id"))
-        .setSlaveId(SlaveID.newBuilder().setValue("slave_id-" + offerId))
+        .setAgentId(AgentID.newBuilder().setValue("slave_id-" + offerId))
         .setHostname(hostName)
         .build();
   }

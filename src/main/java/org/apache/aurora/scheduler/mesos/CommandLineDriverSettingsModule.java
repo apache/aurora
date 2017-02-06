@@ -30,14 +30,14 @@ import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.NotNull;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.mesos.Protos;
+import org.apache.mesos.v1.Protos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.mesos.Protos.FrameworkInfo;
-import static org.apache.mesos.Protos.FrameworkInfo.Capability;
-import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.GPU_RESOURCES;
-import static org.apache.mesos.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RESOURCES;
+import static org.apache.mesos.v1.Protos.FrameworkInfo;
+import static org.apache.mesos.v1.Protos.FrameworkInfo.Capability;
+import static org.apache.mesos.v1.Protos.FrameworkInfo.Capability.Type.GPU_RESOURCES;
+import static org.apache.mesos.v1.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RESOURCES;
 
 /**
  * Creates and binds {@link DriverSettings} based on values found on the command line.

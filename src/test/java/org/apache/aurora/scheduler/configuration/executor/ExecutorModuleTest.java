@@ -18,8 +18,8 @@ import java.util.List;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.GuavaUtils;
-import org.apache.mesos.Protos.CommandInfo;
-import org.apache.mesos.Protos.CommandInfo.URI;
+import org.apache.mesos.v1.Protos.CommandInfo;
+import org.apache.mesos.v1.Protos.CommandInfo.URI;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

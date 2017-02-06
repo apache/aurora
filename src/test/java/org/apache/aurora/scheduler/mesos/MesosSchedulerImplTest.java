@@ -39,17 +39,15 @@ import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
-import org.apache.mesos.Protos.ExecutorID;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.MasterInfo;
-import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.Protos.TaskState;
-import org.apache.mesos.Protos.TaskStatus;
-import org.apache.mesos.Protos.TaskStatus.Reason;
-import org.apache.mesos.Protos.TaskStatus.Source;
+import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.mesos.v1.Protos.FrameworkID;
+import org.apache.mesos.v1.Protos.OfferID;
+import org.apache.mesos.v1.Protos.TaskID;
+import org.apache.mesos.v1.Protos.TaskState;
+import org.apache.mesos.v1.Protos.TaskStatus;
+import org.apache.mesos.v1.Protos.TaskStatus.Reason;
+import org.apache.mesos.v1.Protos.TaskStatus.Source;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
@@ -58,7 +56,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
-import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.anyString;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -72,20 +69,23 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build();
 
   private static final String SLAVE_HOST = "slave-hostname";
-  private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("slave-id").build();
+  private static final Protos.SlaveID SLAVE_ID =
+      Protos.SlaveID.newBuilder().setValue("slave-id").build();
   private static final String SLAVE_HOST_2 = "slave-hostname-2";
-  private static final SlaveID SLAVE_ID_2 = SlaveID.newBuilder().setValue("slave-id-2").build();
-  private static final ExecutorID EXECUTOR_ID =
-      ExecutorID.newBuilder().setValue("executor-id").build();
+  private static final Protos.SlaveID SLAVE_ID_2 =
+      Protos.SlaveID.newBuilder().setValue("slave-id-2").build();
+  private static final Protos.ExecutorID EXECUTOR_ID =
+      Protos.ExecutorID.newBuilder().setValue("executor-id").build();
 
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("offer-id").build();
-  private static final HostOffer OFFER = new HostOffer(
-      Offer.newBuilder()
-          .setFrameworkId(FRAMEWORK)
+  private static final Protos.Offer OFFER = Protos.Offer.newBuilder()
+          .setFrameworkId(ProtosConversion.convert(FRAMEWORK))
           .setSlaveId(SLAVE_ID)
           .setHostname(SLAVE_HOST)
-          .setId(OFFER_ID)
-          .build(),
+          .setId(ProtosConversion.convert(OFFER_ID))
+          .build();
+  private static final HostOffer HOST_OFFER = new HostOffer(
+      ProtosConversion.convert(OFFER),
       IHostAttributes.build(
           new HostAttributes()
               .setHost(SLAVE_HOST)
@@ -93,12 +93,13 @@ public class MesosSchedulerImplTest extends EasyMockTest {
               .setMode(NONE)
               .setAttributes(ImmutableSet.of())));
   private static final OfferID OFFER_ID_2 = OfferID.newBuilder().setValue("offer-id-2").build();
-  private static final HostOffer OFFER_2 = new HostOffer(
-      Offer.newBuilder(OFFER.getOffer())
+  private static final Protos.Offer OFFER_2 = Protos.Offer.newBuilder(OFFER)
           .setSlaveId(SLAVE_ID_2)
           .setHostname(SLAVE_HOST_2)
-          .setId(OFFER_ID_2)
-          .build(),
+          .setId(ProtosConversion.convert(OFFER_ID_2))
+          .build();
+  private static final HostOffer HOST_OFFER_2 = new HostOffer(
+      ProtosConversion.convert(OFFER_2),
       IHostAttributes.build(
           new HostAttributes()
               .setHost(SLAVE_HOST_2)
@@ -108,7 +109,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
   private static final TaskStatus STATUS_NO_REASON = TaskStatus.newBuilder()
       .setState(TaskState.TASK_RUNNING)
-      .setSource(Source.SOURCE_SLAVE)
+      .setSource(Source.SOURCE_AGENT)
       .setMessage("message")
       .setTimestamp(1D)
       .setTaskId(TaskID.newBuilder().setValue("task-id").build())
@@ -192,8 +193,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new AbstractOfferTest() {
       @Override
       void respondToOffer() {
-        expectOfferAttributesSaved(OFFER);
-        offerManager.addOffer(OFFER);
+        expectOfferAttributesSaved(HOST_OFFER);
+        offerManager.addOffer(HOST_OFFER);
       }
     }.run();
   }
@@ -208,8 +209,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new AbstractOfferTest() {
       @Override
       void respondToOffer() {
-        expectOfferAttributesSaved(OFFER);
-        offerManager.addOffer(OFFER);
+        expectOfferAttributesSaved(HOST_OFFER);
+        offerManager.addOffer(HOST_OFFER);
       }
     }.run();
   }
@@ -220,14 +221,14 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override
       void respondToOffer() {
         IHostAttributes draining =
-            IHostAttributes.build(OFFER.getAttributes().newBuilder().setMode(DRAINING));
-        expect(storageUtil.attributeStore.getHostAttributes(OFFER.getOffer().getHostname()))
+            IHostAttributes.build(HOST_OFFER.getAttributes().newBuilder().setMode(DRAINING));
+        expect(storageUtil.attributeStore.getHostAttributes(HOST_OFFER.getOffer().getHostname()))
             .andReturn(Optional.of(draining));
         IHostAttributes saved = IHostAttributes.build(
-            Conversions.getAttributes(OFFER.getOffer()).newBuilder().setMode(DRAINING));
+            Conversions.getAttributes(HOST_OFFER.getOffer()).newBuilder().setMode(DRAINING));
         expect(storageUtil.attributeStore.saveHostAttributes(saved)).andReturn(true);
 
-        HostOffer offer = new HostOffer(OFFER.getOffer(), draining);
+        HostOffer offer = new HostOffer(HOST_OFFER.getOffer(), draining);
         offerManager.addOffer(offer);
       }
     }.run();
@@ -270,15 +271,18 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new AbstractRegisteredTest() {
       @Override
       void expectations() {
-        expectOfferAttributesSaved(OFFER);
-        expectOfferAttributesSaved(OFFER_2);
-        offerManager.addOffer(OFFER);
-        offerManager.addOffer(OFFER_2);
+        expectOfferAttributesSaved(HOST_OFFER);
+        expectOfferAttributesSaved(HOST_OFFER_2);
+        offerManager.addOffer(HOST_OFFER);
+        offerManager.addOffer(HOST_OFFER_2);
       }
 
       @Override
       void test() {
-        scheduler.resourceOffers(driver, ImmutableList.of(OFFER.getOffer(), OFFER_2.getOffer()));
+        scheduler.resourceOffers(driver,
+            ImmutableList.of(
+                ProtosConversion.convert(HOST_OFFER.getOffer()),
+                ProtosConversion.convert(HOST_OFFER_2.getOffer())));
       }
     }.run();
   }
@@ -321,7 +325,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testReregistered() {
     control.replay();
 
-    scheduler.reregistered(driver, MasterInfo.getDefaultInstance());
+    scheduler.reregistered(driver, Protos.MasterInfo.getDefaultInstance());
   }
 
   @Test
@@ -330,7 +334,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    scheduler.offerRescinded(driver, OFFER_ID);
+    scheduler.offerRescinded(driver, ProtosConversion.convert(OFFER_ID));
     assertEquals(1L, statsProvider.getLongValue("offers_rescinded"));
   }
 
@@ -413,7 +417,10 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
       control.replay();
 
-      scheduler.registered(driver, FRAMEWORK, MasterInfo.getDefaultInstance());
+      scheduler.registered(
+          driver,
+          ProtosConversion.convert(FRAMEWORK),
+          Protos.MasterInfo.getDefaultInstance());
       test();
     }
 
@@ -438,7 +445,9 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
     @Override
     void test() {
-      scheduler.resourceOffers(driver, ImmutableList.of(OFFER.getOffer()));
+      scheduler.resourceOffers(
+          driver,
+          ImmutableList.of(ProtosConversion.convert(HOST_OFFER.getOffer())));
     }
   }
 
@@ -456,7 +465,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
     @Override
     void test() {
-      scheduler.statusUpdate(driver, status);
+      scheduler.statusUpdate(driver, ProtosConversion.convert(status));
     }
   }
 

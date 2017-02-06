@@ -46,10 +46,10 @@ import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.Offer.Operation;
-import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.AgentID;
+import org.apache.mesos.v1.Protos.Offer.Operation;
+import org.apache.mesos.v1.Protos.OfferID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,7 +127,7 @@ public interface OfferManager extends EventSubscriber {
    * @param slaveId Slave ID to get offer for.
    * @return An offer for the slave ID.
    */
-  Optional<HostOffer> getOffer(SlaveID slaveId);
+  Optional<HostOffer> getOffer(AgentID slaveId);
 
   /**
    * Thrown when there was an unexpected failure trying to launch a task.
@@ -182,11 +182,11 @@ public interface OfferManager extends EventSubscriber {
       // them after the return delay.
       // There's also a chance that we return an offer for compaction ~simultaneously with the
       // same-host offer being canceled/returned.  This is also fine.
-      Optional<HostOffer> sameSlave = hostOffers.get(offer.getOffer().getSlaveId());
+      Optional<HostOffer> sameSlave = hostOffers.get(offer.getOffer().getAgentId());
       if (sameSlave.isPresent()) {
         // If there are existing offers for the slave, decline all of them so the master can
         // compact all of those offers into a single offer and send them back.
-        LOG.info("Returning offers for " + offer.getOffer().getSlaveId().getValue()
+        LOG.info("Returning offers for " + offer.getOffer().getAgentId().getValue()
             + " for compaction.");
         decline(offer.getOffer().getId());
         removeAndDecline(sameSlave.get().getOffer().getId());
@@ -239,7 +239,7 @@ public interface OfferManager extends EventSubscriber {
     }
 
     @Override
-    public Optional<HostOffer> getOffer(SlaveID slaveId) {
+    public Optional<HostOffer> getOffer(AgentID slaveId) {
       return hostOffers.get(slaveId);
     }
 
@@ -285,7 +285,7 @@ public interface OfferManager extends EventSubscriber {
 
       private final Set<HostOffer> offers = new ConcurrentSkipListSet<>(PREFERENCE_COMPARATOR);
       private final Map<OfferID, HostOffer> offersById = Maps.newHashMap();
-      private final Map<SlaveID, HostOffer> offersBySlave = Maps.newHashMap();
+      private final Map<AgentID, HostOffer> offersBySlave = Maps.newHashMap();
       private final Map<String, HostOffer> offersByHost = Maps.newHashMap();
       // TODO(maxim): Expose via a debug endpoint. AURORA-1136.
       // Keep track of offer->groupKey mappings that will never be matched to avoid redundant
@@ -299,14 +299,14 @@ public interface OfferManager extends EventSubscriber {
         statsProvider.makeGauge(STATICALLY_BANNED_OFFERS, () -> staticallyBannedOffers.size());
       }
 
-      synchronized Optional<HostOffer> get(SlaveID slaveId) {
+      synchronized Optional<HostOffer> get(AgentID slaveId) {
         return Optional.fromNullable(offersBySlave.get(slaveId));
       }
 
       synchronized void add(HostOffer offer) {
         offers.add(offer);
         offersById.put(offer.getOffer().getId(), offer);
-        offersBySlave.put(offer.getOffer().getSlaveId(), offer);
+        offersBySlave.put(offer.getOffer().getAgentId(), offer);
         offersByHost.put(offer.getOffer().getHostname(), offer);
       }
 
@@ -314,7 +314,7 @@ public interface OfferManager extends EventSubscriber {
         HostOffer removed = offersById.remove(id);
         if (removed != null) {
           offers.remove(removed);
-          offersBySlave.remove(removed.getOffer().getSlaveId());
+          offersBySlave.remove(removed.getOffer().getAgentId());
           offersByHost.remove(removed.getOffer().getHostname());
           staticallyBannedOffers.removeAll(id);
         }

@@ -27,7 +27,7 @@ import com.google.common.collect.Range;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.v1.Protos.Offer;
 
 import static java.util.stream.StreamSupport.stream;
 

@@ -44,15 +44,15 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.Protos.TaskInfo;
-import org.apache.mesos.Protos.Value.Range;
-import org.apache.mesos.Protos.Value.Ranges;
-import org.apache.mesos.Protos.Value.Type;
+import org.apache.mesos.v1.Protos.AgentID;
+import org.apache.mesos.v1.Protos.FrameworkID;
+import org.apache.mesos.v1.Protos.OfferID;
+import org.apache.mesos.v1.Protos.Resource;
+import org.apache.mesos.v1.Protos.TaskID;
+import org.apache.mesos.v1.Protos.TaskInfo;
+import org.apache.mesos.v1.Protos.Value.Range;
+import org.apache.mesos.v1.Protos.Value.Ranges;
+import org.apache.mesos.v1.Protos.Value.Type;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -70,7 +70,7 @@ import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.AS
 import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.ASSIGNER_LAUNCH_FAILURES;
 import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.LAUNCH_FAILED_MSG;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import static org.apache.mesos.Protos.Offer;
+import static org.apache.mesos.v1.Protos.Offer;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -82,7 +82,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
   private static final int PORT = 1000;
   private static final Offer MESOS_OFFER = offer(mesosRange(PORTS, PORT));
-  private static final String SLAVE_ID = MESOS_OFFER.getSlaveId().getValue();
+  private static final String SLAVE_ID = MESOS_OFFER.getAgentId().getValue();
   private static final HostOffer OFFER =
       new HostOffer(MESOS_OFFER, IHostAttributes.build(new HostAttributes()
           .setHost(MESOS_OFFER.getHostname())
@@ -93,7 +93,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
   private static final TaskInfo TASK_INFO = TaskInfo.newBuilder()
       .setName("taskName")
       .setTaskId(TaskID.newBuilder().setValue(Tasks.id(TASK)))
-      .setSlaveId(MESOS_OFFER.getSlaveId())
+      .setAgentId(MESOS_OFFER.getAgentId())
       .build();
   private static final Map<String, TaskGroupKey> NO_RESERVATION = ImmutableMap.of();
   private static final UnusedResource UNUSED = new UnusedResource(
@@ -103,7 +103,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
       Offer.newBuilder()
           .setId(OfferID.newBuilder().setValue("offerId0"))
               .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
-              .setSlaveId(SlaveID.newBuilder().setValue("slaveId0"))
+              .setAgentId(AgentID.newBuilder().setValue("slaveId0"))
               .setHostname("hostName0")
           .addResources(Resource.newBuilder()
           .setName("ports")
@@ -319,7 +319,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         Offer.newBuilder()
             .setId(OfferID.newBuilder().setValue("offerId0"))
             .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
-            .setSlaveId(SlaveID.newBuilder().setValue("slaveId0"))
+            .setAgentId(AgentID.newBuilder().setValue("slaveId0"))
             .setHostname("hostName0")
             .addResources(Resource.newBuilder()
                 .setName("ports")
@@ -380,7 +380,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         eq(storeProvider),
         eq(Tasks.id(TASK)),
         eq(offer.getHostname()),
-        eq(offer.getSlaveId()),
+        eq(offer.getAgentId()),
         anyObject())).andReturn(TASK.getAssignedTask());
   }
 }

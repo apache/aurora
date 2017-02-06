@@ -18,7 +18,7 @@ import java.util.Collection;
 import com.google.common.util.concurrent.AbstractIdleService;
 
 import org.apache.aurora.scheduler.mesos.Driver;
-import org.apache.mesos.Protos;
+import org.apache.mesos.v1.Protos;
 
 public class FakeDriver extends AbstractIdleService implements Driver {
   @Override

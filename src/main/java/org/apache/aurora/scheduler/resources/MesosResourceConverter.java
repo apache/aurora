@@ -21,8 +21,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import org.apache.aurora.scheduler.base.Numbers;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.Resource;
 
 import static org.apache.aurora.scheduler.base.Numbers.RANGE_TRANSFORM;
 

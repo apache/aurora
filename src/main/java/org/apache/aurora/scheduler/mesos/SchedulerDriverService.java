@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Futures;
@@ -27,12 +28,15 @@ import com.google.common.util.concurrent.SettableFuture;
 
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.FrameworkInfo;
+import org.apache.mesos.Protos.Filters;
 import org.apache.mesos.Protos.Offer.Operation;
+import org.apache.mesos.Protos.OfferID;
+import org.apache.mesos.Protos.Status;
+import org.apache.mesos.Protos.TaskID;
+import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.apache.mesos.v1.Protos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,11 +83,11 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
       LOG.warn("Connecting to master without authentication!");
     }
 
-    FrameworkInfo.Builder frameworkBuilder = driverSettings.getFrameworkInfo().toBuilder();
+    Protos.FrameworkInfo.Builder frameworkBuilder = driverSettings.getFrameworkInfo().toBuilder();
 
     if (frameworkId.isPresent()) {
       LOG.info("Found persisted framework ID: " + frameworkId);
-      frameworkBuilder.setId(FrameworkID.newBuilder().setValue(frameworkId.get()));
+      frameworkBuilder.setId(Protos.FrameworkID.newBuilder().setValue(frameworkId.get()));
     } else {
       LOG.warn("Did not find a persisted framework ID, connecting as a new framework.");
     }
@@ -93,7 +97,7 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
         driverSettings.getCredentials(),
         frameworkBuilder.build(),
         driverSettings.getMasterUri());
-    Protos.Status status = schedulerDriver.start();
+    Status status = schedulerDriver.start();
     LOG.info("Driver started with code " + status);
 
     driverFuture.set(schedulerDriver);
@@ -119,25 +123,34 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
   @Override
   public void acceptOffers(
       Protos.OfferID offerId,
-      Collection<Operation> operations,
+      Collection<Protos.Offer.Operation> operations,
       Protos.Filters filter) {
     ensureRunning();
 
+    OfferID convertedOfferId = ProtosConversion.convert(offerId);
+    Collection<Operation> convertedOperations =
+        Collections2.transform(operations, ProtosConversion::convert);
+    Filters convertedFilter = ProtosConversion.convert(filter);
+
     Futures.getUnchecked(driverFuture)
-        .acceptOffers(ImmutableList.of(offerId), operations, filter);
+        .acceptOffers(ImmutableList.of(convertedOfferId), convertedOperations, convertedFilter);
   }
 
   @Override
   public void declineOffer(Protos.OfferID offerId, Protos.Filters filter) {
     ensureRunning();
-    Futures.getUnchecked(driverFuture).declineOffer(offerId, filter);
+
+    OfferID convertedOfferId = ProtosConversion.convert(offerId);
+    Filters convertedFilter = ProtosConversion.convert(filter);
+
+    Futures.getUnchecked(driverFuture).declineOffer(convertedOfferId, convertedFilter);
   }
 
   @Override
   public void killTask(String taskId) {
     ensureRunning();
-    Protos.Status status = Futures.getUnchecked(driverFuture).killTask(
-        Protos.TaskID.newBuilder().setValue(taskId).build());
+    Status status = Futures.getUnchecked(driverFuture).killTask(
+        TaskID.newBuilder().setValue(taskId).build());
 
     if (status != DRIVER_RUNNING) {
       LOG.error("Attempt to kill task {} failed with code {}", taskId, status);
@@ -148,13 +161,18 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
   @Override
   public void acknowledgeStatusUpdate(Protos.TaskStatus status) {
     ensureRunning();
-    Futures.getUnchecked(driverFuture).acknowledgeStatusUpdate(status);
+
+    TaskStatus convertedStatus = ProtosConversion.convert(status);
+    Futures.getUnchecked(driverFuture).acknowledgeStatusUpdate(convertedStatus);
   }
 
   @Override
   public void reconcileTasks(Collection<Protos.TaskStatus> statuses) {
     ensureRunning();
-    Futures.getUnchecked(driverFuture).reconcileTasks(statuses);
+
+    Collection<TaskStatus> convertedStatuses =
+        Collections2.transform(statuses, ProtosConversion::convert);
+    Futures.getUnchecked(driverFuture).reconcileTasks(convertedStatuses);
   }
 
   private void ensureRunning() {

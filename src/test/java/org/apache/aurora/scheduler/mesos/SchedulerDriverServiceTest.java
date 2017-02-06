@@ -17,15 +17,16 @@ import com.google.common.base.Optional;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-import org.apache.mesos.Protos;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.apache.mesos.Protos.Status.DRIVER_ABORTED;
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
+import static org.apache.mesos.Protos.TaskID;
+import static org.apache.mesos.v1.Protos.FrameworkID;
+import static org.apache.mesos.v1.Protos.FrameworkInfo;
 import static org.easymock.EasyMock.expect;
 
 public class SchedulerDriverServiceTest extends EasyMockTest {
@@ -50,8 +51,8 @@ public class SchedulerDriverServiceTest extends EasyMockTest {
   private Driver driverService;
   private SchedulerDriver schedulerDriver;
 
-  private static Protos.TaskID createTaskId(String taskId) {
-    return Protos.TaskID.newBuilder().setValue(taskId).build();
+  private static TaskID createTaskId(String taskId) {
+    return TaskID.newBuilder().setValue(taskId).build();
   }
 
   @Before
@@ -136,7 +137,7 @@ public class SchedulerDriverServiceTest extends EasyMockTest {
 
     FrameworkInfo.Builder builder = SETTINGS.getFrameworkInfo().toBuilder();
     if (frameworkId.isPresent()) {
-      builder.setId(Protos.FrameworkID.newBuilder().setValue(frameworkId.get()));
+      builder.setId(FrameworkID.newBuilder().setValue(frameworkId.get()));
     }
 
     expect(driverFactory.create(

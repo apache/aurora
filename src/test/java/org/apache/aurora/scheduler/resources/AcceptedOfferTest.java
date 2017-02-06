@@ -23,8 +23,8 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.Resource;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.Resource;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;

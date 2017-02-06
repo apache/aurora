@@ -37,10 +37,10 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.Filters;
-import org.apache.mesos.Protos.Offer.Operation;
-import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.Filters;
+import org.apache.mesos.v1.Protos.Offer.Operation;
+import org.apache.mesos.v1.Protos.TaskInfo;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -84,7 +84,7 @@ public class OfferManagerImplTest extends EasyMockTest {
   private static final TaskInfo TASK_INFO = TaskInfo.newBuilder()
       .setName("taskName")
       .setTaskId(Protos.TaskID.newBuilder().setValue(Tasks.id(TASK)))
-      .setSlaveId(MESOS_OFFER.getSlaveId())
+      .setAgentId(MESOS_OFFER.getAgentId())
       .build();
   private static Operation launch = Operation.newBuilder()
       .setType(Operation.Type.LAUNCH)
@@ -280,7 +280,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     control.replay();
 
     offerManager.addOffer(OFFER_A);
-    assertEquals(Optional.of(OFFER_A), offerManager.getOffer(OFFER_A.getOffer().getSlaveId()));
+    assertEquals(Optional.of(OFFER_A), offerManager.getOffer(OFFER_A.getOffer().getAgentId()));
     assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     clock.advance(RETURN_DELAY);
   }

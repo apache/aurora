@@ -24,9 +24,9 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IResource;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.Value.Scalar;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.Offer;
+import org.apache.mesos.v1.Protos.Value.Scalar;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.Resource.diskMb;
@@ -44,7 +44,7 @@ import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
-import static org.apache.mesos.Protos.Value.Type.SCALAR;
+import static org.apache.mesos.v1.Protos.Value.Type.SCALAR;
 import static org.junit.Assert.assertEquals;
 
 public class ResourceManagerTest {
@@ -72,7 +72,7 @@ public class ResourceManagerTest {
     Offer offer = Offer.newBuilder()
         .setId(Protos.OfferID.newBuilder().setValue("offer-id"))
         .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("framework-id"))
-        .setSlaveId(Protos.SlaveID.newBuilder().setValue("slave-id"))
+        .setAgentId(Protos.AgentID.newBuilder().setValue("slave-id"))
         .setHostname("hostname")
         .addAllResources(ImmutableSet.of(resource1, resource2, resource3)).build();
 

@@ -27,7 +27,7 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
 import static org.apache.aurora.scheduler.resources.ResourceManager.getOfferResources;
-import static org.apache.mesos.Protos.Offer;
+import static org.apache.mesos.v1.Protos.Offer;
 
 /**
  * An available resource in the cluster.

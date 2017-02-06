@@ -27,7 +27,7 @@ import com.google.common.collect.Sets;
 
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.scheduler.storage.entities.IRange;
-import org.apache.mesos.Protos;
+import org.apache.mesos.v1.Protos;
 
 /**
  * Utility class for working with numbers.
@@ -43,9 +43,9 @@ public final class Numbers {
           .build();
 
   /**
-   * Convert {@link org.apache.mesos.Protos.Value.Range} to set of integers.
+   * Convert {@link org.apache.mesos.v1.Protos.Value.Range} to set of integers.
    */
-  public static final Function<org.apache.mesos.Protos.Value.Range, Set<Integer>> RANGE_TO_MEMBERS =
+  public static final Function<Protos.Value.Range, Set<Integer>> RANGE_TO_MEMBERS =
       range -> ContiguousSet.create(
           Range.closed((int) range.getBegin(), (int) range.getEnd()),
           DiscreteDomain.integers());

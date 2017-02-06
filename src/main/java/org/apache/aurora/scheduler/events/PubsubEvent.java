@@ -26,8 +26,8 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.TaskStatus;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.TaskStatus;
 
 import static java.util.Objects.requireNonNull;
 

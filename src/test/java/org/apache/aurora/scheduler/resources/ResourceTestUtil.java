@@ -28,8 +28,8 @@ import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.Value.Type;
+import org.apache.mesos.v1.Protos;
+import org.apache.mesos.v1.Protos.Value.Type;
 
 import static org.apache.aurora.gen.Resource.diskMb;
 import static org.apache.aurora.gen.Resource.numCpus;
@@ -136,7 +136,7 @@ public final class ResourceTestUtil {
     return Protos.Offer.newBuilder()
         .setId(Protos.OfferID.newBuilder().setValue("offer-id"))
         .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("framework-id"))
-        .setSlaveId(Protos.SlaveID.newBuilder().setValue("slave-id"))
+        .setAgentId(Protos.AgentID.newBuilder().setValue("slave-id"))
         .setHostname("hostname")
         .addAllResources(ImmutableSet.copyOf(resources)).build();
   }
