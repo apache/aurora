@@ -85,7 +85,7 @@ class SchedulerThriftApiSpec(ReadOnlyScheduler.Iface):
   def restartShards(self, job, shardIds):
     pass
 
-  def killTasks(self, jobKey, instances):
+  def killTasks(self, jobKey, instances, message):
     pass
 
   def addInstances(self, key, count):

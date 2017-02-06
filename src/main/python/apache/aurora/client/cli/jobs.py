@@ -305,7 +305,9 @@ class AbstractKillCommand(Verb):
         CONFIG_OPTION,
         BATCH_OPTION,
         MAX_TOTAL_FAILURES_OPTION,
-        NO_BATCHING_OPTION]
+        NO_BATCHING_OPTION,
+        CommandOption('--message', '-m', type=str, default=None,
+                      help='Message to include with the kill state transition')]
 
   def wait_kill_tasks(self, context, scheduler, job_key, instances=None):
     monitor = JobMonitor(scheduler, job_key)
@@ -331,7 +333,7 @@ class AbstractKillCommand(Verb):
       batch = []
       for i in range(min(context.options.batch_size, len(instances_to_kill))):
         batch.append(instances_to_kill.pop())
-      resp = api.kill_job(job, batch, config=config)
+      resp = api.kill_job(job, batch, config=config, message=context.options.message)
       # Short circuit max errors in this case as it's most likely a fatal repeatable error.
       context.log_response_and_raise(
         resp,
@@ -412,7 +414,7 @@ class KillCommand(AbstractKillCommand):
     api = context.get_api(job.cluster)
     config = context.get_job_config_optional(job, context.options.config)
     if context.options.no_batching:
-      resp = api.kill_job(job, instances_arg, config=config)
+      resp = api.kill_job(job, instances_arg, config=config, message=context.options.message)
       context.log_response_and_raise(resp)
       wait_result = self.wait_kill_tasks(context, api.scheduler_proxy, job, instances_arg)
       if wait_result is not EXIT_OK:
@@ -442,7 +444,7 @@ class KillAllJobCommand(AbstractKillCommand):
     api = context.get_api(job.cluster)
     config = context.get_job_config_optional(job, context.options.config)
     if context.options.no_batching:
-      resp = api.kill_job(job, None, config=config)
+      resp = api.kill_job(job, None, config=config, message=context.options.message)
       context.log_response_and_raise(resp)
       wait_result = self.wait_kill_tasks(context, api.scheduler_proxy, job)
       if wait_result is not EXIT_OK:

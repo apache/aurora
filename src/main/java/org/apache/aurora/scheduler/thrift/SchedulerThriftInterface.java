@@ -487,7 +487,11 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response killTasks(@Nullable JobKey mutableJob, @Nullable Set<Integer> instances) {
+  public Response killTasks(
+      @Nullable JobKey mutableJob,
+      @Nullable Set<Integer> instances,
+      @Nullable String message) {
+
     Response response = empty();
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJob));
     Query.Builder query;
@@ -514,7 +518,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
             taskId,
             Optional.absent(),
             ScheduleStatus.KILLING,
-            auditMessages.killedByRemoteUser())) {
+            auditMessages.killedByRemoteUser(Optional.fromNullable(message)))) {
           ++tasksKilled;
         }
       }

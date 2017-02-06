@@ -697,7 +697,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private void expectTransitionsToKilling() {
-    expect(auditMessages.killedByRemoteUser()).andReturn(Optional.of("test"));
+    expectTransitionsToKilling(Optional.absent());
+  }
+
+  private void expectTransitionsToKilling(Optional<String> message) {
+    expect(auditMessages.killedByRemoteUser(message)).andReturn(Optional.of("test"));
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID,
@@ -715,7 +719,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertOkResponse(thrift.killTasks(JOB_KEY.newBuilder(), null));
+    assertOkResponse(thrift.killTasks(JOB_KEY.newBuilder(), null, null));
     assertEquals(1L, statsProvider.getLongValue(KILL_TASKS));
   }
 
@@ -728,7 +732,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertOkResponse(thrift.killTasks(JOB_KEY.newBuilder(), ImmutableSet.of(1)));
+    assertOkResponse(thrift.killTasks(JOB_KEY.newBuilder(), ImmutableSet.of(1), null));
     assertEquals(1L, statsProvider.getLongValue(KILL_TASKS));
   }
 
@@ -747,7 +751,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertResponse(
         LOCK_ERROR,
-        thrift.killTasks(JOB_KEY.newBuilder(), null));
+        thrift.killTasks(JOB_KEY.newBuilder(), null, null));
     assertEquals(0L, statsProvider.getLongValue(KILL_TASKS));
   }
 
@@ -758,10 +762,23 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    Response response = thrift.killTasks(JOB_KEY.newBuilder(), null);
+    Response response = thrift.killTasks(JOB_KEY.newBuilder(), null, null);
     assertOkResponse(response);
     assertMessageMatches(response, SchedulerThriftInterface.NO_TASKS_TO_KILL_MESSAGE);
     assertEquals(0L, statsProvider.getLongValue(KILL_TASKS));
+  }
+
+  @Test
+  public void testKillTasksWithMessage() throws Exception {
+    String message = "Test message";
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
+    storageUtil.expectTaskFetch(query, buildScheduledTask());
+    lockManager.assertNotLocked(LOCK_KEY);
+    expectTransitionsToKilling(Optional.of(message));
+
+    control.replay();
+
+    assertOkResponse(thrift.killTasks(JOB_KEY.newBuilder(), null, message));
   }
 
   @Test

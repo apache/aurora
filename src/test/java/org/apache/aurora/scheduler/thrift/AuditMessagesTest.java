@@ -22,6 +22,7 @@ import org.junit.Test;
 import static org.apache.aurora.scheduler.thrift.AuditMessages.DEFAULT_USER;
 import static org.easymock.EasyMock.expect;
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 public class AuditMessagesTest extends EasyMockTest {
@@ -31,7 +32,9 @@ public class AuditMessagesTest extends EasyMockTest {
 
     control.replay();
 
-    assertThat(emptyMessages.killedByRemoteUser().get(), containsString(DEFAULT_USER));
+    assertThat(emptyMessages.killedByRemoteUser(
+        com.google.common.base.Optional.absent()).get(),
+        containsString(DEFAULT_USER));
     assertThat(emptyMessages.restartedByRemoteUser().get(), containsString(DEFAULT_USER));
     assertThat(emptyMessages.transitionedBy().get(), containsString(DEFAULT_USER));
   }
@@ -45,8 +48,27 @@ public class AuditMessagesTest extends EasyMockTest {
 
     control.replay();
 
-    assertThat(presentMessages.killedByRemoteUser().get(), containsString("shiro"));
+    assertThat(presentMessages.killedByRemoteUser(
+        com.google.common.base.Optional.absent()).get(),
+        containsString("shiro"));
     assertThat(presentMessages.restartedByRemoteUser().get(), containsString("shiro"));
     assertThat(presentMessages.transitionedBy().get(), containsString("shiro"));
+  }
+
+  @Test
+  public void testKilledByRemoteUserMessages() {
+    Subject subject = createMock(Subject.class);
+    AuditMessages messages = new AuditMessages(() -> Optional.of(subject));
+
+    expect(subject.getPrincipal()).andReturn("shiro").times(2);
+
+    control.replay();
+
+    assertEquals(messages.killedByRemoteUser(
+        com.google.common.base.Optional.of("Test message")).get(),
+        "Killed by shiro.\nTest message");
+    assertEquals(messages.killedByRemoteUser(
+        com.google.common.base.Optional.absent()).get(),
+        "Killed by shiro");
   }
 }

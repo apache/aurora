@@ -225,7 +225,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
 
   private void assertKillTasksFails(AuroraAdmin.Client client) throws TException {
     try {
-      client.killTasks(null, null);
+      client.killTasks(null, null, null);
       fail("killTasks should fail.");
     } catch (TTransportException e) {
       // Expected.
@@ -236,44 +236,45 @@ public class HttpSecurityIT extends AbstractJettyTest {
   public void testAuroraSchedulerManager() throws TException, ServletException, IOException {
     JobKey job = JobKeys.from("role", "env", "name").newBuilder();
 
-    expect(auroraAdmin.killTasks(job, null)).andReturn(OK).times(2);
-    expect(auroraAdmin.killTasks(ADS_STAGING_JOB.newBuilder(), null)).andReturn(OK);
+    expect(auroraAdmin.killTasks(job, null, null)).andReturn(OK).times(2);
+    expect(auroraAdmin.killTasks(ADS_STAGING_JOB.newBuilder(), null, null)).andReturn(OK);
     expectShiroAfterAuthFilter().atLeastOnce();
 
     replayAndStart();
 
     assertEquals(
         OK,
-        getAuthenticatedClient(WFARNER).killTasks(job, null));
+        getAuthenticatedClient(WFARNER).killTasks(job, null, null));
     assertEquals(
         OK,
-        getAuthenticatedClient(ROOT).killTasks(job, null));
+        getAuthenticatedClient(ROOT).killTasks(job, null, null));
 
     assertEquals(
         ResponseCode.INVALID_REQUEST,
-        getAuthenticatedClient(UNPRIVILEGED).killTasks(null, null).getResponseCode());
+        getAuthenticatedClient(UNPRIVILEGED).killTasks(null, null, null).getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(UNPRIVILEGED)
-            .killTasks(job, null)
+            .killTasks(job, null, null)
             .getResponseCode());
     assertEquals(
         ResponseCode.INVALID_REQUEST,
-        getAuthenticatedClient(BACKUP_SERVICE).killTasks(null, null).getResponseCode());
+        getAuthenticatedClient(BACKUP_SERVICE).killTasks(null, null, null).getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(BACKUP_SERVICE)
-            .killTasks(job, null)
+            .killTasks(job, null, null)
             .getResponseCode());
     assertEquals(
         ResponseCode.AUTH_FAILED,
         getAuthenticatedClient(DEPLOY_SERVICE)
-            .killTasks(job, null)
+            .killTasks(job, null, null)
             .getResponseCode());
     assertEquals(
         OK,
         getAuthenticatedClient(DEPLOY_SERVICE).killTasks(
             ADS_STAGING_JOB.newBuilder(),
+            null,
             null));
 
     assertKillTasksFails(getUnauthenticatedClient());

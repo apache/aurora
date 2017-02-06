@@ -124,7 +124,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
 
     assertEquals(
         ResponseCode.AUTH_FAILED,
-        decoratedThrift.killTasks(JOB_KEY.newBuilder(), null).getResponseCode());
+        decoratedThrift.killTasks(JOB_KEY.newBuilder(), null, null).getResponseCode());
   }
 
   @Test
@@ -135,7 +135,7 @@ public class ShiroAuthorizingParamInterceptorTest extends EasyMockTest {
         ResponseCode.INVALID_REQUEST,
         decoratedThrift.killTasks(
             JOB_KEY.newBuilder().setName(null),
-            null).getResponseCode());
+            null, null).getResponseCode());
   }
 
   @Test

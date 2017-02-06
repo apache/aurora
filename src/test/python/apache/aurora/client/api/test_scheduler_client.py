@@ -138,9 +138,9 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.make_scheduler_proxy().getJobs(ROLE)
 
   def test_killTasks(self):
-    self.mock_thrift_client.killTasks(IsA(JobKey), IgnoreArg()).AndReturn(DEFAULT_RESPONSE)
+    self.mock_thrift_client.killTasks(IsA(JobKey), IgnoreArg(), None).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().killTasks(JobKey(), {0})
+    self.make_scheduler_proxy().killTasks(JobKey(), {0}, None)
 
   def test_getQuota(self):
     self.mock_thrift_client.getQuota(IgnoreArg()).AndReturn(DEFAULT_RESPONSE)
@@ -195,11 +195,11 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.make_scheduler_proxy().pulseJobUpdate('update_id')
 
   def test_raise_auth_error(self):
-    self.mock_thrift_client.killTasks(None, None).AndRaise(TRequestsTransport.AuthError())
+    self.mock_thrift_client.killTasks(None, None, None).AndRaise(TRequestsTransport.AuthError())
     self.mock_scheduler_client.get_failed_auth_message().AndReturn('failed auth')
     self.mox.ReplayAll()
     with pytest.raises(scheduler_client.SchedulerProxy.AuthError):
-      self.make_scheduler_proxy().killTasks(None, None)
+      self.make_scheduler_proxy().killTasks(None, None, None)
 
 
 class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
@@ -471,7 +471,7 @@ class TestSchedulerClient(unittest.TestCase):
     client.get.return_value = mock_scheduler_client
 
     proxy = scheduler_client.SchedulerProxy(Cluster(name='local'))
-    proxy.killTasks(JobKey(), None)
+    proxy.killTasks(JobKey(), None, None)
 
     assert mock_thrift_client.killTasks.call_count == 3
 

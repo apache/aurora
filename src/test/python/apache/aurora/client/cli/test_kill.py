@@ -70,7 +70,8 @@ class TestKillCommand(AuroraClientCommandTest):
     mock_api.kill_job.assert_called_once_with(
         self.TEST_JOBKEY,
         mock_options.instance_spec.instance,
-        config=None)
+        config=None,
+        message=None)
 
     self.assert_lock_message(fake_context)
 
@@ -98,7 +99,8 @@ class TestKillCommand(AuroraClientCommandTest):
     mock_api.kill_job.assert_called_once_with(
         self.TEST_JOBKEY,
         mock_options.instance_spec.instance,
-        config=None)
+        config=None,
+        message=None)
 
     self.assert_lock_message(fake_context)
 
@@ -174,7 +176,7 @@ class TestKillCommand(AuroraClientCommandTest):
     command.execute(fake_context)
 
     assert mock_api.kill_job.mock_calls == [
-        call(self.TEST_JOBKEY, mock_options.instance_spec.instance, config=config)
+        call(self.TEST_JOBKEY, mock_options.instance_spec.instance, config=config, message=None)
     ]
 
   def test_kill_batched_passes_config(self):
@@ -197,11 +199,10 @@ class TestKillCommand(AuroraClientCommandTest):
 
     mock_api = fake_context.get_api('test')
     mock_api.kill_job.return_value = self.create_simple_success_response()
-
     command.execute(fake_context)
 
     assert mock_api.kill_job.mock_calls == [
-        call(self.TEST_JOBKEY, mock_options.instance_spec.instance, config=config)
+        call(self.TEST_JOBKEY, mock_options.instance_spec.instance, config=config, message=None)
     ]
 
 
@@ -226,7 +227,9 @@ class TestKillAllCommand(AuroraClientCommandTest):
 
     command.execute(fake_context)
 
-    assert mock_api.kill_job.mock_calls == [call(self.TEST_JOBKEY, None, config=config)]
+    assert mock_api.kill_job.mock_calls == [
+        call(self.TEST_JOBKEY, None, config=config, message=None)
+    ]
 
 
 class TestClientKillCommand(AuroraClientCommandTest):
@@ -246,11 +249,14 @@ class TestClientKillCommand(AuroraClientCommandTest):
     return mock_monitor
 
   @classmethod
-  def assert_kill_calls(cls, api, instance_range=None, instances=None):
+  def assert_kill_calls(cls, api, instance_range=None, instances=None, message=None):
     if instances:
-      kill_calls = [call(cls.TEST_JOBKEY, instances, config=None)]
+      kill_calls = [call(cls.TEST_JOBKEY, instances, config=None, message=message)]
     else:
-      kill_calls = [call(cls.TEST_JOBKEY, [i], config=None) for i in instance_range]
+      kill_calls = [
+          call(cls.TEST_JOBKEY, [i], config=None, message=message)
+          for i in instance_range
+      ]
     assert api.kill_job.mock_calls == kill_calls
 
   @classmethod
@@ -263,7 +269,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_kill_call_no_instances(cls, api):
-    assert api.kill_job.mock_calls == [call(cls.TEST_JOBKEY, None, config=None)]
+    assert api.kill_job.mock_calls == [call(cls.TEST_JOBKEY, None, config=None, message=None)]
 
   @classmethod
   def assert_query(cls, fake_api):
@@ -303,7 +309,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'killall', self.TEST_JOBSPEC])
 
-      self.assert_kill_calls(api, instance_range=range(20))
+      self.assert_kill_calls(api, instance_range=range(20), message=None)
       self.assert_wait_calls(mock_monitor, m.terminal, instance_range=range(20))
       self.assert_query(api)
 
@@ -320,7 +326,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
       cmd.execute(['job', 'kill', '--no-batching', self.get_instance_spec('0,2,4-6')])
 
       instances = [0, 2, 4, 5, 6]
-      self.assert_kill_calls(api, instances=instances)
+      self.assert_kill_calls(api, instances=instances, message=None)
       self.assert_wait_calls(mock_monitor, m.terminal, instances=instances)
 
   def test_kill_job_with_invalid_instances_strict(self):
@@ -348,7 +354,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'kill', '--no-batching', self.get_instance_spec('0,2,4-6,11-13')])
       instances = [0, 2, 4, 5, 6, 11, 12, 13]
-      self.assert_kill_calls(api, instances=instances)
+      self.assert_kill_calls(api, instances=instances, message=None)
       self.assert_wait_calls(mock_monitor, m.terminal, instances=instances)
 
   def test_kill_job_with_instances_batched(self):
@@ -386,7 +392,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
       cmd.execute(['job', 'kill', '--max-total-failures=1', self.get_instance_spec('0-4')])
 
       # We should have aborted after the second batch.
-      self.assert_kill_calls(api, instance_range=range(2))
+      self.assert_kill_calls(api, instance_range=range(2), message=None)
       self.assert_query(api)
 
   def test_kill_job_with_empty_instances_batched(self):
@@ -455,3 +461,19 @@ class TestClientKillCommand(AuroraClientCommandTest):
          'Instances [0, 2, 4, 5, 6] were not killed in time',
          'Instances [7, 8, 9, 10, 11] were not killed in time',
          'Exceeded maximum number of errors while killing instances']
+
+  def test_kill_job_with_message(self):
+    """Test kill client-side API logic."""
+    mock_context = FakeAuroraCommandContext()
+    mock_monitor = self.get_monitor_mock()
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor)) as (_, m):
+      api = mock_context.get_api('west')
+      api.kill_job.return_value = self.create_simple_success_response()
+      cmd = AuroraCommandLine()
+      message = 'Test message'
+      cmd.execute(['job', 'kill', '--no-batch', '--message', message, self.get_instance_spec('0')])
+
+      instances = [0]
+      self.assert_kill_calls(api, instances=instances, message=message)

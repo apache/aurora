@@ -269,9 +269,11 @@ test_run() {
 
 test_kill() {
   local _jobkey=$1
+  shift 1
+  local _extra_args="${@}"
 
-  aurora job kill $_jobkey/1
-  aurora job killall $_jobkey
+  aurora job kill $_jobkey/1 $_extra_args
+  aurora job killall $_jobkey $_extra_args
 }
 
 test_quota() {
@@ -563,6 +565,8 @@ TEST_DAEMONIZING_PROCESS_ARGS=(
   $TEST_DAEMONIZING_PROCESS_CONFIG_FILE
 )
 
+TEST_JOB_KILL_MESSAGE_ARGS=("${TEST_JOB_ARGS[@]}" "--message='Test message'")
+
 trap collect_result EXIT
 
 aurorabuild all
@@ -577,6 +581,8 @@ test_health_check
 test_http_example_basic "${TEST_JOB_REVOCABLE_ARGS[@]}"
 
 test_http_example_basic "${TEST_JOB_GPU_ARGS[@]}"
+
+test_http_example_basic "${TEST_JOB_KILL_MESSAGE_ARGS[@]}"
 
 test_http_example "${TEST_JOB_DOCKER_ARGS[@]}"
 

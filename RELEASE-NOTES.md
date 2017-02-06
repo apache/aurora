@@ -1,3 +1,10 @@
+0.18.0
+=====
+
+### New/updated:
+
+- Add message parameter to `killTasks` RPC.
+
 0.17.0
 ======
 

@@ -52,8 +52,9 @@ class NonHookedAuroraClientAPI(AuroraClientAPI):
   def add_instances(self, job_key, instance_id, count, config=None):
     return super(NonHookedAuroraClientAPI, self).add_instances(job_key, instance_id, count)
 
-  def kill_job(self, job_key, instances=None, config=None):
-    return super(NonHookedAuroraClientAPI, self).kill_job(job_key, instances=instances)
+  def kill_job(self, job_key, instances=None, config=None, message=None):
+    return super(NonHookedAuroraClientAPI, self).kill_job(job_key, instances=instances,
+                                                          message=message)
 
   def restart(self, job_key, shards, restart_settings, config=None):
     return super(NonHookedAuroraClientAPI, self).restart(job_key, shards, restart_settings)
@@ -162,10 +163,10 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
         _partial(super(HookedAuroraClientAPI, self).add_instances,
             job_key, instance_id, count, config=config))
 
-  def kill_job(self, job_key, instances=None, config=None):
+  def kill_job(self, job_key, instances=None, config=None, message=None):
     return self._hooked_call(config, job_key,
         _partial(super(HookedAuroraClientAPI, self).kill_job,
-            job_key, instances=instances, config=config))
+            job_key, instances=instances, config=config, message=message))
 
   def restart(self, job_key, shards, restart_settings, config=None):
     return self._hooked_call(config, job_key,

@@ -106,7 +106,7 @@ class AuroraClientAPI(object):
              % (count, job_key, instance_id))
     return self._scheduler_proxy.addInstances(key, count)
 
-  def kill_job(self, job_key, instances=None):
+  def kill_job(self, job_key, instances=None, message=None):
     log.info("Killing tasks for job: %s" % job_key)
     self._assert_valid_job_key(job_key)
 
@@ -114,7 +114,7 @@ class AuroraClientAPI(object):
       log.info("Instances to be killed: %s" % instances)
       instances = frozenset([int(s) for s in instances])
 
-    return self._scheduler_proxy.killTasks(job_key.to_thrift(), instances)
+    return self._scheduler_proxy.killTasks(job_key.to_thrift(), instances, message)
 
   def check_status(self, job_key):
     self._assert_valid_job_key(job_key)

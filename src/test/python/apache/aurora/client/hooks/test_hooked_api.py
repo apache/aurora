@@ -58,7 +58,7 @@ def test_api_methods_params(method_name):
     assert api_argspec.varargs == nonhooked_argspec.varargs
     assert api_argspec.keywords == nonhooked_argspec.keywords
     assert len(api_argspec.args) + 1 == len(nonhooked_argspec.args)
-    assert nonhooked_argspec.args[len(api_argspec.args)] == 'config'
+    assert 'config' in nonhooked_argspec.args
     if api_argspec.defaults is None:
       assert len(nonhooked_argspec.defaults) == 1
       assert nonhooked_argspec.defaults[0] is None

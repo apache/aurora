@@ -1075,7 +1075,7 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   Response restartShards(5: JobKey job, 3: set<i32> shardIds)
 
   /** Initiates a kill on tasks. */
-  Response killTasks(4: JobKey job, 5: set<i32> instances)
+  Response killTasks(4: JobKey job, 5: set<i32> instances, 6: string message)
 
   /**
    * Adds new instances with the TaskConfig of the existing instance pointed by the key.
