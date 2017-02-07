@@ -423,12 +423,12 @@ tasks.withType(FindBugs) {
     xml.enabled = false
     html.enabled = true
   }
-  maxHeapSize = '1g'
+  maxHeapSize = '2g'
   excludeFilter = rootProject.file('config/findbugs/excludeFilter.xml')
 }
 
 pmd {
-  toolVersion = '5.5.2'
+  toolVersion = '5.5.3'
   consoleOutput = true
 }
 
