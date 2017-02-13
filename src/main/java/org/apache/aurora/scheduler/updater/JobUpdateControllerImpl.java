@@ -663,7 +663,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
                 instructions,
                 storeProvider,
                 stateManager,
-                updaterStatus);
+                updaterStatus,
+                key);
             if (reevaluateDelay.isPresent()) {
               executor.schedule(
                   getDeferredEvaluator(instance, key),

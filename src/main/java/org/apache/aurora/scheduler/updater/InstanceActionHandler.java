@@ -28,6 +28,7 @@ import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -44,7 +45,8 @@ interface InstanceActionHandler {
       IJobUpdateInstructions instructions,
       MutableStoreProvider storeProvider,
       StateManager stateManager,
-      JobUpdateStatus status);
+      JobUpdateStatus status,
+      IJobUpdateKey key);
 
   Logger LOG = LoggerFactory.getLogger(InstanceActionHandler.class);
 
@@ -84,7 +86,8 @@ interface InstanceActionHandler {
         IJobUpdateInstructions instructions,
         MutableStoreProvider storeProvider,
         StateManager stateManager,
-        JobUpdateStatus status) {
+        JobUpdateStatus status,
+        IJobUpdateKey key) {
 
       Optional<IScheduledTask> task = getExistingTask(storeProvider, instance);
       if (task.isPresent()) {
@@ -114,7 +117,8 @@ interface InstanceActionHandler {
         IJobUpdateInstructions instructions,
         MutableStoreProvider storeProvider,
         StateManager stateManager,
-        JobUpdateStatus status) {
+        JobUpdateStatus status,
+        IJobUpdateKey key) {
 
       Optional<IScheduledTask> task = getExistingTask(storeProvider, instance);
       if (task.isPresent()) {
@@ -124,7 +128,7 @@ interface InstanceActionHandler {
             Tasks.id(task.get()),
             Optional.absent(),
             ScheduleStatus.KILLING,
-            Optional.of("Killed for job update."));
+            Optional.of("Killed for job update " + key.getId()));
       } else {
         // Due to async event processing it's possible to have a race between task event
         // and it's deletion from the store. This is a perfectly valid case.
@@ -142,7 +146,8 @@ interface InstanceActionHandler {
         IJobUpdateInstructions instructions,
         MutableStoreProvider storeProvider,
         StateManager stateManager,
-        JobUpdateStatus status) {
+        JobUpdateStatus status,
+        IJobUpdateKey key) {
 
       return Optional.of(Amount.of(
           (long) instructions.getSettings().getMinWaitInInstanceRunningMs(),
