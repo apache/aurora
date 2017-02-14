@@ -36,6 +36,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Range;
+import com.google.common.collect.Sets;
 
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.ConfigRewrite;
@@ -137,6 +138,7 @@ import static org.apache.aurora.gen.ResponseCode.WARNING;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
 import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
+import static org.apache.aurora.scheduler.base.Tasks.TERMINAL_STATES;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.thrift.Responses.addMessage;
 import static org.apache.aurora.scheduler.thrift.Responses.empty;
@@ -1113,6 +1115,32 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     } catch (UpdateStateException e) {
       return error(INVALID_REQUEST, e);
     }
+  }
+
+  @Override
+  public Response pruneTasks(TaskQuery query) throws TException {
+    if (query.isSetStatuses() && query.getStatuses().stream().anyMatch(ACTIVE_STATES::contains)) {
+      return error("Tasks in non-terminal state cannot be pruned.");
+    } else if (!query.isSetStatuses()) {
+      query.setStatuses(TERMINAL_STATES);
+    }
+
+    Iterable<IScheduledTask> tasks = storage.read(storeProvider ->
+        storeProvider.getTaskStore().fetchTasks(Query.arbitrary(query)));
+    // For some reason fetchTasks ignores the offset/limit options of a TaskQuery. So we have to
+    // manually apply the limit here. To be fixed in AURORA-1892.
+    if (query.isSetLimit()) {
+      tasks = Iterables.limit(tasks, query.getLimit());
+    }
+
+    Iterable<String> taskIds = Iterables.transform(
+        tasks,
+        task -> task.getAssignedTask().getTaskId());
+
+    return storage.write(storeProvider -> {
+      stateManager.deleteTasks(storeProvider, Sets.newHashSet(taskIds));
+      return ok();
+    });
   }
 
   @ThriftWorkload

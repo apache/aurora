@@ -343,6 +343,9 @@ class AuroraClientAPI(object):
   def snapshot(self):
     return self._scheduler_proxy.snapshot()
 
+  def prune_tasks(self, query):
+    return self._scheduler_proxy.pruneTasks(query)
+
   def unsafe_rewrite_config(self, rewrite_request):
     return self._scheduler_proxy.rewriteConfigs(rewrite_request)
 

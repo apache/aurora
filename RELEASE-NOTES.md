@@ -4,6 +4,7 @@
 ### New/updated:
 
 - Add message parameter to `killTasks` RPC.
+- Add prune_tasks endpoint to aurora_admin. See aurora_admin prune_tasks -h for usage information.
 
 0.17.0
 ======

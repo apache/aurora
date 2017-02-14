@@ -63,6 +63,7 @@ import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.ResponseDetail;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.RewriteConfigsRequest;
@@ -71,12 +72,14 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
@@ -779,6 +782,66 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertOkResponse(thrift.killTasks(JOB_KEY.newBuilder(), null, message));
+  }
+
+  @Test
+  public void testPruneTasksRejectsActiveStates() throws Exception {
+    control.replay();
+    Response rsp = thrift.pruneTasks(new TaskQuery().setStatuses(Tasks.ACTIVE_STATES));
+    assertResponse(ResponseCode.ERROR, rsp);
+  }
+
+  @Test
+  public void testPruneTasksRejectsMixedStates() throws Exception {
+    control.replay();
+    Response rsp = thrift.pruneTasks(new TaskQuery().setStatuses(
+        ImmutableSet.of(ScheduleStatus.FINISHED, ScheduleStatus.KILLING)));
+    assertResponse(ResponseCode.ERROR, rsp);
+  }
+
+  @Test
+  public void testPruneTasksAddsDefaultStatuses() throws Exception {
+    storageUtil.expectTaskFetch(
+        Query.arbitrary(new TaskQuery().setStatuses(Tasks.TERMINAL_STATES)),
+        buildScheduledTask());
+    stateManager.deleteTasks(
+        storageUtil.mutableStoreProvider,
+        ImmutableSet.of(buildScheduledTask().getAssignedTask().getTaskId()));
+    control.replay();
+
+    assertOkResponse(thrift.pruneTasks(new TaskQuery()));
+  }
+
+  @Test
+  public void testPruneTasksRespectsScopedTerminalState() throws Exception {
+    storageUtil.expectTaskFetch(
+        Query.arbitrary(new TaskQuery().setStatuses(ImmutableSet.of(ScheduleStatus.FAILED))),
+        buildScheduledTask());
+    stateManager.deleteTasks(
+        storageUtil.mutableStoreProvider,
+        ImmutableSet.of(buildScheduledTask().getAssignedTask().getTaskId()));
+    control.replay();
+
+    assertOkResponse(thrift.pruneTasks(
+        new TaskQuery().setStatuses(ImmutableSet.of(ScheduleStatus.FAILED))));
+  }
+
+  @Test
+  public void testPruneTasksAppliesQueryLimit() throws Exception {
+    TaskQuery query = new TaskQuery().setLimit(3);
+    storageUtil.expectTaskFetch(
+        Query.arbitrary(query.setStatuses(Tasks.TERMINAL_STATES)),
+        buildScheduledTask("a/b/c", "task1"),
+        buildScheduledTask("a/b/c", "task2"),
+        buildScheduledTask("a/b/c", "task3"),
+        buildScheduledTask("a/b/c", "task4"),
+        buildScheduledTask("a/b/c", "task5"));
+    stateManager.deleteTasks(
+        storageUtil.mutableStoreProvider,
+        ImmutableSet.of("task1", "task2", "task3"));
+    control.replay();
+
+    assertOkResponse(thrift.pruneTasks(query));
   }
 
   @Test

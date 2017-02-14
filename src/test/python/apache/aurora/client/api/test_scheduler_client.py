@@ -282,6 +282,12 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mox.ReplayAll()
     self.make_scheduler_proxy().snapshot()
 
+  def test_pruneTasks(self):
+    t = TaskQuery()
+    self.mock_thrift_client.pruneTasks(IsA(TaskQuery)).AndReturn(DEFAULT_RESPONSE)
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().pruneTasks(t)
+
   def test_rewriteConfigs(self):
     self.mock_thrift_client.rewriteConfigs(
         IsA(RewriteConfigsRequest)).AndReturn(DEFAULT_RESPONSE)

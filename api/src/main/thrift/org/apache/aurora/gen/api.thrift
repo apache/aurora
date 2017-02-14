@@ -1230,6 +1230,13 @@ service AuroraAdmin extends AuroraSchedulerManager {
 
   /** Tell scheduler to trigger an implicit task reconciliation. */
   Response triggerImplicitTaskReconciliation()
+
+  /**
+   * Force prune any (terminal) tasks that match the query. If no statuses are supplied with the
+   * query, it will default to all terminal task states. If statuses are supplied, they must be
+   * terminal states.
+   */
+  Response pruneTasks(1: TaskQuery query)
 }
 
 // The name of the header that should be sent to bypass leader redirection in the Scheduler.

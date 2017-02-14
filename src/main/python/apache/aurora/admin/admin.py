@@ -72,6 +72,38 @@ def make_admin_client_with_options(cluster):
 
 
 @app.command
+@app.command_option('--states', dest='states', default=None,
+    help='Only match tasks with given state(s).')
+@app.command_option('--role', dest='role', default=None,
+    help='Only match tasks with given role.')
+@app.command_option('--env', dest='environment', default=None,
+    help='Only match tasks with given environment.')
+@app.command_option('--limit', dest='limit', default=None, type=int,
+    help='Limit the number of total tasks to prune.')
+def prune_tasks(args, options):
+  if len(args) == 0:
+    die('Must specify at least cluster.')
+  cluster = args[0]
+
+  t = TaskQuery()
+  if options.states:
+    t.statuses = set(map(ScheduleStatus._NAMES_TO_VALUES.get, options.states.split(',')))
+  if options.role:
+    t.role = options.role
+  if options.environment:
+    t.environment = options.environment
+  if options.limit:
+    t.limit = options.limit
+
+  api = make_admin_client_with_options(cluster)
+  rsp = api.prune_tasks(t)
+  if rsp.responseCode != ResponseCode.OK:
+    die('Failed to prune tasks: %s' % combine_messages(rsp))
+  else:
+    print("Tasks pruned.")
+
+
+@app.command
 @app.command_option('--force', dest='force', default=False, action='store_true',
     help='Force expensive queries to run.')
 @app.command_option('--shards', dest='shards', default=None,

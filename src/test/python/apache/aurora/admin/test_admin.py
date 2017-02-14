@@ -19,6 +19,7 @@ from mock import PropertyMock, call, create_autospec, patch
 from apache.aurora.admin.admin import (
     get_scheduler,
     increase_quota,
+    prune_tasks,
     query,
     reconcile_tasks,
     set_quota
@@ -43,6 +44,49 @@ from gen.apache.aurora.api.ttypes import (
     TaskConfig,
     TaskQuery
 )
+
+
+class TestPruneCommand(AuroraClientCommandTest):
+  @classmethod
+  def setup_mock_options(cls, states=None, role=None, env=None, limit=None):
+    mock_options = create_autospec(
+        spec=['states', 'role', 'environment', 'limit'],
+        spec_set=False,
+        instance=True)
+
+    mock_options.role = role
+    mock_options.states = states
+    mock_options.environment = env
+    mock_options.limit = limit
+    mock_options.bypass_leader_redirect = False
+
+    return mock_options
+
+  @classmethod
+  def task_query(cls, options):
+    query = TaskQuery(
+        role=options.role,
+        environment=options.environment,
+        limit=options.limit)
+    if options.states:
+      query.statuses = set(map(ScheduleStatus._NAMES_TO_VALUES.get, options.states.split(',')))
+    return query
+
+  def test_prune(self):
+    mock_options = self.setup_mock_options(
+      role='aurora', env='devel', limit=10, states="LOST,FINISHED")
+    with contextlib.nested(
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.admin.admin.make_admin_client',
+            return_value=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS)
+    ) as (_, mock_make_admin_client, _):
+      api = mock_make_admin_client.return_value
+      api.prune_tasks.return_value = Response(responseCode=ResponseCode.OK)
+
+      prune_tasks(['cluster'], mock_options)
+
+      api.prune_tasks.assert_called_once_with(self.task_query(mock_options))
 
 
 class TestQueryCommand(AuroraClientCommandTest):
