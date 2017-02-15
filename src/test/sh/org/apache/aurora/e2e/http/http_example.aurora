@@ -70,6 +70,11 @@ if __name__ == "__main__":
 """
 )
 
+verify_file_system = Process(
+  name = 'check_fs',
+  cmdline = 'check-fs.sh'
+)
+
 test_task = SequentialTask(
   name = 'http_example',
   resources = Resources(cpu=0.5, ram=32*MB, disk=64*MB, gpu='{{profile.gpu}}'),
@@ -92,6 +97,7 @@ no_python_task = SequentialTask(
       echo_ports,
       verify_command_escaping,
       verify_file_mount,
+      verify_file_system,
       Process(name='run_server', cmdline='run-server.sh {{thermos.ports[http]}}'),
   ]
 )
@@ -121,6 +127,8 @@ job = Service(
   ),
 )
 
+volumes = [Volume(container_path="etc/rsyslog.d.container", host_path="/etc/rsyslog.d", mode=Mode("RO"))]
+
 jobs = [
   job(
     name = 'http_example'
@@ -142,13 +150,13 @@ jobs = [
   ).bind(profile=GpuProfile),
   job(
     name = 'http_example_unified_appc',
-    container = Mesos(image=AppcImage(name='http_example_netcat', image_id='{{appc_image_id}}')),
+    container = Mesos(image=AppcImage(name='http_example_netcat', image_id='{{appc_image_id}}'), volumes=volumes),
     task = no_python_task,
     health_check_config=shell_health_check_config
   ).bind(profile=DefaultProfile()),
   job(
     name = 'http_example_unified_docker',
-    container = Mesos(image=DockerImage(name='http_example_netcat', tag='latest')),
+    container = Mesos(image=DockerImage(name='http_example_netcat', tag='latest'), volumes=volumes),
     task = no_python_task,
     health_check_config=shell_health_check_config
   ).bind(profile=DefaultProfile())

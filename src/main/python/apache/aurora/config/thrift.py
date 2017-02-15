@@ -47,10 +47,12 @@ from gen.apache.aurora.api.ttypes import (
     LimitConstraint,
     MesosContainer,
     Metadata,
+    Mode,
     Resource,
     TaskConfig,
     TaskConstraint,
-    ValueConstraint
+    ValueConstraint,
+    Volume
 )
 
 __all__ = (
@@ -163,9 +165,26 @@ def create_container_config(container):
          else unwrapped)))
 
   if isinstance(unwrapped, Mesos):
-    return Container(MesosContainer(image_to_thrift(unwrapped.image())), None)
+    image = image_to_thrift(unwrapped.image())
+    volumes = volumes_to_thrift(unwrapped.volumes())
+
+    return Container(MesosContainer(image, volumes), None)
 
   raise InvalidConfig('If a container is specified it must set one type.')
+
+
+def volumes_to_thrift(volumes):
+  thrift_volumes = []
+  for v in volumes:
+    mode = parse_enum(Mode, v.mode())
+    thrift_volumes.append(
+      Volume(
+          containerPath=fully_interpolated(v.container_path()),
+          hostPath=fully_interpolated(v.host_path()),
+          mode=mode
+      )
+    )
+  return thrift_volumes
 
 
 def image_to_thrift(image):

@@ -5,6 +5,7 @@
 
 - Add message parameter to `killTasks` RPC.
 - Add prune_tasks endpoint to aurora_admin. See aurora_admin prune_tasks -h for usage information.
+- Add support for per-task volume mounts for Mesos containers to the Aurora config DSL.
 
 0.17.0
 ======

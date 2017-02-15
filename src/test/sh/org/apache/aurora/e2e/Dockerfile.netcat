@@ -16,3 +16,4 @@ FROM buildpack-deps:jessie
 
 RUN apt-get update && apt-get install -y netcat-openbsd
 COPY run-server.sh /usr/local/bin
+COPY check-fs.sh /usr/local/bin

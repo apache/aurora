@@ -1,5 +1,4 @@
 #!/bin/bash
-
 echo "Starting up server..."
 while true
 do

@@ -468,6 +468,15 @@ unified-container, the container can be omitted from your job config.
   param            | type                           | description
   -----            | :----:                         | -----------
   ```image```      | Choice(AppcImage, DockerImage) | An optional filesystem image to use within this container.
+  ```volumes```    | List(Volume)                   | An optional list of volume mounts for this container.
+
+### Volume Object
+
+  param                  | type     | description
+  -----                  | :----:   | -----------
+  ```container_path```   | String   | Path on the host to mount.
+  ```volume_path```      | String   | Mount point in the container.
+  ```mode```             | Enum     | Mode of the mount, can be 'RW' or 'RO'.
 
 ### AppcImage
 

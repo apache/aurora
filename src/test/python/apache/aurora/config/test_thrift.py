@@ -26,14 +26,17 @@ from apache.aurora.config.schema.base import (
     HealthCheckConfig,
     Job,
     Mesos,
+    Mode,
     Parameter,
-    SimpleTask
+    SimpleTask,
+    Volume
 )
 from apache.aurora.config.thrift import convert as convert_pystachio_to_thrift
 from apache.aurora.config.thrift import InvalidConfig, task_instance_from_job
 from apache.thermos.config.schema import Process, Resources, Task
 
 from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
+from gen.apache.aurora.api.ttypes import Mode as ThriftMode
 from gen.apache.aurora.api.ttypes import CronCollisionPolicy, Identity, JobKey, Resource
 from gen.apache.aurora.test.constants import INVALID_IDENTIFIERS, VALID_IDENTIFIERS
 
@@ -106,6 +109,26 @@ def test_config_with_appc_image():
   assert job.taskConfig.container.mesos.image.docker is None
   assert job.taskConfig.container.mesos.image.appc.name == image_name
   assert job.taskConfig.container.mesos.image.appc.imageId == image_id
+
+
+def test_config_with_volumes():
+  image_name = 'some-image'
+  image_tag = 'some-tag'
+  host_path = '/etc/secrets/role/'
+  container_path = '/etc/secrets/'
+
+  volume = Volume(host_path=host_path, container_path=container_path, mode=Mode('RO'))
+
+  container = Mesos(image=DockerImage(name=image_name, tag=image_tag), volumes=[volume])
+
+  job = convert_pystachio_to_thrift(HELLO_WORLD(container=container))
+
+  assert len(job.taskConfig.container.mesos.volumes) == 1
+  thrift_volume = job.taskConfig.container.mesos.volumes[0]
+
+  assert thrift_volume.hostPath == host_path
+  assert thrift_volume.containerPath == container_path
+  assert thrift_volume.mode == ThriftMode.RO
 
 
 def test_docker_with_parameters():

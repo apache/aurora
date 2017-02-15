@@ -132,9 +132,16 @@ class DockerImage(Struct):
   name = Required(String)
   tag = Required(String)
 
+Mode = Enum('RO', 'RW')
+
+class Volume(Struct):
+  container_path = Required(String)
+  host_path = Required(String)
+  mode = Required(Mode)
 
 class Mesos(Struct):
   image = Choice([AppcImage, DockerImage])
+  volumes = Default(List(Volume), [])
 
 
 class Container(Struct):
