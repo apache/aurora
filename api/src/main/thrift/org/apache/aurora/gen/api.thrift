@@ -619,6 +619,9 @@ const set<JobUpdateStatus> ACTIVE_JOB_UPDATE_STATES = [JobUpdateStatus.ROLLING_F
                                                        JobUpdateStatus.ROLL_BACK_PAUSED,
                                                        JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE,
                                                        JobUpdateStatus.ROLL_BACK_AWAITING_PULSE]
+/** States the job update can be in while waiting for a pulse. */
+const set<JobUpdateStatus> AWAITNG_PULSE_JOB_UPDATE_STATES = [JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE,
+                                                              JobUpdateStatus.ROLL_BACK_AWAITING_PULSE]
 
 /** Job update actions that can be applied to job instances. */
 enum JobUpdateAction {

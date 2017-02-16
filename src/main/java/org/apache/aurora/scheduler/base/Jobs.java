@@ -13,8 +13,12 @@
  */
 package org.apache.aurora.scheduler.base;
 
+import java.util.EnumSet;
+
 import org.apache.aurora.gen.JobStats;
+import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.storage.entities.IJobStats;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -26,6 +30,12 @@ public final class Jobs {
   private Jobs() {
     // Utility class.
   }
+
+  /**
+   * States of updates that are blocked on pulses.
+   */
+  public static final EnumSet<JobUpdateStatus> AWAITING_PULSE_STATES =
+      EnumSet.copyOf(apiConstants.AWAITNG_PULSE_JOB_UPDATE_STATES);
 
   /**
    * For a given collection of tasks compute statistics based on the state of the task.

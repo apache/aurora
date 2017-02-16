@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +29,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.application.Lifecycle;
@@ -84,6 +86,7 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE;
 import static org.apache.aurora.scheduler.base.AsyncUtil.shutdownOnError;
+import static org.apache.aurora.scheduler.base.Jobs.AWAITING_PULSE_STATES;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.ACTIVE_QUERY;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.AUTO_RESUME_STATES;
@@ -202,7 +205,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       JobUpdateStatus status = ROLLING_FORWARD;
       if (isCoordinatedUpdate(instructions)) {
         status = ROLL_FORWARD_AWAITING_PULSE;
-        pulseHandler.initializePulseState(update, status);
+        pulseHandler.initializePulseState(update, status, 0L);
       }
 
       recordAndChangeJobUpdateStatus(
@@ -271,6 +274,29 @@ class JobUpdateControllerImpl implements JobUpdateController {
     return status -> addAuditData(newEvent(status), auditData);
   }
 
+  private static final Ordering<IJobUpdateEvent> CHRON_ORDERING =
+      Ordering.from(Comparator.comparingLong(IJobUpdateEvent::getTimestampMs));
+
+  private long inferLastPulseTimestamp(IJobUpdateDetails details) {
+    // Pulse timestamps are not durably stored by design. However, on system recovery,
+    // setting the timestamp of the last pulse to 0L (aka no pulse) is not correct.
+    // By inspecting the job update events we can infer a reasonable time stamp to initialize to.
+    // In this case, if the upgrade was not waiting for a pulse previously, we can reuse the
+    // timestamp of the last event. This does reset the counter for pulses, but reflects the
+    // most likely behaviour of a healthy system.
+
+    // This is safe because we always write at least one job update event on job update creation
+    IJobUpdateEvent mostRecent = CHRON_ORDERING.max(details.getUpdateEvents());
+
+    long ts = 0L;
+
+    if (!AWAITING_PULSE_STATES.contains(mostRecent.getStatus())) {
+      ts = mostRecent.getTimestampMs();
+    }
+
+    return ts;
+  }
+
   @Override
   public void systemResume() {
     storage.write((NoResult.Quiet) storeProvider -> {
@@ -284,7 +310,9 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
         if (isCoordinatedUpdate(instructions)) {
           LOG.info("Automatically restoring pulse state for " + key);
-          pulseHandler.initializePulseState(details.getUpdate(), status);
+
+          long pulseMs = inferLastPulseTimestamp(details);
+          pulseHandler.initializePulseState(details.getUpdate(), status, pulseMs);
         }
 
         if (AUTO_RESUME_STATES.contains(status)) {
@@ -769,11 +797,11 @@ class JobUpdateControllerImpl implements JobUpdateController {
       this.clock = requireNonNull(clock);
     }
 
-    synchronized void initializePulseState(IJobUpdate update, JobUpdateStatus status) {
+    synchronized void initializePulseState(IJobUpdate update, JobUpdateStatus status, long ts) {
       pulseStates.put(update.getSummary().getKey(), new PulseState(
           status,
           update.getInstructions().getSettings().getBlockIfNoPulsesAfterMs(),
-          0L));
+          ts));
     }
 
     synchronized PulseState pulseAndGet(IJobUpdateKey key) {
