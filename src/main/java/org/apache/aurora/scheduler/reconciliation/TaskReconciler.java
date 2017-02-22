@@ -16,16 +16,15 @@ package org.apache.aurora.scheduler.reconciliation;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.AbstractIdleService;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -156,17 +155,16 @@ public class TaskReconciler extends AbstractIdleService {
   }
 
   private void doExplicitReconcile(int batchSize) {
-    ImmutableList<TaskStatus> active = FluentIterable
-        .from(Storage.Util.fetchTasks(
-            storage,
-            Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES)))
-        .transform(TASK_TO_PROTO)
-        .toList();
+    Iterable<List<IScheduledTask>> activeBatches = Iterables.partition(
+        Storage.Util.fetchTasks(storage, Query.unscoped().byStatus(Tasks.SLAVE_ASSIGNED_STATES)),
+        batchSize);
 
-    List<List<TaskStatus>> batches = Lists.partition(active, batchSize);
     long delay = 0;
-    for (List<TaskStatus> batch : batches) {
-      executor.schedule(() -> driver.reconcileTasks(batch), delay, SECONDS.getTimeUnit());
+    for (List<IScheduledTask> batch : activeBatches) {
+      executor.schedule(() -> driver.reconcileTasks(
+          batch.stream().map(TASK_TO_PROTO::apply).collect(Collectors.toList())),
+          delay,
+          SECONDS.getTimeUnit());
       delay += settings.explicitBatchDelaySeconds;
     }
     explicitRuns.incrementAndGet();
