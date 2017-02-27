@@ -170,7 +170,7 @@ public class MesosSchedulerImpl implements Scheduler {
   @Override
   public void disconnected(SchedulerDriver schedulerDriver) {
     log.warn("Framework disconnected.");
-    counters.get("scheduler_framework_disconnects").get();
+    counters.get("scheduler_framework_disconnects").incrementAndGet();
     eventSink.post(new DriverDisconnected());
   }
 

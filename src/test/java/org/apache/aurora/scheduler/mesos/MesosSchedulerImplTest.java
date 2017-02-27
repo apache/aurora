@@ -164,7 +164,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         offerManager,
         eventSink,
         MoreExecutors.sameThreadExecutor(),
-        new CachedCounters(new FakeStatsProvider()),
+        new CachedCounters(statsProvider),
         logger,
         statsProvider);
     driver = createMock(SchedulerDriver.class);
@@ -298,6 +298,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override
       void test() {
         scheduler.disconnected(driver);
+        assertEquals(1L, statsProvider.getLongValue("scheduler_framework_disconnects"));
       }
     }.run();
   }
