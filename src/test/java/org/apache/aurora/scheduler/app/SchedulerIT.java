@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.Hashing;
+import com.google.common.net.InetAddresses;
 import com.google.common.util.concurrent.Atomics;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -116,6 +117,10 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
   private static final String SERVERSET_PATH = "/fake/service/path";
   private static final String STATS_URL_PREFIX = "fake_url";
   private static final String FRAMEWORK_ID = "integration_test_framework_id";
+  private static final Protos.MasterInfo MASTER = Protos.MasterInfo.newBuilder()
+      .setId("master-id")
+      .setIp(InetAddresses.coerceToInteger(InetAddresses.forString("1.2.3.4"))) //NOPMD
+      .setPort(5050).build();
   private static final IHostAttributes HOST_ATTRIBUTES = IHostAttributes.build(new HostAttributes()
       .setHost("host")
       .setSlaveId("slave-id")
@@ -336,7 +341,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     scheduler.getValue().registered(
         driver,
         Protos.FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
-        Protos.MasterInfo.getDefaultInstance());
+        MASTER);
 
     awaitSchedulerReady();
 

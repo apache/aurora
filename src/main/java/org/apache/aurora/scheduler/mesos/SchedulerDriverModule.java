@@ -18,38 +18,58 @@ import java.util.concurrent.Executor;
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
-import com.google.inject.PrivateModule;
 
+import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.mesos.MesosCallbackHandler.MesosCallbackHandlerImpl;
 import org.apache.mesos.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * A module that creates a {@link Driver} binding.
  */
 public class SchedulerDriverModule extends AbstractModule {
   private static final Logger LOG = LoggerFactory.getLogger(SchedulerDriverModule.class);
+  private final SchedulerMain.DriverKind kind;
+
+  public SchedulerDriverModule(SchedulerMain.DriverKind kind) {
+    this.kind = kind;
+  }
 
   @Override
   protected void configure() {
-    install(new PrivateModule() {
-      @Override
-      protected void configure() {
+    bind(Scheduler.class).to(MesosSchedulerImpl.class);
+    bind(org.apache.mesos.v1.scheduler.Scheduler.class).to(VersionedMesosSchedulerImpl.class);
+    bind(MesosSchedulerImpl.class).in(Singleton.class);
+    bind(MesosCallbackHandler.class).to(MesosCallbackHandlerImpl.class);
+    bind(MesosCallbackHandlerImpl.class).in(Singleton.class);
+    // TODO(zmanji): Create singleThreadedExecutor (non-scheduled) variant.
+    bind(Executor.class).annotatedWith(MesosCallbackHandlerImpl.SchedulerExecutor.class)
+        .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SchedulerImpl-%d", LOG));
+
+    switch (kind) {
+      case SCHEDULER_DRIVER:
         bind(Driver.class).to(SchedulerDriverService.class);
         bind(SchedulerDriverService.class).in(Singleton.class);
-        expose(Driver.class);
-
-        bind(Scheduler.class).to(MesosSchedulerImpl.class);
-        bind(MesosSchedulerImpl.class).in(Singleton.class);
-        expose(Scheduler.class);
-
-        // TODO(zmanji): Create singleThreadedExecutor (non-scheduled) variant.
-        bind(Executor.class).annotatedWith(MesosSchedulerImpl.SchedulerExecutor.class)
-            .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SchedulerImpl-%d", LOG));
-      }
-    });
+        break;
+      case V0_DRIVER:
+        bind(Driver.class).to(VersionedSchedulerDriverService.class);
+        bind(VersionedSchedulerDriverService.class).in(Singleton.class);
+        PubsubEventModule.bindSubscriber(binder(), VersionedSchedulerDriverService.class);
+        break;
+      case V1_DRIVER:
+        bind(Driver.class).to(VersionedSchedulerDriverService.class);
+        bind(VersionedSchedulerDriverService.class).in(Singleton.class);
+        PubsubEventModule.bindSubscriber(binder(), VersionedSchedulerDriverService.class);
+        break;
+      default:
+        checkState(false, "Unknown driver kind.");
+        break;
+    }
 
     PubsubEventModule.bindSubscriber(binder(), TaskStatusStats.class);
     bind(TaskStatusStats.class).in(Singleton.class);

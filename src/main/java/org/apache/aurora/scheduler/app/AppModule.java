@@ -35,6 +35,7 @@ import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.Container._Fields;
 import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.app.SchedulerMain.DriverKind;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
@@ -105,13 +106,15 @@ public class AppModule extends AbstractModule {
   private static final Arg<Boolean> ALLOW_CONTAINER_VOLUMES = Arg.create(false);
 
   private final ConfigurationManagerSettings configurationManagerSettings;
+  private final DriverKind kind;
 
   @VisibleForTesting
-  public AppModule(ConfigurationManagerSettings configurationManagerSettings) {
+  public AppModule(ConfigurationManagerSettings configurationManagerSettings, DriverKind kind) {
     this.configurationManagerSettings = requireNonNull(configurationManagerSettings);
+    this.kind = kind;
   }
 
-  public AppModule(boolean allowGpuResource) {
+  public AppModule(boolean allowGpuResource, DriverKind kind) {
     this(new ConfigurationManagerSettings(
         ImmutableSet.copyOf(ALLOWED_CONTAINER_TYPES.get()),
         ENABLE_DOCKER_PARAMETERS.get(),
@@ -119,7 +122,8 @@ public class AppModule extends AbstractModule {
         REQUIRE_DOCKER_USE_EXECUTOR.get(),
         allowGpuResource,
         ENABLE_MESOS_FETCHER.get(),
-        ALLOW_CONTAINER_VOLUMES.get()));
+        ALLOW_CONTAINER_VOLUMES.get()),
+        kind);
   }
 
   @Override
@@ -149,7 +153,7 @@ public class AppModule extends AbstractModule {
     install(new QuotaModule());
     install(new JettyServerModule());
     install(new PreemptorModule());
-    install(new SchedulerDriverModule());
+    install(new SchedulerDriverModule(kind));
     install(new SchedulerServicesModule());
     install(new SchedulerModule());
     install(new StateModule());

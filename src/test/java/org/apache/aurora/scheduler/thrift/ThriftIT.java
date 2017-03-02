@@ -67,6 +67,7 @@ import org.apache.shiro.subject.Subject;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ResponseCode.OK;
+import static org.apache.aurora.scheduler.app.SchedulerMain.DriverKind.SCHEDULER_DRIVER;
 import static org.junit.Assert.assertEquals;
 
 public class ThriftIT extends EasyMockTest {
@@ -97,7 +98,7 @@ public class ThriftIT extends EasyMockTest {
             install(new TierModule(TaskTestUtil.TIER_CONFIG));
             bind(ExecutorSettings.class).toInstance(TestExecutorSettings.THERMOS_EXECUTOR);
 
-            install(new AppModule(configurationManagerSettings));
+            install(new AppModule(configurationManagerSettings, SCHEDULER_DRIVER));
 
             bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
 

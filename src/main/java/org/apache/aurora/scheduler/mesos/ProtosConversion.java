@@ -55,14 +55,34 @@ public final class ProtosConversion {
     return convert(id, Protos.OfferID.newBuilder());
   }
 
+  public static Protos.FrameworkID convert(org.apache.mesos.Protos.FrameworkID id) {
+    return convert(id, Protos.FrameworkID.newBuilder());
+  }
+
+  public static Protos.MasterInfo convert(org.apache.mesos.Protos.MasterInfo id) {
+    return convert(id, Protos.MasterInfo.newBuilder());
+  }
+
   public static Protos.TaskStatus convert(org.apache.mesos.Protos.TaskStatus s) {
     return convert(s, Protos.TaskStatus.newBuilder());
+  }
+
+  public static Protos.AgentID convert(org.apache.mesos.Protos.SlaveID s) {
+    return convert(s, Protos.AgentID.newBuilder());
+  }
+
+  public static Protos.ExecutorID convert(org.apache.mesos.Protos.ExecutorID s) {
+    return convert(s, Protos.ExecutorID.newBuilder());
   }
 
   // Methods to convert from V1 to unversioned.
 
   public static org.apache.mesos.Protos.FrameworkID convert(Protos.FrameworkID id) {
     return convert(id, org.apache.mesos.Protos.FrameworkID.newBuilder());
+  }
+
+  public static org.apache.mesos.Protos.MasterInfo convert(Protos.MasterInfo id) {
+    return convert(id, org.apache.mesos.Protos.MasterInfo.newBuilder());
   }
 
   public static org.apache.mesos.Protos.TaskID convert(Protos.TaskID id) {
@@ -95,5 +115,13 @@ public final class ProtosConversion {
 
   public static org.apache.mesos.Protos.Offer convert(Protos.Offer f) {
     return convert(f, org.apache.mesos.Protos.Offer.newBuilder());
+  }
+
+  public static org.apache.mesos.Protos.ExecutorID convert(Protos.ExecutorID f) {
+    return convert(f, org.apache.mesos.Protos.ExecutorID.newBuilder());
+  }
+
+  public static org.apache.mesos.Protos.SlaveID convert(Protos.AgentID f) {
+    return convert(f, org.apache.mesos.Protos.SlaveID.newBuilder());
   }
 }
