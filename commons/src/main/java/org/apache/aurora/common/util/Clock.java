@@ -13,20 +13,17 @@
  */
 package org.apache.aurora.common.util;
 
-import java.io.Serializable;
-
 /**
  * An abstraction of the system clock.
- *
  * @author John Sirois
  */
 public interface Clock {
-
+  // TODO(zmanji): Consider replacing this with java.time.Clock
   /**
    * A clock that returns the the actual time reported by the system.
    * This clock is guaranteed to be serializable.
    */
-  Clock SYSTEM_CLOCK = new SerializableClock() {
+  Clock SYSTEM_CLOCK = new Clock() {
     @Override public long nowMillis() {
       return System.currentTimeMillis();
     }
@@ -64,7 +61,3 @@ public interface Clock {
   void waitFor(long millis) throws InterruptedException;
 }
 
-/**
- * A typedef to support anonymous {@link Clock} implementations that are also {@link Serializable}.
- */
-interface SerializableClock extends Clock, Serializable { }
