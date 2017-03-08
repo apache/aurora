@@ -116,7 +116,8 @@ class VersionedSchedulerDriverService extends AbstractIdleService
   @Override
   public void acceptOffers(OfferID offerId, Collection<Operation> operations, Filters filter) {
     whenRegistered(() -> {
-      LOG.info("Accepting offer {} with ops {}", offerId, operations);
+      Collection<Operation.Type> opTypes = Collections2.transform(operations, Operation::getType);
+      LOG.info("Accepting offer {} with ops {}", offerId, opTypes);
 
       Futures.getUnchecked(mesosFuture).send(
           Call.newBuilder()
