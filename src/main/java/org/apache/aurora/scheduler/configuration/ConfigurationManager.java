@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -33,7 +32,6 @@ import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskConfig._Fields;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.JobKeys;
@@ -53,8 +51,11 @@ import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.GPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and
@@ -86,31 +87,6 @@ public class ConfigurationManager {
       }
     }
   }
-
-  private static class RequiredFieldValidator<T> implements Validator<TaskConfig> {
-    private final _Fields field;
-    private final Validator<T> validator;
-
-    RequiredFieldValidator(_Fields field, Validator<T> validator) {
-      this.field = field;
-      this.validator = validator;
-    }
-
-    public void validate(TaskConfig task) throws TaskDescriptionException {
-      if (!task.isSet(field)) {
-        throw new TaskDescriptionException("Field " + field.getFieldName() + " is required.");
-      }
-      @SuppressWarnings("unchecked")
-      T value = (T) task.getFieldValue(field);
-      validator.validate(value);
-    }
-  }
-
-  private static final Iterable<RequiredFieldValidator<?>> REQUIRED_FIELDS_VALIDATORS =
-      ImmutableList.of(
-          new RequiredFieldValidator<>(_Fields.NUM_CPUS, new GreaterThan(0.0, "num_cpus")),
-          new RequiredFieldValidator<>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")),
-          new RequiredFieldValidator<>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")));
 
   public static class ConfigurationManagerSettings {
     private final ImmutableSet<Container._Fields> allowedContainerTypes;
@@ -352,10 +328,6 @@ public class ConfigurationManager {
 
     thriftBackfill.backfillTask(builder);
 
-    for (RequiredFieldValidator<?> validator : REQUIRED_FIELDS_VALIDATORS) {
-      validator.validate(builder);
-    }
-
     String types = config.getResources().stream()
         .collect(Collectors.groupingBy(e -> ResourceType.fromResource(e)))
         .entrySet().stream()
@@ -367,6 +339,16 @@ public class ConfigurationManager {
     if (!Strings.isNullOrEmpty(types)) {
       throw new TaskDescriptionException("Multiple resource values are not supported for " + types);
     }
+
+    Validator<Number> cpuvalidator = new GreaterThan(0.0, "num_cpus");
+    cpuvalidator.validate(
+            ResourceManager.quantityOf(ResourceManager.getTaskResources(config, CPUS)));
+    Validator<Number> ramvalidator = new GreaterThan(0.0, "ram_mb");
+    ramvalidator.validate(
+            ResourceManager.quantityOf(ResourceManager.getTaskResources(config, RAM_MB)));
+    Validator<Number> diskvalidator = new GreaterThan(0.0, "disk_mb");
+    diskvalidator.validate(
+            ResourceManager.quantityOf(ResourceManager.getTaskResources(config, DISK_MB)));
 
     if (!settings.allowGpuResource && config.getResources().stream()
         .filter(r -> ResourceType.fromResource(r).equals(GPUS))

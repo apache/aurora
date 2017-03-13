@@ -263,17 +263,6 @@ public class ConfigurationManagerTest {
   }
 
   @Test
-  public void testTaskResourceBackfill() throws Exception {
-    TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
-    builder.unsetResources();
-
-    assertFalse(builder.isSetResources());
-    ITaskConfig populated =
-        DOCKER_CONFIGURATION_MANAGER.validateAndPopulate(ITaskConfig.build(builder));
-    assertEquals(CONFIG_WITH_CONTAINER.getResources(), populated.getResources());
-  }
-
-  @Test
   public void testMultipleResourceValuesBlocked() throws Exception {
     TaskConfig builder = CONFIG_WITH_CONTAINER.newBuilder();
     builder.addToResources(numCpus(3.0));

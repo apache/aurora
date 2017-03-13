@@ -598,6 +598,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setNumCpus(1.0)
         .setRamMb(1024)
         .setDiskMb(1024)
+        .setResources(ImmutableSet.of(
+            numCpus(1.0),
+            ramMb(1024),
+            diskMb(1024)))
         .setIsService(true)
         .setProduction(true)
         .setTier(TaskTestUtil.PROD_TIER_NAME)

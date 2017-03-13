@@ -294,7 +294,7 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
        Resource(ramMb=task.ramMb),
        Resource(diskMb=task.diskMb)]
       + [Resource(namedPort=p) for p in ports]
-      + [Resource(numGpus=numGpus)] if numGpus else [])
+      + ([Resource(numGpus=numGpus)] if numGpus else []))
 
   task.job = key
   task.owner = owner

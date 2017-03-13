@@ -60,9 +60,10 @@ public final class ThriftBackfill {
 
   private static Resource getResource(Set<Resource> resources, ResourceType type) {
     return resources.stream()
-        .filter(e -> ResourceType.fromResource(IResource.build(e)).equals(type))
-        .findFirst()
-        .orElseThrow(() -> new IllegalArgumentException("Missing resource definition for " + type));
+            .filter(e -> ResourceType.fromResource(IResource.build(e)).equals(type))
+            .findFirst()
+            .orElseThrow(() ->
+                    new IllegalArgumentException("Missing resource definition for " + type));
   }
 
   /**
@@ -162,9 +163,12 @@ public final class ThriftBackfill {
 
         throw new IllegalArgumentException("Quota resources must be exactly: " + quotaResources);
       }
-      aggregate.setNumCpus(getResource(aggregate.getResources(), CPUS).getNumCpus());
-      aggregate.setRamMb(getResource(aggregate.getResources(), RAM_MB).getRamMb());
-      aggregate.setDiskMb(getResource(aggregate.getResources(), DISK_MB).getDiskMb());
+      aggregate.setNumCpus(
+              getResource(aggregate.getResources(), CPUS).getNumCpus());
+      aggregate.setRamMb(
+              getResource(aggregate.getResources(), RAM_MB).getRamMb());
+      aggregate.setDiskMb(
+              getResource(aggregate.getResources(), DISK_MB).getDiskMb());
     }
     return IResourceAggregate.build(aggregate);
   }
