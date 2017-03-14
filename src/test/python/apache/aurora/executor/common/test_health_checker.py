@@ -21,6 +21,8 @@ import unittest
 import mock
 import pytest
 from mesos.interface.mesos_pb2 import TaskState
+from twitter.common.contextutil import temporary_dir
+from twitter.common.dirutil import chmod_plus_x
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.testing.clock import ThreadedClock
 
@@ -594,29 +596,49 @@ class TestHealthCheckerProvider(unittest.TestCase):
     assert execconfig_data[
              'health_check_config']['health_checker']['shell']['shell_command'] == 'failed command'
 
-    mock_sandbox = mock.Mock(spec_set=SandboxInterface)
-    type(mock_sandbox).root = mock.PropertyMock(return_value='/some/path')
-    type(mock_sandbox).is_filesystem_image = mock.PropertyMock(return_value=True)
+    with temporary_dir() as td:
+      test_isolator_path = os.path.join(td, 'fake-mesos-containerier')
+      with open(test_isolator_path, 'w') as fd:
+        # We use a fake version of the mesos-containerizer binary that just echoes out its args so
+        # we can assert on them in the process's output. Also imitates a failure when there are not
+        # enough arguments, this is used to find the version of the binary (by checking the failure
+        # message)
+        fd.write('\n'.join([
+          '#!/bin/sh',
+          'if [[ $# == 1 ]]; then',
+          '  { echo "command_info" >&2; };',
+          'else',
+          '  echo "$@";',
+          'fi'
+        ]))
 
-    with mock.patch('apache.aurora.executor.common.health_checker.ShellHealthCheck') as mock_shell:
-      HealthCheckerProvider(
-          nosetuid_health_checks=False,
-          mesos_containerizer_path='/some/path/mesos-containerizer').from_assigned_task(
-              assigned_task,
-              mock_sandbox)
+        fd.close()
 
-      class NotNone(object):
-        def __eq__(self, other):
-          return other is not None
+        chmod_plus_x(test_isolator_path)
 
-      assert mock_shell.mock_calls == [
-          mock.call(
-              raw_cmd='failed command',
-              wrapped_cmd=NotNone(),
-              preexec_fn=None,
-              timeout_secs=5.0
-          )
-      ]
+        mock_sandbox = mock.Mock(spec_set=SandboxInterface)
+        type(mock_sandbox).root = mock.PropertyMock(return_value=td)
+        type(mock_sandbox).is_filesystem_image = mock.PropertyMock(return_value=True)
+
+        with mock.patch('apache.aurora.executor.common.health_checker.ShellHealthCheck') as shell:
+          HealthCheckerProvider(
+              nosetuid_health_checks=False,
+              mesos_containerizer_path=test_isolator_path).from_assigned_task(
+                  assigned_task,
+                  mock_sandbox)
+
+          class NotNone(object):
+            def __eq__(self, other):
+              return other is not None
+
+          assert shell.mock_calls == [
+              mock.call(
+                  raw_cmd='failed command',
+                  wrapped_cmd=NotNone(),
+                  preexec_fn=None,
+                  timeout_secs=5.0
+              )
+          ]
 
   def test_interpolate_cmd(self):
     """Making sure thermos.ports[foo] gets correctly substituted with assignedPorts info."""

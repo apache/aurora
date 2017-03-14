@@ -15,14 +15,28 @@
 import ctypes
 import json
 import os
+import subprocess
 
 from twitter.common import log
 
 from gen.apache.aurora.api.constants import TASK_FILESYSTEM_MOUNT_POINT
 
 
+def is_launch_info_supported(mesos_containerizer_path):
+  process = subprocess.Popen(
+          [mesos_containerizer_path, 'launch'],
+          stdout=subprocess.PIPE,
+          stderr=subprocess.PIPE)
+
+  _, stderr = process.communicate()
+  if "launch_info" in stderr:
+    return True
+
+  return False
+
+
 def wrap_with_mesos_containerizer(cmdline, user, cwd, mesos_containerizer_path):
-  command = json.dumps({
+  command_info = {
     'shell': False,
     'value': '/bin/bash',  # the binary to executed
     'arguments': [
@@ -30,14 +44,33 @@ def wrap_with_mesos_containerizer(cmdline, user, cwd, mesos_containerizer_path):
       '-c',
       cmdline
     ]
-  })
-  return [mesos_containerizer_path,
-          'launch',
-          '--unshare_namespace_mnt',
-          '--working_directory=%s' % cwd,
-          '--rootfs=%s' % os.path.join(os.environ['MESOS_DIRECTORY'], TASK_FILESYSTEM_MOUNT_POINT),
-          '--user=%s' % user,
-          '--command=%s' % command]
+  }
+
+  rootfs = os.path.join(os.environ['MESOS_DIRECTORY'], TASK_FILESYSTEM_MOUNT_POINT)
+
+  launch_info = {
+    'rootfs': rootfs,
+    'user': str(user),
+    'working_directory': cwd,
+    'command': command_info
+  }
+
+  # TODO(santhk) it is unfortunate that we will need to check the
+  # interface of mesos-containerizer like this. Clean this up when we have
+  # migrated to Mesos-1.2.0.
+  if is_launch_info_supported(mesos_containerizer_path):
+    return [mesos_containerizer_path,
+      'launch',
+      '--unshare_namespace_mnt',
+      '--launch_info=%s' % json.dumps(launch_info)]
+  else:
+    return [mesos_containerizer_path,
+      'launch',
+      '--unshare_namespace_mnt',
+      '--working_directory=%s' % cwd,
+      '--rootfs=%s' % rootfs,
+      '--user=%s' % user,
+      '--command=%s' % json.dumps(command_info)]
 
 
 def setup_child_subreaping():

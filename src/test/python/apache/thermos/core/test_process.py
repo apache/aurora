@@ -101,7 +101,7 @@ def test_simple_process():
 
 
 @mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
-def test_simple_process_filesystem_isolator():
+def test_simple_process_filesystem_isolator_command_info():
   with temporary_dir() as td:
     taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
@@ -109,10 +109,61 @@ def test_simple_process_filesystem_isolator():
     test_isolator_path = os.path.join(td, 'fake-mesos-containerier')
     with open(test_isolator_path, 'w') as fd:
       # We use a fake version of the mesos-containerizer binary that just echoes out its args so
-      # we can assert on them in the process's output.
+      # we can assert on them in the process's output. Also imitates a failure when there are not
+      # enough arguments, this is used to find the version of the binary (by checking the failure
+      # message)
       fd.write('\n'.join([
         '#!/bin/sh',
-        'echo "$@"'
+        'if [ "$#" -eq 1 ]; then',
+        '  { echo "command_info" >&2; };',
+        'else',
+        '  echo "$@";',
+        'fi'
+      ]))
+
+      fd.close()
+
+      chmod_plus_x(test_isolator_path)
+
+      p = TestProcess(
+        'process',
+        'echo hello world',
+        0,
+        taskpath,
+        sandbox,
+        mesos_containerizer_path=test_isolator_path,
+        container_sandbox=sandbox)
+      p.start()
+
+    rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
+    assert rc == 0
+    assert_log_content(
+      taskpath,
+      'stdout',
+      'launch --unshare_namespace_mnt --working_directory=%s --rootfs=/some/path/taskfs '
+      '--user=None --command={"shell": false, "arguments": ["/bin/bash", "-c", '
+      '"echo hello world"], "value": "/bin/bash"}\n' % (sandbox))
+
+
+@mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
+def test_simple_process_filesystem_isolator_launch_info():
+  with temporary_dir() as td:
+    taskpath = make_taskpath(td)
+    sandbox = setup_sandbox(td, taskpath)
+
+    test_isolator_path = os.path.join(td, 'fake-mesos-containerier')
+    with open(test_isolator_path, 'w') as fd:
+      # We use a fake version of the mesos-containerizer binary that just echoes out its args so
+      # we can assert on them in the process's output. Also imitates a failure when there are not
+      # enough arguments, this is used to find the version of the binary (by checking the failure
+      # message)
+      fd.write('\n'.join([
+        '#!/bin/sh',
+        'if [ "$#" -eq 1 ]; then',
+        '  { echo "launch_info" >&2; };',
+        'else',
+        '  echo "$@";',
+        'fi'
       ]))
 
       fd.close()
@@ -134,9 +185,9 @@ def test_simple_process_filesystem_isolator():
     assert_log_content(
         taskpath,
         'stdout',
-        'launch --unshare_namespace_mnt --working_directory=%s --rootfs=/some/path/taskfs '
-        '--user=None --command={"shell": false, "arguments": ["/bin/bash", "-c", '
-        '"echo hello world"], "value": "/bin/bash"}\n' % (sandbox))
+        'launch --unshare_namespace_mnt --launch_info={"command": {"shell": false, "arguments": '
+        '["/bin/bash", "-c", "echo hello world"], "value": "/bin/bash"}, '
+        '"working_directory": "%s", "user": "None", "rootfs": "/some/path/taskfs"}\n' % (sandbox))
 
 
 @mock.patch('os.chown')

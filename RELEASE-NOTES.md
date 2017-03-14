@@ -13,6 +13,8 @@
   driver. Users that want to use the HTTP API should use `V1_MESOS`.
   Performance sensitive users should stick with the `SCHEDULER_DRIVER` or
   `V0_MESOS` drivers.
+- Add support for new MesosContainerizer rolled out in Mesos 1.2.0.
+* Please upgrade Aurora to 0.18 before upgrading Mesos to 1.2.0.
 
 0.17.0
 ======
