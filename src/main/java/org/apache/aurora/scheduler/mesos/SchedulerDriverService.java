@@ -54,6 +54,7 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
 
   private final AtomicLong killFailures = Stats.exportLong("scheduler_driver_kill_failures");
   private final DriverFactory driverFactory;
+  private final FrameworkInfoFactory infoFactory;
 
   private final Scheduler scheduler;
   private final Storage storage;
@@ -65,12 +66,14 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
       Scheduler scheduler,
       Storage storage,
       DriverSettings driverSettings,
-      DriverFactory driverFactory) {
+      DriverFactory driverFactory,
+      FrameworkInfoFactory infoFactory) {
 
     this.scheduler = requireNonNull(scheduler);
     this.storage = requireNonNull(storage);
     this.driverSettings = requireNonNull(driverSettings);
     this.driverFactory = requireNonNull(driverFactory);
+    this.infoFactory = requireNonNull(infoFactory);
   }
 
   @Override
@@ -83,7 +86,7 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
       LOG.warn("Connecting to master without authentication!");
     }
 
-    Protos.FrameworkInfo.Builder frameworkBuilder = driverSettings.getFrameworkInfo().toBuilder();
+    Protos.FrameworkInfo.Builder frameworkBuilder = infoFactory.getFrameworkInfo().toBuilder();
 
     if (frameworkId.isPresent()) {
       LOG.info("Found persisted framework ID: " + frameworkId);

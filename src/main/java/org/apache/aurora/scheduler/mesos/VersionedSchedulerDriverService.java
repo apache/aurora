@@ -57,6 +57,7 @@ class VersionedSchedulerDriverService extends AbstractIdleService
   private final DriverSettings driverSettings;
   private final Scheduler scheduler;
   private final VersionedDriverFactory factory;
+  private final FrameworkInfoFactory infoFactory;
   private final SettableFuture<Mesos> mesosFuture = SettableFuture.create();
   private final CountDownLatch terminationLatch = new CountDownLatch(1);
   private final CountDownLatch registrationLatch = new CountDownLatch(1);
@@ -66,11 +67,13 @@ class VersionedSchedulerDriverService extends AbstractIdleService
       Storage storage,
       DriverSettings settings,
       Scheduler scheduler,
-      VersionedDriverFactory factory) {
+      VersionedDriverFactory factory,
+      FrameworkInfoFactory infoFactory) {
     this.storage = requireNonNull(storage);
     this.driverSettings = requireNonNull(settings);
     this.scheduler = requireNonNull(scheduler);
     this.factory = requireNonNull(factory);
+    this.infoFactory = requireNonNull(infoFactory);
   }
 
   private FrameworkID getFrameworkId() {
@@ -89,7 +92,7 @@ class VersionedSchedulerDriverService extends AbstractIdleService
       LOG.warn("Connecting to master without authentication!");
     }
 
-    FrameworkInfo.Builder frameworkBuilder = driverSettings.getFrameworkInfo().toBuilder();
+    FrameworkInfo.Builder frameworkBuilder = infoFactory.getFrameworkInfo().toBuilder();
 
     if (frameworkId.isPresent()) {
       LOG.info("Found persisted framework ID: " + frameworkId);

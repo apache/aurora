@@ -56,6 +56,7 @@ import org.apache.aurora.scheduler.events.WebhookModule;
 import org.apache.aurora.scheduler.http.HttpService;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
+import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory.FrameworkInfoFactoryImpl.SchedulerProtocol;
 import org.apache.aurora.scheduler.mesos.LibMesosLoadingModule;
 import org.apache.aurora.scheduler.stats.StatsModule;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -82,6 +83,7 @@ public class SchedulerMain {
   @CmdLine(name = "serverset_path", help = "ZooKeeper ServerSet path to register at.")
   private static final Arg<String> SERVERSET_PATH = Arg.create();
 
+  // TODO(zmanji): Consider making this an enum of HTTP or HTTPS.
   @CmdLine(name = "serverset_endpoint_name",
       help = "Name of the scheduler endpoint published in ZooKeeper.")
   private static final Arg<String> SERVERSET_ENDPOINT_NAME = Arg.create("http");
@@ -110,6 +112,15 @@ public class SchedulerMain {
 
   @CmdLine(name = "mesos_driver", help = "Which Mesos Driver to use")
   private static final Arg<DriverKind> DRIVER_IMPL = Arg.create(DriverKind.SCHEDULER_DRIVER);
+
+  public static class ProtocolModule extends AbstractModule {
+    @Override
+    protected void configure() {
+      bind(String.class)
+          .annotatedWith(SchedulerProtocol.class)
+          .toInstance(SERVERSET_ENDPOINT_NAME.get());
+    }
+  }
 
   @Inject private SingletonService schedulerService;
   @Inject private HttpService httpService;
@@ -157,6 +168,7 @@ public class SchedulerMain {
   @VisibleForTesting
   static Module getUniversalModule() {
     return Modules.combine(
+        new ProtocolModule(),
         new LifecycleModule(),
         new StatsModule(),
         new AppModule(ALLOW_GPU_RESOURCE.get(), DRIVER_IMPL.get()),

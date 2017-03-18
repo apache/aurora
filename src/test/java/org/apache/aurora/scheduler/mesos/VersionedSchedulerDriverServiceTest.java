@@ -40,18 +40,19 @@ public class VersionedSchedulerDriverServiceTest extends EasyMockTest {
       Protos.OfferID.newBuilder().setValue("offer-id").build();
   private static final Protos.Filters FILTER =
       Protos.Filters.newBuilder().setRefuseSeconds(10).build();
-  private static final DriverSettings SETTINGS = new DriverSettings(
-      "fakemaster",
-      Optional.absent(),
-      Protos.FrameworkInfo.newBuilder()
+  private static final Protos.FrameworkInfo BASE_INFO = Protos.FrameworkInfo.newBuilder()
           .setUser("framework user")
           .setName("test framework")
-          .build());
+          .build();
+  private static final DriverSettings SETTINGS = new DriverSettings(
+      "fakemaster",
+      Optional.absent());
 
   private StorageTestUtil storage;
   private Scheduler scheduler;
   private VersionedSchedulerDriverService driverService;
   private VersionedDriverFactory driverFactory;
+  private FrameworkInfoFactory infoFactory;
   private Mesos mesos;
 
   @Before
@@ -60,11 +61,13 @@ public class VersionedSchedulerDriverServiceTest extends EasyMockTest {
     storage = new StorageTestUtil(this);
     driverFactory = createMock(VersionedDriverFactory.class);
     mesos = createMock(Mesos.class);
+    infoFactory = createMock(FrameworkInfoFactory.class);
     driverService = new VersionedSchedulerDriverService(
         storage.storage,
         SETTINGS,
         scheduler,
-        driverFactory);
+        driverFactory,
+        infoFactory);
   }
 
   @Test
@@ -180,8 +183,9 @@ public class VersionedSchedulerDriverServiceTest extends EasyMockTest {
   private void expectStart() {
     storage.expectOperations();
     expect(storage.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(FRAMEWORK_ID));
+    expect(infoFactory.getFrameworkInfo()).andReturn(BASE_INFO);
 
-    Protos.FrameworkInfo.Builder builder = SETTINGS.getFrameworkInfo().toBuilder();
+    Protos.FrameworkInfo.Builder builder = BASE_INFO.toBuilder();
     builder.setId(Protos.FrameworkID.newBuilder().setValue(FRAMEWORK_ID));
 
     expect(driverFactory.create(

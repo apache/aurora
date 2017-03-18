@@ -72,6 +72,7 @@ import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
+import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -127,13 +128,14 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
       .setMode(MaintenanceMode.NONE)
       .setAttributes(ImmutableSet.of()));
 
-  private static final DriverSettings SETTINGS = new DriverSettings(
-      "fakemaster",
-      Optional.absent(),
-      FrameworkInfo.newBuilder()
+  private static final FrameworkInfo BASE_INFO = FrameworkInfo.newBuilder()
           .setUser("framework user")
           .setName("test framework")
-          .build());
+          .build();
+
+  private static final DriverSettings SETTINGS = new DriverSettings(
+      "fakemaster",
+      Optional.absent());
 
   private final ExecutorService executor = Executors.newCachedThreadPool(
       new ThreadFactoryBuilder().setNameFormat("SchedulerIT-%d").setDaemon(true).build());
@@ -187,6 +189,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
       @Override
       protected void configure() {
         bind(DriverFactory.class).toInstance(driverFactory);
+        bind(FrameworkInfoFactory.class).toInstance(() -> BASE_INFO);
         bind(DriverSettings.class).toInstance(SETTINGS);
         bind(Log.class).toInstance(log);
         Set<Resource> overhead = ImmutableSet.of(
@@ -299,7 +302,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     expect(driverFactory.create(
         capture(scheduler),
         eq(SETTINGS.getCredentials()),
-        eq(SETTINGS.getFrameworkInfo()),
+        eq(BASE_INFO),
         eq(SETTINGS.getMasterUri())))
         .andReturn(driver).anyTimes();
 

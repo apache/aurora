@@ -61,6 +61,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
+import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory;
 import org.apache.aurora.scheduler.mesos.MesosCallbackHandler;
 import org.apache.aurora.scheduler.mesos.MesosCallbackHandler.MesosCallbackHandlerImpl;
 import org.apache.aurora.scheduler.mesos.MesosSchedulerImpl;
@@ -206,11 +207,11 @@ public class StatusUpdateBenchmark {
             bind(DriverSettings.class).toInstance(
                 new DriverSettings(
                     "fakemaster",
-                    Optional.absent(),
-                    Protos.FrameworkInfo.newBuilder()
-                        .setUser("framework user")
-                        .setName("test framework")
-                        .build()));
+                    Optional.absent()));
+            bind(FrameworkInfoFactory.class).toInstance(() -> Protos.FrameworkInfo.newBuilder()
+                    .setUser("framework user")
+                    .setName("test framework")
+                    .build());
             bind(RescheduleCalculator.class).toInstance(new FakeRescheduleCalculator());
             bind(Clock.class).toInstance(new FakeClock());
             bind(ExecutorSettings.class).toInstance(TestExecutorSettings.THERMOS_EXECUTOR);

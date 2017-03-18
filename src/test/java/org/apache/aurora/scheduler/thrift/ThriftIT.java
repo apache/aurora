@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.thrift;
 
 import java.util.Optional;
+import javax.inject.Singleton;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
@@ -42,6 +43,7 @@ import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.app.AppModule;
 import org.apache.aurora.scheduler.app.LifecycleModule;
+import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.app.local.FakeNonVolatileStorage;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
@@ -50,6 +52,9 @@ import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
+import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory;
+import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory.FrameworkInfoFactoryImpl;
+import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory.FrameworkInfoFactoryImpl.BaseFrameworkInfo;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.quota.QuotaModule;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
@@ -99,20 +104,27 @@ public class ThriftIT extends EasyMockTest {
             bind(ExecutorSettings.class).toInstance(TestExecutorSettings.THERMOS_EXECUTOR);
 
             install(new AppModule(configurationManagerSettings, SCHEDULER_DRIVER));
+            install(new SchedulerMain.ProtocolModule());
 
             bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
 
             ServiceGroupMonitor schedulers = createMock(ServiceGroupMonitor.class);
             bind(ServiceGroupMonitor.class).toInstance(schedulers);
 
+            FrameworkInfo base = FrameworkInfo.newBuilder()
+                    .setUser("framework user")
+                    .setName("test framework")
+                    .build();
+
             bindMock(DriverFactory.class);
             bind(DriverSettings.class).toInstance(new DriverSettings(
                 "fakemaster",
-                com.google.common.base.Optional.absent(),
-                FrameworkInfo.newBuilder()
-                    .setUser("framework user")
-                    .setName("test framework")
-                    .build()));
+                com.google.common.base.Optional.absent()));
+            bind(FrameworkInfo.class)
+                .annotatedWith(BaseFrameworkInfo.class)
+                .toInstance(base);
+            bind(FrameworkInfoFactory.class).to(FrameworkInfoFactoryImpl.class);
+            bind(FrameworkInfoFactoryImpl.class).in(Singleton.class);
             bindMock(Recovery.class);
             bindMock(StorageBackup.class);
             bind(IServerInfo.class).toInstance(SERVER_INFO);

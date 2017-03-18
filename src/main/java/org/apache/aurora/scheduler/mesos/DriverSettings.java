@@ -27,16 +27,13 @@ import static java.util.Objects.requireNonNull;
 public class DriverSettings {
   private final String masterUri;
   private final Optional<Protos.Credential> credentials;
-  private final Protos.FrameworkInfo frameworkInfo;
 
   public DriverSettings(
       String masterUri,
-      Optional<Protos.Credential> credentials,
-      Protos.FrameworkInfo frameworkInfo) {
+      Optional<Protos.Credential> credentials) {
 
     this.masterUri = requireNonNull(masterUri);
     this.credentials = requireNonNull(credentials);
-    this.frameworkInfo = requireNonNull(frameworkInfo);
   }
 
   public String getMasterUri() {
@@ -45,9 +42,5 @@ public class DriverSettings {
 
   public Optional<Protos.Credential> getCredentials() {
     return credentials;
-  }
-
-  public Protos.FrameworkInfo getFrameworkInfo() {
-    return frameworkInfo;
   }
 }

@@ -47,7 +47,7 @@ public class VersionedMesosSchedulerImpl implements Scheduler {
   private final CachedCounters counters;
   private final MesosCallbackHandler handler;
   private final Storage storage;
-  private final DriverSettings settings;
+  private final FrameworkInfoFactory infoFactory;
 
   private volatile boolean isRegistered = false;
 
@@ -68,11 +68,11 @@ public class VersionedMesosSchedulerImpl implements Scheduler {
       MesosCallbackHandler handler,
       CachedCounters counters,
       Storage storage,
-      DriverSettings settings) {
+      FrameworkInfoFactory factory) {
     this.handler = requireNonNull(handler);
     this.counters = requireNonNull(counters);
     this.storage = requireNonNull(storage);
-    this.settings = requireNonNull(settings);
+    this.infoFactory = requireNonNull(factory);
     initializeEventMetrics();
   }
 
@@ -83,7 +83,7 @@ public class VersionedMesosSchedulerImpl implements Scheduler {
     Optional<String> frameworkId = storage.read(
         storeProvider -> storeProvider.getSchedulerStore().fetchFrameworkId());
 
-    Protos.FrameworkInfo.Builder frameworkBuilder = settings.getFrameworkInfo().toBuilder();
+    Protos.FrameworkInfo.Builder frameworkBuilder = infoFactory.getFrameworkInfo().toBuilder();
 
     Call.Builder call = Call.newBuilder().setType(Call.Type.SUBSCRIBE);
 

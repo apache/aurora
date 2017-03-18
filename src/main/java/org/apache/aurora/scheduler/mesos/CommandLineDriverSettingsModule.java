@@ -19,6 +19,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
+import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -116,7 +117,10 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
         MESOS_ROLE.hasAppliedValue() ? Optional.of(MESOS_ROLE.get()) : Optional.absent();
     DriverSettings settings = new DriverSettings(
         MESOS_MASTER_ADDRESS.get(),
-        credentials,
+        credentials);
+    bind(DriverSettings.class).toInstance(settings);
+
+    FrameworkInfo base =
         buildFrameworkInfo(
             FRAMEWORK_NAME.get(),
             EXECUTOR_USER.get(),
@@ -124,8 +128,13 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
             FRAMEWORK_FAILOVER_TIMEOUT.get(),
             RECEIVE_REVOCABLE_RESOURCES.get(),
             allowGpuResource,
-            role));
-    bind(DriverSettings.class).toInstance(settings);
+            role);
+    bind(FrameworkInfo.class)
+        .annotatedWith(FrameworkInfoFactory.FrameworkInfoFactoryImpl.BaseFrameworkInfo.class)
+        .toInstance(base);
+    bind(FrameworkInfoFactory.class).to(FrameworkInfoFactory.FrameworkInfoFactoryImpl.class);
+    bind(FrameworkInfoFactory.FrameworkInfoFactoryImpl.class).in(Singleton.class);
+
   }
 
   private static Optional<Protos.Credential> getCredentials() {

@@ -52,7 +52,7 @@ public class VersionedMesosSchedulerImplTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private Mesos driver;
   private FakeStatsProvider statsProvider;
-  private DriverSettings driverSettings;
+  private FrameworkInfoFactory infoFactory;
 
   private VersionedMesosSchedulerImpl scheduler;
 
@@ -144,13 +144,13 @@ public class VersionedMesosSchedulerImplTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     driver = createMock(Mesos.class);
     statsProvider = new FakeStatsProvider();
-    driverSettings = createMock(DriverSettings.class);
+    infoFactory = createMock(FrameworkInfoFactory.class);
 
     scheduler = new VersionedMesosSchedulerImpl(
         handler,
         new CachedCounters(statsProvider),
         storageUtil.storage,
-        driverSettings);
+        infoFactory);
   }
 
   @Test
@@ -159,7 +159,7 @@ public class VersionedMesosSchedulerImplTest extends EasyMockTest {
 
     storageUtil.expectOperations();
     expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(FRAMEWORK_ID));
-    expect(driverSettings.getFrameworkInfo()).andReturn(FRAMEWORK_INFO);
+    expect(infoFactory.getFrameworkInfo()).andReturn(FRAMEWORK_INFO);
 
     Capture<Call> subscribeCapture = createCapture();
 
