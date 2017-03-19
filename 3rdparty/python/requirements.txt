@@ -21,7 +21,7 @@ mock==1.0.1
 mox==0.5.3
 pex==1.1.14
 protobuf==2.6.1
-psutil==4.3.0
+psutil==5.2.0
 pystachio==0.8.3
 requests==2.11.1
 requests-kerberos==0.10.0
