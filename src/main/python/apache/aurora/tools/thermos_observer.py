@@ -25,6 +25,7 @@ from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
 
 from apache.aurora.executor.common.path_detector import MesosPathDetector
+from apache.thermos.monitoring.resource import TaskResourceMonitor
 from apache.thermos.observer.http.configure import configure_server
 from apache.thermos.observer.task_observer import TaskObserver
 
@@ -60,6 +61,22 @@ app.add_option(
       help='The number of seconds between observer refresh attempts.')
 
 
+app.add_option(
+    '--task_process_collection_interval_secs',
+      dest='task_process_collection_interval_secs',
+      type='int',
+      default=int(TaskResourceMonitor.PROCESS_COLLECTION_INTERVAL.as_(Time.SECONDS)),
+      help='The number of seconds between per task process resource collections.')
+
+
+app.add_option(
+    '--task_disk_collection_interval_secs',
+      dest='task_disk_collection_interval_secs',
+      type='int',
+      default=int(TaskResourceMonitor.DISK_COLLECTION_INTERVAL.as_(Time.SECONDS)),
+      help='The number of seconds between per task disk resource collections.')
+
+
 # Allow an interruptible sleep so that ^C works.
 def sleep_forever():
   while True:
@@ -68,8 +85,11 @@ def sleep_forever():
 
 def initialize(options):
   path_detector = MesosPathDetector(options.mesos_root)
-  polling_interval = Amount(options.polling_interval_secs, Time.SECONDS)
-  return TaskObserver(path_detector, interval=polling_interval)
+  return TaskObserver(
+      path_detector,
+      Amount(options.polling_interval_secs, Time.SECONDS),
+      Amount(options.task_process_collection_interval_secs, Time.SECONDS),
+      Amount(options.task_disk_collection_interval_secs, Time.SECONDS))
 
 
 def handle_error(exc_type, value, traceback):

@@ -21,6 +21,7 @@ polls a designated Thermos checkpoint root and collates information about all ta
 """
 import os
 import threading
+import time
 from operator import attrgetter
 
 from twitter.common import log
@@ -31,7 +32,7 @@ from twitter.common.quantity import Amount, Time
 from apache.thermos.common.path import TaskPath
 from apache.thermos.monitoring.monitor import TaskMonitor
 from apache.thermos.monitoring.process import ProcessSample
-from apache.thermos.monitoring.resource import ResourceMonitorBase, TaskResourceMonitor
+from apache.thermos.monitoring.resource import TaskResourceMonitor
 
 from .detector import ObserverTaskDetector
 from .observed_task import ActiveObservedTask, FinishedObservedTask
@@ -55,17 +56,17 @@ class TaskObserver(ExceptionalThread, Lockable):
 
   def __init__(self,
                path_detector,
-               resource_monitor_class=TaskResourceMonitor,
-               interval=POLLING_INTERVAL):
+               interval=POLLING_INTERVAL,
+               task_process_collection_interval=TaskResourceMonitor.PROCESS_COLLECTION_INTERVAL,
+               task_disk_collection_interval=TaskResourceMonitor.DISK_COLLECTION_INTERVAL):
     self._detector = ObserverTaskDetector(
         path_detector,
         self.__on_active,
         self.__on_finished,
         self.__on_removed)
-    if not issubclass(resource_monitor_class, ResourceMonitorBase):
-      raise ValueError("resource monitor class must implement ResourceMonitorBase!")
-    self._resource_monitor_class = resource_monitor_class
     self._interval = interval
+    self._task_process_collection_interval = task_process_collection_interval
+    self._task_disk_collection_interval = task_disk_collection_interval
     self._active_tasks = {}    # task_id => ActiveObservedTask
     self._finished_tasks = {}  # task_id => FinishedObservedTask
     self._stop_event = threading.Event()
@@ -100,7 +101,11 @@ class TaskObserver(ExceptionalThread, Lockable):
       log.error('Found an active task (%s) in finished tasks?' % task_id)
       return
     task_monitor = TaskMonitor(root, task_id)
-    resource_monitor = self._resource_monitor_class(task_id, task_monitor)
+    resource_monitor = TaskResourceMonitor(
+        task_id,
+        task_monitor,
+        process_collection_interval=self._task_process_collection_interval,
+        disk_collection_interval=self._task_disk_collection_interval)
     resource_monitor.start()
     self._active_tasks[task_id] = ActiveObservedTask(
         root,
@@ -132,7 +137,9 @@ class TaskObserver(ExceptionalThread, Lockable):
     while not self._stop_event.is_set():
       self._stop_event.wait(self._interval.as_(Time.SECONDS))
       with self.lock:
+        start = time.time()
         self._detector.refresh()
+        log.debug("TaskObserver: finished checkpoint refresh in %.2fs" % (time.time() - start))
 
   @Lockable.sync
   def process_from_name(self, task_id, process_id):

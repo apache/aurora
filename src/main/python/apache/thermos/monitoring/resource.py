@@ -118,15 +118,17 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
   """
 
   MAX_HISTORY = 10000  # magic number
+  PROCESS_COLLECTION_INTERVAL = Amount(20, Time.SECONDS)
+  DISK_COLLECTION_INTERVAL = Amount(60, Time.SECONDS)
+  HISTORY_TIME = Amount(1, Time.HOURS)
 
   def __init__(self,
                task_id,
                task_monitor,
-               process_collector=ProcessTreeCollector,
                disk_collector=DiskCollector,
-               process_collection_interval=Amount(20, Time.SECONDS),
-               disk_collection_interval=Amount(1, Time.MINUTES),
-               history_time=Amount(1, Time.HOURS)):
+               process_collection_interval=PROCESS_COLLECTION_INTERVAL,
+               disk_collection_interval=DISK_COLLECTION_INTERVAL,
+               history_time=HISTORY_TIME):
     """
       task_monitor: TaskMonitor object specifying the task whose resources should be monitored
       sandbox: Directory for which to monitor disk utilisation
@@ -135,7 +137,6 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
     self._task_id = task_id
     log.debug('Initialising resource collection for task %s' % self._task_id)
     self._process_collectors = dict()  # ProcessStatus => ProcessTreeCollector
-    self._process_collector_factory = process_collector
     self._disk_collector_class = disk_collector
     self._disk_collector = None
     self._process_collection_interval = process_collection_interval.as_(Time.SECONDS)
@@ -167,7 +168,7 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
     else:
       # Since this might be called out of band (before the main loop is aware of the process)
       if process not in self._process_collectors:
-        self._process_collectors[process] = self._process_collector_factory(process.pid)
+        self._process_collectors[process] = ProcessTreeCollector(process.pid)
 
       self._process_collectors[process].sample()
       return self._process_collectors[process].value
@@ -189,7 +190,6 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
     next_disk_collection = 0
 
     while not self._kill_signal.is_set():
-
       now = time.time()
 
       if now > next_process_collection:
@@ -199,7 +199,7 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
         for process in current - actives:
           self._process_collectors.pop(process)
         for process in actives - current:
-          self._process_collectors[process] = self._process_collector_factory(process.pid)
+          self._process_collectors[process] = ProcessTreeCollector(process.pid)
         for process, collector in self._process_collectors.items():
           collector.sample()
 
@@ -223,6 +223,9 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
       except ValueError as err:
         log.warning("Error recording resource sample: %s" % err)
 
+      log.debug("TaskResourceMonitor: finished collection of %s in %.2fs" % (
+          self._task_id, (time.time() - now)))
+
       # Sleep until any of the following conditions are met:
       # - it's time for the next disk collection
       # - it's time for the next process collection
@@ -236,6 +239,10 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
       else:
         waiter = self._kill_signal
 
-      waiter.wait(timeout=max(0, next_collection))
+      if next_collection > 0:
+        waiter.wait(timeout=next_collection)
+      else:
+        log.warning('Task resource collection is backlogged. Consider increasing '
+                    'process_collection_interval and disk_collection_interval.')
 
     log.debug('Stopping resource monitoring for task "%s"' % self._task_id)
