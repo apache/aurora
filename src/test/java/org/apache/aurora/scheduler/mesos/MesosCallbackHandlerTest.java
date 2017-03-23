@@ -21,7 +21,10 @@ import com.google.common.util.concurrent.MoreExecutors;
 
 import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.base.Command;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskStatusHandler;
@@ -30,6 +33,7 @@ import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.offers.OfferManager;
+import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -131,26 +135,44 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
       .setReason(Protos.TaskStatus.Reason.REASON_RECONCILIATION)
       .build();
 
+  private static final Amount<Long, Time> DRAIN_THRESHOLD = Amount.of(2L, Time.MINUTES);
+
+  private static final Protos.InverseOffer INVERSE_OFFER = Protos.InverseOffer.newBuilder()
+      .setAgentId(AGENT_ID)
+      .setFrameworkId(FRAMEWORK)
+      .setId(OFFER_ID)
+      .setUnavailability(Protos.Unavailability.newBuilder()
+          .setStart(Protos.TimeInfo.newBuilder()
+              .setNanoseconds(300000000000L)
+          ))
+      .build();
+
+  private static final Protos.Filters FILTER = Protos.Filters.newBuilder().build();
+
   private StorageTestUtil storageUtil;
   private Command shutdownCommand;
   private TaskStatusHandler statusHandler;
   private OfferManager offerManager;
   private EventSink eventSink;
   private FakeStatsProvider statsProvider;
+  private Driver driver;
   private Logger injectedLog;
+  private FakeClock clock;
+  private MaintenanceController controller;
 
   private MesosCallbackHandler handler;
 
   @Before
   public void setUp() {
-
     storageUtil = new StorageTestUtil(this);
     shutdownCommand = createMock(Command.class);
     statusHandler = createMock(TaskStatusHandler.class);
     offerManager = createMock(OfferManager.class);
     eventSink = createMock(EventSink.class);
     statsProvider = new FakeStatsProvider();
-
+    driver = createMock(Driver.class);
+    clock = new FakeClock();
+    controller = createMock(MaintenanceController.class);
     createHandler(false);
   }
 
@@ -169,7 +191,11 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
         eventSink,
         MoreExecutors.directExecutor(),
         injectedLog,
-        statsProvider);
+        statsProvider,
+        driver,
+        clock,
+        controller,
+        DRAIN_THRESHOLD);
 
   }
 
@@ -426,5 +452,28 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     control.replay();
 
     handler.handleMessage(EXECUTOR_ID, AGENT_ID);
+  }
+
+  @Test
+  public void testInverseOfferInTheFuture() {
+    driver.acceptInverseOffer(OFFER_ID, FILTER);
+
+    control.replay();
+
+    handler.handleInverseOffer(ImmutableList.of(INVERSE_OFFER));
+    assertEquals(1L, statsProvider.getLongValue("scheduler_inverse_offers"));
+  }
+
+  @Test
+  public void testInverseOfferWithinThreshold() {
+    clock.advance(Amount.of(4L, Time.MINUTES));
+
+    driver.acceptInverseOffer(OFFER_ID, FILTER);
+    controller.drainForInverseOffer(INVERSE_OFFER);
+
+    control.replay();
+
+    handler.handleInverseOffer(ImmutableList.of(INVERSE_OFFER));
+    assertEquals(1L, statsProvider.getLongValue("scheduler_inverse_offers"));
   }
 }

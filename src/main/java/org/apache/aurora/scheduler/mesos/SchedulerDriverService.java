@@ -140,6 +140,11 @@ class SchedulerDriverService extends AbstractIdleService implements Driver {
   }
 
   @Override
+  public void acceptInverseOffer(Protos.OfferID offerID, Protos.Filters filter) {
+    throw new UnsupportedOperationException("SchedulerDriver does not support inverse offers");
+  }
+
+  @Override
   public void declineOffer(Protos.OfferID offerId, Protos.Filters filter) {
     ensureRunning();
 

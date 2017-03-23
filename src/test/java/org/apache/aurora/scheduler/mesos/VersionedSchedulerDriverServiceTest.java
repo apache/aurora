@@ -180,6 +180,33 @@ public class VersionedSchedulerDriverServiceTest extends EasyMockTest {
     assertEquals(accept.getAccept().getOperationsList(), ImmutableList.of());
   }
 
+  @Test
+  public void testAcceptInverseOffer() {
+    expectStart();
+
+    expect(storage.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(FRAMEWORK_ID));
+
+    Capture<Call> acceptCapture = createCapture();
+    mesos.send(capture(acceptCapture));
+    expectLastCall().once();
+
+    control.replay();
+    driverService.startAsync().awaitRunning();
+    driverService.registered(new PubsubEvent.DriverRegistered());
+
+    driverService.acceptInverseOffer(OFFER_ID, FILTER);
+
+    assertTrue(acceptCapture.hasCaptured());
+    Call accept = acceptCapture.getValue();
+    assertEquals(accept.getFrameworkId().getValue(), FRAMEWORK_ID);
+    assertEquals(accept.getType(), Call.Type.ACCEPT_INVERSE_OFFERS);
+    assertEquals(accept.getAcceptInverseOffers().getFilters(), FILTER);
+    assertEquals(
+        accept.getAcceptInverseOffers().getInverseOfferIdsList(),
+        ImmutableList.of(OFFER_ID)
+    );
+  }
+
   private void expectStart() {
     storage.expectOperations();
     expect(storage.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(FRAMEWORK_ID));

@@ -13,10 +13,13 @@
  */
 package org.apache.aurora.scheduler.filter;
 
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
@@ -248,10 +251,17 @@ public interface SchedulingFilter {
   class UnusedResource {
     private final ResourceBag offer;
     private final IHostAttributes attributes;
+    private final Optional<Instant> unavailabilityStart;
 
+    @VisibleForTesting
     public UnusedResource(ResourceBag offer, IHostAttributes attributes) {
+      this(offer, attributes, Optional.absent());
+    }
+
+    public UnusedResource(ResourceBag offer, IHostAttributes attributes, Optional<Instant> start) {
       this.offer = offer;
       this.attributes = attributes;
+      this.unavailabilityStart = start;
     }
 
     public ResourceBag getResourceBag() {
@@ -262,6 +272,10 @@ public interface SchedulingFilter {
       return attributes;
     }
 
+    public Optional<Instant> getUnavailabilityStart() {
+      return unavailabilityStart;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (!(o instanceof UnusedResource)) {
@@ -270,12 +284,13 @@ public interface SchedulingFilter {
 
       UnusedResource other = (UnusedResource) o;
       return Objects.equals(offer, other.offer)
-          && Objects.equals(attributes, other.attributes);
+          && Objects.equals(attributes, other.attributes)
+          && Objects.equals(unavailabilityStart, other.unavailabilityStart);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(offer, attributes);
+      return Objects.hash(offer, attributes, unavailabilityStart);
     }
   }
 

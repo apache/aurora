@@ -13,15 +13,12 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import java.util.List;
 import javax.inject.Inject;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.inject.TimedInterceptor;
 import org.apache.aurora.scheduler.stats.CachedCounters;
@@ -147,10 +144,7 @@ public class VersionedMesosSchedulerImpl implements Scheduler {
         break;
 
       case INVERSE_OFFERS:
-        List<Protos.InverseOffer> offers = event.getInverseOffers().getInverseOffersList();
-        String ids = Joiner.on(",").join(
-            Lists.transform(offers, input -> input.getId().getValue()));
-        LOG.warn("Ignoring inverse offers: {}", ids);
+        handler.handleInverseOffer(event.getInverseOffers().getInverseOffersList());
         break;
 
       case RESCIND_INVERSE_OFFER:

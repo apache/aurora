@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -214,8 +215,14 @@ public interface PreemptionVictimFilter {
       for (PreemptionVictim victim : sortedVictims) {
         toPreemptTasks.add(victim);
         totalResource = totalResource.add(victimToResources.apply(victim));
+
+        Optional<Instant> unavailability = Optional.absent();
+        if (offer.isPresent()) {
+          unavailability = offer.get().getUnavailabilityStart();
+        }
+
         Set<Veto> vetoes = schedulingFilter.filter(
-            new UnusedResource(totalResource, attributes.get()),
+            new UnusedResource(totalResource, attributes.get(), unavailability),
             new ResourceRequest(
                 pendingTask,
                 ResourceManager.bagFromResources(pendingTask.getResources()).add(overhead),

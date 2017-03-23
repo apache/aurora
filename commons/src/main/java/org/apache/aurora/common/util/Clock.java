@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.common.util;
 
+import java.time.Instant;
+
 /**
  * An abstraction of the system clock.
  * @author John Sirois
@@ -21,7 +23,6 @@ public interface Clock {
   // TODO(zmanji): Consider replacing this with java.time.Clock
   /**
    * A clock that returns the the actual time reported by the system.
-   * This clock is guaranteed to be serializable.
    */
   Clock SYSTEM_CLOCK = new Clock() {
     @Override public long nowMillis() {
@@ -32,6 +33,9 @@ public interface Clock {
     }
     @Override public void waitFor(long millis) throws InterruptedException {
       Thread.sleep(millis);
+    }
+    @Override public Instant nowInstant() {
+      return Instant.now();
     }
   };
 
@@ -44,7 +48,7 @@ public interface Clock {
   long nowMillis();
 
   /**
-   * Returns the current time in nanoseconds.  Should be used only for relative timing.
+   * Returns the current time in nanoseconds. Should be used only for relative timing.
    * See {@code System.nanoTime()} for tips on using the value returned here.
    *
    * @return A measure of the current time in nanoseconds.
@@ -59,5 +63,12 @@ public interface Clock {
    * @throws InterruptedException if this wait was interrupted
    */
   void waitFor(long millis) throws InterruptedException;
-}
 
+  /**
+   * Returns the current time as an java.time.Instant.
+   *
+   * @return the Instant representing the current time.
+   * @see Instant#now()
+   */
+  Instant nowInstant();
+}

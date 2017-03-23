@@ -41,6 +41,8 @@ import org.apache.mesos.v1.Protos;
 import org.apache.mesos.v1.Protos.Filters;
 import org.apache.mesos.v1.Protos.Offer.Operation;
 import org.apache.mesos.v1.Protos.TaskInfo;
+import org.apache.mesos.v1.Protos.TimeInfo;
+import org.apache.mesos.v1.Protos.Unavailability;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -62,6 +64,7 @@ import static org.junit.Assert.fail;
 public class OfferManagerImplTest extends EasyMockTest {
 
   private static final Amount<Long, Time> RETURN_DELAY = Amount.of(1L, Time.DAYS);
+  private static final Amount<Long, Time> ONE_HOUR = Amount.of(1L, Time.HOURS);
   private static final String HOST_A = "HOST_A";
   private static final IHostAttributes HOST_ATTRIBUTES_A =
       IHostAttributes.build(new HostAttributes().setMode(NONE).setHost(HOST_A));
@@ -115,7 +118,35 @@ public class OfferManagerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testOffersSorted() throws Exception {
+  public void testOffersSortedByUnavailability() throws Exception {
+    clock.advance(Amount.of(1L, Time.HOURS));
+
+    HostOffer hostOfferB = setUnavailability(OFFER_B, clock.nowMillis());
+    Long offerCStartTime = clock.nowMillis() + ONE_HOUR.as(Time.MILLISECONDS);
+    HostOffer hostOfferC = setUnavailability(OFFER_C, offerCStartTime);
+
+    driver.declineOffer(OFFER_B.getOffer().getId(), OFFER_FILTER);
+    driver.declineOffer(OFFER_A.getOffer().getId(), OFFER_FILTER);
+    driver.declineOffer(OFFER_C.getOffer().getId(), OFFER_FILTER);
+
+    control.replay();
+
+    offerManager.addOffer(hostOfferB);
+    offerManager.addOffer(OFFER_A);
+    offerManager.addOffer(hostOfferC);
+
+    List<HostOffer> actual = ImmutableList.copyOf(offerManager.getOffers());
+
+    assertEquals(
+        // hostOfferC has a further away start time, so it should be preferred.
+        ImmutableList.of(OFFER_A, hostOfferC, hostOfferB),
+        actual);
+
+    clock.advance(RETURN_DELAY);
+  }
+
+  @Test
+  public void testOffersSortedByMaintenance() throws Exception {
     // Ensures that non-DRAINING offers are preferred - the DRAINING offer would be tried last.
 
     HostOffer offerA = setMode(OFFER_A, DRAINING);
@@ -335,6 +366,14 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     clock.advance(RETURN_DELAY);
     assertEquals(0L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
+  }
+
+  private static HostOffer setUnavailability(HostOffer offer, Long startMs) {
+    Unavailability unavailability = Unavailability.newBuilder()
+        .setStart(TimeInfo.newBuilder().setNanoseconds(startMs * 1000L)).build();
+    return new HostOffer(
+        offer.getOffer().toBuilder().setUnavailability(unavailability).build(),
+        offer.getAttributes());
   }
 
   private static HostOffer setMode(HostOffer offer, MaintenanceMode mode) {

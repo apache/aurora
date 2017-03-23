@@ -25,7 +25,9 @@ import com.google.common.collect.Sets;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.ExecutorConfig;
@@ -98,12 +100,14 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   private static final String HOST_ATTRIBUTE = "host";
   private static final String OFFER = "offer";
   private static final Optional<HostOffer> NO_OFFER = Optional.absent();
+  private static final Amount<Long, Time> UNAVAILABLITY_THRESHOLD = Amount.of(1L, Time.MINUTES);
 
   private StorageTestUtil storageUtil;
   private SchedulingFilter schedulingFilter;
   private FakeStatsProvider statsProvider;
   private PreemptorMetrics preemptorMetrics;
   private TierManager tierManager;
+  private FakeClock clock;
 
   @Before
   public void setUp() {
@@ -112,6 +116,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     statsProvider = new FakeStatsProvider();
     preemptorMetrics = new PreemptorMetrics(new CachedCounters(statsProvider));
     tierManager = createMock(TierManager.class);
+    clock = new FakeClock();
   }
 
   private Optional<ImmutableSet<PreemptionVictim>> runFilter(
@@ -267,7 +272,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   // Ensures a production task can preempt 2 tasks on the same host.
   @Test
   public void testProductionPreemptingManyNonProduction() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(UNAVAILABLITY_THRESHOLD, clock);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     setResource(a1, CPUS, 1.0);
     setResource(a1, RAM_MB, 512.0);
@@ -295,7 +300,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   // Ensures we select the minimal number of tasks to preempt
   @Test
   public void testMinimalSetPreempted() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(UNAVAILABLITY_THRESHOLD, clock);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     setResource(a1, CPUS, 4.0);
     setResource(a1, RAM_MB, 4096.0);
@@ -330,7 +335,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   // Ensures a production task *never* preempts a production task from another job.
   @Test
   public void testProductionJobNeverPreemptsProductionJob() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(UNAVAILABLITY_THRESHOLD, clock);
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
     expectGetTier(p1, PREFERRED_TIER);
@@ -350,7 +355,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   // Ensures that we can preempt if a task + offer can satisfy a pending task.
   @Test
   public void testPreemptWithOfferAndTask() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(UNAVAILABLITY_THRESHOLD, clock);
 
     setUpHost();
 
@@ -375,7 +380,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   // Ensures revocable offer resources are filtered out.
   @Test
   public void testRevocableOfferFiltered() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(UNAVAILABLITY_THRESHOLD, clock);
 
     setUpHost();
 
@@ -400,7 +405,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   // Ensures revocable task CPU is not considered for preemption.
   @Test
   public void testRevocableVictimsFiltered() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(UNAVAILABLITY_THRESHOLD, clock);
 
     setUpHost();
 
@@ -425,7 +430,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   // Ensures revocable victim non-compressible resources are still considered.
   @Test
   public void testRevocableVictimRamUsed() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(UNAVAILABLITY_THRESHOLD, clock);
 
     setUpHost();
 
@@ -452,7 +457,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   // Ensures we can preempt if two tasks and an offer can satisfy a pending task.
   @Test
   public void testPreemptWithOfferAndMultipleTasks() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(UNAVAILABLITY_THRESHOLD, clock);
 
     setUpHost();
 

@@ -171,7 +171,10 @@ public interface TaskAssigner {
         }
 
         Set<Veto> vetoes = filter.filter(
-            new UnusedResource(offer.getResourceBag(tierInfo), offer.getAttributes()),
+            new UnusedResource(
+                offer.getResourceBag(tierInfo),
+                offer.getAttributes(),
+                offer.getUnavailabilityStart()),
             resourceRequest);
 
         if (vetoes.isEmpty()) {

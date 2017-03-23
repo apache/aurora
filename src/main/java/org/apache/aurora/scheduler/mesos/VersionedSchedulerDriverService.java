@@ -137,6 +137,24 @@ class VersionedSchedulerDriverService extends AbstractIdleService
   }
 
   @Override
+  public void acceptInverseOffer(OfferID offerID, Filters filter) {
+    whenRegistered(() -> {
+      LOG.info("Accepting Inverse Offer {}", offerID.getValue());
+
+      Futures.getUnchecked(mesosFuture).send(
+          Call.newBuilder()
+              .setFrameworkId(getFrameworkId())
+              .setType(Call.Type.ACCEPT_INVERSE_OFFERS)
+              .setAcceptInverseOffers(
+                  Call.AcceptInverseOffers.newBuilder()
+                    .addInverseOfferIds(offerID)
+                    .setFilters(filter)
+              )
+          .build());
+    });
+  }
+
+  @Override
   public void declineOffer(OfferID offerId, Filters filter) {
     whenRegistered(() -> {
       LOG.info("Declining offer {}", offerId.getValue());

@@ -134,6 +134,9 @@ jobs = [
     name = 'http_example'
   ).bind(profile=DefaultProfile()),
   job(
+    name = 'http_example_maintenance'
+  ).bind(profile=DefaultProfile()),
+  job(
     name = 'http_example_watch_secs',
     update_config = update_config_watch_secs
   ).bind(profile=DefaultProfile()),

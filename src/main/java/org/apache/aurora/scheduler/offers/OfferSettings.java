@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.offers;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Supplier;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -24,7 +23,6 @@ import static java.util.Objects.requireNonNull;
 /**
  * Settings required to create an OfferManager.
  */
-@VisibleForTesting
 public class OfferSettings {
 
   private final Amount<Long, Time> offerFilterDuration;

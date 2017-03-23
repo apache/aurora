@@ -13,15 +13,20 @@
  */
 package org.apache.aurora.scheduler.filter;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Set;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.ExecutorConfig;
@@ -87,11 +92,13 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       mesosScalar(DISK_MB, DEFAULT_DISK),
       mesosRange(PORTS, 80, 81)));
 
+  private static final Amount<Long, Time> UNAVAILABILITY_THRESHOLD = Amount.of(2L, Time.MINUTES);
+  private final FakeClock clock = new FakeClock();
   private SchedulingFilter defaultFilter;
 
   @Before
   public void setUp() {
-    defaultFilter = new SchedulingFilterImpl();
+    defaultFilter = new SchedulingFilterImpl(UNAVAILABILITY_THRESHOLD, clock);
   }
 
   @Test
@@ -214,6 +221,55 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertNoVetoes(
         makeTask(),
         hostAttributes(HOST_A, MaintenanceMode.SCHEDULED, host(HOST_A), rack(RACK_A)));
+  }
+
+  @Test
+  public void testDrainingMesosMaintenance() {
+    // Start the test at minute 8
+    clock.advance(Amount.of(8L, Time.MINUTES));
+
+    // The agent will go down at minute 9
+    // this is less than the threshold of two minutes
+
+    Instant start = Instant.ofEpochMilli(Amount.of(9L, Time.MINUTES).as(Time.MILLISECONDS));
+
+    ITaskConfig task = makeTask();
+    UnusedResource unusedResource = new UnusedResource(
+        DEFAULT_OFFER,
+        hostAttributes(HOST_A),
+        Optional.of(start));
+    ResourceRequest request = new ResourceRequest(task, bag(task), empty());
+
+    control.replay();
+
+    assertEquals(
+        ImmutableSet.of(Veto.maintenance("draining")),
+        defaultFilter.filter(unusedResource, request));
+  }
+
+  @Test
+  public void testNotVetoingWithMesosMaintenace() {
+    // Start the test at minute 8
+    clock.advance(Amount.of(8L, Time.MINUTES));
+
+    // The agent will go down at minute 100
+    // this is greater than the threshold of two minutes
+
+    Instant start = Instant.ofEpochMilli(Amount.of(100L, Time.MINUTES).as(Time.MILLISECONDS));
+
+    ITaskConfig task = makeTask();
+    UnusedResource unusedResource = new UnusedResource(
+        DEFAULT_OFFER,
+        hostAttributes(HOST_A),
+        Optional.of(start));
+    ResourceRequest request = new ResourceRequest(task, bag(task), empty());
+
+    control.replay();
+
+    assertEquals(
+        ImmutableSet.of(),
+        defaultFilter.filter(unusedResource, request));
+
   }
 
   @Test

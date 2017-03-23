@@ -42,6 +42,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IHostStatus;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.mesos.v1.Protos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +56,6 @@ import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
  * All state-changing functions return their results.  Additionally, all state-changing functions
  * will ignore requests to change state of unknown hosts and subsequently omit these hosts from
  * return values.
- * TODO(wfarner): Convert use of HostStatus in this API to IHostStatus (immutable).
  */
 public interface MaintenanceController {
 
@@ -78,6 +78,14 @@ public interface MaintenanceController {
    *         moved to DRAINED.
    */
   Set<IHostStatus> drain(Set<String> hosts);
+
+  /**
+   * Drain tasks defined by the inverse offer.
+   * This method doesn't set any host attributes.
+   *
+   * @param inverseOffer the inverse offer to use.
+   */
+  void drainForInverseOffer(Protos.InverseOffer inverseOffer);
 
   /**
    * Fetches the current maintenance mode of {$code host}.
@@ -120,28 +128,40 @@ public interface MaintenanceController {
       this.batchWorker = requireNonNull(batchWorker);
     }
 
+    private Set<String> drainTasksOnHost(String host, MutableStoreProvider store) {
+      Query.Builder query = Query.slaveScoped(host).active();
+      Set<String> activeTasks = FluentIterable.from(store.getTaskStore().fetchTasks(query))
+          .transform(Tasks::id)
+          .toSet();
+
+      if (activeTasks.isEmpty()) {
+        LOG.info("No tasks to drain on host: {}", host);
+        // Simple way to avoid the log message if there are no tasks.
+        return activeTasks;
+      } else {
+        LOG.info("Draining tasks: {} on host: {}", activeTasks, host);
+        for (String taskId : activeTasks) {
+          stateManager.changeState(
+              store,
+              taskId,
+              Optional.absent(),
+              ScheduleStatus.DRAINING,
+              DRAINING_MESSAGE);
+        }
+
+        return activeTasks;
+      }
+
+    }
+
     private Set<IHostStatus> watchDrainingTasks(MutableStoreProvider store, Set<String> hosts) {
       LOG.info("Hosts to drain: " + hosts);
       Set<String> emptyHosts = Sets.newHashSet();
       for (String host : hosts) {
+        Set<String> drainedTasks = drainTasksOnHost(host, store);
         // If there are no tasks on the host, immediately transition to DRAINED.
-        Query.Builder query = Query.slaveScoped(host).active();
-        Set<String> activeTasks = FluentIterable.from(store.getTaskStore().fetchTasks(query))
-            .transform(Tasks::id)
-            .toSet();
-        if (activeTasks.isEmpty()) {
-          LOG.info("No tasks to drain for host: " + host);
+        if (drainedTasks.isEmpty()) {
           emptyHosts.add(host);
-        } else {
-          LOG.info("Draining tasks: {} on host: {}", activeTasks, host);
-          for (String taskId : activeTasks) {
-            stateManager.changeState(
-                store,
-                taskId,
-                Optional.absent(),
-                ScheduleStatus.DRAINING,
-                DRAINING_MESSAGE);
-          }
         }
       }
 
@@ -193,6 +213,28 @@ public interface MaintenanceController {
     @Override
     public Set<IHostStatus> drain(Set<String> hosts) {
       return storage.write(store -> watchDrainingTasks(store, hosts));
+    }
+
+    private Optional<String> getHostname(Protos.InverseOffer offer) {
+      if (offer.getUrl().getAddress().hasHostname()) {
+        return Optional.of(offer.getUrl().getAddress().getHostname());
+      } else {
+        return Optional.absent();
+      }
+    }
+
+    @Override
+    public void drainForInverseOffer(Protos.InverseOffer offer) {
+      // TaskStore does not allow for querying by agent id.
+      Optional<String> hostname = getHostname(offer);
+
+      if (hostname.isPresent()) {
+        String host = hostname.get();
+        storage.write(storeProvider -> drainTasksOnHost(host, storeProvider));
+      } else {
+        LOG.error("Unable to drain tasks on agent {} because "
+            + "no hostname attached to inverse offer {}.", offer.getAgentId(), offer.getId());
+      }
     }
 
     private static final Function<IHostAttributes, String> HOST_NAME =

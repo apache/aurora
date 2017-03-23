@@ -42,6 +42,14 @@ public interface Driver extends Service {
   void acceptOffers(OfferID offerId, Collection<Operation> operations, Filters filter);
 
   /**
+   * Accepts an inverse offer.
+   *
+   * @param offerID ID of the inverse offer.
+   * @param filter offer filter to apply.
+   */
+  void acceptInverseOffer(OfferID offerID, Filters filter);
+
+  /**
    * Declines a resource offer.
    *
    * @param offerId ID of the offer to decline.

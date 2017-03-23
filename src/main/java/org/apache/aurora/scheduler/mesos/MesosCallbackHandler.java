@@ -15,6 +15,8 @@ package org.apache.aurora.scheduler.mesos;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
@@ -26,19 +28,27 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskStatusHandler;
+import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.offers.OfferManager;
+import org.apache.aurora.scheduler.offers.OffersModule;
+import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.v1.Protos.AgentID;
 import org.apache.mesos.v1.Protos.ExecutorID;
+import org.apache.mesos.v1.Protos.Filters;
 import org.apache.mesos.v1.Protos.FrameworkID;
+import org.apache.mesos.v1.Protos.InverseOffer;
 import org.apache.mesos.v1.Protos.MasterInfo;
 import org.apache.mesos.v1.Protos.Offer;
 import org.apache.mesos.v1.Protos.OfferID;
@@ -70,9 +80,9 @@ public interface MesosCallbackHandler {
   void handleUpdate(TaskStatus status);
   void handleLostAgent(AgentID agentId);
   void handleLostExecutor(ExecutorID executorID, AgentID slaveID, int status);
+  void handleInverseOffer(List<InverseOffer> offers);
 
   class MesosCallbackHandlerImpl implements MesosCallbackHandler {
-
     private final TaskStatusHandler taskStatusHandler;
     private final OfferManager offerManager;
     private final Storage storage;
@@ -80,11 +90,16 @@ public interface MesosCallbackHandler {
     private final EventSink eventSink;
     private final Executor executor;
     private final Logger log;
+    private final Driver driver;
+    private final Clock clock;
+    private final MaintenanceController maintenanceController;
+    private final Amount<Long, Time> unavailabilityThreshold;
 
     private final AtomicLong offersRescinded;
     private final AtomicLong slavesLost;
     private final AtomicLong reRegisters;
-    private final AtomicLong offersRecieved;
+    private final AtomicLong offersReceived;
+    private final AtomicLong inverseOffersReceived;
     private final AtomicLong disconnects;
     private final AtomicLong executorsLost;
 
@@ -114,7 +129,11 @@ public interface MesosCallbackHandler {
         OfferManager offerManager,
         EventSink eventSink,
         @SchedulerExecutor Executor executor,
-        StatsProvider statsProvider) {
+        StatsProvider statsProvider,
+        Driver driver,
+        Clock clock,
+        MaintenanceController controller,
+        @OffersModule.UnavailabilityThreshold Amount<Long, Time> unavailabilityThreshold) {
 
       this(
           storage,
@@ -124,7 +143,11 @@ public interface MesosCallbackHandler {
           eventSink,
           executor,
           LoggerFactory.getLogger(MesosCallbackHandlerImpl.class),
-          statsProvider);
+          statsProvider,
+          driver,
+          clock,
+          controller,
+          unavailabilityThreshold);
     }
 
     @VisibleForTesting
@@ -136,7 +159,11 @@ public interface MesosCallbackHandler {
         EventSink eventSink,
         Executor executor,
         Logger log,
-        StatsProvider statsProvider) {
+        StatsProvider statsProvider,
+        Driver driver,
+        Clock clock,
+        MaintenanceController maintenanceController,
+        Amount<Long, Time> unavailabilityThreshold) {
 
       this.storage = requireNonNull(storage);
       this.lifecycle = requireNonNull(lifecycle);
@@ -145,11 +172,16 @@ public interface MesosCallbackHandler {
       this.eventSink = requireNonNull(eventSink);
       this.executor = requireNonNull(executor);
       this.log = requireNonNull(log);
+      this.driver = requireNonNull(driver);
+      this.clock = requireNonNull(clock);
+      this.maintenanceController = requireNonNull(maintenanceController);
+      this.unavailabilityThreshold = requireNonNull(unavailabilityThreshold);
 
       this.offersRescinded = statsProvider.makeCounter("offers_rescinded");
       this.slavesLost = statsProvider.makeCounter("slaves_lost");
       this.reRegisters = statsProvider.makeCounter("scheduler_framework_reregisters");
-      this.offersRecieved = statsProvider.makeCounter("scheduler_resource_offers");
+      this.offersReceived = statsProvider.makeCounter("scheduler_resource_offers");
+      this.inverseOffersReceived = statsProvider.makeCounter("scheduler_inverse_offers");
       this.disconnects = statsProvider.makeCounter("scheduler_framework_disconnects");
       this.executorsLost = statsProvider.makeCounter("scheduler_lost_executors");
     }
@@ -186,7 +218,7 @@ public interface MesosCallbackHandler {
                 AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);
             storeProvider.getAttributeStore().saveHostAttributes(attributes);
             log.debug("Received offer: {}", offer);
-            offersRecieved.incrementAndGet();
+            offersReceived.incrementAndGet();
             offerManager.addOffer(new HostOffer(offer, attributes));
           }
         });
@@ -202,7 +234,7 @@ public interface MesosCallbackHandler {
 
     @Override
     public void handleRescind(OfferID offerId) {
-      log.info("Offer rescinded: " + offerId);
+      log.info("Offer rescinded: {}", offerId.getValue());
       offerManager.cancelOffer(offerId);
       offersRescinded.incrementAndGet();
     }
@@ -283,6 +315,30 @@ public interface MesosCallbackHandler {
         log.warn("Lost executor " + executorID + " on slave " + slaveID + " with status " + status);
         executorsLost.incrementAndGet();
       }
+    }
+
+    @Override
+    public void handleInverseOffer(List<InverseOffer> offers) {
+      if (offers.isEmpty()) {
+        return;
+      }
+
+      executor.execute(() -> {
+        for (InverseOffer offer: offers) {
+          inverseOffersReceived.incrementAndGet();
+          log.debug("Received inverse offer: {}", offer);
+          // Use the default filter for accepting inverse offers.
+          driver.acceptInverseOffer(offer.getId(), Filters.newBuilder().build());
+
+          Instant start = Conversions.getStart(offer.getUnavailability());
+          Instant drainTime = start
+              .minus(unavailabilityThreshold.as(Time.MILLISECONDS), ChronoUnit.MILLIS);
+
+          if (clock.nowInstant().isAfter(drainTime)) {
+            maintenanceController.drainForInverseOffer(offer);
+          }
+        }
+      });
     }
   }
 }

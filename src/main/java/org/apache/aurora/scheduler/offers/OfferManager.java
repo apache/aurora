@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.offers;
 
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Set;
@@ -22,7 +23,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
@@ -37,7 +37,6 @@ import com.google.common.eventbus.Subscribe;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.DelayExecutor;
@@ -272,15 +271,22 @@ public interface OfferManager extends EventSubscriber {
      * the different indices used and their consistency.
      */
     private static class HostOffers {
+      private static final Ordering<HostOffer> AURORA_MAINTENANCE_COMPARATOR =
+          Ordering.explicit(NONE, SCHEDULED, DRAINING, DRAINED)
+              .onResultOf(offer -> offer.getAttributes().getMode());
+      // We should not prefer offers from agents that are scheduled to become unavailable.
+      // We should also sort the unavailability start to prefer agents that are starting
+      // maintenance later.
+      private static final Ordering<HostOffer> MESOS_MAINTENANCE_COMPARATOR =
+          Ordering
+            .natural()
+            .reverse()
+            .onResultOf(o -> o.getUnavailabilityStart().or(Instant.MAX));
+
       private static final Comparator<HostOffer> PREFERENCE_COMPARATOR =
           // Currently, the only preference is based on host maintenance status.
-          Ordering.explicit(NONE, SCHEDULED, DRAINING, DRAINED)
-              .onResultOf(new Function<HostOffer, MaintenanceMode>() {
-                @Override
-                public MaintenanceMode apply(HostOffer offer) {
-                  return offer.getAttributes().getMode();
-                }
-              })
+          AURORA_MAINTENANCE_COMPARATOR
+              .compound(MESOS_MAINTENANCE_COMPARATOR)
               .compound(Ordering.arbitrary());
 
       private final Set<HostOffer> offers = new ConcurrentSkipListSet<>(PREFERENCE_COMPARATOR);

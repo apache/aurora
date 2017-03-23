@@ -33,6 +33,11 @@ public class FakeDriver extends AbstractIdleService implements Driver {
   }
 
   @Override
+  public void acceptInverseOffer(Protos.OfferID offerID, Protos.Filters filter) {
+    // no-op
+  }
+
+  @Override
   public void declineOffer(Protos.OfferID offerId, Protos.Filters filters) {
     // no-op
   }

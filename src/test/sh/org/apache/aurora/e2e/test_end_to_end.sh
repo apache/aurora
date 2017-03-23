@@ -79,6 +79,57 @@ test_version() {
   [[ $(aurora --version 2>&1) = $(cat /vagrant/.auroraversion) ]]
 }
 
+clear_mesos_maintenance() {
+  curl http://"$TEST_SLAVE_IP":5050/maintenance/schedule \
+    -H "Content-type: application/json" \
+    -X POST \
+    -d "{}"
+}
+
+test_mesos_maintenance() {
+  local _cluster=$1 _role=$2 _env=$3
+  local _base_config=$4
+  local _job=$7
+  local _jobkey="$_cluster/$_role/$_env/$_job"
+
+  # Clear any previous maintenance schedules before running this test.
+  clear_mesos_maintenance
+
+  test_create $_jobkey $_base_config
+
+  echo "Waiting job to enter RUNNING..."
+  wait_until_task_status $_jobkey "0" "RUNNING"
+
+  # Create the maintenance schedule
+  MAINTENANCE_SCHEDULE="/tmp/maintenance_schedule.json"
+  python \
+  /vagrant/src/test/sh/org/apache/aurora/e2e/generate_mesos_maintenance_schedule.py > "$MAINTENANCE_SCHEDULE"
+  echo "Creating maintenance with schedule"
+  cat $MAINTENANCE_SCHEDULE | jq .
+
+  curl http://"$TEST_SLAVE_IP":5050/maintenance/schedule \
+    -H "Content-type: application/json" \
+    -X POST \
+    -d @"$MAINTENANCE_SCHEDULE"
+
+  trap clear_mesos_maintenance EXIT
+
+  # Posting of a maintenance schedule should not cause the task to drain right
+  # away.
+  assert_task_status $_jobkey "0" "RUNNING"
+
+  # When it is drain time, it should be killed.
+  echo "Waiting for time to drain tasks..."
+  wait_until_task_status $_jobkey "0" "PENDING"
+
+  clear_mesos_maintenance
+
+  echo "Waiting for drained task to re-launch..."
+  wait_until_task_status $_jobkey "0" "RUNNING"
+
+  test_kill $_jobkey
+}
+
 test_health_check() {
   [[ $(_curl "$TEST_SLAVE_IP:8081/health") == 'OK' ]]
 }
@@ -163,6 +214,39 @@ assert_update_state() {
   local _state=$(aurora update list $_jobkey --status active | tail -n +2 | awk '{print $3}')
   if [[ $_state != $_expected_state ]]; then
     echo "Expected update to be in state $_expected_state, but found $_state"
+    exit 1
+  fi
+}
+
+assert_task_status() {
+  local _jobkey=$1 _id=$2 _expected_state=$3
+
+  local _state=$(aurora job status $_jobkey --write-json | jq -r ".[0].active[$_id].status")
+
+  if [[ $_state != $_expected_state ]]; then
+    echo "Expected task to be in state $_expected_state, but found $_state"
+    exit 1
+  fi
+}
+
+wait_until_task_status() {
+  # Poll the task, waiting for it to enter the target state
+  local _jobkey=$1 _id=$2 _expected_state=$3
+  local _state=""
+  local _success=0
+
+  for i in $(seq 1 120); do
+    _state=$(aurora job status $_jobkey --write-json | jq -r ".[0].active[$_id].status")
+    if [[ $_state == $_expected_state ]]; then
+      _success=1
+      break
+    else
+      sleep 1
+    fi
+  done
+
+  if [[ "$_success" -ne "1" ]]; then
+    echo "Task did not transition to $_expected_state within two minutes."
     exit 1
   fi
 }
@@ -514,6 +598,7 @@ TEST_CLUSTER=devcluster
 TEST_ROLE=vagrant
 TEST_ENV=test
 TEST_JOB=http_example
+TEST_MAINTENANCE_JOB=http_example_maintenance
 TEST_JOB_WATCH_SECS=http_example_watch_secs
 TEST_JOB_REVOCABLE=http_example_revocable
 TEST_JOB_GPU=http_example_gpu
@@ -538,6 +623,8 @@ BASE_ARGS=(
 )
 
 TEST_JOB_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB")
+
+TEST_MAINTENANCE_JOB_ARGS=("${BASE_ARGS[@]}" "$TEST_MAINTENANCE_JOB")
 
 TEST_JOB_WATCH_SECS_ARGS=("${BASE_ARGS[@]}" "$TEST_JOB_WATCH_SECS")
 
@@ -577,6 +664,8 @@ test_version
 test_http_example "${TEST_JOB_ARGS[@]}"
 test_http_example "${TEST_JOB_WATCH_SECS_ARGS[@]}"
 test_health_check
+
+test_mesos_maintenance "${TEST_MAINTENANCE_JOB_ARGS[@]}"
 
 test_http_example_basic "${TEST_JOB_REVOCABLE_ARGS[@]}"
 

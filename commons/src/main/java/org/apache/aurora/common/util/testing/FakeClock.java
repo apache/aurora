@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.common.util.testing;
 
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Preconditions;
@@ -75,5 +76,10 @@ public class FakeClock implements Clock {
   @Override
   public void waitFor(long millis) {
     advance(Amount.of(millis, Time.MILLISECONDS));
+  }
+
+  @Override
+  public Instant nowInstant() {
+    return Instant.ofEpochMilli(nowMillis());
   }
 }

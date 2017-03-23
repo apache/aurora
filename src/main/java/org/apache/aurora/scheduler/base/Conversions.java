@@ -13,9 +13,11 @@
  */
 package org.apache.aurora.scheduler.base;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -33,11 +35,13 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.v1.Protos;
 import org.apache.mesos.v1.Protos.Offer;
 import org.apache.mesos.v1.Protos.TaskState;
+import org.apache.mesos.v1.Protos.Unavailability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Collection of utility functions to convert mesos protobuf types to internal thrift types.
+ * Collection of utility functions to convert mesos protobuf types to internal thrift types or
+ * Java types.
  */
 public final class Conversions {
 
@@ -151,5 +155,16 @@ public final class Conversions {
     return FluentIterable.from(offer.getAttributesList())
         .transform(ATTRIBUTE_NAME)
         .anyMatch(Predicates.equalTo(ConfigurationManager.DEDICATED_ATTRIBUTE));
+  }
+
+  /**
+   * Converts the start of an Unavailability proto to an Instant.
+   *
+   * @param unavailability Unavailability information from Mesos.
+   * @return The java.time.Instant of the start.
+   */
+  public static Instant getStart(Unavailability unavailability) {
+    long ns = unavailability.getStart().getNanoseconds();
+    return Instant.ofEpochMilli(TimeUnit.NANOSECONDS.toMillis(ns));
   }
 }
