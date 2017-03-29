@@ -84,7 +84,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
         shutdownRegistry,
         statsProvider,
         serviceManager);
-    assertEquals(0, statsProvider.getValue(SchedulerLifecycle.REGISTERED_GAUGE));
     assertEquals(1, statsProvider.getValue(stateGaugeName(State.IDLE)));
     return shutdownCommand;
   }
@@ -137,10 +136,8 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     assertEquals(1, statsProvider.getValue(stateGaugeName(State.STORAGE_PREPARED)));
     leaderListener.onLeading(leaderControl);
     assertEquals(1, statsProvider.getValue(stateGaugeName(State.LEADER_AWAITING_REGISTRATION)));
-    assertEquals(0, statsProvider.getValue(SchedulerLifecycle.REGISTERED_GAUGE));
     schedulerLifecycle.registered(new DriverRegistered());
     assertEquals(1, statsProvider.getValue(stateGaugeName(State.ACTIVE)));
-    assertEquals(1, statsProvider.getValue(SchedulerLifecycle.REGISTERED_GAUGE));
     triggerFailover.getValue().run();
   }
 

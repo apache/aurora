@@ -211,7 +211,9 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
     control.replay();
 
+    assertEquals(0L, statsProvider.getLongValue("framework_registered"));
     handler.handleRegistration(FRAMEWORK, MASTER);
+    assertEquals(1L, statsProvider.getLongValue("framework_registered"));
   }
 
   @Test
@@ -220,6 +222,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
     handler.handleReregistration(MASTER);
     assertEquals(1L, statsProvider.getLongValue("scheduler_framework_reregisters"));
+    assertEquals(1L, statsProvider.getLongValue("framework_registered"));
   }
 
   @Test
@@ -294,6 +297,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
     handler.handleDisconnection();
     assertEquals(1L, statsProvider.getLongValue("scheduler_framework_disconnects"));
+    assertEquals(0L, statsProvider.getLongValue("framework_registered"));
   }
 
   @Test

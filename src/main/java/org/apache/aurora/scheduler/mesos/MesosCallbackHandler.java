@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -102,6 +103,7 @@ public interface MesosCallbackHandler {
     private final AtomicLong inverseOffersReceived;
     private final AtomicLong disconnects;
     private final AtomicLong executorsLost;
+    private final AtomicBoolean frameworkRegistered;
 
     /**
      * Binding annotation for the executor the incoming Mesos message handler uses.
@@ -184,6 +186,8 @@ public interface MesosCallbackHandler {
       this.inverseOffersReceived = statsProvider.makeCounter("scheduler_inverse_offers");
       this.disconnects = statsProvider.makeCounter("scheduler_framework_disconnects");
       this.executorsLost = statsProvider.makeCounter("scheduler_lost_executors");
+      this.frameworkRegistered = new AtomicBoolean(false);
+      statsProvider.makeGauge("framework_registered", () -> frameworkRegistered.get() ? 1 : 0);
     }
 
     @Override
@@ -193,12 +197,14 @@ public interface MesosCallbackHandler {
       storage.write(
           (Storage.MutateWork.NoResult.Quiet) storeProvider ->
               storeProvider.getSchedulerStore().saveFrameworkId(frameworkId.getValue()));
+      frameworkRegistered.set(true);
       eventSink.post(new PubsubEvent.DriverRegistered());
     }
 
     @Override
     public void handleReregistration(MasterInfo masterInfo) {
       log.info("Framework re-registered with master " + masterInfo);
+      frameworkRegistered.set(true);
       reRegisters.incrementAndGet();
     }
 
@@ -228,7 +234,8 @@ public interface MesosCallbackHandler {
     @Override
     public void handleDisconnection() {
       log.warn("Framework disconnected.");
-      this.disconnects.incrementAndGet();
+      disconnects.incrementAndGet();
+      frameworkRegistered.set(false);
       eventSink.post(new PubsubEvent.DriverDisconnected());
     }
 
