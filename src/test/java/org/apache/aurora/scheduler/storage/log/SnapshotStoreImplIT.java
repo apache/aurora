@@ -20,6 +20,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.Injector;
 
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.util.testing.FakeBuildInfo;
@@ -56,6 +57,7 @@ import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.db.EnumBackfill;
 import org.apache.aurora.scheduler.storage.db.MigrationManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -74,7 +76,6 @@ import static org.apache.aurora.common.util.testing.FakeBuildInfo.generateBuildI
 import static org.apache.aurora.scheduler.resources.ResourceManager.aggregateFromBag;
 import static org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import static org.apache.aurora.scheduler.storage.db.DbModule.testModuleWithWorkQueue;
-import static org.apache.aurora.scheduler.storage.db.DbUtil.createStorage;
 import static org.apache.aurora.scheduler.storage.db.DbUtil.createStorageInjector;
 import static org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.ALL_H2_STORE_FIELDS;
 import static org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.SNAPSHOT_RESTORE;
@@ -94,11 +95,15 @@ public class SnapshotStoreImplIT {
   private SnapshotStore<Snapshot> snapshotStore;
 
   private void setUpStore(boolean dbTaskStore, Set<String> hydrateFields) {
-    storage = dbTaskStore
-        ? createStorage()
-        : createStorageInjector(
-        testModuleWithWorkQueue(PLAIN, Optional.of(new InMemStoresModule(PLAIN))))
-        .getInstance(Storage.class);
+    Injector injector;
+    if (dbTaskStore)  {
+      injector = createStorageInjector(testModuleWithWorkQueue());
+    } else {
+      injector = createStorageInjector(
+          testModuleWithWorkQueue(PLAIN, Optional.of(new InMemStoresModule(PLAIN))));
+    }
+
+    storage = injector.getInstance(Storage.class);
 
     FakeClock clock = new FakeClock();
     clock.setNowMillis(NOW);
@@ -109,7 +114,8 @@ public class SnapshotStoreImplIT {
         dbTaskStore,
         hydrateFields,
         createStorageInjector(testModuleWithWorkQueue()).getInstance(MigrationManager.class),
-        TaskTestUtil.THRIFT_BACKFILL);
+        TaskTestUtil.THRIFT_BACKFILL,
+        injector.getInstance(EnumBackfill.class));
     Stats.flush();
   }
 

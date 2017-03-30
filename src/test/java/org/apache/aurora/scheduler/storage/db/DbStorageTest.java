@@ -51,7 +51,7 @@ public class DbStorageTest extends EasyMockTest {
 
     storage = new DbStorage(
         createMock(SqlSessionFactory.class),
-        createMock(EnumValueMapper.class),
+        createMock(EnumBackfill.class),
         gatedWorkQueue,
         createMock(CronJobStore.Mutable.class),
         createMock(TaskStore.Mutable.class),

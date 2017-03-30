@@ -26,16 +26,9 @@ import com.google.inject.Inject;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.gen.CronCollisionPolicy;
-import org.apache.aurora.gen.JobUpdateAction;
-import org.apache.aurora.gen.JobUpdateStatus;
-import org.apache.aurora.gen.MaintenanceMode;
-import org.apache.aurora.gen.Mode;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.GatedWorkQueue;
 import org.apache.aurora.scheduler.async.GatedWorkQueue.GatedOperation;
-import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -67,15 +60,15 @@ import static org.apache.ibatis.mapping.SqlCommandType.UPDATE;
 class DbStorage extends AbstractIdleService implements Storage {
 
   private final SqlSessionFactory sessionFactory;
+  private final EnumBackfill enumBackfill;
   private final MutableStoreProvider storeProvider;
-  private final EnumValueMapper enumValueMapper;
   private final GatedWorkQueue gatedWorkQueue;
   private final StatsProvider statsProvider;
 
   @Inject
   DbStorage(
       SqlSessionFactory sessionFactory,
-      EnumValueMapper enumValueMapper,
+      EnumBackfill enumBackfill,
       @AsyncExecutor GatedWorkQueue gatedWorkQueue,
       final CronJobStore.Mutable cronJobStore,
       final TaskStore.Mutable taskStore,
@@ -87,7 +80,7 @@ class DbStorage extends AbstractIdleService implements Storage {
       StatsProvider statsProvider) {
 
     this.sessionFactory = requireNonNull(sessionFactory);
-    this.enumValueMapper = requireNonNull(enumValueMapper);
+    this.enumBackfill = requireNonNull(enumBackfill);
     this.gatedWorkQueue = requireNonNull(gatedWorkQueue);
     requireNonNull(cronJobStore);
     requireNonNull(taskStore);
@@ -216,33 +209,7 @@ class DbStorage extends AbstractIdleService implements Storage {
       session.update(createStatementName);
     }
 
-    for (CronCollisionPolicy policy : CronCollisionPolicy.values()) {
-      enumValueMapper.addEnumValue("cron_policies", policy.getValue(), policy.name());
-    }
-
-    for (MaintenanceMode mode : MaintenanceMode.values()) {
-      enumValueMapper.addEnumValue("maintenance_modes", mode.getValue(), mode.name());
-    }
-
-    for (JobUpdateStatus status : JobUpdateStatus.values()) {
-      enumValueMapper.addEnumValue("job_update_statuses", status.getValue(), status.name());
-    }
-
-    for (JobUpdateAction action : JobUpdateAction.values()) {
-      enumValueMapper.addEnumValue("job_instance_update_actions", action.getValue(), action.name());
-    }
-
-    for (ScheduleStatus status : ScheduleStatus.values()) {
-      enumValueMapper.addEnumValue("task_states", status.getValue(), status.name());
-    }
-
-    for (ResourceType resourceType : ResourceType.values()) {
-      enumValueMapper.addEnumValue("resource_types", resourceType.getValue(), resourceType.name());
-    }
-
-    for (Mode mode : Mode.values()) {
-      enumValueMapper.addEnumValue("volume_modes", mode.getValue(), mode.name());
-    }
+    enumBackfill.backfill();
 
     createPoolMetrics();
   }

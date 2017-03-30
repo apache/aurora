@@ -29,6 +29,7 @@ import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.db.DbUtil;
+import org.apache.aurora.scheduler.storage.db.EnumBackfill;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
@@ -71,10 +72,12 @@ interface TemporaryStorage {
   class TemporaryStorageFactory implements Function<Snapshot, TemporaryStorage> {
 
     private final ThriftBackfill thriftBackfill;
+    private final EnumBackfill enumBackfill;
 
     @Inject
-    TemporaryStorageFactory(ThriftBackfill thriftBackfill) {
+    TemporaryStorageFactory(ThriftBackfill thriftBackfill, EnumBackfill enumBackfill) {
       this.thriftBackfill = requireNonNull(thriftBackfill);
+      this.enumBackfill = requireNonNull(enumBackfill);
     }
 
     @Override
@@ -96,7 +99,8 @@ interface TemporaryStorage {
           // We can just pass an empty lambda for the MigrationManager as migration is a no-op
           // when restoring from backup.
           () -> { } /** migrationManager */,
-          thriftBackfill);
+          thriftBackfill,
+          enumBackfill);
       snapshotStore.applySnapshot(snapshot);
 
       return new TemporaryStorage() {

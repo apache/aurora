@@ -41,6 +41,7 @@ import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import org.apache.aurora.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
+import org.apache.aurora.scheduler.storage.db.EnumBackfill;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.easymock.Capture;
@@ -81,7 +82,9 @@ public class RecoveryTest extends EasyMockTest {
     shutDownNow = createMock(Command.class);
     ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
     clock = FakeScheduledExecutor.scheduleExecutor(executor);
-    TemporaryStorageFactory factory = new TemporaryStorageFactory(TaskTestUtil.THRIFT_BACKFILL);
+    final EnumBackfill enumBackfill = createMock(EnumBackfill.class);
+    TemporaryStorageFactory factory =
+        new TemporaryStorageFactory(TaskTestUtil.THRIFT_BACKFILL, enumBackfill);
     storageBackup = new StorageBackupImpl(
         snapshotStore,
         clock,

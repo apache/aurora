@@ -315,6 +315,10 @@ public final class DbModule extends PrivateModule {
     bind(DbStorage.class).in(Singleton.class);
     expose(storageKey);
 
+    bind(EnumBackfill.class).to(EnumBackfill.EnumBackfillImpl.class);
+    bind(EnumBackfill.EnumBackfillImpl.class).in(Singleton.class);
+    expose(EnumBackfill.class);
+
     expose(DbStorage.class);
     expose(SqlSessionFactory.class);
     expose(TaskMapper.class);

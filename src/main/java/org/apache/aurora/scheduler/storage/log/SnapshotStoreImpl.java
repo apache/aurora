@@ -62,6 +62,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
+import org.apache.aurora.scheduler.storage.db.EnumBackfill;
 import org.apache.aurora.scheduler.storage.db.MigrationManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -188,6 +189,10 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
             } catch (SQLException e) {
               throw new RuntimeException(e);
             }
+
+            // This ensures any subsequently added enum values since the last snapshot exist in
+            // the db.
+            enumBackfill.backfill();
           }
         }
       },
@@ -436,6 +441,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   private final Set<String> hydrateSnapshotFields;
   private final MigrationManager migrationManager;
   private final ThriftBackfill thriftBackfill;
+  private final EnumBackfill enumBackfill;
 
   /**
    * Identifies if experimental task store is in use.
@@ -461,7 +467,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       @ExperimentalTaskStore boolean useDbSnapshotForTaskStore,
       @HydrateSnapshotFields Set<String> hydrateSnapshotFields,
       MigrationManager migrationManager,
-      ThriftBackfill thriftBackfill) {
+      ThriftBackfill thriftBackfill,
+      EnumBackfill enumBackfill) {
 
     this.buildInfo = requireNonNull(buildInfo);
     this.clock = requireNonNull(clock);
@@ -470,6 +477,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
     this.hydrateSnapshotFields = requireNonNull(hydrateSnapshotFields);
     this.migrationManager = requireNonNull(migrationManager);
     this.thriftBackfill = requireNonNull(thriftBackfill);
+    this.enumBackfill = requireNonNull(enumBackfill);
   }
 
   @Timed("snapshot_create")
