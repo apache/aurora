@@ -53,6 +53,22 @@ class DiffFormatter(object):
       def __repr__(self):
         return self.data
 
+    # Sorting sets, hence they turn into lists
+    if task.constraints:
+      task.constraints = sorted(task.constraints, key=str)
+
+    if task.metadata:
+      task.metadata = sorted(task.metadata, key=str)
+
+    if task.resources:
+      task.resources = sorted(task.resources, key=str)
+
+    if task.requestedPorts:
+      task.requestedPorts = sorted(task.requestedPorts, key=str)
+
+    if task.mesosFetcherUris:
+      task.mesosFetcherUris = sorted(task.mesosFetcherUris, key=str)
+
     task.executorConfig = ExecutorConfig(
       name=AURORA_EXECUTOR_NAME,
       data=RawRepr(pretty_executor))
@@ -72,12 +88,16 @@ class DiffFormatter(object):
       self._dump_tasks(local_tasks, local)
       with NamedTemporaryFile() as remote:
         self._dump_tasks(remote_tasks, remote)
-        result = subprocess.call("%s %s %s" % (
-          diff_program, quote(remote.name), quote(local.name)), shell=True)
+        process = subprocess.Popen(
+          [diff_program, quote(remote.name), quote(local.name)],
+          stdout=subprocess.PIPE,
+          stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
         # Unlike most commands, diff doesn't return zero on success; it returns
         # 1 when a successful diff is non-empty.
-        if result not in (0, 1):
-          raise self.context.CommandError(EXIT_COMMAND_FAILURE, "Error running diff command")
+        if process.poll() not in (0, 1):
+          raise self.context.CommandError(EXIT_COMMAND_FAILURE, "Error running diff: %s" % stderr)
+        self.context.print_out(stdout)
 
   def _show_diff(self, header, configs_summaries, local_task=None):
     def min_start(ranges):

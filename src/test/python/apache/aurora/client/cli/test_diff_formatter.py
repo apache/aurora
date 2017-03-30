@@ -12,12 +12,11 @@
 # limitations under the License.
 #
 
-import contextlib
-import os
 import textwrap
+from copy import deepcopy
 
 import pytest
-from mock import Mock, call, patch
+from mock import Mock, call
 from pystachio import Empty
 
 from apache.aurora.client.cli import Context
@@ -33,6 +32,7 @@ from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_o
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     ConfigGroup,
+    Constraint,
     GetJobUpdateDiffResult,
     Range,
     Result,
@@ -66,9 +66,10 @@ class TestDiffFormatter(AuroraClientCommandTest):
     ))
 
   @classmethod
-  def get_job_update_diff_result(cls):
+  def get_job_update_diff_result(cls, task=None):
     diff = cls.create_simple_success_response()
-    task = cls.create_task_config('foo')
+    if task is None:
+      task = cls.create_task_config('foo')
     diff.result = Result(getJobUpdateDiffResult=GetJobUpdateDiffResult(
         add=set([ConfigGroup(
             config=task,
@@ -102,26 +103,48 @@ class TestDiffFormatter(AuroraClientCommandTest):
     self._fake_context.get_job_config = Mock(return_value=config)
     formatter = DiffFormatter(self._fake_context, config)
     local_task = self.create_scheduled_tasks()[0].assignedTask.task
+    local_task.constraints = set([Constraint(name='host'), Constraint(name='rack')])
     self._mock_api.get_job_update_diff.return_value = self.get_job_update_diff_result()
 
-    with contextlib.nested(
-        patch('subprocess.call', return_value=0),
-        patch('json.loads', return_value={})) as (subprocess_patch, _):
+    formatter.show_job_update_diff(self._mock_options.instance_spec.instance, local_task)
 
-      formatter.show_job_update_diff(self._mock_options.instance_spec.instance, local_task)
+    assert self._mock_api.get_job_update_diff.mock_calls == [
+        call(config, self._mock_options.instance_spec.instance)
+    ]
+    assert "\n".join(self._fake_context.get_out()) == textwrap.dedent("""\
+      This job update will:
+      add instances: [10], [12-14]
+      update instances: [11]
+      with diff:\n
+      2c2,3
+      <   'constraints': None,
+      ---
+      >   'constraints': [ Constraint(name='host', constraint=None),
+      >                    Constraint(name='rack', constraint=None)],
+      \n
+      not change instances: [0-9]""")
 
-      assert self._mock_api.get_job_update_diff.mock_calls == [
-          call(config, self._mock_options.instance_spec.instance)
-      ]
-      assert "\n".join(self._fake_context.get_out()) == textwrap.dedent("""\
-        This job update will:
-        add instances: [10], [12-14]
-        update instances: [11]
-        with diff:\n\n
-        not change instances: [0-9]""")
-      assert subprocess_patch.call_count == 1
-      assert subprocess_patch.call_args[0][0].startswith(
-          os.environ.get('DIFF_VIEWER', 'diff') + ' ')
+  def test_show_job_update_diff_no_diff_out_of_order_constraints(self):
+    config = self.get_job_config()
+    self._fake_context.get_job_config = Mock(return_value=config)
+    formatter = DiffFormatter(self._fake_context, config)
+    local_task = self.create_scheduled_tasks()[0].assignedTask.task
+    local_task.constraints = set([Constraint(name='host'), Constraint(name='rack')])
+    remote_task = deepcopy(local_task)
+    remote_task.constraints = set([Constraint(name='rack'), Constraint(name='host')])
+    self._mock_api.get_job_update_diff.return_value = self.get_job_update_diff_result(remote_task)
+
+    formatter.show_job_update_diff(self._mock_options.instance_spec.instance, local_task)
+
+    assert self._mock_api.get_job_update_diff.mock_calls == [
+      call(config, self._mock_options.instance_spec.instance)
+    ]
+    assert "\n".join(self._fake_context.get_out()) == textwrap.dedent("""\
+      This job update will:
+      add instances: [10], [12-14]
+      update instances: [11]
+      with diff:\n\n\n
+      not change instances: [0-9]""")
 
   def test_show_job_update_diff_without_task_diff(self):
     config = self.get_job_config()
@@ -181,12 +204,4 @@ class TestDiffFormatter(AuroraClientCommandTest):
     self._mock_api.build_query.return_value = query
     local_tasks = []
 
-    with contextlib.nested(
-        patch('subprocess.call', return_value=0),
-        patch('json.loads', return_value={})) as (subprocess_patch, _):
-
-      formatter.diff_no_update_details(local_tasks)
-
-      assert subprocess_patch.call_count == 1
-      assert subprocess_patch.call_args[0][0].startswith(
-          os.environ.get('DIFF_VIEWER', 'diff') + ' ')
+    formatter.diff_no_update_details(local_tasks)

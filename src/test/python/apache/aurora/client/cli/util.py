@@ -224,7 +224,7 @@ class AuroraClientCommandTest(unittest.TestCase):
   def create_task_config(cls, name):
     return TaskConfig(
         maxTaskFailures=1,
-        executorConfig=ExecutorConfig(data='fake data'),
+        executorConfig=ExecutorConfig(data='{"fake": "data"}'),
         metadata=[],
         job=JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name),
         numCpus=2,
