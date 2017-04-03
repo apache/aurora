@@ -87,15 +87,11 @@ public class ConfigurationManagerTest {
               .setIsService(false)
               .setTaskLinks(ImmutableMap.of())
               .setExecutorConfig(new ExecutorConfig(apiConstants.AURORA_EXECUTOR_NAME, "config"))
-              .setRequestedPorts(ImmutableSet.of())
               .setPriority(0)
               .setOwner(null)
               .setContactEmail("foo@twitter.com")
               .setProduction(false)
-              .setDiskMb(1)
               .setMetadata(null)
-              .setNumCpus(1.0)
-              .setRamMb(1)
               .setMaxTaskFailures(0)
               .setConstraints(
                   ImmutableSet.of(

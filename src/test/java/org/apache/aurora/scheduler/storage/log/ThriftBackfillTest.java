@@ -47,9 +47,10 @@ public class ThriftBackfillTest extends EasyMockTest {
   @Test
   public void testFieldsToSetNoPorts() {
     TaskConfig config = new TaskConfig()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64)
+        .setResources(ImmutableSet.of(
+            numCpus(1.0),
+            ramMb(32),
+            diskMb(64)))
         .setProduction(false)
         .setTier("tierName");
     TaskConfig expected = config.deepCopy()
@@ -62,76 +63,6 @@ public class ThriftBackfillTest extends EasyMockTest {
     assertEquals(
         expected,
         thriftBackfill.backfillTask(config));
-  }
-
-  @Test
-  public void testFieldsToSetWithPorts() {
-    TaskConfig config = new TaskConfig()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64)
-        .setRequestedPorts(ImmutableSet.of("http"))
-        .setProduction(false)
-        .setTier("tierName");
-    TaskConfig expected = config.deepCopy()
-        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64), namedPort("http")));
-
-    expect(tierManager.getTier(ITaskConfig.build(expected))).andReturn(TaskTestUtil.DEV_TIER);
-
-    control.replay();
-
-    assertEquals(
-        expected,
-        thriftBackfill.backfillTask(config));
-  }
-
-  @Test
-  public void testSetToFieldsNoPorts() {
-    TaskConfig config = new TaskConfig()
-        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)))
-        .setProduction(false)
-        .setTier("tierName");
-    TaskConfig expected = config.deepCopy()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64);
-
-    expect(tierManager.getTier(ITaskConfig.build(expected))).andReturn(TaskTestUtil.DEV_TIER);
-
-    control.replay();
-
-    assertEquals(
-        expected,
-        thriftBackfill.backfillTask(config));
-  }
-
-  @Test
-  public void testSetToFieldsWithPorts() {
-    TaskConfig config = new TaskConfig()
-        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64), namedPort("http")))
-        .setProduction(false)
-        .setTier("tierName");
-    TaskConfig expected = config.deepCopy()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64)
-        .setRequestedPorts(ImmutableSet.of("http"));
-
-    expect(tierManager.getTier(ITaskConfig.build(expected))).andReturn(TaskTestUtil.DEV_TIER);
-
-    control.replay();
-
-    assertEquals(
-        expected,
-        thriftBackfill.backfillTask(config));
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testMissingResourceThrows() {
-    control.replay();
-
-    TaskConfig config = new TaskConfig().setResources(ImmutableSet.of(numCpus(1.0), ramMb(32)));
-    thriftBackfill.backfillTask(config);
   }
 
   @Test
@@ -194,9 +125,7 @@ public class ThriftBackfillTest extends EasyMockTest {
   @Test
   public void testBackfillTierProduction() {
     TaskConfig config = new TaskConfig()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64)
+        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)))
         .setProduction(true)
         .setTier("tierName");
     TaskConfig expected = config.deepCopy()
@@ -214,9 +143,7 @@ public class ThriftBackfillTest extends EasyMockTest {
   @Test
   public void testBackfillTierNotProduction() {
     TaskConfig config = new TaskConfig()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64)
+        .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)))
         .setProduction(true)
         .setTier("tierName");
     TaskConfig configWithBackfilledResources = config.deepCopy()
@@ -238,9 +165,10 @@ public class ThriftBackfillTest extends EasyMockTest {
   @Test
   public void testBackfillTierSetsTierToPreemptible() {
     TaskConfig config = new TaskConfig()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64);
+            .setResources(ImmutableSet.of(
+                    numCpus(1.0),
+                    ramMb(32),
+                    diskMb(64)));
     TaskConfig configWithBackfilledResources = config.deepCopy()
         .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)));
 
@@ -258,9 +186,10 @@ public class ThriftBackfillTest extends EasyMockTest {
   @Test
   public void testBackfillTierSetsTierToPreferred() {
     TaskConfig config = new TaskConfig()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64)
+        .setResources(ImmutableSet.of(
+            numCpus(1.0),
+            ramMb(32),
+            diskMb(64)))
         .setProduction(true);
     TaskConfig configWithBackfilledResources = config.deepCopy()
         .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)));
@@ -279,9 +208,10 @@ public class ThriftBackfillTest extends EasyMockTest {
   @Test(expected = IllegalStateException.class)
   public void testBackfillTierBadTierConfiguration() {
     TaskConfig config = new TaskConfig()
-        .setNumCpus(1.0)
-        .setRamMb(32)
-        .setDiskMb(64);
+            .setResources(ImmutableSet.of(
+                    numCpus(1.0),
+                    ramMb(32),
+                    diskMb(64)));
 
     expect(tierManager.getTiers()).andReturn(ImmutableMap.of());
 

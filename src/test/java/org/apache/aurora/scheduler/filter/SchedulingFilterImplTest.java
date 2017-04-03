@@ -675,9 +675,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private ITaskConfig makeTask(IJobKey job, int cpus, long ramMb, long diskMb) {
     return ITaskConfig.build(new TaskConfig()
         .setJob(job.newBuilder())
-        .setNumCpus(cpus)
-        .setRamMb(ramMb)
-        .setDiskMb(diskMb)
         .setResources(ImmutableSet.of(numCpus(cpus), ramMb(ramMb), diskMb(diskMb)))
         .setExecutorConfig(new ExecutorConfig(apiConstants.AURORA_EXECUTOR_NAME, "config")));
   }

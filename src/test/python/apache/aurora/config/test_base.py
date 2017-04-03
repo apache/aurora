@@ -19,6 +19,8 @@ from twitter.common.contextutil import temporary_file
 from apache.aurora.config import AuroraConfig, PortResolver
 from apache.aurora.config.schema.base import Announcer, Empty, Job, Process, Resources, Task
 
+from gen.apache.aurora.api.ttypes import Resource
+
 resolve = PortResolver.resolve
 
 
@@ -193,14 +195,21 @@ def test_ports():
 def test_static_port_aliasing():
   announce = Announcer(primary_port='thrift',
                        portmap={'thrift': 8081, 'health': 8300, 'aurora': 'health'})
-  assert make_config(announce).ports() == set()
-  assert make_config(announce).job().taskConfig.requestedPorts == set()
-  assert make_config(announce, 'thrift').ports() == set()
-  assert make_config(announce, 'thrift').job().taskConfig.requestedPorts == set()
-  assert make_config(announce, 'thrift', 'health').ports() == set()
-  assert make_config(announce, 'thrift', 'health').job().taskConfig.requestedPorts == set()
-  assert make_config(announce, 'derp').ports() == set(['derp'])
-  assert make_config(announce, 'derp').job().taskConfig.requestedPorts == set(['derp'])
+  config = make_config(announce)
+  assert config.ports() == set()
+  for resource in list(config.job().taskConfig.resources):
+    assert resource.namedPort is None
+  config = make_config(announce, 'thrift')
+  assert config.ports() == set()
+  for resource in list(config.job().taskConfig.resources):
+    assert resource.namedPort is None
+  config = make_config(announce, 'thrift', 'health')
+  assert config.ports() == set()
+  for resource in list(config.job().taskConfig.resources):
+    assert resource.namedPort is None
+  config = make_config(announce, 'derp')
+  assert config.ports() == set(['derp'])
+  assert Resource(namedPort='derp') in list(config.job().taskConfig.resources)
 
 
 def test_pystachio_schema_regression():

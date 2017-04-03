@@ -397,9 +397,9 @@ public class LogStorageTest extends EasyMockTest {
   }
 
   private TaskConfig nonBackfilledConfig() {
-    TaskConfig config = makeConfig(JOB_KEY).newBuilder();
-    config.unsetResources();
-    return config;
+    // When more fields have to be backfilled
+    // modify this method.
+    return makeConfig(JOB_KEY).newBuilder();
   }
 
   abstract class AbstractStorageFixture {

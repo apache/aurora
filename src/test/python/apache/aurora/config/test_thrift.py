@@ -66,10 +66,6 @@ def test_simple_config():
   assert job.cronSchedule is None
   assert tti.job == expected_key
   assert tti.isService is False
-  assert tti.numCpus == 0.1
-  assert tti.ramMb == 64
-  assert tti.diskMb == 64
-  assert tti.requestedPorts == frozenset(['health'])
   assert tti.production is False
   assert tti.priority == 0
   assert tti.maxTaskFailures == 1
@@ -176,7 +172,8 @@ def test_config_with_ports():
   )
   config = AuroraConfig(hwc)
   job = config.job()
-  assert job.taskConfig.requestedPorts == set(['http', 'admin'])
+  assert Resource(namedPort='http') in list(job.taskConfig.resources)
+  assert Resource(namedPort='admin') in list(job.taskConfig.resources)
 
 
 def test_config_with_bad_resources():

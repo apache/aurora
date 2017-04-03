@@ -299,18 +299,7 @@ public class SnapshotStoreImplIT {
   }
 
   private Snapshot makeNonBackfilled() {
-    Snapshot snapshot = expected();
-    snapshot.getTasks().forEach(e -> e.getAssignedTask().getTask().unsetResources());
-    snapshot.getCronJobs()
-        .forEach(e -> e.getJobConfiguration().getTaskConfig().unsetResources());
-    snapshot.getJobUpdateDetails()
-        .forEach(e -> e.getDetails().getUpdate().getInstructions()
-            .getDesiredState().getTask().unsetResources());
-    snapshot.getJobUpdateDetails()
-        .forEach(e -> e.getDetails().getUpdate().getInstructions()
-            .getInitialState().forEach(i -> i.getTask().unsetResources()));
-
-    return snapshot;
+    return expected();
   }
 
   private void populateStore() {

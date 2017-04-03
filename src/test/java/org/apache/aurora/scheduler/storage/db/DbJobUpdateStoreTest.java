@@ -80,6 +80,9 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.scheduler.storage.db.DbJobUpdateStore.jobUpdateActionStatName;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -173,9 +176,11 @@ public class DbJobUpdateStoreTest {
     IJobUpdateKey updateId = makeKey(JobKeys.from("role", "env", "name1"), "u1");
 
     JobUpdate builder = makeFullyPopulatedUpdate(updateId).newBuilder();
-    builder.getInstructions().getDesiredState().getTask().setNumCpus(Double.MAX_VALUE);
-    builder.getInstructions().getDesiredState().getTask().setRamMb(Long.MAX_VALUE);
-    builder.getInstructions().getDesiredState().getTask().setDiskMb(Long.MAX_VALUE);
+    builder.getInstructions().getDesiredState().getTask().setResources(
+            ImmutableSet.of(
+                    numCpus(Double.MAX_VALUE),
+                    ramMb(Long.MAX_VALUE),
+                    diskMb(Long.MAX_VALUE)));
 
     IJobUpdate update = IJobUpdate.build(builder);
 

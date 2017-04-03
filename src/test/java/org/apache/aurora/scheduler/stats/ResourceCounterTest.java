@@ -42,6 +42,9 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
@@ -165,9 +168,10 @@ public class ResourceCounterTest {
 
     ScheduledTask task = TaskTestUtil.makeTask(id, JobKeys.from(role, "test", job)).newBuilder();
     TaskConfig config = task.getAssignedTask().getTask()
-        .setNumCpus(numCpus)
-        .setRamMb(ramMb)
-        .setDiskMb(diskMb)
+        .setResources(ImmutableSet.of(
+                numCpus(numCpus),
+                ramMb(ramMb),
+                diskMb(diskMb)))
         .setProduction(production);
 
     if (dedicated.isPresent()) {

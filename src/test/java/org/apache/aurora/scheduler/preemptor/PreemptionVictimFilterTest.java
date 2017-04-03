@@ -63,6 +63,8 @@ import org.junit.Test;
 import static java.util.stream.Collectors.toSet;
 
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.PREFERRED_TIER;
@@ -307,7 +309,10 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     expectGetTier(a1, DEV_TIER).atLeastOnce();
 
     ScheduledTask b1 = makeTask(USER_B, JOB_B, TASK_ID_B + "_b1");
-    b1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    b1.getAssignedTask().getTask()
+        .setResources(ImmutableSet.of(
+            numCpus(1),
+            ramMb(512)));
     setResource(b1, CPUS, 1.0);
     setResource(b1, RAM_MB, 512.0);
     expectGetTier(b1, DEV_TIER).anyTimes();
@@ -337,7 +342,10 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   public void testProductionJobNeverPreemptsProductionJob() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(UNAVAILABLITY_THRESHOLD, clock);
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    p1.getAssignedTask().getTask()
+        .setResources(ImmutableSet.of(
+            numCpus(2),
+            ramMb(1024)));
     expectGetTier(p1, PREFERRED_TIER);
 
     setUpHost();
@@ -345,7 +353,10 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     assignToHost(p1);
 
     ScheduledTask p2 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p2");
-    p2.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    p2.getAssignedTask().getTask()
+        .setResources(ImmutableSet.of(
+            numCpus(1),
+            ramMb(512)));
     expectGetTier(p2, PREFERRED_TIER);
 
     control.replay();
@@ -360,12 +371,18 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     setUpHost();
 
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
+    a1.getAssignedTask().getTask()
+        .setResources(ImmutableSet.of(
+            numCpus(1),
+            ramMb(512)));
     assignToHost(a1);
     expectGetTier(a1, DEV_TIER).times(2);
 
     ScheduledTask p1 = makeProductionTask(USER_B, JOB_B, TASK_ID_B + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
+    p1.getAssignedTask().getTask()
+        .setResources(ImmutableSet.of(
+            numCpus(2),
+            ramMb(1024)));
     expectGetTier(p1, PREFERRED_TIER);
 
     control.replay();

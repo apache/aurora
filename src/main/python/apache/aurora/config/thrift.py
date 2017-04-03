@@ -281,24 +281,23 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
       fully_interpolated(task_raw.resources().ram()),
       fully_interpolated(task_raw.resources().disk())))
 
-  task.numCpus = fully_interpolated(task_raw.resources().cpu())
-  task.ramMb = fully_interpolated(task_raw.resources().ram()) / MB
-  task.diskMb = fully_interpolated(task_raw.resources().disk()) / MB
-  if task.numCpus <= 0 or task.ramMb <= 0 or task.diskMb <= 0:
+  numCpus = fully_interpolated(task_raw.resources().cpu())
+  ramMb = fully_interpolated(task_raw.resources().ram()) / MB
+  diskMb = fully_interpolated(task_raw.resources().disk()) / MB
+  if numCpus <= 0 or ramMb <= 0 or diskMb <= 0:
     raise InvalidConfig('Task has invalid resources.  cpu/ramMb/diskMb must all be positive: '
-        'cpu:%r ramMb:%r diskMb:%r' % (task.numCpus, task.ramMb, task.diskMb))
+        'cpu:%r ramMb:%r diskMb:%r' % (numCpus, ramMb, diskMb))
   numGpus = fully_interpolated(task_raw.resources().gpu())
 
   task.resources = frozenset(
-      [Resource(numCpus=task.numCpus),
-       Resource(ramMb=task.ramMb),
-       Resource(diskMb=task.diskMb)]
+      [Resource(numCpus=numCpus),
+       Resource(ramMb=ramMb),
+       Resource(diskMb=diskMb)]
       + [Resource(namedPort=p) for p in ports]
       + ([Resource(numGpus=numGpus)] if numGpus else []))
 
   task.job = key
   task.owner = owner
-  task.requestedPorts = ports
   task.taskLinks = {}  # See AURORA-739
   task.constraints = constraints_to_thrift(not_empty_or(job.constraints(), {}))
   task.container = create_container_config(job.container())

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.storage.db;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -32,6 +33,9 @@ import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.junit.Assert.assertEquals;
 
 public class RowGarbageCollectorTest {
@@ -40,7 +44,8 @@ public class RowGarbageCollectorTest {
   private static final IJobKey JOB_B = IJobKey.build(new JobKey("roleB", "envB", "jobB"));
   private static final IScheduledTask TASK_A2 = TaskTestUtil.makeTask("task_a2", JOB_A);
   private static final ITaskConfig CONFIG_A =
-      ITaskConfig.build(TASK_A2.getAssignedTask().getTask().newBuilder().setRamMb(124246));
+      ITaskConfig.build(TASK_A2.getAssignedTask().getTask().newBuilder()
+              .setResources(ImmutableSet.of(numCpus(1.0), ramMb(124246), diskMb(1024))));
   private static final ITaskConfig CONFIG_B = TaskTestUtil.makeConfig(JOB_B);
 
   private JobKeyMapper jobKeyMapper;

@@ -965,10 +965,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
         .newBuilder();
     builder.getAssignedTask().setInstanceId(instanceId);
     builder.getAssignedTask().getTask()
-        .setNumCpus(cpus)
-        .setRamMb(ramMb)
-        .setDiskMb(diskMb)
-        .setRequestedPorts(ImmutableSet.of("a"))
         .setResources(ImmutableSet.of(numCpus(cpus), ramMb(ramMb), diskMb(diskMb), namedPort("a")))
         .setProduction(production);
     return IScheduledTask.build(builder);

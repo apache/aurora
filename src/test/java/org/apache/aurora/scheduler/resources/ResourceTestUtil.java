@@ -63,8 +63,7 @@ public final class ResourceTestUtil {
   }
 
   public static ITaskConfig resetPorts(ITaskConfig config, Set<String> portNames) {
-    TaskConfig builder = config.newBuilder()
-        .setRequestedPorts(portNames);
+    TaskConfig builder = config.newBuilder();
     builder.getResources().removeIf(e -> fromResource(IResource.build(e)).equals(PORTS));
     portNames.forEach(e -> builder.addToResources(Resource.namedPort(e)));
     return ITaskConfig.build(builder);

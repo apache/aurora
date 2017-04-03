@@ -18,6 +18,7 @@ import java.util.Objects;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -33,6 +34,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.Resource.numCpus;
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
@@ -51,8 +53,10 @@ import static org.junit.Assert.assertEquals;
 public class InstanceUpdaterTest {
   private static final Optional<ITaskConfig> NO_CONFIG = Optional.absent();
 
-  private static final ITaskConfig OLD = ITaskConfig.build(new TaskConfig().setNumCpus(1.0));
-  private static final ITaskConfig NEW = ITaskConfig.build(new TaskConfig().setNumCpus(2.0));
+  private static final ITaskConfig OLD = ITaskConfig.build(new TaskConfig()
+          .setResources(ImmutableSet.of(numCpus(1.0))));
+  private static final ITaskConfig NEW = ITaskConfig.build(new TaskConfig()
+          .setResources(ImmutableSet.of(numCpus(2.0))));
 
   private static final Amount<Long, Time> MIN_RUNNING_TIME = Amount.of(1L, Time.MINUTES);
   private static final Amount<Long, Time> A_LONG_TIME = Amount.of(1L, Time.DAYS);

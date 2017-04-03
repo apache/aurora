@@ -35,15 +35,19 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class NotifyingSchedulingFilterTest extends EasyMockTest {
 
   private static final ITaskConfig TASK = ITaskConfig.build(new TaskConfig()
-      .setNumCpus(1)
-      .setRamMb(1024)
-      .setDiskMb(1024));
+      .setResources(ImmutableSet.of(
+          numCpus(1),
+          ramMb(1024),
+          diskMb(1024))));
   private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(TASK);
   private static final UnusedResource RESOURCE = new UnusedResource(
       ResourceManager.bagFromResources(TASK.getResources()),

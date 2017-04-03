@@ -144,15 +144,11 @@ final class Tasks {
         builder.getAssignedTask().setAssignedPorts(ImmutableMap.of());
         builder.getAssignedTask().getTask()
             .setConstraints(constraints.build())
-            .setNumCpus(cpu)
-            .setRamMb(ram.as(Data.MB))
-            .setDiskMb(disk.as(Data.MB))
             .setProduction(isProduction)
             .setResources(ImmutableSet.of(
                 numCpus(cpu),
                 ramMb(ram.as(Data.MB)),
-                diskMb(disk.as(Data.MB))))
-            .setRequestedPorts(ImmutableSet.of());
+                diskMb(disk.as(Data.MB))));
         tasks.add(IScheduledTask.build(builder));
       }
 

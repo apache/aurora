@@ -44,6 +44,8 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.Resource.numCpus;
+
 import static org.junit.Assert.assertEquals;
 
 public class NearestFitTest {
@@ -60,7 +62,8 @@ public class NearestFitTest {
   private static final Veto SEVERITY_4_PORTS =
       Veto.insufficientResources("ports", RESOURCE_MAX_SCORE);
 
-  private static final ITaskConfig TASK = ITaskConfig.build(new TaskConfig().setNumCpus(1.0));
+  private static final ITaskConfig TASK = ITaskConfig.build(new TaskConfig()
+          .setResources(ImmutableSet.of(numCpus(1.0))));
   private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(TASK);
 
   private FakeTicker ticker;

@@ -61,6 +61,7 @@ import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ReadOnlyScheduler;
+import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
@@ -494,30 +495,20 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     TaskConfig task = productionTask();
-    task.setNumCpus(0);
-    task.setRamMb(0);
-    task.setDiskMb(0);
     task.unsetResources();
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
     assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testCreateJobMissingResources() throws Exception {
-    control.replay();
-    TaskConfig task = productionTask();
-    task.unsetResources();
-    task.setResources(ImmutableSet.of(numCpus(1.0)));
-
-    thrift.createJob(makeJob(task));
   }
 
   @Test
   public void testCreateJobBadCpu() throws Exception {
     control.replay();
 
-    TaskConfig task = productionTask().setNumCpus(0.0);
-    task.unsetResources();
+    TaskConfig task = productionTask()
+            .setResources(ImmutableSet.of(
+                    numCpus(0.0),
+                    ramMb(1024),
+                    diskMb(1024)));
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
     assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
   }
@@ -526,8 +517,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testCreateJobBadRam() throws Exception {
     control.replay();
 
-    TaskConfig task = productionTask().setRamMb(-123);
-    task.unsetResources();
+    TaskConfig task = productionTask()
+            .setResources(ImmutableSet.of(
+                    numCpus(1),
+                    ramMb(-123),
+                    diskMb(1024)));
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
     assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
   }
@@ -536,26 +530,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testCreateJobBadDisk() throws Exception {
     control.replay();
 
-    TaskConfig task = productionTask().setDiskMb(0);
-    task.unsetResources();
-    assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
-  }
-
-  @Test
-  public void testCreateJobBadResources() throws Exception {
-    control.replay();
-
     TaskConfig task = productionTask()
             .setResources(ImmutableSet.of(
-            numCpus(-1),
-            ramMb(1024),
-            diskMb(1024)))
-            .setNumCpus(0)
-            .setRamMb(0)
-            .setDiskMb(0);
-
+                    numCpus(1),
+                    ramMb(1024),
+                    diskMb(0)));
+    task.unsetResources();
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task)));
-    assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
   }
 
   @Test
@@ -565,10 +546,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setResources(ImmutableSet.of(
                     numCpus(1.0),
                     ramMb(1024),
-                    diskMb(1024)))
-            .setNumCpus(0)
-            .setRamMb(0)
-            .setDiskMb(0);
+                    diskMb(1024)));
 
     IJobConfiguration job = IJobConfiguration.build(makeJob(task));
     SanitizedConfiguration sanitized = fromUnsanitized(job);
@@ -591,17 +569,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testCreateJobPopulateDefaults() throws Exception {
+    Set<Resource> resources = ImmutableSet.of(numCpus(1.0), ramMb(1024), diskMb(1024));
     TaskConfig task = new TaskConfig()
         .setContactEmail("testing@twitter.com")
         .setExecutorConfig(
             new ExecutorConfig(EXECUTOR_NAME, "config")) // Arbitrary opaque data.
-        .setNumCpus(1.0)
-        .setRamMb(1024)
-        .setDiskMb(1024)
-        .setResources(ImmutableSet.of(
-            numCpus(1.0),
-            ramMb(1024),
-            diskMb(1024)))
+        .setResources(resources)
         .setIsService(true)
         .setProduction(true)
         .setTier(TaskTestUtil.PROD_TIER_NAME)
@@ -613,20 +586,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration sanitized = job.deepCopy();
     sanitized.getTaskConfig()
         .setJob(JOB_KEY.newBuilder())
-        .setNumCpus(1.0)
         .setPriority(0)
-        .setRamMb(1024)
-        .setDiskMb(1024)
         .setIsService(true)
         .setProduction(true)
-        .setRequestedPorts(ImmutableSet.of())
         .setTaskLinks(ImmutableMap.of())
         .setConstraints(ImmutableSet.of())
         .setMaxTaskFailures(0)
-        .setResources(ImmutableSet.of(
-            numCpus(1.0),
-            ramMb(1024),
-            diskMb(1024)));
+        .setResources(resources);
 
     lockManager.assertNotLocked(LOCK_KEY);
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
@@ -1933,7 +1899,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
 
     ScheduledTask taskBuilder = buildTaskForJobUpdate(0).newBuilder();
-    taskBuilder.getAssignedTask().getTask().setNumCpus(100);
+    taskBuilder.getAssignedTask().getTask()
+            .setResources(ImmutableSet.of(
+                    numCpus(100),
+                    ramMb(1024),
+                    diskMb(1024)));
     IScheduledTask newTask = IScheduledTask.build(taskBuilder);
 
     IScheduledTask oldTask1 = buildTaskForJobUpdate(1);

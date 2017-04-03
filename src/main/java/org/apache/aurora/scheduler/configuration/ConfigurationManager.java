@@ -231,10 +231,6 @@ public class ConfigurationManager {
   public ITaskConfig validateAndPopulate(ITaskConfig config) throws TaskDescriptionException {
     TaskConfig builder = config.newBuilder();
 
-    if (!builder.isSetRequestedPorts()) {
-      builder.setRequestedPorts(ImmutableSet.of());
-    }
-
     if (config.isSetTier() && !UserProvidedStrings.isGoodIdentifier(config.getTier())) {
       throw new TaskDescriptionException("Tier contains illegal characters: " + config.getTier());
     }

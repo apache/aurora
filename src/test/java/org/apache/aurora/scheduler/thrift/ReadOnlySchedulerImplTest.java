@@ -92,6 +92,9 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
@@ -527,7 +530,8 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     IJobKey key = JobKeys.from("test", "test", "test");
 
     TaskConfig firstGroupTask = defaultTask(true);
-    TaskConfig secondGroupTask = defaultTask(true).setNumCpus(2);
+    TaskConfig secondGroupTask = defaultTask(true)
+            .setResources(ImmutableSet.of(numCpus(2)));
 
     IScheduledTask first1 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(firstGroupTask).setInstanceId(0)));
@@ -679,7 +683,11 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     IScheduledTask task1 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig)));
     IScheduledTask task2 = IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig.setNumCpus(2))));
+        .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig
+            .setResources(ImmutableSet.of(
+                    numCpus(2),
+                    ramMb(1024),
+                    diskMb(1024))))));
 
     TaskConfig immediateTaskConfigTwo = defaultTask(false)
         .setJob(JOB_KEY.newBuilder().setRole(bazRole).setName("immediateTwo"))
@@ -856,8 +864,11 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   @Test
   public void testGetJobUpdateDiffInvalidConfig() throws Exception {
     control.replay();
-    TaskConfig task = defaultTask(false).setNumCpus(-1);
-    task.unsetResources();
+    TaskConfig task = defaultTask(false)
+            .setResources(ImmutableSet.of(
+                    numCpus(-1),
+                    ramMb(1024),
+                    diskMb(1024)));
 
     JobUpdateRequest request =
         new JobUpdateRequest().setTaskConfig(task);
