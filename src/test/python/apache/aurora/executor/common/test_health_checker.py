@@ -46,6 +46,14 @@ from .fixtures import HELLO_WORLD, MESOS_JOB
 from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, JobKey, TaskConfig
 
 
+FAKE_MESOS_CONTAINERIZER_BINARY = '''#!/bin/sh
+if [[ $# == 1 ]]; then
+  echo "command_info" >&2
+else
+  echo "$@"
+fi'''
+
+
 class TestHealthChecker(unittest.TestCase):
   def setUp(self):
     self._clock = ThreadedClock(0)
@@ -565,80 +573,123 @@ class TestHealthCheckerProvider(unittest.TestCase):
     # Should not be trying to access role's user info.
     assert not mock_getpwnam.called
 
+  def make_fake_mesos_containerizer(self, temp_dir):
+    # We use a fake version of the mesos-containerizer binary that just echoes out its args so
+    # we can assert on them in the process's output. Also imitates a failure when there are not
+    # enough arguments, this is used to find the version of the binary (by checking the failure
+    # message)
+    fake_mesos_containerizer_path = os.path.join(temp_dir, 'fake-mesos-containerizer')
+    with open(fake_mesos_containerizer_path, 'w') as fd:
+      fd.write(FAKE_MESOS_CONTAINERIZER_BINARY)
+    chmod_plus_x(fake_mesos_containerizer_path)
+    return fake_mesos_containerizer_path
+
   @mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
-  @mock.patch('pwd.getpwnam')
-  def test_from_assigned_task_shell_filesystem_image(self, mock_getpwnam):
-    interval_secs = 17
-    initial_interval_secs = 3
-    max_consecutive_failures = 2
-    min_consecutive_successes = 2
-    timeout_secs = 5
-    shell_config = ShellHealthChecker(shell_command='failed command')
+  @mock.patch('apache.aurora.executor.common.health_checker.ShellHealthCheck')
+  def test_from_assigned_task_shell_filesystem_image(self, mock_shell):
+    shell_config = ShellHealthChecker(shell_command='run health check')
     task_config = TaskConfig(
-            job=JobKey(role='role', environment='env', name='name'),
-            executorConfig=ExecutorConfig(
-                    name='thermos-generic',
-                    data=MESOS_JOB(
-                            task=HELLO_WORLD,
-                            health_check_config=HealthCheckConfig(
-                                    health_checker=HealthCheckerConfig(shell=shell_config),
-                                    interval_secs=interval_secs,
-                                    initial_interval_secs=initial_interval_secs,
-                                    max_consecutive_failures=max_consecutive_failures,
-                                    min_consecutive_successes=min_consecutive_successes,
-                                    timeout_secs=timeout_secs
-                            )
-                    ).json_dumps()
-            )
+      job=JobKey(role='role', environment='env', name='name'),
+      executorConfig=ExecutorConfig(
+        name='thermos-generic',
+        data=MESOS_JOB(
+          task=HELLO_WORLD,
+          health_check_config=HealthCheckConfig(
+            health_checker=HealthCheckerConfig(shell=shell_config),
+            timeout_secs=5
+          )
+        ).json_dumps()
+      )
     )
     assigned_task = AssignedTask(task=task_config, instanceId=1, assignedPorts={'foo': 9001})
     execconfig_data = json.loads(assigned_task.task.executorConfig.data)
-    assert execconfig_data[
-             'health_check_config']['health_checker']['shell']['shell_command'] == 'failed command'
+    assert execconfig_data['health_check_config'][
+             'health_checker']['shell']['shell_command'] == 'run health check'
 
     with temporary_dir() as td:
-      test_isolator_path = os.path.join(td, 'fake-mesos-containerier')
-      with open(test_isolator_path, 'w') as fd:
-        # We use a fake version of the mesos-containerizer binary that just echoes out its args so
-        # we can assert on them in the process's output. Also imitates a failure when there are not
-        # enough arguments, this is used to find the version of the binary (by checking the failure
-        # message)
-        fd.write('\n'.join([
-          '#!/bin/sh',
-          'if [[ $# == 1 ]]; then',
-          '  { echo "command_info" >&2; };',
-          'else',
-          '  echo "$@";',
-          'fi'
-        ]))
+      fake_mesos_containerizer_path = self.make_fake_mesos_containerizer(td)
 
-        fd.close()
+      mock_sandbox = mock.Mock(spec_set=SandboxInterface)
+      type(mock_sandbox).root = mock.PropertyMock(return_value=td)
+      type(mock_sandbox).is_filesystem_image = mock.PropertyMock(return_value=True)
+      container_root_path = os.path.join(td, 'container-root')
+      type(mock_sandbox).container_root = mock.PropertyMock(return_value=container_root_path)
 
-        chmod_plus_x(test_isolator_path)
+      HealthCheckerProvider(
+        nosetuid_health_checks=False,
+        mesos_containerizer_path=fake_mesos_containerizer_path
+      ).from_assigned_task(
+        assigned_task,
+        mock_sandbox
+      )
 
-        mock_sandbox = mock.Mock(spec_set=SandboxInterface)
-        type(mock_sandbox).root = mock.PropertyMock(return_value=td)
-        type(mock_sandbox).is_filesystem_image = mock.PropertyMock(return_value=True)
+      class ValidateWrapperCmd(object):
+        def __eq__(self, other):
+          assert "--user=role" in other
+          return True
 
-        with mock.patch('apache.aurora.executor.common.health_checker.ShellHealthCheck') as shell:
-          HealthCheckerProvider(
-              nosetuid_health_checks=False,
-              mesos_containerizer_path=test_isolator_path).from_assigned_task(
-                  assigned_task,
-                  mock_sandbox)
+      assert mock_shell.mock_calls == [
+        mock.call(
+          raw_cmd='run health check',
+          wrapped_cmd=ValidateWrapperCmd(),
+          preexec_fn=None,
+          timeout_secs=5.0
+        )
+      ]
 
-          class NotNone(object):
-            def __eq__(self, other):
-              return other is not None
+  @mock.patch.dict(os.environ, {'MESOS_DIRECTORY': '/some/path'})
+  @mock.patch('getpass.getuser', return_value='user')
+  @mock.patch('apache.aurora.executor.common.health_checker.ShellHealthCheck')
+  def test_from_assigned_task_shell_filesystem_image_no_demotion(self, mock_shell, mock_getuser):
+    shell_config = ShellHealthChecker(shell_command='run health check')
+    task_config = TaskConfig(
+      job=JobKey(role='role', environment='env', name='name'),
+      executorConfig=ExecutorConfig(
+        name='thermos-generic',
+        data=MESOS_JOB(
+          task=HELLO_WORLD,
+          health_check_config=HealthCheckConfig(
+            health_checker=HealthCheckerConfig(shell=shell_config),
+            timeout_secs=5
+          )
+        ).json_dumps()
+      )
+    )
+    assigned_task = AssignedTask(task=task_config, instanceId=1, assignedPorts={'foo': 9001})
+    execconfig_data = json.loads(assigned_task.task.executorConfig.data)
+    assert execconfig_data['health_check_config'][
+             'health_checker']['shell']['shell_command'] == 'run health check'
 
-          assert shell.mock_calls == [
-              mock.call(
-                  raw_cmd='failed command',
-                  wrapped_cmd=NotNone(),
-                  preexec_fn=None,
-                  timeout_secs=5.0
-              )
-          ]
+    with temporary_dir() as td:
+      fake_mesos_containerizer_path = self.make_fake_mesos_containerizer(td)
+
+      mock_sandbox = mock.Mock(spec_set=SandboxInterface)
+      type(mock_sandbox).root = mock.PropertyMock(return_value=td)
+      type(mock_sandbox).is_filesystem_image = mock.PropertyMock(return_value=True)
+      container_root_path = os.path.join(td, 'container-root')
+      type(mock_sandbox).container_root = mock.PropertyMock(return_value=container_root_path)
+
+      HealthCheckerProvider(
+        nosetuid_health_checks=True,
+        mesos_containerizer_path=fake_mesos_containerizer_path
+      ).from_assigned_task(
+        assigned_task,
+        mock_sandbox
+      )
+
+      class ValidateWrapperCmd(object):
+        def __eq__(self, other):
+          assert "--user=user" in other
+          return True
+
+      assert mock_shell.mock_calls == [
+        mock.call(
+          raw_cmd='run health check',
+          wrapped_cmd=ValidateWrapperCmd(),
+          preexec_fn=None,
+          timeout_secs=5.0
+        )
+      ]
 
   def test_interpolate_cmd(self):
     """Making sure thermos.ports[foo] gets correctly substituted with assignedPorts info."""

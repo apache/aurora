@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import getpass
 import math
 import os
 import pwd
@@ -367,7 +368,7 @@ class HealthCheckerProvider(StatusCheckerProvider):
       # command within a mesos-containerizer invocation so that it's executed within that
       # filesystem.
       if sandbox.is_filesystem_image:
-        health_check_user = (os.getusername() if self._nosetuid_health_checks
+        health_check_user = (getpass.getuser() if self._nosetuid_health_checks
             else assigned_task.task.job.role)
         wrapped_cmd = wrap_with_mesos_containerizer(
             interpolated_command,
