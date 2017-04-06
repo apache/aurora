@@ -66,6 +66,7 @@ import org.apache.aurora.scheduler.mesos.MesosCallbackHandler;
 import org.apache.aurora.scheduler.mesos.MesosCallbackHandler.MesosCallbackHandlerImpl;
 import org.apache.aurora.scheduler.mesos.MesosSchedulerImpl;
 import org.apache.aurora.scheduler.mesos.ProtosConversion;
+import org.apache.aurora.scheduler.mesos.SchedulerDriverModule;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
@@ -189,7 +190,7 @@ public class StatusUpdateBenchmark {
             bind(MesosCallbackHandler.class).to(MesosCallbackHandlerImpl.class);
             bind(MesosCallbackHandlerImpl.class).in(Singleton.class);
             bind(Executor.class)
-                .annotatedWith(MesosCallbackHandlerImpl.SchedulerExecutor.class)
+                .annotatedWith(SchedulerDriverModule.SchedulerExecutor.class)
                 .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor(
                     "SchedulerImpl-%d",
                     LoggerFactory.getLogger(StatusUpdateBenchmark.class)));

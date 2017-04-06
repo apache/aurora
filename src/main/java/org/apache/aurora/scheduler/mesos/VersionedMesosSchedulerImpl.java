@@ -13,6 +13,9 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
@@ -21,6 +24,8 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 
 import org.apache.aurora.common.inject.TimedInterceptor;
+import org.apache.aurora.common.stats.StatsProvider;
+import org.apache.aurora.common.util.BackoffHelper;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.mesos.v1.Protos;
@@ -45,8 +50,13 @@ public class VersionedMesosSchedulerImpl implements Scheduler {
   private final MesosCallbackHandler handler;
   private final Storage storage;
   private final FrameworkInfoFactory infoFactory;
+  private final Executor executor;
+  private final BackoffHelper backoffHelper;
 
-  private volatile boolean isRegistered = false;
+  private final AtomicBoolean isSubscribed = new AtomicBoolean(false);
+  private final AtomicBoolean isConnected = new AtomicBoolean(false);
+  private final AtomicBoolean isRegistered = new AtomicBoolean(false);
+  private final AtomicLong subcriptionCalls;
 
   private static final String EVENT_COUNTER_STAT_PREFIX = "mesos_scheduler_event_";
   // A cache to hold the metric names to prevent us from creating strings for every event
@@ -64,18 +74,26 @@ public class VersionedMesosSchedulerImpl implements Scheduler {
   VersionedMesosSchedulerImpl(
       MesosCallbackHandler handler,
       CachedCounters counters,
+      StatsProvider statsProvider,
       Storage storage,
+      @SchedulerDriverModule.SchedulerExecutor Executor executor,
+      BackoffHelper backoffHelper,
       FrameworkInfoFactory factory) {
     this.handler = requireNonNull(handler);
     this.counters = requireNonNull(counters);
     this.storage = requireNonNull(storage);
     this.infoFactory = requireNonNull(factory);
+    this.executor = requireNonNull(executor);
+    this.backoffHelper = requireNonNull(backoffHelper);
     initializeEventMetrics();
+
+    this.subcriptionCalls = statsProvider.makeCounter("mesos_scheduler_subscription_attempts");
   }
 
   @Override
   public void connected(Mesos mesos) {
     LOG.info("Connected to Mesos master.");
+    isConnected.set(true);
 
     Optional<String> frameworkId = storage.read(
         storeProvider -> storeProvider.getSchedulerStore().fetchFrameworkId());
@@ -95,15 +113,35 @@ public class VersionedMesosSchedulerImpl implements Scheduler {
       LOG.warn("Did not find a persisted framework ID, connecting as a new framework.");
     }
 
-    LOG.info("Sending subscribe call");
-    mesos.send(call.setSubscribe(Call.Subscribe.newBuilder()
-        .setFrameworkInfo(frameworkBuilder.build())
-        .build())
-        .build());
+    call.setSubscribe(Call.Subscribe.newBuilder().setFrameworkInfo(frameworkBuilder));
+
+    executor.execute(() -> {
+      LOG.info("Starting to subscribe to Mesos with backoff.");
+      try {
+        backoffHelper.doUntilSuccess(() -> {
+          if (!isConnected.get())  {
+            LOG.info("Disconnected while attempting to subscribe. Stopping attempt.");
+            return true;
+          }
+          if (!isSubscribed.get()) {
+            LOG.info("Sending subscribe call.");
+            mesos.send(call.build());
+            subcriptionCalls.incrementAndGet();
+            return false;
+          }
+          LOG.info("Subscribed to Mesos");
+          return true;
+        });
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    });
   }
 
   @Override
   public void disconnected(Mesos mesos) {
+    isSubscribed.set(false);
+    isConnected.set(false);
     handler.handleDisconnection();
   }
 
@@ -126,16 +164,17 @@ public class VersionedMesosSchedulerImpl implements Scheduler {
     switch(event.getType()) {
       case SUBSCRIBED:
         Event.Subscribed subscribed = event.getSubscribed();
-        if (isRegistered) {
+        if (isRegistered.get()) {
           handler.handleReregistration(subscribed.getMasterInfo());
         } else {
+          isRegistered.set(true);
           handler.handleRegistration(subscribed.getFrameworkId(), subscribed.getMasterInfo());
-          isRegistered = true;
         }
+        isSubscribed.set(true);
         break;
 
       case OFFERS:
-        checkState(isRegistered, "Must be registered before receiving offers.");
+        checkState(isSubscribed.get(), "Must be registered before receiving offers.");
         handler.handleOffers(event.getOffers().getOffersList());
         break;
 

@@ -13,12 +13,16 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.concurrent.Executors;
+
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InetAddresses;
 import com.google.protobuf.ByteString;
 
+import org.apache.aurora.common.base.ExceptionalSupplier;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.common.util.BackoffHelper;
 import org.apache.aurora.scheduler.stats.CachedCounters;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
@@ -40,10 +44,12 @@ import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class VersionedMesosSchedulerImplTest extends EasyMockTest {
@@ -53,6 +59,7 @@ public class VersionedMesosSchedulerImplTest extends EasyMockTest {
   private Mesos driver;
   private FakeStatsProvider statsProvider;
   private FrameworkInfoFactory infoFactory;
+  private BackoffHelper backoffHelper;
 
   private VersionedMesosSchedulerImpl scheduler;
 
@@ -145,30 +152,43 @@ public class VersionedMesosSchedulerImplTest extends EasyMockTest {
     driver = createMock(Mesos.class);
     statsProvider = new FakeStatsProvider();
     infoFactory = createMock(FrameworkInfoFactory.class);
+    backoffHelper = createMock(BackoffHelper.class);
 
     scheduler = new VersionedMesosSchedulerImpl(
         handler,
         new CachedCounters(statsProvider),
+        statsProvider,
         storageUtil.storage,
+        Executors.newSingleThreadExecutor(),
+        backoffHelper,
         infoFactory);
   }
 
-  @Test
-  public void testConnected() {
+  @Test(timeout = 300000)
+  public void testConnected() throws Exception {
     // Once the V1 driver has connected, we need to establish a subscription to get events
-
-    storageUtil.expectOperations();
-    expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(FRAMEWORK_ID));
-    expect(infoFactory.getFrameworkInfo()).andReturn(FRAMEWORK_INFO);
+    expectFrameworkInfoRead();
 
     Capture<Call> subscribeCapture = createCapture();
 
     driver.send(capture(subscribeCapture));
     expectLastCall().once();
 
+    Capture<ExceptionalSupplier<Boolean, RuntimeException>> supplierCapture = createCapture();
+    backoffHelper.doUntilSuccess(capture(supplierCapture));
+    expectLastCall().once();
+
     control.replay();
 
     scheduler.connected(driver);
+
+    waitUntilCaptured(supplierCapture);
+
+    assertTrue(supplierCapture.hasCaptured());
+    ExceptionalSupplier<Boolean, RuntimeException> supplier = supplierCapture.getValue();
+
+    // Make one connection attempt
+    supplier.get();
 
     assertTrue(subscribeCapture.hasCaptured());
 
@@ -179,6 +199,78 @@ public class VersionedMesosSchedulerImplTest extends EasyMockTest {
     assertEquals(
         subscribe.getSubscribe().getFrameworkInfo(),
         FRAMEWORK_INFO.toBuilder().setId(FRAMEWORK).build());
+  }
+
+  @Test(timeout = 300000)
+  public void testAttemptSubscriptionSuccessful() throws Exception {
+    expectFrameworkInfoRead();
+
+    // Other tests already check if what we send is correct.
+    driver.send(anyObject());
+    expectLastCall().once();
+    driver.send(anyObject());
+    expectLastCall().once();
+
+    Capture<ExceptionalSupplier<Boolean, RuntimeException>> supplierCapture = createCapture();
+    backoffHelper.doUntilSuccess(capture(supplierCapture));
+    expectLastCall().once();
+
+    handler.handleRegistration(FRAMEWORK, MASTER);
+
+    control.replay();
+
+    scheduler.connected(driver);
+
+    waitUntilCaptured(supplierCapture);
+    assertTrue(supplierCapture.hasCaptured());
+    ExceptionalSupplier<Boolean, RuntimeException> supplier = supplierCapture.getValue();
+
+    // Each attempt should return false.
+    assertFalse(supplier.get());
+    assertFalse(supplier.get());
+
+    // After the callback we should return true because it was successful.
+    scheduler.received(driver, SUBSCRIBED_EVENT);
+
+    assertTrue(supplier.get());
+  }
+
+  @Test(timeout = 300000)
+  public void testAttemptSubscriptionHaltsAfterDisconnection() throws Exception {
+    storageUtil.expectOperations();
+    expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(FRAMEWORK_ID));
+    expect(infoFactory.getFrameworkInfo()).andReturn(FRAMEWORK_INFO);
+
+    // Other tests already check if what we send is correct.
+    driver.send(anyObject());
+    expectLastCall().once();
+
+    Capture<ExceptionalSupplier<Boolean, RuntimeException>> supplierCapture = createCapture();
+    backoffHelper.doUntilSuccess(capture(supplierCapture));
+    expectLastCall().once();
+
+    handler.handleDisconnection();
+
+    control.replay();
+
+    scheduler.connected(driver);
+
+    waitUntilCaptured(supplierCapture);
+    assertTrue(supplierCapture.hasCaptured());
+    ExceptionalSupplier<Boolean, RuntimeException> supplier = supplierCapture.getValue();
+
+    assertFalse(supplier.get());
+
+    // After disconnection we should stop.
+    scheduler.disconnected(driver);
+
+    assertTrue(supplier.get());
+  }
+
+  private static void waitUntilCaptured(Capture<?> capture) throws Exception {
+    while (!capture.hasCaptured()) {
+      Thread.sleep(1000);
+    }
   }
 
   @Test
@@ -271,5 +363,49 @@ public class VersionedMesosSchedulerImplTest extends EasyMockTest {
 
     scheduler.received(driver, FAILED_AGENT_EVENT);
     assertEquals(1L, statsProvider.getLongValue("mesos_scheduler_event_FAILURE"));
+  }
+
+  @Test(timeout = 300000)
+  public void testSubscribeDisconnectSubscribeCycle() throws Exception {
+    expectFrameworkInfoRead();
+
+    Capture<ExceptionalSupplier<Boolean, RuntimeException>> firstSubscribeAttempt = createCapture();
+    backoffHelper.doUntilSuccess(capture(firstSubscribeAttempt));
+    expectLastCall().once();
+
+    handler.handleRegistration(FRAMEWORK, MASTER);
+    handler.handleDisconnection();
+
+    Capture<ExceptionalSupplier<Boolean, RuntimeException>> secondSubscribeAttempt =
+        createCapture();
+    backoffHelper.doUntilSuccess(capture(secondSubscribeAttempt));
+    expectLastCall().once();
+
+    // Second subscribe should call the reregistration handler.
+    handler.handleReregistration(MASTER);
+
+    control.replay();
+
+    scheduler.connected(driver);
+
+    waitUntilCaptured(firstSubscribeAttempt);
+    assertTrue(firstSubscribeAttempt.hasCaptured());
+
+    scheduler.received(driver, SUBSCRIBED_EVENT);
+    scheduler.disconnected(driver);
+    scheduler.connected(driver);
+
+    waitUntilCaptured(secondSubscribeAttempt);
+    assertTrue(secondSubscribeAttempt.hasCaptured());
+
+    scheduler.received(driver, SUBSCRIBED_EVENT);
+  }
+
+  private void expectFrameworkInfoRead() {
+    storageUtil.expectOperations();
+    expect(storageUtil.schedulerStore.fetchFrameworkId())
+        .andReturn(Optional.of(FRAMEWORK_ID))
+        .anyTimes();
+    expect(infoFactory.getFrameworkInfo()).andReturn(FRAMEWORK_INFO).anyTimes();
   }
 }

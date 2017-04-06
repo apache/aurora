@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -22,7 +20,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
-import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -57,10 +54,6 @@ import org.apache.mesos.v1.Protos.TaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.mesos.v1.Protos.TaskStatus.Reason.REASON_RECONCILIATION;
@@ -106,14 +99,6 @@ public interface MesosCallbackHandler {
     private final AtomicBoolean frameworkRegistered;
 
     /**
-     * Binding annotation for the executor the incoming Mesos message handler uses.
-     */
-    @VisibleForTesting
-    @Qualifier
-    @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-    public @interface SchedulerExecutor { }
-
-    /**
      * Creates a new handler for callbacks.
      *
      * @param storage Store to save host attributes into.
@@ -130,7 +115,7 @@ public interface MesosCallbackHandler {
         TaskStatusHandler taskStatusHandler,
         OfferManager offerManager,
         EventSink eventSink,
-        @SchedulerExecutor Executor executor,
+        @SchedulerDriverModule.SchedulerExecutor Executor executor,
         StatsProvider statsProvider,
         Driver driver,
         Clock clock,

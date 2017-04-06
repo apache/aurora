@@ -13,10 +13,14 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.util.concurrent.Executor;
 
+import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
 
 import org.apache.aurora.scheduler.app.SchedulerMain;
@@ -26,6 +30,11 @@ import org.apache.aurora.scheduler.mesos.MesosCallbackHandler.MesosCallbackHandl
 import org.apache.mesos.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -40,6 +49,14 @@ public class SchedulerDriverModule extends AbstractModule {
     this.kind = kind;
   }
 
+  /**
+   * Binding annotation for the executor the incoming Mesos message handler uses.
+   */
+  @VisibleForTesting
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  public @interface SchedulerExecutor { }
+
   @Override
   protected void configure() {
     bind(Scheduler.class).to(MesosSchedulerImpl.class);
@@ -48,7 +65,7 @@ public class SchedulerDriverModule extends AbstractModule {
     bind(MesosCallbackHandler.class).to(MesosCallbackHandlerImpl.class);
     bind(MesosCallbackHandlerImpl.class).in(Singleton.class);
     // TODO(zmanji): Create singleThreadedExecutor (non-scheduled) variant.
-    bind(Executor.class).annotatedWith(MesosCallbackHandlerImpl.SchedulerExecutor.class)
+    bind(Executor.class).annotatedWith(SchedulerExecutor.class)
         .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SchedulerImpl-%d", LOG));
 
     switch (kind) {
