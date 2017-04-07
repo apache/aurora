@@ -235,8 +235,6 @@ CREATE TABLE task_config_volumes(
   host_path VARCHAR NOT NULL,
   container_path VARCHAR NOT NULL,
   mode INT NOT NULL REFERENCES volume_modes(id),
-
-  UNIQUE(task_config_id)
 );
 
 CREATE TABLE task_states(

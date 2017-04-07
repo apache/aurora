@@ -197,7 +197,9 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   public void testSaveWithContainerVolumes() {
     ScheduledTask builder = TASK_B.newBuilder();
     Image image = Image.docker(new DockerImage().setName("some-name").setTag("some-tag"));
-    List<Volume> volumes = ImmutableList.of(new Volume("container", "host", Mode.RO));
+    List<Volume> volumes = ImmutableList.of(
+        new Volume("container2", "host2", Mode.RW),
+        new Volume("container", "host", Mode.RO));
     builder.getAssignedTask().getTask().getContainer().getMesos().setImage(image)
         .setVolumes(volumes);
 
@@ -683,7 +685,8 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
   private void assertQueryResults(Query.Builder query, Set<IScheduledTask> tasks) {
     Iterable<IScheduledTask> result = fetchTasks(query);
     assertQueryHasNoDupes(result);
-    assertEquals(tasks, ImmutableSet.copyOf(fetchTasks(query)));
+    Set<IScheduledTask> set = ImmutableSet.copyOf(result);
+    assertEquals(tasks, set);
   }
 
   private void assertQueryHasNoDupes(Iterable<IScheduledTask> result) {

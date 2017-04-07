@@ -26,6 +26,7 @@ import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.MesosFetcherURI;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.Volume;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static org.apache.aurora.GuavaUtils.toImmutableSet;
@@ -49,6 +50,7 @@ public final class DbTaskConfig {
   private List<Metadata> metadata;
   private List<MesosFetcherURI> mesosFetcherUris;
   private DbContainer container;
+  private List<Volume> volumes;
   private String tier;
   private List<DBResource> resources;
 
@@ -60,7 +62,7 @@ public final class DbTaskConfig {
   }
 
   TaskConfig toThrift() {
-    return new TaskConfig()
+    TaskConfig builder = new TaskConfig()
         .setJob(job)
         .setOwner(owner)
         .setIsService(isService)
@@ -83,6 +85,14 @@ public final class DbTaskConfig {
         .setContainer(
             container == null ? Container.mesos(new MesosContainer()) : container.toThrift())
         .setResources(resources.stream().map(DBResource::toThrift).collect(toImmutableSet()));
+
+    // In the DB Layer volumes are associated with a task config, since containers are not
+    // modelled as tables.
+    if (builder.getContainer().isSetMesos()) {
+      builder.getContainer().getMesos().setVolumes(volumes);
+    }
+
+    return builder;
   }
 
   public ITaskConfig toImmutable() {

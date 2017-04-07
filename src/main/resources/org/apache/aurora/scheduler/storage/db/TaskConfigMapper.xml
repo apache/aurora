@@ -118,9 +118,12 @@
   </resultMap>
 
   <resultMap id="containerMap" type="org.apache.aurora.scheduler.storage.db.views.DbContainer">
+    <!--NOTE: Do not put any collections under here. ContainerMap doesn't correspond to a table, it's a syntheic map
+    for assocations. Since it doesn't have a table, there is no unique id. Since there is no unique id, MyBatis nested
+    result map collections fail.
+    -->
     <association property="docker" resultMap="dockerContainerMap" />
     <association property="image" columnPrefix="image_" resultMap="imageMap" />
-    <collection property="volumes" columnPrefix="volume_" resultMap="volumeMap" notNullColumn="id" />
   </resultMap>
 
   <resultMap id="metadataMap" type="org.apache.aurora.gen.Metadata">
@@ -153,6 +156,7 @@
         resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
         columnPrefix="j_"/>
     <association property="container" resultMap="containerMap" columnPrefix="c_"/>
+    <collection property="volumes" columnPrefix="volume_" resultMap="volumeMap" notNullColumn="id" />
     <collection
         property="constraints"
         columnPrefix="constraint_"
@@ -207,10 +211,10 @@
       di.tag as c_image_docker_tag,
       ai.name as c_image_appc_name,
       ai.image_id as c_image_appc_image_id,
-      v.id as c_volume_id,
-      v.host_path as c_volume_host_path,
-      v.container_path as c_volume_container_path,
-      v.mode as c_volume_mode,
+      v.id as volume_id,
+      v.host_path as volume_host_path,
+      v.container_path as volume_container_path,
+      v.mode as volume_mode,
       tc.id AS constraint_id,
       tc.name AS constraint_name,
       tlc.id AS constraint_l_id,
