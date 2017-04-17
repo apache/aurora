@@ -3,6 +3,8 @@
 
 ### New/updated:
 
+- Update to Mesos 1.2.0. Please upgrade Aurora to 0.18 before upgrading Mesos to 1.2.0 if you rely
+  on Mesos filesystem images.
 - Add message parameter to `killTasks` RPC.
 - Add `prune_tasks` endpoint to `aurora_admin`. See `aurora_admin prune_tasks -h` for usage information.
 - Add support for per-task volume mounts for Mesos containers to the Aurora config DSL.
@@ -13,8 +15,6 @@
   driver. Users that want to use the HTTP API should use `V1_MESOS`.
   Performance sensitive users should stick with the `SCHEDULER_DRIVER` or
   `V0_MESOS` drivers.
-- Add support for new MesosContainerizer rolled out in Mesos 1.2.0.
-  Please upgrade Aurora to 0.18 before upgrading Mesos to 1.2.0.
 - Add observer command line options to control the resource collection interval
   for observed tasks. See [here](docs/reference/observer-configuration.md) for details.
 
