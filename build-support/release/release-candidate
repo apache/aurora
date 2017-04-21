@@ -156,7 +156,8 @@ To roll back your local repo you will need to run:
 
   git checkout master
   git reset --hard ${current_git_rev}
-  git tag -D ${rc_version_tag}
+  git branch -D "stage_${rc_version_tag}"
+  git tag -d ${rc_version_tag}
 EOF
 }
 

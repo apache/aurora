@@ -125,6 +125,22 @@ if [[ $publish == 0 ]]; then
 fi
 
 dist_name="apache-aurora-${current_version}"
+dist_dir=${base_dir}/dist
+
+function print_reset_instructions {
+cat <<EOF
+To roll back your local repo you will need to run:
+
+  rm -rf ${dist_dir}
+EOF
+}
+
+# If anything goes wrong from here then print roll back instructions before exiting.
+function print_rollback_instructions {
+  echo "ERROR: Looks like something has failed while creating the release."
+  print_reset_instructions
+}
+trap print_rollback_instructions EXIT
 
 if [[ $publish == 1 ]]; then
   # Create release branch and tag and push them to the origin
@@ -140,7 +156,6 @@ if [[ $publish == 1 ]]; then
   git push origin "${current_version_tag}"
 fi
 
-dist_dir=${base_dir}/dist
 rc_dir=${dist_dir}/rc
 release_dir=${dist_dir}/${current_version}
 mkdir -p ${rc_dir}
@@ -244,7 +259,9 @@ if [[ $publish == 0 ]]; then
   echo
   echo "This is a dry run, nothing has been published."
   echo
-  echo "To clean up run: rm -rf ${dist_dir}"
+  print_reset_instructions
 fi
 
+# Unset error message handler and exit
+trap '' EXIT
 exit 0
