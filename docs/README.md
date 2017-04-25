@@ -35,6 +35,8 @@ For those that wish to manage and fine-tune an Aurora cluster.
 
  * [Installation](operations/installation.md)
  * [Configuration](operations/configuration.md)
+ * [Upgrades](operations/upgrades.md)
+ * [Troubleshooting](operations/troubleshooting.md)
  * [Monitoring](operations/monitoring.md)
  * [Security](operations/security.md)
  * [Storage](operations/storage.md)
@@ -55,6 +57,7 @@ The complete reference of commands, configuration options, and scheduler interna
     - [Client Cluster Configuration](reference/client-cluster-configuration.md)
  * [Scheduler Configuration](reference/scheduler-configuration.md)
  * [Observer Configuration](reference/observer-configuration.md)
+ * [Endpoints](reference/scheduler-endpoints.md)
 
 ## Additional Resources
  * [Tools integrating with Aurora](additional-resources/tools.md)

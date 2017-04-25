@@ -36,6 +36,7 @@ uris (optional)          | List of resources to download into the task sandbox.
 shell (optional)         | Run executor via shell.
 
 A note on the command property (from [mesos.proto](https://github.com/apache/mesos/blob/master/include/mesos/mesos.proto)):
+
 ```
 1) If 'shell == true', the command will be launched via shell
    (i.e., /bin/sh -c 'value'). The 'value' specified will be
@@ -68,14 +69,15 @@ scalar (required)    | Value in float for cpus or int for mem (in MBs)
 
 ### volume_mounts (list)
 
-Property                  | Description
-------------------------  | ---------------------------------
-host_path (required)      | Host path to mount inside the container.
-container_path (required) | Path inside the container where `host_path` will be mounted.
-mode (required)           | Mode in which to mount the volume, Read-Write (RW) or Read-Only (RO).
+Property                     | Description
+---------------------------  | ---------------------------------
+host_path (required)         | Host path to mount inside the container.
+container_path (required)    | Path inside the container where `host_path` will be mounted.
+mode (required)              | Mode in which to mount the volume, Read-Write (RW) or Read-Only (RO).
 
 A sample configuration is as follows:
-```
+
+```json
 [
     {
       "executor": {
@@ -135,7 +137,6 @@ A sample configuration is as follows:
       "task_prefix": "my-executor-"
     }
 ]
-
 ```
 
 It should be noted that if you do not use Thermos or a Thermos based executor, links in the scheduler's

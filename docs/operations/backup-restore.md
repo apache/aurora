@@ -3,7 +3,7 @@
 **Be sure to read the entire page before attempting to restore from a backup, as it may have
 unintended consequences.**
 
-# Summary
+## Summary
 
 The restoration procedure replaces the existing (possibly corrupted) Mesos replicated log with an
 earlier, backed up, version and requires all schedulers to be taken down temporarily while
@@ -18,7 +18,7 @@ so any tasks that have been rescheduled since the backup was taken will be kille
 Instructions below have been verified in [Vagrant environment](../getting-started/vagrant.md) and with minor
 syntax/path changes should be applicable to any Aurora cluster.
 
-# Preparation
+## Preparation
 
 Follow these steps to prepare the cluster for restoring from a backup:
 
@@ -54,7 +54,7 @@ accomplished by updating the following scheduler configuration options:
 
 * Restart all schedulers
 
-# Cleanup and re-initialize Mesos replicated log
+## Cleanup and re-initialize Mesos replicated log
 
 Get rid of the corrupted files and re-initialize Mesos replicated log:
 
@@ -63,7 +63,7 @@ Get rid of the corrupted files and re-initialize Mesos replicated log:
 * Initialize Mesos replica's log file: `sudo mesos-log initialize --path=<-native_log_file_path>`
 * Start schedulers
 
-# Restore from backup
+## Restore from backup
 
 At this point the scheduler is ready to rehydrate from the backup:
 
@@ -87,5 +87,5 @@ See `aurora_admin help <command>` for usage details.
 the provided backup snapshot and initiate a mandatory failover
 `aurora_admin scheduler_commit_recovery --bypass-leader-redirect  <cluster>`
 
-# Cleanup
+## Cleanup
 Undo any modification done during [Preparation](#preparation) sequence.

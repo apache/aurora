@@ -19,6 +19,7 @@ Below is a sample configuration:
 ```
 
 And an example of a response that you will get back:
+
 ```json
 {
     "task":
@@ -77,4 +78,3 @@ And an example of a response that you will get back:
         },
         "oldState":{}}
 ```
-
