@@ -59,7 +59,7 @@ public class ReconciliationModule extends AbstractModule {
       help = "When killing a task, retry after this delay if mesos has not responded,"
           + " backing off up to transient_task_state_timeout")
   private static final Arg<Amount<Long, Time>> INITIAL_TASK_KILL_RETRY_INTERVAL =
-      Arg.create(Amount.of(5L, Time.SECONDS));
+      Arg.create(Amount.of(15L, Time.SECONDS));
 
   // Reconciliation may create a big surge of status updates in a large cluster. Setting the default
   // initial delay to 1 minute to ease up storage contention during scheduler start up.
