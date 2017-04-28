@@ -101,7 +101,7 @@ class DbTaskStore implements TaskStore.Mutable {
     String message = "Query took {} ms: {}";
     if (infoLevel) {
       LOG.info(message, time, query.get());
-    } else {
+    } else if (LOG.isDebugEnabled()) {
       LOG.debug(message, time, query.get());
     }
 

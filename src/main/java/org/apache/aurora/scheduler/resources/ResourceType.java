@@ -332,7 +332,11 @@ public enum ResourceType implements TEnum {
    * @return {@link ResourceType}.
    */
   public static ResourceType fromIdValue(int value) {
-    return requireNonNull(byField.get(value), "Unmapped value: " + value);
+    ResourceType resourceType = byField.get(value);
+    if (resourceType == null) {
+      throw new NullPointerException("Unmapped value: " + value);
+    }
+    return resourceType;
   }
 
   /**
@@ -342,9 +346,11 @@ public enum ResourceType implements TEnum {
    * @return {@link ResourceType}.
    */
   public static ResourceType fromResource(IResource resource) {
-    return requireNonNull(
-        byField.get((int) resource.getSetField().getThriftFieldId()),
-        "Unknown resource: " + resource);
+    ResourceType resourceType = byField.get((int) resource.getSetField().getThriftFieldId());
+    if (resourceType == null) {
+      throw new NullPointerException("Unknown resource: " + resource);
+    }
+    return resourceType;
   }
 
   /**
@@ -354,8 +360,10 @@ public enum ResourceType implements TEnum {
    * @return {@link ResourceType}.
    */
   public static ResourceType fromResource(Resource resource) {
-    return requireNonNull(
-        BY_MESOS_NAME.get(resource.getName()),
-        "Unknown Mesos resource: " + resource);
+    ResourceType resourceType = BY_MESOS_NAME.get(resource.getName());
+    if (resourceType == null) {
+      throw new NullPointerException("Unknown Mesos resource: " + resource);
+    }
+    return resourceType;
   }
 }

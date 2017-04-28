@@ -177,9 +177,11 @@ public interface MesosTaskFactory {
       }
       Iterable<Resource> resources = acceptedOffer.getTaskResources();
 
-      LOG.debug(
-          "Setting task resources to {}",
-          Iterables.transform(resources, Protobufs::toString));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Setting task resources to {}",
+            Iterables.transform(resources, Protobufs::toString));
+      }
 
       TaskInfo.Builder taskBuilder = TaskInfo.newBuilder()
           .setName(JobKeys.canonicalString(Tasks.getJob(task)))
@@ -334,9 +336,11 @@ public interface MesosTaskFactory {
       builder.setCommand(builder.getCommand().toBuilder().addAllUris(mesosFetcherUris));
 
       Iterable<Resource> executorResources = acceptedOffer.getExecutorResources();
-      LOG.debug(
-          "Setting executor resources to {}",
-          Iterables.transform(executorResources, Protobufs::toString));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Setting executor resources to {}",
+            Iterables.transform(executorResources, Protobufs::toString));
+      }
       builder.clearResources().addAllResources(executorResources);
       return builder;
     }
