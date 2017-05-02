@@ -21,7 +21,7 @@ from apache.aurora.common.cluster import Cluster
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.schema.base import UpdateConfig
 
-from ...api_util import SchedulerThriftApiSpec
+from ...api_util import SchedulerProxyApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     InstanceKey,
@@ -75,7 +75,7 @@ class TestJobUpdateApis(unittest.TestCase):
   @classmethod
   def mock_api(cls):
     api = AuroraClientAPI(Cluster(name="foo"), 'test-client')
-    mock_proxy = create_autospec(spec=SchedulerThriftApiSpec, spec_set=True, instance=True)
+    mock_proxy = create_autospec(spec=SchedulerProxyApiSpec, spec_set=True, instance=True)
     api._scheduler_proxy = mock_proxy
     return api, mock_proxy
 
@@ -131,7 +131,8 @@ class TestJobUpdateApis(unittest.TestCase):
     api.start_job_update(self.mock_job_config(), instances=None, message='hello')
     mock_proxy.startJobUpdate.assert_called_once_with(
         self.create_update_request(task_config),
-        'hello')
+        'hello',
+        retry=True)
 
   def test_start_job_update_fails_parse_update_config(self):
     """Test start_job_update fails to parse invalid UpdateConfig."""
@@ -150,7 +151,9 @@ class TestJobUpdateApis(unittest.TestCase):
     mock_proxy.getJobUpdateDiff.return_value = self.create_simple_success_response()
 
     api.get_job_update_diff(self.mock_job_config(), instances=None)
-    mock_proxy.getJobUpdateDiff.assert_called_once_with(self.create_update_request(task_config))
+    mock_proxy.getJobUpdateDiff.assert_called_once_with(
+      self.create_update_request(task_config),
+      retry=True)
 
   def test_pause_job_update(self):
     """Test successful job update pause."""
@@ -176,14 +179,14 @@ class TestJobUpdateApis(unittest.TestCase):
         jobKey=job_key.to_thrift(),
         updateStatuses={JobUpdateStatus.ROLLING_FORWARD})
     api.query_job_updates(job_key=job_key, update_statuses=query.updateStatuses)
-    mock_proxy.getJobUpdateSummaries.assert_called_once_with(query)
+    mock_proxy.getJobUpdateSummaries.assert_called_once_with(query, retry=True)
 
   def test_query_job_updates_no_filter(self):
     """Test querying job updates with no filter args."""
     api, mock_proxy = self.mock_api()
     query = JobUpdateQuery()
     api.query_job_updates()
-    mock_proxy.getJobUpdateSummaries.assert_called_once_with(query)
+    mock_proxy.getJobUpdateSummaries.assert_called_once_with(query, retry=True)
 
   def test_get_job_update_details(self):
     """Test getting job update details."""
@@ -191,7 +194,7 @@ class TestJobUpdateApis(unittest.TestCase):
     key = JobUpdateKey(job=JobKey(role="role", environment="env", name="name"), id="id")
     api.get_job_update_details(key)
     query = JobUpdateQuery(key=key)
-    mock_proxy.getJobUpdateDetails.assert_called_once_with(key, query)
+    mock_proxy.getJobUpdateDetails.assert_called_once_with(key, query, retry=True)
 
   def test_set_quota(self):
     """Test setting quota."""

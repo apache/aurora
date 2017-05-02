@@ -107,14 +107,16 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
       host_activate([self.TEST_CLUSTER])
 
       mock_scheduler_proxy.endMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
-      mock_scheduler_proxy.maintenanceStatus.assert_called_with(Hosts(set(self.HOSTNAMES)))
+      mock_scheduler_proxy.maintenanceStatus.assert_called_with(
+        Hosts(set(self.HOSTNAMES)),
+        retry=True)
 
   def test_perform_maintenance_hosts(self):
     mock_options = self.make_mock_options()
     mock_options.post_drain_script = 'callback'
     mock_options.grouping = 'by_host'
 
-    def host_status_results(hostnames):
+    def host_status_results(hostnames, retry=True):
       if isinstance(hostnames, Hosts):
         return self.create_drained_status_result(hostnames)
       return self.create_maintenance_status_result()
@@ -150,7 +152,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_options.post_drain_script = None
     mock_options.grouping = 'by_host'
 
-    def host_status_results(hostnames):
+    def host_status_results(hostnames, retry=True):
       if isinstance(hostnames, Hosts):
         return self.create_drained_status_result(hostnames)
       return self.create_maintenance_status_result()
@@ -247,7 +249,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_options.post_drain_script = None
     mock_options.grouping = 'by_host'
 
-    def host_status_results(hostnames):
+    def host_status_results(hostnames, retry=True):
       if isinstance(hostnames, Hosts):
         return self.create_drained_status_result(hostnames)
       return self.create_maintenance_status_result()
@@ -321,4 +323,6 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
         patch('twitter.common.app.get_options', return_value=mock_options)):
       host_status([self.TEST_CLUSTER])
 
-      mock_scheduler_proxy.maintenanceStatus.assert_called_with(Hosts(set(self.HOSTNAMES)))
+      mock_scheduler_proxy.maintenanceStatus.assert_called_with(
+        Hosts(set(self.HOSTNAMES)),
+        retry=True)

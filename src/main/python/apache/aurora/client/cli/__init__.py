@@ -40,6 +40,7 @@ import pkg_resources
 from twitter.common.lang import AbstractClass, Compatibility
 
 from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.api.scheduler_client import SchedulerProxy
 
 from .command_hooks import GlobalCommandHookRegistry
 from .options import CommandOption
@@ -319,6 +320,12 @@ class CommandLine(AbstractClass):
     except Context.CommandError as c:
       context.print_err(c.msg)
       return c.code
+    except SchedulerProxy.NotRetriableError as e:
+      context.print_err(e.message)
+      return EXIT_NETWORK_ERROR
+    except SchedulerProxy.TimeoutError as e:
+      context.print_err(e.message)
+      return EXIT_TIMEOUT
     except AuroraClientAPI.Error as e:
       # TODO(wfarner): Generalize this error type in the contract of noun and verb implementations.
       context.print_err("Fatal error running command: %s" % e.message)

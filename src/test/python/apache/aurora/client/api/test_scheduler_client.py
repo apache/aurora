@@ -483,6 +483,73 @@ class TestSchedulerClient(unittest.TestCase):
 
   @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
               spec=scheduler_client.SchedulerClient)
+  @mock.patch('threading._Event.wait')
+  def test_performBackup_retriable_errors(self, mock_wait, mock_client):
+    mock_scheduler_client = mock.create_autospec(
+        spec=scheduler_client.SchedulerClient,
+        spec_set=False,
+        instance=True)
+    mock_thrift_client = mock.create_autospec(spec=AuroraAdmin.Client, instance=True)
+    mock_thrift_client.performBackup.side_effect = [
+      Response(responseCode=ResponseCode.ERROR_TRANSIENT),
+      scheduler_client.SchedulerProxy.TimeoutError,
+      Response(responseCode=ResponseCode.OK)]
+
+    mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
+    mock_client.get.return_value = mock_scheduler_client
+
+    proxy = scheduler_client.SchedulerProxy(Cluster(name='local'))
+    proxy.performBackup()
+
+    assert mock_thrift_client.performBackup.call_count == 3
+    assert mock_wait.call_count == 2
+
+  @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
+              spec=scheduler_client.SchedulerClient)
+  @mock.patch('threading._Event.wait')
+  def test_performBackup_transport_exception(self, mock_wait, mock_client):
+    mock_scheduler_client = mock.create_autospec(
+      spec=scheduler_client.SchedulerClient,
+      spec_set=False,
+      instance=True)
+
+    mock_thrift_client = mock.create_autospec(spec=AuroraAdmin.Client, instance=True)
+    mock_thrift_client.performBackup.side_effect = TTransport.TTransportException('error')
+    mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
+    mock_client.get.return_value = mock_scheduler_client
+
+    proxy = scheduler_client.SchedulerProxy(Cluster(name='local'))
+    with pytest.raises(scheduler_client.SchedulerProxy.NotRetriableError):
+      proxy.performBackup()
+
+    assert mock_thrift_client.performBackup.call_count == 1
+    assert not mock_wait.called
+
+  @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
+              spec=scheduler_client.SchedulerClient)
+  @mock.patch('threading._Event.wait')
+  def test_getTierConfigs_transport_exception(self, mock_wait, mock_client):
+    mock_scheduler_client = mock.create_autospec(
+      spec=scheduler_client.SchedulerClient,
+      spec_set=False,
+      instance=True)
+
+    mock_thrift_client = mock.create_autospec(spec=AuroraAdmin.Client, instance=True)
+    mock_thrift_client.getTierConfigs.side_effect = [
+      TTransport.TTransportException('error'),
+      Response(responseCode=ResponseCode.OK)
+    ]
+    mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
+    mock_client.get.return_value = mock_scheduler_client
+
+    proxy = scheduler_client.SchedulerProxy(Cluster(name='local'))
+    proxy.getTierConfigs(retry=True)
+
+    assert mock_thrift_client.getTierConfigs.call_count == 2
+    assert mock_wait.call_count == 1
+
+  @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
+              spec=scheduler_client.SchedulerClient)
   def test_unknown_connection_error(self, client):
     mock_scheduler_client = mock.create_autospec(spec=scheduler_client.SchedulerClient,
                                                  instance=True)

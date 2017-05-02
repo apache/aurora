@@ -94,7 +94,8 @@ class TestRunCommand(AuroraClientCommandTest):
           jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
               ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING]),
-          instanceIds=instances))
+          instanceIds=instances),
+          retry=True)
 
       # The mock status call returns 3 three ScheduledTasks, so three commands should have been run
       assert mock_subprocess.call_count == 3
@@ -147,7 +148,8 @@ class TestSshCommand(AuroraClientCommandTest):
           jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
           instanceIds=set([1]),
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING])))
+              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING])),
+          retry=True)
       mock_subprocess.assert_called_with(['ssh', '-t', '-v', 'bozo@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])
@@ -174,7 +176,8 @@ class TestSshCommand(AuroraClientCommandTest):
           jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
           instanceIds=None,
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING])))
+              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING])),
+          retry=True)
       mock_subprocess.assert_called_with(['ssh', '-t', '-v', 'bozo@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;bash'])

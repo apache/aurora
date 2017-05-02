@@ -235,6 +235,7 @@ class SchedulerProxy(object):
   class AuthError(Error): pass
   class APIVersionError(Error): pass
   class ThriftInternalError(Error): pass
+  class NotRetriableError(Error): pass
 
   def __init__(self, cluster, verbose=False, **kwargs):
     self.cluster = cluster
@@ -302,12 +303,12 @@ class SchedulerProxy(object):
       return method
 
     @functools.wraps(method)
-    def method_wrapper(*args):
+    def method_wrapper(*args, **kwargs):
+      retry = kwargs.get('retry', False)
       with self._lock:
         start = time.time()
         while not self._terminating.is_set() and (
             time.time() - start) < self.RPC_MAXIMUM_WAIT.as_(Time.SECONDS):
-
           try:
             method = getattr(self.client(), method_name)
             if not callable(method):
@@ -321,7 +322,23 @@ class SchedulerProxy(object):
           except TRequestsTransport.AuthError as e:
             log.error(self.scheduler_client().get_failed_auth_message())
             raise self.AuthError(e)
-          except (TTransport.TTransportException, self.TimeoutError, self.TransientError) as e:
+          except TTransport.TTransportException as e:
+            # Client does not know if the request has been received and processed by
+            # the scheduler, therefore the call is retried if it is idempotent.
+            if not self._terminating.is_set():
+              if retry:
+                log.warning('Transport error communicating with scheduler: %s, retrying...' % e)
+                self.invalidate()
+                self._terminating.wait(self.RPC_RETRY_INTERVAL.as_(Time.SECONDS))
+              else:
+                raise self.NotRetriableError('Transport error communicating with scheduler during '
+                                             'non-idempotent operation: %s, not retrying' % e)
+          except (self.TimeoutError, self.TransientError) as e:
+            # If it is TimeoutError then the connection with scheduler could not
+            # be established, therefore the call did not go through.
+            # If it is TransientError then the scheduler could not process the call
+            # because its storage is not in READY state.
+            # In both cases, the call can be safely retried.
             if not self._terminating.is_set():
               log.warning('Connection error with scheduler: %s, reconnecting...' % e)
               self.invalidate()

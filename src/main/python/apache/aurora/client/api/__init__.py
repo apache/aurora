@@ -88,7 +88,8 @@ class AuroraClientAPI(object):
     return self._scheduler_proxy.descheduleCronJob(jobkey.to_thrift())
 
   def populate_job_config(self, config):
-    return self._scheduler_proxy.populateJobConfig(config.job())
+    # read-only calls are retriable.
+    return self._scheduler_proxy.populateJobConfig(config.job(), retry=True)
 
   def start_cronjob(self, job_key):
     self._assert_valid_job_key(job_key)
@@ -98,7 +99,8 @@ class AuroraClientAPI(object):
 
   def get_jobs(self, role):
     log.info("Retrieving jobs for role %s" % role)
-    return self._scheduler_proxy.getJobs(role)
+    # read-only calls are retriable.
+    return self._scheduler_proxy.getJobs(role, retry=True)
 
   def add_instances(self, job_key, instance_id, count):
     key = InstanceKey(jobKey=job_key.to_thrift(), instanceId=instance_id)
@@ -113,7 +115,6 @@ class AuroraClientAPI(object):
     if instances is not None:
       log.info("Instances to be killed: %s" % instances)
       instances = frozenset([int(s) for s in instances])
-
     return self._scheduler_proxy.killTasks(job_key.to_thrift(), instances, message)
 
   def check_status(self, job_key):
@@ -130,14 +131,16 @@ class AuroraClientAPI(object):
 
   def query(self, query):
     try:
-      return self._scheduler_proxy.getTasksStatus(query)
+      # read-only calls are retriable.
+      return self._scheduler_proxy.getTasksStatus(query, retry=True)
     except SchedulerProxy.ThriftInternalError as e:
       raise self.ThriftInternalError(e.args[0])
 
   def query_no_configs(self, query):
     """Returns all matching tasks without TaskConfig.executorConfig set."""
     try:
-      return self._scheduler_proxy.getTasksWithoutConfigs(query)
+      # read-only calls are retriable.
+      return self._scheduler_proxy.getTasksWithoutConfigs(query, retry=True)
     except SchedulerProxy.ThriftInternalError as e:
       raise self.ThriftInternalError(e.args[0])
 
@@ -167,7 +170,9 @@ class AuroraClientAPI(object):
     """
     request = self._job_update_request(config, instances, metadata)
     log.info("Starting update for: %s" % config.name())
-    return self._scheduler_proxy.startJobUpdate(request, message)
+    # retring starting a job update is safe, client and scheduler reconcile state if the
+    # job update is in progress (AURORA-1711).
+    return self._scheduler_proxy.startJobUpdate(request, message, retry=True)
 
   def pause_job_update(self, update_key, message):
     """Requests Scheduler to pause active job update.
@@ -225,7 +230,8 @@ class AuroraClientAPI(object):
     """
     request = self._job_update_request(config, instances)
     log.debug("Requesting job update diff details for: %s" % config.name())
-    return self._scheduler_proxy.getJobUpdateDiff(request)
+    # read-only calls are retriable.
+    return self._scheduler_proxy.getJobUpdateDiff(request, retry=True)
 
   def query_job_updates(
       self,
@@ -246,13 +252,15 @@ class AuroraClientAPI(object):
     Returns response object with all matching job update summaries.
     """
     # TODO(wfarner): Consider accepting JobUpdateQuery in this function instead of kwargs.
+    # read-only calls are retriable.
     return self._scheduler_proxy.getJobUpdateSummaries(
         JobUpdateQuery(
             role=role,
             jobKey=job_key.to_thrift() if job_key else None,
             user=user,
             updateStatuses=update_statuses,
-            key=update_key))
+            key=update_key),
+        retry=True)
 
   def get_job_update_details(self, key):
     """Gets JobUpdateDetails for the specified job update ID.
@@ -267,7 +275,8 @@ class AuroraClientAPI(object):
                            % (key, JobUpdateKey.__name__, key.__class__.__name__))
 
     query = JobUpdateQuery(key=key)
-    return self._scheduler_proxy.getJobUpdateDetails(key, query)
+    # read-only calls are retriable.
+    return self._scheduler_proxy.getJobUpdateDetails(key, query, retry=True)
 
   def restart(self, job_key, instances, restart_settings):
     """Perform a rolling restart of the job.
@@ -291,7 +300,8 @@ class AuroraClientAPI(object):
 
   def maintenance_status(self, hosts):
     log.info("Maintenance status for: %s" % hosts.hostNames)
-    return self._scheduler_proxy.maintenanceStatus(hosts)
+    # read-only calls are retriable.
+    return self._scheduler_proxy.maintenanceStatus(hosts, retry=True)
 
   def end_maintenance(self, hosts):
     log.info("Ending maintenance for: %s" % hosts.hostNames)
@@ -299,7 +309,8 @@ class AuroraClientAPI(object):
 
   def get_quota(self, role):
     log.info("Getting quota for: %s" % role)
-    return self._scheduler_proxy.getQuota(role)
+    # read-only calls are retriable.
+    return self._scheduler_proxy.getQuota(role, retry=True)
 
   def set_quota(self, role, cpu, ram, disk):
     log.info("Setting quota for user:%s cpu:%f ram:%d disk: %d"
@@ -313,7 +324,8 @@ class AuroraClientAPI(object):
 
   def get_tier_configs(self):
     log.debug("Getting tier configurations")
-    return self._scheduler_proxy.getTierConfigs()
+    # read-only calls are retriable.
+    return self._scheduler_proxy.getTierConfigs(retry=True)
 
   def force_task_state(self, task_id, status):
     log.info("Requesting that task %s transition to state %s" % (task_id, status))
@@ -329,7 +341,8 @@ class AuroraClientAPI(object):
     return self._scheduler_proxy.stageRecovery(backup_id)
 
   def query_recovery(self, query):
-    return self._scheduler_proxy.queryRecovery(query)
+    # read-only calls are retriable.
+    return self._scheduler_proxy.queryRecovery(query, retry=True)
 
   def delete_recovery_tasks(self, query):
     return self._scheduler_proxy.deleteRecoveryTasks(query)

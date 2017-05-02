@@ -222,7 +222,8 @@ class TestJobStatus(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
-          TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))
+          TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]),
+          retry=True)
 
   def test_successful_status_output_no_metadata(self):
     """Test the status command more deeply: in a request with a fully specified
@@ -343,7 +344,8 @@ class TestJobStatus(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
-          TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))
+          TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]),
+          retry=True)
 
   def test_status_wildcard(self):
     """Test status using a wildcard. It should first call api.get_jobs, and then do a

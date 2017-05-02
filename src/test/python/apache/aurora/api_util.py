@@ -115,5 +115,41 @@ class SchedulerProxyApiSpec(SchedulerThriftApiSpec, SchedulerProxy):
   A concrete definition of the API provided by SchedulerProxy.
   """
 
+  def getTasksStatus(self, query, retry=True):
+    pass
+
+  def getTasksWithoutConfigs(self, query, retry=True):
+    pass
+
+  def getJobs(self, ownerRole, retry=True):
+    pass
+
+  def getQuota(self, ownerRole, retry=True):
+    pass
+
+  def populateJobConfig(self, description, retry=True):
+    pass
+
+  def getJobUpdateSummaries(self, jobUpdateQuery, retry=True):
+    pass
+
+  def getJobUpdateDetails(self, key, query, retry=True):
+    pass
+
+  def getJobUpdateDiff(self, request, retry=True):
+    pass
+
+  def getTierConfigs(self, retry=True):
+    pass
+
+  def queryRecovery(self, query, retry=True):
+    pass
+
+  def maintenanceStatus(self, hosts, retry=True):
+    pass
+
+  def startJobUpdate(self, request, message, retry=True):
+    pass
+
   def url(self):
     pass
