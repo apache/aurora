@@ -180,10 +180,10 @@ public class TaskGroups implements EventSubscriber {
             throw new RuntimeException(e);
           }
 
+          scheduledTaskPenalties.accumulate(group.getPenaltyMs());
           if (scheduled.isEmpty()) {
             penaltyMs = settings.taskGroupBackoff.calculateBackoffMs(group.getPenaltyMs());
           } else {
-            scheduledTaskPenalties.accumulate(group.getPenaltyMs());
             group.remove(scheduled);
             if (group.hasMore()) {
               penaltyMs = settings.firstScheduleDelay.as(Time.MILLISECONDS);
