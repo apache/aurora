@@ -102,6 +102,7 @@ class TestStartUpdate(AuroraClientCommandTest):
     self._fake_context.set_options(self._mock_options)
     self._mock_api = self._fake_context.get_api('UNUSED')
     self._formatter = Mock(spec=DiffFormatter)
+    super(TestStartUpdate, self).setUp()
 
   @classmethod
   def create_mock_config(cls, is_cron=False):
@@ -350,6 +351,24 @@ class TestStartUpdate(AuroraClientCommandTest):
 
     assert e.value == error
     assert self._mock_api.start_job_update.mock_calls == [call(ANY, None, None, ANY)]
+
+  def test_start_update_and_open_page(self):
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    self._mock_options.open_browser = True
+
+    resp = self.create_simple_success_response()
+    resp.result = Result(startJobUpdateResult=StartJobUpdateResult(
+      key=JobUpdateKey(job=JobKey(role="role", environment="env", name="name"), id="id")))
+    self._mock_api.start_job_update.return_value = resp
+
+    with patch('apache.aurora.client.cli.update.DiffFormatter') as formatter:
+      formatter.return_value = self._formatter
+      assert self._command.execute(self._fake_context) == EXIT_OK
+
+    assert self.mock_webbrowser.mock_calls == [
+      call('http://something_or_other/scheduler/role/env/name/update/id')
+    ]
 
 
 class TestListUpdates(AuroraClientCommandTest):

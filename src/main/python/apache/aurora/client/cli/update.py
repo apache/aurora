@@ -19,6 +19,7 @@ import json
 import textwrap
 import time
 import uuid
+import webbrowser
 from collections import namedtuple
 
 from apache.aurora.client.api import AuroraClientAPI
@@ -209,6 +210,9 @@ class StartUpdate(Verb):
         AuroraJobKey.from_thrift(config.cluster(), update_key.job),
         resp.result.startJobUpdateResult.key.id)
       context.print_out(self.UPDATE_MSG_TEMPLATE % url)
+
+      if context.options.open_browser:
+        webbrowser.open_new_tab(url)
 
       if context.options.wait:
         return wait_for_update(context, self._clock, api, update_key, update_state_to_err_code)
