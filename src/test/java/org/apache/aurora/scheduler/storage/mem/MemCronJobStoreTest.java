@@ -25,19 +25,26 @@ import org.apache.aurora.scheduler.storage.AbstractCronJobStoreTest;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.db.InstrumentingInterceptor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
+import org.junit.Test;
 
 import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
+import static org.apache.aurora.scheduler.storage.mem.MemCronJobStore.CRON_JOBS_SIZE;
 import static org.easymock.EasyMock.createMock;
+import static org.junit.Assert.assertEquals;
 
 public class MemCronJobStoreTest extends AbstractCronJobStoreTest {
+
+  private FakeStatsProvider statsProvider;
+
   @Override
   protected Module getStorageModule() {
+    statsProvider = new FakeStatsProvider();
     return Modules.combine(
         DbModule.testModuleWithWorkQueue(PLAIN, Optional.of(new InMemStoresModule(PLAIN))),
         new AbstractModule() {
           @Override
           protected void configure() {
-            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
+            bind(StatsProvider.class).toInstance(statsProvider);
 
             // bindings for mybatis interceptor
             SlidingStats slidingStats = createMock(SlidingStats.class);
@@ -46,5 +53,16 @@ public class MemCronJobStoreTest extends AbstractCronJobStoreTest {
             ));
           }
         });
+  }
+
+  @Test
+  public void testStoreSize() {
+    assertEquals(0L, statsProvider.getLongValue(CRON_JOBS_SIZE));
+    saveAcceptedJob(JOB_A);
+    assertEquals(1L, statsProvider.getLongValue(CRON_JOBS_SIZE));
+    saveAcceptedJob(JOB_B);
+    assertEquals(2L, statsProvider.getLongValue(CRON_JOBS_SIZE));
+    deleteJobs();
+    assertEquals(0L, statsProvider.getLongValue(CRON_JOBS_SIZE));
   }
 }

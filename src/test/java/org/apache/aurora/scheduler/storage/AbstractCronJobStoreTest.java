@@ -41,8 +41,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 public abstract class AbstractCronJobStoreTest {
-  private static final IJobConfiguration JOB_A = makeJob("a");
-  private static final IJobConfiguration JOB_B = makeJob("b");
+  protected static final IJobConfiguration JOB_A = makeJob("a");
+  protected static final IJobConfiguration JOB_B = makeJob("b");
 
   private static final IJobKey KEY_A = JOB_A.getKey();
   private static final IJobKey KEY_B = JOB_B.getKey();
@@ -154,7 +154,7 @@ public abstract class AbstractCronJobStoreTest {
     return storage.read(storeProvider -> storeProvider.getCronJobStore().fetchJob(jobKey));
   }
 
-  private void saveAcceptedJob(IJobConfiguration jobConfig) {
+  protected void saveAcceptedJob(IJobConfiguration jobConfig) {
     storage.write((NoResult.Quiet)
         storeProvider -> storeProvider.getCronJobStore().saveAcceptedJob(jobConfig));
   }
@@ -164,7 +164,7 @@ public abstract class AbstractCronJobStoreTest {
         (NoResult.Quiet) storeProvider -> storeProvider.getCronJobStore().removeJob(jobKey));
   }
 
-  private void deleteJobs() {
+  protected void deleteJobs() {
     storage.write((NoResult.Quiet) storeProvider -> storeProvider.getCronJobStore().deleteJobs());
   }
 }
