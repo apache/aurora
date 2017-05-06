@@ -31,11 +31,13 @@ import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
 
 public class KillTaskTest extends EasyMockTest {
   private static final IJobUpdateInstructions INSTRUCTIONS = IJobUpdateInstructions.build(
@@ -52,13 +54,15 @@ public class KillTaskTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private InstanceActionHandler handler;
+  private UpdateAgentReserver updateAgentReserver;
 
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
-    handler = new InstanceActionHandler.KillTask();
+    updateAgentReserver = createMock(UpdateAgentReserver.class);
+    handler = new InstanceActionHandler.KillTask(false);
   }
 
   @Test
@@ -83,6 +87,36 @@ public class KillTaskTest extends EasyMockTest {
         INSTRUCTIONS,
         storageUtil.mutableStoreProvider,
         stateManager,
+        updateAgentReserver,
+        JobUpdateStatus.ROLLING_BACK,
+        UPDATE_ID);
+  }
+
+  @Test
+  public void testKillForUpdateReservesAgentForInstance() throws Exception {
+    String id = "task_id";
+    IScheduledTask task = TaskTestUtil.makeTask(id, INSTANCE.getJobKey(), 1, "agent01");
+    storageUtil.expectTaskFetch(Query.instanceScoped(INSTANCE).active(), task);
+
+    expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
+        id,
+        Optional.absent(),
+        ScheduleStatus.KILLING,
+        Optional.of("Killed for job update " + UPDATE_ID.getId())))
+        .andReturn(StateChangeResult.SUCCESS);
+
+    updateAgentReserver.reserve(task.getAssignedTask().getSlaveId(), INSTANCE);
+    expectLastCall();
+
+    control.replay();
+
+    new InstanceActionHandler.KillTask(true).getReevaluationDelay(
+        INSTANCE,
+        INSTRUCTIONS,
+        storageUtil.mutableStoreProvider,
+        stateManager,
+        updateAgentReserver,
         JobUpdateStatus.ROLLING_BACK,
         UPDATE_ID);
   }
@@ -98,6 +132,7 @@ public class KillTaskTest extends EasyMockTest {
         INSTRUCTIONS,
         storageUtil.mutableStoreProvider,
         stateManager,
+        updateAgentReserver,
         JobUpdateStatus.ROLLING_BACK,
         UPDATE_ID);
   }

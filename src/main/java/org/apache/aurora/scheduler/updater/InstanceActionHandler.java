@@ -45,6 +45,7 @@ interface InstanceActionHandler {
       IJobUpdateInstructions instructions,
       MutableStoreProvider storeProvider,
       StateManager stateManager,
+      UpdateAgentReserver reserver,
       JobUpdateStatus status,
       IJobUpdateKey key);
 
@@ -86,6 +87,7 @@ interface InstanceActionHandler {
         IJobUpdateInstructions instructions,
         MutableStoreProvider storeProvider,
         StateManager stateManager,
+        UpdateAgentReserver reserver,
         JobUpdateStatus status,
         IJobUpdateKey key) {
 
@@ -111,12 +113,19 @@ interface InstanceActionHandler {
   }
 
   class KillTask implements InstanceActionHandler {
+    private final boolean reserveForReplacement;
+
+    KillTask(boolean reserveForReplacement) {
+      this.reserveForReplacement = reserveForReplacement;
+    }
+
     @Override
     public Optional<Amount<Long, Time>> getReevaluationDelay(
         IInstanceKey instance,
         IJobUpdateInstructions instructions,
         MutableStoreProvider storeProvider,
         StateManager stateManager,
+        UpdateAgentReserver reserver,
         JobUpdateStatus status,
         IJobUpdateKey key) {
 
@@ -129,6 +138,9 @@ interface InstanceActionHandler {
             Optional.absent(),
             ScheduleStatus.KILLING,
             Optional.of("Killed for job update " + key.getId()));
+        if (reserveForReplacement && task.get().getAssignedTask().isSetSlaveId()) {
+          reserver.reserve(task.get().getAssignedTask().getSlaveId(), instance);
+        }
       } else {
         // Due to async event processing it's possible to have a race between task event
         // and it's deletion from the store. This is a perfectly valid case.
@@ -146,6 +158,7 @@ interface InstanceActionHandler {
         IJobUpdateInstructions instructions,
         MutableStoreProvider storeProvider,
         StateManager stateManager,
+        UpdateAgentReserver reserver,
         JobUpdateStatus status,
         IJobUpdateKey key) {
 

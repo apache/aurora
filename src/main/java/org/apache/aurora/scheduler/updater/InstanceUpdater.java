@@ -33,10 +33,12 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromResources;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED_TERMINATED;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.KILL_TASK_WITH_RESERVATION_AND_EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.SUCCEEDED;
 
@@ -116,6 +118,11 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
     return observedFailures > toleratedFailures;
   }
 
+  private boolean resourceFits(ITaskConfig desired, ITaskConfig existing) {
+    return bagFromResources(existing.getResources())
+        .greaterThanOrEqualTo(bagFromResources(desired.getResources()));
+  }
+
   private StateEvaluator.Result handleActualAndDesiredPresent(IScheduledTask actualState) {
     Preconditions.checkState(desiredState.isPresent());
     Preconditions.checkArgument(!actualState.getTaskEvents().isEmpty());
@@ -144,7 +151,13 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
       // This is not the configuration that we would like to run.
       if (isKillable(status)) {
         // Task is active, kill it.
-        return KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+        if (resourceFits(desiredState.get(), actualState.getAssignedTask().getTask())) {
+          // If the desired task fits into the existing offer, we reserve the offer.
+          return KILL_TASK_WITH_RESERVATION_AND_EVALUATE_ON_STATE_CHANGE;
+        } else {
+          // The resource requirements have increased, force fresh scheduling attempt.
+          return KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+        }
       } else if (Tasks.isTerminated(status) && isPermanentlyKilled(actualState)) {
         // The old task has exited, it is now safe to add the new one.
         return REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;

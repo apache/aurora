@@ -145,7 +145,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         storageUtil.mutableStoreProvider,
         new ResourceRequest(task.getAssignedTask().getTask(), bag(task), empty()),
         TaskGroupKey.from(task.getAssignedTask().getTask()),
-        ImmutableSet.of(Tasks.id(task)),
+        ImmutableSet.of(task.getAssignedTask()),
         reservationMap));
   }
 
@@ -329,7 +329,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         EasyMock.anyObject(),
         eq(new ResourceRequest(taskA.getAssignedTask().getTask(), bag(taskA), empty())),
         eq(TaskGroupKey.from(taskA.getAssignedTask().getTask())),
-        eq(SINGLE_TASK),
+        eq(ImmutableSet.of(taskA.getAssignedTask())),
         eq(NO_RESERVATION))).andReturn(SCHEDULED_RESULT);
 
     control.replay();

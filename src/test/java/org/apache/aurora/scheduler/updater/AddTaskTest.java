@@ -54,12 +54,14 @@ public class AddTaskTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private InstanceActionHandler handler;
+  private UpdateAgentReserver updateAgentReserver;
 
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
+    updateAgentReserver = createMock(UpdateAgentReserver.class);
     handler = new InstanceActionHandler.AddTask();
   }
 
@@ -79,6 +81,7 @@ public class AddTaskTest extends EasyMockTest {
         INSTRUCTIONS,
         storageUtil.mutableStoreProvider,
         stateManager,
+        updateAgentReserver,
         JobUpdateStatus.ROLLING_FORWARD,
         UPDATE_ID);
   }
@@ -96,6 +99,7 @@ public class AddTaskTest extends EasyMockTest {
         INSTRUCTIONS,
         storageUtil.mutableStoreProvider,
         stateManager,
+        updateAgentReserver,
         JobUpdateStatus.ROLLING_FORWARD,
         UPDATE_ID);
   }
@@ -111,6 +115,7 @@ public class AddTaskTest extends EasyMockTest {
         INSTRUCTIONS,
         storageUtil.mutableStoreProvider,
         stateManager,
+        updateAgentReserver,
         JobUpdateStatus.ROLLING_BACK,
         UPDATE_ID);
   }

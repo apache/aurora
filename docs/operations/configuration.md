@@ -302,3 +302,38 @@ Increasing executor overhead on an existing cluster, whether it be for custom ex
 will result in degraded preemption performance until all task which began life with the previous
 executor configuration with less overhead are preempted/restarted.
 
+## Controlling MTTA via Update Affinity
+
+When there is high resource contention in your cluster you may experience noticably elevated job update
+times, as well as high task churn across the cluster. This is due to Aurora's first-fit scheduling
+algorithm. To alleviate this, you can enable update affinity where the Scheduler will make a best-effort
+attempt to reuse the same agent for the updated task (so long as the resources for the job are not being
+increased).
+
+To enable this in the Scheduler, you can set the following options:
+
+    --enable_update_affinity=true
+    --update_affinity_reservation_hold_time=3mins
+
+You will need to tune the hold time to match the behavior you see in your cluster. If you have extremely
+high update throughput, you might have to extend it as processing updates could easily add significant
+delays between scheduling attempts. You may also have to tune scheduling parameters to achieve the
+throughput you need in your cluster. Some relevant settings (with defaults) are:
+
+    --max_schedule_attempts_per_sec=40
+    --initial_schedule_penalty=1secs
+    --max_schedule_penalty=1mins
+    --scheduling_max_batch_size=3
+    --max_tasks_per_schedule_attempt=5
+
+There are metrics exposed by the Scheduler which can provide guidance on where the bottleneck is.
+Example metrics to look at:
+
+    - schedule_attempts_blocks (if this number is greater than 0, then task throughput is hitting
+                                limits controlled by --max_scheduler_attempts_per_sec)
+    - scheduled_task_penalty_* (metrics around scheduling penalties for tasks, if the numbers here are high
+                                then you could have high contention for resources)
+
+Most likely you'll run into limits with the number of update instances that can be processed per minute
+before you run into any other limits. So if your total work done per minute starts to exceed 2k instances,
+you may need to extend the update_affinity_reservation_hold_time.

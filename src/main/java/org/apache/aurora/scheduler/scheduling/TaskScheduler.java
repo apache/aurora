@@ -180,7 +180,7 @@ public interface TaskScheduler extends EventSubscriber {
               task,
               bagFromResources(task.getResources()).add(overhead), aggregate),
           TaskGroupKey.from(task),
-          assignableTaskMap.keySet(),
+          assignedTasks,
           reservations.asMap());
 
       attemptsFired.addAndGet(assignableTaskMap.size());

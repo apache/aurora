@@ -30,6 +30,8 @@ import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class ResourceBagTest {
   @Test
@@ -88,5 +90,18 @@ public class ResourceBagTest {
     assertEquals(
         new ResourceBag(ImmutableMap.of(CPUS, -1.0)),
         bag(-1.0, 128, 1024).filter(IS_NEGATIVE));
+  }
+
+  @Test
+  public void testGreaterThanOrEqualTo() {
+    assertTrue(LARGE.greaterThanOrEqualTo(SMALL));
+    assertTrue(LARGE.greaterThanOrEqualTo(LARGE));
+    assertFalse(SMALL.greaterThanOrEqualTo(LARGE));
+    assertTrue(
+        new ResourceBag(ImmutableMap.of(CPUS, 1.0, RAM_MB, 132768.0))
+            .greaterThanOrEqualTo(new ResourceBag(ImmutableMap.of(CPUS, 1.0))));
+    assertFalse(
+        new ResourceBag(ImmutableMap.of(CPUS, 1.0))
+            .greaterThanOrEqualTo(new ResourceBag(ImmutableMap.of(CPUS, 1.0, RAM_MB, 132768.0))));
   }
 }

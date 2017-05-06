@@ -180,7 +180,7 @@ public class JobUpdaterIT extends EasyMockTest {
     TaskEventBatchWorker batchWorker = createMock(TaskEventBatchWorker.class);
 
     Injector injector = Guice.createInjector(
-        new UpdaterModule(executor),
+        new UpdaterModule(executor, true),
         DbModule.testModuleWithWorkQueue(),
         new AbstractModule() {
           @Override

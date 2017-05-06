@@ -53,6 +53,8 @@ interface StateEvaluator<T> {
     EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.AWAIT_STATE_CHANGE), NO_FAILURE),
     REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.ADD_TASK), NO_FAILURE),
     KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.KILL_TASK), NO_FAILURE),
+    KILL_TASK_WITH_RESERVATION_AND_EVALUATE_ON_STATE_CHANGE(
+        Optional.of(InstanceAction.KILL_TASK_AND_RESERVE), NO_FAILURE),
     EVALUATE_AFTER_MIN_RUNNING_MS(Optional.of(InstanceAction.WATCH_TASK), NO_FAILURE),
     SUCCEEDED(Optional.absent(), NO_FAILURE),
     FAILED_TERMINATED(Optional.absent(), Optional.of(Failure.EXITED));

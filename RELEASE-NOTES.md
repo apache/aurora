@@ -17,6 +17,10 @@
   `V0_MESOS` drivers.
 - Add observer command line options to control the resource collection interval
   for observed tasks. See [here](docs/reference/observer-configuration.md) for details.
+- Added support for reserving agents during job updates, which can substantially reduce update times
+  in clusters with high contention for resources. Disabled by default, but can be enabled with
+  enable_update_affinity option, and the reservation timeout can be controlled via
+  update_affinity_reservation_hold_time.
 
 0.17.0
 ======

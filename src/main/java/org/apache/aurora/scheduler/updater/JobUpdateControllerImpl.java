@@ -125,6 +125,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   private final PulseHandler pulseHandler;
   private final Lifecycle lifecycle;
   private final TaskEventBatchWorker batchWorker;
+  private final UpdateAgentReserver updateAgentReserver;
 
   // Currently-active updaters. An active updater is one that is rolling forward or back. Paused
   // and completed updates are represented only in storage, not here.
@@ -138,6 +139,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       Storage storage,
       ScheduledExecutorService executor,
       StateManager stateManager,
+      UpdateAgentReserver updateAgentReserver,
       Clock clock,
       Lifecycle lifecycle,
       TaskEventBatchWorker batchWorker) {
@@ -151,6 +153,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     this.lifecycle = requireNonNull(lifecycle);
     this.batchWorker = requireNonNull(batchWorker);
     this.pulseHandler = new PulseHandler(clock);
+    this.updateAgentReserver = requireNonNull(updateAgentReserver);
   }
 
   @Override
@@ -691,6 +694,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
                 instructions,
                 storeProvider,
                 stateManager,
+                updateAgentReserver,
                 updaterStatus,
                 key);
             if (reevaluateDelay.isPresent()) {
