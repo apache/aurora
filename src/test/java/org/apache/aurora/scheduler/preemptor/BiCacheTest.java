@@ -31,7 +31,11 @@ import static org.junit.Assert.assertEquals;
 
 public class BiCacheTest {
   private static final Amount<Long, Time> HOLD_DURATION = Amount.of(1L, Time.MINUTES);
-  private static final String STAT_NAME = "cache_size_stat";
+  private static final String CACHE_NAME = "TEST";
+  private static final String CACHE_SIZE_STAT_NAME = "TEST_cache_size";
+  private static final String CACHE_REMOVAL_STAT_NAME = "TEST_cache_removals";
+  private static final String CACHE_EXPLICIT_REMOVAL_STAT_NAME = "TEST_cache_explicit_removals";
+  private static final String CACHE_EXPIRATION_REMOVAL_STAT_NAME = "TEST_cache_expiration_removals";
   private static final String KEY_1 = "Key 1";
   private static final String KEY_2 = "Key 2";
   private static final Optional<Integer> NO_VALUE = Optional.absent();
@@ -44,31 +48,43 @@ public class BiCacheTest {
   public void setUp() {
     statsProvider = new FakeStatsProvider();
     clock = new FakeClock();
-    biCache = new BiCache<>(statsProvider, new BiCacheSettings(HOLD_DURATION, STAT_NAME), clock);
+    biCache = new BiCache<>(statsProvider, new BiCacheSettings(HOLD_DURATION, CACHE_NAME), clock);
   }
 
   @Test
   public void testExpiration() {
     biCache.put(KEY_1, 1);
     assertEquals(Optional.of(1), biCache.get(KEY_1));
-    assertEquals(1L, statsProvider.getLongValue(STAT_NAME));
+    assertEquals(1L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_REMOVAL_STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_EXPIRATION_REMOVAL_STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_EXPLICIT_REMOVAL_STAT_NAME));
 
     clock.advance(HOLD_DURATION);
 
     assertEquals(NO_VALUE, biCache.get(KEY_1));
     assertEquals(ImmutableSet.of(), biCache.getByValue(1));
-    assertEquals(0L, statsProvider.getLongValue(STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
+    assertEquals(1L, statsProvider.getLongValue(CACHE_REMOVAL_STAT_NAME));
+    assertEquals(1L, statsProvider.getLongValue(CACHE_EXPIRATION_REMOVAL_STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_EXPLICIT_REMOVAL_STAT_NAME));
   }
 
   @Test
   public void testRemoval() {
     biCache.put(KEY_1, 1);
-    assertEquals(1L, statsProvider.getLongValue(STAT_NAME));
+    assertEquals(1L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_REMOVAL_STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_EXPIRATION_REMOVAL_STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_EXPLICIT_REMOVAL_STAT_NAME));
     assertEquals(Optional.of(1), biCache.get(KEY_1));
     assertEquals(NO_VALUE, biCache.get(KEY_2));
     biCache.remove(KEY_1, 1);
     assertEquals(NO_VALUE, biCache.get(KEY_1));
-    assertEquals(0L, statsProvider.getLongValue(STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
+    assertEquals(1L, statsProvider.getLongValue(CACHE_REMOVAL_STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_EXPIRATION_REMOVAL_STAT_NAME));
+    assertEquals(1L, statsProvider.getLongValue(CACHE_EXPLICIT_REMOVAL_STAT_NAME));
   }
 
   @Test(expected = NullPointerException.class)
@@ -80,7 +96,7 @@ public class BiCacheTest {
   public void testDifferentKeysIdenticalValues() {
     biCache.put(KEY_1, 1);
     biCache.put(KEY_2, 1);
-    assertEquals(2L, statsProvider.getLongValue(STAT_NAME));
+    assertEquals(2L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
 
     assertEquals(Optional.of(1), biCache.get(KEY_1));
     assertEquals(Optional.of(1), biCache.get(KEY_2));
@@ -90,13 +106,13 @@ public class BiCacheTest {
     assertEquals(NO_VALUE, biCache.get(KEY_1));
     assertEquals(Optional.of(1), biCache.get(KEY_2));
     assertEquals(ImmutableSet.of(KEY_2), biCache.getByValue(1));
-    assertEquals(1L, statsProvider.getLongValue(STAT_NAME));
+    assertEquals(1L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
 
     clock.advance(HOLD_DURATION);
     assertEquals(NO_VALUE, biCache.get(KEY_1));
     assertEquals(NO_VALUE, biCache.get(KEY_2));
     assertEquals(ImmutableSet.of(), biCache.getByValue(1));
-    assertEquals(0L, statsProvider.getLongValue(STAT_NAME));
+    assertEquals(0L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
   }
 
   @Test
@@ -106,7 +122,7 @@ public class BiCacheTest {
     assertEquals(Optional.of(2), biCache.get(KEY_1));
     assertEquals(ImmutableSet.of(), biCache.getByValue(1));
     assertEquals(ImmutableSet.of(KEY_1), biCache.getByValue(2));
-    assertEquals(1L, statsProvider.getLongValue(STAT_NAME));
+    assertEquals(1L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
   }
 
   @Test

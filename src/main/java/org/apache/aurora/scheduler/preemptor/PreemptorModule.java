@@ -108,7 +108,7 @@ public class PreemptorModule extends AbstractModule {
               .annotatedWith(PendingTaskProcessor.PreemptionDelay.class)
               .toInstance(preemptionDelay);
           bind(BiCacheSettings.class).toInstance(
-              new BiCacheSettings(PREEMPTION_SLOT_HOLD_TIME.get(), "preemption_slot_cache_size"));
+              new BiCacheSettings(PREEMPTION_SLOT_HOLD_TIME.get(), "preemption_slot"));
           bind(new TypeLiteral<BiCache<PreemptionProposal, TaskGroupKey>>() { })
               .in(Singleton.class);
           bind(new TypeLiteral<Integer>() { })

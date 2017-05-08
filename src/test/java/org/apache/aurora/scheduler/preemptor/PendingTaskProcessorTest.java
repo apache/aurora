@@ -64,7 +64,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class PendingTaskProcessorTest extends EasyMockTest {
-  private static final String CACHE_STAT = "cache_size";
+  private static final String CACHE_NAME = "TEST";
+  private static final String CACHE_SIZE_STAT_NAME = "TEST_cache_size";
   private static final String SLAVE_ID_1 = "slave_id_1";
   private static final String SLAVE_ID_2 = "slave_id_2";
   private static final IJobKey JOB_A = JobKeys.from("role_a", "env", "job_a");
@@ -98,7 +99,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     clock = new FakeClock();
     slotCache = new BiCache<>(
         statsProvider,
-        new BiCache.BiCacheSettings(EXPIRATION, CACHE_STAT),
+        new BiCache.BiCacheSettings(EXPIRATION, CACHE_NAME),
         clock);
 
     slotFinder = new PendingTaskProcessor(
@@ -133,7 +134,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     assertEquals(2L, statsProvider.getLongValue(slotSearchStatName(true, true)));
     assertEquals(0L, statsProvider.getLongValue(slotSearchStatName(false, true)));
     assertEquals(0L, statsProvider.getLongValue(UNMATCHED_TASKS));
-    assertEquals(2L, statsProvider.getLongValue(CACHE_STAT));
+    assertEquals(2L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
   }
 
   @Test
@@ -212,7 +213,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
     assertTrue(ImmutableSet.of(0L, 2L).contains(
         statsProvider.getLongValue(slotSearchStatName(false, true))));
     assertEquals(1L, statsProvider.getLongValue(UNMATCHED_TASKS));
-    assertEquals(2L, statsProvider.getLongValue(CACHE_STAT));
+    assertEquals(2L, statsProvider.getLongValue(CACHE_SIZE_STAT_NAME));
   }
 
   @Test
