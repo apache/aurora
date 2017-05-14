@@ -71,7 +71,7 @@ public class UpdaterModule extends AbstractModule {
       protected void configure() {
         if (enableAffinity) {
           bind(BiCacheSettings.class).toInstance(
-              new BiCacheSettings(AFFINITY_EXPIRATION.get(), "update_affinity_cache_size"));
+              new BiCacheSettings(AFFINITY_EXPIRATION.get(), "update_affinity"));
           bind(new TypeLiteral<BiCache<IInstanceKey, TaskGroupKey>>() { }).in(Singleton.class);
           bind(UpdateAgentReserver.class).to(UpdateAgentReserver.UpdateAgentReserverImpl.class);
           bind(UpdateAgentReserver.UpdateAgentReserverImpl.class).in(Singleton.class);
