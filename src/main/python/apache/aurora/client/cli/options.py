@@ -260,7 +260,7 @@ MAX_TOTAL_FAILURES_OPTION = CommandOption('--max-total-failures', type=int, defa
 
 
 NO_BATCHING_OPTION = CommandOption('--no-batching', default=False, action='store_true',
-  help='Run the command on all instances at once, instead of running in batches')
+    help='Run the command on all instances at once, instead of running in batches')
 
 
 ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role, metavar='CLUSTER/NAME',
@@ -268,6 +268,15 @@ ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role, metavar='CLUSTE
 
 ROLE_OPTION = CommandOption('--role', metavar='ROLENAME', default=None,
     help='Name of the user/role')
+
+SCP_OPTIONS = CommandOption('--scp-options', type=parse_options, dest='scp_options',
+    default=None, metavar='scp_options', help='A string of space separated system scp options.')
+
+SCP_SOURCE_ARGUMENT = CommandOption('source', nargs='+', metavar='source',
+    help='Source file(s)/folder(s) to copy, in `[CLUSTER/ROLE/ENV/NAME/INSTANCE:]source` format.')
+
+SCP_DEST_ARGUMENT = CommandOption('dest', metavar='dest',
+    help='Destination path to copy into, in `[CLUSTER/ROLE/ENV/NAME/INSTANCE:]dest` format.')
 
 SSH_INSTANCE_ARGUMENT = create_instance_argument(
     help_text=('Fully specified job instance key, in CLUSTER/ROLE/ENV/NAME[/INSTANCES] format. '

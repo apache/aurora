@@ -25,6 +25,7 @@ Aurora Client Commands
     - [Getting Job Status](#getting-job-status)
     - [Opening the Web UI](#opening-the-web-ui)
     - [SSHing to a Specific Task Machine](#sshing-to-a-specific-task-machine)
+    - [SCPing with Specific Task Machines](#scping-with-specific-task-machines)
     - [Templating Command Arguments](#templating-command-arguments)
 
 Introduction
@@ -298,6 +299,18 @@ You can have the Aurora client ssh directly to the machine that has been
 assigned a particular Job/shard number. This may be useful for quickly
 diagnosing issues such as performance issues or abnormal behavior on a
 particular machine.
+
+### SCPing with Specific Task Machines
+
+    aurora task scp [<cluster>/<role>/<env>/<job_name>/<instance_id>]:source [<cluster>/<role>/<env>/<job_name>/<instance_id>]:dest
+
+You can have the Aurora client copy file(s)/folder(s) to, from, and between
+individual tasks. The sandbox folder serves as the relative root and is the
+same folder you see when you browse `chroot` from the Scheduler task UI. You
+can also use absolute paths (like for `/tmp`), but tilde expansion is not
+supported. Currently, this command is only fully supported for Mesos
+containers. Users may use this to copy files from Docker containers but they
+cannot copy files to them.
 
 ### Templating Command Arguments
 

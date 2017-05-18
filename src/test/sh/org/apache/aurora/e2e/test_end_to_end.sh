@@ -351,6 +351,55 @@ test_run() {
   [[ "$sandbox_contents" = "      3 .logs" ]]
 }
 
+test_scp_success() {
+  local _jobkey=$1/0
+  local _filename=scp_success.txt
+  local _expected_return="      1 scp_success.txt"
+
+  # Unset because grep can return 1 if the file does not exist
+  set +e
+
+  # Ensure file does not exists before scp
+  pre_sandbox_contents=$(aurora task run $_jobkey "ls" | awk '{print $2}' | grep ${_filename} | sort | uniq -c)
+  [[ "$pre_sandbox_contents" != $_expected_return ]]
+
+  # Reset -e after command has been run
+  set -e
+
+  # Create a file and move it to the sandbox of a job
+  touch $_filename
+  aurora task scp $_filename ${_jobkey}:
+  sandbox_contents=$(aurora task run $_jobkey "ls" | awk '{print $2}' | grep ${_filename} | sort | uniq -c)
+  [[ "$sandbox_contents" == $_expected_return ]]
+}
+
+test_scp_permissions() {
+  local _jobkey=$1/0
+  local _filename=scp_fail_permission.txt
+  local _retcode=0
+  local _sandbox_contents
+  # Create a file and try to move it, ensure we get permission denied
+  touch $_filename
+
+  # Unset because we are expecting an error
+  set +e
+
+  _sandbox_contents=$(aurora task scp $_filename ${_jobkey}:../ 2>&1 > /dev/null)
+  _retcode=$?
+
+  # Reset -e after command has been run
+  set -e
+
+  if [[ "$_retcode" != 1 ]]; then
+    echo "Permission to exit chroot jail given when should have failed"
+    exit 1
+  fi
+  if [[ "$_sandbox_contents" != *"../scp_fail_permission.txt: Permission denied"* ]]; then
+    echo "Unexpected response from invalid scp command"
+    exit 1
+  fi
+}
+
 test_kill() {
   local _jobkey=$1
   shift 1
@@ -440,6 +489,13 @@ test_http_example() {
   test_update $_jobkey $_updated_config $_cluster $_bind_parameters
   test_announce $_role $_env $_job
   test_run $_jobkey
+  # TODO(AURORA-1926): 'aurora task scp' only works fully on Mesos containers (can only read for
+  # Docker). See if it is possible to enable write for Docker sandboxes as well then remove the
+  # 'if' guard below.
+  if [[ $_job != *"docker"* ]]; then
+    test_scp_success $_jobkey
+    test_scp_permissions $_jobkey
+  fi
   test_kill $_jobkey
   test_quota $_cluster $_role
 }

@@ -21,6 +21,10 @@
   in clusters with high contention for resources. Disabled by default, but can be enabled with
   enable_update_affinity option, and the reservation timeout can be controlled via
   update_affinity_reservation_hold_time.
+- Add `task scp` command to the CLI client for easy transferring of files to/from/between task
+  instances. See [here](docs/reference/client-commands.md#scping-with-task-machines) for details.
+  Currently only fully supported for Mesos containers (you can copy files from the Docker container
+  sandbox but you cannot send files to it).
 
 0.17.0
 ======

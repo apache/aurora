@@ -14,12 +14,14 @@
 
 import contextlib
 
+import pytest
 from mock import Mock, patch
 
-from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK, Context
 from apache.aurora.client.cli.client import AuroraCommandLine
+from apache.aurora.client.cli.task import ScpCommand
 
-from .util import AuroraClientCommandTest
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 
 from gen.apache.aurora.api.ttypes import (
     JobKey,
@@ -208,4 +210,161 @@ class TestSshCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       result = cmd.execute(['task', 'ssh', 'west/bozo/test/hello', '--command=ls'])
       assert result == EXIT_INVALID_PARAMETER
+      assert mock_subprocess.call_count == 0
+
+
+class TestScpCommand(AuroraClientCommandTest):
+
+  @classmethod
+  def create_status_response(cls):
+    resp = cls.create_simple_success_response()
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(tasks=cls.create_scheduled_tasks()))
+    return resp
+
+  @classmethod
+  def create_nojob_status_response(cls):
+    resp = cls.create_simple_success_response()
+    resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[]))
+    return resp
+
+  def setUp(self):
+    self._command = ScpCommand()
+    self._mock_options = mock_verb_options(self._command)
+    self._fake_context = FakeAuroraCommandContext()
+    self._fake_context.set_options(self._mock_options)
+    self._mock_api = self._fake_context.get_api('UNUSED')
+    self._sandbox_args = {'slave_root': '/slaveroot', 'slave_run_directory': 'slaverun'}
+
+  def test_successful_scp_simple(self):
+    """Test the scp command."""
+    self._mock_api.query.return_value = self.create_status_response()
+    self._mock_options.scp_options = ['-v', '-t']
+    self._mock_options.source = ['test.txt']
+    self._mock_options.dest = 'west/bozo/test/hello/1:./test/dir'
+
+    with contextlib.nested(
+        patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
+            return_value=self._sandbox_args),
+        patch('subprocess.call', return_value=EXIT_OK)) as [
+            mock_runner_args_patch,
+            mock_subprocess]:
+      assert self._command.execute(self._fake_context) == EXIT_OK
+      mock_subprocess.assert_called_with(['scp', '-v', '-t', 'test.txt',
+          'bozo@slavehost:'
+           '/slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/slaverun/sandbox/'
+           'test/dir'])
+
+  def test_successful_scp_absolute_path(self):
+    """Test the scp command uses absolute paths correctly."""
+    self._mock_api.query.return_value = self.create_status_response()
+    self._mock_options.scp_options = ['-v']
+    self._mock_options.source = ['test.txt']
+    self._mock_options.dest = 'west/bozo/test/hello/1:/tmp'
+
+    with contextlib.nested(
+        patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
+            return_value=self._sandbox_args),
+        patch('subprocess.call', return_value=EXIT_OK)) as [
+            mock_runner_args_patch,
+            mock_subprocess]:
+      assert self._command.execute(self._fake_context) == EXIT_OK
+      mock_subprocess.assert_called_with(['scp', '-v', 'test.txt', 'bozo@slavehost:/tmp'])
+
+  def test_successful_scp_two_instances(self):
+    """Test that the scp command correctly evaluates commands with two jobkeys."""
+    self._mock_api.query.return_value = self.create_status_response()
+    self._mock_options.scp_options = ['-v']
+    self._mock_options.source = ['west/bozo/test/hello/1:test.txt']
+    self._mock_options.dest = 'west/bozo/test/hello/1:/tmp'
+
+    with contextlib.nested(
+        patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
+            return_value=self._sandbox_args),
+        patch('subprocess.call', return_value=EXIT_OK)) as [
+            mock_runner_args_patch,
+            mock_subprocess]:
+      assert self._command.execute(self._fake_context) == EXIT_OK
+      mock_subprocess.assert_called_with(['scp', '-v',
+          'bozo@slavehost:'
+           '/slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/slaverun/sandbox/'
+           'test.txt',
+          'bozo@slavehost:/tmp'])
+
+  def test_successful_scp_multiple_files(self):
+    """Test that the scp command correctly evaluates commands with multiple files."""
+    self._mock_api.query.return_value = self.create_status_response()
+    self._mock_options.source = ['test.txt', 'another.txt']
+    self._mock_options.dest = 'west/bozo/test/hello/1:test/dir'
+
+    with contextlib.nested(
+        patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
+            return_value=self._sandbox_args),
+        patch('subprocess.call', return_value=EXIT_OK)) as [
+            mock_runner_args_patch,
+            mock_subprocess]:
+      assert self._command.execute(self._fake_context) == EXIT_OK
+      mock_subprocess.assert_called_with(['scp', 'test.txt', 'another.txt',
+          'bozo@slavehost:'
+           '/slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/slaverun/sandbox/'
+           'test/dir'])
+
+  def test_scp_invalid_tilde_expansion(self):
+    """Test the scp command fails when using tilde expansion."""
+    self._mock_api.query.return_value = self.create_status_response()
+    self._mock_options.scp_options = ['-v']
+    self._mock_options.source = ['test.txt']
+    self._mock_options.dest = 'west/bozo/test/hello/1:~/test.txt'
+
+    with contextlib.nested(patch('subprocess.call', return_value=EXIT_OK)) as [mock_subprocess]:
+      with pytest.raises(Context.CommandError) as exc:
+        assert self._command.execute(self._fake_context) == EXIT_INVALID_PARAMETER
+      assert(ScpCommand.TILDE_USAGE_ERROR_MSG % '~/test.txt' in exc.value.message)
+      assert mock_subprocess.call_count == 0
+
+    # Test another tilde expansion form
+    self._mock_options.source = ['test.txt']
+    self._mock_options.dest = 'west/bozo/test/hello/1:~'
+
+    with contextlib.nested(patch('subprocess.call', return_value=EXIT_OK)) as [mock_subprocess]:
+      with pytest.raises(Context.CommandError) as exc:
+        assert self._command.execute(self._fake_context) == EXIT_INVALID_PARAMETER
+      assert(ScpCommand.TILDE_USAGE_ERROR_MSG % '~' in exc.value.message)
+      assert mock_subprocess.call_count == 0
+
+  def test_scp_bad_jobkey_no_instance(self):
+    """Test the scp command fails when instance id is not specified."""
+    self._mock_api.query.return_value = self.create_status_response()
+    self._mock_options.source = ['test.txt']
+    self._mock_options.dest = 'west/bozo/test/hello:test/dir'
+
+    with contextlib.nested(patch('subprocess.call', return_value=EXIT_OK)) as [mock_subprocess]:
+      with pytest.raises(Context.CommandError) as exc:
+        assert self._command.execute(self._fake_context) == EXIT_INVALID_PARAMETER
+      assert('not in the form CLUSTER/ROLE/ENV/NAME/INSTANCE' in exc.value.message)
+      assert mock_subprocess.call_count == 0
+
+  def test_scp_bad_jobkey_invalid_format(self):
+    """Test the scp command fails when given general scp format."""
+    self._mock_api.query.return_value = self.create_status_response()
+    self._mock_options.source = ['root@192.168.0.1:test.txt']
+    self._mock_options.dest = 'west/bozo/test/hello/1:test/dir'
+
+    with contextlib.nested(patch('subprocess.call', return_value=EXIT_OK)) as [mock_subprocess]:
+      with pytest.raises(Context.CommandError) as exc:
+        assert self._command.execute(self._fake_context) == EXIT_INVALID_PARAMETER
+      assert('not in the form CLUSTER/ROLE/ENV/NAME/INSTANCE' in exc.value.message)
+      assert mock_subprocess.call_count == 0
+
+  def test_scp_job_not_found(self):
+    """Test the scp command when the jobkey parameter specifies a job that isn't running."""
+    self._mock_api.query.return_value = self.create_nojob_status_response()
+    self._mock_options.source = ['test.txt']
+    self._mock_options.dest = 'west/bozo/test/hello/0:test/dir'
+
+    with contextlib.nested(patch('subprocess.call', return_value=EXIT_OK)) as [mock_subprocess]:
+      with pytest.raises(Context.CommandError) as exc:
+        assert self._command.execute(self._fake_context) == EXIT_INVALID_PARAMETER
+      assert(ScpCommand.JOB_NOT_FOUND_ERROR_MSG % ('west/bozo/test/hello', '0')
+          in exc.value.message)
       assert mock_subprocess.call_count == 0
