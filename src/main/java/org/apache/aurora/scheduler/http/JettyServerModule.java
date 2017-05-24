@@ -206,6 +206,7 @@ public class JettyServerModule extends AbstractModule {
       "pendingtasks",
       "quotas",
       "slaves",
+      "state",
       "tiers",
       "utilization"
   );
@@ -227,6 +228,7 @@ public class JettyServerModule extends AbstractModule {
           .put(Quotas.class, "quotas")
           .put(Services.class, "services")
           .put(StructDump.class, "structdump")
+          .put(State.class, "state")
           .put(ThreadStackPrinter.class, "threads")
           .put(Tiers.class, "tiers")
           .put(TimeSeriesDataSource.class, "graphdata")
