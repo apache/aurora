@@ -13,13 +13,19 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.util.Set;
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AbstractScheduledService;
 import com.google.inject.AbstractModule;
+import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 
@@ -29,12 +35,17 @@ import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.preemptor.BiCache.BiCacheSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 public class PreemptorModule extends AbstractModule {
@@ -65,10 +76,40 @@ public class PreemptorModule extends AbstractModule {
       help = "The maximum number of reservations for a task group to be made in a batch.")
   private static final Arg<Integer> RESERVATION_MAX_BATCH_SIZE = Arg.create(5);
 
+  @CmdLine(name = "preemption_slot_finder_modules",
+      help = "Guice modules for custom preemption slot searching for pending tasks.")
+  private static final Arg<Set<Module>> SLOT_FINDER_MODULES = Arg.create(
+      ImmutableSet.of(
+          MoreModules.lazilyInstantiated(PendingTaskProcessorModule.class),
+          MoreModules.lazilyInstantiated(PreemptionVictimFilterModule.class)));
+
   private final boolean enablePreemptor;
   private final Amount<Long, Time> preemptionDelay;
   private final Amount<Long, Time> slotSearchInterval;
   private final Integer reservationBatchSize;
+  private final Set<Module> slotFinderModules;
+
+  /*
+   * Binding annotation for the async processor that finds preemption slots.
+   */
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  public @interface PreemptionSlotFinder { }
+
+  @VisibleForTesting
+  public PreemptorModule(
+      boolean enablePreemptor,
+      Amount<Long, Time> preemptionDelay,
+      Amount<Long, Time> slotSearchInterval,
+      Integer reservationBatchSize,
+      Set<Module> slotFinderModules) {
+
+    this.enablePreemptor = enablePreemptor;
+    this.preemptionDelay = requireNonNull(preemptionDelay);
+    this.slotSearchInterval = requireNonNull(slotSearchInterval);
+    this.reservationBatchSize = requireNonNull(reservationBatchSize);
+    this.slotFinderModules = requireNonNull(slotFinderModules);
+  }
 
   @VisibleForTesting
   public PreemptorModule(
@@ -77,10 +118,12 @@ public class PreemptorModule extends AbstractModule {
       Amount<Long, Time> slotSearchInterval,
       Integer reservationBatchSize) {
 
-    this.enablePreemptor = enablePreemptor;
-    this.preemptionDelay = requireNonNull(preemptionDelay);
-    this.slotSearchInterval = requireNonNull(slotSearchInterval);
-    this.reservationBatchSize = requireNonNull(reservationBatchSize);
+    this(
+        enablePreemptor,
+        preemptionDelay,
+        slotSearchInterval,
+        reservationBatchSize,
+        SLOT_FINDER_MODULES.get());
   }
 
   public PreemptorModule() {
@@ -88,7 +131,8 @@ public class PreemptorModule extends AbstractModule {
         ENABLE_PREEMPTOR.get(),
         PREEMPTION_DELAY.get(),
         PREEMPTION_SLOT_SEARCH_INTERVAL.get(),
-        RESERVATION_MAX_BATCH_SIZE.get());
+        RESERVATION_MAX_BATCH_SIZE.get(),
+        SLOT_FINDER_MODULES.get());
   }
 
   @Override
@@ -99,9 +143,6 @@ public class PreemptorModule extends AbstractModule {
         if (enablePreemptor) {
           LOG.info("Preemptor Enabled.");
           bind(PreemptorMetrics.class).in(Singleton.class);
-          bind(PreemptionVictimFilter.class)
-              .to(PreemptionVictimFilter.PreemptionVictimFilterImpl.class);
-          bind(PreemptionVictimFilter.PreemptionVictimFilterImpl.class).in(Singleton.class);
           bind(Preemptor.class).to(Preemptor.PreemptorImpl.class);
           bind(Preemptor.PreemptorImpl.class).in(Singleton.class);
           bind(new TypeLiteral<Amount<Long, Time>>() { })
@@ -114,10 +155,13 @@ public class PreemptorModule extends AbstractModule {
           bind(new TypeLiteral<Integer>() { })
               .annotatedWith(PendingTaskProcessor.ReservationBatchSize.class)
               .toInstance(reservationBatchSize);
-          bind(PendingTaskProcessor.class).in(Singleton.class);
           bind(ClusterState.class).to(ClusterStateImpl.class);
           bind(ClusterStateImpl.class).in(Singleton.class);
           expose(ClusterStateImpl.class);
+
+          for (Module module: slotFinderModules) {
+            install(module);
+          }
 
           bind(PreemptorService.class).in(Singleton.class);
           bind(AbstractScheduledService.Scheduler.class).toInstance(
@@ -127,7 +171,7 @@ public class PreemptorModule extends AbstractModule {
                   slotSearchInterval.getUnit().getTimeUnit()));
 
           expose(PreemptorService.class);
-          expose(PendingTaskProcessor.class);
+          expose(Runnable.class).annotatedWith(PreemptionSlotFinder.class);
         } else {
           bind(Preemptor.class).toInstance(NULL_PREEMPTOR);
           LOG.warn("Preemptor Disabled.");
@@ -147,11 +191,11 @@ public class PreemptorModule extends AbstractModule {
   }
 
   static class PreemptorService extends AbstractScheduledService {
-    private final PendingTaskProcessor slotFinder;
+    private final Runnable slotFinder;
     private final Scheduler schedule;
 
     @Inject
-    PreemptorService(PendingTaskProcessor slotFinder, Scheduler schedule) {
+    PreemptorService(@PreemptionSlotFinder Runnable slotFinder, Scheduler schedule) {
       this.slotFinder = requireNonNull(slotFinder);
       this.schedule = requireNonNull(schedule);
     }

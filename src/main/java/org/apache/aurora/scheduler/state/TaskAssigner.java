@@ -78,8 +78,8 @@ public interface TaskAssigner {
       Iterable<IAssignedTask> tasks,
       Map<String, TaskGroupKey> preemptionReservations);
 
-  class TaskAssignerImpl implements TaskAssigner {
-    private static final Logger LOG = LoggerFactory.getLogger(TaskAssignerImpl.class);
+  class FirstFitTaskAssigner implements TaskAssigner {
+    private static final Logger LOG = LoggerFactory.getLogger(FirstFitTaskAssigner.class);
 
     @VisibleForTesting
     static final Optional<String> LAUNCH_FAILED_MSG =
@@ -100,7 +100,7 @@ public interface TaskAssigner {
     private final UpdateAgentReserver updateAgentReserver;
 
     @Inject
-    public TaskAssignerImpl(
+    public FirstFitTaskAssigner(
         StateManager stateManager,
         SchedulingFilter filter,
         MesosTaskFactory taskFactory,

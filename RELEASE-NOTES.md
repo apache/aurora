@@ -25,6 +25,9 @@
   instances. See [here](docs/reference/client-commands.md#scping-with-task-machines) for details.
   Currently only fully supported for Mesos containers (you can copy files from the Docker container
   sandbox but you cannot send files to it).
+- Added ability to inject your own scheduling logic, via a lazy Guice module binding. This is an
+  alpha-level feature and not subject to backwards compatibility considerations. You can specify
+  your custom modules using the `task_assigner_modules` and `preemption_slot_finder_modules` options.
 
 0.17.0
 ======

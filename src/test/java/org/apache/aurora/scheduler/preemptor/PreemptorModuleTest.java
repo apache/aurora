@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.preemptor;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -70,7 +71,14 @@ public class PreemptorModuleTest extends EasyMockTest {
         false,
         Amount.of(0L, Time.SECONDS),
         Amount.of(0L, Time.SECONDS),
-        5));
+        5,
+        ImmutableSet.of(new AbstractModule() {
+          @Override
+          protected void configure() {
+            bind(Runnable.class).annotatedWith(PreemptorModule.PreemptionSlotFinder.class)
+                .toInstance(createMock(Runnable.class));
+          }
+        })));
 
     control.replay();
 

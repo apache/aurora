@@ -13,28 +13,51 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Set;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
+import com.google.inject.Module;
 
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
-import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
 import org.apache.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Binding module for scheduling logic and higher-level state management.
  */
 public class StateModule extends AbstractModule {
 
+  @CmdLine(name = "task_assigner_modules",
+      help = "Guice modules for customizing task assignment.")
+  private static final Arg<Set<Module>> TASK_ASSIGNER_MODULES = Arg.create(
+      ImmutableSet.of(MoreModules.lazilyInstantiated(FirstFitTaskAssignerModule.class)));
+
+  private final Set<Module> assignerModules;
+
+  public StateModule() {
+    this(TASK_ASSIGNER_MODULES.get());
+  }
+
+  private StateModule(Set<Module> assignerModules) {
+    this.assignerModules = requireNonNull(assignerModules);
+  }
+
   @Override
   protected void configure() {
-    bind(TaskAssigner.class).to(TaskAssignerImpl.class);
-    bind(TaskAssignerImpl.class).in(Singleton.class);
+    for (Module module: assignerModules) {
+      install(module);
+    }
     bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);
 
     bind(StateManager.class).to(StateManagerImpl.class);

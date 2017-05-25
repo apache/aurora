@@ -39,7 +39,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.resources.ResourceBag;
-import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
+import org.apache.aurora.scheduler.state.TaskAssigner.FirstFitTaskAssigner;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
@@ -69,9 +69,9 @@ import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesos
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.offer;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
-import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.ASSIGNER_EVALUATED_OFFERS;
-import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.ASSIGNER_LAUNCH_FAILURES;
-import static org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl.LAUNCH_FAILED_MSG;
+import static org.apache.aurora.scheduler.state.TaskAssigner.FirstFitTaskAssigner.ASSIGNER_EVALUATED_OFFERS;
+import static org.apache.aurora.scheduler.state.TaskAssigner.FirstFitTaskAssigner.ASSIGNER_LAUNCH_FAILURES;
+import static org.apache.aurora.scheduler.state.TaskAssigner.FirstFitTaskAssigner.LAUNCH_FAILED_MSG;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.mesos.v1.Protos.Offer;
 import static org.easymock.EasyMock.anyObject;
@@ -82,7 +82,7 @@ import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
-public class TaskAssignerImplTest extends EasyMockTest {
+public class FirstFitTaskAssignerTest extends EasyMockTest {
 
   private static final int PORT = 1000;
   private static final Offer MESOS_OFFER = offer(mesosRange(PORTS, PORT));
@@ -128,7 +128,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
   private SchedulingFilter filter;
   private MesosTaskFactory taskFactory;
   private OfferManager offerManager;
-  private TaskAssignerImpl assigner;
+  private FirstFitTaskAssigner assigner;
   private TierManager tierManager;
   private FakeStatsProvider statsProvider;
   private UpdateAgentReserver updateAgentReserver;
@@ -143,7 +143,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     tierManager = createMock(TierManager.class);
     updateAgentReserver = createMock(UpdateAgentReserver.class);
     statsProvider = new FakeStatsProvider();
-    assigner = new TaskAssignerImpl(
+    assigner = new FirstFitTaskAssigner(
         stateManager,
         filter,
         taskFactory,

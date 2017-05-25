@@ -18,5 +18,6 @@ Current and past documents:
 * [Supporting the Mesos Universal Containerizer](https://docs.google.com/document/d/111T09NBF2zjjl7HE95xglsDpRdKoZqhCRM5hHmOfTLA/edit?usp=sharing)
 * [Tier Management In Apache Aurora](https://docs.google.com/document/d/1erszT-HsWf1zCIfhbqHlsotHxWUvDyI2xUwNQQQxLgs/edit?usp=sharing)
 * [Ubiquitous Jobs](https://docs.google.com/document/d/12hr6GnUZU3mc7xsWRzMi3nQILGB-3vyUxvbG-6YmvdE/edit)
+* [Pluggable Scheduling](https://docs.google.com/document/d/1fVHLt9AF-YbOCVCDMQmi5DATVusn-tqY8DldKbjVEm0/edit)
 
 Design documents can be found in the Aurora issue tracker via the query [`project = AURORA AND text ~ "docs.google.com" ORDER BY created`](https://issues.apache.org/jira/browse/AURORA-1528?jql=project%20%3D%20AURORA%20AND%20text%20~%20%22docs.google.com%22%20ORDER%20BY%20created).
