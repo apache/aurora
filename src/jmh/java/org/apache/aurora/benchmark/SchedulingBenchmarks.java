@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
@@ -52,6 +53,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.offers.OfferManager;
+import org.apache.aurora.scheduler.offers.OfferOrder;
 import org.apache.aurora.scheduler.offers.OfferSettings;
 import org.apache.aurora.scheduler.offers.OffersModule;
 import org.apache.aurora.scheduler.preemptor.BiCache;
@@ -142,7 +144,10 @@ public class SchedulingBenchmarks {
               bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
               bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
               bind(OfferSettings.class).toInstance(
-                  new OfferSettings(NO_DELAY, () -> DELAY_FOREVER));
+                  new OfferSettings(
+                      NO_DELAY,
+                      () -> DELAY_FOREVER,
+                      ImmutableList.of(OfferOrder.RANDOM)));
               bind(BiCache.BiCacheSettings.class).toInstance(
                   new BiCache.BiCacheSettings(DELAY_FOREVER, ""));
               bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);

@@ -132,10 +132,14 @@ public final class ResourceTestUtil {
   }
 
   public static Protos.Offer offer(Protos.Resource... resources) {
+    return offer("slave-id", resources);
+  }
+
+  public static Protos.Offer offer(String agentId, Protos.Resource... resources) {
     return Protos.Offer.newBuilder()
         .setId(Protos.OfferID.newBuilder().setValue("offer-id"))
         .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("framework-id"))
-        .setAgentId(Protos.AgentID.newBuilder().setValue("slave-id"))
+        .setAgentId(Protos.AgentID.newBuilder().setValue(agentId))
         .setHostname("hostname")
         .addAllResources(ImmutableSet.copyOf(resources)).build();
   }

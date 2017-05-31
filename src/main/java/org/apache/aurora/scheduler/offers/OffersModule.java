@@ -15,9 +15,11 @@ package org.apache.aurora.scheduler.offers;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.List;
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
+import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
@@ -69,6 +71,13 @@ public class OffersModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> UNAVAILABILITY_THRESHOLD =
       Arg.create(Amount.of(6L, Time.MINUTES));
 
+  @CmdLine(name = "offer_order",
+      help = "Iteration order for offers, to influence task scheduling. Multiple orderings will be "
+          + "compounded together. E.g. CPU,MEMORY,RANDOM would sort first by cpus offered, then "
+          + " memory and finally would randomize any equal offers.")
+  private static final Arg<List<OfferOrder>> OFFER_ORDER =
+      Arg.create(ImmutableList.of(OfferOrder.RANDOM));
+
   /**
    * Binding annotation for the threshold to veto tasks with unavailability.
    */
@@ -102,7 +111,8 @@ public class OffersModule extends AbstractModule {
                 new RandomJitterReturnDelay(
                     MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS),
                     OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
-                    Random.Util.newDefaultRandom())));
+                    Random.Util.newDefaultRandom()),
+                OFFER_ORDER.get()));
         bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
         bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
         expose(OfferManager.class);

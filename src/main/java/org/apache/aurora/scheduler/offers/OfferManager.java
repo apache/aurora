@@ -13,8 +13,7 @@
  */
 package org.apache.aurora.scheduler.offers;
 
-import java.time.Instant;
-import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -31,7 +30,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
@@ -54,10 +52,6 @@ import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
-import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
-import static org.apache.aurora.gen.MaintenanceMode.NONE;
-import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
 import static org.apache.aurora.scheduler.events.PubsubEvent.HostAttributesChanged;
 
 /**
@@ -170,7 +164,7 @@ public interface OfferManager extends EventSubscriber {
       this.driver = requireNonNull(driver);
       this.offerSettings = requireNonNull(offerSettings);
       this.executor = requireNonNull(executor);
-      this.hostOffers = new HostOffers(statsProvider);
+      this.hostOffers = new HostOffers(statsProvider, offerSettings.getOfferOrder());
       this.offerRaces = statsProvider.makeCounter(OFFER_ACCEPT_RACES);
     }
 
@@ -271,34 +265,19 @@ public interface OfferManager extends EventSubscriber {
      * the different indices used and their consistency.
      */
     private static class HostOffers {
-      private static final Ordering<HostOffer> AURORA_MAINTENANCE_COMPARATOR =
-          Ordering.explicit(NONE, SCHEDULED, DRAINING, DRAINED)
-              .onResultOf(offer -> offer.getAttributes().getMode());
-      // We should not prefer offers from agents that are scheduled to become unavailable.
-      // We should also sort the unavailability start to prefer agents that are starting
-      // maintenance later.
-      private static final Ordering<HostOffer> MESOS_MAINTENANCE_COMPARATOR =
-          Ordering
-            .natural()
-            .reverse()
-            .onResultOf(o -> o.getUnavailabilityStart().or(Instant.MAX));
 
-      private static final Comparator<HostOffer> PREFERENCE_COMPARATOR =
-          // Currently, the only preference is based on host maintenance status.
-          AURORA_MAINTENANCE_COMPARATOR
-              .compound(MESOS_MAINTENANCE_COMPARATOR)
-              .compound(Ordering.arbitrary());
-
-      private final Set<HostOffer> offers = new ConcurrentSkipListSet<>(PREFERENCE_COMPARATOR);
+      private final Set<HostOffer> offers;
       private final Map<OfferID, HostOffer> offersById = Maps.newHashMap();
       private final Map<AgentID, HostOffer> offersBySlave = Maps.newHashMap();
       private final Map<String, HostOffer> offersByHost = Maps.newHashMap();
+
       // TODO(maxim): Expose via a debug endpoint. AURORA-1136.
       // Keep track of offer->groupKey mappings that will never be matched to avoid redundant
       // scheduling attempts. See VetoGroup for more details on static ban.
       private final Multimap<OfferID, TaskGroupKey> staticallyBannedOffers = HashMultimap.create();
 
-      HostOffers(StatsProvider statsProvider) {
+      HostOffers(StatsProvider statsProvider, List<OfferOrder> offerOrder) {
+        offers = new ConcurrentSkipListSet<>(OfferOrderBuilder.create(offerOrder));
         // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
         // Could track this separately if it turns out to pose problems.
         statsProvider.exportSize(OUTSTANDING_OFFERS, offers);

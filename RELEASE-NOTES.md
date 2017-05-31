@@ -28,6 +28,13 @@
 - Added ability to inject your own scheduling logic, via a lazy Guice module binding. This is an
   alpha-level feature and not subject to backwards compatibility considerations. You can specify
   your custom modules using the `task_assigner_modules` and `preemption_slot_finder_modules` options.
+- Added support for resource bin-packing via the '-offer_order' option. You can choose from `CPU`,
+  `MEMORY`, `DISK`, `RANDOM` or `REVOCABLE_CPU`. You can also compose secondary sorts by combining
+  orders together: e.g. to bin-pack by CPU and MEMORY you could supply 'CPU,MEMORY'. The current
+  default is `RANDOM`, which has the strong advantage that users can (usually) relocate their tasks
+  due to noisy neighbors or machine issues with a task restart. When you have deterministic
+  bin-packing, they may always end up on the same agent. So be careful enabling this without proper
+  monitoring and remediation of host failures.
 
 0.17.0
 ======

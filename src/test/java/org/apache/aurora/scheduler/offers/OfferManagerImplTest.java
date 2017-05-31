@@ -54,8 +54,12 @@ import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.O
 import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.OUTSTANDING_OFFERS;
 import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.STATICALLY_BANNED_OFFERS;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.offer;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
+import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -112,7 +116,8 @@ public class OfferManagerImplTest extends EasyMockTest {
     addTearDown(clock::assertEmpty);
     OfferSettings offerSettings = new OfferSettings(
         Amount.of(OFFER_FILTER_SECONDS, Time.SECONDS),
-        () -> RETURN_DELAY);
+        () -> RETURN_DELAY,
+        ImmutableList.of(OfferOrder.RANDOM));
     statsProvider = new FakeStatsProvider();
     offerManager = new OfferManagerImpl(driver, offerSettings, statsProvider, executorMock);
   }
@@ -380,5 +385,165 @@ public class OfferManagerImplTest extends EasyMockTest {
     return new HostOffer(
         offer.getOffer(),
         IHostAttributes.build(offer.getAttributes().newBuilder().setMode(mode)));
+  }
+
+  private OfferManager createOrderedManager(List<OfferOrder> order) {
+    OfferSettings settings = new OfferSettings(
+        Amount.of(OFFER_FILTER_SECONDS, Time.SECONDS),
+        () -> RETURN_DELAY,
+        order);
+    DelayExecutor executorMock = createMock(DelayExecutor.class);
+    clock = FakeScheduledExecutor.fromDelayExecutor(executorMock);
+    return new OfferManagerImpl(driver, settings, statsProvider, executorMock);
+  }
+
+  @Test
+  public void testCPUOrdering() throws Exception {
+    OfferManager cpuManager = createOrderedManager(ImmutableList.of(OfferOrder.CPU));
+
+    HostOffer small = setMode(new HostOffer(
+        offer("host1", mesosScalar(CPUS, 1.0), mesosScalar(CPUS, 24.0, true)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer medium = setMode(new HostOffer(
+        offer("host2", mesosScalar(CPUS, 5.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer large = setMode(new HostOffer(
+        offer("host3", mesosScalar(CPUS, 10.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    control.replay();
+
+    cpuManager.addOffer(medium);
+    cpuManager.addOffer(large);
+    cpuManager.addOffer(small);
+
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers(GROUP_KEY)));
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers()));
+  }
+
+  @Test
+  public void testRevocableCPUOrdering() throws Exception {
+    OfferManager cpuManager = createOrderedManager(ImmutableList.of(OfferOrder.REVOCABLE_CPU));
+
+    HostOffer small = setMode(new HostOffer(
+        offer("host2", mesosScalar(CPUS, 5.0), mesosScalar(CPUS, 23.0, true)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer medium = setMode(new HostOffer(
+        offer("host1", mesosScalar(CPUS, 3.0), mesosScalar(CPUS, 24.0, true)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer large = setMode(new HostOffer(
+        offer("host3", mesosScalar(CPUS, 1.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    control.replay();
+
+    cpuManager.addOffer(medium);
+    cpuManager.addOffer(large);
+    cpuManager.addOffer(small);
+
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers(GROUP_KEY)));
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers()));
+  }
+
+  @Test
+  public void testDiskOrdering() throws Exception {
+    OfferManager cpuManager = createOrderedManager(ImmutableList.of(OfferOrder.DISK));
+
+    HostOffer small = setMode(new HostOffer(
+        offer("host1", mesosScalar(DISK_MB, 1.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer medium = setMode(new HostOffer(
+        offer("host2", mesosScalar(DISK_MB, 5.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer large = setMode(new HostOffer(
+        offer("host3", mesosScalar(DISK_MB, 10.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    control.replay();
+
+    cpuManager.addOffer(medium);
+    cpuManager.addOffer(large);
+    cpuManager.addOffer(small);
+
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers(GROUP_KEY)));
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers()));
+  }
+
+  @Test
+  public void testMemoryOrdering() throws Exception {
+    OfferManager cpuManager = createOrderedManager(ImmutableList.of(OfferOrder.MEMORY));
+
+    HostOffer small = setMode(new HostOffer(
+        offer("host1", mesosScalar(RAM_MB, 1.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer medium = setMode(new HostOffer(
+        offer("host2", mesosScalar(RAM_MB, 5.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer large = setMode(new HostOffer(
+        offer("host3", mesosScalar(RAM_MB, 10.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    control.replay();
+
+    cpuManager.addOffer(medium);
+    cpuManager.addOffer(large);
+    cpuManager.addOffer(small);
+
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers(GROUP_KEY)));
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers()));
+  }
+
+  @Test
+  public void testCPUMemoryOrdering() throws Exception {
+    OfferManager cpuManager = createOrderedManager(
+        ImmutableList.of(OfferOrder.CPU, OfferOrder.MEMORY));
+
+    HostOffer small = setMode(new HostOffer(
+        offer("host1",
+            mesosScalar(CPUS, 1.0),
+            mesosScalar(RAM_MB, 2.0),
+            mesosScalar(DISK_MB, 3.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer medium = setMode(new HostOffer(
+        offer("host2",
+            mesosScalar(CPUS, 1.0),
+            mesosScalar(RAM_MB, 3.0),
+            mesosScalar(DISK_MB, 2.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    HostOffer large = setMode(new HostOffer(
+        offer("host3",
+            mesosScalar(CPUS, 10.0),
+            mesosScalar(CPUS, 1.0),
+            mesosScalar(DISK_MB, 1.0)),
+        HOST_ATTRIBUTES_A), DRAINING);
+
+    control.replay();
+
+    cpuManager.addOffer(large);
+    cpuManager.addOffer(medium);
+    cpuManager.addOffer(small);
+
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers(GROUP_KEY)));
+    assertEquals(ImmutableList.of(small, medium, large),
+        ImmutableList.copyOf(cpuManager.getOffers()));
   }
 }
