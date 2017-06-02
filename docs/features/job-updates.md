@@ -37,16 +37,16 @@ in the current (possibly partially-updated) state.
 For a configuration update, the Aurora Scheduler calculates required changes
 by examining the current job config state and the new desired job config.
 It then starts a *rolling batched update process* by going through every batch
-and performing these operations:
+and performing these operations, in order:
 
-- If an instance is present in the scheduler but isn't in the new config,
-  then that instance is killed.
 - If an instance is not present in the scheduler but is present in
   the new config, then the instance is created.
 - If an instance is present in both the scheduler and the new config, then
   the scheduler diffs both task configs. If it detects any changes, it
   performs an instance update by killing the old config instance and adds
   the new config instance.
+- If an instance is present in the scheduler but isn't in the new config,
+  then that instance is killed.
 
 The Aurora Scheduler continues through the instance list until all tasks are
 updated and in `RUNNING`. If the scheduler determines the update is not going

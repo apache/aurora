@@ -13,7 +13,10 @@
  */
 package org.apache.aurora.scheduler.updater;
 
+import java.util.Set;
+
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.InstanceTaskConfig;
@@ -27,6 +30,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.scheduler.updater.UpdateFactory.Update;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This test can't exercise much functionality of the output from the factory without duplicating
@@ -93,6 +97,70 @@ public class UpdateFactoryImplTest {
 
     Update update = factory.newUpdate(IJobUpdateInstructions.build(config), true);
     assertEquals(ImmutableSet.of(0, 1, 2), update.getUpdater().getInstances());
+  }
+
+  @Test
+  public void testUpdateOrdering() throws Exception {
+    Set<Integer> currentInstances = ImmutableSet.of(0, 1, 2, 3);
+    Set<Integer> desiredInstances = ImmutableSet.of(0, 1, 2, 3);
+
+    UpdateFactory.UpdateOrdering ordering = new UpdateFactory.UpdateOrdering(
+        currentInstances,
+        desiredInstances);
+
+    // Rolling forward
+    assertTrue(ordering.isOrdered(Lists.newArrayList(0, 1, 2, 3)));
+
+    // Rolling backward
+    assertTrue(ordering.reverse().isOrdered(Lists.newArrayList(3, 2, 1, 0)));
+  }
+
+  @Test
+  public void testUpdateCreateOrdering() throws Exception {
+    Set<Integer> currentInstances = ImmutableSet.of(0, 1, 2, 3);
+    Set<Integer> desiredInstances = ImmutableSet.of(0, 1, 2, 3, 4, 5);
+
+    UpdateFactory.UpdateOrdering ordering = new UpdateFactory.UpdateOrdering(
+        currentInstances,
+        desiredInstances);
+
+    // Rolling forward
+    assertTrue(ordering.isOrdered(Lists.newArrayList(4, 5, 0, 1, 2, 3)));
+
+    // Rolling backward
+    assertTrue(ordering.reverse().isOrdered(Lists.newArrayList(3, 2, 1, 0, 5, 4)));
+  }
+
+  @Test
+  public void testUpdateKillOrdering() throws Exception {
+    Set<Integer> currentInstances = ImmutableSet.of(0, 1, 2, 3);
+    Set<Integer> desiredInstances = ImmutableSet.of(0, 1);
+
+    UpdateFactory.UpdateOrdering ordering = new UpdateFactory.UpdateOrdering(
+        currentInstances,
+        desiredInstances);
+
+    // Rolling forward
+    assertTrue(ordering.isOrdered(Lists.newArrayList(0, 1, 2, 3)));
+
+    // Rolling backward
+    assertTrue(ordering.reverse().isOrdered(Lists.newArrayList(3, 2, 1, 0)));
+  }
+
+  @Test
+  public void testCreateUpdateKillOrdering() throws Exception {
+    Set<Integer> currentInstances = ImmutableSet.of(0, 2, 4, 5, 6);
+    Set<Integer> desiredInstances = ImmutableSet.of(0, 1, 2, 3);
+
+    UpdateFactory.UpdateOrdering ordering = new UpdateFactory.UpdateOrdering(
+        currentInstances,
+        desiredInstances);
+
+    // Rolling forward
+    assertTrue(ordering.isOrdered(Lists.newArrayList(1, 3, 0, 2, 5, 6)));
+
+    // Rolling backward
+    assertTrue(ordering.reverse().isOrdered(Lists.newArrayList(6, 5, 2, 0, 3, 1)));
   }
 
   private static InstanceTaskConfig instanceConfig(Range instances) {

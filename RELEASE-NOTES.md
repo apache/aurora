@@ -35,6 +35,9 @@
   due to noisy neighbors or machine issues with a task restart. When you have deterministic
   bin-packing, they may always end up on the same agent. So be careful enabling this without proper
   monitoring and remediation of host failures.
+- Modified job update behavior to create new instances, then update existing instances, and then
+  kill unwanted instances. Previously, a job update would modify each instance in the order of
+  their instance ID.
 
 0.17.0
 ======
