@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.offers;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -30,6 +29,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
@@ -276,8 +276,8 @@ public interface OfferManager extends EventSubscriber {
       // scheduling attempts. See VetoGroup for more details on static ban.
       private final Multimap<OfferID, TaskGroupKey> staticallyBannedOffers = HashMultimap.create();
 
-      HostOffers(StatsProvider statsProvider, List<OfferOrder> offerOrder) {
-        offers = new ConcurrentSkipListSet<>(OfferOrderBuilder.create(offerOrder));
+      HostOffers(StatsProvider statsProvider, Ordering<HostOffer> offerOrder) {
+        offers = new ConcurrentSkipListSet<>(offerOrder);
         // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
         // Could track this separately if it turns out to pose problems.
         statsProvider.exportSize(OUTSTANDING_OFFERS, offers);

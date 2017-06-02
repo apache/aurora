@@ -16,9 +16,11 @@ package org.apache.aurora.scheduler.offers;
 import java.util.List;
 
 import com.google.common.base.Supplier;
+import com.google.common.collect.Ordering;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.scheduler.HostOffer;
 
 import static java.util.Objects.requireNonNull;
 
@@ -29,12 +31,20 @@ public class OfferSettings {
 
   private final Amount<Long, Time> offerFilterDuration;
   private final Supplier<Amount<Long, Time>> returnDelaySupplier;
-  private final List<OfferOrder> offerOrder;
+  private final Ordering<HostOffer> offerOrder;
 
   public OfferSettings(
       Amount<Long, Time> offerFilterDuration,
       Supplier<Amount<Long, Time>> returnDelaySupplier,
       List<OfferOrder> offerOrder) {
+
+    this(offerFilterDuration, returnDelaySupplier, OfferOrderBuilder.create(offerOrder));
+  }
+
+  OfferSettings(
+      Amount<Long, Time> offerFilterDuration,
+      Supplier<Amount<Long, Time>> returnDelaySupplier,
+      Ordering<HostOffer> offerOrder) {
 
     this.offerFilterDuration = requireNonNull(offerFilterDuration);
     this.returnDelaySupplier = requireNonNull(returnDelaySupplier);
@@ -59,7 +69,7 @@ public class OfferSettings {
   /**
    * The ordering to use when fetching offers from OfferManager.
    */
-  public List<OfferOrder> getOfferOrder() {
+  public Ordering<HostOffer> getOfferOrder() {
     return offerOrder;
   }
 }

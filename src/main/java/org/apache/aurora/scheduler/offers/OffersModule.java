@@ -16,12 +16,17 @@ package org.apache.aurora.scheduler.offers;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.List;
+import java.util.Set;
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Ordering;
 import com.google.inject.AbstractModule;
+import com.google.inject.Module;
 import com.google.inject.PrivateModule;
+import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.common.args.Arg;
@@ -30,6 +35,8 @@ import org.apache.aurora.common.args.constraints.NotNegative;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Random;
+import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +85,19 @@ public class OffersModule extends AbstractModule {
   private static final Arg<List<OfferOrder>> OFFER_ORDER =
       Arg.create(ImmutableList.of(OfferOrder.RANDOM));
 
+  @CmdLine(name = "offer_order_modules",
+      help = "Custom Guice module to provide an offer ordering.")
+  private static final Arg<Set<Module>> OFFER_ORDER_MODULES = Arg.create(
+      ImmutableSet.of(MoreModules.lazilyInstantiated(OfferOrderModule.class)));
+
+  public static class OfferOrderModule extends AbstractModule {
+    @Override
+    protected void configure() {
+      bind(new TypeLiteral<Ordering<HostOffer>>() { })
+          .toInstance(OfferOrderBuilder.create(OFFER_ORDER.get()));
+    }
+  }
+
   /**
    * Binding annotation for the threshold to veto tasks with unavailability.
    */
@@ -98,6 +118,10 @@ public class OffersModule extends AbstractModule {
           OFFER_HOLD_JITTER_WINDOW.get());
     }
 
+    for (Module module: OFFER_ORDER_MODULES.get()) {
+      install(module);
+    }
+
     bind(new TypeLiteral<Amount<Long, Time>>() { })
         .annotatedWith(UnavailabilityThreshold.class)
         .toInstance(UNAVAILABILITY_THRESHOLD.get());
@@ -105,20 +129,23 @@ public class OffersModule extends AbstractModule {
     install(new PrivateModule() {
       @Override
       protected void configure() {
-        bind(OfferSettings.class).toInstance(
-            new OfferSettings(
-                OFFER_FILTER_DURATION.get(),
-                new RandomJitterReturnDelay(
-                    MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS),
-                    OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
-                    Random.Util.newDefaultRandom()),
-                OFFER_ORDER.get()));
         bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
         bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
         expose(OfferManager.class);
-        expose(OfferSettings.class);
       }
     });
     PubsubEventModule.bindSubscriber(binder(), OfferManager.class);
+  }
+
+  @Provides
+  @Singleton
+  OfferSettings provideOfferSettings(Ordering<HostOffer> offerOrdering) {
+    return new OfferSettings(
+        OFFER_FILTER_DURATION.get(),
+        new RandomJitterReturnDelay(
+            MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS),
+            OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
+            Random.Util.newDefaultRandom()),
+        offerOrdering);
   }
 }
