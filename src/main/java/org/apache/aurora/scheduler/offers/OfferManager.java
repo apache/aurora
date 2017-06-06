@@ -145,9 +145,12 @@ public interface OfferManager extends EventSubscriber {
     static final String OUTSTANDING_OFFERS = "outstanding_offers";
     @VisibleForTesting
     static final String STATICALLY_BANNED_OFFERS = "statically_banned_offers_size";
+    @VisibleForTesting
+    static final String OFFER_CANCEL_FAILURES = "offer_cancel_failures";
 
     private final HostOffers hostOffers;
     private final AtomicLong offerRaces;
+    private final AtomicLong offerCancelFailures;
 
     private final Driver driver;
     private final OfferSettings offerSettings;
@@ -166,6 +169,7 @@ public interface OfferManager extends EventSubscriber {
       this.executor = requireNonNull(executor);
       this.hostOffers = new HostOffers(statsProvider, offerSettings.getOfferOrder());
       this.offerRaces = statsProvider.makeCounter(OFFER_ACCEPT_RACES);
+      this.offerCancelFailures = statsProvider.makeCounter(OFFER_CANCEL_FAILURES);
     }
 
     @Override
@@ -210,7 +214,14 @@ public interface OfferManager extends EventSubscriber {
 
     @Override
     public void cancelOffer(final OfferID offerId) {
-      removeFromHostOffers(offerId);
+      boolean success = removeFromHostOffers(offerId);
+      if (!success) {
+        // This will happen rarely when we race to process this rescind against accepting the offer
+        // to launch a task.
+        // If it happens frequently, we are likely processing rescinds before the offer itself.
+        LOG.warn("Failed to cancel offer: {}.", offerId.getValue());
+        this.offerCancelFailures.incrementAndGet();
+      }
     }
 
     private boolean removeFromHostOffers(final OfferID offerId) {

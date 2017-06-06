@@ -200,6 +200,9 @@ public interface MesosCallbackHandler {
         return;
       }
 
+      // NOTE: We need to use the executor here to save attributes and store the offer because this
+      // requires the storage lock which can block. We cannot block in the libmesos callback
+      // handler without ill effects.
       executor.execute(() -> {
         // TODO(wfarner): Reconsider the requirements here, augment the task scheduler to skip over
         //                offers when the host attributes cannot be found. (AURORA-137)
@@ -208,11 +211,24 @@ public interface MesosCallbackHandler {
             IHostAttributes attributes =
                 AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);
             storeProvider.getAttributeStore().saveHostAttributes(attributes);
-            log.debug("Received offer: {}", offer);
+            log.info("Received offer: {}", offer.getId().getValue());
             offersReceived.incrementAndGet();
             offerManager.addOffer(new HostOffer(offer, attributes));
           }
         });
+      });
+    }
+
+    @Override
+    public void handleRescind(OfferID offerId) {
+      // NOTE: We need to use the executor here to prevent racing against processing the offers.
+      // If the callback thread rescinded the offers directly, it could rescind the offer
+      // before the thread for processing the offer got the storage lock and was able to write.
+      // Therefore we use the executor here to also process the rescind to maintain the ordering.
+      executor.execute(() -> {
+        log.info("Offer rescinded: {}", offerId.getValue());
+        offerManager.cancelOffer(offerId);
+        offersRescinded.incrementAndGet();
       });
     }
 
@@ -222,13 +238,6 @@ public interface MesosCallbackHandler {
       disconnects.incrementAndGet();
       frameworkRegistered.set(false);
       eventSink.post(new PubsubEvent.DriverDisconnected());
-    }
-
-    @Override
-    public void handleRescind(OfferID offerId) {
-      log.info("Offer rescinded: {}", offerId.getValue());
-      offerManager.cancelOffer(offerId);
-      offersRescinded.incrementAndGet();
     }
 
     @Override

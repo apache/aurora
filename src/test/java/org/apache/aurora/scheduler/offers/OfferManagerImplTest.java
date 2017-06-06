@@ -51,6 +51,7 @@ import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
 import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.OFFER_ACCEPT_RACES;
+import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.OFFER_CANCEL_FAILURES;
 import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.OUTSTANDING_OFFERS;
 import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.STATICALLY_BANNED_OFFERS;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
@@ -234,6 +235,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
 
     offerManager.cancelOffer(OFFER_A_ID);
+    assertEquals(0L, statsProvider.getLongValue(OFFER_CANCEL_FAILURES));
     assertTrue(Iterables.isEmpty(offerManager.getOffers()));
     assertEquals(0L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
 
@@ -358,6 +360,14 @@ public class OfferManagerImplTest extends EasyMockTest {
     offerManager.driverDisconnected(new DriverDisconnected());
     assertEquals(0L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     clock.advance(RETURN_DELAY);
+  }
+
+  @Test
+  public void testCancelFailure() throws Exception {
+    control.replay();
+
+    offerManager.cancelOffer(OFFER_A.getOffer().getId());
+    assertEquals(1L, statsProvider.getLongValue(OFFER_CANCEL_FAILURES));
   }
 
   @Test
