@@ -1,3 +1,39 @@
+Aurora 0.18.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1913] - Aurora Client Job Update Diff output is erroneous
+    * [AURORA-1850] - Raw StatusResult passed to the scheduler when tasks are healthy
+    * [AURORA-1911] - HTTP Scheduler Driver does not reliably re subscribe
+    * [AURORA-1912] - DbSnapShot may remove enum values
+    * [AURORA-1933] - Scheduler can process rescind before offer
+    * [AURORA-1909] - Thermos Health Check fails for MesosContainerizer if `--nosetuid-health-checks` is set
+    * [AURORA-1914] - Unable to specify multiple volumes per task.
+    * [AURORA-1910] - framework_registered metric isn't reset when scheduler disconnects
+
+## Epic
+    * [AURORA-1920] - Add pluggable scheduling logic to Aurora
+    * [AURORA-1680] - Aurora 0.16.0 deprecations
+
+## Story
+    * [AURORA-1923] - Aurora client should not automatically retry non-idempotent operations
+    * [AURORA-1922] - Expose stats on the number of jobs stored in MemCronJobStore
+    * [AURORA-1907] - Thermos unresponsive on hosts with many active task
+    * [AURORA-1915] - Add automatic browser tab open feature for aurora update start
+
+## Task
+    * [AURORA-1882] - Add support for Mesos ContainerLaunchInfo
+    * [AURORA-1870] - Add finer grained timings to the Snapshot process
+    * [AURORA-1904] - Support Mesos Maintenance
+    * [AURORA-1905] - Set "webui_url" field of FrameworkInfo
+    * [AURORA-1929] - Improve explicit task history pruning.
+    * [AURORA-1925] - Easily copy files to/from an aurora task instance
+    * [AURORA-1928] - Aurora should prioritize adding instances over updating instances during an update
+    * [AURORA-1860] - Fix bug in scheduler driver disconnect stats
+    * [AURORA-1888] - Create Driver implementation around V1Mesos
+    * [AURORA-1887] - Create Driver implementation around V0Mesos.
+    * [AURORA-1921] - Create proposal for which components should be pluggable
+
+
 Aurora 0.17.0
 --------------------------------------------------------------------------------
 ## Bug
