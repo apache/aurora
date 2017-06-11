@@ -26,6 +26,11 @@
 set -o errexit
 set -o nounset
 
+# If GPG_TTY is unset, set it to the default tty. Otherwise git will not prompt
+# for a passpharse for the GPG-key and silently fail when tryint to create signed
+# commits/tags.
+export GPG_TTY=${GPG_TTY:-$(tty)}
+
 rc_number=0
 override_version=''
 aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=aurora.git'
