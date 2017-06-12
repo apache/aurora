@@ -70,7 +70,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.StartMaintenanceResult;
 import org.apache.aurora.gen.TaskQuery;
-import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.base.Query;
@@ -155,11 +154,6 @@ import static org.apache.aurora.scheduler.thrift.Responses.ok;
 @DecoratedThrift
 class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
-  // This number is derived from the maximum file name length limit on most UNIX systems, less
-  // the number of characters we've observed being added by mesos for the executor ID, prefix, and
-  // delimiters.
-  @VisibleForTesting
-  static final int MAX_TASK_ID_LENGTH = 255 - 90;
   @VisibleForTesting
   static final String STAT_PREFIX = "thrift_workload_";
   @VisibleForTesting
@@ -197,7 +191,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   private final CronJobManager cronJobManager;
   private final QuotaManager quotaManager;
   private final StateManager stateManager;
-  private final TaskIdGenerator taskIdGenerator;
   private final UUIDGenerator uuidGenerator;
   private final JobUpdateController jobUpdateController;
   private final ReadOnlyScheduler.Iface readOnlyScheduler;
@@ -228,7 +221,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       MaintenanceController maintenance,
       QuotaManager quotaManager,
       StateManager stateManager,
-      TaskIdGenerator taskIdGenerator,
       UUIDGenerator uuidGenerator,
       JobUpdateController jobUpdateController,
       ReadOnlyScheduler.Iface readOnlyScheduler,
@@ -246,7 +238,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     this.cronJobManager = requireNonNull(cronJobManager);
     this.quotaManager = requireNonNull(quotaManager);
     this.stateManager = requireNonNull(stateManager);
-    this.taskIdGenerator = requireNonNull(taskIdGenerator);
     this.uuidGenerator = requireNonNull(uuidGenerator);
     this.jobUpdateController = requireNonNull(jobUpdateController);
     this.readOnlyScheduler = requireNonNull(readOnlyScheduler);
@@ -293,7 +284,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         int count = sanitized.getJobConfig().getInstanceCount();
 
         validateTaskLimits(
-            template,
             count,
             quotaManager.checkInstanceAddition(template, count, storeProvider));
 
@@ -349,11 +339,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       try {
         lockManager.assertNotLocked(ILockKey.build(LockKey.job(jobKey.newBuilder())));
 
-        ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
         int count = sanitized.getJobConfig().getInstanceCount();
 
         validateTaskLimits(
-            template,
             count,
             quotaManager.checkCronUpdate(sanitized.getJobConfig(), storeProvider));
 
@@ -863,7 +851,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
         ITaskConfig task = templateTask.get().getAssignedTask().getTask();
         validateTaskLimits(
-            task,
             Iterables.size(currentTasks) + instanceIds.size(),
             quotaManager.checkInstanceAddition(task, instanceIds.size(), storeProvider));
 
@@ -891,20 +878,12 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   private void validateTaskLimits(
-      ITaskConfig task,
       int totalInstances,
       QuotaCheckResult quotaCheck) throws TaskValidationException {
 
     if (totalInstances <= 0 || totalInstances > thresholds.getMaxTasksPerJob()) {
       throw new TaskValidationException(String.format(
           "Instance count must be between 1 and %d inclusive.", thresholds.getMaxTasksPerJob()));
-    }
-
-    // TODO(maximk): This is a short-term hack to stop the bleeding from
-    //               https://issues.apache.org/jira/browse/MESOS-691
-    if (taskIdGenerator.generate(task, totalInstances).length() > MAX_TASK_ID_LENGTH) {
-      throw new TaskValidationException(
-          "Task ID is too long, please shorten your role or job name.");
     }
 
     if (quotaCheck.getResult() == INSUFFICIENT_QUOTA) {
@@ -1026,7 +1005,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       Response response = empty();
       try {
         validateTaskLimits(
-            request.getTaskConfig(),
             request.getInstanceCount(),
             quotaManager.checkJobUpdate(update, storeProvider));
 
