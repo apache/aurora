@@ -15,6 +15,7 @@
 from contextlib import contextmanager
 
 import mock
+from twitter.common.quantity import Amount, Time
 
 from apache.aurora.config.schema.base import HttpLifecycleConfig, LifecycleConfig, MesosTaskInstance
 from apache.aurora.executor.http_lifecycle import HttpLifecycleManager
@@ -53,20 +54,24 @@ def test_http_lifecycle_wrapper_with_lifecycle():
   with make_mocks(mti, {'health': 31337}) as (runner_mock, runner_wrapper, wrapper_init):
     assert isinstance(runner_wrapper, HttpLifecycleManager)
     assert wrapper_init.mock_calls == [
-      mock.call(runner_mock, 31337, ['/quitquitquit', '/abortabortabort'])
+      mock.call(runner_mock, 31337, [('/quitquitquit', Amount(5, Time.SECONDS)),
+        ('/abortabortabort', Amount(5, Time.SECONDS))])
     ]
 
-  # Validate that we can override ports
+  # Validate that we can override ports, endpoints, wait times
   mti = MesosTaskInstance(lifecycle=LifecycleConfig(http=HttpLifecycleConfig(
       port='http',
       graceful_shutdown_endpoint='/frankfrankfrank',
       shutdown_endpoint='/bobbobbob',
+      graceful_shutdown_wait_secs=123,
+      shutdown_wait_secs=456
   )))
   portmap = {'http': 12345, 'admin': 54321}
   with make_mocks(mti, portmap) as (runner_mock, runner_wrapper, wrapper_init):
     assert isinstance(runner_wrapper, HttpLifecycleManager)
     assert wrapper_init.mock_calls == [
-      mock.call(runner_mock, 12345, ['/frankfrankfrank', '/bobbobbob'])
+      mock.call(runner_mock, 12345, [('/frankfrankfrank', Amount(123, Time.SECONDS)),
+        ('/bobbobbob', Amount(456, Time.SECONDS))])
     ]
 
 

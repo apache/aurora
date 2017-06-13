@@ -39,7 +39,6 @@ class AuroraExecutor(ExecutorBase, Observable):
   PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
   SANDBOX_INITIALIZATION_TIMEOUT = Amount(10, Time.MINUTES)
   START_TIMEOUT = Amount(2, Time.MINUTES)
-  STOP_TIMEOUT = Amount(2, Time.MINUTES)
   STOP_WAIT = Amount(5, Time.SECONDS)
 
   def __init__(
@@ -50,7 +49,8 @@ class AuroraExecutor(ExecutorBase, Observable):
       status_providers=(),
       clock=time,
       no_sandbox_create_user=False,
-      sandbox_mount_point=None):
+      sandbox_mount_point=None,
+      stop_timeout_in_secs=120):
 
     ExecutorBase.__init__(self)
     if not isinstance(runner_provider, TaskRunnerProvider):
@@ -67,6 +67,7 @@ class AuroraExecutor(ExecutorBase, Observable):
     self._sandbox_provider = sandbox_provider
     self._no_sandbox_create_user = no_sandbox_create_user
     self._sandbox_mount_point = sandbox_mount_point
+    self._stop_timeout = Amount(stop_timeout_in_secs, Time.SECONDS)
     self._kill_manager = KillManager()
     # Events that are exposed for interested entities
     self.runner_aborted = threading.Event()
@@ -206,7 +207,7 @@ class AuroraExecutor(ExecutorBase, Observable):
     runner_status = self._runner.status
 
     try:
-      propagate_deadline(self._chained_checker.stop, timeout=self.STOP_TIMEOUT)
+      propagate_deadline(self._chained_checker.stop, timeout=self._stop_timeout)
     except Timeout:
       log.error('Failed to stop all checkers within deadline.')
     except Exception:
@@ -214,7 +215,7 @@ class AuroraExecutor(ExecutorBase, Observable):
       log.error(traceback.format_exc())
 
     try:
-      propagate_deadline(self._runner.stop, timeout=self.STOP_TIMEOUT)
+      propagate_deadline(self._runner.stop, timeout=self._stop_timeout)
     except Timeout:
       log.error('Failed to stop runner within deadline.')
     except Exception:

@@ -25,7 +25,8 @@ from .common.task_runner import TaskError, TaskRunner
 class HttpLifecycleManager(TaskRunner):
   """A wrapper around a TaskRunner that performs HTTP lifecycle management."""
 
-  ESCALATION_WAIT = Amount(5, Time.SECONDS)
+  DEFAULT_ESCALATION_WAIT = Amount(5, Time.SECONDS)
+  WAIT_POLL_INTERVAL = Amount(1, Time.SECONDS)
 
   @classmethod
   def wrap(cls, runner, task_instance, portmap):
@@ -36,6 +37,14 @@ class HttpLifecycleManager(TaskRunner):
 
     http_lifecycle = task_instance.lifecycle().http()
     http_lifecycle_port = http_lifecycle.port().get()
+    graceful_shutdown_wait_secs = (
+        Amount(http_lifecycle.graceful_shutdown_wait_secs().get(), Time.SECONDS)
+        if http_lifecycle.has_graceful_shutdown_wait_secs()
+        else cls.DEFAULT_ESCALATION_WAIT)
+    shutdown_wait_secs = (
+        Amount(http_lifecycle.shutdown_wait_secs().get(), Time.SECONDS)
+        if http_lifecycle.has_shutdown_wait_secs()
+        else cls.DEFAULT_ESCALATION_WAIT)
 
     if not portmap or http_lifecycle_port not in portmap:
       # If DefaultLifecycle is ever to disable task lifecycle by default, we should
@@ -44,8 +53,8 @@ class HttpLifecycleManager(TaskRunner):
       return runner
 
     escalation_endpoints = [
-        http_lifecycle.graceful_shutdown_endpoint().get(),
-        http_lifecycle.shutdown_endpoint().get()
+        (http_lifecycle.graceful_shutdown_endpoint().get(), graceful_shutdown_wait_secs),
+        (http_lifecycle.shutdown_endpoint().get(), shutdown_wait_secs)
     ]
     return cls(runner, portmap[http_lifecycle_port], escalation_endpoints)
 
@@ -63,13 +72,20 @@ class HttpLifecycleManager(TaskRunner):
   def _terminate_http(self):
     http_signaler = HttpSignaler(self._lifecycle_port)
 
-    for endpoint in self._escalation_endpoints:
+    for endpoint, wait_time in self._escalation_endpoints:
       handled, _ = http_signaler(endpoint, use_post_method=True)
+      log.info('Killing task, calling %s and waiting %s, handled is %s' % (
+          endpoint, str(wait_time), str(handled)))
 
-      if handled:
-        self._clock.sleep(self.ESCALATION_WAIT.as_(Time.SECONDS))
+      waited = Amount(0, Time.SECONDS)
+      while handled:
         if self._runner.status is not None:
           return True
+        if waited >= wait_time:
+          break
+
+        self._clock.sleep(self.WAIT_POLL_INTERVAL.as_(Time.SECONDS))
+        waited += self.WAIT_POLL_INTERVAL
 
   # --- public interface
   def start(self, timeout=None):

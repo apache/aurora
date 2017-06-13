@@ -528,26 +528,31 @@ See [Docker Command Line Reference](https://docs.docker.com/reference/commandlin
 
 ### HttpLifecycleConfig Objects
 
-  param          | type            | description
-  -----          | :----:          | -----------
-  ```port```     | String          | The named port to send POST commands (Default: health)
-  ```graceful_shutdown_endpoint``` | String | Endpoint to hit to indicate that a task should gracefully shutdown. (Default: /quitquitquit)
-  ```shutdown_endpoint``` | String | Endpoint to hit to give a task its final warning before being killed. (Default: /abortabortabort)
+*Note: The combined `graceful_shutdown_wait_secs` and `shutdown_wait_secs` is implicitly upper bounded by the `--stop_timeout_in_secs` flag exposed by the executor (see options [here](https://github.com/apache/aurora/blob/master/src/main/python/apache/aurora/executor/bin/thermos_executor_main.py), default is 2 minutes). Therefore, if the user specifies values that add up to more than `--stop_timeout_in_secs`, the task will be killed earlier than the user anticipates (see the termination lifecycle [here](https://aurora.apache.org/documentation/latest/reference/task-lifecycle/#forceful-termination-killing-restarting)). Furthermore, `stop_timeout_in_secs` itself is implicitly upper bounded by two scheduler options: `transient_task_state_timeout` and `preemption_slot_hold_time` (see reference [here](http://aurora.apache.org/documentation/latest/reference/scheduler-configuration/). If the `stop_timeout_in_secs` exceeds either of these scheduler options, tasks could be designated as LOST or tasks utilizing preemption could lose their desired slot respectively. Cluster operators should be aware of these timings should they change the defaults.*
+
+  param                             | type    | description
+  -----                             | :----:  | -----------
+  ```port```                        | String  | The named port to send POST commands. (Default: health)
+  ```graceful_shutdown_endpoint```  | String  | Endpoint to hit to indicate that a task should gracefully shutdown. (Default: /quitquitquit)
+  ```shutdown_endpoint```           | String  | Endpoint to hit to give a task its final warning before being killed. (Default: /abortabortabort)
+  ```graceful_shutdown_wait_secs``` | Integer | The amount of time (in seconds) to wait after hitting the ```graceful_shutdown_endpoint``` before proceeding with the [task termination lifecycle](https://aurora.apache.org/documentation/latest/reference/task-lifecycle/#forceful-termination-killing-restarting). (Default: 5)
+  ```shutdown_wait_secs```          | Integer | The amount of time (in seconds) to wait after hitting the ```shutdown_endpoint``` before proceeding with the [task termination lifecycle](https://aurora.apache.org/documentation/latest/reference/task-lifecycle/#forceful-termination-killing-restarting). (Default: 5)
 
 #### graceful_shutdown_endpoint
 
 If the Job is listening on the port as specified by the HttpLifecycleConfig
 (default: `health`), a HTTP POST request will be sent over localhost to this
 endpoint to request that the task gracefully shut itself down.  This is a
-courtesy call before the `shutdown_endpoint` is invoked a fixed amount of
-time later.
+courtesy call before the `shutdown_endpoint` is invoked
+`graceful_shutdown_wait_secs` seconds later.
 
 #### shutdown_endpoint
 
 If the Job is listening on the port as specified by the HttpLifecycleConfig
 (default: `health`), a HTTP POST request will be sent over localhost to this
 endpoint to request as a final warning before being shut down.  If the task
-does not shut down on its own after this, it will be forcefully killed
+does not shut down on its own after `shutdown_wait_secs` seconds, it will be
+forcefully killed.
 
 
 Specifying Scheduling Constraints

@@ -188,6 +188,15 @@ app.add_option(
      action='store_true',
      help="Preserve thermos runners' environment variables for the task being run.")
 
+app.add_option(
+    '--stop_timeout_in_secs',
+    dest='stop_timeout_in_secs',
+    type=int,
+    default=120,
+    help='The maximum amount of time to wait (in seconds) when gracefully killing a task before '
+         'beginning forceful termination. Graceful and forceful termination is defined in '
+         'HttpLifecycleConfig (see Task Lifecycle documentation for more info on termination).')
+
 
 # TODO(wickman) Consider just having the OSS version require pip installed
 # thermos_runner binaries on every machine and instead of embedding the pex
@@ -254,7 +263,8 @@ def initialize(options):
       status_providers=status_providers,
       sandbox_provider=UserOverrideDirectorySandboxProvider(options.execute_as_user),
       no_sandbox_create_user=options.no_create_user,
-      sandbox_mount_point=options.sandbox_mount_point
+      sandbox_mount_point=options.sandbox_mount_point,
+      stop_timeout_in_secs=options.stop_timeout_in_secs
     )
   else:
     thermos_runner_provider = DefaultThermosTaskRunnerProvider(
@@ -273,7 +283,8 @@ def initialize(options):
       runner_provider=thermos_runner_provider,
       status_providers=status_providers,
       no_sandbox_create_user=options.no_create_user,
-      sandbox_mount_point=options.sandbox_mount_point
+      sandbox_mount_point=options.sandbox_mount_point,
+      stop_timeout_in_secs=options.stop_timeout_in_secs
     )
 
   return thermos_executor

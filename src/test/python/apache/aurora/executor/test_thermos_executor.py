@@ -42,7 +42,7 @@ from apache.aurora.config.schema.base import (
     Resources,
     Task
 )
-from apache.aurora.executor.aurora_executor import AuroraExecutor
+from apache.aurora.executor.aurora_executor import AuroraExecutor, propagate_deadline
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
 from apache.aurora.executor.common.health_checker import HealthCheckerProvider
 from apache.aurora.executor.common.sandbox import DirectorySandbox, SandboxProvider
@@ -218,7 +218,8 @@ def make_executor(
     fast_status=False,
     runner_class=ThermosTaskRunner,
     status_providers=[HealthCheckerProvider()],
-    assert_task_is_running=True):
+    assert_task_is_running=True,
+    stop_timeout_in_secs=120):
 
   status_manager_class = FastStatusManager if fast_status else StatusManager
   runner_provider = make_provider(checkpoint_root, runner_class)
@@ -227,6 +228,7 @@ def make_executor(
       status_manager_class=status_manager_class,
       sandbox_provider=DefaultTestSandboxProvider(),
       status_providers=status_providers,
+      stop_timeout_in_secs=stop_timeout_in_secs
   )
 
   ExecutorTimeout(te.launched, proxy_driver, timeout=Amount(100, Time.MILLISECONDS)).start()
@@ -394,16 +396,35 @@ class TestThermosExecutor(object):
   def test_killTask(self):  # noqa
     proxy_driver = ProxyDriver()
 
-    with temporary_dir() as checkpoint_root:
-      _, executor = make_executor(proxy_driver, checkpoint_root, SLEEP60_MTI)
+    class ProvidedThermosRunnerMatcher(object):
+      """Matcher that ensures a bound method 'stop' from 'ProvidedThermosTaskRunner' is called."""
+
+      def __eq__(self, other):
+        return (type(other.im_self).__name__ == 'ProvidedThermosTaskRunner'
+            and other.__name__ == 'stop')
+
+    with contextlib.nested(
+        temporary_dir(),
+        mock.patch('apache.aurora.executor.aurora_executor.propagate_deadline',
+            wraps=propagate_deadline)) as (checkpoint_root, mock_propagate_deadline):
+
+      _, executor = make_executor(
+          proxy_driver,
+          checkpoint_root,
+          SLEEP60_MTI,
+          stop_timeout_in_secs=123)
       # send two, expect at most one delivered
       executor.killTask(proxy_driver, mesos_pb2.TaskID(value='sleep60-001'))
       executor.killTask(proxy_driver, mesos_pb2.TaskID(value='sleep60-001'))
       executor.terminated.wait()
 
-    updates = proxy_driver.method_calls['sendStatusUpdate']
-    assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb2.TASK_KILLED
+      updates = proxy_driver.method_calls['sendStatusUpdate']
+
+      mock_propagate_deadline.assert_called_with(  # Ensure 'stop' is called with custom timeout.
+          ProvidedThermosRunnerMatcher(),
+          timeout=Amount(123, Time.SECONDS))
+      assert len(updates) == 3
+      assert updates[-1][0][0].state == mesos_pb2.TASK_KILLED
 
   def test_shutdown(self):
     proxy_driver = ProxyDriver()
@@ -618,12 +639,11 @@ class TestThermosExecutor(object):
     with temporary_dir() as tempdir:
       te = FastThermosExecutor(
         runner_provider=make_provider(tempdir, mesos_containerizer_path='/doesnotexist'),
-        sandbox_provider=FileSystemImageTestSandboxProvider())
+        sandbox_provider=FileSystemImageTestSandboxProvider(), stop_timeout_in_secs=1)
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
 
       te.SANDBOX_INITIALIZATION_TIMEOUT = Amount(1, Time.MILLISECONDS)
       te.START_TIMEOUT = Amount(10, Time.MILLISECONDS)
-      te.STOP_TIMEOUT = Amount(10, Time.MILLISECONDS)
 
       proxy_driver.wait_stopped()
 
@@ -643,11 +663,10 @@ class TestThermosExecutor(object):
 
       te = FastThermosExecutor(
         runner_provider=make_provider(tempdir, mesos_containerizer_path=tempfile),
-        sandbox_provider=FileSystemImageTestSandboxProvider())
+        sandbox_provider=FileSystemImageTestSandboxProvider(), stop_timeout_in_secs=1)
 
       te.SANDBOX_INITIALIZATION_TIMEOUT = Amount(1, Time.MILLISECONDS)
       te.START_TIMEOUT = Amount(10, Time.MILLISECONDS)
-      te.STOP_TIMEOUT = Amount(10, Time.MILLISECONDS)
 
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
 

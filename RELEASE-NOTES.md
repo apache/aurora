@@ -1,5 +1,21 @@
-0.18.0
+0.19.0 (unreleased)
 ===================
+
+### New/updated:
+
+- Added the ability to configure the executor's stop timeout, which is the maximum amount of time
+  the executor will wait during a graceful shutdown sequence before continuing the 'Forceful
+  Termination' process (see
+  [here](http://aurora.apache.org/documentation/latest/reference/task-lifecycle/) for details).
+- Added the ability to configure the wait period after calling the graceful shutdown endpoint and
+  the shutdown endpoint using the `graceful_shutdown_wait_secs` and `shutdown_wait_secs` fields in
+  `HttpLifecycleConfig` respectively. Previously, the executor would only wait 5 seconds between
+  steps (adding up to a total of 10 seconds as there are 2 steps). The overall waiting period is
+  bounded by the executor's stop timeout, which can be configured using the executor's
+  `stop_timeout_in_secs` flag.
+
+0.18.0
+======
 
 ### New/updated:
 

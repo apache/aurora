@@ -32,6 +32,7 @@ from twitter.common.quantity import Amount, Time
 
 from apache.aurora.config.schema.base import MB, MesosTaskInstance, Process, Resources, Task
 from apache.aurora.executor.common.sandbox import DirectorySandbox
+from apache.aurora.executor.common.status_checker import StatusResult
 from apache.aurora.executor.http_lifecycle import HttpLifecycleManager
 from apache.aurora.executor.thermos_task_runner import ThermosTaskRunner
 from apache.thermos.common.statuses import (
@@ -227,33 +228,95 @@ class TestThermosTaskRunnerIntegration(object):
       assert task_runner.status.status == mesos_pb2.TASK_KILLED
 
   @patch('apache.aurora.executor.http_lifecycle.HttpSignaler')
-  def test_integration_http_teardown(self, SignalerClass):
+  def test_integration_http_teardown_killed(self, SignalerClass):
+    """Ensure that the http teardown procedure closes correctly when abort kills the process."""
     signaler = SignalerClass.return_value
-    signaler.side_effect = lambda path, use_post_method: (path != '/quitquitquit', None)
+    signaler.side_effect = lambda path, use_post_method: (path == '/abortabortabort', None)
 
     clock = Mock(wraps=time)
 
+    class TerminalStateStatusRunner(ThermosTaskRunner):
+      """
+      Status is called each poll in the teardown procedure. We return kill after the 3rd poll
+      to mimic a task that exits early. We want to ensure the shutdown procedure doesn't wait
+      the full time if it doesn't need to.
+      """
+
+      TIMES_CALLED = 0
+
+      @property
+      def status(self):
+        if (self.TIMES_CALLED >= 3):
+          return StatusResult('Test task mock status', mesos_pb2.TASK_KILLED)
+        self.TIMES_CALLED += 1
+
     with self.yield_sleepy(
-        ThermosTaskRunner,
+        TerminalStateStatusRunner,
         portmap={'health': 3141},
         clock=clock,
-        sleep=1000,
+        sleep=0,
         exit_code=0) as task_runner:
 
-      class ImmediateHttpLifecycleManager(HttpLifecycleManager):
-        ESCALATION_WAIT = Amount(1, Time.MICROSECONDS)
-
-      http_task_runner = ImmediateHttpLifecycleManager(
-          task_runner, 3141, ['/quitquitquit', '/abortabortabort'], clock=clock)
+      graceful_shutdown_wait = Amount(1, Time.SECONDS)
+      shutdown_wait = Amount(5, Time.SECONDS)
+      http_task_runner = HttpLifecycleManager(
+          task_runner, 3141, [('/quitquitquit', graceful_shutdown_wait),
+          ('/abortabortabort', shutdown_wait)], clock=clock)
       http_task_runner.start()
       task_runner.forked.wait()
       http_task_runner.stop()
 
-      escalation_wait = call(ImmediateHttpLifecycleManager.ESCALATION_WAIT.as_(Time.SECONDS))
-      assert clock.sleep.mock_calls.count(escalation_wait) == 1
+      http_teardown_poll_wait_call = call(HttpLifecycleManager.WAIT_POLL_INTERVAL.as_(Time.SECONDS))
+      assert clock.sleep.mock_calls.count(http_teardown_poll_wait_call) == 3  # Killed before 5
       assert signaler.mock_calls == [
         call('/quitquitquit', use_post_method=True),
         call('/abortabortabort', use_post_method=True)]
+
+  @patch('apache.aurora.executor.http_lifecycle.HttpSignaler')
+  def test_integration_http_teardown_escalate(self, SignalerClass):
+    """Ensure that the http teardown process fully escalates when quit/abort both fail to kill."""
+    signaler = SignalerClass.return_value
+    signaler.side_effect = lambda path, use_post_method: (True, None)
+
+    clock = Mock(wraps=time)
+
+    class KillCalledTaskRunner(ThermosTaskRunner):
+      def __init__(self, *args, **kwargs):
+        self._killed_called = False
+        ThermosTaskRunner.__init__(self, *args, **kwargs)
+
+      def kill_called(self):
+        return self._killed_called
+
+      def kill(self):
+        self._killed_called = True
+
+      @property
+      def status(self):
+        return None
+
+    with self.yield_sleepy(
+        KillCalledTaskRunner,
+        portmap={'health': 3141},
+        clock=clock,
+        sleep=0,
+        exit_code=0) as task_runner:
+
+      graceful_shutdown_wait = Amount(1, Time.SECONDS)
+      shutdown_wait = Amount(5, Time.SECONDS)
+      http_task_runner = HttpLifecycleManager(
+          task_runner, 3141, [('/quitquitquit', graceful_shutdown_wait),
+          ('/abortabortabort', shutdown_wait)], clock=clock)
+      http_task_runner.start()
+      task_runner.forked.wait()
+      http_task_runner.stop()
+
+      http_teardown_poll_wait_call = call(HttpLifecycleManager.WAIT_POLL_INTERVAL.as_(Time.SECONDS))
+      assert clock.sleep.mock_calls.count(http_teardown_poll_wait_call) == 6
+      assert signaler.mock_calls == [
+        call('/quitquitquit', use_post_method=True),
+        call('/abortabortabort', use_post_method=True)]
+      assert task_runner.kill_called() == True
 
   def test_thermos_normal_exit_status(self):
     with self.exit_with_status(0, TaskState.SUCCESS) as task_runner:

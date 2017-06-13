@@ -74,6 +74,12 @@ class HttpLifecycleConfig(Struct):
   # Endpoint to hit to give a task it's final warning before being killed.
   shutdown_endpoint = Default(String, '/abortabortabort')
 
+  # How much time to wait in seconds after calling the graceful shutdown endpoint
+  graceful_shutdown_wait_secs = Default(Integer, 5)
+
+  # How much time to wait in seconds after calling the shutdown endpoint
+  shutdown_wait_secs = Default(Integer, 5)
+
 
 class LifecycleConfig(Struct):
   http = HttpLifecycleConfig
