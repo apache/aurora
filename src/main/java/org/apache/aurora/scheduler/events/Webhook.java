@@ -17,10 +17,12 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.time.Instant;
 
+import com.google.common.base.Predicate;
 import com.google.common.eventbus.Subscribe;
 
 import com.google.inject.Inject;
 
+import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.http.HttpEntity;
@@ -41,11 +43,16 @@ public class Webhook implements EventSubscriber {
 
   private final WebhookInfo webhookInfo;
   private final CloseableHttpClient httpClient;
+  private final Predicate<ScheduleStatus> isWhitelisted;
 
   @Inject
   Webhook(CloseableHttpClient httpClient, WebhookInfo webhookInfo) {
     this.webhookInfo = webhookInfo;
     this.httpClient = httpClient;
+    // A task status is whitelisted if: a) the whitelist is absent, or b) the task status is
+    // explicitly specified in the whitelist.
+    this.isWhitelisted = status -> !webhookInfo.getWhitelistedStatuses().isPresent()
+        || webhookInfo.getWhitelistedStatuses().get().contains(status);
     LOG.info("Webhook enabled with info" + this.webhookInfo);
   }
 
@@ -72,8 +79,9 @@ public class Webhook implements EventSubscriber {
   public void taskChangedState(TaskStateChange stateChange) {
     LOG.debug("Got an event: {}", stateChange);
     // Old state is not present because a scheduler just failed over. In that case we do not want to
-    // resend the entire state.
-    if (stateChange.getOldState().isPresent()) {
+    // resend the entire state. This check also ensures that only whitelisted statuses will be sent
+    // to the configured endpoint.
+    if (stateChange.getOldState().isPresent() && isWhitelisted.apply(stateChange.getNewState())) {
       try {
         HttpPost post = createPostRequest(stateChange);
         // Using try-with-resources on closeable and following
@@ -82,7 +90,7 @@ public class Webhook implements EventSubscriber {
         try (CloseableHttpResponse httpResponse = httpClient.execute(post)) {
           HttpEntity entity = httpResponse.getEntity();
           EntityUtils.consumeQuietly(entity);
-        }  catch (IOException exp) {
+        } catch (IOException exp) {
           LOG.error("Error sending a Webhook event", exp);
         }
       } catch (UnsupportedEncodingException exp) {

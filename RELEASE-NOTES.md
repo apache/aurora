@@ -54,6 +54,9 @@
 - Modified job update behavior to create new instances, then update existing instances, and then
   kill unwanted instances. Previously, a job update would modify each instance in the order of
   their instance ID.
+- Added ability to whitelist TaskStateChanges in the webhook configuration file. You can specify
+  a list of desired TaskStateChanges(represented by their task statuses) to be sent to a configured
+  endpoint.
 
 0.17.0
 ======
