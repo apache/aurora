@@ -8,6 +8,9 @@
 /.cache/
 /.coverage
 /.idea/
+/.settings/
+/.classpath/
+/.project/
 /.pants.*
 /.pids/
 /.vagrant/

@@ -18,9 +18,12 @@ import javax.inject.Singleton;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
+import com.google.inject.Provides;
 
 import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
+import org.apache.shiro.authc.credential.CredentialsMatcher;
+import org.apache.shiro.authc.credential.SimpleCredentialsMatcher;
 import org.apache.shiro.config.Ini;
 import org.apache.shiro.realm.text.IniRealm;
 
@@ -39,19 +42,28 @@ public class IniShiroRealmModule extends AbstractModule {
       help = "Path to shiro.ini for authentication and authorization configuration.")
   private static final Arg<Ini> SHIRO_INI_PATH = Arg.create(null);
 
+  @CmdLine(name = "shiro_credentials_matcher",
+      help = "The shiro credentials matcher to use (will be constructed by Guice).")
+  private static final Arg<Class<? extends CredentialsMatcher>> SHIRO_CREDENTIALS_MATCHER =
+      Arg.<Class<? extends CredentialsMatcher>>create(SimpleCredentialsMatcher.class);
+
   private final Optional<Ini> ini;
+  private final Optional<Class<? extends CredentialsMatcher>> shiroCredentialsMatcher;
 
   public IniShiroRealmModule() {
-    this(Optional.fromNullable(SHIRO_INI_PATH.get()));
+    this(Optional.fromNullable(SHIRO_INI_PATH.get()),
+        Optional.fromNullable(SHIRO_CREDENTIALS_MATCHER.get()));
   }
 
   @VisibleForTesting
-  IniShiroRealmModule(Ini ini) {
-    this(Optional.of(ini));
+  IniShiroRealmModule(Ini ini, Class<? extends CredentialsMatcher> shiroCredentialsMatcher) {
+    this(Optional.of(ini), Optional.of(shiroCredentialsMatcher));
   }
 
-  private IniShiroRealmModule(Optional<Ini> ini) {
+  private IniShiroRealmModule(Optional<Ini> ini,
+      Optional<Class<? extends CredentialsMatcher>> shiroCredentialsMatcher) {
     this.ini = ini;
+    this.shiroCredentialsMatcher = shiroCredentialsMatcher;
   }
 
   @Override
@@ -62,11 +74,23 @@ public class IniShiroRealmModule extends AbstractModule {
       addError("shiro.ini is required.");
     }
 
-    try {
-      ShiroUtils.addRealmBinding(binder()).toConstructor(IniRealm.class.getConstructor(Ini.class));
-    } catch (NoSuchMethodException e) {
-      addError(e);
+    if (shiroCredentialsMatcher.isPresent()) {
+      bind(CredentialsMatcher.class).to(shiroCredentialsMatcher.get()).in(Singleton.class);
+    } else {
+      addError("shiro_credentials_matcher is required.");
     }
-    bind(IniRealm.class).in(Singleton.class);
+
+    ShiroUtils.addRealmBinding(binder()).to(IniRealm.class);
+  }
+
+  @Singleton
+  @Provides
+  public IniRealm providesIniReal(Ini providedIni,
+      CredentialsMatcher providedShiroCredentialsMatcher) {
+    IniRealm result = new IniRealm(providedIni);
+    result.setCredentialsMatcher(providedShiroCredentialsMatcher);
+    result.init();
+
+    return result;
   }
 }

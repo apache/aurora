@@ -53,6 +53,8 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.shiro.authc.credential.CredentialsMatcher;
+import org.apache.shiro.authc.credential.SimpleCredentialsMatcher;
 import org.apache.shiro.config.Ini;
 import org.apache.shiro.realm.text.IniRealm;
 import org.apache.thrift.TException;
@@ -112,12 +114,14 @@ public class HttpSecurityIT extends AbstractJettyTest {
   private static final Named SHIRO_AFTER_AUTH_FILTER_ANNOTATION = Names.named("shiro_post_filter");
 
   private Ini ini;
+  private Class<? extends CredentialsMatcher> credentialsMatcher;
   private AnnotatedAuroraAdmin auroraAdmin;
   private Filter shiroAfterAuthFilter;
 
   @Before
   public void setUp() {
     ini = new Ini();
+    credentialsMatcher = SimpleCredentialsMatcher.class;
 
     Ini.Section users = ini.addSection(IniRealm.USERS_SECTION_NAME);
     users.put(ROOT.getUserName(), COMMA_JOINER.join(ROOT.getPassword(), ADMIN_ROLE));
@@ -155,7 +159,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
         new ApiModule(),
         new H2ConsoleModule(true),
         new HttpSecurityModule(
-            new IniShiroRealmModule(ini),
+            new IniShiroRealmModule(ini, credentialsMatcher),
             Key.get(Filter.class, SHIRO_AFTER_AUTH_FILTER_ANNOTATION)),
         new AbstractModule() {
           @Override
