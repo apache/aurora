@@ -248,6 +248,8 @@ Optional flags:
 	A comma separated list of additional resources to copy into the sandbox.Note: if thermos_executor_path is not the thermos_executor.pex file itself, this must include it.
 -thermos_home_in_sandbox (default false)
 	If true, changes HOME to the sandbox before running the executor. This primarily has the effect of causing the executor and runner to extract themselves into the sandbox.
+-thrift_method_interceptor_modules (default [])
+	Additional Guice modules for intercepting Thrift method calls.
 -transient_task_state_timeout (default (5, mins))
 	The amount of time after which to treat a task stuck in a transient state as LOST.
 -use_beta_db_task_store (default false)

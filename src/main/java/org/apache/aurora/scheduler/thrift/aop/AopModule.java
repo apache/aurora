@@ -13,13 +13,18 @@
  */
 package org.apache.aurora.scheduler.thrift.aop;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.util.Set;
+
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
+import com.google.inject.Module;
 import com.google.inject.matcher.Matcher;
 import com.google.inject.matcher.Matchers;
 
 import org.aopalliance.intercept.MethodInterceptor;
+import org.apache.aurora.common.args.Arg;
+import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 
@@ -28,14 +33,18 @@ import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
  */
 public class AopModule extends AbstractModule {
 
-  private static final Matcher<? super Class<?>> THRIFT_IFACE_MATCHER =
+  @CmdLine(name = "thrift_method_interceptor_modules",
+      help = "Custom Guice module(s) to provide additional Thrift method interceptors.")
+  private static final Arg<Set<Module>> METHOD_INTERCEPTOR_MODULES = Arg.create(ImmutableSet.of());
+
+  public static final Matcher<? super Class<?>> THRIFT_IFACE_MATCHER =
       Matchers.subclassesOf(AnnotatedAuroraAdmin.class)
           .and(Matchers.annotatedWith(DecoratedThrift.class));
 
   @Override
   protected void configure() {
     // Layer ordering:
-    // APIVersion -> Log -> StatsExporter -> SchedulerThriftInterface
+    // APIVersion -> Log -> StatsExporter -> custom interceptors -> SchedulerThriftInterface
 
     // It's important for this interceptor to be registered first to ensure it's at the 'top' of
     // the stack and the standard message is always applied.
@@ -43,14 +52,18 @@ public class AopModule extends AbstractModule {
 
     bindThriftDecorator(new LoggingInterceptor());
     bindThriftDecorator(new ThriftStatsExporterInterceptor());
+
+    // Install custom interceptor modules
+    for (Module module : METHOD_INTERCEPTOR_MODULES.get()) {
+      install(module);
+    }
   }
 
   private void bindThriftDecorator(MethodInterceptor interceptor) {
     bindThriftDecorator(binder(), THRIFT_IFACE_MATCHER, interceptor);
   }
 
-  @VisibleForTesting
-  static void bindThriftDecorator(
+  public static void bindThriftDecorator(
       Binder binder,
       Matcher<? super Class<?>> classMatcher,
       MethodInterceptor interceptor) {

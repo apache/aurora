@@ -13,6 +13,8 @@
   steps (adding up to a total of 10 seconds as there are 2 steps). The overall waiting period is
   bounded by the executor's stop timeout, which can be configured using the executor's
   `stop_timeout_in_secs` flag.
+- Added the `thrift_method_interceptor_modules` scheduler flag that lets cluster operators inject
+  custom Thrift method interceptors.
 
 0.18.0
 ======
