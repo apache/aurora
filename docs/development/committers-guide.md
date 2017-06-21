@@ -100,3 +100,6 @@ git pre-receive hook explicitly forbidding release tag manipulations.**
 6. Update the draft email created fom the `release` script in step #5 to include the Apache ID's for
 all binding votes and send the [RESULT][VOTE] email to the dev@ mailing list.
 
+7. Update the [Aurora Website](http://aurora.apache.org/) by following the
+[instructions](https://svn.apache.org/repos/asf/aurora/site/README.md) on the ASF Aurora SVN repo.
+Remember to add a blog post under source/blog and regenerate the site before committing.
