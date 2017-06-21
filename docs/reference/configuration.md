@@ -44,7 +44,7 @@ behavior with its optional attributes. Remember, Processes are handled by Thermo
    **max_failures**   | Integer     | Maximum process failures (Default: 1)
    **daemon**         | Boolean     | When True, this is a daemon process. (Default: False)
    **ephemeral**      | Boolean     | When True, this is an ephemeral process. (Default: False)
-   **min_duration**   | Integer     | Minimum duration between process restarts in seconds. (Default: 15)
+   **min_duration**   | Integer     | Minimum duration between process restarts in seconds. (Default: 5)
    **final**          | Boolean     | When True, this process is a finalizing one that should run last. (Default: False)
    **logger**         | Logger      | Struct defining the log behavior for the process. (Default: Empty)
 

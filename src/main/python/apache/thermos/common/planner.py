@@ -199,6 +199,7 @@ class TaskPlanner(object):
     self._last_terminal = {}  # process => timestamp of last terminal state
     self._failures = defaultdict(int)
     self._successes = defaultdict(int)
+    self._losses = defaultdict(int)
     self._attributes = {}
     self._ephemerals = set(process.name().get() for process in task.processes()
         if (self._filter is None or self._filter(process)) and process.ephemeral().get())
@@ -215,6 +216,10 @@ class TaskPlanner(object):
     if process not in self._last_terminal:
       return 0
     return self._attributes[process].min_duration - (now - self._last_terminal[process])
+
+  def _record_termination_time(self, process, timestamp=None):
+    timestamp = timestamp if timestamp is not None else self._clock.time()
+    self._last_terminal[process] = timestamp
 
   def is_ready(self, process, timestamp=None):
     return self.get_wait(process, timestamp) <= 0
@@ -253,15 +258,15 @@ class TaskPlanner(object):
     """Increment the failure count of a process, and reset it to runnable if maximum number of
     failures has not been reached, or mark it as failed otherwise (ephemeral processes do not
     count towards the success of a task, and are hence marked finished instead)"""
-    timestamp = timestamp if timestamp is not None else self._clock.time()
-    self._last_terminal[process] = timestamp
+    self._record_termination_time(process, timestamp)
     self._failures[process] += 1
-    self.failure_transition(process)
+    self._failure_transition(process)
 
   def has_reached_run_limit(self, process):
-    return (self._successes[process] + self._failures[process]) >= self.TOTAL_RUN_LIMIT
+    runs = self._successes[process] + self._failures[process] + self._losses[process]
+    return runs >= self.TOTAL_RUN_LIMIT
 
-  def failure_transition(self, process):
+  def _failure_transition(self, process):
     if self.has_reached_run_limit(process):
       self._planner.set_failed(process)
       return
@@ -276,12 +281,11 @@ class TaskPlanner(object):
 
   def add_success(self, process, timestamp=None):
     """Reset a process to runnable if it is a daemon, or mark it as finished otherwise."""
-    timestamp = timestamp if timestamp is not None else self._clock.time()
-    self._last_terminal[process] = timestamp
+    self._record_termination_time(process, timestamp)
     self._successes[process] += 1
-    self.success_transition(process)
+    self._success_transition(process)
 
-  def success_transition(self, process):
+  def _success_transition(self, process):
     if self.has_reached_run_limit(process):
       self._planner.set_failed(process)
       return
@@ -295,9 +299,21 @@ class TaskPlanner(object):
     """Force a process to be in failed state.  E.g. kill -9 and you want it pinned failed."""
     self._planner.set_failed(process)
 
-  def lost(self, process):
-    """Mark a process as lost.  This sets its runnable state back to the previous runnable
-       state and does not increment its failure count."""
+  def lost(self, process, timestamp=None):
+    """Mark a process as lost. This sets its runnable state back to the previous runnable
+       state and does not increment the failure count of the process.
+
+       In order to prevent Thermos from overloading itself, even restarts of lost processes will be
+       throttled by the `min_duration` uptime and capped at TOTAL_RUN_LIMIT."""
+    self._record_termination_time(process, timestamp)
+    self._losses[process] += 1
+    self._lost_transition(process)
+
+  def _lost_transition(self, process):
+    if self.has_reached_run_limit(process):
+      self._planner.set_failed(process)
+      return
+
     self._planner.reset(process)
 
   def is_complete(self):

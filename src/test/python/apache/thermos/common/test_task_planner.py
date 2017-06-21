@@ -287,8 +287,8 @@ def test_task_lost():
   p.add_failure('d1', timestamp=1)
   assert approx_equal(p.min_wait(timestamp=1), 1)
   p.set_running('d1')
-  p.lost('d1')
-  assert approx_equal(p.min_wait(timestamp=1), 1)
+  p.lost('d1', timestamp=2)
+  assert approx_equal(p.min_wait(timestamp=2), 1)
   p.set_running('d1')
   p.add_failure('d1', timestamp=3)
   assert p.min_wait(timestamp=3) == TaskPlanner.INFINITY
@@ -316,7 +316,7 @@ def test_task_filters():
 
 def test_task_max_runs():
   class CappedTaskPlanner(TaskPlanner):
-    TOTAL_RUN_LIMIT = 2
+    TOTAL_RUN_LIMIT = 3
   dt = p1(daemon=True, max_failures=0)
 
   p = CappedTaskPlanner(empty_task(processes=[dt(name='d1', max_failures=100, daemon=False)]))
@@ -324,7 +324,10 @@ def test_task_max_runs():
   p.add_failure('d1', timestamp=1)
   assert 'd1' in p.runnable
   p.set_running('d1')
-  p.add_failure('d1', timestamp=2)
+  p.lost('d1', timestamp=2)
+  assert 'd1' in p.runnable
+  p.set_running('d1')
+  p.add_failure('d1', timestamp=3)
   assert 'd1' not in p.runnable
 
   p = CappedTaskPlanner(empty_task(processes=[dt(name='d1', max_failures=100)]))
@@ -333,4 +336,7 @@ def test_task_max_runs():
   assert 'd1' in p.runnable
   p.set_running('d1')
   p.add_success('d1', timestamp=2)
+  assert 'd1' in p.runnable
+  p.set_running('d1')
+  p.lost('d1', timestamp=3)
   assert 'd1' not in p.runnable
