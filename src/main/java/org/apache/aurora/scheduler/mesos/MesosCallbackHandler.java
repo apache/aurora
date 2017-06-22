@@ -91,11 +91,13 @@ public interface MesosCallbackHandler {
 
     private final AtomicLong offersRescinded;
     private final AtomicLong slavesLost;
+    private final AtomicLong statusUpdate;
     private final AtomicLong reRegisters;
     private final AtomicLong offersReceived;
     private final AtomicLong inverseOffersReceived;
     private final AtomicLong disconnects;
     private final AtomicLong executorsLost;
+    private final AtomicLong frameworkMessage;
     private final AtomicBoolean frameworkRegistered;
 
     /**
@@ -166,11 +168,13 @@ public interface MesosCallbackHandler {
 
       this.offersRescinded = statsProvider.makeCounter("offers_rescinded");
       this.slavesLost = statsProvider.makeCounter("slaves_lost");
+      this.statusUpdate = statsProvider.makeCounter("scheduler_status_update");
       this.reRegisters = statsProvider.makeCounter("scheduler_framework_reregisters");
       this.offersReceived = statsProvider.makeCounter("scheduler_resource_offers");
       this.inverseOffersReceived = statsProvider.makeCounter("scheduler_inverse_offers");
       this.disconnects = statsProvider.makeCounter("scheduler_framework_disconnects");
       this.executorsLost = statsProvider.makeCounter("scheduler_lost_executors");
+      this.frameworkMessage = statsProvider.makeCounter("scheduler_framework_message");
       this.frameworkRegistered = new AtomicBoolean(false);
       statsProvider.makeGauge("framework_registered", () -> frameworkRegistered.get() ? 1 : 0);
     }
@@ -246,6 +250,7 @@ public interface MesosCallbackHandler {
           "Ignoring framework message from {} on {}.",
           executorID.getValue(),
           agentID.getValue());
+      frameworkMessage.incrementAndGet();
     }
 
     @Override
@@ -295,6 +300,7 @@ public interface MesosCallbackHandler {
       try {
         // The status handler is responsible for acknowledging the update.
         taskStatusHandler.statusUpdate(status);
+        statusUpdate.incrementAndGet();
       } catch (SchedulerException e) {
         log.error("Status update failed due to scheduler exception: " + e, e);
         // We re-throw the exception here to trigger an abort of the driver.

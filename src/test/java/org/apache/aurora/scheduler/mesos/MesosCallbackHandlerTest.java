@@ -333,6 +333,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     control.replay();
 
     handler.handleUpdate(STATUS);
+    assertEquals(1L, statsProvider.getLongValue("scheduler_status_update"));
   }
 
   @Test
@@ -350,6 +351,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     control.replay();
 
     handler.handleUpdate(status);
+    assertEquals(1L, statsProvider.getLongValue("scheduler_status_update"));
   }
 
   @Test
@@ -367,6 +369,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     control.replay();
 
     handler.handleUpdate(status);
+    assertEquals(1L, statsProvider.getLongValue("scheduler_status_update"));
   }
 
   @Test
@@ -384,6 +387,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     control.replay();
 
     handler.handleUpdate(status);
+    assertEquals(1L, statsProvider.getLongValue("scheduler_status_update"));
   }
 
   @Test(expected = SchedulerException.class)
@@ -400,6 +404,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     control.replay();
 
     handler.handleUpdate(STATUS);
+    assertEquals(0L, statsProvider.getLongValue("scheduler_status_update"));
   }
 
   @Test
@@ -424,6 +429,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     control.replay();
 
     handler.handleUpdate(STATUS_RECONCILIATION);
+    assertEquals(1L, statsProvider.getLongValue("scheduler_status_update"));
   }
 
   @Test
@@ -456,6 +462,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     control.replay();
 
     handler.handleMessage(EXECUTOR_ID, AGENT_ID);
+    assertEquals(1L, statsProvider.getLongValue("scheduler_framework_message"));
   }
 
   @Test
