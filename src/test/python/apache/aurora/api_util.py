@@ -151,5 +151,8 @@ class SchedulerProxyApiSpec(SchedulerThriftApiSpec, SchedulerProxy):
   def startJobUpdate(self, request, message, retry=True):
     pass
 
+  def restartShards(self, job, shardIds, retry=True):
+    pass
+
   def url(self):
     pass

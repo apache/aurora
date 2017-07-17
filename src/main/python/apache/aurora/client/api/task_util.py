@@ -25,17 +25,18 @@ class StatusHelper(object):
     self._scheduler = scheduler
     self._query_factory = query_factory
 
-  def get_tasks(self, instance_ids=None):
+  def get_tasks(self, instance_ids=None, retry=False):
     """Gets tasks from the scheduler.
 
     Arguments:
     instance_ids -- optional list of instance IDs to query for.
+    retry -- optional boolean value indicating whether to retry the operation.
 
     Returns a list of tasks.
     """
     log.debug('Querying instance statuses: %s' % instance_ids)
     try:
-      resp = self._scheduler.getTasksWithoutConfigs(self._query_factory(instance_ids))
+      resp = self._scheduler.getTasksWithoutConfigs(self._query_factory(instance_ids), retry=retry)
     except IOError as e:
       log.error('IO Exception during scheduler call: %s' % e)
       return []

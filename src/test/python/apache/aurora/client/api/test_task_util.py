@@ -18,7 +18,7 @@ from mock import call, create_autospec
 
 from apache.aurora.client.api.task_util import StatusHelper
 
-from ...api_util import SchedulerThriftApiSpec
+from ...api_util import SchedulerProxyApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -51,7 +51,7 @@ class TaskUtilTest(unittest.TestCase):
 
   @classmethod
   def mock_scheduler(cls, response_code=None):
-    scheduler = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
+    scheduler = create_autospec(spec=SchedulerProxyApiSpec, instance=True)
     response_code = ResponseCode.OK if response_code is None else response_code
     resp = Response(responseCode=response_code, details=[ResponseDetail(message='test')])
     resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=cls.create_tasks()))
@@ -63,5 +63,6 @@ class TaskUtilTest(unittest.TestCase):
     helper = self.create_helper(scheduler, self.create_query)
     tasks = helper.get_tasks(self.INSTANCES)
 
-    assert scheduler.getTasksWithoutConfigs.mock_calls == [call(self.create_query(self.INSTANCES))]
+    assert scheduler.getTasksWithoutConfigs.mock_calls == [call(self.create_query(
+      self.INSTANCES), retry=False)]
     assert 1 == len(tasks)

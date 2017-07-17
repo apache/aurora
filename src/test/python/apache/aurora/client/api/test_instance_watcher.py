@@ -20,7 +20,8 @@ import mox
 from apache.aurora.client.api.health_check import HealthCheck
 from apache.aurora.client.api.instance_watcher import InstanceWatcher
 
-from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
+from ...api_util import SchedulerProxyApiSpec
+
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     JobKey,
@@ -74,7 +75,7 @@ class InstanceWatcherTest(unittest.TestCase):
   def setUp(self):
     self._clock = FakeClock()
     self._event = FakeEvent(self._clock)
-    self._scheduler = mox.MockObject(scheduler_client)
+    self._scheduler = mox.MockObject(SchedulerProxyApiSpec)
     self._job_key = JobKey(role='mesos', name='jimbob', environment='test')
     self._health_check = mox.MockObject(HealthCheck)
     self._watcher = InstanceWatcher(self._scheduler,
@@ -104,14 +105,14 @@ class InstanceWatcherTest(unittest.TestCase):
 
     query = self.get_tasks_status_query(instance_ids)
     for _ in range(int(num_calls)):
-      self._scheduler.getTasksWithoutConfigs(query).AndReturn(response)
+      self._scheduler.getTasksWithoutConfigs(query, retry=True).AndReturn(response)
 
   def expect_io_error_in_get_statuses(self, instance_ids=WATCH_INSTANCES,
       num_calls=EXPECTED_CYCLES):
 
     query = self.get_tasks_status_query(instance_ids)
     for _ in range(int(num_calls)):
-      self._scheduler.getTasksWithoutConfigs(query).AndRaise(IOError('oops'))
+      self._scheduler.getTasksWithoutConfigs(query, retry=True).AndRaise(IOError('oops'))
 
   def mock_health_check(self, task, status):
     self._health_check.health(task).InAnyOrder().AndReturn(status)

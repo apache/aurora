@@ -60,7 +60,7 @@ class Restarter(object):
     # Verify that this operates on a valid job.
     query = self._job_key.to_thrift_query()
     query.statuses = ACTIVE_STATES
-    status = self._scheduler.getTasksWithoutConfigs(query)
+    status = self._scheduler.getTasksWithoutConfigs(query, retry=True)
     if status.responseCode != ResponseCode.OK:
       return status
 
@@ -85,7 +85,7 @@ class Restarter(object):
 
       log.info("Restarting instances: %s", batch)
 
-      resp = self._scheduler.restartShards(self._job_key.to_thrift(), batch)
+      resp = self._scheduler.restartShards(self._job_key.to_thrift(), batch, retry=True)
       if resp.responseCode != ResponseCode.OK:
         log.error('Error restarting instances: %s', combine_messages(resp))
         return resp

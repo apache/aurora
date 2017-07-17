@@ -90,7 +90,7 @@ class InstanceWatcher(object):
         instance_states[instance_id] = Instance(finished=True)
 
     while not self._terminating.is_set():
-      running_tasks = self._status_helper.get_tasks(instance_ids)
+      running_tasks = self._status_helper.get_tasks(instance_ids, retry=True)
       now = self._clock.time()
       tasks_by_instance = dict((task.assignedTask.instanceId, task) for task in running_tasks)
       for instance_id in instance_ids:
