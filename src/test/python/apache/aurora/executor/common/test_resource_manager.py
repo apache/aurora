@@ -25,7 +25,7 @@ def _mock_resource_monitor(num_procs=0, process_sample=ProcessSample.empty(), di
   mock_resource_monitor = mock.Mock(spec=ResourceMonitorBase)
   mock_resource_monitor.sample.return_value = (
       12345,  # timestamp
-      ResourceMonitorBase.ResourceResult(num_procs, process_sample, disk_usage))
+      ResourceMonitorBase.AggregateResourceResult(num_procs, process_sample, disk_usage))
 
   return mock_resource_monitor
 

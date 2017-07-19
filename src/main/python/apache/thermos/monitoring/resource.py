@@ -51,21 +51,40 @@ class ResourceMonitorBase(Interface):
 
   class Error(Exception): pass
 
-  class ResourceResult(namedtuple('ResourceResult', 'num_procs process_sample disk_usage')):
-    pass
+  class AggregateResourceResult(namedtuple('AggregateResourceResult',
+                                           'num_procs process_sample disk_usage')):
+    """ Class representing task level stats:
+        num_procs: total number of pids initiated by the task
+        process_sample: a .process.ProcessSample object representing resources consumed by the task
+        disk_usage: disk usage consumed in the task's sandbox
+    """
+
+  class FullResourceResult(namedtuple('FullResourceResult', 'proc_usage disk_usage')):
+    """ Class representing detailed information on task level stats:
+        proc_usage: a dictionary mapping ProcessStatus objects to ProcResourceResult objects. One
+                    entry per process in the task
+        disk_usage: disk usage consumed in the task's sandbox
+    """
+
+  class ProcResourceResult(namedtuple('ProcResourceResult', 'process_sample num_procs')):
+    """ Class representing process level stats:
+        process_sample: a .process.ProcessSample object representing resources consumed by
+                        the process
+        num_procs: total number of pids initiated by the process
+    """
 
   @abstractmethod
   def sample(self):
     """ Return a sample of the resource consumption of the task right now
 
-    Returns a tuple of (timestamp, ResourceResult)
+    Returns a tuple of (timestamp, AggregateResourceResult)
     """
 
   @abstractmethod
   def sample_at(self, time):
     """ Return a sample of the resource consumption as close as possible to the specified time
 
-    Returns a tuple of (timestamp, ResourceResult)
+    Returns a tuple of (timestamp, AggregateResourceResult)
     """
 
   @abstractmethod
@@ -77,8 +96,9 @@ class ResourceMonitorBase(Interface):
 
 
 class ResourceHistory(object):
-  """Simple class to contain a RingBuffer (fixed-length FIFO) history of resource samples, with the
-       mapping: timestamp => (number_of_procs, ProcessSample, disk_usage_in_bytes)
+  """ Simple class to contain a RingBuffer (fixed-length FIFO) history of resource samples, with the
+      mapping:
+      timestamp => ({process_status => (process_sample, number_of_procs)}, disk_usage_in_bytes)
   """
 
   def __init__(self, maxlen, initialize=True):
@@ -87,7 +107,7 @@ class ResourceHistory(object):
     self._maxlen = maxlen
     self._values = RingBuffer(maxlen, None)
     if initialize:
-      self.add(time.time(), ResourceMonitorBase.ResourceResult(0, ProcessSample.empty(), 0))
+      self.add(time.time(), ResourceMonitorBase.FullResourceResult({}, 0))
 
   def add(self, timestamp, value):
     """Store a new resource sample corresponding to the given timestamp"""
@@ -110,6 +130,17 @@ class ResourceHistory(object):
     return 'ResourceHistory(%s)' % ', '.join([str(r) for r in self._values])
 
 
+class HistoryProvider(object):
+  MAX_HISTORY = 10000  # magic number
+
+  def provides(self, history_time, min_collection_interval):
+    history_length = int(history_time.as_(Time.SECONDS) / min_collection_interval)
+    if history_length > self.MAX_HISTORY:
+      raise ValueError("Requested history length too large")
+    log.debug("Initialising ResourceHistory of length %s" % history_length)
+    return ResourceHistory(history_length)
+
+
 class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
   """ Lightweight thread to aggregate resource consumption for a task's constituent processes.
       Actual resource calculation is delegated to collectors; this class periodically polls the
@@ -117,7 +148,6 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
       history of previous sample results.
   """
 
-  MAX_HISTORY = 10000  # magic number
   PROCESS_COLLECTION_INTERVAL = Amount(20, Time.SECONDS)
   DISK_COLLECTION_INTERVAL = Amount(60, Time.SECONDS)
   HISTORY_TIME = Amount(1, Time.HOURS)
@@ -128,7 +158,8 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
                disk_collector=DiskCollector,
                process_collection_interval=PROCESS_COLLECTION_INTERVAL,
                disk_collection_interval=DISK_COLLECTION_INTERVAL,
-               history_time=HISTORY_TIME):
+               history_time=HISTORY_TIME,
+               history_provider=HistoryProvider()):
     """
       task_monitor: TaskMonitor object specifying the task whose resources should be monitored
       sandbox: Directory for which to monitor disk utilisation
@@ -142,11 +173,7 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
     self._process_collection_interval = process_collection_interval.as_(Time.SECONDS)
     self._disk_collection_interval = disk_collection_interval.as_(Time.SECONDS)
     min_collection_interval = min(self._process_collection_interval, self._disk_collection_interval)
-    history_length = int(history_time.as_(Time.SECONDS) / min_collection_interval)
-    if history_length > self.MAX_HISTORY:
-      raise ValueError("Requested history length too large")
-    log.debug("Initialising ResourceHistory of length %s" % history_length)
-    self._history = ResourceHistory(history_length)
+    self._history = history_provider.provides(history_time, min_collection_interval)
     self._kill_signal = threading.Event()
     ExceptionalThread.__init__(self, name='%s[%s]' % (self.__class__.__name__, task_id))
     self.daemon = True
@@ -157,7 +184,14 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
     return self.sample_at(time.time())
 
   def sample_at(self, timestamp):
-    return self._history.get(timestamp)
+    _timestamp, full_resources = self._history.get(timestamp)
+
+    aggregated_procs = sum(map(attrgetter('num_procs'), full_resources.proc_usage.values()))
+    aggregated_sample = sum(map(attrgetter('process_sample'), full_resources.proc_usage.values()),
+        ProcessSample.empty())
+
+    return _timestamp, self.AggregateResourceResult(
+        aggregated_procs, aggregated_sample, full_resources.disk_usage)
 
   def sample_by_process(self, process_name):
     try:
@@ -169,6 +203,12 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
       # Since this might be called out of band (before the main loop is aware of the process)
       if process not in self._process_collectors:
         self._process_collectors[process] = ProcessTreeCollector(process.pid)
+
+      # The sample obtained from history is tuple of (timestamp, FullResourceResult), and per
+      # process sample can be lookup up from FullResourceResult
+      _, full_resources = self._history.get(time.time())
+      if process in full_resources.proc_usage:
+        return full_resources.proc_usage[process].process_sample
 
       self._process_collectors[process].sample()
       return self._process_collectors[process].value
@@ -215,11 +255,14 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
           log.debug('No sandbox detected yet for %s' % self._task_id)
 
       try:
-        aggregated_procs = sum(map(attrgetter('procs'), self._process_collectors.values()))
-        aggregated_sample = sum(map(attrgetter('value'), self._process_collectors.values()),
-                                ProcessSample.empty())
-        disk_value = self._disk_collector.value if self._disk_collector else 0
-        self._history.add(now, self.ResourceResult(aggregated_procs, aggregated_sample, disk_value))
+        disk_usage = self._disk_collector.value if self._disk_collector else 0
+
+        proc_usage_dict = dict()
+        for process, collector in self._process_collectors.items():
+          proc_usage_dict.update({process: self.ProcResourceResult(collector.value,
+              collector.procs)})
+
+        self._history.add(now, self.FullResourceResult(proc_usage_dict, disk_usage))
       except ValueError as err:
         log.warning("Error recording resource sample: %s" % err)
 

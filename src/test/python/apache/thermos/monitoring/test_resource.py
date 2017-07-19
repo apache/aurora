@@ -16,16 +16,25 @@ from time import time
 from unittest import TestCase
 
 import mock
+import pytest
+from twitter.common.quantity import Amount, Time
 
 from apache.thermos.monitoring.monitor import TaskMonitor
 from apache.thermos.monitoring.process import ProcessSample
 from apache.thermos.monitoring.resource import (
+    HistoryProvider,
     ResourceHistory,
     ResourceMonitorBase,
     TaskResourceMonitor
 )
 
 from gen.apache.thermos.ttypes import ProcessStatus
+
+
+class TestResourceHistoryProvider(TestCase):
+  def test_too_long_history(self):
+    with pytest.raises(ValueError):
+      HistoryProvider().provides(Amount(1, Time.DAYS), 1)
 
 
 class TestResourceHistory(TestCase):
@@ -35,7 +44,7 @@ class TestResourceHistory(TestCase):
 
   def test_add(self):
     next_resource_stamp = time() + 100
-    value = ResourceMonitorBase.ResourceResult(1, 1, 0)
+    value = ResourceMonitorBase.FullResourceResult({}, 0)
 
     assert (next_resource_stamp, value) not in self.resource_history._values
     self.resource_history.add(next_resource_stamp, value)
@@ -47,8 +56,9 @@ class TestResourceHistory(TestCase):
 
   def test_get(self):
     resource_stamp = time() + 100
-    value = ResourceMonitorBase.ResourceResult(1, 1, 0)
-    value_wrong = ResourceMonitorBase.ResourceResult(1, 1, 50)
+
+    value = ResourceMonitorBase.FullResourceResult({}, 0)
+    value_wrong = ResourceMonitorBase.FullResourceResult({}, 50)
 
     self.resource_history.add(resource_stamp, value)
     self.resource_history.add(resource_stamp + 1000, value_wrong)
@@ -56,12 +66,19 @@ class TestResourceHistory(TestCase):
     assert resource_stamp, value == self.resource_history.get(resource_stamp)
 
 
-class TestTaskResouceMonitor(TestCase):
+class TestTaskResourceMonitor(TestCase):
+  class FakeResourceHistoryProvider(object):
+    def __init__(self, history):
+      self.history = history
+
+    def provides(self, history_time, min_collection_interval):
+      return self.history
+
   @mock.patch('apache.thermos.monitoring.process_collector_psutil.ProcessTreeCollector.sample',
       autospec=True, spec_set=True)
   @mock.patch('apache.thermos.monitoring.monitor.TaskMonitor.get_active_processes',
       autospec=True, spec_set=True)
-  def test_sample_by_process(self, mock_get_active_processes, mock_sample):
+  def test_sample_by_process_without_history(self, mock_get_active_processes, mock_sample):
     fake_process_name = 'fake-process-name'
     task_path = '.'
     task_monitor = TaskMonitor(task_path, 'fake-task-id')
@@ -77,6 +94,39 @@ class TestTaskResouceMonitor(TestCase):
     assert mock_get_active_processes.mock_calls == [mock.call(task_monitor)]
     assert mock_sample.mock_calls == [mock.call(
         task_resource_monitor._process_collectors[fake_process_status])]
+
+  @mock.patch('apache.thermos.monitoring.monitor.TaskMonitor.get_active_processes',
+      autospec=True, spec_set=True)
+  def test_sample_by_process_from_history(self, mock_get_active_processes):
+
+    fake_process_name_1 = 'fake-process-name-1'
+    fake_process_name_2 = 'fake-process-name-2'
+    task_path = '.'
+    task_monitor = TaskMonitor(task_path, 'fake-task-id')
+    fake_process_status_1 = ProcessStatus(process=fake_process_name_1)
+    fake_process_status_2 = ProcessStatus(process=fake_process_name_2)
+    mock_get_active_processes.return_value = [(fake_process_status_1, 1),
+                                              (fake_process_status_2, 2)]
+
+    fake_history = ResourceHistory(2)
+    fake_history.add(time(), ResourceMonitorBase.FullResourceResult(
+        {fake_process_status_1: ResourceMonitorBase.ProcResourceResult(ProcessSample.empty(), 1),
+         fake_process_status_2: ResourceMonitorBase.ProcResourceResult(ProcessSample.empty(), 2),
+         }, 10))
+
+    task_resource_monitor = TaskResourceMonitor('fake-task-id', task_monitor,
+        history_provider=self.FakeResourceHistoryProvider(fake_history))
+
+    assert task_resource_monitor.name == 'TaskResourceMonitor[fake-task-id]'
+    assert task_resource_monitor.sample_by_process(fake_process_name_1) == ProcessSample.empty()
+    assert task_resource_monitor.sample_by_process(fake_process_name_2) == ProcessSample.empty()
+
+    _, sample = task_resource_monitor.sample()
+    assert sample.num_procs == 3  # 1 pid in fake_process_status_1 and 2 in fake_process_status_2
+    assert sample.process_sample == ProcessSample.empty()
+    assert sample.disk_usage == 10
+    assert mock_get_active_processes.mock_calls == [mock.call(task_monitor),
+        mock.call(task_monitor)]
 
   @mock.patch('apache.thermos.monitoring.monitor.TaskMonitor.get_active_processes',
       autospec=True, spec_set=True)
