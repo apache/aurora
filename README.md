@@ -60,6 +60,7 @@ Are you using Aurora too?  Let us know, or submit a patch to join the list!
 - [Magine TV](https://magine.com)
 - [Medallia](http://www.medallia.com)
 - [Oscar Health](https://www.hioscar.com)
+- [PayPal](https://www.paypal.com)
 - [Sabre Labs](http://www.sabre.com)
 - [TellApart](https://www.tellapart.com)
 - [Twitter](https://twitter.com)
