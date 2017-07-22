@@ -27,18 +27,17 @@ from .process import ProcessSample
 def process_to_sample(process):
   """ Given a psutil.Process, return a current ProcessSample """
   try:
-    with process.oneshot():
-      # the nonblocking get_cpu_percent call is stateful on a particular Process object, and hence
-      # >2 consecutive calls are required before it will return a non-zero value
-      rate = process.cpu_percent(0.0) / 100.0
-      cpu_times = process.cpu_times()
-      user, system = cpu_times.user, cpu_times.system
-      memory_info = process.memory_info()
-      rss, vms = memory_info.rss, memory_info.vms
-      nice = process.nice()
-      status = process.status()
-      threads = process.num_threads()
-      return ProcessSample(rate, user, system, rss, vms, nice, status, threads)
+    # the nonblocking get_cpu_percent call is stateful on a particular Process object, and hence
+    # >2 consecutive calls are required before it will return a non-zero value
+    rate = process.cpu_percent(0.0) / 100.0
+    cpu_times = process.cpu_times()
+    user, system = cpu_times.user, cpu_times.system
+    memory_info = process.memory_info()
+    rss, vms = memory_info.rss, memory_info.vms
+    nice = process.nice()
+    status = process.status()
+    threads = process.num_threads()
+    return ProcessSample(rate, user, system, rss, vms, nice, status, threads)
   except (AccessDenied, NoSuchProcess) as e:
     log.debug('Error during process sampling [pid=%s]: %s' % (process.pid, e))
     return ProcessSample.empty()
