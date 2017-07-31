@@ -20,6 +20,7 @@ import java.util.stream.IntStream;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
@@ -77,6 +78,7 @@ import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
 import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.DISK_MB;
+import static org.apache.aurora.scheduler.resources.ResourceType.GPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
 import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.apache.mesos.v1.Protos.Offer;
@@ -563,6 +565,28 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     assertEquals(
         ImmutableList.of(one, two, three, three),
         ORDER.sortedCopy(ImmutableList.of(three, one, two, three)));
+  }
+
+  @Test
+  public void testOrderDifferentResources() {
+    control.replay();
+
+    ResourceBag one = bag(ImmutableMap.of(
+        CPUS, 1.0,
+        RAM_MB, 1.0
+    ));
+
+    ResourceBag two = bag(ImmutableMap.of(
+        CPUS, 1.0,
+        GPUS, 1.0
+    ));
+
+    ResourceBag three = bag(ImmutableMap.of(
+        CPUS, 1.0
+    ));
+
+    assertEquals(0, ORDER.compare(one, two));
+    assertEquals(1, ORDER.compare(one, three));
   }
 
   private static ImmutableSet<PreemptionVictim> preemptionVictims(ScheduledTask... tasks) {
