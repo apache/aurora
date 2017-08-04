@@ -25,7 +25,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 
+import org.apache.aurora.GuiceUtils.AllowUnchecked;
 import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
@@ -197,6 +199,7 @@ public interface MesosCallbackHandler {
       reRegisters.incrementAndGet();
     }
 
+    @Timed("scheduler_resource_offers")
     @Override
     public void handleOffers(List<Offer> offers) {
       // Don't invoke the executor or storage lock if the list of offers is empty.
@@ -244,6 +247,7 @@ public interface MesosCallbackHandler {
       eventSink.post(new PubsubEvent.DriverDisconnected());
     }
 
+    @Timed("scheduler_framework_message")
     @Override
     public void handleMessage(ExecutorID executorID, AgentID agentID) {
       log.warn(
@@ -287,6 +291,8 @@ public interface MesosCallbackHandler {
     private static final Function<Double, Long> SECONDS_TO_MICROS =
         seconds -> (long) (seconds * 1E6);
 
+    @AllowUnchecked
+    @Timed("scheduler_status_update")
     @Override
     public void handleUpdate(TaskStatus status) {
       logStatusUpdate(log, status);

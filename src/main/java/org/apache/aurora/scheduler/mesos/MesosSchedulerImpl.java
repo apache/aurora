@@ -19,8 +19,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.inject.Inject;
 
-import org.apache.aurora.GuiceUtils.AllowUnchecked;
-import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
@@ -74,7 +72,6 @@ public class MesosSchedulerImpl implements Scheduler {
     handler.handleReregistration(convert(masterInfo));
   }
 
-  @Timed("scheduler_resource_offers")
   @Override
   public void resourceOffers(SchedulerDriver driver, final List<Offer> offers) {
     checkState(isRegistered, "Must be registered before receiving offers.");
@@ -86,8 +83,6 @@ public class MesosSchedulerImpl implements Scheduler {
     handler.handleRescind(convert(offerId));
   }
 
-  @AllowUnchecked
-  @Timed("scheduler_status_update")
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
     handler.handleUpdate(convert(status));
@@ -104,7 +99,6 @@ public class MesosSchedulerImpl implements Scheduler {
     handler.handleLostExecutor(convert(executorID), convert(slaveID), status);
   }
 
-  @Timed("scheduler_framework_message")
   @Override
   public void frameworkMessage(
       SchedulerDriver driver,
