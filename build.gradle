@@ -18,6 +18,7 @@ plugins {
   id 'com.eriwen.gradle.js' version '1.12.1'
   id 'com.github.ben-manes.versions' version '0.11.3'
   id 'com.github.hierynomus.license' version '0.11.0'
+  id 'com.moowork.node' version '1.1.1'
   id 'me.champeau.gradle.jmh' version '0.2.0'
 }
 
@@ -129,6 +130,50 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
     }
   }
 }
+
+/**
+ * This gradle project contains the logic to bootstrap and build the UI bundle using NodeJS.
+ * The core logic of UI building is delegated to npm and Webpack. Webpack writes the UI bundle
+ * into the resources directory of the Scheduler, so it must be built before the Scheduler.
+ */
+project(':ui') {
+  apply plugin: 'com.moowork.node'
+  node {
+    download = true
+  }
+
+  task test(type: NpmTask, overwrite: true) {
+    inputs.files(fileTree('src'))
+    outputs.files(fileTree('dist'))
+    args = ['test']
+  }
+
+  task install(type: NpmTask) {
+    inputs.files(file('package.json'))
+    outputs.files(fileTree('node_modules'))
+    // Install into the project dir to sandbox everything under ui/
+    args = ['install']
+  }
+
+  task lint(type: NpmTask, dependsOn: 'install') {
+    inputs.files(fileTree('src'))
+    outputs.files(fileTree('.'))
+    args = ['run-script', 'lint']
+  }
+
+  task webpack(type: NodeTask, dependsOn: 'install') {
+    inputs.files(fileTree('src'))
+    outputs.files(sourceSets.main.java)
+    script = file('node_modules/.bin/webpack')
+  }
+
+  tasks.build.dependsOn(lint)
+  tasks.build.dependsOn(webpack)
+  tasks.build.dependsOn(npm_test)
+}
+// Make sure UI webpack is run as part of 'processResources --continuous'. Also makes sure when
+// building the Scheduler JAR, the JS bundle is built first.
+tasks.processResources.dependsOn(':ui:webpack')
 
 /* This gradle project contains the annotation procesor from
  * com.twitter.common.args and related dependencies. It needs to be outside of
@@ -446,40 +491,6 @@ pmdMain {
 pmdTest {
   ruleSetFiles = files('config/pmd/common.xml', 'config/pmd/test.xml')
 }
-
-/**
- * There is a jshint target recommended in the README for gradle-js-plugin
- * but it does not work. This workaround from here:
- * https://github.com/eriwen/gradle-js-plugin/issues/73
- */
-task jsHint(type:com.eriwen.gradle.js.tasks.JsHintTask) {
-  source = fileTree("src/main/resources/$httpAssetsPath/js/")
-  dest file("${buildDir}/jshint.out")
-  // Set this to false once JS code complies with JSHint.
-  ignoreExitCode false
-  outputToStdOut true
-  jshint.options = [
-    // See: http://www.jshint.com/docs/options/ for explanation.
-    browser: true,
-    camelcase: true,
-    curly: true,
-    eqeqeq: true,
-    indent: 2,
-    maxlen: 100,
-    quotmark: true,
-    trailing: true,
-    undef: true,
-    unused: 'vars',
-    white: true
-  ]
-  jshint.predef = [
-    '_': true,
-    'angular': true,
-    'moment': true,
-    'Thrift': true
-  ]
-}
-tasks.checkstyleMain.dependsOn(jsHint)
 
 tasks.withType(Test) {
   maxParallelForks = Runtime.runtime.availableProcessors()

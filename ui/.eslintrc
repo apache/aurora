@@ -1,0 +1,29 @@
+{
+  // babel parser to support ES features
+  "parser": "babel-eslint",
+  "extends": [
+    "standard",
+    "standard-react"
+  ],
+  "globals": {
+    "Thrift": true,
+    "ReadOnlySchedulerClient"
+  },
+  "rules": {
+    "arrow-parens": [2, "always"],
+    // not covered in standard
+    "no-var": 2,
+    "prefer-const": 2,
+    // overrides of the standard style
+    "curly": [2, "all"],
+    "max-len": [2, 100, 4],
+    "semi": [2, "always"],
+    "space-before-function-paren": [2, {"anonymous": "always", "named": "never"}],
+    "wrap-iife": [2, "outside"],
+    // overrides of the standard-react style
+    "react/jsx-sort-props": 2,
+    "react/prop-types": 0,
+    "react/sort-prop-types": 2,
+    "camelcase": [2, {"properties": "never"}],
+  }
+}

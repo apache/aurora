@@ -4,6 +4,7 @@
 *.iws
 *.pyc
 *~
+*bundle.js*
 .gradle
 /.cache/
 /.coverage
@@ -33,3 +34,6 @@
 /out/
 /requirements.txt
 /third_party/
+/ui/dist/
+/ui/node_modules/
+/ui/out/

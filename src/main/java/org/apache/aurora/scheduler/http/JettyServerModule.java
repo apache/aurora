@@ -324,6 +324,7 @@ public class JettyServerModule extends AbstractModule {
             .put("/graphview(?:/index.html)?", "/assets/graphview/graphview.html")
             .put("/graphview/(.*)", "/assets/graphview/$1")
             .put("/(?:scheduler|updates)(?:/.*)?", "/assets/scheduler/index.html")
+            .put("/beta/(?:scheduler|updates)(?:/.*)?", "/assets/scheduler/new-index.html")
             .put("/slaves", "/agents")
             .build();
 

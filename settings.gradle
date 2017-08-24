@@ -12,4 +12,4 @@
  * limitations under the License.
  */
 rootProject.name = 'aurora'
-include 'api', 'buildSrc', 'commons-args', 'commons'
+include 'ui', 'api', 'buildSrc', 'commons-args', 'commons'
