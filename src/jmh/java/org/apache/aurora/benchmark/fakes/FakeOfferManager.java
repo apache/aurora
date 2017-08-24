@@ -28,7 +28,12 @@ public class FakeOfferManager implements OfferManager {
   }
 
   @Override
-  public void cancelOffer(Protos.OfferID offerId) {
+  public boolean cancelOffer(Protos.OfferID offerId) {
+    return false;
+  }
+
+  @Override
+  public void banOffer(Protos.OfferID offerId) {
     // no-op
   }
 
@@ -38,7 +43,7 @@ public class FakeOfferManager implements OfferManager {
   }
 
   @Override
-  public void banOffer(Protos.OfferID offerId, TaskGroupKey groupKey) {
+  public void banOfferForTaskGroup(Protos.OfferID offerId, TaskGroupKey groupKey) {
     // no-op
   }
 

@@ -13,6 +13,9 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -48,6 +51,9 @@ import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.easymock.EasyMock.replay;
+import static org.easymock.EasyMock.strictMock;
+import static org.easymock.EasyMock.verify;
 import static org.junit.Assert.assertEquals;
 
 public class MesosCallbackHandlerTest extends EasyMockTest {
@@ -177,6 +183,10 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
   }
 
   private void createHandler(boolean mockLogger) {
+    createHandler(mockLogger, MoreExecutors.directExecutor());
+  }
+
+  private void createHandler(boolean mockLogger, Executor customExecutor) {
     if (mockLogger) {
       injectedLog = createMock(Logger.class);
     } else {
@@ -189,14 +199,13 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
         statusHandler,
         offerManager,
         eventSink,
-        MoreExecutors.directExecutor(),
+        customExecutor,
         injectedLog,
         statsProvider,
         driver,
         clock,
         controller,
         DRAIN_THRESHOLD);
-
   }
 
   @Test
@@ -302,12 +311,50 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
   @Test
   public void testRescind() {
-    offerManager.cancelOffer(OFFER_ID);
+    expect(offerManager.cancelOffer(OFFER_ID)).andReturn(true);
 
     control.replay();
 
     handler.handleRescind(OFFER_ID);
     assertEquals(1L, statsProvider.getLongValue("offers_rescinded"));
+  }
+
+  /**
+   * Ensure that if we get a rescind and the offer has not been added yet, we will ban it and
+   * eventually unban.
+   */
+  @Test
+  public void testRescindBeforeAdd() throws InterruptedException {
+    // We want to observe the order of the offerManager calls to we create a strict mock.
+    offerManager = strictMock(OfferManager.class);
+
+    long delayInMilliseconds = 50;
+    createHandler(false, new DelayExecutor(delayInMilliseconds));
+
+    expect(offerManager.cancelOffer(OFFER_ID)).andReturn(false);
+    offerManager.banOffer(OFFER_ID);
+    storageUtil.expectOperations();
+    expectOfferAttributesSaved(HOST_OFFER);
+    offerManager.addOffer(HOST_OFFER);
+    expect(offerManager.cancelOffer(OFFER_ID)).andReturn(true);
+
+    control.replay();
+    replay(offerManager);
+
+    // Offer comes in, it will be put on the executor queue to add.
+    handler.handleOffers(ImmutableList.of(HOST_OFFER.getOffer()));
+
+    // Rescind comes in asynchronously, and we do not see HOST_OFFER in available list so we will
+    // temporarily ban it and add a command to the executor to unban it later. As the executor
+    // processes commands, we will try to add HOST_OFFER but it should be already banned.
+    // Eventually, we unban the offer.
+    handler.handleRescind(OFFER_ID);
+
+    // 2 commands executed (addOffer and unbanOffer) so we wait the length of 3.
+    Thread.sleep(delayInMilliseconds * 3);
+
+    assertEquals(1L, statsProvider.getLongValue("offers_rescinded"));
+    verify(offerManager);
   }
 
   @Test
@@ -486,5 +533,31 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
     handler.handleInverseOffer(ImmutableList.of(INVERSE_OFFER));
     assertEquals(1L, statsProvider.getLongValue("scheduler_inverse_offers"));
+  }
+
+  /**
+   * Test executor that will execute commands after waiting {@code delayTimeInMilliseconds}.
+   */
+  private static final class DelayExecutor implements Executor {
+    private final Executor executor = Executors.newSingleThreadExecutor();
+    private final long delayTimeInMilliseconds;
+
+    DelayExecutor(long delayTimeInMilliseconds) {
+      this.delayTimeInMilliseconds = delayTimeInMilliseconds;
+    }
+
+    @Override
+    public void execute(Runnable command) {
+      executor.execute(() -> {
+        try {
+          Thread.sleep(delayTimeInMilliseconds);
+        } catch (InterruptedException e) {
+          // Do not interrupt this thread.
+          throw new RuntimeException("DelayExecutor sleep interrupted.", e);
+        }
+
+        command.run();
+      });
+    }
   }
 }

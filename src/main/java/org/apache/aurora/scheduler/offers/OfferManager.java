@@ -25,11 +25,11 @@ import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Ordering;
+import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
@@ -70,9 +70,17 @@ public interface OfferManager extends EventSubscriber {
    * Invalidates an offer.  This indicates that the scheduler should not attempt to match any
    * tasks against the offer.
    *
-   * @param offerId Canceled offer.
+   * @param offerId Cancelled offer.
+   * @return A boolean on whether or not the offer was successfully cancelled.
    */
-  void cancelOffer(OfferID offerId);
+  boolean cancelOffer(OfferID offerId);
+
+  /**
+   * Exclude an offer from being matched against all tasks.
+   *
+   * @param offerId Offer ID to ban.
+   */
+  void banOffer(OfferID offerId);
 
   /**
    * Exclude an offer that results in a static mismatch from further attempts to match against all
@@ -81,7 +89,7 @@ public interface OfferManager extends EventSubscriber {
    * @param offerId Offer ID to exclude for the given {@code groupKey}.
    * @param groupKey Task group key to exclude.
    */
-  void banOffer(OfferID offerId, TaskGroupKey groupKey);
+  void banOfferForTaskGroup(OfferID offerId, TaskGroupKey groupKey);
 
   /**
    * Launches the task matched against the offer.
@@ -100,14 +108,14 @@ public interface OfferManager extends EventSubscriber {
   void hostAttributesChanged(HostAttributesChanged change);
 
   /**
-   * Gets the offers that the scheduler is holding.
+   * Gets the offers that the scheduler is holding, excluding banned offers.
    *
    * @return A snapshot of the offers that the scheduler is currently holding.
    */
   Iterable<HostOffer> getOffers();
 
   /**
-   * Gets all offers that are not statically banned for the given {@code groupKey}.
+   * Gets all offers that are not banned for the given {@code groupKey}.
    *
    * @param groupKey Task group key to check offers for.
    * @return A snapshot of all offers eligible for the given {@code groupKey}.
@@ -147,6 +155,8 @@ public interface OfferManager extends EventSubscriber {
     static final String STATICALLY_BANNED_OFFERS = "statically_banned_offers_size";
     @VisibleForTesting
     static final String OFFER_CANCEL_FAILURES = "offer_cancel_failures";
+    @VisibleForTesting
+    static final String GLOBALLY_BANNED_OFFERS = "globally_banned_offers_size";
 
     private final HostOffers hostOffers;
     private final AtomicLong offerRaces;
@@ -178,7 +188,7 @@ public interface OfferManager extends EventSubscriber {
       // temporarily hold two offers for the same host, which should be corrected when we return
       // them after the return delay.
       // There's also a chance that we return an offer for compaction ~simultaneously with the
-      // same-host offer being canceled/returned.  This is also fine.
+      // same-host offer being cancelled/returned.  This is also fine.
       Optional<HostOffer> sameSlave = hostOffers.get(offer.getOffer().getAgentId());
       if (sameSlave.isPresent()) {
         // If there are existing offers for the slave, decline all of them so the master can
@@ -195,13 +205,13 @@ public interface OfferManager extends EventSubscriber {
       }
     }
 
-    void removeAndDecline(OfferID id) {
+    private void removeAndDecline(OfferID id) {
       if (removeFromHostOffers(id)) {
         decline(id);
       }
     }
 
-    void decline(OfferID id) {
+    private void decline(OfferID id) {
       LOG.debug("Declining offer {}", id);
       driver.declineOffer(id, getOfferFilter());
     }
@@ -213,7 +223,7 @@ public interface OfferManager extends EventSubscriber {
     }
 
     @Override
-    public void cancelOffer(final OfferID offerId) {
+    public boolean cancelOffer(final OfferID offerId) {
       boolean success = removeFromHostOffers(offerId);
       if (!success) {
         // This will happen rarely when we race to process this rescind against accepting the offer
@@ -222,6 +232,12 @@ public interface OfferManager extends EventSubscriber {
         LOG.warn("Failed to cancel offer: {}.", offerId.getValue());
         this.offerCancelFailures.incrementAndGet();
       }
+      return success;
+    }
+
+    @Override
+    public void banOffer(OfferID offerId) {
+      hostOffers.addGlobalBan(offerId);
     }
 
     private boolean removeFromHostOffers(final OfferID offerId) {
@@ -287,16 +303,25 @@ public interface OfferManager extends EventSubscriber {
       // scheduling attempts. See VetoGroup for more details on static ban.
       private final Multimap<OfferID, TaskGroupKey> staticallyBannedOffers = HashMultimap.create();
 
+      // Keep track of globally banned offers that will never be matched to anything.
+      private final Set<OfferID> globallyBannedOffers = Sets.newHashSet();
+
       HostOffers(StatsProvider statsProvider, Ordering<HostOffer> offerOrder) {
         offers = new ConcurrentSkipListSet<>(offerOrder);
         // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
         // Could track this separately if it turns out to pose problems.
         statsProvider.exportSize(OUTSTANDING_OFFERS, offers);
         statsProvider.makeGauge(STATICALLY_BANNED_OFFERS, () -> staticallyBannedOffers.size());
+        statsProvider.makeGauge(GLOBALLY_BANNED_OFFERS, () -> globallyBannedOffers.size());
       }
 
       synchronized Optional<HostOffer> get(AgentID slaveId) {
-        return Optional.fromNullable(offersBySlave.get(slaveId));
+        HostOffer offer = offersBySlave.get(slaveId);
+        if (offer == null || globallyBannedOffers.contains(offer.getOffer().getId())) {
+          return Optional.absent();
+        }
+
+        return Optional.of(offer);
       }
 
       synchronized void add(HostOffer offer) {
@@ -312,8 +337,9 @@ public interface OfferManager extends EventSubscriber {
           offers.remove(removed);
           offersBySlave.remove(removed.getOffer().getAgentId());
           offersByHost.remove(removed.getOffer().getHostname());
-          staticallyBannedOffers.removeAll(id);
         }
+        staticallyBannedOffers.removeAll(id);
+        globallyBannedOffers.remove(id);
         return removed != null;
       }
 
@@ -327,12 +353,19 @@ public interface OfferManager extends EventSubscriber {
       }
 
       synchronized Iterable<HostOffer> getOffers() {
-        return ImmutableSet.copyOf(offers);
+        return Iterables.unmodifiableIterable(FluentIterable.from(offers).filter(
+            e -> !globallyBannedOffers.contains(e.getOffer().getId())
+        ));
       }
 
       synchronized Iterable<HostOffer> getWeaklyConsistentOffers(TaskGroupKey groupKey) {
         return Iterables.unmodifiableIterable(FluentIterable.from(offers).filter(
-            e -> !staticallyBannedOffers.containsEntry(e.getOffer().getId(), groupKey)));
+            e -> !staticallyBannedOffers.containsEntry(e.getOffer().getId(), groupKey)
+                && !globallyBannedOffers.contains(e.getOffer().getId())));
+      }
+
+      synchronized void addGlobalBan(OfferID offerId) {
+        globallyBannedOffers.add(offerId);
       }
 
       synchronized void addStaticGroupBan(OfferID offerId, TaskGroupKey groupKey) {
@@ -347,11 +380,12 @@ public interface OfferManager extends EventSubscriber {
         offersBySlave.clear();
         offersByHost.clear();
         staticallyBannedOffers.clear();
+        globallyBannedOffers.clear();
       }
     }
 
     @Override
-    public void banOffer(OfferID offerId, TaskGroupKey groupKey) {
+    public void banOfferForTaskGroup(OfferID offerId, TaskGroupKey groupKey) {
       hostOffers.addStaticGroupBan(offerId, groupKey);
     }
 

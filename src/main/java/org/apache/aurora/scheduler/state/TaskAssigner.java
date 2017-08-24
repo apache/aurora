@@ -196,7 +196,7 @@ public interface TaskAssigner {
       } else {
         if (Veto.identifyGroup(vetoes) == VetoGroup.STATIC) {
           // Never attempt to match this offer/groupKey pair again.
-          offerManager.banOffer(offer.getOffer().getId(), groupKey);
+          offerManager.banOfferForTaskGroup(offer.getOffer().getId(), groupKey);
         }
         LOG.debug("Agent {} vetoed task {}: {}", offer.getOffer().getHostname(), taskId, vetoes);
       }

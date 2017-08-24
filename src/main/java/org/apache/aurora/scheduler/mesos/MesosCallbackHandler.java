@@ -228,15 +228,28 @@ public interface MesosCallbackHandler {
 
     @Override
     public void handleRescind(OfferID offerId) {
-      // NOTE: We need to use the executor here to prevent racing against processing the offers.
-      // If the callback thread rescinded the offers directly, it could rescind the offer
-      // before the thread for processing the offer got the storage lock and was able to write.
-      // Therefore we use the executor here to also process the rescind to maintain the ordering.
-      executor.execute(() -> {
-        log.info("Offer rescinded: {}", offerId.getValue());
-        offerManager.cancelOffer(offerId);
-        offersRescinded.incrementAndGet();
-      });
+      log.info("Offer rescinded: {}", offerId.getValue());
+
+      // For rescinds, we want to ensure they are processed quickly before we attempt to use an
+      // invalid offer. There are a few scenarios we want to be aware of:
+      //   1. We receive an offer, add it to OfferManager, and then get a rescind. In this scenario,
+      //      we can just remove the offer from the offers list.
+      //   2. We receive an offer, but before we add it to the OfferManager list we get a rescind.
+      //      In this scenario, we want to ensure that we do not use it/accept it when the executor
+      //      finally processes the offer. We will temporarily ban it and add a command for the
+      //      executor to unban it so future offers can be processed normally.
+      boolean offerCancelled = offerManager.cancelOffer(offerId);
+      if (!offerCancelled) {
+        log.info(
+            "Received rescind before adding offer: {}, temporarily banning.",
+            offerId.getValue());
+        offerManager.banOffer(offerId);
+        executor.execute(() -> {
+          log.info("Cancelling and unbanning offer: {}.", offerId.getValue());
+          offerManager.cancelOffer(offerId);
+        });
+      }
+      offersRescinded.incrementAndGet();
     }
 
     @Override

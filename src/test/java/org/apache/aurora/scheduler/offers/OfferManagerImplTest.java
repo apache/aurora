@@ -50,6 +50,7 @@ import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
+import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.GLOBALLY_BANNED_OFFERS;
 import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.OFFER_ACCEPT_RACES;
 import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.OFFER_CANCEL_FAILURES;
 import static org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl.OUTSTANDING_OFFERS;
@@ -250,14 +251,14 @@ public class OfferManagerImplTest extends EasyMockTest {
     control.replay();
 
     // Static ban ignored when now offers.
-    offerManager.banOffer(OFFER_A_ID, GROUP_KEY);
+    offerManager.banOfferForTaskGroup(OFFER_A_ID, GROUP_KEY);
     assertEquals(0L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     offerManager.addOffer(OFFER_A);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers(GROUP_KEY)));
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
 
     // Add static ban.
-    offerManager.banOffer(OFFER_A_ID, GROUP_KEY);
+    offerManager.banOfferForTaskGroup(OFFER_A_ID, GROUP_KEY);
     assertEquals(1L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
     assertTrue(Iterables.isEmpty(offerManager.getOffers(GROUP_KEY)));
@@ -274,7 +275,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     control.replay();
 
     offerManager.addOffer(OFFER_A);
-    offerManager.banOffer(OFFER_A_ID, GROUP_KEY);
+    offerManager.banOfferForTaskGroup(OFFER_A_ID, GROUP_KEY);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
     assertTrue(Iterables.isEmpty(offerManager.getOffers(GROUP_KEY)));
     assertEquals(1L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
@@ -296,7 +297,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     control.replay();
 
     offerManager.addOffer(OFFER_A);
-    offerManager.banOffer(OFFER_A_ID, GROUP_KEY);
+    offerManager.banOfferForTaskGroup(OFFER_A_ID, GROUP_KEY);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers()));
     assertTrue(Iterables.isEmpty(offerManager.getOffers(GROUP_KEY)));
     assertEquals(1L, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
@@ -381,6 +382,28 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     clock.advance(RETURN_DELAY);
     assertEquals(0L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
+  }
+
+  @Test
+  public void testBanAndUnbanOffer() throws Exception {
+    driver.declineOffer(OFFER_A.getOffer().getId(), OFFER_FILTER);
+    expectLastCall().times(2);
+    control.replay();
+
+    // After adding a banned offer, user can see it is in OUTSTANDING_OFFERS but cannot retrieve it.
+    offerManager.banOffer(OFFER_A_ID);
+    offerManager.addOffer(OFFER_A);
+    assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
+    assertEquals(1L, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
+    assertTrue(Iterables.isEmpty(offerManager.getOffers(GROUP_KEY)));
+    clock.advance(RETURN_DELAY);
+
+    offerManager.cancelOffer(OFFER_A_ID);
+    offerManager.addOffer(OFFER_A);
+    assertEquals(1L, statsProvider.getLongValue(OUTSTANDING_OFFERS));
+    assertEquals(0L, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
+    assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getOffers(GROUP_KEY)));
+    clock.advance(RETURN_DELAY);
   }
 
   private static HostOffer setUnavailability(HostOffer offer, Long startMs) {

@@ -200,7 +200,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
   public void testAssignVetoesWithStaticBan() throws Exception {
     expectNoUpdateReservations(1);
     expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(OFFER));
-    offerManager.banOffer(MESOS_OFFER.getId(), GROUP_KEY);
+    offerManager.banOfferForTaskGroup(MESOS_OFFER.getId(), GROUP_KEY);
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
     expect(filter.filter(UNUSED, resourceRequest))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("denied")));
@@ -359,7 +359,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
             mismatched.getAttributes()),
         resourceRequest))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("constraint mismatch")));
-    offerManager.banOffer(mismatched.getOffer().getId(), GROUP_KEY);
+    offerManager.banOfferForTaskGroup(mismatched.getOffer().getId(), GROUP_KEY);
     expect(filter.filter(
         new UnusedResource(
             bagFromMesosResources(MESOS_OFFER.getResourcesList()), OFFER.getAttributes()),
@@ -436,7 +436,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
     expect(filter.filter(UNUSED, resourceRequest))
         .andReturn(ImmutableSet.of(Veto.insufficientResources("cpu", 1)));
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
-    offerManager.banOffer(MESOS_OFFER.getId(), GROUP_KEY);
+    offerManager.banOfferForTaskGroup(MESOS_OFFER.getId(), GROUP_KEY);
     expectLastCall();
 
     control.replay();
@@ -479,7 +479,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
         .andReturn(ImmutableSet.of());
     expect(filter.filter(UNUSED, resources))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("lol")));
-    offerManager.banOffer(MESOS_OFFER.getId(), GROUP_KEY);
+    offerManager.banOfferForTaskGroup(MESOS_OFFER.getId(), GROUP_KEY);
 
     control.replay();
 
