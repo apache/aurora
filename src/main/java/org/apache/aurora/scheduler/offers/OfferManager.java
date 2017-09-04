@@ -28,6 +28,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
@@ -301,10 +302,11 @@ public interface OfferManager extends EventSubscriber {
       // TODO(maxim): Expose via a debug endpoint. AURORA-1136.
       // Keep track of offer->groupKey mappings that will never be matched to avoid redundant
       // scheduling attempts. See VetoGroup for more details on static ban.
-      private final Multimap<OfferID, TaskGroupKey> staticallyBannedOffers = HashMultimap.create();
+      private final Multimap<OfferID, TaskGroupKey> staticallyBannedOffers =
+          Multimaps.synchronizedMultimap(HashMultimap.create());
 
       // Keep track of globally banned offers that will never be matched to anything.
-      private final Set<OfferID> globallyBannedOffers = Sets.newHashSet();
+      private final Set<OfferID> globallyBannedOffers = Sets.newConcurrentHashSet();
 
       HostOffers(StatsProvider statsProvider, Ordering<HostOffer> offerOrder) {
         offers = new ConcurrentSkipListSet<>(offerOrder);
@@ -352,12 +354,28 @@ public interface OfferManager extends EventSubscriber {
         }
       }
 
+      /**
+       * Returns an iterable giving the state of the offers at the time the method is called. Unlike
+       * {@code getWeaklyConsistentOffers}, the underlying collection is a copy of the original and
+       * will not be modified outside of the returned iterable.
+       *
+       * @return The offers currently known by the scheduler.
+       */
       synchronized Iterable<HostOffer> getOffers() {
-        return Iterables.unmodifiableIterable(FluentIterable.from(offers).filter(
+        return FluentIterable.from(offers).filter(
             e -> !globallyBannedOffers.contains(e.getOffer().getId())
-        ));
+        ).toSet();
       }
 
+      /**
+       * Returns a weakly-consistent iterable giving the available offers to a given
+       * {@code groupKey}. This iterable can handle concurrent operations on its underlying
+       * collection, and may reflect changes that happen after the construction of the iterable.
+       * This property is mainly used in {@code launchTask}.
+       *
+       * @param groupKey The task group to get offers for.
+       * @return The offers a given task group can use.
+       */
       synchronized Iterable<HostOffer> getWeaklyConsistentOffers(TaskGroupKey groupKey) {
         return Iterables.unmodifiableIterable(FluentIterable.from(offers).filter(
             e -> !staticallyBannedOffers.containsEntry(e.getOffer().getId(), groupKey)
