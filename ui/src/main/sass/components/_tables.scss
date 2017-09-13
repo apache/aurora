@@ -1,0 +1,93 @@
+.aurora-table {
+  width: 100%;
+  font-size: 16px;
+
+  a {
+   font-weight: 600;
+  }
+
+  .number {
+    text-align: center;
+  }
+
+  th {
+   padding: 5px;
+  }
+}
+
+.reactable-data {
+  border: 1px solid $grid_color;
+
+  tr + tr {
+    border-top: 1px solid $grid_color;
+  }
+
+  td + td {
+    border-left: 1px solid $grid_color;
+  }
+
+  tr:nth-child(even) {
+    background: rgba(0,0,0,0.017);
+  }
+
+  tr:hover {
+    background: #edf5fd;
+  }
+
+  td, th {
+    padding: 5px;
+  }
+}
+
+.reactable-pagination {
+  td {
+    padding: 2em 0 4em 0;
+    text-align: center;
+  }
+
+  a {
+    padding: 6px 12px;
+    border: 1px solid $grid_highlight_color;
+    border-left: 0px;
+  }
+
+  a:first-child {
+    padding: 6px 12px;
+    border-left: 1px solid $grid_highlight_color;
+  }
+
+  a:hover {
+    background-color: steelblue;
+    border: 1px solid #FFF;
+    color: white;
+  }
+}
+
+.reactable-current-page {
+  font-weight: normal;
+  color: #222;
+}
+
+.table-input-wrapper {
+  border-radius: 4px;
+  padding: 5px;
+  background-color: $grid_color;
+  margin-bottom: 10px;
+
+  .glyphicon {
+    font-size: 14px;
+    color: $secondary_font_color;
+    margin: 0px 5px;
+  }
+
+  input {
+    width: 90%;
+    font-size: 14px;
+    border: 0;
+    background-color: transparent;
+  }
+
+  input:focus {
+    outline: none;
+  }
+}

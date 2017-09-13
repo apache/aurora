@@ -5,10 +5,16 @@
     "standard",
     "standard-react"
   ],
+  "env": {
+    "jasmine": true
+  },
   "globals": {
     "Thrift": true,
     "ReadOnlySchedulerClient"
   },
+  "plugins": [
+    "chai-friendly"
+  ],
   "rules": {
     "arrow-parens": [2, "always"],
     // not covered in standard
@@ -25,5 +31,8 @@
     "react/prop-types": 0,
     "react/sort-prop-types": 2,
     "camelcase": [2, {"properties": "never"}],
+    // deals with the chai expression problem
+    "no-unused-expressions": 0,
+    "chai-friendly/no-unused-expressions": 2
   }
 }

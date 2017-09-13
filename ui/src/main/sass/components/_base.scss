@@ -1,0 +1,11 @@
+@import 'modules/all';
+
+html, html a {
+  -webkit-font-smoothing: antialiased !important;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.004);
+}
+
+html, body {
+  font-family: $font_stack;
+  background-color: $main_bg_color;
+}

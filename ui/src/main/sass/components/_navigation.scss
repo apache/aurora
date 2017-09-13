@@ -1,0 +1,23 @@
+.nav-divider {
+  height: 3px;
+  margin-top: -20px;
+}
+
+.navbar {
+  text-transform: uppercase;
+  font-size: 11px;
+  min-height: 80px;
+  border-radius: 0px;
+  background-color: $main_contrast_color;
+  margin-bottom: 0px;
+}
+
+.navbar-nav>li>a {
+  line-height: 50px;
+  font-size: 14px;
+  color: $content_box_color;
+}
+
+.navbar img {
+  height: 50px;
+}

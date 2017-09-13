@@ -7,6 +7,6 @@ chai.use(assertJsx);
 
 describe('Home', () => {
   it('Should render Hello, World!', () => {
-    expect(<Home/>).to.deep.equal(<div>Hello, World!</div>);
+    expect(<Home />).to.deep.equal(<div>Hello, World!</div>);
   });
 });

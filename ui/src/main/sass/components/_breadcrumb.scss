@@ -1,0 +1,19 @@
+.aurora-breadcrumb {
+  padding: 1.5em 0;
+  border-bottom: 1px solid #EEE;
+  background-color: #FFF;
+  margin-bottom: 20px;
+
+  h2 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  a:last-child {
+    font-weight: 700;
+  }
+
+  span {
+    margin: 0 8px;
+  }
+}
