@@ -56,6 +56,7 @@ Are you using Aurora too?  Let us know, or submit a patch to join the list!
 - [Fitbit](https://fitbit.com)
 - [Foursquare](https://foursquare.com)
 - [Gutefrage.net](https://www.gutefrage.net)
+- [Houghton Mifflin Harcourt](https://www.hmhco.com)
 - [Kakao](https://kakao.com/)
 - [Magine TV](https://magine.com)
 - [Medallia](http://www.medallia.com)
