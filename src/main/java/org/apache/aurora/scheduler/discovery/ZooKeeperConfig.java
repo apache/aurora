@@ -102,7 +102,7 @@ public class ZooKeeperConfig {
     return useCurator;
   }
 
-  public Iterable<InetSocketAddress> getServers() {
+  Iterable<InetSocketAddress> getServers() {
     return servers;
   }
 

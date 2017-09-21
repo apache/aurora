@@ -31,7 +31,7 @@ import org.apache.zookeeper.data.ACL;
  * Useful constants for Guice modules that provide or consume service discovery configuration
  * bindings.
  */
-final class ServiceDiscoveryBindings {
+public final class ServiceDiscoveryBindings {
 
   /**
    * Indicates a binding for ZooKeeper configuration data.
@@ -39,7 +39,7 @@ final class ServiceDiscoveryBindings {
   @Qualifier
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
-  @interface ZooKeeper { }
+  public @interface ZooKeeper { }
 
   /**
    * A binding key for the ZooKeeper cluster endpoints.

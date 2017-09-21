@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.log.mesos;
 
 import java.io.File;
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +36,7 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.gen.storage.LogEntry;
+import org.apache.aurora.scheduler.discovery.ServiceDiscoveryBindings;
 import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
@@ -138,14 +140,14 @@ public class MesosLogStreamModule extends PrivateModule {
 
   @Provides
   @Singleton
-  Log provideLog() {
+  Log provideLog(@ServiceDiscoveryBindings.ZooKeeper Iterable<InetSocketAddress> servers) {
     File parentDir = logPath.getParentFile();
     if (!parentDir.exists() && !parentDir.mkdirs()) {
       addError("Failed to create parent directory to store native log at: %s", parentDir);
     }
 
     String zkConnectString = Joiner.on(',').join(
-        Iterables.transform(zkClientConfig.getServers(), InetSocketAddressHelper::toString));
+        Iterables.transform(servers, InetSocketAddressHelper::toString));
 
     if (zkClientConfig.getCredentials().isPresent()) {
       Credentials zkCredentials = zkClientConfig.getCredentials().get();

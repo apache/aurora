@@ -17,6 +17,9 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
@@ -77,7 +80,7 @@ public class ServiceDiscoveryModule extends AbstractModule {
       bind(ZooKeeperTestServer.class).toInstance(new ZooKeeperTestServer(tempDir, tempDir));
       SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(TestServerService.class);
 
-      clusterBinder.toProvider(LocalZooKeeperClusterProvider.class);
+      clusterBinder.toProvider(LocalZooKeeperClusterProvider.class).in(Singleton.class);
     } else {
       clusterBinder.toInstance(zooKeeperConfig.getServers());
     }
@@ -125,7 +128,10 @@ public class ServiceDiscoveryModule extends AbstractModule {
 
     @Override
     protected void shutDown() {
-      testServer.stop();
+      // Delay stopping ZooKeeper server to ensure that clients close first during service shutdown.
+      ScheduledExecutorService executorService = Executors.newScheduledThreadPool(0);
+      executorService.schedule(() -> testServer.stop(), 1000, TimeUnit.MILLISECONDS);
+      executorService.shutdown();
     }
   }
 
