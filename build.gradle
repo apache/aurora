@@ -11,9 +11,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import org.apache.aurora.build.CoverageReportCheck
-import org.gradle.api.JavaVersion
-
 plugins {
   id 'com.eriwen.gradle.js' version '1.12.1'
   id 'com.github.ben-manes.versions' version '0.11.3'
@@ -237,20 +234,22 @@ project(':api') {
   apply plugin: org.apache.aurora.build.ThriftPlugin
   apply plugin: org.apache.aurora.build.ThriftEntitiesPlugin
 
-  task checkPython << {
-    def python27Executable = ['python2.7', 'python'].find { python ->
-      try {
-        def check = "import sys; sys.exit(0 if sys.version_info >= (2,7) and sys.version_info < (3,) else 1)"
-        return [python, "-c", check].execute().waitFor() == 0
-      } catch (IOException e) {
-        return false
+  task checkPython {
+    doLast {
+      def python27Executable = ['python2.7', 'python'].find { python ->
+        try {
+          def check = "import sys; sys.exit(0 if sys.version_info >= (2,7) and sys.version_info < (3,) else 1)"
+          return [python, "-c", check].execute().waitFor() == 0
+        } catch (IOException e) {
+          return false
+        }
       }
-    }
 
-    if (python27Executable == null) {
-      throw new GradleException('Build requires Python 2.7.')
-    } else {
-      thriftEntities.python = python27Executable
+      if (python27Executable == null) {
+        throw new GradleException('Build requires Python 2.7.')
+      } else {
+        thriftEntities.python = python27Executable
+      }
     }
   }
   generateThriftEntitiesJava.dependsOn checkPython
@@ -621,13 +620,23 @@ jacocoTestReport {
 }
 test.finalizedBy jacocoTestReport
 
-task analyzeReport(type: CoverageReportCheck) {
-  coverageReportFile = "$reportPath/jacocoTestReport.xml"
-  minInstructionCoverage = 0.89
-  minBranchCoverage = 0.835
-  legacyClassesWithoutCoverage = file('config/legacy_untested_classes.txt').readLines()
+jacocoTestCoverageVerification {
+  violationRules {
+    rule {
+      limit {
+        counter = 'INSTRUCTION'
+        minimum = 0.87
+      }
+    }
+    rule {
+      limit {
+        counter = 'BRANCH'
+        minimum = 0.79
+      }
+    }
+  }
 }
-jacocoTestReport.finalizedBy analyzeReport
+jacocoTestReport.finalizedBy jacocoTestCoverageVerification
 
 def jmhHumanOutputPath = "$buildDir/reports/jmh/human.txt"
 jmh {
