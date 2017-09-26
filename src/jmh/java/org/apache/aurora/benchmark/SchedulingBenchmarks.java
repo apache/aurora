@@ -28,6 +28,7 @@ import com.google.common.eventbus.EventBus;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 
@@ -58,7 +59,6 @@ import org.apache.aurora.scheduler.offers.OfferSettings;
 import org.apache.aurora.scheduler.offers.OffersModule;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
-import org.apache.aurora.scheduler.preemptor.PendingTaskProcessor;
 import org.apache.aurora.scheduler.preemptor.PreemptorModule;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.scheduling.TaskScheduler;
@@ -103,7 +103,6 @@ public class SchedulingBenchmarks {
     private static final Amount<Long, Time> DELAY_FOREVER = Amount.of(30L, Time.DAYS);
     private static final Integer BATCH_SIZE = 5;
     protected Storage storage;
-    protected PendingTaskProcessor pendingTaskProcessor;
     private TaskScheduler taskScheduler;
     private OfferManager offerManager;
     private EventBus eventBus;
@@ -184,8 +183,9 @@ public class SchedulingBenchmarks {
 
       taskScheduler = injector.getInstance(TaskScheduler.class);
       offerManager = injector.getInstance(OfferManager.class);
-      pendingTaskProcessor = injector.getInstance(PendingTaskProcessor.class);
       eventBus.register(injector.getInstance(ClusterStateImpl.class));
+
+      withInjector(injector);
 
       settings = getSettings();
       saveHostAttributes(settings.getHostAttributes());
@@ -195,6 +195,11 @@ public class SchedulingBenchmarks {
       fillUpCluster(offers.size());
 
       saveTasks(settings.getTasks());
+    }
+
+    protected void withInjector(Injector injector) {
+      // No-op by default.  Subclasses may use this to retrieve bindings from the injector for use
+      // in their test.
     }
 
     private Set<IScheduledTask> buildClusterTasks(int numOffers) {
@@ -353,6 +358,14 @@ public class SchedulingBenchmarks {
   public static class PreemptorSlotSearchBenchmark extends AbstractBase {
     @Param({"1", "10", "100", "1000"})
     public int numPendingTasks;
+
+    private Runnable pendingTaskProcessor;
+
+    @Override
+    protected void withInjector(Injector injector) {
+      pendingTaskProcessor =
+          injector.getInstance(Key.get(Runnable.class, PreemptorModule.PreemptionSlotFinder.class));
+    }
 
     @Override
     protected BenchmarkSettings getSettings() {
