@@ -30,9 +30,9 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
-import com.google.common.collect.Sets;
 
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.AssignedTask;
@@ -119,13 +119,10 @@ public class StateManagerImpl implements StateManager {
     Set<IScheduledTask> scheduledTasks = FluentIterable.from(instanceIds)
         .transform(instanceId -> createTask(instanceId, task)).toSet();
 
-    Iterable<IScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
-        Query.jobScoped(task.getJob()).active());
+    Iterable<IScheduledTask> collision = storeProvider.getTaskStore().fetchTasks(
+        Query.instanceScoped(task.getJob(), instanceIds).active());
 
-    Set<Integer> existingInstanceIds =
-        FluentIterable.from(existingTasks).transform(Tasks::getInstanceId).toSet();
-
-    if (!Sets.intersection(existingInstanceIds, instanceIds).isEmpty()) {
+    if (!Iterables.isEmpty(collision)) {
       throw new IllegalArgumentException("Instance ID collision detected.");
     }
 
