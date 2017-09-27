@@ -1,12 +1,35 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import Reactable, { Table, Tr, Thead, Th, Td } from 'reactable';
 
 import Icon from 'components/Icon';
+import Pagination from 'components/Pagination';
 
 export default class RoleList extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      filter: props.filter,
+      reverseSort: props.reverseSort || false,
+      sortBy: props.sortBy || 'role'
+    };
+  }
+
   setFilter(e) {
-    this.setState({filter: e.target.value});
+    this.setState({filter: e.target.value, sortBy: 'role'});
+  }
+
+  setSort(sortBy) {
+    // If they change sort key, it's always ascending the first time.
+    const reverseSort = (sortBy === this.state.sortBy) ? !this.state.reverseSort : false;
+    this.setState({reverseSort, sortBy});
+  }
+
+  _renderRow(r) {
+    return (<tr key={r.role}>
+      <td><Link to={`/beta/scheduler/${r.role}`}>{r.role}</Link></td>
+      <td>{r.jobCount}</td>
+      <td>{r.cronJobCount}</td>
+    </tr>);
   }
 
   render() {
@@ -19,30 +42,23 @@ export default class RoleList extends React.Component {
           placeholder='Search for roles'
           type='text' />
       </div>
-      <Table
-        className='aurora-table'
-        defaultSort={{column: 'role'}}
-        filterBy={this.state.filter}
-        filterPlaceholder='Search roles...'
-        filterable={['role']}
-        hideFilterInput
-        itemsPerPage={25}
-        noDataText={'No results found.'}
-        pageButtonLimit={8}
-        sortable={['role',
-          {'column': 'jobs', sortFunction: Reactable.Sort.Numeric},
-          {'column': 'crons', sortFunction: Reactable.Sort.Numeric}]}>
-        <Thead>
-          <Th column='role'>Role</Th>
-          <Th className='number' column='jobs'>Jobs</Th>
-          <Th className='number' column='crons'>Crons</Th>
-        </Thead>
-        {this.props.roles.map((r) => (<Tr key={r.role}>
-          <Td column='role' value={r.role}><Link to={`/scheduler/${r.role}`}>{r.role}</Link></Td>
-          <Td className='number' column='jobs'>{r.jobCount}</Td>
-          <Td className='number' column='crons'>{r.cronJobCount}</Td>
-        </Tr>))}
-      </Table>
+      <table className='aurora-table'>
+        <thead>
+          <tr>
+            <th onClick={(e) => this.setSort('role')}>Role</th>
+            <th onClick={(e) => this.setSort('jobCount')}>Jobs</th>
+            <th onClick={(e) => this.setSort('cronJobCount')}>Crons</th>
+          </tr>
+        </thead>
+        <Pagination
+          data={this.props.roles}
+          filter={(r) => (this.state.filter) ? r.role.startsWith(this.state.filter) : true}
+          isTable
+          numberPerPage={25}
+          renderer={this._renderRow}
+          reverseSort={this.state.reverseSort}
+          sortBy={this.state.sortBy} />
+      </table>
     </div>);
   }
 }

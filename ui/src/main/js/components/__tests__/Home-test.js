@@ -1,12 +1,10 @@
 import React from 'react';
-import Home from '../Home';
+import { shallow } from 'enzyme';
 
-import chai, { expect } from 'chai';
-import assertJsx from 'preact-jsx-chai';
-chai.use(assertJsx);
+import Home from '../Home';
 
 describe('Home', () => {
   it('Should render Hello, World!', () => {
-    expect(<Home />).to.deep.equal(<div>Hello, World!</div>);
+    expect(shallow(<Home />).equals(<div>Hello, World!</div>)).toBe(true);
   });
 });

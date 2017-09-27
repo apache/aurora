@@ -13,10 +13,6 @@ module.exports = {
     publicPath: '/'
   },
   resolve: {
-    alias: {
-      react: "preact-compat",
-      "react-dom": "preact-compat"
-    },
     extensions: [ '.js' ],
     modules: [EXTENSION_PATH, SOURCE_PATH, 'node_modules']
   },
