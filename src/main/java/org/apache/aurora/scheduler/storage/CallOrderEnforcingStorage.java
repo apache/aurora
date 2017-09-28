@@ -63,9 +63,19 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
   private final StateMachine<State> stateMachine = StateMachine.<State>builder("storage")
       .logTransitions()
       .initialState(State.CONSTRUCTED)
-      .addState(State.CONSTRUCTED, State.PREPARED)
-      .addState(State.PREPARED, State.READY)
-      .addState(State.READY, State.STOPPED)
+      .addState(
+          State.CONSTRUCTED,
+          State.PREPARED, State.STOPPED)
+      .addState(
+          State.PREPARED,
+          State.READY, State.STOPPED)
+      .addState(
+          State.READY,
+          State.STOPPED)
+      .addState(
+          State.STOPPED,
+          // Allow cycles in STOPPED to prevent throwing and avoid the need for call-site checking.
+          State.STOPPED)
       .build();
 
   @Inject
@@ -74,22 +84,24 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
     this.eventSink = requireNonNull(eventSink);
   }
 
-  private void checkInState(State state) throws StorageException {
-    if (stateMachine.getState() != state) {
-      throw new TransientStorageException("Storage is not " + state);
+  private void checkState(State state) throws StorageException {
+    try {
+      stateMachine.checkState(state);
+    } catch (IllegalStateException e) {
+      throw new TransientStorageException("Storage is not " + state, e);
     }
   }
 
   @Override
   public void prepare() throws StorageException {
-    checkInState(State.CONSTRUCTED);
+    checkState(State.CONSTRUCTED);
     wrapped.prepare();
     stateMachine.transition(State.PREPARED);
   }
 
   @Override
   public void start(Quiet initializationLogic) throws StorageException {
-    checkInState(State.PREPARED);
+    checkState(State.PREPARED);
     wrapped.start(initializationLogic);
     stateMachine.transition(State.READY);
     wrapped.write((NoResult.Quiet) storeProvider -> {
@@ -109,20 +121,20 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
 
   @Override
   public <T, E extends Exception> T read(Work<T, E> work) throws StorageException, E {
-    checkInState(State.READY);
+    checkState(State.READY);
     return wrapped.read(work);
   }
 
   @Override
   public <T, E extends Exception> T write(MutateWork<T, E> work)
       throws StorageException, E {
-    checkInState(State.READY);
+    checkState(State.READY);
     return wrapped.write(work);
   }
 
   @Override
   public void snapshot() throws StorageException {
-    checkInState(State.READY);
+    checkState(State.READY);
     wrapped.snapshot();
   }
 

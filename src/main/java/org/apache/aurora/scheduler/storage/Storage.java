@@ -190,6 +190,10 @@ public interface Storage {
    * Indicates that stable storage is temporarily unavailable.
    */
   class TransientStorageException extends StorageException {
+    public TransientStorageException(String message, Throwable cause) {
+      super(message, cause);
+    }
+
     public TransientStorageException(String message) {
       super(message);
     }
