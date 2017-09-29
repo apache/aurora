@@ -359,9 +359,6 @@ class AuroraClientAPI(object):
   def prune_tasks(self, query):
     return self._scheduler_proxy.pruneTasks(query)
 
-  def unsafe_rewrite_config(self, rewrite_request):
-    return self._scheduler_proxy.rewriteConfigs(rewrite_request)
-
   def sla_get_job_uptime_vector(self, job_key):
     self._assert_valid_job_key(job_key)
     return Sla(self._scheduler_proxy).get_job_uptime_vector(job_key)

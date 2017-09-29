@@ -26,7 +26,6 @@ import org.apache.aurora.gen.storage.RemoveJob;
 import org.apache.aurora.gen.storage.RemoveLock;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
-import org.apache.aurora.gen.storage.RewriteTask;
 import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
@@ -57,7 +56,6 @@ import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.slf4j.Logger;
 
 import uno.perk.forward.Forward;
@@ -158,18 +156,6 @@ class WriteAheadStorage extends WriteAheadStorageForwarder implements
 
     write(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
     schedulerStore.saveFrameworkId(frameworkId);
-  }
-
-  @Override
-  public boolean unsafeModifyInPlace(final String taskId, final ITaskConfig taskConfiguration) {
-    requireNonNull(taskId);
-    requireNonNull(taskConfiguration);
-
-    boolean mutated = taskStore.unsafeModifyInPlace(taskId, taskConfiguration);
-    if (mutated) {
-      write(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration.newBuilder())));
-    }
-    return mutated;
   }
 
   @Override

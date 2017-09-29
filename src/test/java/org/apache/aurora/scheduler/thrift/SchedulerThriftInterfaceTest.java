@@ -30,20 +30,14 @@ import com.google.common.collect.Sets;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.AuroraAdmin;
-import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.ExplicitReconciliationSettings;
 import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.Hosts;
-import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.InstanceConfigRewrite;
-import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.InstanceTaskConfig;
-import org.apache.aurora.gen.JobConfigRewrite;
 import org.apache.aurora.gen.JobConfiguration;
-import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdatePulseStatus;
@@ -67,7 +61,6 @@ import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.ResponseDetail;
 import org.apache.aurora.gen.Result;
-import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.StartJobUpdateResult;
@@ -99,9 +92,7 @@ import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IHostStatus;
-import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IMetadata;
@@ -130,7 +121,6 @@ import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
-import static org.apache.aurora.gen.ResponseCode.WARNING;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import static org.apache.aurora.scheduler.thrift.Fixtures.CRON_JOB;
@@ -166,7 +156,6 @@ import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAINTE
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NO_CRON;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.RESTART_SHARDS;
-import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.REWRITE_CONFIGS;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.START_JOB_UPDATE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.START_MAINTENANCE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.jobAlreadyExistsMessage;
@@ -269,12 +258,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       throws TaskDescriptionException {
 
     return SanitizedConfiguration.fromUnsanitized(TaskTestUtil.CONFIGURATION_MANAGER, job);
-  }
-
-  private static IJobConfiguration validateAndPopulate(IJobConfiguration job)
-      throws TaskDescriptionException {
-
-    return TaskTestUtil.CONFIGURATION_MANAGER.validateAndPopulate(job);
   }
 
   @Test
@@ -1105,186 +1088,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(
         okEmptyResponse(notScheduledCronMessage(JOB_KEY)),
         thrift.descheduleCronJob(JOB_KEY.newBuilder()));
-  }
-
-  @Test
-  public void testRewriteShardTaskMissing() throws Exception {
-    InstanceKey instance = new InstanceKey(JobKeys.from("foo", "bar", "baz").newBuilder(), 0);
-
-    storageUtil.expectTaskFetch(
-        Query.instanceScoped(IJobKey.build(instance.getJobKey()), instance.getInstanceId())
-            .active());
-
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.instanceRewrite(
-            new InstanceConfigRewrite(instance, productionTask(), productionTask()))));
-    assertResponse(WARNING, thrift.rewriteConfigs(request));
-    assertEquals(0L, statsProvider.getLongValue(REWRITE_CONFIGS));
-  }
-
-  @Test
-  public void testRewriteNoCommands() throws Exception {
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(ImmutableList.of());
-    assertResponse(INVALID_REQUEST, thrift.rewriteConfigs(request));
-    assertEquals(0L, statsProvider.getLongValue(REWRITE_CONFIGS));
-  }
-
-  @Test(expected = RuntimeException.class)
-  public void testRewriteInvalidJob() throws Exception {
-    control.replay();
-
-    IJobConfiguration job = IJobConfiguration.build(makeJob());
-    thrift.rewriteConfigs(
-        new RewriteConfigsRequest(
-            ImmutableList.of(ConfigRewrite.jobRewrite(
-                new JobConfigRewrite(job.newBuilder(), job.newBuilder().setTaskConfig(null))))));
-  }
-
-  @Test
-  public void testRewriteChangeJobKey() throws Exception {
-    control.replay();
-
-    IJobConfiguration job = IJobConfiguration.build(makeJob());
-    JobKey rewrittenJobKey = JobKeys.from("a", "b", "c").newBuilder();
-    Identity rewrittenIdentity = new Identity().setUser("steve");
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.jobRewrite(new JobConfigRewrite(
-            job.newBuilder(),
-            job.newBuilder()
-                .setTaskConfig(job.getTaskConfig().newBuilder().setJob(rewrittenJobKey)
-                    .setOwner(rewrittenIdentity))
-                .setOwner(rewrittenIdentity)
-                .setKey(rewrittenJobKey)))));
-    assertResponse(WARNING, thrift.rewriteConfigs(request));
-    assertEquals(0L, statsProvider.getLongValue(REWRITE_CONFIGS));
-  }
-
-  @Test
-  public void testRewriteShardCasMismatch() throws Exception {
-    TaskConfig storedConfig = productionTask();
-    TaskConfig modifiedConfig =
-        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten"));
-    IScheduledTask storedTask = IScheduledTask.build(
-        new ScheduledTask().setAssignedTask(new AssignedTask().setTask(storedConfig)));
-    InstanceKey instance = new InstanceKey(storedConfig.getJob(), 0);
-
-    storageUtil.expectTaskFetch(
-        Query.instanceScoped(IInstanceKey.build(instance)).active(), storedTask);
-
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.instanceRewrite(
-            new InstanceConfigRewrite(instance, modifiedConfig, modifiedConfig))));
-    assertResponse(WARNING, thrift.rewriteConfigs(request));
-    assertEquals(0L, statsProvider.getLongValue(REWRITE_CONFIGS));
-  }
-
-  @Test
-  public void testRewriteInstance() throws Exception {
-    TaskConfig storedConfig = productionTask();
-    ITaskConfig modifiedConfig = ITaskConfig.build(
-        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten")));
-    String taskId = "task_id";
-    IScheduledTask storedTask = IScheduledTask.build(new ScheduledTask().setAssignedTask(
-        new AssignedTask()
-            .setTaskId(taskId)
-            .setTask(storedConfig)));
-    InstanceKey instanceKey = new InstanceKey(storedConfig.getJob(), 0);
-
-    storageUtil.expectTaskFetch(
-        Query.instanceScoped(IInstanceKey.build(instanceKey)).active(), storedTask);
-    expect(storageUtil.taskStore.unsafeModifyInPlace(taskId, modifiedConfig)) .andReturn(true);
-
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.instanceRewrite(
-            new InstanceConfigRewrite(instanceKey, storedConfig, modifiedConfig.newBuilder()))));
-    assertOkResponse(thrift.rewriteConfigs(request));
-    assertEquals(1L, statsProvider.getLongValue(REWRITE_CONFIGS));
-  }
-
-  @Test
-  public void testRewriteInstanceUnchanged() throws Exception {
-    TaskConfig config = productionTask();
-    String taskId = "task_id";
-    IScheduledTask task = IScheduledTask.build(new ScheduledTask().setAssignedTask(
-        new AssignedTask()
-            .setTaskId(taskId)
-            .setTask(config)));
-    InstanceKey instanceKey = new InstanceKey(config.getJob(), 0);
-
-    storageUtil.expectTaskFetch(
-        Query.instanceScoped(IInstanceKey.build(instanceKey)).active(), task);
-    expect(storageUtil.taskStore.unsafeModifyInPlace(
-        taskId,
-        ITaskConfig.build(config.deepCopy())))
-        .andReturn(false);
-
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.instanceRewrite(
-            new InstanceConfigRewrite(instanceKey, config, config))));
-    assertResponse(WARNING, thrift.rewriteConfigs(request));
-    assertEquals(0L, statsProvider.getLongValue(REWRITE_CONFIGS));
-  }
-
-  @Test
-  public void testRewriteJobCasMismatch() throws Exception {
-    JobConfiguration oldJob = makeJob(productionTask());
-    JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten"));
-    expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
-        .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
-
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.jobRewrite(
-            new JobConfigRewrite(newJob, newJob))));
-    assertResponse(WARNING, thrift.rewriteConfigs(request));
-    assertEquals(0L, statsProvider.getLongValue(REWRITE_CONFIGS));
-  }
-
-  @Test
-  public void testRewriteJobNotFound() throws Exception {
-    JobConfiguration oldJob = makeJob(productionTask());
-    JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten"));
-    expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
-        .andReturn(Optional.absent());
-
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.jobRewrite(
-            new JobConfigRewrite(oldJob, newJob))));
-    assertResponse(WARNING, thrift.rewriteConfigs(request));
-    assertEquals(0L, statsProvider.getLongValue(REWRITE_CONFIGS));
-  }
-
-  @Test
-  public void testRewriteJob() throws Exception {
-    JobConfiguration oldJob = makeJob(productionTask());
-    JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig(EXECUTOR_NAME, "rewritten"));
-    expect(storageUtil.jobStore.fetchJob(IJobKey.build(oldJob.getKey())))
-        .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
-    storageUtil.jobStore.saveAcceptedJob(validateAndPopulate(IJobConfiguration.build(newJob)));
-
-    control.replay();
-
-    RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.jobRewrite(
-            new JobConfigRewrite(oldJob, newJob))));
-    assertOkResponse(thrift.rewriteConfigs(request));
-    assertEquals(1L, statsProvider.getLongValue(REWRITE_CONFIGS));
   }
 
   @Test

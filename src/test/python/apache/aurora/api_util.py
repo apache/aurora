@@ -67,9 +67,6 @@ class SchedulerThriftApiSpec(ReadOnlyScheduler.Iface):
   def snapshot(self):
     pass
 
-  def rewriteConfigs(self, request):
-    pass
-
   def createJob(self, description):
     pass
 

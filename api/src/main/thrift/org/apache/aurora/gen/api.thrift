@@ -1139,31 +1139,6 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   Response pulseJobUpdate(1: JobUpdateKey key)
 }
 
-struct InstanceConfigRewrite {
-  /** Key for the task to rewrite. */
-  1: InstanceKey instanceKey
-  /** The original configuration. */
-  2: TaskConfig oldTask
-  /** The rewritten configuration. */
-  3: TaskConfig rewrittenTask
-}
-
-struct JobConfigRewrite {
-  /** The original job configuration. */
-  1: JobConfiguration oldJob
-  /** The rewritten job configuration. */
-  2: JobConfiguration rewrittenJob
-}
-
-union ConfigRewrite {
-  1: JobConfigRewrite jobRewrite
-  2: InstanceConfigRewrite instanceRewrite
-}
-
-struct RewriteConfigsRequest {
-  1: list<ConfigRewrite> rewriteCommands
-}
-
 struct ExplicitReconciliationSettings {
   1: optional i32 batchSize
 }
@@ -1218,15 +1193,6 @@ service AuroraAdmin extends AuroraSchedulerManager {
 
   /** Start a storage snapshot and block until it completes. */
   Response snapshot()
-
-  /**
-   * Forcibly rewrites the stored definition of user configurations.  This is intended to be used
-   * in a controlled setting, primarily to migrate pieces of configurations that are opaque to the
-   * scheduler (e.g. executorConfig).
-   * The scheduler may do some validation of the rewritten configurations, but it is important
-   * that the caller take care to provide valid input and alter only necessary fields.
-   */
-  Response rewriteConfigs(1: RewriteConfigsRequest request)
 
   /** Tell scheduler to trigger an explicit task reconciliation with the given settings. */
   Response triggerExplicitTaskReconciliation(1: ExplicitReconciliationSettings settings)

@@ -64,7 +64,6 @@ import org.apache.aurora.gen.storage.RemoveJob;
 import org.apache.aurora.gen.storage.RemoveLock;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
-import org.apache.aurora.gen.storage.RewriteTask;
 import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
@@ -104,7 +103,6 @@ import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.log.LogStorage.SchedulingService;
 import org.apache.aurora.scheduler.storage.log.SnapshotDeduplicator.SnapshotDeduplicatorImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
@@ -296,12 +294,6 @@ public class LogStorageTest extends EasyMockTest {
     SaveTasks saveTasks = new SaveTasks(ImmutableSet.of(actualTask));
     builder.add(createTransaction(Op.saveTasks(saveTasks)));
     storageUtil.taskStore.saveTasks(ImmutableSet.of(expectedTask));
-
-    RewriteTask rewriteTask = new RewriteTask("id1", new TaskConfig());
-    builder.add(createTransaction(Op.rewriteTask(rewriteTask)));
-    expect(storageUtil.taskStore.unsafeModifyInPlace(
-        rewriteTask.getTaskId(),
-        ITaskConfig.build(rewriteTask.getTask()))).andReturn(true);
 
     RemoveTasks removeTasks = new RemoveTasks(ImmutableSet.of("taskId1"));
     builder.add(createTransaction(Op.removeTasks(removeTasks)));
@@ -575,30 +567,6 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
         assertEquals(mutated, storeProvider.getUnsafeTaskStore().mutateTask(taskId, mutation));
-      }
-    }.run();
-  }
-
-  @Test
-  public void testUnsafeModifyInPlace() throws Exception {
-    String taskId = "wilma";
-    String taskId2 = "barney";
-    ITaskConfig updatedConfig = task(taskId, ScheduleStatus.RUNNING).getAssignedTask().getTask();
-    new AbstractMutationFixture() {
-      @Override
-      protected void setupExpectations() throws Exception {
-        storageUtil.expectWrite();
-        expect(storageUtil.taskStore.unsafeModifyInPlace(taskId2, updatedConfig)).andReturn(false);
-        expect(storageUtil.taskStore.unsafeModifyInPlace(taskId, updatedConfig)).andReturn(true);
-        streamMatcher.expectTransaction(
-            Op.rewriteTask(new RewriteTask(taskId, updatedConfig.newBuilder())))
-            .andReturn(position);
-      }
-
-      @Override
-      protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(taskId2, updatedConfig);
-        storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(taskId, updatedConfig);
       }
     }.run();
   }

@@ -32,7 +32,6 @@ import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Clock;
-import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -45,8 +44,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A task store implementation based on a relational database.
@@ -185,22 +182,6 @@ class DbTaskStore implements TaskStore.Mutable {
       }
       return maybeMutated;
     });
-  }
-
-  @Timed("db_storage_unsafe_modify_in_place")
-  @Override
-  public boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration) {
-    checkNotNull(taskId);
-    checkNotNull(taskConfiguration);
-    Optional<IScheduledTask> task = fetchTask(taskId);
-    if (task.isPresent()) {
-      deleteTasks(ImmutableSet.of(taskId));
-      ScheduledTask builder = task.get().newBuilder();
-      builder.getAssignedTask().setTask(taskConfiguration.newBuilder());
-      saveTasks(ImmutableSet.of(IScheduledTask.build(builder)));
-      return true;
-    }
-    return false;
   }
 
   private FluentIterable<IScheduledTask> matches(Query.Builder query) {

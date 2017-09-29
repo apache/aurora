@@ -44,11 +44,6 @@ struct SaveTasks {
   1: set<api.ScheduledTask> tasks
 }
 
-struct RewriteTask {
-  1: string taskId
-  2: api.TaskConfig task
-}
-
 struct RemoveTasks {
   1: set<string> taskIds
 }
@@ -101,7 +96,7 @@ union Op {
   8: SaveQuota saveQuota
   9: RemoveQuota removeQuota
   10: SaveHostAttributes saveHostAttributes
-  11: RewriteTask rewriteTask
+  // 11: removed
   12: SaveLock saveLock
   13: RemoveLock removeLock
   14: SaveJobUpdate saveJobUpdate

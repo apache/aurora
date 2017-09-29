@@ -16,6 +16,12 @@
 - Added the `thrift_method_interceptor_modules` scheduler flag that lets cluster operators inject
   custom Thrift method interceptors.
 
+### Deprecations and removals
+
+- Removed the `rewriteConfigs` thrift API call in the scheduler. This was a last-ditch mechanism
+  to modify scheduler state on the fly. It was considered extremely risky to use since its
+  inception, and is safer to abandon due to its lack of use and likelihood for code rot.
+
 0.18.0
 ======
 

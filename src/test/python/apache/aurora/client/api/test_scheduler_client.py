@@ -45,7 +45,6 @@ from gen.apache.aurora.api.ttypes import (
     Response,
     ResponseCode,
     ResponseDetail,
-    RewriteConfigsRequest,
     ScheduleStatus,
     TaskQuery
 )
@@ -287,12 +286,6 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mock_thrift_client.pruneTasks(IsA(TaskQuery)).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
     self.make_scheduler_proxy().pruneTasks(t)
-
-  def test_rewriteConfigs(self):
-    self.mock_thrift_client.rewriteConfigs(
-        IsA(RewriteConfigsRequest)).AndReturn(DEFAULT_RESPONSE)
-    self.mox.ReplayAll()
-    self.make_scheduler_proxy().rewriteConfigs(RewriteConfigsRequest())
 
   def test_triggerExplicitTaskReconciliation(self):
     self.mock_thrift_client.triggerExplicitTaskReconciliation(

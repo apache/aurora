@@ -42,7 +42,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 
-import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -55,7 +54,6 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,23 +218,6 @@ class MemTaskStore implements TaskStore.Mutable {
       }
       return maybeMutated;
     });
-  }
-
-  @Timed("mem_storage_unsafe_modify_in_place")
-  @Override
-  public boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration) {
-    MorePreconditions.checkNotBlank(taskId);
-    requireNonNull(taskConfiguration);
-
-    Task stored = tasks.get(taskId);
-    if (stored == null) {
-      return false;
-    } else {
-      ScheduledTask updated = stored.storedTask.newBuilder();
-      updated.getAssignedTask().setTask(taskConfiguration.newBuilder());
-      tasks.put(taskId, toTask.apply(IScheduledTask.build(updated)));
-      return true;
-    }
   }
 
   private static Predicate<Task> queryFilter(Query.Builder query) {

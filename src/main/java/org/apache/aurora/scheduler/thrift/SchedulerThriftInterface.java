@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.thrift;
 
 import java.util.Comparator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -31,7 +30,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -39,7 +37,6 @@ import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
 import org.apache.aurora.gen.ExplicitReconciliationSettings;
@@ -65,7 +62,6 @@ import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.Result;
-import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.StartMaintenanceResult;
@@ -90,19 +86,12 @@ import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
-import org.apache.aurora.scheduler.storage.CronJobStore;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
-import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.aurora.scheduler.storage.entities.IConfigRewrite;
 import org.apache.aurora.scheduler.storage.entities.IHostStatus;
-import org.apache.aurora.scheduler.storage.entities.IInstanceConfigRewrite;
-import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
-import org.apache.aurora.scheduler.storage.entities.IJobConfigRewrite;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
@@ -133,7 +122,6 @@ import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
-import static org.apache.aurora.gen.ResponseCode.WARNING;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
 import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
@@ -173,8 +161,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   @VisibleForTesting
   static final String END_MAINTENANCE = STAT_PREFIX + "endMaintenance";
   @VisibleForTesting
-  static final String REWRITE_CONFIGS = STAT_PREFIX + "rewriteConfigs";
-  @VisibleForTesting
   static final String ADD_INSTANCES = STAT_PREFIX + "addInstances";
   @VisibleForTesting
   static final String START_JOB_UPDATE = STAT_PREFIX + "startJobUpdate";
@@ -205,7 +191,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   private final AtomicLong drainHostsCounter;
   private final AtomicLong maintenanceStatusCounter;
   private final AtomicLong endMaintenanceCounter;
-  private final AtomicLong rewriteConfigsCounter;
   private final AtomicLong addInstancesCounter;
   private final AtomicLong startJobUpdateCounter;
 
@@ -252,7 +237,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     this.drainHostsCounter = statsProvider.makeCounter(DRAIN_HOSTS);
     this.maintenanceStatusCounter = statsProvider.makeCounter(MAINTENANCE_STATUS);
     this.endMaintenanceCounter = statsProvider.makeCounter(END_MAINTENANCE);
-    this.rewriteConfigsCounter = statsProvider.makeCounter(REWRITE_CONFIGS);
     this.addInstancesCounter = statsProvider.makeCounter(ADD_INSTANCES);
     this.startJobUpdateCounter = statsProvider.makeCounter(START_JOB_UPDATE);
   }
@@ -672,36 +656,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   }
 
   @Override
-  public Response rewriteConfigs(RewriteConfigsRequest request) {
-    if (request.getRewriteCommandsSize() == 0) {
-      return addMessage(empty(), INVALID_REQUEST, "No rewrite commands provided.");
-    }
-
-    return storage.write(storeProvider -> {
-      List<String> errors = Lists.newArrayList();
-
-      for (ConfigRewrite command : request.getRewriteCommands()) {
-        Optional<String> error = rewriteConfig(IConfigRewrite.build(command), storeProvider);
-        if (error.isPresent()) {
-          errors.add(error.get());
-        } else {
-          rewriteConfigsCounter.incrementAndGet();
-        }
-      }
-
-      Response resp = empty();
-      if (errors.isEmpty()) {
-        resp.setResponseCode(OK);
-      } else {
-        for (String error : errors) {
-          addMessage(resp, WARNING, error);
-        }
-      }
-      return resp;
-    });
-  }
-
-  @Override
   public Response triggerExplicitTaskReconciliation(ExplicitReconciliationSettings settings)
       throws TException {
     try {
@@ -724,92 +678,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   public Response triggerImplicitTaskReconciliation() throws TException {
     taskReconciler.triggerImplicitReconciliation();
     return ok();
-  }
-
-  private Optional<String> rewriteJob(IJobConfigRewrite jobRewrite, CronJobStore.Mutable jobStore) {
-    IJobConfiguration existingJob = jobRewrite.getOldJob();
-    IJobConfiguration rewrittenJob;
-    Optional<String> error = Optional.absent();
-    try {
-      rewrittenJob = configurationManager.validateAndPopulate(jobRewrite.getRewrittenJob());
-    } catch (TaskDescriptionException e) {
-      // We could add an error here, but this is probably a hint of something wrong in
-      // the client that's causing a bad configuration to be applied.
-      throw new RuntimeException(e);
-    }
-
-    if (existingJob.getKey().equals(rewrittenJob.getKey())) {
-      Optional<IJobConfiguration> job = jobStore.fetchJob(existingJob.getKey());
-      if (job.isPresent()) {
-        IJobConfiguration storedJob = job.get();
-        if (storedJob.equals(existingJob)) {
-          jobStore.saveAcceptedJob(rewrittenJob);
-        } else {
-          error = Optional.of(
-              "CAS compare failed for " + JobKeys.canonicalString(storedJob.getKey()));
-        }
-      } else {
-        error = Optional.of(
-            "No jobs found for key " + JobKeys.canonicalString(existingJob.getKey()));
-      }
-    } else {
-      error = Optional.of("Disallowing rewrite attempting to change job key.");
-    }
-
-    return error;
-  }
-
-  private Optional<String> rewriteInstance(
-      IInstanceConfigRewrite instanceRewrite,
-      MutableStoreProvider storeProvider) {
-
-    IInstanceKey instanceKey = instanceRewrite.getInstanceKey();
-    Optional<String> error = Optional.absent();
-    Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
-        Query.instanceScoped(instanceKey.getJobKey(),
-            instanceKey.getInstanceId())
-            .active());
-    Optional<IAssignedTask> task =
-        Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
-            .transform(IScheduledTask::getAssignedTask);
-
-    if (task.isPresent()) {
-      if (task.get().getTask().equals(instanceRewrite.getOldTask())) {
-        ITaskConfig newConfiguration = instanceRewrite.getRewrittenTask();
-        boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
-            task.get().getTaskId(), newConfiguration);
-        if (!changed) {
-          error = Optional.of("Did not change " + task.get().getTaskId());
-        }
-      } else {
-        error = Optional.of("CAS compare failed for " + instanceKey);
-      }
-    } else {
-      error = Optional.of("No active task found for " + instanceKey);
-    }
-
-    return error;
-  }
-
-  private Optional<String> rewriteConfig(
-      IConfigRewrite command,
-      MutableStoreProvider storeProvider) {
-
-    Optional<String> error;
-    switch (command.getSetField()) {
-      case JOB_REWRITE:
-        error = rewriteJob(command.getJobRewrite(), storeProvider.getCronJobStore());
-        break;
-
-      case INSTANCE_REWRITE:
-        error = rewriteInstance(command.getInstanceRewrite(), storeProvider);
-        break;
-
-      default:
-        throw new IllegalArgumentException("Unhandled command type " + command.getSetField());
-    }
-
-    return error;
   }
 
   @Override

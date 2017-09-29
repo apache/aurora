@@ -98,22 +98,6 @@ public interface TaskStore {
     Optional<IScheduledTask> mutateTask(
         String taskId,
         Function<IScheduledTask, IScheduledTask> mutator);
-
-    /**
-     * Rewrites a task's configuration in-place.
-     * <p>
-     * <b>WARNING</b>: this is a dangerous operation, and should not be used without exercising
-     * great care.  This feature should be used as a last-ditch effort to rewrite things that
-     * the scheduler otherwise can't (e.g. {@link ITaskConfig#executorConfig}) rewrite in a
-     * controlled/tested backfill operation.
-     *
-     * @param taskId ID of the task to alter.
-     * @param taskConfiguration Configuration object to swap with the existing task's
-     *                          configuration.
-     * @return {@code true} if the modification took effect, or {@code false} if the task does not
-     *         exist in the store.
-     */
-    boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration);
   }
 
   final class Util {

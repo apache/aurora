@@ -37,7 +37,6 @@ import org.apache.aurora.common.stats.SlidingStats;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
-import org.apache.aurora.gen.storage.RewriteTask;
 import org.apache.aurora.gen.storage.SaveCronJob;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
@@ -67,7 +66,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -339,12 +337,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
             Op._Fields.SAVE_TASKS,
             op -> writeBehindTaskStore.saveTasks(
                 thriftBackfill.backfillTasks(op.getSaveTasks().getTasks())))
-        .put(Op._Fields.REWRITE_TASK, op -> {
-          RewriteTask rewriteTask = op.getRewriteTask();
-          writeBehindTaskStore.unsafeModifyInPlace(
-              rewriteTask.getTaskId(),
-              ITaskConfig.build(rewriteTask.getTask()));
-        })
         .put(
             Op._Fields.REMOVE_TASKS,
             op -> writeBehindTaskStore.deleteTasks(op.getRemoveTasks().getTaskIds()))
