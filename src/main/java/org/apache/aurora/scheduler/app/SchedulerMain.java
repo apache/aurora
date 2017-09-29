@@ -143,16 +143,17 @@ public class SchedulerMain {
   }
 
   void run() {
-    startupServices.startAsync();
-    Runtime.getRuntime().addShutdownHook(new Thread(SchedulerMain.this::stop, "ShutdownHook"));
-    startupServices.awaitHealthy();
-
-    LeadershipListener leaderListener = schedulerLifecycle.prepare();
-
-    HostAndPort httpAddress = httpService.getAddress();
-    InetSocketAddress httpSocketAddress =
-        InetSocketAddress.createUnresolved(httpAddress.getHost(), httpAddress.getPort());
     try {
+      startupServices.startAsync();
+      Runtime.getRuntime().addShutdownHook(new Thread(SchedulerMain.this::stop, "ShutdownHook"));
+      startupServices.awaitHealthy();
+
+      LeadershipListener leaderListener = schedulerLifecycle.prepare();
+
+      HostAndPort httpAddress = httpService.getAddress();
+      InetSocketAddress httpSocketAddress =
+          InetSocketAddress.createUnresolved(httpAddress.getHost(), httpAddress.getPort());
+
       schedulerService.lead(
           httpSocketAddress,
           ImmutableMap.of(SERVERSET_ENDPOINT_NAME.get(), httpSocketAddress),
@@ -161,10 +162,10 @@ public class SchedulerMain {
       throw new IllegalStateException("Failed to lead service.", e);
     } catch (InterruptedException e) {
       throw new IllegalStateException("Interrupted while joining scheduler service group.", e);
+    } finally {
+      appLifecycle.awaitShutdown();
+      stop();
     }
-
-    appLifecycle.awaitShutdown();
-    stop();
   }
 
   @VisibleForTesting
