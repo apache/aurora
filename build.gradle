@@ -428,7 +428,6 @@ dependencies {
   compile 'org.mybatis:mybatis-guice:3.7'
   compile 'org.mybatis:mybatis-migrations:3.2.0'
   compile 'org.quartz-scheduler:quartz:2.2.2'
-  compile "uno.perk:forward:1.0.0"
 
   testCompile "com.sun.jersey:jersey-client:${jerseyRev}"
   testCompile "junit:junit:${junitRev}"
