@@ -3,3 +3,30 @@
   margin: 10px 0;
   padding: 20px;
 }
+
+.content-panel-group {
+  margin: 10px 0;
+
+  .content-panel:last-child {
+    border-radius: 0px 0px 5px 5px;
+  }
+
+  .content-panel-title {
+    padding: 15px 20px;
+    background-color: $content_box_color;
+    border-bottom: 1px solid #d7e2ec;
+    color: #555;
+    border-radius: 5px 5px 0px 0px;
+    font-weight: 700;
+    font-size: 18px;
+  }
+
+  .content-panel {
+    padding: 20px;
+    background-color: $content_box_color;
+  }
+
+  .content-panel + .content-panel {
+    margin-top: 1px;
+  }
+}

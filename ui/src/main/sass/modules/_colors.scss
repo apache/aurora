@@ -13,3 +13,23 @@ $success_secondary_color: #afe8b8;
 
 $error_color: #d63c39;
 $error_secondary_color: rgb(230, 101, 98);
+
+// Use to signify something is in a good state.
+$colors_success_light: #afe8b8;
+$colors_success: #74C080;
+$colors_success_dark: #628a68;
+
+// Use to attract user's attention to negative behavior.
+$colors_error_light: rgb(230, 101, 98);
+$colors_error: #d63c39;
+$colors_error_dark: #882422;
+
+// Use to highlight something that *may* need attention.
+$colors_warning_light: #f5d96c;
+$colors_warning: #f3c200;
+$colors_warning_dark: #d4a900;
+
+// Use to highlight something important, but that is currently operating as expected.
+$colors_highlight_light: #8ac5f9;
+$colors_highlight: #5FA2DD;
+$colors_highlight_dark: #3b71a0;

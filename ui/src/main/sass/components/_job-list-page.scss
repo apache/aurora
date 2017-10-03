@@ -1,0 +1,82 @@
+.job-task-stats {
+  display: block;
+  padding: 0;
+  margin: 0 10px;
+  white-space: nowrap;
+
+  li {
+    display: inline-block;
+    margin-right: 12px;
+    font-size: 16px;
+  }
+
+  .img-circle {
+    width: 10px;
+    height: 10px;
+    background-color: #CCC;
+    display: inline-block;
+    border-radius: 50%;
+  }
+}
+
+.job-list-sort-control {
+  text-align: right;
+  margin-bottom: 10px;
+  li {
+    font-size: 14px;
+  }
+}
+
+td.job-list-name {
+  width: 99%;
+
+  .glyphicon {
+    font-size: 12px;
+    margin-left: 3px;
+  }
+}
+
+td.job-list-stats {
+  text-align: right;
+}
+
+td.job-list-type {
+  text-align: center;
+}
+
+.pending-task {
+  background-color: $colors_warning !important;
+}
+
+.active-task {
+  background-color: $colors_success !important;
+}
+
+.failed-task {
+  background-color: $colors_error !important;
+}
+
+.job-env {
+  display: inline-block;
+  font-size: 11px;
+  text-transform: uppercase;
+  overflow: hidden;
+  margin-right: 20px;
+}
+
+.job-tier {
+  display: inline-block;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #777;
+  padding: 2px;
+}
+
+.job-type {
+  font-size: 11px;
+  text-transform: uppercase;
+  display: inline-block;
+  width: 50px;
+  text-align: center;
+  color: $secondary_font_color;
+}

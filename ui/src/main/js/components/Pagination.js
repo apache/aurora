@@ -56,6 +56,11 @@ export default class Pagination extends React.Component {
     const { reverseSort, sortBy } = this.props;
     const gte = reverseSort ? -1 : 1;
     const lte = reverseSort ? 1 : -1;
+    if (typeof sortBy === 'function') {
+      return data.sort((a, b) => {
+        return (sortBy(a) > sortBy(b)) ? gte : lte;
+      });
+    }
     return data.sort((a, b) => {
       return (a[sortBy] > b[sortBy]) ? gte : lte;
     });
@@ -88,8 +93,8 @@ export default class Pagination extends React.Component {
       numPages={Math.ceil(filtered.length / numberPerPage)}
       onClick={(page) => that.changePage(page)} />;
 
-    // React/JSX statements must resolve to a single node, so we need to wrap the page in a parent.
-    // We need the caller to be able to signify they are paging through a table element.
+    // We need the caller to be able to signify they are paging through a table element so
+    // we know to wrap the pagination links in a tr.
     if (isTable) {
       return (<tbody>
         {elements}

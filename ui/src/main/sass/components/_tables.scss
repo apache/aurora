@@ -57,6 +57,28 @@
   }
 }
 
+.psuedo-table {
+  width: 100%;
+  font-size: 16px;
+  border-top: 1px solid $grid_color;
+
+  td {
+    padding: 5px;
+  }
+
+  tr:hover {
+    background: #edf5fd;
+  }
+
+  tr {
+    border-bottom: 1px solid $grid_color;
+  }
+
+  a {
+    font-weight: 600;
+  }
+}
+
 .table-input-wrapper {
   border-radius: 4px;
   padding: 5px;
