@@ -29,16 +29,17 @@ import org.apache.aurora.common.args.Arg;
 import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.args.constraints.CanRead;
 import org.apache.aurora.common.args.constraints.Exists;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.conn.ConnectionKeepAliveStrategy;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.DefaultConnectionKeepAliveStrategy;
-import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.asynchttpclient.AsyncHttpClient;
+import org.asynchttpclient.DefaultAsyncHttpClientConfig;
+import org.asynchttpclient.channel.DefaultKeepAliveStrategy;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkArgument;
+
+import static org.asynchttpclient.Dsl.asyncHttpClient;
 
 /**
  * Binding module for webhook management.
@@ -70,24 +71,23 @@ public class WebhookModule extends AbstractModule {
   protected void configure() {
     if (enableWebhook) {
       WebhookInfo webhookInfo = parseWebhookConfig(readWebhookFile());
-      int timeout = webhookInfo.getConnectonTimeoutMsec();
-      RequestConfig config = RequestConfig.custom()
-          .setConnectTimeout(timeout) // establish connection with server eg time to TCP handshake.
-          .setConnectionRequestTimeout(timeout)  // get a connection from internal pool.
-          .setSocketTimeout(timeout) // wait for data after connection was established.
+      DefaultAsyncHttpClientConfig config = new DefaultAsyncHttpClientConfig.Builder()
+          .setConnectTimeout(webhookInfo.getConnectonTimeoutMsec())
+          .setHandshakeTimeout(webhookInfo.getConnectonTimeoutMsec())
+          .setSslSessionTimeout(webhookInfo.getConnectonTimeoutMsec())
+          .setReadTimeout(webhookInfo.getConnectonTimeoutMsec())
+          .setRequestTimeout(webhookInfo.getConnectonTimeoutMsec())
+          .setKeepAliveStrategy(new DefaultKeepAliveStrategy())
           .build();
-      ConnectionKeepAliveStrategy connectionStrategy = new DefaultConnectionKeepAliveStrategy();
-      CloseableHttpClient client =
-          HttpClientBuilder.create()
-              .setDefaultRequestConfig(config)
-              // being explicit about using default Keep-Alive strategy.
-              .setKeepAliveStrategy(connectionStrategy)
-              .build();
+      AsyncHttpClient httpClient = asyncHttpClient(config);
 
       bind(WebhookInfo.class).toInstance(webhookInfo);
-      bind(CloseableHttpClient.class).toInstance(client);
+      bind(AsyncHttpClient.class).toInstance(httpClient);
       PubsubEventModule.bindSubscriber(binder(), Webhook.class);
       bind(Webhook.class).in(Singleton.class);
+
+      SchedulerServicesModule.addSchedulerActiveServiceBinding(binder())
+          .to(Webhook.class);
     }
   }
 

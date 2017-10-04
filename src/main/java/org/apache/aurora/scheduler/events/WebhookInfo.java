@@ -129,6 +129,20 @@ public class WebhookInfo {
       return this;
     }
 
+    /**
+     * This method will add the supplied headers to the current headers.
+     *
+     * @param values The headers to add.
+     * @return The modified builder.
+     */
+    public WebhookInfoBuilder setHeaders(Map<String, String> values) {
+      for (Map.Entry<String, String> entry : values.entrySet()) {
+        setHeader(entry.getKey(), entry.getValue());
+      }
+
+      return this;
+    }
+
     public WebhookInfoBuilder setTargetURL(String targetURL) {
       this.targetURL = targetURL;
       return this;

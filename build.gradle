@@ -82,14 +82,14 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.gsonRev = '2.3.1'
   ext.guavaRev = '20.0'
   ext.guiceRev = '3.0'
-  ext.httpclientRev = '4.5.2'
-  ext.httpcoreRev = '4.4.4'
+  ext.asyncHttpclientRev = '2.0.37'
   ext.jacksonRev = '2.5.1'
   ext.jerseyRev = '1.19'
   ext.jsrRev = '3.0.1'
   ext.junitRev = '4.12'
   ext.logbackRev = '1.2.3'
   ext.mybatisRev = '3.4.1'
+  ext.nettyRev = '4.0.52.Final'
   ext.protobufRev = '2.6.1'
   ext.servletRev = '3.1.0'
   ext.slf4jRev = '1.7.25'
@@ -110,13 +110,12 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
       // See http://forums.gradle.org/gradle/topics/shouldnt-resolutionstrategy-affect-depending-projects-transitive-dependencies
       resolutionStrategy {
         failOnVersionConflict()
-        force "org.apache.httpcomponents:httpclient:${httpclientRev}"
-        force "org.apache.httpcomponents:httpcore:${httpcoreRev}"
         force "com.fasterxml.jackson.core:jackson-annotations:${jacksonRev}"
         force "com.fasterxml.jackson.core:jackson-core:${jacksonRev}"
         force "com.google.code.gson:gson:${gsonRev}"
         force "com.google.guava:guava:${guavaRev}"
         force "com.google.protobuf:protobuf-java:${protobufRev}"
+        force "io.netty:netty-handler:${nettyRev}"
         force "junit:junit:${junitRev}"
         force "org.apache.thrift:libthrift:${thriftRev}"
         force "org.apache.zookeeper:zookeeper:${zookeeperRev}"
@@ -415,8 +414,7 @@ dependencies {
   compile "org.apache.curator:curator-framework:${curatorRev}"
   compile "org.apache.curator:curator-recipes:${curatorRev}"
   compile 'org.apache.mesos:mesos:1.2.0'
-  compile "org.apache.httpcomponents:httpclient:${httpclientRev}"
-  compile "org.apache.httpcomponents:httpcore:${httpcoreRev}"
+  compile "org.asynchttpclient:async-http-client:${asyncHttpclientRev}"
   compile "org.apache.shiro:shiro-guice:${shiroRev}"
   compile "org.apache.shiro:shiro-web:${shiroRev}"
   compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"

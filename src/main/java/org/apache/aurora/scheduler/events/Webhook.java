@@ -13,59 +13,73 @@
  */
 package org.apache.aurora.scheduler.events;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 import com.google.common.eventbus.Subscribe;
 
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
 
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.util.EntityUtils;
+import org.asynchttpclient.AsyncCompletionHandler;
+import org.asynchttpclient.AsyncHttpClient;
+import org.asynchttpclient.BoundRequestBuilder;
+import org.asynchttpclient.HttpResponseStatus;
+import org.asynchttpclient.Response;
+import org.asynchttpclient.util.HttpConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Watches TaskStateChanges and send events to configured endpoint.
  */
-public class Webhook implements EventSubscriber {
+public class Webhook extends AbstractIdleService implements EventSubscriber {
+  @VisibleForTesting
+  static final String ATTEMPTS_STAT_NAME = "webhooks_attempts";
+  @VisibleForTesting
+  static final String SUCCESS_STAT_NAME = "webhooks_success";
+  @VisibleForTesting
+  static final String ERRORS_STAT_NAME = "webhooks_errors";
+  @VisibleForTesting
+  static final String USER_ERRORS_STAT_NAME = "webhooks_user_errors";
 
   private static final Logger LOG = LoggerFactory.getLogger(Webhook.class);
 
   private final WebhookInfo webhookInfo;
-  private final CloseableHttpClient httpClient;
+  private final AsyncHttpClient httpClient;
   private final Predicate<ScheduleStatus> isWhitelisted;
 
+  private final AtomicLong attemptsCounter;
+  private final AtomicLong successCounter;
+  private final AtomicLong errorsCounter;
+  private final AtomicLong userErrorsCounter;
+
   @Inject
-  Webhook(CloseableHttpClient httpClient, WebhookInfo webhookInfo) {
-    this.webhookInfo = webhookInfo;
-    this.httpClient = httpClient;
-    // A task status is whitelisted if: a) the whitelist is absent, or b) the task status is
-    // explicitly specified in the whitelist.
+  Webhook(AsyncHttpClient httpClient, WebhookInfo webhookInfo, StatsProvider statsProvider) {
+    this.webhookInfo = requireNonNull(webhookInfo);
+    this.httpClient = requireNonNull(httpClient);
+    this.attemptsCounter = statsProvider.makeCounter(ATTEMPTS_STAT_NAME);
+    this.successCounter = statsProvider.makeCounter(SUCCESS_STAT_NAME);
+    this.errorsCounter = statsProvider.makeCounter(ERRORS_STAT_NAME);
+    this.userErrorsCounter = statsProvider.makeCounter(USER_ERRORS_STAT_NAME);
     this.isWhitelisted = status -> !webhookInfo.getWhitelistedStatuses().isPresent()
         || webhookInfo.getWhitelistedStatuses().get().contains(status);
     LOG.info("Webhook enabled with info" + this.webhookInfo);
   }
 
-  private HttpPost createPostRequest(TaskStateChange stateChange)
-      throws UnsupportedEncodingException {
-    String eventJson = stateChange.toJson();
-    HttpPost post = new HttpPost();
-    post.setURI(webhookInfo.getTargetURI());
-    post.setHeader("Timestamp", Long.toString(Instant.now().toEpochMilli()));
-    post.setEntity(new StringEntity(eventJson));
-    webhookInfo.getHeaders().entrySet().forEach(
-        e -> post.setHeader(e.getKey(), e.getValue()));
-    return post;
+  private BoundRequestBuilder createRequest(TaskStateChange stateChange) {
+    return httpClient.preparePost(webhookInfo.getTargetURI().toString())
+        .setBody(stateChange.toJson())
+        .setSingleHeaders(webhookInfo.getHeaders())
+        .addHeader("Timestamp", Long.toString(Instant.now().toEpochMilli()));
   }
 
   /**
@@ -82,20 +96,49 @@ public class Webhook implements EventSubscriber {
     // resend the entire state. This check also ensures that only whitelisted statuses will be sent
     // to the configured endpoint.
     if (stateChange.getOldState().isPresent() && isWhitelisted.apply(stateChange.getNewState())) {
+      attemptsCounter.incrementAndGet();
       try {
-        HttpPost post = createPostRequest(stateChange);
-        // Using try-with-resources on closeable and following
-        // https://hc.apache.org/httpcomponents-client-4.5.x/quickstart.html to make sure stream is
-        // closed after we get back a response to not leak http connections.
-        try (CloseableHttpResponse httpResponse = httpClient.execute(post)) {
-          HttpEntity entity = httpResponse.getEntity();
-          EntityUtils.consumeQuietly(entity);
-        } catch (IOException exp) {
-          LOG.error("Error sending a Webhook event", exp);
-        }
-      } catch (UnsupportedEncodingException exp) {
-        LOG.error("HttpPost exception when creating an HTTP Post request", exp);
+        // We don't care about the response body, so only listen for the HTTP status code.
+        createRequest(stateChange).execute(new AsyncCompletionHandler<Integer>() {
+          @Override
+          public void onThrowable(Throwable t) {
+            errorsCounter.incrementAndGet();
+            LOG.error("Error sending a Webhook event", t);
+          }
+
+          @Override
+          public State onStatusReceived(HttpResponseStatus status) throws Exception {
+            if (status.getStatusCode() == HttpConstants.ResponseStatusCodes.OK_200) {
+              successCounter.incrementAndGet();
+            } else {
+              userErrorsCounter.incrementAndGet();
+            }
+
+            // Abort after we get the status because that is all we use for processing.
+            return State.ABORT;
+          }
+
+          @Override
+          public Integer onCompleted(Response response) throws Exception {
+            // We do not care about the full response.
+            return 0;
+          }
+        });
+      } catch (Exception e) {
+        LOG.error("Error making Webhook request", e);
+        errorsCounter.incrementAndGet();
       }
     }
+  }
+
+  @Override
+  protected void startUp() throws Exception {
+    // No-op
+  }
+
+  @Override
+  protected void shutDown() throws Exception {
+    LOG.info("Shutting down async Webhook client.");
+    httpClient.close();
   }
 }
