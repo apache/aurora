@@ -194,7 +194,7 @@ gpg --armor --output ${dist_name}.tar.gz.asc --detach-sig ${dist_name}.tar.gz
 # Create the checksums
 echo "Creating checksums"
 gpg --print-md MD5 ${dist_name}.tar.gz > ${dist_name}.tar.gz.md5
-shasum ${dist_name}.tar.gz > ${dist_name}.tar.gz.sha
+shasum -a 512 ${dist_name}.tar.gz > ${dist_name}.tar.gz.sha512
 
 if [[ $publish == 1 ]]; then
   # Commit the release
