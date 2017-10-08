@@ -475,7 +475,7 @@ unified-container, the container can be omitted from your job config.
   param                  | type     | description
   -----                  | :----:   | -----------
   ```container_path```   | String   | Path on the host to mount.
-  ```volume_path```      | String   | Mount point in the container.
+  ```host_path```        | String   | Mount point in the container.
   ```mode```             | Enum     | Mode of the mount, can be 'RW' or 'RO'.
 
 ### AppcImage
