@@ -18,7 +18,7 @@ set -eux
 date
 
 # Run all Java tests
-./gradlew -Pq clean build
+./gradlew --no-daemon -Pq clean build
 
 # Run Python import ordering check
 ./build-support/python/isort-check
