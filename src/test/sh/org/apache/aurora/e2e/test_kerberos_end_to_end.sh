@@ -58,6 +58,7 @@ function snapshot_as {
   curl -u : --negotiate -w '%{http_code}\n' \
     -o $(printf $SNAPSHOT_RESPONSE_OUTFILE $principal) \
     -v "http://$SCHEDULER_HOSTNAME:8081/api" \
+    -H "Content-Type:application/vnd.apache.thrift.json" \
     --data-binary "$SNAPSHOT_RPC_DATA"
   kdestroy
 }
