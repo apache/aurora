@@ -1,0 +1,23 @@
+.img-circle {
+  width: 10px;
+  height: 10px;
+  background-color: #CCC;
+  display: inline-block;
+  border-radius: 50%;
+
+  &.okay {
+    background-color: $colors_success;
+  }
+
+  &.error {
+    background-color: $colors_error;
+  }
+
+  &.attention {
+    background-color: $colors_warning;
+  }
+
+  &.in-progress {
+    background-color: $colors_highlight;
+  }
+}

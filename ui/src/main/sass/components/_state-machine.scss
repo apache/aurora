@@ -1,0 +1,114 @@
+.state-machine {
+  position: relative;
+  margin-top: 20px;
+  padding-left: 120px;
+
+  ul {
+    list-style-type: none;
+    padding: 0;
+  }
+
+  ul:before {
+    position: absolute;
+    top: 10px;
+    bottom: 25px;
+    display: block;
+    width: 3px;
+    content: "";
+    background-color: $grid_color;
+  }
+
+  ul.okay:before {
+    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_success);
+  }
+
+  ul.error:before {
+    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_error);
+  }
+
+  ul.attention:before {
+    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_warning);
+  }
+
+  ul.in-progress:before {
+    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_highlight);
+  }
+
+  li {
+    margin: 20px 0px;
+    position: relative;
+    color: $secondary_font_color;
+    min-height: 30px;
+  }
+
+  li.active {
+    color: $primary_font_color;
+  }
+
+  .state-machine-item {
+    display: flex;
+    flex-direction: row;
+  }
+
+  svg {
+    width: 15px;
+    height: 15px;
+    margin-left: -4px;
+    margin-right: 5px;
+    display: inline-block;
+    margin-top: 4px;
+  }
+
+  .state-machine-bullet {
+    fill: $grid_color;
+    stroke: $grid_highlight_color;
+    stroke-width: 2;
+  }
+
+  .active.okay .state-machine-bullet {
+    fill: $colors_success_light;
+    stroke: $colors_success;
+  }
+
+  .active.attention .state-machine-bullet {
+    fill: #f3bc88;
+    stroke: #FA9F47;
+  }
+
+  .active.error .state-machine-bullet {
+    fill: $colors_error_light;
+    stroke: $colors_error;
+  }
+
+  .active.in-progress .state-machine-bullet {
+    fill: $colors_highlight_light;
+    stroke: $colors_highlight;
+  }
+
+  .state-machine-item-details {
+    display: inline-block;
+    position: relative;
+    width: 100%;
+  }
+
+  .state-machine-item-state {
+    font-size: 14px;
+    font-weight: 500;
+    width: 100px;
+    display: inline-block;
+  }
+
+  .state-machine-item-time {
+    font-size: 11px;
+    color: $secondary_font_color;
+    position: absolute;
+    left: -120px;
+    text-align: right;
+  }
+
+  .state-machine-item-message {
+    display: block;
+    font-size: 12px;
+    color: $secondary_font_color;
+  }
+}

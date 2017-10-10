@@ -6,11 +6,14 @@
     "standard-react"
   ],
   "env": {
-    "jasmine": true
+    "jest": true
   },
   "globals": {
+    "ACTIVE_STATES": true,
     "Thrift": true,
-    "ReadOnlySchedulerClient"
+    "ReadOnlySchedulerClient": true,
+    "ScheduleStatus": true,
+    "TaskQuery": true
   },
   "plugins": [
     "chai-friendly"

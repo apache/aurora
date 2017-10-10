@@ -1,0 +1,111 @@
+.instance-page {
+  .active-task-details {
+    h5, .task-details-title {
+      text-transform: uppercase;
+      margin: 0;
+      margin-bottom: 3px;
+      font-weight: 700;
+    }
+
+    code {
+      background-color: $content_box_color;
+      color: #555;
+      padding: 0;
+    }
+
+    a {
+      display:block;
+      line-height: 1em;
+      margin-bottom: 20px;
+    }
+  }
+
+  .instance-history {
+    .state-machine, .state-machine ul, .state-machine li {
+      margin: 0 !important;
+    }
+
+    .instance-history-item-body {
+      padding: 20px;
+    }
+
+    .instance-history-item-footer {
+      padding: 10px 40px;
+      font-size: 12px;
+
+      strong {
+        text-transform: uppercase;
+      }
+
+      span {
+        display: inline-block;
+        background-color: rgba(0, 0, 0, 0.02);
+        padding: 3px 10px;
+      }
+    }
+
+    .instance-history-item {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+    }
+
+    .instance-history-time {
+      margin: 0px 5px;
+      font-size: 12px;
+    }
+
+    .instance-history-message {
+      color: $secondary_font_color;
+      font-size: 12px;
+    }
+
+    .img-circle {
+      margin: 0px 10px;
+      width: 8px;
+      height: 8px;
+    }
+
+    .instance-history-item-details {
+      margin: 0px 5px;
+
+      h5 {
+        display: inline-block;
+        margin: 0;
+        font-weight: 600;
+      }
+
+      &:hover {
+        cursor: pointer;
+        cursor: hand;
+      }
+    }
+
+    .instance-history-item-actions {
+      margin: 0;
+      margin-left: auto;
+      list-style-type: none;
+      padding: 0;
+
+      li {
+        display: inline-block;
+        padding: 0;
+        margin: 0;
+      }
+
+      a {
+        display: inline-block;
+        border: 1px solid $grid_color;
+        background-color: $content_box_color;
+        padding: 5px 10px;
+        margin-left: 3px;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .debug-data {
+    font-family: Menlo,Monaco,Consolas,"Courier New",monospace;
+    font-size: 90%;
+  }
+}

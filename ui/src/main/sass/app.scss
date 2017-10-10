@@ -7,8 +7,11 @@
 /* Indiviudal Components */
 @import 'components/breadcrumb';
 @import 'components/navigation';
+@import 'components/state-machine';
+@import 'components/status';
 @import 'components/tables';
 
 /* Page Styles */
 @import 'components/home-page';
+@import 'components/instance-page';
 @import 'components/job-list-page';
