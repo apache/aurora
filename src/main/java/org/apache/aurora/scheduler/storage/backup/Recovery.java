@@ -13,7 +13,9 @@
  */
 package org.apache.aurora.scheduler.storage.backup;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -23,10 +25,8 @@ import javax.inject.Inject;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.io.Files;
 import com.google.common.util.concurrent.Atomics;
 
-import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.base.Command;
 import org.apache.aurora.gen.storage.Snapshot;
@@ -35,6 +35,9 @@ import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.transport.TIOStreamTransport;
 
 import static java.util.Objects.requireNonNull;
 
@@ -138,10 +141,13 @@ public interface Recovery {
         throw new RecoveryException("Backup " + backupName + " does not exist.");
       }
 
-      Snapshot snapshot;
+      Snapshot snapshot = new Snapshot();
       try {
-        snapshot = ThriftBinaryCodec.decode(Snapshot.class, Files.toByteArray(backupFile));
-      } catch (CodingException e) {
+        TBinaryProtocol prot = new TBinaryProtocol(
+            new TIOStreamTransport(new BufferedInputStream(new FileInputStream(backupFile))));
+
+        snapshot.read(prot);
+      } catch (TException e) {
         throw new RecoveryException("Failed to decode backup " + e, e);
       } catch (IOException e) {
         throw new RecoveryException("Failed to read backup " + e, e);
