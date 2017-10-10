@@ -1,0 +1,38 @@
+.update-list {
+  .update-list-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid $grid_color;
+
+    .img-circle {
+      margin-right: 10px;
+    }
+
+    a {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .update-list-item-status {
+      display: block;
+    }
+
+    &:hover {
+      background-color: #edf5fd;
+    }
+
+    .update-list-user {
+      font-weight: 600;
+    }
+
+    .update-list-status {
+      color: $secondary_font_color;
+    }
+
+    .update-list-last-updated {
+      margin-left: auto;
+      color: $secondary_font_color;
+    }
+  }
+}

@@ -1,0 +1,151 @@
+.update-page {
+  pre {
+    border: 0;
+    background-color: $content_box_color;
+  }
+
+  .update-summary-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    text-transform: uppercase;
+
+    h5 {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    span {
+      font-size: 12px;
+    }
+  }
+
+  .update-settings {
+    width: 100%;
+    font-size: 14px;
+    text-transform: uppercase;
+
+    td {
+      padding: 3px;
+    }
+  }
+
+  .update-byline {
+    margin-top: -15px;
+    color: $secondary_font_color;
+
+    span + span {
+      margin: 0px 3px;
+    }
+
+    span:last-child {
+      margin: 0;
+    }
+  }
+
+  .update-time {
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .update-time h4 {
+    font-size: 33px;
+    margin: 0;
+  }
+
+  .update-time .time-ago {
+    color: #999;
+  }
+
+  .time-divider {
+    text-align: center;
+    font-size: 70px;
+    font-weight: bold;
+    color: #ccc;
+  }
+
+  .time-display-duration {
+    text-transform: uppercase;
+    text-align: center;
+    color: #999;
+    margin-top: -20px;
+    margin-bottom: 20px;
+  }
+
+  .update-duration {
+    text-align: center;
+    color: #999;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .update-time-range {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin-top: 20px;
+
+    h5 {
+      color: #CCC;
+      font-weight: 900;
+      font-size: 60px;
+      line-height: 40px;
+    }
+
+    .update-time, .update-duration {
+      font-size: 12px;
+    }
+  }
+
+  .instance-events {
+    .glyphicon-chevron-right {
+      color: $secondary_font_color;
+      font-size: 12px;
+    }
+
+    .update-instance-event-id {
+      font-weight: $heavy;
+      margin: 0 5px;
+      display: inline-block;
+    }
+
+    .update-instance-event-time {
+      float: right;
+      color: $secondary_font_color;
+      display: inline-block;
+      font-size: 14px;
+    }
+
+    .update-instance-event-status {
+      .glyphicon {
+        margin-left: 5px;
+      }
+
+      .okay {
+        color: $colors_success !important;
+      }
+
+      .attention {
+        color: $colors_warning !important;
+      }
+
+      .error {
+        color: $colors_error !important;
+      }
+
+      .in-progress {
+        color: $colors_highlight !important;
+      }
+    }
+
+    .update-instance-event-container {
+      border-bottom: 1px solid $grid_color;
+      padding: 5px 20px;
+
+      &:hover {
+        cursor: pointer;
+        cursor: hand;
+      }
+    }
+  }
+}

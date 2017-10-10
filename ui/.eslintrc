@@ -10,10 +10,16 @@
   },
   "globals": {
     "ACTIVE_STATES": true,
-    "Thrift": true,
+    "ACTIVE_JOB_UPDATE_STATES": true,
+    "JobKey": true,
+    "JobUpdateAction": true,
+    "JobUpdateKey": true,
+    "JobUpdateQuery": true,
+    "JobUpdateStatus": true,
     "ReadOnlySchedulerClient": true,
     "ScheduleStatus": true,
-    "TaskQuery": true
+    "TaskQuery": true,
+    "Thrift": true
   },
   "plugins": [
     "chai-friendly"

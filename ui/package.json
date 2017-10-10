@@ -4,6 +4,7 @@
   "description": "UI project for Apache Aurora",
   "main": "index.js",
   "dependencies": {
+    "es6-shim": "^0.35.3",
     "moment": "^2.18.1",
     "react": "^16.0.0",
     "react-dom": "^16.0.0",
@@ -40,7 +41,10 @@
     "webpack": "^2.6.1"
   },
   "jest": {
-    "moduleDirectories": ["./src/main/js", "node_modules"],
+    "moduleDirectories": [
+      "./src/main/js",
+      "node_modules"
+    ],
     "setupFiles": [
       "./test-setup.js"
     ]

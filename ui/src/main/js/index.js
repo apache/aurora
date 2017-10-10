@@ -7,6 +7,8 @@ import Navigation from 'components/Navigation';
 import Home from 'pages/Home';
 import Instance from 'pages/Instance';
 import Jobs from 'pages/Jobs';
+import Update from 'pages/Update';
+import Updates from 'pages/Updates';
 
 import styles from '../sass/app.scss'; // eslint-disable-line no-unused-vars
 
@@ -24,8 +26,11 @@ const SchedulerUI = () => (
         component={injectApi(Instance)}
         exact
         path='/beta/scheduler/:role/:environment/:name/:instance' />
-      <Route component={Home} exact path='/beta/scheduler/:role/:environment/:name/update/:uid' />
-      <Route component={Home} exact path='/beta/updates' />
+      <Route
+        component={injectApi(Update)}
+        exact
+        path='/beta/scheduler/:role/:environment/:name/update/:uid' />
+      <Route component={injectApi(Updates)} exact path='/beta/updates' />
     </div>
   </Router>
 );

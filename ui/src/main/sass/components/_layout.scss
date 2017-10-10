@@ -21,6 +21,16 @@
     font-size: 18px;
   }
 
+  .content-panel-subtitle {
+    padding: 15px 20px 5px 20px;
+    background-color: rgba(250, 250, 250, 1);
+    border-bottom: 1px solid $grid_color;
+    text-transform: uppercase;
+    color: #555;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
   .content-panel {
     padding: 20px;
     background-color: $content_box_color;
@@ -28,6 +38,81 @@
 
   .content-panel + .content-panel {
     margin-top: 1px;
+  }
+
+  .fluid {
+    padding: 0px;
+  }
+
+  .content-icon-title {
+    background-color: $content_box_color;
+
+    .content-icon-title-text {
+      background-color: $grid_color;
+      padding: 15px 10px;
+      margin-left: -20px;
+      display: block;
+      color: white;
+
+      font-weight: $heavy;
+      text-transform: uppercase;
+      font-size: 24px;
+
+      .glyphicon {
+        font-size: 0.8em;
+      }
+    }
+
+    &:after {
+      content: "";
+      width: 0;
+      height: 0;
+      display: block;
+      margin-left: -20px;
+      border-width: 0 20px 12px 0;
+      border-color: transparent $grid_color transparent transparent;
+      border-style: solid;
+    }
+  }
+}
+
+.success {
+  .content-icon-title-text {
+    background-color: $colors_success !important;
+  }
+
+  &:after {
+    border-color: transparent $colors_success_dark transparent transparent !important;
+  }
+}
+
+.error {
+  .content-icon-title-text {
+    background-color: $colors_error !important;
+  }
+
+  &:after {
+    border-color: transparent $colors_error_dark transparent transparent !important;
+  }
+}
+
+.highlight {
+  .content-icon-title-text {
+    background-color: $colors_highlight !important;
+  }
+
+  &:after {
+    border-color: transparent $colors_highlight_dark transparent transparent !important;
+  }
+}
+
+.attention {
+  .content-icon-title-text {
+    background-color: $colors_warning !important;
+  }
+
+  &:after {
+    border-color: transparent $colors_warning_dark transparent transparent !important;
   }
 }
 

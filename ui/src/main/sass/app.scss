@@ -6,12 +6,15 @@
 
 /* Indiviudal Components */
 @import 'components/breadcrumb';
+@import 'components/instance-viz';
 @import 'components/navigation';
 @import 'components/state-machine';
 @import 'components/status';
 @import 'components/tables';
+@import 'components/update-list';
 
 /* Page Styles */
 @import 'components/home-page';
 @import 'components/instance-page';
 @import 'components/job-list-page';
+@import 'components/update-page';

@@ -53,6 +53,20 @@ describe('Pagination', () => {
       el.containsAllMatchingElements([<PageNavigation currentPage={1} numPages={1} />])).toBe(true);
   });
 
+  it('Should not show PageNavigation when hide single page is set', () => {
+    const el = shallow(
+      <Pagination data={data} hideIfSinglePage numberPerPage={25} renderer={render} />);
+    expect(el.find(Row).length).toBe(10);
+    expect(el.find(PageNavigation).length).toBe(0);
+  });
+
+  it('Should show PageNavigation when hide single page is set, but theres multiple pages', () => {
+    const el = shallow(
+      <Pagination data={data} hideIfSinglePage numberPerPage={2} renderer={render} />);
+    expect(el.find(Row).length).toBe(2);
+    expect(el.find(PageNavigation).length).toBe(1);
+  });
+
   it('Should sort correctly', () => {
     const el = shallow(
       <Pagination data={data} numberPerPage={3} renderer={render} sortBy='name' />);
@@ -72,6 +86,17 @@ describe('Pagination', () => {
       <Row key={2} />,
       <Row key={3} />,
       <Row key={10} />,
+      <PageNavigation currentPage={1} numPages={4} />])).toBe(true);
+  });
+
+  it('Should respect natural order when sortBy is omitted', () => {
+    const el = shallow(
+      <Pagination data={data} numberPerPage={3} renderer={render} />);
+    expect(el.find(Row).length).toBe(3);
+    expect(el.containsAllMatchingElements([
+      <Row key={1} />,
+      <Row key={2} />,
+      <Row key={3} />,
       <PageNavigation currentPage={1} numPages={4} />])).toBe(true);
   });
 

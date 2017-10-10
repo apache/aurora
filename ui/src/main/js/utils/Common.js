@@ -20,3 +20,19 @@ export function addClass(original, maybeClass) {
 export function clone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
+
+export function sort(arr, prop, reverse = false) {
+  return arr.sort((a, b) => {
+    if (prop(a) === prop(b)) {
+      return 0;
+    }
+    if (prop(a) < prop(b)) {
+      return reverse ? 1 : -1;
+    }
+    return reverse ? -1 : 1;
+  });
+}
+
+export function range(start, end) {
+  return [...Array(1 + end - start).keys()].map((i) => start + i);
+}

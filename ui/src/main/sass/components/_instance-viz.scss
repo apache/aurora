@@ -1,0 +1,78 @@
+.instance-grid {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  margin-bottom: 20px;
+  overflow: hidden;
+
+  li {
+    padding: 0;
+    float: left;
+    margin-right: 2px;
+    margin-bottom: 2px;
+  }
+
+  .instance-id {
+    visibility: hidden;
+  }
+
+  &:after {
+    clear: both;
+    content: '#';
+    visibility: hidden;
+  }
+
+  .okay {
+    border: 1px solid $colors_success;
+    background-color: $colors_success_light;
+  }
+
+  .attention {
+    border: 1px solid $colors_warning;
+    background-color: $colors_warning_light;
+  }
+
+  .error {
+    border: 1px solid $colors_error;
+    background-color: $colors_error_light;
+  }
+
+  .in-progress {
+    border: 1px solid $colors_highlight;
+    background-color: $colors_highlight_light;
+  }
+
+  .removed {
+    border: 1px solid #444;
+    background-color: #999;
+  }
+
+  .instance-updated {
+    border: 1px solid $colors_success;
+    background-color: $colors_success_light;
+  }
+
+  .pending {
+    border: 1px solid $colors_success;
+  }
+
+  .instance-updating {
+    border: 1px solid $success_secondary_color;
+    background-color: $success_secondary_color;
+  }
+}
+
+.instance-grid.small li {
+  width: 3px;
+  height: 6px;
+}
+
+.instance-grid.medium li {
+  width: 6px;
+  height: 12px;
+}
+
+.instance-grid.big li {
+  width: 15px;
+  height: 25px;
+}

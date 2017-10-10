@@ -54,6 +54,10 @@ export default class Pagination extends React.Component {
 
   sort(data) {
     const { reverseSort, sortBy } = this.props;
+    if (!sortBy) {
+      return data;
+    }
+
     const gte = reverseSort ? -1 : 1;
     const lte = reverseSort ? 1 : -1;
     if (typeof sortBy === 'function') {
@@ -68,7 +72,7 @@ export default class Pagination extends React.Component {
 
   render() {
     const that = this;
-    const { data, isTable, maxPages, numberPerPage, renderer } = this.props;
+    const { data, isTable, maxPages, numberPerPage, renderer, hideIfSinglePage } = this.props;
     const { page } = this.state;
 
     // Apply the filter before we try to paginate.
@@ -86,8 +90,10 @@ export default class Pagination extends React.Component {
     // but first attempts at this broke shallow rendering in enzyme.
     const elements = currentPageItems.map(renderer);
 
+    const numPages = Math.ceil(filtered.length / numberPerPage);
+
     // The clickable page list.
-    const pagination = <PageNavigation
+    const pagination = (numPages === 1 && hideIfSinglePage) ? '' : <PageNavigation
       currentPage={page}
       maxPages={maxPages || 8}
       numPages={Math.ceil(filtered.length / numberPerPage)}
