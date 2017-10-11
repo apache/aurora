@@ -17,7 +17,6 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.AppcImage;
@@ -121,7 +120,7 @@ public class ConfigurationManagerTest {
       new ConfigurationManagerSettings(
           ALL_CONTAINER_TYPES,
           false,
-          ImmutableMultimap.of(),
+          ImmutableList.of(),
           true,
           false,
           true,
@@ -133,7 +132,7 @@ public class ConfigurationManagerTest {
       new ConfigurationManagerSettings(
           ALL_CONTAINER_TYPES,
           true,
-          ImmutableMultimap.of("foo", "bar"),
+          ImmutableList.of(new DockerParameter("foo", "bar")),
           false,
           true,
           true,
@@ -286,7 +285,7 @@ public class ConfigurationManagerTest {
         new ConfigurationManagerSettings(
             ALL_CONTAINER_TYPES,
             true,
-            ImmutableMultimap.of("foo", "bar"),
+            ImmutableList.of(new DockerParameter("foo", "bar")),
             false,
             false,
             false,
@@ -309,7 +308,7 @@ public class ConfigurationManagerTest {
             new ConfigurationManagerSettings(
                     ALL_CONTAINER_TYPES,
                     true,
-                    ImmutableMultimap.of("foo", "bar"),
+                ImmutableList.of(new DockerParameter("foo", "bar")),
                     false,
                     false,
                     false,

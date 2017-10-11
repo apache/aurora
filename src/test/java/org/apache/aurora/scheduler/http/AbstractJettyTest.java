@@ -50,6 +50,7 @@ import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.async.AsyncModule;
+import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler;
 import org.apache.aurora.scheduler.offers.OfferManager;
@@ -97,11 +98,13 @@ public abstract class AbstractJettyTest extends EasyMockTest {
 
     ServiceGroupMonitor serviceGroupMonitor = createMock(ServiceGroupMonitor.class);
 
+    CliOptions options = new CliOptions();
+
     injector = Guice.createInjector(
-        new StatsModule(),
+        new StatsModule(options.stats),
         new LifecycleModule(),
         new SchedulerServicesModule(),
-        new AsyncModule(),
+        new AsyncModule(options.async),
         new AbstractModule() {
           <T> T bindMock(Class<T> clazz) {
             T mock = createMock(clazz);
@@ -137,7 +140,7 @@ public abstract class AbstractJettyTest extends EasyMockTest {
             });
           }
         },
-        new JettyServerModule(false));
+        new JettyServerModule(options, false));
 
     schedulers = new AtomicReference<>(ImmutableSet.of());
 

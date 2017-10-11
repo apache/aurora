@@ -16,12 +16,13 @@ package org.apache.aurora.scheduler.log.mesos;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.inject.PrivateModule;
@@ -29,13 +30,12 @@ import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.net.InetSocketAddressHelper;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.gen.storage.LogEntry;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryBindings;
 import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
@@ -52,86 +52,75 @@ import org.apache.zookeeper.common.PathUtils;
  * </ul>
  */
 public class MesosLogStreamModule extends PrivateModule {
-  @CmdLine(name = "native_log_quorum_size",
-           help = "The size of the quorum required for all log mutations.")
-  private static final Arg<Integer> QUORUM_SIZE = Arg.create(1);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-native_log_quorum_size",
+        description = "The size of the quorum required for all log mutations.")
+    public int quorumSize = 1;
 
-  @CmdLine(name = "native_log_file_path",
-           help = "Path to a file to store the native log data in.  If the parent directory does"
-               + "not exist it will be created.")
-  private static final Arg<File> LOG_PATH = Arg.create(null);
+    @Parameter(names = "-native_log_file_path",
+        description =
+            "Path to a file to store the native log data in.  If the parent directory does"
+                + "not exist it will be created.")
+    public File logPath = null;
 
-  @CmdLine(name = "native_log_zk_group_path",
-           help = "A zookeeper node for use by the native log to track the master coordinator.")
-  private static final Arg<String> ZK_LOG_GROUP_PATH = Arg.create(null);
+    @Parameter(names = "-native_log_zk_group_path",
+        description = "A zookeeper node for use by the native log to track the master coordinator.")
+    public String zkLogGroupPath = null;
 
-  /*
-   * This timeout includes the time to get a quorum to promise leadership to the coordinator and
-   * the time to fill any holes in the coordinator's log.
-   */
-  @CmdLine(name = "native_log_election_timeout",
-           help = "The timeout for a single attempt to obtain a new log writer.")
-  private static final Arg<Amount<Long, Time>> COORDINATOR_ELECTION_TIMEOUT =
-      Arg.create(Amount.of(15L, Time.SECONDS));
+    /*
+     * This timeout includes the time to get a quorum to promise leadership to the coordinator and
+     * the time to fill any holes in the coordinator's log.
+     */
+    @Parameter(names = "-native_log_election_timeout",
+        description = "The timeout for a single attempt to obtain a new log writer.")
+    public TimeAmount coordinatorElectionTimeout = new TimeAmount(15, Time.SECONDS);
 
-  /*
-   * Normally retries would not be expected to help much - however in the small replica set where
-   * a few down replicas doom a coordinator election attempt, retrying effectively gives us a wider
-   * window in which to await a live quorum before giving up and thrashing the global election
-   * process.  Observed log replica recovery times as of 4/6/2012 can be ~45 seconds so giving a
-   * window >= 2x this should support 1-round election events (that possibly use several retries in
-   * the single round).
-   */
-  @CmdLine(name = "native_log_election_retries",
-           help = "The maximum number of attempts to obtain a new log writer.")
-  private static final Arg<Integer> COORDINATOR_ELECTION_RETRIES = Arg.create(20);
+    /**
+     * Normally retries would not be expected to help much - however in the small replica set where
+     * a few down replicas doom a coordinator election attempt, retrying effectively gives us a
+     * wider window in which to await a live quorum before giving up and thrashing the global
+     * election process.  Observed log replica recovery times as of 4/6/2012 can be ~45 seconds so
+     * giving a window >= 2x this should support 1-round election events (that possibly use several
+     * retries in the single round).
+     */
+    @Parameter(names = "-native_log_election_retries",
+        description = "The maximum number of attempts to obtain a new log writer.")
+    public int coordinatorElectionRetries = 20;
 
-  @CmdLine(name = "native_log_read_timeout",
-           help = "The timeout for doing log reads.")
-  private static final Arg<Amount<Long, Time>> READ_TIMEOUT =
-      Arg.create(Amount.of(5L, Time.SECONDS));
+    @Parameter(names = "-native_log_read_timeout",
+        description = "The timeout for doing log reads.")
+    public TimeAmount readTimeout = new TimeAmount(5, Time.SECONDS);
 
-  @CmdLine(name = "native_log_write_timeout",
-           help = "The timeout for doing log appends and truncations.")
-  private static final Arg<Amount<Long, Time>> WRITE_TIMEOUT =
-      Arg.create(Amount.of(3L, Time.SECONDS));
+    @Parameter(names = "-native_log_write_timeout",
+        description = "The timeout for doing log appends and truncations.")
+    public TimeAmount writeTimeout = new TimeAmount(3, Time.SECONDS);
+  }
 
-  private static <T> T getRequiredArg(Arg<T> arg, String name) {
-    if (!arg.hasAppliedValue()) {
-      throw new IllegalStateException(
+  private static void requireArg(Object arg, String name) {
+    if (arg == null) {
+      throw new IllegalArgumentException(
           String.format("A value for the -%s flag must be supplied", name));
     }
-    return arg.get();
   }
 
+  private final Options options;
   private final ZooKeeperConfig zkClientConfig;
-  private final File logPath;
-  private final String zkLogGroupPath;
 
-  public MesosLogStreamModule(ZooKeeperConfig zkClientConfig) {
-    this(zkClientConfig,
-        getRequiredArg(LOG_PATH, "native_log_file_path"),
-        getRequiredArg(ZK_LOG_GROUP_PATH, "native_log_zk_group_path"));
-  }
-
-  public MesosLogStreamModule(
-      ZooKeeperConfig zkClientConfig,
-      File logPath,
-      String zkLogGroupPath) {
-
-    this.zkClientConfig = Objects.requireNonNull(zkClientConfig);
-    this.logPath = Objects.requireNonNull(logPath);
-
-    PathUtils.validatePath(zkLogGroupPath); // This checks for null.
-    this.zkLogGroupPath = zkLogGroupPath;
+  public MesosLogStreamModule(Options options, ZooKeeperConfig zkClientConfig) {
+    this.options = options;
+    requireArg(options.logPath, "native_log_file_path");
+    requireArg(options.zkLogGroupPath, "native_log_zk_group_path");
+    PathUtils.validatePath(options.zkLogGroupPath);
+    this.zkClientConfig = zkClientConfig;
   }
 
   @Override
   protected void configure() {
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.ReadTimeout.class)
-        .toInstance(READ_TIMEOUT.get());
+        .toInstance(options.readTimeout);
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.WriteTimeout.class)
-        .toInstance(WRITE_TIMEOUT.get());
+        .toInstance(options.writeTimeout);
 
     bind(org.apache.aurora.scheduler.log.Log.class).to(MesosLog.class);
     bind(MesosLog.class).in(Singleton.class);
@@ -141,7 +130,7 @@ public class MesosLogStreamModule extends PrivateModule {
   @Provides
   @Singleton
   Log provideLog(@ServiceDiscoveryBindings.ZooKeeper Iterable<InetSocketAddress> servers) {
-    File parentDir = logPath.getParentFile();
+    File parentDir = options.logPath.getParentFile();
     if (!parentDir.exists() && !parentDir.mkdirs()) {
       addError("Failed to create parent directory to store native log at: %s", parentDir);
     }
@@ -152,22 +141,22 @@ public class MesosLogStreamModule extends PrivateModule {
     if (zkClientConfig.getCredentials().isPresent()) {
       Credentials zkCredentials = zkClientConfig.getCredentials().get();
       return new Log(
-          QUORUM_SIZE.get(),
-          logPath.getAbsolutePath(),
+          options.quorumSize,
+          options.logPath.getAbsolutePath(),
           zkConnectString,
           zkClientConfig.getSessionTimeout().getValue(),
           zkClientConfig.getSessionTimeout().getUnit().getTimeUnit(),
-          zkLogGroupPath,
+          options.zkLogGroupPath,
           zkCredentials.scheme(),
           zkCredentials.authToken());
     } else {
       return new Log(
-          QUORUM_SIZE.get(),
-          logPath.getAbsolutePath(),
+          options.quorumSize,
+          options.logPath.getAbsolutePath(),
           zkConnectString,
           zkClientConfig.getSessionTimeout().getValue(),
           zkClientConfig.getSessionTimeout().getUnit().getTimeUnit(),
-          zkLogGroupPath);
+          options.zkLogGroupPath);
     }
   }
 
@@ -178,9 +167,12 @@ public class MesosLogStreamModule extends PrivateModule {
 
   @Provides
   Log.Writer provideWriter(Log log) {
-    Amount<Long, Time> electionTimeout = COORDINATOR_ELECTION_TIMEOUT.get();
-    return new Log.Writer(log, electionTimeout.getValue(), electionTimeout.getUnit().getTimeUnit(),
-        COORDINATOR_ELECTION_RETRIES.get());
+    Amount<Long, Time> electionTimeout = options.coordinatorElectionTimeout;
+    return new Log.Writer(
+        log,
+        electionTimeout.getValue(),
+        electionTimeout.getUnit().getTimeUnit(),
+        options.coordinatorElectionRetries);
   }
 
   @Provides

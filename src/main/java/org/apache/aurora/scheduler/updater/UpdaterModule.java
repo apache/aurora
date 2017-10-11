@@ -18,18 +18,18 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.preemptor.BiCache.BiCacheSettings;
@@ -43,25 +43,31 @@ import org.slf4j.LoggerFactory;
 public class UpdaterModule extends AbstractModule {
   private static final Logger LOG = LoggerFactory.getLogger(UpdaterModule.class);
 
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-enable_update_affinity",
+        description = "Enable best-effort affinity of task updates.",
+        arity = 1)
+    public boolean enableAffinity = false;
+
+    @Parameter(names = "-update_affinity_reservation_hold_time",
+        description = "How long to wait for a reserved agent to reoffer freed up resources.")
+    public TimeAmount affinityExpiration = new TimeAmount(3L, Time.MINUTES);
+  }
+
   private final ScheduledExecutorService executor;
-  private final boolean enableAffinity;
+  private final Options options;
 
-  @CmdLine(name = "enable_update_affinity", help = "Enable best-effort affinity of task updates.")
-  private static final Arg<Boolean> ENABLE_AFFINITY = Arg.create(false);
-
-  @CmdLine(name = "update_affinity_reservation_hold_time",
-      help = "How long to wait for a reserved agent to reoffer freed up resources.")
-  private static final Arg<Amount<Long, Time>> AFFINITY_EXPIRATION =
-      Arg.create(Amount.of(3L, Time.MINUTES));
-
-  public UpdaterModule() {
-    this(AsyncUtil.singleThreadLoggingScheduledExecutor("updater-%d", LOG), ENABLE_AFFINITY.get());
+  public UpdaterModule(Options options) {
+    this(
+        AsyncUtil.singleThreadLoggingScheduledExecutor("updater-%d", LOG),
+        options);
   }
 
   @VisibleForTesting
-  UpdaterModule(ScheduledExecutorService executor, boolean enableAffinity) {
+  UpdaterModule(ScheduledExecutorService executor, Options options) {
     this.executor = Objects.requireNonNull(executor);
-    this.enableAffinity = enableAffinity;
+    this.options = options;
   }
 
   @Override
@@ -69,9 +75,9 @@ public class UpdaterModule extends AbstractModule {
     install(new PrivateModule() {
       @Override
       protected void configure() {
-        if (enableAffinity) {
+        if (options.enableAffinity) {
           bind(BiCacheSettings.class).toInstance(
-              new BiCacheSettings(AFFINITY_EXPIRATION.get(), "update_affinity"));
+              new BiCacheSettings(options.affinityExpiration, "update_affinity"));
           bind(new TypeLiteral<BiCache<IInstanceKey, TaskGroupKey>>() { }).in(Singleton.class);
           bind(UpdateAgentReserver.class).to(UpdateAgentReserver.UpdateAgentReserverImpl.class);
           bind(UpdateAgentReserver.UpdateAgentReserverImpl.class).in(Singleton.class);

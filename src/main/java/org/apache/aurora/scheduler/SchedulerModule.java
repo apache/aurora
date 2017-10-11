@@ -20,20 +20,21 @@ import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.Positive;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.BatchWorker.NoResult;
 import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
+import org.apache.aurora.scheduler.config.validators.PositiveNumber;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.mesos.v1.Protos;
@@ -49,25 +50,33 @@ public class SchedulerModule extends AbstractModule {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchedulerModule.class);
 
-  @CmdLine(name = "max_registration_delay",
-      help = "Max allowable delay to allow the driver to register before aborting")
-  private static final Arg<Amount<Long, Time>> MAX_REGISTRATION_DELAY =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-max_registration_delay",
+        description = "Max allowable delay to allow the driver to register before aborting")
+    public TimeAmount maxRegistrationDelay = new TimeAmount(1, Time.MINUTES);
 
-  @CmdLine(name = "max_leading_duration",
-      help = "After leading for this duration, the scheduler should commit suicide.")
-  private static final Arg<Amount<Long, Time>> MAX_LEADING_DURATION =
-      Arg.create(Amount.of(1L, Time.DAYS));
+    @Parameter(names = "-max_leading_duration",
+        description = "After leading for this duration, the scheduler should commit suicide.")
+    public TimeAmount maxLeadingDuration = new TimeAmount(1, Time.DAYS);
 
-  @Positive
-  @CmdLine(name = "max_status_update_batch_size",
-      help = "The maximum number of status updates that can be processed in a batch.")
-  private static final Arg<Integer> MAX_STATUS_UPDATE_BATCH_SIZE = Arg.create(1000);
+    @Parameter(names = "-max_status_update_batch_size",
+        validateValueWith = PositiveNumber.class,
+        description = "The maximum number of status updates that can be processed in a batch.")
+    public int maxStatusUpdateBatchSize = 1000;
 
-  @Positive
-  @CmdLine(name = "max_task_event_batch_size",
-      help = "The maximum number of task state change events that can be processed in a batch.")
-  private static final Arg<Integer> MAX_TASK_EVENT_BATCH_SIZE = Arg.create(300);
+    @Parameter(names = "-max_task_event_batch_size",
+        validateValueWith = PositiveNumber.class,
+        description =
+            "The maximum number of task state change events that can be processed in a batch.")
+    public int maxTaskEventBatchSize = 300;
+  }
+
+  private final Options options;
+
+  public SchedulerModule(Options options) {
+    this.options = options;
+  }
 
   @Override
   protected void configure() {
@@ -77,7 +86,7 @@ public class SchedulerModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(LeadingOptions.class).toInstance(
-            new LeadingOptions(MAX_REGISTRATION_DELAY.get(), MAX_LEADING_DURATION.get()));
+            new LeadingOptions(options.maxRegistrationDelay, options.maxLeadingDuration));
 
         final ScheduledExecutorService executor =
             AsyncUtil.singleThreadLoggingScheduledExecutor("Lifecycle-%d", LOG);
@@ -98,7 +107,7 @@ public class SchedulerModule extends AbstractModule {
         .toInstance(new LinkedBlockingQueue<>());
     bind(new TypeLiteral<Integer>() { })
         .annotatedWith(TaskStatusHandlerImpl.MaxBatchSize.class)
-        .toInstance(MAX_STATUS_UPDATE_BATCH_SIZE.get());
+        .toInstance(options.maxStatusUpdateBatchSize);
 
     bind(TaskStatusHandler.class).to(TaskStatusHandlerImpl.class);
     bind(TaskStatusHandlerImpl.class).in(Singleton.class);
@@ -110,9 +119,8 @@ public class SchedulerModule extends AbstractModule {
 
   public static class TaskEventBatchWorker extends BatchWorker<NoResult> {
     @Inject
-    TaskEventBatchWorker(Storage storage, StatsProvider statsProvider) {
-
-      super(storage, statsProvider, MAX_TASK_EVENT_BATCH_SIZE.get());
+    TaskEventBatchWorker(CliOptions options, Storage storage, StatsProvider statsProvider) {
+      super(storage, statsProvider, options.scheduler.maxTaskEventBatchSize);
     }
 
     @Override

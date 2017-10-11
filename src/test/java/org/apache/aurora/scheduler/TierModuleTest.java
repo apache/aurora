@@ -33,7 +33,7 @@ public class TierModuleTest {
 
   @Test
   public void testTierConfigArgumentNotSpecified() throws Exception {
-    String tierFileContents = readTierFile();
+    String tierFileContents = readTierFile(new TierModule.Options());
     assertFalse(Strings.isNullOrEmpty(tierFileContents));
     assertEquals(
         tierFileContents,

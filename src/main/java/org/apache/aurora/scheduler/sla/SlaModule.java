@@ -15,26 +15,27 @@ package org.apache.aurora.scheduler.sla;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.Set;
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.Positive;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
+import org.apache.aurora.scheduler.config.validators.PositiveAmount;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCategory;
 import org.slf4j.Logger;
@@ -57,52 +58,41 @@ public class SlaModule extends AbstractModule {
 
   private static final Logger LOG = LoggerFactory.getLogger(SlaModule.class);
 
-  @Positive
-  @CmdLine(name = "sla_stat_refresh_interval", help = "The SLA stat refresh interval.")
-  private static final Arg<Amount<Long, Time>> SLA_REFRESH_INTERVAL =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-sla_stat_refresh_interval",
+        validateValueWith = PositiveAmount.class,
+        description = "The SLA stat refresh interval.")
+    public TimeAmount slaRefreshInterval = new TimeAmount(1, Time.MINUTES);
 
-  @CmdLine(name = "sla_prod_metrics",
-      help = "Metric categories collected for production tasks.")
-  private static final Arg<Set<MetricCategory>> SLA_PROD_METRICS =
-      Arg.<Set<MetricCategory>>create(ImmutableSet.of(JOB_UPTIMES, PLATFORM_UPTIME, MEDIANS));
+    @Parameter(names = "-sla_prod_metrics",
+        description = "Metric categories collected for production tasks.")
+    public List<MetricCategory> slaProdMetrics =
+        ImmutableList.of(JOB_UPTIMES, PLATFORM_UPTIME, MEDIANS);
 
-  @CmdLine(name = "sla_non_prod_metrics",
-      help = "Metric categories collected for non production tasks.")
-  private static final Arg<Set<MetricCategory>> SLA_NON_PROD_METRICS =
-      Arg.<Set<MetricCategory>>create(ImmutableSet.of());
+    @Parameter(names = "-sla_non_prod_metrics",
+        description = "Metric categories collected for non production tasks.")
+    public List<MetricCategory> slaNonProdMetrics = ImmutableList.of();
+  }
 
   @VisibleForTesting
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   @interface SlaExecutor { }
 
-  private final Amount<Long, Time> refreshInterval;
-  private final Set<MetricCategory> prodMetrics;
-  private final Set<MetricCategory> nonProdMetrics;
+  private final Options options;
 
-  @VisibleForTesting
-  SlaModule(
-      Amount<Long, Time> refreshInterval,
-      Set<MetricCategory> prodMetrics,
-      Set<MetricCategory> nonProdMetrics) {
-
-    this.refreshInterval = refreshInterval;
-    this.prodMetrics = prodMetrics;
-    this.nonProdMetrics = nonProdMetrics;
-  }
-
-  public SlaModule() {
-    this(SLA_REFRESH_INTERVAL.get(), SLA_PROD_METRICS.get(), SLA_NON_PROD_METRICS.get());
+  public SlaModule(Options options) {
+    this.options = options;
   }
 
   @Override
   protected void configure() {
     bind(MetricCalculatorSettings.class)
         .toInstance(new MetricCalculatorSettings(
-            refreshInterval.as(Time.MILLISECONDS),
-            prodMetrics,
-            nonProdMetrics));
+            options.slaRefreshInterval.as(Time.MILLISECONDS),
+            ImmutableSet.copyOf(options.slaProdMetrics),
+            ImmutableSet.copyOf(options.slaNonProdMetrics)));
 
     bind(MetricCalculator.class).in(Singleton.class);
     bind(ScheduledExecutorService.class)

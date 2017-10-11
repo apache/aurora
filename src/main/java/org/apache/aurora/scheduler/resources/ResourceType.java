@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.gen.Resource._Fields;
+import org.apache.aurora.scheduler.config.CommandLine;
 import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.mesos.v1.Protos.Resource;
 import org.apache.thrift.TEnum;
@@ -37,8 +38,6 @@ import static org.apache.aurora.scheduler.resources.AuroraResourceConverter.STRI
 import static org.apache.aurora.scheduler.resources.MesosResourceConverter.RANGES;
 import static org.apache.aurora.scheduler.resources.MesosResourceConverter.SCALAR;
 import static org.apache.aurora.scheduler.resources.ResourceMapper.PORT_MAPPER;
-import static org.apache.aurora.scheduler.resources.ResourceSettings.ENABLE_REVOCABLE_CPUS;
-import static org.apache.aurora.scheduler.resources.ResourceSettings.ENABLE_REVOCABLE_RAM;
 import static org.apache.aurora.scheduler.resources.ResourceSettings.NOT_REVOCABLE;
 
 /**
@@ -46,6 +45,7 @@ import static org.apache.aurora.scheduler.resources.ResourceSettings.NOT_REVOCAB
  */
 @VisibleForTesting
 public enum ResourceType implements TEnum {
+
   /**
    * CPU resource.
    */
@@ -59,7 +59,8 @@ public enum ResourceType implements TEnum {
       "core(s)",
       16,
       false,
-      ENABLE_REVOCABLE_CPUS),
+          // TODO(wfarner): Figure out why checkstyle wants this indentation.
+          () -> CommandLine.legacyGetStaticOptions().resourceSettings.enableRevocableCpus),
 
   /**
    * RAM resource.
@@ -74,7 +75,7 @@ public enum ResourceType implements TEnum {
       "MB",
       Amount.of(24, GB).as(MB),
       false,
-      ENABLE_REVOCABLE_RAM),
+          () -> CommandLine.legacyGetStaticOptions().resourceSettings.enableRevocableRam),
 
   /**
    * DISK resource.
@@ -120,6 +121,10 @@ public enum ResourceType implements TEnum {
       4,
       false,
       NOT_REVOCABLE);
+
+  public static void initializeEmptyCliArgsForTest() {
+    CommandLine.initializeForTest();
+  }
 
   /**
    * Correspondent thrift {@link org.apache.aurora.gen.Resource} enum value.

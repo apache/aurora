@@ -15,8 +15,8 @@ package org.apache.aurora.scheduler.resources;
 
 import java.util.function.Supplier;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 
 /**
  * Control knobs for how Aurora treats different resource types.
@@ -25,17 +25,18 @@ import org.apache.aurora.common.args.CmdLine;
  * and then inject them via 'settings' classes. Unfortunately, this does not work here as we
  * would need to perform the injection into the ResourceType enum. Enums are picky in that regard.
  */
-final class ResourceSettings {
+@Parameters(separators = "=")
+public class ResourceSettings {
 
-  @CmdLine(name = "enable_revocable_cpus", help = "Treat CPUs as a revocable resource.")
-  static final Arg<Boolean> ENABLE_REVOCABLE_CPUS = Arg.create(true);
+  @Parameter(names = "-enable_revocable_cpus",
+      description = "Treat CPUs as a revocable resource.",
+      arity = 1)
+  public boolean enableRevocableCpus = true;
 
-  @CmdLine(name = "enable_revocable_ram", help = "Treat RAM as a revocable resource.")
-  static final Arg<Boolean> ENABLE_REVOCABLE_RAM = Arg.create(false);
+  @Parameter(names = "-enable_revocable_ram",
+      description = "Treat RAM as a revocable resource.",
+      arity = 1)
+  public boolean enableRevocableRam = false;
 
   static final Supplier<Boolean> NOT_REVOCABLE = () -> false;
-
-  private ResourceSettings() {
-
-  }
 }

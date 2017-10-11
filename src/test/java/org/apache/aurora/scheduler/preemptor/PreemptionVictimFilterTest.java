@@ -121,6 +121,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     preemptorMetrics = new PreemptorMetrics(new CachedCounters(statsProvider));
     tierManager = createMock(TierManager.class);
     clock = new FakeClock();
+    ResourceType.initializeEmptyCliArgsForTest();
   }
 
   private Optional<ImmutableSet<PreemptionVictim>> runFilter(

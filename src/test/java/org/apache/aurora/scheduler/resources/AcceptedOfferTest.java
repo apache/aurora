@@ -25,6 +25,7 @@ import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.v1.Protos;
 import org.apache.mesos.v1.Protos.Resource;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.base.TaskTestUtil.DEV_TIER;
@@ -51,6 +52,11 @@ public class AcceptedOfferTest {
   private static final ResourceBag TOTAL_BAG =
       EXECUTOR_BAG.add(bagFromResources(TASK.getTask().getResources()));
   private static final Integer[] TASK_PORTS = {TASK.getAssignedPorts().get("http")};
+
+  @Before
+  public void setUp() {
+    ResourceType.initializeEmptyCliArgsForTest();
+  }
 
   @Test
   public void testReservedPredicates() {

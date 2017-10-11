@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.stats;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.base.Supplier;
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
@@ -20,8 +22,6 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 
 import org.apache.aurora.common.application.ShutdownRegistry;
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stat;
@@ -30,20 +30,29 @@ import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.stats.TimeSeriesRepository;
 import org.apache.aurora.common.stats.TimeSeriesRepositoryImpl;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 
 /**
  * Binding module for injections related to the in-process stats system.
  */
 public class StatsModule extends AbstractModule {
 
-  @CmdLine(name = "stat_sampling_interval", help = "Statistic value sampling interval.")
-  private static final Arg<Amount<Long, Time>> SAMPLING_INTERVAL =
-      Arg.create(Amount.of(1L, Time.SECONDS));
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-stat_sampling_interval",
+        description = "Statistic value sampling interval.")
+    public TimeAmount samplingInterval = new TimeAmount(1, Time.SECONDS);
 
-  @CmdLine(name = "stat_retention_period",
-      help = "Time for a stat to be retained in memory before expiring.")
-  private static final Arg<Amount<Long, Time>> RETENTION_PERIOD =
-      Arg.create(Amount.of(1L, Time.HOURS));
+    @Parameter(names = "-stat_retention_period",
+        description = "Time for a stat to be retained in memory before expiring.")
+    public TimeAmount retentionPeriod = new TimeAmount(1, Time.HOURS);
+  }
+
+  private final Options options;
+
+  public StatsModule(Options options) {
+    this.options = options;
+  }
 
   @Override
   protected void configure() {
@@ -53,10 +62,10 @@ public class StatsModule extends AbstractModule {
     bind(StatRegistry.class).toInstance(Stats.STAT_REGISTRY);
     bind(new TypeLiteral<Amount<Long, Time>>() { })
         .annotatedWith(Names.named(TimeSeriesRepositoryImpl.SAMPLE_RETENTION_PERIOD))
-        .toInstance(RETENTION_PERIOD.get());
+        .toInstance(options.retentionPeriod);
     bind(new TypeLiteral<Amount<Long, Time>>() { })
         .annotatedWith(Names.named(TimeSeriesRepositoryImpl.SAMPLE_PERIOD))
-        .toInstance(SAMPLING_INTERVAL.get());
+        .toInstance(options.samplingInterval);
     bind(TimeSeriesRepository.class).to(TimeSeriesRepositoryImpl.class);
     bind(TimeSeriesRepositoryImpl.class).in(Singleton.class);
 

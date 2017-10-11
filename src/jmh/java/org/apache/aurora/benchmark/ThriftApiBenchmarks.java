@@ -154,8 +154,8 @@ public class ThriftApiBenchmarks {
             bind(ConfigurationManager.class).toInstance(TaskTestUtil.CONFIGURATION_MANAGER);
           }
         },
-        new AsyncModule(),
-        DbModule.productionModule(Bindings.KeyFactory.PLAIN),
+        new AsyncModule(new AsyncModule.Options()),
+        DbModule.productionModule(Bindings.KeyFactory.PLAIN, new DbModule.Options()),
         new ThriftModule.ReadOnly());
   }
 

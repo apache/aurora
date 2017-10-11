@@ -43,6 +43,8 @@ import com.google.inject.Module;
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.application.Lifecycle;
+import org.apache.aurora.common.quantity.Amount;
+import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ServerSetImpl;
@@ -63,6 +65,7 @@ import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.discovery.ServiceDiscoveryModule;
 import org.apache.aurora.scheduler.discovery.ZooKeeperConfig;
@@ -176,7 +179,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     logStream = control.createMock(Stream.class);
     streamMatcher = LogOpMatcher.matcherFor(logStream);
     entrySerializer = new EntrySerializer.EntrySerializerImpl(
-        LogStorageModule.MAX_LOG_ENTRY_SIZE.get(),
+        Amount.of(512, Data.KB),
         Hashing.md5());
 
     zkClient = createZkClient();
@@ -197,7 +200,11 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
             mesosScalar(RAM_MB, 1));
         bind(ExecutorSettings.class)
             .toInstance(TestExecutorSettings.thermosOnlyWithOverhead(overhead));
-        install(new BackupModule(backupDir, SnapshotStoreImpl.class));
+
+        BackupModule.Options backupOptions = new BackupModule.Options();
+        backupOptions.backupDir = backupDir;
+
+        install(new BackupModule(backupOptions, SnapshotStoreImpl.class));
 
         bind(IServerInfo.class).toInstance(
             IServerInfo.build(
@@ -214,9 +221,9 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     SchedulerMain main = SchedulerMain.class.newInstance();
     Injector injector = Guice.createInjector(
         ImmutableList.<Module>builder()
-            .add(SchedulerMain.getUniversalModule())
+            .add(SchedulerMain.getUniversalModule(new CliOptions()))
             .add(new TierModule(TaskTestUtil.TIER_CONFIG))
-            .add(new LogStorageModule())
+            .add(new LogStorageModule(new LogStorageModule.Options(), false))
             .add(new ServiceDiscoveryModule(zkClientConfig, SERVERSET_PATH))
             .add(testModule)
             .build()
@@ -226,7 +233,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
 
     executor.submit(() -> {
       try {
-        main.run();
+        main.run(new SchedulerMain.Options());
       } catch (RuntimeException e) {
         mainException.set(Optional.of(e));
         executor.shutdownNow();

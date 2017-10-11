@@ -14,25 +14,26 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import java.util.Set;
+
 import javax.inject.Singleton;
 
-import com.google.common.annotations.VisibleForTesting;
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.scheduler.config.types.DataAmount;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.storage.CallOrderEnforcingStorage;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
-import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
 import org.apache.aurora.scheduler.storage.log.LogStorage.Settings;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.ExperimentalTaskStore;
@@ -47,45 +48,52 @@ import static org.apache.aurora.scheduler.storage.log.SnapshotDeduplicator.Snaps
  */
 public class LogStorageModule extends PrivateModule {
 
-  @CmdLine(name = "dlog_shutdown_grace_period",
-           help = "Specifies the maximum time to wait for scheduled checkpoint and snapshot "
-                  + "actions to complete before forcibly shutting down.")
-  private static final Arg<Amount<Long, Time>> SHUTDOWN_GRACE_PERIOD =
-      Arg.create(Amount.of(2L, Time.SECONDS));
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-dlog_shutdown_grace_period",
+        description = "Specifies the maximum time to wait for scheduled checkpoint and snapshot "
+            + "actions to complete before forcibly shutting down.")
+    public TimeAmount shutdownGracePeriod = new TimeAmount(2, Time.SECONDS);
 
-  @CmdLine(name = "dlog_snapshot_interval",
-           help = "Specifies the frequency at which snapshots of local storage are taken and "
-                  + "written to the log.")
-  private static final Arg<Amount<Long, Time>> SNAPSHOT_INTERVAL =
-      Arg.create(Amount.of(1L, Time.HOURS));
+    @Parameter(names = "-dlog_snapshot_interval",
+        description = "Specifies the frequency at which snapshots of local storage are taken and "
+            + "written to the log.")
+    public TimeAmount snapshotInterval = new TimeAmount(1, Time.HOURS);
 
-  @CmdLine(name = "dlog_max_entry_size",
-           help = "Specifies the maximum entry size to append to the log. Larger entries will be "
-                  + "split across entry Frames.")
-  @VisibleForTesting
-  public static final Arg<Amount<Integer, Data>> MAX_LOG_ENTRY_SIZE =
-      Arg.create(Amount.of(512, Data.KB));
+    @Parameter(names = "-dlog_max_entry_size",
+        description =
+            "Specifies the maximum entry size to append to the log. Larger entries will be "
+                + "split across entry Frames.")
+    public DataAmount maxLogEntrySize = new DataAmount(512, Data.KB);
 
-  @CmdLine(name = "snapshot_hydrate_stores",
-      help = "Which H2-backed stores to fully hydrate on the Snapshot.")
-  private static final Arg<Set<String>> HYDRATE_SNAPSHOT_FIELDS =
-      Arg.create(SnapshotStoreImpl.ALL_H2_STORE_FIELDS);
+    @Parameter(names = "-snapshot_hydrate_stores",
+        description = "Which H2-backed stores to fully hydrate on the Snapshot.")
+    public Set<String> hydrateSnapshotFields = SnapshotStoreImpl.ALL_H2_STORE_FIELDS;
+  }
+
+  private final Options options;
+  private final boolean useDbTaskStore;
+
+  public LogStorageModule(Options options, boolean useDbTaskStore) {
+    this.options = options;
+    this.useDbTaskStore = useDbTaskStore;
+  }
 
   @Override
   protected void configure() {
     bind(Settings.class)
-        .toInstance(new Settings(SHUTDOWN_GRACE_PERIOD.get(), SNAPSHOT_INTERVAL.get()));
+        .toInstance(new Settings(options.shutdownGracePeriod, options.snapshotInterval));
 
     bind(new TypeLiteral<Boolean>() { }).annotatedWith(ExperimentalTaskStore.class)
-        .toInstance(DbModule.USE_DB_TASK_STORE.get());
+        .toInstance(useDbTaskStore);
 
     bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
-        .toInstance(MAX_LOG_ENTRY_SIZE.get());
+        .toInstance(options.maxLogEntrySize);
     bind(LogManager.class).in(Singleton.class);
     bind(LogStorage.class).in(Singleton.class);
 
     bind(new TypeLiteral<Set<String>>() { }).annotatedWith(HydrateSnapshotFields.class)
-        .toInstance(HYDRATE_SNAPSHOT_FIELDS.get());
+        .toInstance(options.hydrateSnapshotFields);
 
     install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));
     bind(DistributedSnapshotStore.class).to(LogStorage.class);

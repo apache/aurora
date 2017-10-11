@@ -16,13 +16,13 @@ package org.apache.aurora.scheduler.http.api;
 import javax.inject.Singleton;
 import javax.ws.rs.core.MediaType;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Provides;
 import com.google.inject.servlet.ServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.scheduler.http.CorsFilter;
 import org.apache.aurora.scheduler.http.JettyServerModule;
@@ -46,13 +46,22 @@ public class ApiModule extends ServletModule {
   private static final MediaType THRIFT_BINARY =
       new MediaType("application", "vnd.apache.thrift.binary");
 
-  /**
-   * Set the {@code Access-Control-Allow-Origin} header for API requests. See
-   * http://www.w3.org/TR/cors/
-   */
-  @CmdLine(name = "enable_cors_for",
-      help = "List of domains for which CORS support should be enabled.")
-  private static final Arg<String> ENABLE_CORS_FOR = Arg.create(null);
+  @Parameters(separators = "=")
+  public static class Options {
+    /**
+     * Set the {@code Access-Control-Allow-Origin} header for API requests. See
+     * http://www.w3.org/TR/cors/
+     */
+    @Parameter(names = "-enable_cors_for",
+        description = "List of domains for which CORS support should be enabled.")
+    public String enableCorsFor;
+  }
+
+  private final Options options;
+
+  public ApiModule(Options options) {
+    this.options = options;
+  }
 
   private static final String API_CLIENT_ROOT = Resource
       .newClassPathResource("org/apache/aurora/scheduler/gen/client")
@@ -60,8 +69,8 @@ public class ApiModule extends ServletModule {
 
   @Override
   protected void configureServlets() {
-    if (ENABLE_CORS_FOR.get() != null) {
-      filter(API_PATH).through(new CorsFilter(ENABLE_CORS_FOR.get()));
+    if (options.enableCorsFor != null) {
+      filter(API_PATH).through(new CorsFilter(options.enableCorsFor));
     }
     serve(API_PATH).with(TContentAwareServlet.class);
 

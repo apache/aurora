@@ -16,12 +16,13 @@ package org.apache.aurora.scheduler.offers;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.List;
-import java.util.Set;
+
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Ordering;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
@@ -29,14 +30,14 @@ import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.NotNegative;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Random;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.app.MoreModules;
+import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
+import org.apache.aurora.scheduler.config.validators.NotNegativeAmount;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,49 +53,56 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public class OffersModule extends AbstractModule {
   private static final Logger LOG = LoggerFactory.getLogger(OffersModule.class);
 
-  @CmdLine(name = "min_offer_hold_time",
-      help = "Minimum amount of time to hold a resource offer before declining.")
-  @NotNegative
-  private static final Arg<Amount<Integer, Time>> MIN_OFFER_HOLD_TIME =
-      Arg.create(Amount.of(5, Time.MINUTES));
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-min_offer_hold_time",
+        validateValueWith = NotNegativeAmount.class,
+        description = "Minimum amount of time to hold a resource offer before declining.")
+    public TimeAmount minOfferHoldTime = new TimeAmount(5, Time.MINUTES);
 
-  @CmdLine(name = "offer_hold_jitter_window",
-      help = "Maximum amount of random jitter to add to the offer hold time window.")
-  @NotNegative
-  private static final Arg<Amount<Integer, Time>> OFFER_HOLD_JITTER_WINDOW =
-      Arg.create(Amount.of(1, Time.MINUTES));
+    @Parameter(names = "-offer_hold_jitter_window",
+        validateValueWith = NotNegativeAmount.class,
+        description = "Maximum amount of random jitter to add to the offer hold time window.")
+    public TimeAmount offerHoldJitterWindow = new TimeAmount(1, Time.MINUTES);
 
-  @CmdLine(name = "offer_filter_duration",
-      help = "Duration after which we expect Mesos to re-offer unused resources. A short duration "
-          + "improves scheduling performance in smaller clusters, but might lead to resource "
-          + "starvation for other frameworks if you run many frameworks in your cluster.")
-  private static final Arg<Amount<Long, Time>> OFFER_FILTER_DURATION =
-      Arg.create(Amount.of(5L, Time.SECONDS));
+    @Parameter(names = "-offer_filter_duration",
+        description =
+            "Duration after which we expect Mesos to re-offer unused resources. A short duration "
+                + "improves scheduling performance in smaller clusters, but might lead to resource "
+                + "starvation for other frameworks if you run many frameworks in your cluster.")
+    public TimeAmount offerFilterDuration = new TimeAmount(5, Time.SECONDS);
 
-  @CmdLine(name = "unavailability_threshold",
-      help = "Threshold time, when running tasks should be drained from a host, before a host "
-          + "becomes unavailable. Should be greater than min_offer_hold_time + "
-          + "offer_hold_jitter_window.")
-  private static final Arg<Amount<Long, Time>> UNAVAILABILITY_THRESHOLD =
-      Arg.create(Amount.of(6L, Time.MINUTES));
+    @Parameter(names = "-unavailability_threshold",
+        description =
+            "Threshold time, when running tasks should be drained from a host, before a host "
+                + "becomes unavailable. Should be greater than min_offer_hold_time + "
+                + "offer_hold_jitter_window.")
+    public TimeAmount unavailabilityThreshold = new TimeAmount(6, Time.MINUTES);
 
-  @CmdLine(name = "offer_order",
-      help = "Iteration order for offers, to influence task scheduling. Multiple orderings will be "
-          + "compounded together. E.g. CPU,MEMORY,RANDOM would sort first by cpus offered, then "
-          + " memory and finally would randomize any equal offers.")
-  private static final Arg<List<OfferOrder>> OFFER_ORDER =
-      Arg.create(ImmutableList.of(OfferOrder.RANDOM));
+    @Parameter(names = "-offer_order",
+        description =
+            "Iteration order for offers, to influence task scheduling. Multiple orderings will be "
+                + "compounded together. E.g. CPU,MEMORY,RANDOM would sort first by cpus offered,"
+                + " then memory and finally would randomize any equal offers.")
+    public List<OfferOrder> offerOrder = ImmutableList.of(OfferOrder.RANDOM);
 
-  @CmdLine(name = "offer_order_modules",
-      help = "Custom Guice module to provide an offer ordering.")
-  private static final Arg<Set<Module>> OFFER_ORDER_MODULES = Arg.create(
-      ImmutableSet.of(MoreModules.lazilyInstantiated(OfferOrderModule.class)));
+    @Parameter(names = "-offer_order_modules",
+        description = "Custom Guice module to provide an offer ordering.")
+    @SuppressWarnings("rawtypes")
+    public List<Class> offerOrderModules = ImmutableList.of(OfferOrderModule.class);
+  }
 
   public static class OfferOrderModule extends AbstractModule {
+    private final CliOptions options;
+
+    public OfferOrderModule(CliOptions options) {
+      this.options = options;
+    }
+
     @Override
     protected void configure() {
       bind(new TypeLiteral<Ordering<HostOffer>>() { })
-          .toInstance(OfferOrderBuilder.create(OFFER_ORDER.get()));
+          .toInstance(OfferOrderBuilder.create(options.offer.offerOrder));
     }
   }
 
@@ -105,26 +113,33 @@ public class OffersModule extends AbstractModule {
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface UnavailabilityThreshold { }
 
+  private final CliOptions cliOptions;
+
+  public OffersModule(CliOptions cliOptions) {
+    this.cliOptions = cliOptions;
+  }
+
   @Override
   protected void configure() {
-    long offerHoldTime = OFFER_HOLD_JITTER_WINDOW.get().as(Time.SECONDS)
-        + MIN_OFFER_HOLD_TIME.get().as(Time.SECONDS);
-    if (UNAVAILABILITY_THRESHOLD.get().as(Time.SECONDS) < offerHoldTime) {
+    Options options = cliOptions.offer;
+    long offerHoldTime =
+        options.offerHoldJitterWindow.as(Time.SECONDS) + options.minOfferHoldTime.as(Time.SECONDS);
+    if (options.unavailabilityThreshold.as(Time.SECONDS) < offerHoldTime) {
       LOG.warn("unavailability_threshold ({}) is less than the sum of min_offer_hold_time ({}) and"
           + "offer_hold_jitter_window ({}). This creates risks of races between launching and"
           + "draining",
-          UNAVAILABILITY_THRESHOLD.get(),
-          MIN_OFFER_HOLD_TIME.get(),
-          OFFER_HOLD_JITTER_WINDOW.get());
+          options.unavailabilityThreshold,
+          options.minOfferHoldTime,
+          options.offerHoldJitterWindow);
     }
 
-    for (Module module: OFFER_ORDER_MODULES.get()) {
+    for (Module module: MoreModules.instantiateAll(options.offerOrderModules, cliOptions)) {
       install(module);
     }
 
     bind(new TypeLiteral<Amount<Long, Time>>() { })
         .annotatedWith(UnavailabilityThreshold.class)
-        .toInstance(UNAVAILABILITY_THRESHOLD.get());
+        .toInstance(options.unavailabilityThreshold);
 
     install(new PrivateModule() {
       @Override
@@ -141,10 +156,10 @@ public class OffersModule extends AbstractModule {
   @Singleton
   OfferSettings provideOfferSettings(Ordering<HostOffer> offerOrdering) {
     return new OfferSettings(
-        OFFER_FILTER_DURATION.get(),
+        cliOptions.offer.offerFilterDuration,
         new RandomJitterReturnDelay(
-            MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS),
-            OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
+            cliOptions.offer.minOfferHoldTime.as(Time.MILLISECONDS),
+            cliOptions.offer.offerHoldJitterWindow.as(Time.MILLISECONDS),
             Random.Util.newDefaultRandom()),
         offerOrdering);
   }

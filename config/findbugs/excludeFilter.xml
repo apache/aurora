@@ -120,4 +120,10 @@ limitations under the License.
     </Or>
     <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
+
+  <Match>
+    <!-- Options fields may be flagged as always null, since they are set reflectively. -->
+    <Class name="~org.apache.aurora.scheduler.*Options" />
+    <Bug pattern="UWF_NULL_FIELD" />
+  </Match>
 </FindBugsFilter>

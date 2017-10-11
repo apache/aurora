@@ -19,7 +19,6 @@ import java.util.Set;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -83,7 +82,7 @@ public final class TaskTestUtil {
       new ConfigurationManagerSettings(
           ImmutableSet.of(_Fields.MESOS),
           false,
-          ImmutableMultimap.of(),
+          ImmutableList.of(),
           true,
           true,
           true,

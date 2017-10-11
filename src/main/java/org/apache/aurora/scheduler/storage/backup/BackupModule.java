@@ -19,21 +19,19 @@ import java.util.concurrent.Executor;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import com.google.common.annotations.VisibleForTesting;
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.base.Function;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.common.application.Lifecycle;
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.NotNull;
 import org.apache.aurora.common.base.Command;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
@@ -51,41 +49,28 @@ import static java.util.Objects.requireNonNull;
 public class BackupModule extends PrivateModule {
   private static final Logger LOG = LoggerFactory.getLogger(BackupModule.class);
 
-  @CmdLine(name = "backup_interval", help = "Minimum interval on which to write a storage backup.")
-  private static final Arg<Amount<Long, Time>> BACKUP_INTERVAL =
-      Arg.create(Amount.of(1L, Time.HOURS));
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-backup_interval",
+        description = "Minimum interval on which to write a storage backup.")
+    public TimeAmount backupInterval = new TimeAmount(1, Time.HOURS);
 
-  @CmdLine(name = "max_saved_backups",
-      help = "Maximum number of backups to retain before deleting the oldest backups.")
-  private static final Arg<Integer> MAX_SAVED_BACKUPS = Arg.create(48);
+    @Parameter(names = "-max_saved_backups",
+        description = "Maximum number of backups to retain before deleting the oldest backups.")
+    public int maxSavedBackups = 48;
 
-  @NotNull
-  @CmdLine(name = "backup_dir",
-      help = "Directory to store backups under. Will be created if it does not exist.")
-  private static final Arg<File> BACKUP_DIR = Arg.create();
-
-  private final Class<? extends SnapshotStore<Snapshot>> snapshotStore;
-  private final File unvalidatedBackupDir;
-
-  /**
-   * Creates a new backup module.
-   *
-   * @param snapshotStore Snapshot store implementation class.
-   */
-  public BackupModule(Class<? extends SnapshotStore<Snapshot>> snapshotStore) {
-    this(BACKUP_DIR.get(), snapshotStore);
+    @Parameter(names = "-backup_dir",
+        required = true,
+        description = "Directory to store backups under. Will be created if it does not exist.")
+    public File backupDir;
   }
 
-  /**
-   * Creates a new backup module using a given backupDir instead of a flagged one.
-   *
-   * @param backupDir Directory to write backups to.
-   * @param snapshotStore Snapshot store implementation class.
-   */
-  @VisibleForTesting
-  public BackupModule(File backupDir, Class<? extends SnapshotStore<Snapshot>> snapshotStore) {
-    this.unvalidatedBackupDir = requireNonNull(backupDir);
-    this.snapshotStore = requireNonNull(snapshotStore);
+  private final Options options;
+  private final Class<? extends SnapshotStore<Snapshot>> snapshotStore;
+
+  public BackupModule(Options options, Class<? extends SnapshotStore<Snapshot>> snapshotStore) {
+    this.options = options;
+    this.snapshotStore = snapshotStore;
   }
 
   @Override
@@ -126,25 +111,25 @@ public class BackupModule extends PrivateModule {
 
   @Provides
   File provideBackupDir() {
-    if (!unvalidatedBackupDir.exists()) {
-      if (unvalidatedBackupDir.mkdirs()) {
-        LOG.info("Created backup dir " + unvalidatedBackupDir.getPath() + ".");
+    if (!options.backupDir.exists()) {
+      if (options.backupDir.mkdirs()) {
+        LOG.info("Created backup dir " + options.backupDir.getPath() + ".");
       } else {
         throw new IllegalArgumentException(
-            "Unable to create backup dir " + unvalidatedBackupDir.getPath() + ".");
+            "Unable to create backup dir " + options.backupDir.getPath() + ".");
       }
     }
 
-    if (!unvalidatedBackupDir.canWrite()) {
+    if (!options.backupDir.canWrite()) {
       throw new IllegalArgumentException(
-          "Backup dir " + unvalidatedBackupDir.getPath() + " is not writable.");
+          "Backup dir " + options.backupDir.getPath() + " is not writable.");
     }
 
-    return unvalidatedBackupDir;
+    return options.backupDir;
   }
 
   @Provides
   BackupConfig provideBackupConfig(File backupDir) {
-    return new BackupConfig(backupDir, MAX_SAVED_BACKUPS.get(), BACKUP_INTERVAL.get());
+    return new BackupConfig(backupDir, options.maxSavedBackups, options.backupInterval);
   }
 }

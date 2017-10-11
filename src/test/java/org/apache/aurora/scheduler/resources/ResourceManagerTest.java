@@ -48,8 +48,10 @@ import static org.apache.mesos.v1.Protos.Value.Type.SCALAR;
 import static org.junit.Assert.assertEquals;
 
 public class ResourceManagerTest {
+
   @Test
   public void testGetOfferResources() {
+    ResourceType.initializeEmptyCliArgsForTest();
     Protos.Resource resource1 = Protos.Resource.newBuilder()
         .setType(SCALAR)
         .setName(CPUS.getMesosName())

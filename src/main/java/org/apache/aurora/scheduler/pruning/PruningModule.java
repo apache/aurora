@@ -17,15 +17,15 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.pruning.TaskHistoryPruner.HistoryPrunnerSettings;
 import org.slf4j.Logger;
@@ -38,33 +38,39 @@ public class PruningModule extends AbstractModule {
 
   private static final Logger LOG = LoggerFactory.getLogger(PruningModule.class);
 
-  @CmdLine(name = "history_prune_threshold",
-      help = "Time after which the scheduler will prune terminated task history.")
-  private static final Arg<Amount<Long, Time>> HISTORY_PRUNE_THRESHOLD =
-      Arg.create(Amount.of(2L, Time.DAYS));
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-history_prune_threshold",
+        description = "Time after which the scheduler will prune terminated task history.")
+    public TimeAmount historyPruneThreshold = new TimeAmount(2, Time.DAYS);
 
-  @CmdLine(name = "history_max_per_job_threshold",
-      help = "Maximum number of terminated tasks to retain in a job history.")
-  private static final Arg<Integer> HISTORY_MAX_PER_JOB_THRESHOLD = Arg.create(100);
+    @Parameter(names = "-history_max_per_job_threshold",
+        description = "Maximum number of terminated tasks to retain in a job history.")
+    public int historyMaxPerJobThreshold = 100;
 
-  @CmdLine(name = "history_min_retention_threshold",
-      help = "Minimum guaranteed time for task history retention before any pruning is attempted.")
-  private static final Arg<Amount<Long, Time>> HISTORY_MIN_RETENTION_THRESHOLD =
-      Arg.create(Amount.of(1L, Time.HOURS));
+    @Parameter(names = "-history_min_retention_threshold",
+        description =
+            "Minimum guaranteed time for task history retention before any pruning is attempted.")
+    public TimeAmount historyMinRetentionThreshold = new TimeAmount(1, Time.HOURS);
 
-  @CmdLine(name = "job_update_history_per_job_threshold",
-      help = "Maximum number of completed job updates to retain in a job update history.")
-  private static final Arg<Integer> JOB_UPDATE_HISTORY_PER_JOB_THRESHOLD = Arg.create(10);
+    @Parameter(names = "-job_update_history_per_job_threshold",
+        description = "Maximum number of completed job updates to retain in a job update history.")
+    public int jobUpdateHistoryPerJobThreshold = 10;
 
-  @CmdLine(name = "job_update_history_pruning_interval",
-      help = "Job update history pruning interval.")
-  private static final Arg<Amount<Long, Time>> JOB_UPDATE_HISTORY_PRUNING_INTERVAL =
-      Arg.create(Amount.of(15L, Time.MINUTES));
+    @Parameter(names = "-job_update_history_pruning_interval",
+        description = "Job update history pruning interval.")
+    public TimeAmount jobUpdateHistoryPruningInterval = new TimeAmount(15, Time.MINUTES);
 
-  @CmdLine(name = "job_update_history_pruning_threshold",
-      help = "Time after which the scheduler will prune completed job update history.")
-  private static final Arg<Amount<Long, Time>> JOB_UPDATE_HISTORY_PRUNING_THRESHOLD =
-      Arg.create(Amount.of(30L, Time.DAYS));
+    @Parameter(names = "-job_update_history_pruning_threshold",
+        description = "Time after which the scheduler will prune completed job update history.")
+    public TimeAmount jobUpdateHistoryPruningThreshold = new TimeAmount(30, Time.DAYS);
+  }
+
+  private final Options options;
+
+  public PruningModule(Options options) {
+    this.options = options;
+  }
 
   @Override
   protected void configure() {
@@ -74,9 +80,9 @@ public class PruningModule extends AbstractModule {
         // TODO(ksweeney): Create a configuration validator module so this can be injected.
         // TODO(William Farner): Revert this once large task counts is cheap ala hierarchichal store
         bind(HistoryPrunnerSettings.class).toInstance(new HistoryPrunnerSettings(
-            HISTORY_PRUNE_THRESHOLD.get(),
-            HISTORY_MIN_RETENTION_THRESHOLD.get(),
-            HISTORY_MAX_PER_JOB_THRESHOLD.get()
+            options.historyPruneThreshold,
+            options.historyMinRetentionThreshold,
+            options.historyMaxPerJobThreshold
         ));
 
         bind(TaskHistoryPruner.class).in(Singleton.class);
@@ -90,9 +96,9 @@ public class PruningModule extends AbstractModule {
       protected void configure() {
         bind(JobUpdateHistoryPruner.HistoryPrunerSettings.class).toInstance(
             new JobUpdateHistoryPruner.HistoryPrunerSettings(
-                JOB_UPDATE_HISTORY_PRUNING_INTERVAL.get(),
-                JOB_UPDATE_HISTORY_PRUNING_THRESHOLD.get(),
-                JOB_UPDATE_HISTORY_PER_JOB_THRESHOLD.get()));
+                options.jobUpdateHistoryPruningInterval,
+                options.jobUpdateHistoryPruningThreshold,
+                options.jobUpdateHistoryPerJobThreshold));
 
         bind(ScheduledExecutorService.class).toInstance(
             AsyncUtil.singleThreadLoggingScheduledExecutor("JobUpdatePruner-%d", LOG));

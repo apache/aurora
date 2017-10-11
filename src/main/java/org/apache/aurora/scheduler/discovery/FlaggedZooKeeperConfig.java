@@ -18,51 +18,59 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.NotEmpty;
 import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.Credentials;
-import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
+import org.apache.aurora.scheduler.config.validators.NotEmptyIterable;
+
+import static org.apache.aurora.scheduler.discovery.ZooKeeperConfig.DEFAULT_SESSION_TIMEOUT;
 
 /**
  * A factory that creates a {@link ZooKeeperConfig} instance based on command line argument
  * values.
  */
 public final class FlaggedZooKeeperConfig {
-  private static final Logger LOG = LoggerFactory.getLogger(FlaggedZooKeeperConfig.class);
 
-  @CmdLine(name = "zk_use_curator",
-      help = "DEPRECATED: Uses Apache Curator as the zookeeper client; otherwise a copy of Twitter "
-          + "commons/zookeeper (the legacy library) is used.")
-  private static final Arg<Boolean> USE_CURATOR = Arg.create(true);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-zk_use_curator",
+        description =
+            "DEPRECATED: Uses Apache Curator as the zookeeper client; otherwise a copy of Twitter "
+                + "commons/zookeeper (the legacy library) is used.",
+        arity = 1)
+    public boolean useCurator = true;
 
-  @CmdLine(name = "zk_in_proc",
-      help = "Launches an embedded zookeeper server for local testing causing -zk_endpoints "
-          + "to be ignored if specified.")
-  private static final Arg<Boolean> IN_PROCESS = Arg.create(false);
+    @Parameter(names = "-zk_in_proc",
+        description =
+            "Launches an embedded zookeeper server for local testing causing -zk_endpoints "
+                + "to be ignored if specified.",
+        arity = 1)
+    public boolean inProcess = false;
 
-  @NotEmpty
-  @CmdLine(name = "zk_endpoints", help = "Endpoint specification for the ZooKeeper servers.")
-  private static final Arg<List<InetSocketAddress>> ZK_ENDPOINTS = Arg.create();
+    @Parameter(
+        names = "-zk_endpoints",
+        required = true,
+        validateValueWith = NotEmptyIterable.class,
+        description = "Endpoint specification for the ZooKeeper servers.")
+    public List<InetSocketAddress> zkEndpoints;
 
-  @CmdLine(name = "zk_chroot_path", help = "chroot path to use for the ZooKeeper connections")
-  private static final Arg<String> CHROOT_PATH = Arg.create(null);
+    @Parameter(names = "-zk_chroot_path",
+        description = "chroot path to use for the ZooKeeper connections")
+    public String chrootPath;
 
-  @CmdLine(name = "zk_session_timeout", help = "The ZooKeeper session timeout.")
-  private static final Arg<Amount<Integer, Time>> SESSION_TIMEOUT =
-      Arg.create(ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT);
+    @Parameter(names = "-zk_session_timeout", description = "The ZooKeeper session timeout.")
+    public TimeAmount sessionTimeout = DEFAULT_SESSION_TIMEOUT;
 
-  @CmdLine(name = "zk_digest_credentials",
-           help = "user:password to use when authenticating with ZooKeeper.")
-  private static final Arg<String> DIGEST_CREDENTIALS = Arg.create(null);
+    @Parameter(names = "-zk_digest_credentials",
+        description = "user:password to use when authenticating with ZooKeeper.")
+    public String digestCredentials;
+  }
 
   private FlaggedZooKeeperConfig() {
     // Utility class.
@@ -73,17 +81,14 @@ public final class FlaggedZooKeeperConfig {
    *
    * @return Configuration instance.
    */
-  public static ZooKeeperConfig create() {
-    if (USE_CURATOR.hasAppliedValue()) {
-      LOG.warn("The -zk_use_curator flag is deprecated and will be removed in a future release.");
-    }
+  public static ZooKeeperConfig create(Options opts) {
     return new ZooKeeperConfig(
-        USE_CURATOR.get(),
-        ZK_ENDPOINTS.get(),
-        Optional.fromNullable(CHROOT_PATH.get()),
-        IN_PROCESS.get(),
-        SESSION_TIMEOUT.get(),
-        getCredentials(DIGEST_CREDENTIALS.get()));
+        opts.useCurator,
+        opts.zkEndpoints,
+        Optional.fromNullable(opts.chrootPath),
+        opts.inProcess,
+        Amount.of(opts.sessionTimeout.getValue().intValue(), opts.sessionTimeout.getUnit()),
+        getCredentials(opts.digestCredentials));
   }
 
   private static Optional<Credentials> getCredentials(@Nullable String userAndPass) {

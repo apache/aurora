@@ -15,18 +15,19 @@ package org.apache.aurora.scheduler.scheduling;
 
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.Positive;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.TruncatedBinaryBackoff;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
+import org.apache.aurora.scheduler.config.validators.PositiveAmount;
+import org.apache.aurora.scheduler.config.validators.PositiveNumber;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator.RescheduleCalculatorImpl;
@@ -38,62 +39,68 @@ import static org.apache.aurora.scheduler.SchedulerServicesModule.addSchedulerAc
  */
 public class SchedulingModule extends AbstractModule {
 
-  @CmdLine(name = "max_schedule_attempts_per_sec",
-      help = "Maximum number of scheduling attempts to make per second.")
-  private static final Arg<Double> MAX_SCHEDULE_ATTEMPTS_PER_SEC = Arg.create(40D);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-max_schedule_attempts_per_sec",
+        description = "Maximum number of scheduling attempts to make per second.")
+    public double maxScheduleAttemptsPerSec = 40D;
 
-  @CmdLine(name = "flapping_task_threshold",
-      help = "A task that repeatedly runs for less than this time is considered to be flapping.")
-  private static final Arg<Amount<Long, Time>> FLAPPING_THRESHOLD =
-      Arg.create(Amount.of(5L, Time.MINUTES));
+    @Parameter(names = "-flapping_task_threshold",
+        description =
+            "A task that repeatedly runs for less than this time is considered to be flapping.")
+    public TimeAmount flappingThreshold = new TimeAmount(5, Time.MINUTES);
 
-  @CmdLine(name = "initial_flapping_task_delay",
-      help = "Initial amount of time to wait before attempting to schedule a flapping task.")
-  private static final Arg<Amount<Long, Time>> INITIAL_FLAPPING_DELAY =
-      Arg.create(Amount.of(30L, Time.SECONDS));
+    @Parameter(names = "-initial_flapping_task_delay",
+        description =
+            "Initial amount of time to wait before attempting to schedule a flapping task.")
+    public TimeAmount initialFlappingDelay = new TimeAmount(30, Time.SECONDS);
 
-  @CmdLine(name = "max_flapping_task_delay",
-      help = "Maximum delay between attempts to schedule a flapping task.")
-  private static final Arg<Amount<Long, Time>> MAX_FLAPPING_DELAY =
-      Arg.create(Amount.of(5L, Time.MINUTES));
+    @Parameter(names = "-max_flapping_task_delay",
+        description = "Maximum delay between attempts to schedule a flapping task.")
+    public TimeAmount maxFlappingDelay = new TimeAmount(5, Time.MINUTES);
 
-  @CmdLine(name = "max_reschedule_task_delay_on_startup",
-      help = "Upper bound of random delay for pending task rescheduling on scheduler startup.")
-  private static final Arg<Amount<Integer, Time>> MAX_RESCHEDULING_DELAY =
-      Arg.create(Amount.of(30, Time.SECONDS));
+    @Parameter(names = "-max_reschedule_task_delay_on_startup",
+        description =
+            "Upper bound of random delay for pending task rescheduling on scheduler startup.")
+    public TimeAmount maxReschedulingDelay = new TimeAmount(30, Time.SECONDS);
 
-  @Positive
-  @CmdLine(name = "first_schedule_delay",
-      help = "Initial amount of time to wait before first attempting to schedule a PENDING task.")
-  private static final Arg<Amount<Long, Time>> FIRST_SCHEDULE_DELAY =
-      Arg.create(Amount.of(1L, Time.MILLISECONDS));
+    @Parameter(names = "-first_schedule_delay",
+        validateValueWith = PositiveAmount.class,
+        description =
+            "Initial amount of time to wait before first attempting to schedule a PENDING task.")
+    public TimeAmount firstScheduleDelay = new TimeAmount(1, Time.MILLISECONDS);
 
-  @Positive
-  @CmdLine(name = "initial_schedule_penalty",
-      help = "Initial amount of time to wait before attempting to schedule a task that has failed"
-          + " to schedule.")
-  private static final Arg<Amount<Long, Time>> INITIAL_SCHEDULE_PENALTY =
-      Arg.create(Amount.of(1L, Time.SECONDS));
+    @Parameter(names = "-initial_schedule_penalty",
+        validateValueWith = PositiveAmount.class,
+        description = "Initial amount of time to wait before attempting to schedule a task that "
+            + "has failed to schedule.")
+    public TimeAmount initialSchedulePenalty = new TimeAmount(1, Time.SECONDS);
 
-  @CmdLine(name = "max_schedule_penalty",
-      help = "Maximum delay between attempts to schedule a PENDING tasks.")
-  private static final Arg<Amount<Long, Time>> MAX_SCHEDULE_PENALTY =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+    @Parameter(names = "-max_schedule_penalty",
+        description = "Maximum delay between attempts to schedule a PENDING tasks.")
+    public TimeAmount maxSchedulePenalty = new TimeAmount(1, Time.MINUTES);
 
-  @CmdLine(name = "offer_reservation_duration", help = "Time to reserve a agent's offers while "
-      + "trying to satisfy a task preempting another.")
-  private static final Arg<Amount<Long, Time>> RESERVATION_DURATION =
-      Arg.create(Amount.of(3L, Time.MINUTES));
+    @Parameter(names = "-offer_reservation_duration",
+        description = "Time to reserve a agent's offers while "
+            + "trying to satisfy a task preempting another.")
+    public TimeAmount reservationDuration = new TimeAmount(3, Time.MINUTES);
 
-  @Positive
-  @CmdLine(name = "scheduling_max_batch_size",
-      help = "The maximum number of scheduling attempts that can be processed in a batch.")
-  private static final Arg<Integer> SCHEDULING_MAX_BATCH_SIZE = Arg.create(3);
+    @Parameter(names = "-scheduling_max_batch_size",
+        validateValueWith = PositiveNumber.class,
+        description = "The maximum number of scheduling attempts that can be processed in a batch.")
+    public int schedulingMaxBatchSize = 3;
 
-  @Positive
-  @CmdLine(name = "max_tasks_per_schedule_attempt",
-      help = "The maximum number of tasks to pick in a single scheduling attempt.")
-  private static final Arg<Integer> MAX_TASKS_PER_SCHEDULE_ATTEMPT = Arg.create(5);
+    @Parameter(names = "-max_tasks_per_schedule_attempt",
+        validateValueWith = PositiveNumber.class,
+        description = "The maximum number of tasks to pick in a single scheduling attempt.")
+    public int maxTasksPerScheduleAttempt = 5;
+  }
+
+  private final Options options;
+
+  public SchedulingModule(Options options) {
+    this.options = options;
+  }
 
   @Override
   protected void configure() {
@@ -101,18 +108,16 @@ public class SchedulingModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(TaskGroups.TaskGroupsSettings.class).toInstance(new TaskGroups.TaskGroupsSettings(
-            FIRST_SCHEDULE_DELAY.get(),
-            new TruncatedBinaryBackoff(
-                INITIAL_SCHEDULE_PENALTY.get(),
-                MAX_SCHEDULE_PENALTY.get()),
-            RateLimiter.create(MAX_SCHEDULE_ATTEMPTS_PER_SEC.get()),
-            MAX_TASKS_PER_SCHEDULE_ATTEMPT.get()));
+            options.firstScheduleDelay,
+            new TruncatedBinaryBackoff(options.initialSchedulePenalty, options.maxSchedulePenalty),
+            RateLimiter.create(options.maxScheduleAttemptsPerSec),
+            options.maxTasksPerScheduleAttempt));
 
         bind(RescheduleCalculatorImpl.RescheduleCalculatorSettings.class)
             .toInstance(new RescheduleCalculatorImpl.RescheduleCalculatorSettings(
-                new TruncatedBinaryBackoff(INITIAL_FLAPPING_DELAY.get(), MAX_FLAPPING_DELAY.get()),
-                FLAPPING_THRESHOLD.get(),
-                MAX_RESCHEDULING_DELAY.get()));
+                new TruncatedBinaryBackoff(options.initialFlappingDelay, options.maxFlappingDelay),
+                options.flappingThreshold,
+                options.maxReschedulingDelay));
 
         bind(RescheduleCalculator.class).to(RescheduleCalculatorImpl.class).in(Singleton.class);
         expose(RescheduleCalculator.class);
@@ -124,7 +129,7 @@ public class SchedulingModule extends AbstractModule {
 
     bind(new TypeLiteral<Integer>() { })
         .annotatedWith(TaskGroups.SchedulingMaxBatchSize.class)
-        .toInstance(SCHEDULING_MAX_BATCH_SIZE.get());
+        .toInstance(options.schedulingMaxBatchSize);
     bind(TaskGroups.TaskGroupBatchWorker.class).in(Singleton.class);
     addSchedulerActiveServiceBinding(binder()).to(TaskGroups.TaskGroupBatchWorker.class);
 
@@ -133,7 +138,7 @@ public class SchedulingModule extends AbstractModule {
       protected void configure() {
         bind(new TypeLiteral<BiCache<String, TaskGroupKey>>() { }).in(Singleton.class);
         bind(BiCache.BiCacheSettings.class).toInstance(
-            new BiCache.BiCacheSettings(RESERVATION_DURATION.get(), "reservation"));
+            new BiCache.BiCacheSettings(options.reservationDuration, "reservation"));
         bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
         bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
         expose(TaskScheduler.class);

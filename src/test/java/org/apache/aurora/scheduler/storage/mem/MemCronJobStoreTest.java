@@ -40,7 +40,9 @@ public class MemCronJobStoreTest extends AbstractCronJobStoreTest {
   protected Module getStorageModule() {
     statsProvider = new FakeStatsProvider();
     return Modules.combine(
-        DbModule.testModuleWithWorkQueue(PLAIN, Optional.of(new InMemStoresModule(PLAIN))),
+        DbModule.testModuleWithWorkQueue(
+            PLAIN,
+            Optional.of(new InMemStoresModule(new DbModule.Options(), PLAIN))),
         new AbstractModule() {
           @Override
           protected void configure() {

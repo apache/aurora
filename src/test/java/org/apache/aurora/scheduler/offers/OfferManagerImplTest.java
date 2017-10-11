@@ -33,6 +33,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.HostAttributesChanged;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.offers.OfferManager.OfferManagerImpl;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
@@ -460,6 +461,7 @@ public class OfferManagerImplTest extends EasyMockTest {
 
   @Test
   public void testRevocableCPUOrdering() throws Exception {
+    ResourceType.initializeEmptyCliArgsForTest();
     OfferManager cpuManager = createOrderedManager(ImmutableList.of(OfferOrder.REVOCABLE_CPU));
 
     HostOffer small = setMode(new HostOffer(

@@ -47,6 +47,8 @@ import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -99,7 +101,7 @@ public class SchedulingBenchmarks {
   @Fork(1)
   @State(Scope.Thread)
   public abstract static class AbstractBase {
-    private static final Amount<Long, Time> NO_DELAY = Amount.of(1L, Time.MILLISECONDS);
+    private static final TimeAmount NO_DELAY = new TimeAmount(1L, Time.MILLISECONDS);
     private static final Amount<Long, Time> DELAY_FOREVER = Amount.of(30L, Time.DAYS);
     private static final Integer BATCH_SIZE = 5;
     protected Storage storage;
@@ -118,10 +120,16 @@ public class SchedulingBenchmarks {
       final FakeClock clock = new FakeClock();
       clock.setNowMillis(System.currentTimeMillis());
 
+      CliOptions options = new CliOptions();
+      options.preemptor.enablePreemptor = true;
+      options.preemptor.preemptionDelay = NO_DELAY;
+      options.preemptor.preemptionSlotSearchInterval = NO_DELAY;
+      options.preemptor.reservationMaxBatchSize = BATCH_SIZE;
+
       // TODO(maxim): Find a way to DRY it and reuse existing modules instead.
       Injector injector = Guice.createInjector(
-          new StateModule(),
-          new PreemptorModule(true, NO_DELAY, NO_DELAY, BATCH_SIZE),
+          new StateModule(new CliOptions()),
+          new PreemptorModule(options),
           new TierModule(TaskTestUtil.TIER_CONFIG),
           new PrivateModule() {
             @Override

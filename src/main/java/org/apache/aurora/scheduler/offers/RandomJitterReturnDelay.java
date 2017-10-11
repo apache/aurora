@@ -30,11 +30,11 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 @VisibleForTesting
 class RandomJitterReturnDelay implements Supplier<Amount<Long, Time>>  {
-  private final int minHoldTimeMs;
-  private final int maxJitterWindowMs;
+  private final long minHoldTimeMs;
+  private final long maxJitterWindowMs;
   private final Random random;
 
-  RandomJitterReturnDelay(int minHoldTimeMs, int maxJitterWindowMs, Random random) {
+  RandomJitterReturnDelay(long minHoldTimeMs, long maxJitterWindowMs, Random random) {
     checkArgument(minHoldTimeMs >= 0);
     checkArgument(maxJitterWindowMs >= 0);
 
@@ -45,6 +45,6 @@ class RandomJitterReturnDelay implements Supplier<Amount<Long, Time>>  {
 
   @Override
   public Amount<Long, Time> get() {
-    return Amount.of((long) minHoldTimeMs + random.nextInt(maxJitterWindowMs), Time.MILLISECONDS);
+    return Amount.of(minHoldTimeMs + random.nextInt((int) maxJitterWindowMs), Time.MILLISECONDS);
   }
 }

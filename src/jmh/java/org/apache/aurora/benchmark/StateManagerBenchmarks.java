@@ -185,9 +185,9 @@ public class StateManagerBenchmarks {
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
           }
         },
-        DbModule.productionModule(Bindings.KeyFactory.PLAIN),
+        DbModule.productionModule(Bindings.KeyFactory.PLAIN, new DbModule.Options()),
         // This is needed for storage
-        new AsyncModule()
+        new AsyncModule(new AsyncModule.Options())
     );
   }
 }

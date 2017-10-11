@@ -57,6 +57,7 @@ import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.db.EnumBackfill;
 import org.apache.aurora.scheduler.storage.db.MigrationManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -100,7 +101,9 @@ public class SnapshotStoreImplIT {
       injector = createStorageInjector(testModuleWithWorkQueue());
     } else {
       injector = createStorageInjector(
-          testModuleWithWorkQueue(PLAIN, Optional.of(new InMemStoresModule(PLAIN))));
+          testModuleWithWorkQueue(
+              PLAIN,
+              Optional.of(new InMemStoresModule(new DbModule.Options(), PLAIN))));
     }
 
     storage = injector.getInstance(Storage.class);

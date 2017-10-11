@@ -14,16 +14,15 @@
 package org.apache.aurora.scheduler.preemptor;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -65,20 +64,24 @@ public class PreemptorModuleTest extends EasyMockTest {
         });
   }
 
+  public static class FakeSlotFinder extends AbstractModule {
+    @Override
+    protected void configure() {
+      Runnable alwaysThrow = () -> {
+        throw new RuntimeException("I should not run");
+      };
+      bind(Runnable.class).annotatedWith(PreemptorModule.PreemptionSlotFinder.class)
+          .toInstance(alwaysThrow);
+    }
+  }
+
   @Test
   public void testPreemptorDisabled() throws Exception {
-    Injector injector = createInjector(new PreemptorModule(
-        false,
-        Amount.of(0L, Time.SECONDS),
-        Amount.of(0L, Time.SECONDS),
-        5,
-        ImmutableSet.of(new AbstractModule() {
-          @Override
-          protected void configure() {
-            bind(Runnable.class).annotatedWith(PreemptorModule.PreemptionSlotFinder.class)
-                .toInstance(createMock(Runnable.class));
-          }
-        })));
+    CliOptions options = new CliOptions();
+    options.preemptor.enablePreemptor = false;
+    options.preemptor.slotFinderModules = ImmutableList.of(FakeSlotFinder.class);
+
+    Injector injector = createInjector(new PreemptorModule(options));
 
     control.replay();
 

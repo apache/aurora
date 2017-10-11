@@ -64,7 +64,7 @@ import static org.apache.aurora.scheduler.sla.SlaGroup.GroupType.RESOURCE_RAM;
 /**
  * Responsible for calculating and exporting SLA metrics.
  */
-class MetricCalculator implements Runnable {
+public class MetricCalculator implements Runnable {
 
   @VisibleForTesting
   static final String NAME_QUALIFIER_PROD = "";
@@ -75,7 +75,7 @@ class MetricCalculator implements Runnable {
   /**
    * Pre-configured categories of metrics.
    */
-  enum MetricCategory {
+  public enum MetricCategory {
 
     JOB_UPTIMES(ImmutableMultimap.<AlgorithmType, GroupType>builder()
         .put(JOB_UPTIME_50, JOB)

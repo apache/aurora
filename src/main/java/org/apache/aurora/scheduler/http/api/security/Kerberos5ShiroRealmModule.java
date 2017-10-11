@@ -24,6 +24,8 @@ import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.io.Files;
@@ -32,8 +34,7 @@ import com.google.inject.PrivateModule;
 import com.sun.security.auth.login.ConfigFile;
 import com.sun.security.auth.module.Krb5LoginModule;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.scheduler.config.CliOptions;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
@@ -59,9 +60,6 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
    */
   private static final String GSS_SPNEGO_MECH_OID = "1.3.6.1.5.5.2";
 
-  private static final String SERVER_KEYTAB_ARGNAME = "kerberos_server_keytab";
-  private static final String SERVER_PRINCIPAL_ARGNAME = "kerberos_server_principal";
-
   private static final String JAAS_CONF_TEMPLATE =
       "%s {\n"
           + Krb5LoginModule.class.getName()
@@ -69,28 +67,36 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
           + "keyTab=\"%s\" principal=\"%s\" debug=%s;\n"
           + "};";
 
-  @CmdLine(name = SERVER_KEYTAB_ARGNAME, help = "Path to the server keytab.")
-  private static final Arg<File> SERVER_KEYTAB = Arg.create(null);
+  @Parameters(separators = "=")
+  public static class Options {
+    private static final String SERVER_KEYTAB_ARGNAME = "-kerberos_server_keytab";
+    private static final String SERVER_PRINCIPAL_ARGNAME = "-kerberos_server_principal";
 
-  @CmdLine(name = SERVER_PRINCIPAL_ARGNAME,
-      help = "Kerberos server principal to use, usually of the form "
-          + "HTTP/aurora.example.com@EXAMPLE.COM")
-  private static final Arg<KerberosPrincipal> SERVER_PRINCIPAL = Arg.create(null);
+    @Parameter(names = SERVER_KEYTAB_ARGNAME, description = "Path to the server keytab.")
+    public File serverKeytab;
 
-  @CmdLine(name = "kerberos_debug", help = "Produce additional Kerberos debugging output.")
-  private static final Arg<Boolean> DEBUG = Arg.create(false);
+    @Parameter(names = SERVER_PRINCIPAL_ARGNAME,
+        description = "Kerberos server principal to use, usually of the form "
+            + "HTTP/aurora.example.com@EXAMPLE.COM")
+    public KerberosPrincipal serverPrincipal;
+
+    @Parameter(names = "-kerberos_debug",
+        description = "Produce additional Kerberos debugging output.",
+        arity = 1)
+    public boolean kerberosDebug = false;
+  }
 
   private final Optional<File> serverKeyTab;
   private final Optional<KerberosPrincipal> serverPrincipal;
   private final GSSManager gssManager;
   private final boolean kerberosDebugEnabled;
 
-  public Kerberos5ShiroRealmModule() {
+  public Kerberos5ShiroRealmModule(CliOptions options) {
     this(
-        Optional.fromNullable(SERVER_KEYTAB.get()),
-        Optional.fromNullable(SERVER_PRINCIPAL.get()),
+        Optional.fromNullable(options.kerberos.serverKeytab),
+        Optional.fromNullable(options.kerberos.serverPrincipal),
         GSSManager.getInstance(),
-        DEBUG.get());
+        options.kerberos.kerberosDebug);
   }
 
   @VisibleForTesting
@@ -121,12 +127,12 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
   @Override
   protected void configure() {
     if (!serverKeyTab.isPresent()) {
-      addError("No -" + SERVER_KEYTAB_ARGNAME + " specified.");
+      addError("No -" + Options.SERVER_KEYTAB_ARGNAME + " specified.");
       return;
     }
 
     if (!serverPrincipal.isPresent()) {
-      addError("No -" + SERVER_PRINCIPAL_ARGNAME + " specified.");
+      addError("No -" + Options.SERVER_PRINCIPAL_ARGNAME + " specified.");
       return;
     }
 

@@ -23,7 +23,7 @@ import javax.inject.Singleton;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
 
-import org.apache.aurora.scheduler.app.SchedulerMain;
+import org.apache.aurora.scheduler.app.SchedulerMain.Options.DriverKind;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.mesos.MesosCallbackHandler.MesosCallbackHandlerImpl;
@@ -43,9 +43,9 @@ import static com.google.common.base.Preconditions.checkState;
  */
 public class SchedulerDriverModule extends AbstractModule {
   private static final Logger LOG = LoggerFactory.getLogger(SchedulerDriverModule.class);
-  private final SchedulerMain.DriverKind kind;
+  private final DriverKind kind;
 
-  public SchedulerDriverModule(SchedulerMain.DriverKind kind) {
+  public SchedulerDriverModule(DriverKind kind) {
     this.kind = kind;
   }
 

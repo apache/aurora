@@ -18,7 +18,6 @@ import com.google.inject.AbstractModule;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ReadOnlyScheduler;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
-import org.apache.aurora.scheduler.thrift.aop.AopModule;
 
 /**
  * Binding module to configure a thrift server.
@@ -34,7 +33,6 @@ public class ThriftModule extends AbstractModule {
     // Promote to an explicit binding so it's created in the servlet container child injector.
     // See https://code.google.com/p/google-guice/issues/detail?id=461
     bind(SchedulerThriftInterface.class);
-    install(new AopModule());
   }
 
   /**

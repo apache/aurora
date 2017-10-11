@@ -72,7 +72,7 @@ public class AsyncModuleTest extends EasyMockTest {
 
   @Test
   public void testBindings() throws Exception {
-    Injector injector = createInjector(new AsyncModule());
+    Injector injector = createInjector(new AsyncModule(new AsyncModule.Options()));
 
     control.replay();
 

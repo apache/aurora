@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -28,15 +30,12 @@ import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 
 import org.apache.aurora.GuavaUtils;
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.CanRead;
-import org.apache.aurora.common.args.constraints.Exists;
 import org.apache.aurora.common.base.MorePreconditions;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.gen.Volume;
 import org.apache.aurora.gen.apiConstants;
+import org.apache.aurora.scheduler.config.types.DataAmount;
+import org.apache.aurora.scheduler.config.validators.ReadableFile;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.mesos.v1.Protos;
 import org.apache.mesos.v1.Protos.CommandInfo;
@@ -54,56 +53,65 @@ import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
  */
 public class ExecutorModule extends AbstractModule {
 
-  @CmdLine(
-      name = "custom_executor_config",
-      help = "Path to custom executor settings configuration file.")
-  @Exists
-  @CanRead
-  private static final Arg<File> CUSTOM_EXECUTOR_CONFIG = Arg.create(null);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(
+        names = "-custom_executor_config",
+        validateValueWith = ReadableFile.class,
+        description = "Path to custom executor settings configuration file.")
+    public File customExecutorConfig;
 
-  @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor entry point.")
-  private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
+    @Parameter(names = "-thermos_executor_path",
+        description = "Path to the thermos executor entry point.")
+    public String thermosExecutorPath;
 
-  @CmdLine(name = "thermos_executor_resources",
-      help = "A comma separated list of additional resources to copy into the sandbox."
-          + "Note: if thermos_executor_path is not the thermos_executor.pex file itself, "
-          + "this must include it.")
-  private static final Arg<List<String>> THERMOS_EXECUTOR_RESOURCES =
-      Arg.create(ImmutableList.of());
+    @Parameter(names = "-thermos_executor_resources",
+        description = "A comma separated list of additional resources to copy into the sandbox."
+            + "Note: if thermos_executor_path is not the thermos_executor.pex file itself, "
+            + "this must include it.")
+    public List<String> thermosExecutorResources = ImmutableList.of();
 
-  @CmdLine(name = "thermos_executor_flags",
-      help = "Extra arguments to be passed to the thermos executor")
-  private static final Arg<String> THERMOS_EXECUTOR_FLAGS = Arg.create(null);
+    @Parameter(names = "-thermos_executor_flags",
+        description = "Extra arguments to be passed to the thermos executor")
+    public String thermosExecutorFlags;
 
-  @CmdLine(name = "thermos_home_in_sandbox",
-      help = "If true, changes HOME to the sandbox before running the executor. "
-          + "This primarily has the effect of causing the executor and runner "
-          + "to extract themselves into the sandbox.")
-  private static final Arg<Boolean> THERMOS_HOME_IN_SANDBOX = Arg.create(false);
+    @Parameter(names = "-thermos_home_in_sandbox",
+        description = "If true, changes HOME to the sandbox before running the executor. "
+            + "This primarily has the effect of causing the executor and runner "
+            + "to extract themselves into the sandbox.",
+        arity = 1)
+    public boolean thermosHomeInSandbox = false;
 
-  /**
-   * Extra CPU allocated for each executor.
-   */
-  @CmdLine(name = "thermos_executor_cpu",
-      help = "The number of CPU cores to allocate for each instance of the executor.")
-  private static final Arg<Double> EXECUTOR_OVERHEAD_CPUS = Arg.create(0.25);
+    /**
+     * Extra CPU allocated for each executor.
+     */
+    @Parameter(names = "-thermos_executor_cpu",
+        description = "The number of CPU cores to allocate for each instance of the executor.")
+    public double executorOverheadCpus = 0.25;
 
-  /**
-   * Extra RAM allocated for the executor.
-   */
-  @CmdLine(name = "thermos_executor_ram",
-      help = "The amount of RAM to allocate for each instance of the executor.")
-  private static final Arg<Amount<Long, Data>> EXECUTOR_OVERHEAD_RAM =
-      Arg.create(Amount.of(128L, Data.MB));
+    /**
+     * Extra RAM allocated for the executor.
+     */
+    @Parameter(names = "-thermos_executor_ram",
+        description = "The amount of RAM to allocate for each instance of the executor.")
+    public DataAmount executorOverheadRam = new DataAmount(128, Data.MB);
 
-  @CmdLine(name = "global_container_mounts",
-      help = "A comma separated list of mount points (in host:container form) to mount "
-          + "into all (non-mesos) containers.")
-  private static final Arg<List<Volume>> GLOBAL_CONTAINER_MOUNTS = Arg.create(ImmutableList.of());
+    @Parameter(names = "-global_container_mounts",
+        description = "A comma separated list of mount points (in host:container form) to mount "
+            + "into all (non-mesos) containers.")
+    public List<Volume> globalContainerMounts = ImmutableList.of();
 
-  @CmdLine(name = "populate_discovery_info",
-      help = "If true, Aurora populates DiscoveryInfo field of Mesos TaskInfo.")
-  private static final Arg<Boolean> POPULATE_DISCOVERY_INFO = Arg.create(false);
+    @Parameter(names = "-populate_discovery_info",
+        description = "If true, Aurora populates DiscoveryInfo field of Mesos TaskInfo.",
+        arity = 1)
+    public boolean populateDiscoveryInfo = false;
+  }
+
+  private final Options options;
+
+  public ExecutorModule(Options options) {
+    this.options = options;
+  }
 
   @VisibleForTesting
   static CommandInfo makeExecutorCommand(
@@ -135,11 +143,11 @@ public class ExecutorModule extends AbstractModule {
         .build();
   }
 
-  private static ExecutorConfig makeThermosExecutorConfig()  {
+  private static ExecutorConfig makeThermosExecutorConfig(Options opts)  {
     List<Protos.Volume> volumeMounts =
         ImmutableList.<Protos.Volume>builder()
             .addAll(Iterables.transform(
-                GLOBAL_CONTAINER_MOUNTS.get(),
+                opts.globalContainerMounts,
                 v -> Protos.Volume.newBuilder()
                     .setHostPath(v.getHostPath())
                     .setContainerPath(v.getContainerPath())
@@ -154,33 +162,32 @@ public class ExecutorModule extends AbstractModule {
             .setExecutorId(Executors.PLACEHOLDER_EXECUTOR_ID)
             .setCommand(
                 makeExecutorCommand(
-                    THERMOS_EXECUTOR_PATH.get(),
-                    THERMOS_EXECUTOR_RESOURCES.get(),
-                    THERMOS_HOME_IN_SANDBOX.get(),
-                    THERMOS_EXECUTOR_FLAGS.get()))
-            .addResources(makeResource(CPUS, EXECUTOR_OVERHEAD_CPUS.get()))
-            .addResources(makeResource(RAM_MB, EXECUTOR_OVERHEAD_RAM.get().as(Data.MB)))
+                    opts.thermosExecutorPath,
+                    opts.thermosExecutorResources,
+                    opts.thermosHomeInSandbox,
+                    opts.thermosExecutorFlags))
+            .addResources(makeResource(CPUS, opts.executorOverheadCpus))
+            .addResources(makeResource(RAM_MB, opts.executorOverheadRam.as(Data.MB)))
             .build(),
         volumeMounts,
         "thermos-");
   }
 
-  private static ExecutorSettings makeExecutorSettings() {
+  private static ExecutorSettings makeExecutorSettings(Options opts) {
     try {
-
       ImmutableMap.Builder<String, ExecutorConfig> configsBuilder = ImmutableMap.builder();
 
-      configsBuilder.put(apiConstants.AURORA_EXECUTOR_NAME, makeThermosExecutorConfig());
+      configsBuilder.put(apiConstants.AURORA_EXECUTOR_NAME, makeThermosExecutorConfig(opts));
 
-      if (CUSTOM_EXECUTOR_CONFIG.hasAppliedValue()) {
+      if (opts.customExecutorConfig != null) {
         configsBuilder.putAll(
             ExecutorSettingsLoader.read(
                 Files.newBufferedReader(
-                    CUSTOM_EXECUTOR_CONFIG.get().toPath(),
+                    opts.customExecutorConfig.toPath(),
                     StandardCharsets.UTF_8)));
       }
 
-      return new ExecutorSettings(configsBuilder.build(), POPULATE_DISCOVERY_INFO.get());
+      return new ExecutorSettings(configsBuilder.build(), opts.populateDiscoveryInfo);
 
     } catch (ExecutorSettingsLoader.ExecutorConfigException | IOException e) {
       throw new IllegalArgumentException("Failed to read executor settings: " + e, e);
@@ -189,7 +196,7 @@ public class ExecutorModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(ExecutorSettings.class).toInstance(makeExecutorSettings());
+    bind(ExecutorSettings.class).toInstance(makeExecutorSettings(options));
   }
 
   private static Resource makeResource(ResourceType type, double value) {

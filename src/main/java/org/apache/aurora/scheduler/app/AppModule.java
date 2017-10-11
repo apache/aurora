@@ -13,30 +13,31 @@
  */
 package org.apache.aurora.scheduler.app;
 
-import java.util.Set;
+import java.util.List;
 
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
 import com.google.inject.AbstractModule;
 
 import org.apache.aurora.GuiceUtils;
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.common.inject.TimedInterceptor;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.Container._Fields;
+import org.apache.aurora.gen.DockerParameter;
 import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
-import org.apache.aurora.scheduler.app.SchedulerMain.DriverKind;
+import org.apache.aurora.scheduler.app.SchedulerMain.Options.DriverKind;
 import org.apache.aurora.scheduler.async.AsyncModule;
+import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.validators.PositiveNumber;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
@@ -62,75 +63,90 @@ import static java.util.Objects.requireNonNull;
  * Binding module for the aurora scheduler application.
  */
 public class AppModule extends AbstractModule {
-  private static final int DEFAULT_MAX_TASKS_PER_JOB = 4000;
 
-  @Positive
-  @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
-  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(DEFAULT_MAX_TASKS_PER_JOB);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-max_tasks_per_job",
+        validateValueWith = PositiveNumber.class,
+        description = "Maximum number of allowed tasks in a single job.")
+    public int maxTasksPerJob = 4000;
 
-  private static final int DEFAULT_MAX_UPDATE_INSTANCE_FAILURES = DEFAULT_MAX_TASKS_PER_JOB * 5;
+    @Parameter(names = "-max_update_instance_failures",
+        validateValueWith = PositiveNumber.class,
+        description = "Upper limit on the number of "
+            + "failures allowed during a job update. This helps cap potentially unbounded entries"
+            + " into storage.")
+    public int maxUpdateInstanceFailures = maxTasksPerJob * 5;
 
-  @Positive
-  @CmdLine(name = "max_update_instance_failures", help = "Upper limit on the number of "
-      + "failures allowed during a job update. This helps cap potentially unbounded entries into "
-      + "storage.")
-  public static final Arg<Integer> MAX_UPDATE_INSTANCE_FAILURES = Arg.create(
-      DEFAULT_MAX_UPDATE_INSTANCE_FAILURES);
+    // TODO(wfarner): From jcommander docs - "Also, note that only List<String> is allowed for
+    // parameters that define an arity. You will have to convert these values yourself..."
 
-  @CmdLine(name = "allowed_container_types",
-      help = "Container types that are allowed to be used by jobs.")
-  private static final Arg<Set<_Fields>> ALLOWED_CONTAINER_TYPES =
-      Arg.create(ImmutableSet.of(Container._Fields.MESOS));
+    @Parameter(names = "-allowed_container_types",
+        description = "Container types that are allowed to be used by jobs.")
+    public List<_Fields> allowedContainerTypes = ImmutableList.of(Container._Fields.MESOS);
 
-  @CmdLine(name = "allow_docker_parameters",
-      help = "Allow to pass docker container parameters in the job.")
-  private static final Arg<Boolean> ENABLE_DOCKER_PARAMETERS = Arg.create(false);
+    @Parameter(names = "-allow_docker_parameters",
+        description = "Allow to pass docker container parameters in the job.",
+        arity = 1)
+    public boolean enableDockerParameters = false;
 
-  @CmdLine(name = "default_docker_parameters",
-      help = "Default docker parameters for any job that does not explicitly declare parameters.")
-  private static final Arg<Multimap<String, String>> DEFAULT_DOCKER_PARAMETERS =
-      Arg.create(ImmutableMultimap.of());
+    @Parameter(names = "-default_docker_parameters",
+        description =
+            "Default docker parameters for any job that does not explicitly declare parameters.")
+    public List<DockerParameter> defaultDockerParameters = ImmutableList.of();
 
-  @CmdLine(name = "require_docker_use_executor",
-      help = "If false, Docker tasks may run without an executor (EXPERIMENTAL)")
-  private static final Arg<Boolean> REQUIRE_DOCKER_USE_EXECUTOR = Arg.create(true);
+    @Parameter(names = "-require_docker_use_executor",
+        description = "If false, Docker tasks may run without an executor (EXPERIMENTAL)",
+        arity = 1)
+    public boolean requireDockerUseExecutor = true;
 
-  @CmdLine(name = "enable_mesos_fetcher", help = "Allow jobs to pass URIs "
-      + "to the Mesos Fetcher. Note that enabling this feature could pose "
-      + "a privilege escalation threat.")
-  private static final Arg<Boolean> ENABLE_MESOS_FETCHER = Arg.create(false);
+    @Parameter(names = "-enable_mesos_fetcher", description = "Allow jobs to pass URIs "
+        + "to the Mesos Fetcher. Note that enabling this feature could pose "
+        + "a privilege escalation threat.",
+        arity = 1)
+    public boolean enableMesosFetcher = false;
 
-  @CmdLine(name = "allow_container_volumes",
-      help = "Allow passing in volumes in the job. Enabling this could pose a privilege "
-          + "escalation threat.")
-  private static final Arg<Boolean> ALLOW_CONTAINER_VOLUMES = Arg.create(false);
+    @Parameter(names = "-allow_container_volumes",
+        description = "Allow passing in volumes in the job. Enabling this could pose a privilege "
+            + "escalation threat.",
+        arity = 1)
+    public boolean allowContainerVolumes = false;
+  }
 
   private final ConfigurationManagerSettings configurationManagerSettings;
   private final DriverKind kind;
+  private final CliOptions options;
 
   @VisibleForTesting
-  public AppModule(ConfigurationManagerSettings configurationManagerSettings, DriverKind kind) {
+  public AppModule(
+      ConfigurationManagerSettings configurationManagerSettings,
+      DriverKind kind,
+      CliOptions options) {
     this.configurationManagerSettings = requireNonNull(configurationManagerSettings);
     this.kind = kind;
+    this.options = options;
   }
 
-  public AppModule(boolean allowGpuResource, DriverKind kind) {
+  public AppModule(CliOptions opts) {
     this(new ConfigurationManagerSettings(
-        ImmutableSet.copyOf(ALLOWED_CONTAINER_TYPES.get()),
-        ENABLE_DOCKER_PARAMETERS.get(),
-        DEFAULT_DOCKER_PARAMETERS.get(),
-        REQUIRE_DOCKER_USE_EXECUTOR.get(),
-        allowGpuResource,
-        ENABLE_MESOS_FETCHER.get(),
-        ALLOW_CONTAINER_VOLUMES.get()),
-        kind);
+        ImmutableSet.copyOf(opts.app.allowedContainerTypes),
+            opts.app.enableDockerParameters,
+            opts.app.defaultDockerParameters,
+            opts.app.requireDockerUseExecutor,
+            opts.main.allowGpuResource,
+            opts.app.enableMesosFetcher,
+            opts.app.allowContainerVolumes),
+        opts.main.driverImpl,
+        opts);
   }
 
   @Override
   protected void configure() {
     bind(ConfigurationManagerSettings.class).toInstance(configurationManagerSettings);
     bind(Thresholds.class)
-        .toInstance(new Thresholds(MAX_TASKS_PER_JOB.get(), MAX_UPDATE_INSTANCE_FAILURES.get()));
+        .toInstance(
+            new Thresholds(options.app.maxTasksPerJob,
+            options.app.maxUpdateInstanceFailures));
 
     // Enable intercepted method timings and context classloader repair.
     TimedInterceptor.bind(binder());
@@ -143,22 +159,22 @@ public class AppModule extends AbstractModule {
     PubsubEventModule.bindSchedulingFilterDelegate(binder()).to(SchedulingFilterImpl.class);
     bind(SchedulingFilterImpl.class).in(Singleton.class);
 
-    install(new AsyncModule());
-    install(new OffersModule());
-    install(new PruningModule());
-    install(new ReconciliationModule());
-    install(new SchedulingModule());
-    install(new AsyncStatsModule());
+    install(new AsyncModule(options.async));
+    install(new OffersModule(options));
+    install(new PruningModule(options.pruning));
+    install(new ReconciliationModule(options.reconciliation));
+    install(new SchedulingModule(options.scheduling));
+    install(new AsyncStatsModule(options.asyncStats));
     install(new MetadataModule());
     install(new QuotaModule());
-    install(new JettyServerModule());
-    install(new PreemptorModule());
+    install(new JettyServerModule(options));
+    install(new PreemptorModule(options));
     install(new SchedulerDriverModule(kind));
     install(new SchedulerServicesModule());
-    install(new SchedulerModule());
-    install(new StateModule());
-    install(new SlaModule());
-    install(new UpdaterModule());
+    install(new SchedulerModule(options.scheduler));
+    install(new StateModule(options));
+    install(new SlaModule(options.sla));
+    install(new UpdaterModule(options.updater));
     bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
   }
 }

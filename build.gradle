@@ -171,25 +171,6 @@ project(':ui') {
 // building the Scheduler JAR, the JS bundle is built first.
 tasks.processResources.dependsOn(':ui:webpack')
 
-/* This gradle project contains the annotation procesor from
- * com.twitter.common.args and related dependencies. It needs to be outside of
- * the commons project because gradle needs to compile the annotation processor
- * first.
- */
-project(':commons-args') {
-  dependencies {
-    compile "com.google.guava:guava:${guavaRev}"
-    compile "com.google.code.findbugs:jsr305:${jsrRev}"
-    compile "commons-lang:commons-lang:${commonsLangRev}"
-  }
-
-  apply plugin: 'license'
-  license {
-    header rootProject.file('config/checkstyle/apache.header')
-    strictCheck true
-  }
-}
-
 project(':commons') {
   apply plugin: org.apache.aurora.build.ThriftPlugin
   thrift {
@@ -391,10 +372,10 @@ dependencies {
 
   compile project(':api')
   compile project(':commons')
-  compile project(':commons-args')
 
   compile 'aopalliance:aopalliance:1.0'
   compile "ch.qos.logback:logback-classic:${logbackRev}"
+  compile "com.beust:jcommander:1.72"
   compile "com.google.code.findbugs:jsr305:${jsrRev}"
   compile "com.google.inject:guice:${guiceRev}"
   compile "com.google.inject.extensions:guice-assistedinject:${guiceRev}"
@@ -492,15 +473,6 @@ tasks.withType(Test) {
   maxParallelForks = Runtime.runtime.availableProcessors()
 }
 
-// Turn on annotation processors for commons (uses commons-args) and aurora
-// (uses commons-args, forward, ...).  The crux here is _not_ turning annotation processing on
-// for commons-args (this leads to an attempt at self-processing before its processor is
-// compiled); so the strategy taken is to white-list modules.
-//
-// NB: Unfortunately, most of the ipr/iml modeling we need is not exposed by the idea plugin DSL so
-// we drop to xml manipulation here only out of necessity.
-def apt_projects = ['commons', 'aurora']
-
 idea {
   project {
     vcs = 'Git'
@@ -510,6 +482,9 @@ idea {
     ipr {
       withXml {
         def projectNode = it.asNode()
+
+        // TODO(wfarner): Does the below work?  It still seems necessary to manually turn on
+        // annotation processing.
 
         // Configure an annotation processor profile.
         def compilerConfiguration = projectNode.find {
@@ -524,9 +499,7 @@ idea {
               sourceOutputDir(name: 'generated')
               sourceTestOutputDir(name: 'generated')
               processorPath(useClasspath: 'true')
-              apt_projects.each {
-                module(name: it)
-              }
+              module(name: 'aurora')
             }
           }
         }
@@ -534,11 +507,6 @@ idea {
           it.name() == 'component' && it.@name == 'ProjectRootManager'
         }
         projectRoot.remove(projectRoot.output)
-
-        // Add parameter names to generated class file debug info.
-        projectNode
-            .appendNode('component', [name: 'JavacSettings'])
-            .appendNode('option', [name: 'ADDITIONAL_OPTIONS_STRING', value: '-parameters'])
       }
     }
   }
@@ -548,21 +516,18 @@ idea {
 // generated code output dirs as source (and test) dirs.  The key difficulty being worked around
 // here is the fact that excludes higher in a directory tree override includes deeper in the tree.
 allprojects {
-  def isApt = it.name in apt_projects
   def generatedSourceDir = file("${it.projectDir}/out/production/generated")
   def generatedTestDir = file("${it.projectDir}/out/test/generated")
 
   idea {
     module {
-      if (isApt) {
-        generatedSourceDir.exists() || generatedSourceDir.mkdirs()
-        sourceDirs += generatedSourceDir
-        generatedSourceDirs += generatedSourceDir
+      generatedSourceDir.exists() || generatedSourceDir.mkdirs()
+      sourceDirs += generatedSourceDir
+      generatedSourceDirs += generatedSourceDir
 
-        generatedTestDir.exists() || generatedTestDir.mkdirs()
-        testSourceDirs += generatedTestDir
-        generatedSourceDirs += generatedTestDir
-      }
+      generatedTestDir.exists() || generatedTestDir.mkdirs()
+      testSourceDirs += generatedTestDir
+      generatedSourceDirs += generatedTestDir
 
       iml {
         withXml {
@@ -574,11 +539,9 @@ allprojects {
           moduleConfiguration.appendNode('output', [url: 'file://$MODULE_DIR$/out/production'])
           moduleConfiguration.appendNode('output-test', [url: 'file://$MODULE_DIR$/out/test'])
 
-          if (isApt) {
-            def excludeOutput = moduleConfiguration.find { it.name() == 'exclude-output' }
-            if (excludeOutput) {
-              moduleConfiguration.remove(excludeOutput)
-            }
+          def excludeOutput = moduleConfiguration.find { it.name() == 'exclude-output' }
+          if (excludeOutput) {
+            moduleConfiguration.remove(excludeOutput)
           }
         }
       }

@@ -85,7 +85,7 @@ public class CronIT extends EasyMockTest {
     injector = Guice.createInjector(
         // Override to verify that Guice is actually used for construction of the AuroraCronJob.
         // TODO(ksweeney): Use the production class here.
-        Modules.override(new CronModule()).with(new AbstractModule() {
+        Modules.override(new CronModule(new CronModule.Options())).with(new AbstractModule() {
           @Override
           protected void configure() {
             bind(AuroraCronJob.class).toInstance(auroraCronJob);

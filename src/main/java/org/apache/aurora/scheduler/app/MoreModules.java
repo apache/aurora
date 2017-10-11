@@ -13,8 +13,15 @@
  */
 package org.apache.aurora.scheduler.app;
 
-import com.google.inject.AbstractModule;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.util.List;
+import java.util.Set;
+
+import com.google.common.collect.FluentIterable;
 import com.google.inject.Module;
+
+import org.apache.aurora.scheduler.config.CliOptions;
 
 /**
  * A utility class for managing guice modules.
@@ -24,13 +31,36 @@ public final class MoreModules {
     // Utility class
   }
 
-  private static Module instantiateModule(final Class<? extends Module> moduleClass) {
+  /**
+   * Instantiate a module, supplying command line options if accepted by the module class.
+   * <p>
+   * Reflectively instantiates a module, first invoking a constructor that accepts
+   * {@link CliOptions} as the only parameter, falling back to a default constructor if options are
+   * not accepted by the class.
+   *
+   * @param moduleClass Module to instantiate
+   * @param options Options to provide the module.
+   * @return An instance of the module class.
+   */
+  public static Module instantiate(Class<?> moduleClass, CliOptions options) {
     try {
-      return moduleClass.newInstance();
+      // If it exists, use the constructor accepting CliOptions.
+      try {
+        Constructor<?> constructor = moduleClass.getConstructor(CliOptions.class);
+        return (Module) constructor.newInstance(options);
+      } catch (NoSuchMethodException e) {
+        // Fall back to default constructor.
+        return (Module) moduleClass.newInstance();
+      } catch (InvocationTargetException e) {
+        throw new IllegalArgumentException(
+            String.format("Failed to invoke %s(CliOption)", moduleClass.getName()),
+            e);
+      }
     } catch (InstantiationException e) {
       throw new IllegalArgumentException(
           String.format(
-              "Failed to instantiate module %s. Are you sure it has a no-arg constructor?",
+              "Failed to instantiate module %s."
+                  + "Dynamic modules must have a default constructor or accept CliOptions",
               moduleClass.getName()),
           e);
     } catch (IllegalAccessException e) {
@@ -42,32 +72,11 @@ public final class MoreModules {
     }
   }
 
-  static Module getModule(Class<? extends Module> moduleClass) {
-    return instantiateModule(moduleClass);
-  }
-
   /**
-   * Creates a module that will lazily instantiate and install another module.
-   * <p/>
-   * This serves as an indirection between module procurement and installation, which is necessary
-   * in cases where a module is referenced within a static initializer.  In this scenario, a module
-   * must not be instantiated if it reads command line arguments, as the args system has not yet
-   * had a chance to populate them.
-   *
-   * @param moduleClass Module to install.
-   * @return An installer that will install {@code moduleClass}.
+   * Identical to {@link #instantiate(Class, CliOptions)} for multiple module classes.
    */
-  public static Module lazilyInstantiated(final Class<? extends Module> moduleClass) {
-    return new AbstractModule() {
-      @Override
-      protected void configure() {
-        install(getModule(moduleClass));
-      }
-
-      @Override
-      public String toString() {
-        return moduleClass.toString();
-      }
-    };
+  @SuppressWarnings("rawtypes")
+  public static Set<Module> instantiateAll(List<Class> moduleClasses, CliOptions options) {
+    return FluentIterable.from(moduleClasses).transform(c -> instantiate(c, options)).toSet();
   }
 }

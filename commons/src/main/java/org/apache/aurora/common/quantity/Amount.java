@@ -42,7 +42,7 @@ public abstract class Amount<T extends Number & Comparable<T>, U extends Unit<U>
   private final Pair<T, U> amount;
   private final T maxValue;
 
-  private Amount(T value, U unit, T maxValue) {
+  protected Amount(T value, U unit, T maxValue) {
     Preconditions.checkNotNull(value);
     Preconditions.checkNotNull(unit);
     this.maxValue = maxValue;

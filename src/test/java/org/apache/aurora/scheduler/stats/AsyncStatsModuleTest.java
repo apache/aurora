@@ -20,9 +20,11 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.v1.Protos;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
@@ -34,6 +36,12 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class AsyncStatsModuleTest extends EasyMockTest {
+
+  @Before
+  public void setUp() {
+    ResourceType.initializeEmptyCliArgsForTest();
+  }
+
   @Test
   public void testOfferAdapter() {
     OfferManager offerManager = createMock(OfferManager.class);

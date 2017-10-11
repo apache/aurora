@@ -16,19 +16,20 @@ package org.apache.aurora.scheduler.stats;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractScheduledService;
 import com.google.common.util.concurrent.AbstractScheduledService.Scheduler;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.Conversions;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
@@ -46,15 +47,23 @@ import static org.apache.aurora.scheduler.resources.ResourceManager.getRevocable
  * Module to configure export of cluster-wide resource allocation and consumption statistics.
  */
 public class AsyncStatsModule extends AbstractModule {
-  @CmdLine(name = "async_task_stat_update_interval",
-      help = "Interval on which to try to update resource consumption stats.")
-  private static final Arg<Amount<Long, Time>> TASK_STAT_INTERVAL =
-      Arg.create(Amount.of(1L, Time.HOURS));
 
-  @CmdLine(name = "async_slot_stat_update_interval",
-      help = "Interval on which to try to update open slot stats.")
-  private static final Arg<Amount<Long, Time>> SLOT_STAT_INTERVAL =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-async_task_stat_update_interval",
+        description = "Interval on which to try to update resource consumption stats.")
+    public TimeAmount taskStatInterval = new TimeAmount(1, Time.HOURS);
+
+    @Parameter(names = "-async_slot_stat_update_interval",
+        description = "Interval on which to try to update open slot stats.")
+    public TimeAmount slotStatInterval = new TimeAmount(1, Time.MINUTES);
+  }
+
+  private final Options options;
+
+  public AsyncStatsModule(Options options) {
+    this.options = options;
+  }
 
   @Override
   protected void configure() {
@@ -67,11 +76,12 @@ public class AsyncStatsModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(TaskStatUpdaterService.class).in(Singleton.class);
+        Amount<Long, Time> taskStatInterval = options.taskStatInterval;
         bind(Scheduler.class).toInstance(
             Scheduler.newFixedRateSchedule(
-                TASK_STAT_INTERVAL.get().getValue(),
-                TASK_STAT_INTERVAL.get().getValue(),
-                TASK_STAT_INTERVAL.get().getUnit().getTimeUnit()));
+                taskStatInterval.getValue(),
+                taskStatInterval.getValue(),
+                taskStatInterval.getUnit().getTimeUnit()));
         expose(TaskStatUpdaterService.class);
       }
     });
@@ -82,11 +92,12 @@ public class AsyncStatsModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(SlotSizeCounterService.class).in(Singleton.class);
+        Amount<Long, Time> slotStatInterval = options.slotStatInterval;
         bind(Scheduler.class).toInstance(
             Scheduler.newFixedRateSchedule(
-                SLOT_STAT_INTERVAL.get().getValue(),
-                SLOT_STAT_INTERVAL.get().getValue(),
-                SLOT_STAT_INTERVAL.get().getUnit().getTimeUnit()));
+                slotStatInterval.getValue(),
+                slotStatInterval.getValue(),
+                slotStatInterval.getUnit().getTimeUnit()));
         expose(SlotSizeCounterService.class);
       }
     });

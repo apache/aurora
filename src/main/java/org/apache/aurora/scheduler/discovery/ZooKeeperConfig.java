@@ -22,6 +22,7 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.common.zookeeper.ZooKeeperUtils;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 
 import static java.util.Objects.requireNonNull;
 
@@ -31,6 +32,10 @@ import static java.util.Objects.requireNonNull;
  * Instances of this class are immutable, but builder-style chained calls are supported.
  */
 public class ZooKeeperConfig {
+
+  public static final TimeAmount DEFAULT_SESSION_TIMEOUT = new TimeAmount(
+      ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT.getValue(),
+        ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT.getUnit());
 
   /**
    * Creates a new client configuration with defaults for the session timeout and credentials.

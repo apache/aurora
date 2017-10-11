@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.thrift;
 
 import java.util.Optional;
+
 import javax.inject.Singleton;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
@@ -47,6 +47,7 @@ import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.app.local.FakeNonVolatileStorage;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
@@ -58,6 +59,7 @@ import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory.FrameworkInfoFacto
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.quota.QuotaModule;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.stats.StatsModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
@@ -67,12 +69,13 @@ import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
+import org.apache.aurora.scheduler.thrift.aop.AopModule;
 import org.apache.mesos.v1.Protos.FrameworkInfo;
 import org.apache.shiro.subject.Subject;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ResponseCode.OK;
-import static org.apache.aurora.scheduler.app.SchedulerMain.DriverKind.SCHEDULER_DRIVER;
+import static org.apache.aurora.scheduler.app.SchedulerMain.Options.DriverKind.SCHEDULER_DRIVER;
 import static org.junit.Assert.assertEquals;
 
 public class ThriftIT extends EasyMockTest {
@@ -84,8 +87,11 @@ public class ThriftIT extends EasyMockTest {
   private AuroraAdmin.Iface thrift;
 
   private void createThrift(ConfigurationManagerSettings configurationManagerSettings) {
+    ResourceType.initializeEmptyCliArgsForTest();
+    CliOptions options = new CliOptions();
     Injector injector = Guice.createInjector(
         new ThriftModule(),
+        new AopModule(options),
         new AbstractModule() {
           private <T> T bindMock(Class<T> clazz) {
             T mock = createMock(clazz);
@@ -95,16 +101,17 @@ public class ThriftIT extends EasyMockTest {
 
           @Override
           protected void configure() {
+            bind(CliOptions.class).toInstance(options);
             install(new LifecycleModule());
-            install(new StatsModule());
+            install(new StatsModule(options.stats));
             install(DbModule.testModule());
             install(new QuotaModule());
-            install(new CronModule());
+            install(new CronModule(options.cron));
             install(new TierModule(TaskTestUtil.TIER_CONFIG));
             bind(ExecutorSettings.class).toInstance(TestExecutorSettings.THERMOS_EXECUTOR);
 
-            install(new AppModule(configurationManagerSettings, SCHEDULER_DRIVER));
-            install(new SchedulerMain.ProtocolModule());
+            install(new AppModule(configurationManagerSettings, SCHEDULER_DRIVER, options));
+            install(new SchedulerMain.ProtocolModule(new SchedulerMain.Options()));
 
             bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
 
@@ -166,7 +173,7 @@ public class ThriftIT extends EasyMockTest {
     ConfigurationManagerSettings configurationManagerSettings = new ConfigurationManagerSettings(
         ImmutableSet.of(_Fields.DOCKER),
         true,
-        ImmutableMultimap.of(),
+        ImmutableList.of(),
         false,
         true,
         true,

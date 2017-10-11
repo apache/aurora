@@ -23,13 +23,13 @@ import javax.inject.Inject;
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
@@ -48,19 +48,26 @@ import static java.util.Objects.requireNonNull;
 public class AsyncModule extends AbstractModule {
   private static final Logger LOG = LoggerFactory.getLogger(AsyncModule.class);
 
-  @CmdLine(name = "async_worker_threads",
-      help = "The number of worker threads to process async task operations with.")
-  private static final Arg<Integer> ASYNC_WORKER_THREADS = Arg.create(8);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-async_worker_threads",
+        description = "The number of worker threads to process async task operations with.")
+    public int asyncWorkerThreads = 8;
+  }
+
   private final ScheduledThreadPoolExecutor afterTransaction;
 
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface AsyncExecutor { }
 
-  public AsyncModule() {
+  public AsyncModule(Options options) {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
     // TODO(wfarner): Should we use a bounded caching thread pool executor instead?
-    this(AsyncUtil.loggingScheduledExecutor(ASYNC_WORKER_THREADS.get(), "AsyncProcessor-%d", LOG));
+    this(AsyncUtil.loggingScheduledExecutor(
+        options.asyncWorkerThreads,
+        "AsyncProcessor-%d",
+        LOG));
   }
 
   @VisibleForTesting

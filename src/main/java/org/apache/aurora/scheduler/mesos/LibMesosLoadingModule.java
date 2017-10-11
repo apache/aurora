@@ -15,7 +15,7 @@ package org.apache.aurora.scheduler.mesos;
 
 import com.google.inject.AbstractModule;
 
-import org.apache.aurora.scheduler.app.SchedulerMain;
+import org.apache.aurora.scheduler.app.SchedulerMain.Options.DriverKind;
 import org.apache.mesos.v1.scheduler.V0Mesos;
 import org.apache.mesos.v1.scheduler.V1Mesos;
 
@@ -25,9 +25,9 @@ import static com.google.common.base.Preconditions.checkState;
  * A module that binds a driver factory which requires the libmesos native libary.
  */
 public class LibMesosLoadingModule extends AbstractModule {
-  private final SchedulerMain.DriverKind kind;
+  private final DriverKind kind;
 
-  public LibMesosLoadingModule(SchedulerMain.DriverKind kind)  {
+  public LibMesosLoadingModule(DriverKind kind)  {
     this.kind = kind;
   }
 

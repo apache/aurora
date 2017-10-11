@@ -249,11 +249,6 @@ limitations under the License.
     <module name="FinalClass"/>
     <module name="HideUtilityClassConstructor"/>
     <module name="InterfaceIsType"/>
-    <module name="VisibilityModifier">
-      <property name="protectedAllowed" value="true"/>
-      <!-- Allow public members at the coder's discretion, for struct-like things. -->
-      <property name="publicMemberPattern" value="^.*$" />
-    </module>
     <module name="MutableException"/>
 
     <!-- Miscellaneous other checks.                   -->

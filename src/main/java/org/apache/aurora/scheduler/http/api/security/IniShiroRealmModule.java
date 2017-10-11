@@ -15,13 +15,14 @@ package org.apache.aurora.scheduler.http.api.security;
 
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
+import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.shiro.authc.credential.CredentialsMatcher;
 import org.apache.shiro.authc.credential.SimpleCredentialsMatcher;
 import org.apache.shiro.config.Ini;
@@ -38,21 +39,27 @@ import org.apache.shiro.realm.text.IniRealm;
  * used to provide authorization configuration and the passwords will be ignored.
  */
 public class IniShiroRealmModule extends AbstractModule {
-  @CmdLine(name = "shiro_ini_path",
-      help = "Path to shiro.ini for authentication and authorization configuration.")
-  private static final Arg<Ini> SHIRO_INI_PATH = Arg.create(null);
 
-  @CmdLine(name = "shiro_credentials_matcher",
-      help = "The shiro credentials matcher to use (will be constructed by Guice).")
-  private static final Arg<Class<? extends CredentialsMatcher>> SHIRO_CREDENTIALS_MATCHER =
-      Arg.<Class<? extends CredentialsMatcher>>create(SimpleCredentialsMatcher.class);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-shiro_ini_path",
+        description = "Path to shiro.ini for authentication and authorization configuration.",
+        converter = ShiroIniConverter.class)
+    public Ini shiroIniPath;
+
+    @Parameter(names = "-shiro_credentials_matcher",
+        description = "The shiro credentials matcher to use (will be constructed by Guice).")
+    public Class<? extends CredentialsMatcher> shiroCredentialsMatcher =
+        SimpleCredentialsMatcher.class;
+  }
 
   private final Optional<Ini> ini;
   private final Optional<Class<? extends CredentialsMatcher>> shiroCredentialsMatcher;
 
-  public IniShiroRealmModule() {
-    this(Optional.fromNullable(SHIRO_INI_PATH.get()),
-        Optional.fromNullable(SHIRO_CREDENTIALS_MATCHER.get()));
+  public IniShiroRealmModule(CliOptions options) {
+    this(
+        Optional.fromNullable(options.iniShiroRealm.shiroIniPath),
+        Optional.fromNullable(options.iniShiroRealm.shiroCredentialsMatcher));
   }
 
   @VisibleForTesting

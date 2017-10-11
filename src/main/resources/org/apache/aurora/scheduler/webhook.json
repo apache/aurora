@@ -1,8 +1,0 @@
-{
-  "headers": {
-    "Content-Type": "application/vnd.kafka.json.v1+json",
-    "Producer-Type": "reliable"
-  },
-  "targetURL": "http://localhost:8080/",
-  "timeoutMsec": 5000
-}

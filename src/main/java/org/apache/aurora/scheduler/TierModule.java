@@ -17,17 +17,17 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.inject.AbstractModule;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.CanRead;
 import org.apache.aurora.scheduler.TierManager.TierManagerImpl;
 import org.apache.aurora.scheduler.TierManager.TierManagerImpl.TierConfig;
+import org.apache.aurora.scheduler.config.validators.ReadableFile;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,15 +45,19 @@ public class TierModule extends AbstractModule {
   @VisibleForTesting
   static final String TIER_CONFIG_PATH = "org/apache/aurora/scheduler/tiers.json";
 
-  @CanRead
-  @CmdLine(name = "tier_config",
-      help = "Configuration file defining supported task tiers, task traits and behaviors.")
-  private static final Arg<File> TIER_CONFIG_FILE = Arg.create();
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-tier_config",
+        validateValueWith = ReadableFile.class,
+        description =
+            "Configuration file defining supported task tiers, task traits and behaviors.")
+    public File tierConfigFile;
+  }
 
   private final TierConfig tierConfig;
 
-  public TierModule() {
-    this(parseTierConfig(readTierFile()));
+  public TierModule(Options options) {
+    this(parseTierConfig(readTierFile(options)));
   }
 
   @VisibleForTesting
@@ -66,13 +70,14 @@ public class TierModule extends AbstractModule {
     bind(TierManager.class).toInstance(new TierManagerImpl(tierConfig));
   }
 
-  static String readTierFile() {
+  static String readTierFile(Options options) {
     try {
-      return TIER_CONFIG_FILE.hasAppliedValue()
-          ? Files.toString(TIER_CONFIG_FILE.get(), StandardCharsets.UTF_8)
-          : Resources.toString(
+      File tierConfig = options.tierConfigFile;
+      return tierConfig == null
+          ? Resources.toString(
               TierModule.class.getClassLoader().getResource(TIER_CONFIG_PATH),
-              StandardCharsets.UTF_8);
+              StandardCharsets.UTF_8)
+          : Files.toString(tierConfig, StandardCharsets.UTF_8);
     } catch (IOException e) {
       LOG.error("Error loading tier configuration file.");
       throw new RuntimeException(e);

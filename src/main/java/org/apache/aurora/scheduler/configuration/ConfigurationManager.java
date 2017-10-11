@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.configuration;
 
-import java.util.Map;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
@@ -23,10 +23,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Multimap;
 
 import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.DockerParameter;
@@ -91,7 +91,7 @@ public class ConfigurationManager {
   public static class ConfigurationManagerSettings {
     private final ImmutableSet<Container._Fields> allowedContainerTypes;
     private final boolean allowDockerParameters;
-    private final Multimap<String, String> defaultDockerParameters;
+    private final List<DockerParameter> defaultDockerParameters;
     private final boolean requireDockerUseExecutor;
     private final boolean allowGpuResource;
     private final boolean enableMesosFetcher;
@@ -100,7 +100,7 @@ public class ConfigurationManager {
     public ConfigurationManagerSettings(
         ImmutableSet<Container._Fields> allowedContainerTypes,
         boolean allowDockerParameters,
-        Multimap<String, String> defaultDockerParameters,
+        List<DockerParameter> defaultDockerParameters,
         boolean requireDockerUseExecutor,
         boolean allowGpuResource,
         boolean enableMesosFetcher,
@@ -294,10 +294,8 @@ public class ConfigurationManager {
           throw new TaskDescriptionException("A container must specify an image.");
         }
         if (containerConfig.getDocker().getParameters().isEmpty()) {
-          for (Map.Entry<String, String> e : settings.defaultDockerParameters.entries()) {
-            builder.getContainer().getDocker().addToParameters(
-                new DockerParameter(e.getKey(), e.getValue()));
-          }
+          builder.getContainer().getDocker()
+              .setParameters(ImmutableList.copyOf(settings.defaultDockerParameters));
         } else {
           if (!settings.allowDockerParameters) {
             throw new TaskDescriptionException(NO_DOCKER_PARAMETERS);

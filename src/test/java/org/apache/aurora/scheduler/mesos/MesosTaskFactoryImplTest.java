@@ -155,6 +155,8 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
   public void setUp() {
     config = THERMOS_EXECUTOR;
     tierManager = createMock(TierManager.class);
+
+    ResourceType.initializeEmptyCliArgsForTest();
   }
 
   private static ExecutorInfo populateDynamicFields(ExecutorInfo executor, IAssignedTask task) {

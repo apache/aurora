@@ -118,7 +118,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
    * Used by LogStorageModule to maintain legacy behavior for a change to snapshot format
    * (and thus also backup processing) behavior. See AURORA-1861 for context.
    */
-  static final Set<String> ALL_H2_STORE_FIELDS = ImmutableSet.of(
+  public static final Set<String> ALL_H2_STORE_FIELDS = ImmutableSet.of(
       LOCK_FIELD,
       HOST_ATTRIBUTES_FIELD,
       QUOTA_FIELD,

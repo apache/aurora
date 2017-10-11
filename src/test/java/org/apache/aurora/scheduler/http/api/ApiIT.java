@@ -51,7 +51,7 @@ public class ApiIT extends AbstractJettyTest {
   @Override
   protected Module getChildServletModule() {
     return Modules.combine(
-        new ApiModule(),
+        new ApiModule(new ApiModule.Options()),
         new AbstractModule() {
           @Override
           protected void configure() {

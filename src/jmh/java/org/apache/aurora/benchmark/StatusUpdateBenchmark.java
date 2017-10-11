@@ -53,6 +53,7 @@ import org.apache.aurora.scheduler.TaskStatusHandlerImpl;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
+import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
@@ -179,7 +180,7 @@ public class StatusUpdateBenchmark {
     storage = new SlowStorageWrapper(DbUtil.createStorage());
 
     Injector injector = Guice.createInjector(
-        new StateModule(),
+        new StateModule(new CliOptions()),
         new TierModule(TaskTestUtil.TIER_CONFIG),
         new AbstractModule() {
           @Override

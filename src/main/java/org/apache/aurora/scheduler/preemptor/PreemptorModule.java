@@ -15,28 +15,30 @@ package org.apache.aurora.scheduler.preemptor;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.Set;
+import java.util.List;
+
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
-import com.google.common.annotations.VisibleForTesting;
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractScheduledService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
+import org.apache.aurora.scheduler.config.validators.PositiveNumber;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.preemptor.BiCache.BiCacheSettings;
 import org.slf4j.Logger;
@@ -52,42 +54,40 @@ public class PreemptorModule extends AbstractModule {
 
   private static final Logger LOG = LoggerFactory.getLogger(PreemptorModule.class);
 
-  @CmdLine(name = "enable_preemptor",
-      help = "Enable the preemptor and preemption")
-  private static final Arg<Boolean> ENABLE_PREEMPTOR = Arg.create(true);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-enable_preemptor",
+        description = "Enable the preemptor and preemption",
+        arity = 1)
+    public boolean enablePreemptor = true;
 
-  @CmdLine(name = "preemption_delay",
-      help = "Time interval after which a pending task becomes eligible to preempt other tasks")
-  private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
-      Arg.create(Amount.of(3L, Time.MINUTES));
+    @Parameter(names = "-preemption_delay",
+        description =
+            "Time interval after which a pending task becomes eligible to preempt other tasks")
+    public TimeAmount preemptionDelay = new TimeAmount(3, Time.MINUTES);
 
-  @CmdLine(name = "preemption_slot_hold_time",
-      help = "Time to hold a preemption slot found before it is discarded.")
-  private static final Arg<Amount<Long, Time>> PREEMPTION_SLOT_HOLD_TIME =
-      Arg.create(Amount.of(5L, Time.MINUTES));
+    @Parameter(names = "-preemption_slot_hold_time",
+        description = "Time to hold a preemption slot found before it is discarded.")
+    public TimeAmount preemptionSlotHoldTime = new TimeAmount(5, Time.MINUTES);
 
-  @CmdLine(name = "preemption_slot_search_interval",
-      help = "Time interval between pending task preemption slot searches.")
-  private static final Arg<Amount<Long, Time>> PREEMPTION_SLOT_SEARCH_INTERVAL =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+    @Parameter(names = "-preemption_slot_search_interval",
+        description = "Time interval between pending task preemption slot searches.")
+    public TimeAmount preemptionSlotSearchInterval = new TimeAmount(1, Time.MINUTES);
 
-  @Positive
-  @CmdLine(name = "preemption_reservation_max_batch_size",
-      help = "The maximum number of reservations for a task group to be made in a batch.")
-  private static final Arg<Integer> RESERVATION_MAX_BATCH_SIZE = Arg.create(5);
+    @Parameter(names = "-preemption_reservation_max_batch_size",
+        validateValueWith = PositiveNumber.class,
+        description = "The maximum number of reservations for a task group to be made in a batch.")
+    public int reservationMaxBatchSize = 5;
 
-  @CmdLine(name = "preemption_slot_finder_modules",
-      help = "Guice modules for custom preemption slot searching for pending tasks.")
-  private static final Arg<Set<Module>> SLOT_FINDER_MODULES = Arg.create(
-      ImmutableSet.of(
-          MoreModules.lazilyInstantiated(PendingTaskProcessorModule.class),
-          MoreModules.lazilyInstantiated(PreemptionVictimFilterModule.class)));
+    @Parameter(names = "-preemption_slot_finder_modules",
+        description = "Guice modules for custom preemption slot searching for pending tasks.")
+    @SuppressWarnings("rawtypes")
+    public List<Class> slotFinderModules = ImmutableList.of(
+        PendingTaskProcessorModule.class,
+        PreemptionVictimFilterModule.class);
+  }
 
-  private final boolean enablePreemptor;
-  private final Amount<Long, Time> preemptionDelay;
-  private final Amount<Long, Time> slotSearchInterval;
-  private final Integer reservationBatchSize;
-  private final Set<Module> slotFinderModules;
+  private final CliOptions cliOptions;
 
   /*
    * Binding annotation for the async processor that finds preemption slots.
@@ -96,70 +96,36 @@ public class PreemptorModule extends AbstractModule {
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface PreemptionSlotFinder { }
 
-  @VisibleForTesting
-  public PreemptorModule(
-      boolean enablePreemptor,
-      Amount<Long, Time> preemptionDelay,
-      Amount<Long, Time> slotSearchInterval,
-      Integer reservationBatchSize,
-      Set<Module> slotFinderModules) {
-
-    this.enablePreemptor = enablePreemptor;
-    this.preemptionDelay = requireNonNull(preemptionDelay);
-    this.slotSearchInterval = requireNonNull(slotSearchInterval);
-    this.reservationBatchSize = requireNonNull(reservationBatchSize);
-    this.slotFinderModules = requireNonNull(slotFinderModules);
-  }
-
-  @VisibleForTesting
-  public PreemptorModule(
-      boolean enablePreemptor,
-      Amount<Long, Time> preemptionDelay,
-      Amount<Long, Time> slotSearchInterval,
-      Integer reservationBatchSize) {
-
-    this(
-        enablePreemptor,
-        preemptionDelay,
-        slotSearchInterval,
-        reservationBatchSize,
-        SLOT_FINDER_MODULES.get());
-  }
-
-  public PreemptorModule() {
-    this(
-        ENABLE_PREEMPTOR.get(),
-        PREEMPTION_DELAY.get(),
-        PREEMPTION_SLOT_SEARCH_INTERVAL.get(),
-        RESERVATION_MAX_BATCH_SIZE.get(),
-        SLOT_FINDER_MODULES.get());
+  public PreemptorModule(CliOptions cliOptions) {
+    this.cliOptions = cliOptions;
   }
 
   @Override
   protected void configure() {
+    Options options = cliOptions.preemptor;
     install(new PrivateModule() {
       @Override
       protected void configure() {
-        if (enablePreemptor) {
+        if (options.enablePreemptor) {
           LOG.info("Preemptor Enabled.");
           bind(PreemptorMetrics.class).in(Singleton.class);
           bind(Preemptor.class).to(Preemptor.PreemptorImpl.class);
           bind(Preemptor.PreemptorImpl.class).in(Singleton.class);
           bind(new TypeLiteral<Amount<Long, Time>>() { })
               .annotatedWith(PendingTaskProcessor.PreemptionDelay.class)
-              .toInstance(preemptionDelay);
+              .toInstance(options.preemptionDelay);
           bind(BiCacheSettings.class).toInstance(
-              new BiCacheSettings(PREEMPTION_SLOT_HOLD_TIME.get(), "preemption_slot"));
+              new BiCacheSettings(options.preemptionSlotHoldTime, "preemption_slot"));
           bind(new TypeLiteral<BiCache<PreemptionProposal, TaskGroupKey>>() { })
               .in(Singleton.class);
           bind(new TypeLiteral<Integer>() { })
               .annotatedWith(PendingTaskProcessor.ReservationBatchSize.class)
-              .toInstance(reservationBatchSize);
+              .toInstance(options.reservationMaxBatchSize);
           bind(ClusterState.class).to(ClusterStateImpl.class);
           bind(ClusterStateImpl.class).in(Singleton.class);
           expose(ClusterStateImpl.class);
 
-          for (Module module: slotFinderModules) {
+          for (Module module: MoreModules.instantiateAll(options.slotFinderModules, cliOptions)) {
             install(module);
           }
 
@@ -167,8 +133,8 @@ public class PreemptorModule extends AbstractModule {
           bind(AbstractScheduledService.Scheduler.class).toInstance(
               AbstractScheduledService.Scheduler.newFixedRateSchedule(
                   0L,
-                  slotSearchInterval.getValue(),
-                  slotSearchInterval.getUnit().getTimeUnit()));
+                  options.preemptionSlotSearchInterval.getValue(),
+                  options.preemptionSlotSearchInterval.getUnit().getTimeUnit()));
 
           expose(PreemptorService.class);
           expose(Runnable.class).annotatedWith(PreemptionSlotFinder.class);
@@ -184,7 +150,7 @@ public class PreemptorModule extends AbstractModule {
     // and private modules due to multiple injectors.  We accept the added complexity here to keep
     // the other bindings private.
     PubsubEventModule.bindSubscriber(binder(), ClusterStateImpl.class);
-    if (enablePreemptor) {
+    if (options.enablePreemptor) {
       SchedulerServicesModule.addSchedulerActiveServiceBinding(binder())
           .to(PreemptorService.class);
     }

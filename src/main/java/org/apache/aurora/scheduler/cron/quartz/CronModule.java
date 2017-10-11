@@ -19,16 +19,16 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.Positive;
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.BackoffHelper;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
+import org.apache.aurora.scheduler.config.validators.PositiveNumber;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CronScheduler;
@@ -57,30 +57,37 @@ import static org.quartz.impl.StdSchedulerFactory.PROP_THREAD_POOL_PREFIX;
 public class CronModule extends AbstractModule {
   private static final Logger LOG = LoggerFactory.getLogger(CronModule.class);
 
-  @CmdLine(name = "cron_scheduler_num_threads",
-      help = "Number of threads to use for the cron scheduler thread pool.")
-  private static final Arg<Integer> NUM_THREADS = Arg.create(10);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-cron_scheduler_num_threads",
+        description = "Number of threads to use for the cron scheduler thread pool.")
+    public int cronSchedulerNumThreads = 10;
 
-  @CmdLine(name = "cron_timezone", help = "TimeZone to use for cron predictions.")
-  private static final Arg<String> CRON_TIMEZONE = Arg.create("GMT");
+    @Parameter(names = "-cron_timezone", description = "TimeZone to use for cron predictions.")
+    public String cronTimezone = "GMT";
 
-  @CmdLine(name = "cron_start_initial_backoff", help =
-      "Initial backoff delay while waiting for a previous cron run to be killed.")
-  public static final Arg<Amount<Long, Time>> CRON_START_INITIAL_BACKOFF =
-      Arg.create(Amount.of(5L, Time.SECONDS));
+    @Parameter(names = "-cron_start_initial_backoff", description =
+        "Initial backoff delay while waiting for a previous cron run to be killed.")
+    public TimeAmount cronStartInitialBackoff = new TimeAmount(5, Time.SECONDS);
 
-  @CmdLine(name = "cron_start_max_backoff", help =
-      "Max backoff delay while waiting for a previous cron run to be killed.")
-  public static final Arg<Amount<Long, Time>> CRON_START_MAX_BACKOFF =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+    @Parameter(names = "-cron_start_max_backoff", description =
+        "Max backoff delay while waiting for a previous cron run to be killed.")
+    public TimeAmount cronStartMaxBackoff = new TimeAmount(1, Time.MINUTES);
 
-  @Positive
-  @CmdLine(name = "cron_scheduling_max_batch_size",
-      help = "The maximum number of triggered cron jobs that can be processed in a batch.")
-  private static final Arg<Integer> CRON_MAX_BATCH_SIZE = Arg.create(10);
+    @Parameter(names = "-cron_scheduling_max_batch_size",
+        validateValueWith = PositiveNumber.class,
+        description = "The maximum number of triggered cron jobs that can be processed in a batch.")
+    public int cronMaxBatchSize = 10;
+  }
 
   // Global per-JVM ID number generator for the provided Quartz Scheduler.
   private static final AtomicLong ID_GENERATOR = new AtomicLong();
+
+  private final Options options;
+
+  public CronModule(Options options) {
+    this.options = options;
+  }
 
   @Override
   protected void configure() {
@@ -97,7 +104,7 @@ public class CronModule extends AbstractModule {
 
     bind(AuroraCronJob.class).in(Singleton.class);
     bind(AuroraCronJob.Config.class).toInstance(new AuroraCronJob.Config(
-        new BackoffHelper(CRON_START_INITIAL_BACKOFF.get(), CRON_START_MAX_BACKOFF.get())));
+        new BackoffHelper(options.cronStartInitialBackoff, options.cronStartMaxBackoff)));
 
     PubsubEventModule.bindSubscriber(binder(), AuroraCronJob.class);
 
@@ -106,14 +113,14 @@ public class CronModule extends AbstractModule {
 
     bind(new TypeLiteral<Integer>() { })
         .annotatedWith(AuroraCronJob.CronMaxBatchSize.class)
-        .toInstance(CRON_MAX_BATCH_SIZE.get());
+        .toInstance(options.cronMaxBatchSize);
     bind(CronBatchWorker.class).in(Singleton.class);
     addSchedulerActiveServiceBinding(binder()).to(CronBatchWorker.class);
   }
 
   @Provides
   TimeZone provideTimeZone() {
-    TimeZone timeZone = TimeZone.getTimeZone(CRON_TIMEZONE.get());
+    TimeZone timeZone = TimeZone.getTimeZone(options.cronTimezone);
     TimeZone systemTimeZone = TimeZone.getDefault();
     if (!timeZone.equals(systemTimeZone)) {
       LOG.warn("Cron schedules are configured to fire according to timezone "
@@ -126,7 +133,7 @@ public class CronModule extends AbstractModule {
 
   @Provides
   @Singleton
-  static Scheduler provideScheduler(AuroraCronJobFactory jobFactory) throws SchedulerException {
+  Scheduler provideScheduler(AuroraCronJobFactory jobFactory) throws SchedulerException {
     // There are several ways to create a quartz Scheduler instance.  This path was chosen as the
     // simplest to create a Scheduler that uses a *daemon* QuartzSchedulerThread instance.
     Properties props = new Properties();
@@ -134,7 +141,9 @@ public class CronModule extends AbstractModule {
     props.setProperty(PROP_SCHED_NAME, name);
     props.setProperty(PROP_SCHED_INSTANCE_ID, name);
     props.setProperty(PROP_THREAD_POOL_CLASS, SimpleThreadPool.class.getCanonicalName());
-    props.setProperty(PROP_THREAD_POOL_PREFIX + ".threadCount", NUM_THREADS.get().toString());
+    props.setProperty(
+        PROP_THREAD_POOL_PREFIX + ".threadCount",
+        String.valueOf(options.cronSchedulerNumThreads));
     props.setProperty(PROP_THREAD_POOL_PREFIX + ".makeThreadsDaemons", Boolean.TRUE.toString());
 
     props.setProperty(PROP_SCHED_MAKE_SCHEDULER_THREAD_DAEMON, Boolean.TRUE.toString());

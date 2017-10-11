@@ -13,9 +13,11 @@
  */
 package org.apache.aurora.scheduler.thrift.aop;
 
-import java.util.Set;
+import java.util.List;
 
-import com.google.common.collect.ImmutableSet;
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.Module;
@@ -23,9 +25,9 @@ import com.google.inject.matcher.Matcher;
 import com.google.inject.matcher.Matchers;
 
 import org.aopalliance.intercept.MethodInterceptor;
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.gen.Response;
+import org.apache.aurora.scheduler.app.MoreModules;
+import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 
 /**
@@ -33,13 +35,23 @@ import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
  */
 public class AopModule extends AbstractModule {
 
-  @CmdLine(name = "thrift_method_interceptor_modules",
-      help = "Custom Guice module(s) to provide additional Thrift method interceptors.")
-  private static final Arg<Set<Module>> METHOD_INTERCEPTOR_MODULES = Arg.create(ImmutableSet.of());
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-thrift_method_interceptor_modules",
+        description = "Custom Guice module(s) to provide additional Thrift method interceptors.")
+    @SuppressWarnings("rawtypes")
+    public List<Class> methodInterceptorModules = ImmutableList.of();
+  }
 
   public static final Matcher<? super Class<?>> THRIFT_IFACE_MATCHER =
       Matchers.subclassesOf(AnnotatedAuroraAdmin.class)
           .and(Matchers.annotatedWith(DecoratedThrift.class));
+
+  private final CliOptions options;
+
+  public AopModule(CliOptions options) {
+    this.options = options;
+  }
 
   @Override
   protected void configure() {
@@ -54,7 +66,9 @@ public class AopModule extends AbstractModule {
     bindThriftDecorator(new ThriftStatsExporterInterceptor());
 
     // Install custom interceptor modules
-    for (Module module : METHOD_INTERCEPTOR_MODULES.get()) {
+    for (Module module
+        : MoreModules.instantiateAll(options.aop.methodInterceptorModules, options)) {
+
       install(module);
     }
   }

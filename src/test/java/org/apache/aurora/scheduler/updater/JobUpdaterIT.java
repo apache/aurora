@@ -68,6 +68,7 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -141,7 +142,7 @@ public class JobUpdaterIT extends EasyMockTest {
   private static final IJobUpdateKey UPDATE_ID =
       IJobUpdateKey.build(new JobUpdateKey(JOB.newBuilder(), "update_id"));
   private static final Amount<Long, Time> WATCH_TIMEOUT = Amount.of(2000L, Time.MILLISECONDS);
-  private static final Amount<Long, Time> FLAPPING_THRESHOLD = Amount.of(1L, Time.MILLISECONDS);
+  private static final TimeAmount FLAPPING_THRESHOLD = new TimeAmount(1L, Time.MILLISECONDS);
   private static final Amount<Long, Time> ONE_DAY = Amount.of(1L, Time.DAYS);
   private static final Amount<Long, Time> ONE_HOUR = Amount.of(1L, Time.HOURS);
   private static final Amount<Long, Time> ONE_MINUTE = Amount.of(1L, Time.MINUTES);
@@ -179,8 +180,11 @@ public class JobUpdaterIT extends EasyMockTest {
     eventBus = new EventBus();
     TaskEventBatchWorker batchWorker = createMock(TaskEventBatchWorker.class);
 
+    UpdaterModule.Options options = new UpdaterModule.Options();
+    options.enableAffinity = true;
+
     Injector injector = Guice.createInjector(
-        new UpdaterModule(executor, true),
+        new UpdaterModule(executor, options),
         DbModule.testModuleWithWorkQueue(),
         new AbstractModule() {
           @Override
@@ -196,7 +200,7 @@ public class JobUpdaterIT extends EasyMockTest {
                     new TruncatedBinaryBackoff(
                         Amount.of(1L, Time.SECONDS), Amount.of(1L, Time.MINUTES)),
                     FLAPPING_THRESHOLD,
-                    Amount.of(1, Time.MINUTES)));
+                    new TimeAmount(1, Time.MINUTES)));
             bind(EventSink.class).toInstance(eventBus::post);
             bind(LockManager.class).to(LockManagerImpl.class);
             bind(UUIDGenerator.class).to(UUIDGeneratorImpl.class);

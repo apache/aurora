@@ -32,6 +32,8 @@ import com.google.inject.util.Modules;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.app.local.simulator.ClusterSimulatorModule;
+import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.CommandLine;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory;
@@ -79,7 +81,7 @@ public final class LocalSchedulerMain {
             + "org/apache/aurora/scheduler/http/api/security/shiro-example.ini")
         .add("-enable_h2_console=true")
         .build();
-    SchedulerMain.applyStaticArgumentValues(arguments.toArray(new String[] {}));
+    CliOptions options = CommandLine.parseOptions(arguments.toArray(new String[] {}));
 
     Module persistentStorage = new AbstractModule() {
       @Override
@@ -112,6 +114,7 @@ public final class LocalSchedulerMain {
     };
 
     SchedulerMain.flagConfiguredMain(
-        Modules.combine(fakeMesos, persistentStorage, new TierModule()));
+        options,
+        Modules.combine(fakeMesos, persistentStorage, new TierModule(options.tiers)));
   }
 }

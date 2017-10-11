@@ -13,49 +13,48 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import java.util.Set;
+import java.util.List;
+
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
 import org.apache.aurora.scheduler.app.MoreModules;
+import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
 import org.apache.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
 
-import static java.util.Objects.requireNonNull;
-
 /**
  * Binding module for scheduling logic and higher-level state management.
  */
 public class StateModule extends AbstractModule {
 
-  @CmdLine(name = "task_assigner_modules",
-      help = "Guice modules for customizing task assignment.")
-  private static final Arg<Set<Module>> TASK_ASSIGNER_MODULES = Arg.create(
-      ImmutableSet.of(MoreModules.lazilyInstantiated(FirstFitTaskAssignerModule.class)));
-
-  private final Set<Module> assignerModules;
-
-  public StateModule() {
-    this(TASK_ASSIGNER_MODULES.get());
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-task_assigner_modules",
+        description = "Guice modules for customizing task assignment.")
+    @SuppressWarnings("rawtypes")
+    public List<Class> taskAssignerModules = ImmutableList.of(FirstFitTaskAssignerModule.class);
   }
 
-  private StateModule(Set<Module> assignerModules) {
-    this.assignerModules = requireNonNull(assignerModules);
+  private final CliOptions options;
+
+  public StateModule(CliOptions options) {
+    this.options = options;
   }
 
   @Override
   protected void configure() {
-    for (Module module: assignerModules) {
+    for (Module module : MoreModules.instantiateAll(options.state.taskAssignerModules, options)) {
       install(module);
     }
     bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);

@@ -26,6 +26,8 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.mesos.v1.Protos;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule.Options.PRINCIPAL_KEY;
+import static org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule.Options.SECRET_KEY;
 import static org.apache.mesos.v1.Protos.FrameworkInfo.Capability.Type.GPU_RESOURCES;
 import static org.apache.mesos.v1.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RESOURCES;
 import static org.junit.Assert.assertEquals;
@@ -39,7 +41,7 @@ public class CommandLineDriverSettingsModuleTest {
   @Test(expected = IllegalStateException.class)
   public void testMissingPropertiesParsing() {
     Properties testProperties = new Properties();
-    testProperties.put(CommandLineDriverSettingsModule.PRINCIPAL_KEY, "aurora-scheduler");
+    testProperties.put(PRINCIPAL_KEY, "aurora-scheduler");
 
     ByteArrayOutputStream propertiesStream = new ByteArrayOutputStream();
     try {
@@ -55,8 +57,8 @@ public class CommandLineDriverSettingsModuleTest {
   @Test
   public void testPropertiesParsing() {
     Properties testProperties = new Properties();
-    testProperties.put(CommandLineDriverSettingsModule.PRINCIPAL_KEY, "aurora-scheduler");
-    testProperties.put(CommandLineDriverSettingsModule.SECRET_KEY, "secret");
+    testProperties.put(PRINCIPAL_KEY, "aurora-scheduler");
+    testProperties.put(SECRET_KEY, "secret");
 
     ByteArrayOutputStream propertiesStream = new ByteArrayOutputStream();
     try {

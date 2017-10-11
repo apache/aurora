@@ -231,14 +231,22 @@ public class WebhookTest {
     webhook.taskChangedState(CHANGE_OLD_STATE);
   }
 
+  private static final String TEST_CONFIG = "{\n"
+      + "  \"headers\": {\n"
+      + "    \"Content-Type\": \"application/vnd.kafka.json.v1+json\",\n"
+      + "    \"Producer-Type\": \"reliable\"\n"
+      + "  },\n"
+      + "  \"targetURL\": \"http://localhost:8080/\",\n"
+      + "  \"timeoutMsec\": 5000\n"
+      + "}\n";
+
   @Test
   public void testParsingWebhookInfo() throws Exception {
     WebhookInfo webhookInfo = WEBHOOK_INFO_BUILDER
         .setTargetURL(STATIC_URL)
         .build();
 
-    WebhookInfo parsedWebhookInfo = WebhookModule.parseWebhookConfig(
-        WebhookModule.readWebhookFile());
+    WebhookInfo parsedWebhookInfo = WebhookModule.parseWebhookConfig(TEST_CONFIG);
     // Verifying the WebhookInfo parsed from webhook.json file is identical to the WebhookInfo
     // built from WebhookInfoBuilder.
     assertEquals(parsedWebhookInfo.toString(), webhookInfo.toString());

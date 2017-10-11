@@ -19,7 +19,6 @@ import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.BackoffStrategy;
@@ -28,6 +27,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator.RescheduleCalculatorImpl;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -45,8 +45,8 @@ import static org.junit.Assert.assertEquals;
 
 public class RescheduleCalculatorImplTest extends EasyMockTest {
 
-  private static final Amount<Long, Time> FLAPPING_THRESHOLD = Amount.of(1L, Time.MINUTES);
-  private static final Amount<Integer, Time> MAX_STARTUP_DELAY = Amount.of(10, Time.MINUTES);
+  private static final TimeAmount FLAPPING_THRESHOLD = new TimeAmount(1, Time.MINUTES);
+  private static final TimeAmount MAX_STARTUP_DELAY = new TimeAmount(10, Time.MINUTES);
 
   private StorageTestUtil storageUtil;
   private BackoffStrategy backoff;

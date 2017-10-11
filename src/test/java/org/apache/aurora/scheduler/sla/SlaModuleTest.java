@@ -19,14 +19,12 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
 
-import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
@@ -34,6 +32,7 @@ import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.sla.SlaModule.SlaUpdater;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -62,10 +61,11 @@ public class SlaModuleTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     clock = new FakeClock();
     statsProvider = createMock(StatsProvider.class);
-    module = new SlaModule(
-        Amount.of(5L, Time.MILLISECONDS),
-        ImmutableSet.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME),
-        ImmutableSet.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME));
+    SlaModule.Options options = new SlaModule.Options();
+    options.slaRefreshInterval = new TimeAmount(5L, Time.MILLISECONDS);
+    options.slaProdMetrics = ImmutableList.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME);
+    options.slaNonProdMetrics = ImmutableList.of(JOB_UPTIMES, MEDIANS, PLATFORM_UPTIME);
+    module = new SlaModule(options);
     injector = Guice.createInjector(
         ImmutableList.<Module>builder()
             .add(module)

@@ -19,6 +19,8 @@ import java.util.UUID;
 
 import javax.inject.Singleton;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -32,15 +34,13 @@ import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.google.inject.util.Modules;
 
-import org.apache.aurora.common.args.Arg;
-import org.apache.aurora.common.args.CmdLine;
-import org.apache.aurora.common.args.constraints.Positive;
 import org.apache.aurora.common.inject.Bindings.KeyFactory;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
 import org.apache.aurora.scheduler.async.GatedWorkQueue;
+import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
@@ -69,39 +69,39 @@ import static com.google.inject.name.Names.bindProperties;
  */
 public final class DbModule extends PrivateModule {
 
-  @CmdLine(name = "use_beta_db_task_store",
-      help = "Whether to use the experimental database-backed task store.")
-  public static final Arg<Boolean> USE_DB_TASK_STORE = Arg.create(false);
+  @Parameters(separators = "=")
+  public static class Options {
+    @Parameter(names = "-use_beta_db_task_store",
+        description = "Whether to use the experimental database-backed task store.",
+        arity = 1)
+    public boolean useDbTaskStore = false;
 
-  @CmdLine(name = "enable_db_metrics",
-      help = "Whether to use MyBatis interceptor to measure the timing of intercepted Statements.")
-  private static final Arg<Boolean> ENABLE_DB_METRICS = Arg.create(true);
+    @Parameter(names = "-enable_db_metrics",
+        description =
+            "Whether to use MyBatis interceptor to measure the timing of intercepted Statements.",
+        arity = 1)
+    public boolean enableDbMetrics = true;
 
-  @CmdLine(name = "slow_query_log_threshold",
-      help = "Log all queries that take at least this long to execute.")
-  private static final Arg<Amount<Long, Time>> SLOW_QUERY_LOG_THRESHOLD =
-      Arg.create(Amount.of(25L, Time.MILLISECONDS));
+    @Parameter(names = "-slow_query_log_threshold",
+        description = "Log all queries that take at least this long to execute.")
+    public TimeAmount slowQueryLogThreshold = new TimeAmount(25, Time.MILLISECONDS);
 
-  @CmdLine(name = "db_row_gc_interval",
-      help = "Interval on which to scan the database for unused row references.")
-  private static final Arg<Amount<Long, Time>> DB_ROW_GC_INTERVAL =
-      Arg.create(Amount.of(2L, Time.HOURS));
+    @Parameter(names = "-db_row_gc_interval",
+        description = "Interval on which to scan the database for unused row references.")
+    public TimeAmount dbRowGcInterval = new TimeAmount(2, Time.HOURS);
 
-  // http://h2database.com/html/grammar.html#set_lock_timeout
-  @CmdLine(name = "db_lock_timeout", help = "H2 table lock timeout")
-  private static final Arg<Amount<Long, Time>> H2_LOCK_TIMEOUT =
-      Arg.create(Amount.of(1L, Time.MINUTES));
+    // http://h2database.com/html/grammar.html#set_lock_timeout
+    @Parameter(names = "-db_lock_timeout", description = "H2 table lock timeout")
+    public TimeAmount h2LockTimeout = new TimeAmount(1, Time.MINUTES);
 
-  // Flags to configure the PooledDataSource from mybatis.
-  @Positive
-  @CmdLine(name = "db_max_active_connection_count",
-      help = "Max number of connections to use with database via MyBatis")
-  private static final Arg<Integer> MYBATIS_MAX_ACTIVE_CONNECTION_COUNT = Arg.create();
+    @Parameter(names = "-db_max_active_connection_count",
+        description = "Max number of connections to use with database via MyBatis")
+    public int mybatisMaxActiveConnectionCount = -1;
 
-  @Positive
-  @CmdLine(name = "db_max_idle_connection_count",
-      help = "Max number of idle connections to the database via MyBatis")
-  private static final Arg<Integer> MYBATIS_MAX_IDLE_CONNECTION_COUNT = Arg.create();
+    @Parameter(names = "-db_max_idle_connection_count",
+        description = "Max number of idle connections to the database via MyBatis")
+    public int mybatisMaxIdleConnectionCount = -1;
+  }
 
   private static final Set<Class<?>> MAPPER_CLASSES = ImmutableSet.<Class<?>>builder()
       .add(AttributeMapper.class)
@@ -119,16 +119,19 @@ public final class DbModule extends PrivateModule {
       .add(TaskMapper.class)
       .build();
 
+  private final Options options;
   private final KeyFactory keyFactory;
   private final Module taskStoresModule;
   private final String jdbcSchema;
 
   private DbModule(
+      Options options,
       KeyFactory keyFactory,
       Module taskStoresModule,
       String dbName,
       Map<String, String> jdbcUriArgs) {
 
+    this.options = requireNonNull(options);
     this.keyFactory = requireNonNull(keyFactory);
     this.taskStoresModule = requireNonNull(taskStoresModule);
 
@@ -143,7 +146,7 @@ public final class DbModule extends PrivateModule {
         // Enable Query Statistics
         .put("QUERY_STATISTICS", "TRUE")
         // Configure the lock timeout
-        .put("LOCK_TIMEOUT", H2_LOCK_TIMEOUT.get().as(Time.MILLISECONDS).toString())
+        .put("LOCK_TIMEOUT", options.h2LockTimeout.as(Time.MILLISECONDS).toString())
         .build();
     this.jdbcSchema = dbName + ";" + Joiner.on(";").withKeyValueSeparator("=").join(args);
   }
@@ -155,19 +158,23 @@ public final class DbModule extends PrivateModule {
    * @param keyFactory Binding scope for the storage system.
    * @return A new database module for production.
    */
-  public static Module productionModule(KeyFactory keyFactory) {
+  public static Module productionModule(KeyFactory keyFactory, DbModule.Options options) {
     return new DbModule(
+        options,
         keyFactory,
-        getTaskStoreModule(keyFactory),
+        getTaskStoreModule(options, keyFactory),
         "aurora",
         ImmutableMap.of("DB_CLOSE_DELAY", "-1"));
   }
 
   @VisibleForTesting
   public static Module testModule(KeyFactory keyFactory, Optional<Module> taskStoreModule) {
+    DbModule.Options options = new DbModule.Options();
     return new DbModule(
+        options,
         keyFactory,
-        taskStoreModule.isPresent() ? taskStoreModule.get() : getTaskStoreModule(keyFactory),
+        taskStoreModule.isPresent()
+            ? taskStoreModule.get() : getTaskStoreModule(options, keyFactory),
         "testdb-" + UUID.randomUUID().toString(),
         // A non-zero close delay is used here to avoid eager database cleanup in tests that
         // make use of multiple threads.  Since all test databases are separately scoped by the
@@ -232,10 +239,10 @@ public final class DbModule extends PrivateModule {
         Optional.of(new TaskStoreModule(KeyFactory.PLAIN)));
   }
 
-  private static Module getTaskStoreModule(KeyFactory keyFactory) {
-    return USE_DB_TASK_STORE.get()
+  private static Module getTaskStoreModule(Options options, KeyFactory keyFactory) {
+    return options.useDbTaskStore
         ? new TaskStoreModule(keyFactory)
-        : new InMemStoresModule(keyFactory);
+        : new InMemStoresModule(options, keyFactory);
   }
 
   private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {
@@ -251,7 +258,7 @@ public final class DbModule extends PrivateModule {
     install(new MyBatisModule() {
       @Override
       protected void initialize() {
-        if (ENABLE_DB_METRICS.get()) {
+        if (options.enableDbMetrics) {
           addInterceptorClass(InstrumentingInterceptor.class);
         }
 
@@ -273,20 +280,21 @@ public final class DbModule extends PrivateModule {
 
         addTypeHandlersClasses(TypeHandlers.getAll());
 
-        bind(new TypeLiteral<Amount<Long, Time>>() { }).toInstance(SLOW_QUERY_LOG_THRESHOLD.get());
+        bind(new TypeLiteral<Amount<Long, Time>>() { })
+            .toInstance(options.slowQueryLogThreshold);
 
         // Enable a ping query which will prevent the use of invalid connections in the
         // connection pool.
         bindProperties(binder(), ImmutableMap.of("mybatis.pooled.pingEnabled", "true"));
         bindProperties(binder(), ImmutableMap.of("mybatis.pooled.pingQuery", "SELECT 1;"));
 
-        if (MYBATIS_MAX_ACTIVE_CONNECTION_COUNT.hasAppliedValue()) {
-          String val = MYBATIS_MAX_ACTIVE_CONNECTION_COUNT.get().toString();
+        if (options.mybatisMaxActiveConnectionCount > 0) {
+          String val = String.valueOf(options.mybatisMaxActiveConnectionCount);
           bindProperties(binder(), ImmutableMap.of("mybatis.pooled.maximumActiveConnections", val));
         }
 
-        if (MYBATIS_MAX_IDLE_CONNECTION_COUNT.hasAppliedValue()) {
-          String val = MYBATIS_MAX_IDLE_CONNECTION_COUNT.get().toString();
+        if (options.mybatisMaxIdleConnectionCount > 0) {
+          String val = String.valueOf(options.mybatisMaxIdleConnectionCount);
           bindProperties(binder(), ImmutableMap.of("mybatis.pooled.maximumIdleConnections", val));
         }
 
@@ -359,6 +367,13 @@ public final class DbModule extends PrivateModule {
    * Module that sets up a periodic database garbage-collection routine.
    */
   public static class GarbageCollectorModule extends AbstractModule {
+
+    private final Options options;
+
+    public GarbageCollectorModule(Options options) {
+      this.options = options;
+    }
+
     @Override
     protected void configure() {
       install(new PrivateModule() {
@@ -368,8 +383,8 @@ public final class DbModule extends PrivateModule {
           bind(AbstractScheduledService.Scheduler.class).toInstance(
               AbstractScheduledService.Scheduler.newFixedRateSchedule(
                   0L,
-                  DB_ROW_GC_INTERVAL.get().getValue(),
-                  DB_ROW_GC_INTERVAL.get().getUnit().getTimeUnit()));
+                  options.dbRowGcInterval.getValue(),
+                  options.dbRowGcInterval.getUnit().getTimeUnit()));
           expose(RowGarbageCollector.class);
         }
       });
