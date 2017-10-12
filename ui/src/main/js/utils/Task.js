@@ -1,4 +1,5 @@
 import moment from 'moment';
+import { isNully } from 'utils/Common';
 import ThriftUtils, { SCHEDULE_STATUS } from 'utils/Thrift';
 
 export function isActive(task) {
@@ -40,4 +41,26 @@ export function getDuration(task) {
   const firstEvent = moment(task.taskEvents[0].timestamp);
   const latestEvent = moment(task.taskEvents[task.taskEvents.length - 1].timestamp);
   return moment.duration(latestEvent.diff(firstEvent)).humanize();
+}
+
+export function instanceRangeToString(ranges) {
+  return ranges.map(({first, last}) => (first === last) ? first : `${first} - ${last}`);
+}
+
+export function getActiveResource(resource) {
+  return Object.keys(resource).find((r) => !isNully(resource[r]));
+}
+
+export function constraintToString(constraint) {
+  return isNully(constraint.value)
+    ? `limit=${constraint.limit.limit}`
+    : constraint.value.values.join(',');
+}
+
+export function getResource(resources, key) {
+  return resources.find((r) => !isNully(r[key]));
+}
+
+export function getResources(resources, key) {
+  return resources.filter((r) => !isNully(r[key]));
 }

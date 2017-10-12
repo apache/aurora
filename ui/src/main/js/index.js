@@ -6,6 +6,7 @@ import SchedulerClient from 'client/scheduler-client';
 import Navigation from 'components/Navigation';
 import Home from 'pages/Home';
 import Instance from 'pages/Instance';
+import Job from 'pages/Job';
 import Jobs from 'pages/Jobs';
 import Update from 'pages/Update';
 import Updates from 'pages/Updates';
@@ -21,7 +22,7 @@ const SchedulerUI = () => (
       <Route component={injectApi(Home)} exact path='/beta/scheduler' />
       <Route component={injectApi(Jobs)} exact path='/beta/scheduler/:role' />
       <Route component={injectApi(Jobs)} exact path='/beta/scheduler/:role/:environment' />
-      <Route component={Home} exact path='/beta/scheduler/:role/:environment/:name' />
+      <Route component={injectApi(Job)} exact path='/beta/scheduler/:role/:environment/:name' />
       <Route
         component={injectApi(Instance)}
         exact

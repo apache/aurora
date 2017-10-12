@@ -9,8 +9,11 @@ import { isNully } from 'utils/Common';
 import { UPDATE_STATUS } from 'utils/Thrift';
 import { getClassForUpdateStatus } from 'utils/Update';
 
-function UpdateListItem({ summary }) {
+function UpdateListItem({ summary, titleFn }) {
   const {job: {role, environment, name}, id} = summary.key;
+
+  const title = titleFn || ((u) => `${role}/${environment}/${name}`);
+
   return (<div className='update-list-item'>
     <span className={`img-circle ${getClassForUpdateStatus(summary.state.status)}`} />
     <div className='update-list-item-details'>
@@ -18,7 +21,7 @@ function UpdateListItem({ summary }) {
         <Link
           className='update-list-job'
           to={`/beta/scheduler/${role}/${environment}/${name}/update/${id}`}>
-          {role}/{environment}/{name}
+          {title(summary)}
         </Link> &bull; <span className='update-list-status'>
           {UPDATE_STATUS[summary.state.status]}
         </span>
@@ -29,6 +32,16 @@ function UpdateListItem({ summary }) {
     <span className='update-list-last-updated'>
       updated <RelativeTime ts={summary.state.lastModifiedTimestampMs} />
     </span>
+  </div>);
+}
+
+export function JobUpdateList({ updates }) {
+  if (isNully(updates)) {
+    return <Loading />;
+  }
+
+  return (<div className='update-list'>
+    {updates.map((u) => <UpdateListItem key={u.key.id} summary={u} titleFn={(u) => u.key.id} />)}
   </div>);
 }
 

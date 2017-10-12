@@ -1,0 +1,91 @@
+.task-list {
+  margin: 10px 0;
+  border: 1px solid $grid_color !important;
+
+  table {
+    font-size: 14px;
+    margin: 0;
+    border: 0;
+
+    tr:first-child {
+      border-top: 0;
+    }
+
+    tr:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  .task-list-item-col {
+    width: 99%;
+  }
+
+  td {
+    padding: 5px;
+  }
+
+  td:first-child {
+    text-align: center;
+  }
+
+  .expanded:hover {
+    background-color: $content_box_color !important;
+  }
+
+  .task-list-item-instance {
+    padding: 5px;
+    a {
+      font-size: 20px;
+      font-weight: 800 !important;
+    }
+  }
+
+  .task-list-item-expander {
+    margin: 0px 5px;
+    font-weight: 800;
+    line-height: 10px;
+    font-size: 14px;
+    cursor: hand;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .task-list-item-host {
+    white-space: nowrap;
+    margin: 0px 5px;
+  }
+
+  .img-circle {
+    margin: 0px 5px;
+    width: 6px;
+    height: 6px;
+  }
+
+  .task-list-item {
+    align-items: center;
+    padding: 10px 0;
+
+    .task-list-item-time {
+      color: $secondary_font_color;
+    }
+
+    .task-list-item-duration {
+      color: $secondary_font_color;
+      margin-left: 5px;
+    }
+
+    .task-list-item-status {
+      font-weight: 600;
+    }
+
+    .task-list-item-message {
+      display: block;
+      max-width: 500px;
+      font-size: 12px;
+      white-space: nowrap;
+      max-width: 500px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+  }
+}

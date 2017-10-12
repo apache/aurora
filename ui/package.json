@@ -4,6 +4,7 @@
   "description": "UI project for Apache Aurora",
   "main": "index.js",
   "dependencies": {
+    "diff": "^3.4.0",
     "es6-shim": "^0.35.3",
     "moment": "^2.18.1",
     "react": "^16.0.0",

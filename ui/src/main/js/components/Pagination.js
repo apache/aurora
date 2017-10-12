@@ -104,7 +104,7 @@ export default class Pagination extends React.Component {
     if (isTable) {
       return (<tbody>
         {elements}
-        <tr className='pagination-row'><td colSpan='100%'>{pagination}</td></tr>
+        {pagination ? <tr className='pagination-row'><td colSpan='100%'>{pagination}</td></tr> : ''}
       </tbody>);
     }
     return <div>{elements}{pagination}</div>;

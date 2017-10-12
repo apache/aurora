@@ -55,3 +55,10 @@ export const ScheduledTaskBuilder = createBuilder({
   taskEvents: [TaskEventBuilder.build()],
   ancestorId: ''
 });
+
+export function createConfigGroup(taskBuilder, ...instances) {
+  return {
+    config: taskBuilder.build(),
+    instances: instances.map((pair) => { return {first: pair[0], last: pair[1]}; })
+  };
+}
