@@ -42,6 +42,7 @@ public class ZooKeeperConfigTest {
         Optional.absent(),
         false,
         Amount.of(1, Time.DAYS),
+        Amount.of(1, Time.DAYS),
         Optional.absent());
   }
 
@@ -53,6 +54,7 @@ public class ZooKeeperConfigTest {
             SERVERS,
             Optional.absent(),
             false,
+            Amount.of(1, Time.HOURS),
             Amount.of(1, Time.HOURS),
             Optional.absent()); // credentials
     assertFalse(config.getCredentials().isPresent());
@@ -77,6 +79,7 @@ public class ZooKeeperConfigTest {
     assertFalse(config.getChrootPath().isPresent());
     assertFalse(config.isInProcess());
     assertEquals(ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT, config.getSessionTimeout());
+    assertEquals(ZooKeeperUtils.DEFAULT_ZK_CONNECTION_TIMEOUT, config.getConnectionTimeout());
     assertFalse(config.getCredentials().isPresent());
   }
 }

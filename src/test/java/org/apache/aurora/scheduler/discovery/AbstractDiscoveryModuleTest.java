@@ -47,6 +47,7 @@ abstract class AbstractDiscoveryModuleTest extends TearDownTestCase {
             Optional.of("/chroot"),
             false, // inProcess
             Amount.of(1, Time.DAYS),
+            Amount.of(1, Time.DAYS),
             Optional.of(Credentials.digestCredentials("test", "user")));
 
     Injector injector =

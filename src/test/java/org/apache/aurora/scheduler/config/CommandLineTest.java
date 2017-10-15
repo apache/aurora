@@ -164,6 +164,7 @@ public class CommandLineTest {
     expected.zk.zkEndpoints = ImmutableList.of(InetSocketAddress.createUnresolved("testing", 42));
     expected.zk.chrootPath = "testing";
     expected.zk.sessionTimeout = TEST_TIME;
+    expected.zk.connectionTimeout = TEST_TIME;
     expected.zk.digestCredentials = "testing";
     expected.updater.enableAffinity = true;
     expected.updater.affinityExpiration = TEST_TIME;
@@ -315,6 +316,7 @@ public class CommandLineTest {
         "-zk_endpoints=testing:42",
         "-zk_chroot_path=testing",
         "-zk_session_timeout=42days",
+        "-zk_connection_timeout=42days",
         "-zk_digest_credentials=testing",
         "-enable_update_affinity=true",
         "-update_affinity_reservation_hold_time=42days",

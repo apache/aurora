@@ -39,7 +39,9 @@ public final class ZooKeeperUtils {
   /**
    * An appropriate default session timeout for Twitter ZooKeeper clusters.
    */
-  public static final Amount<Integer,Time> DEFAULT_ZK_SESSION_TIMEOUT = Amount.of(4, Time.SECONDS);
+  public static final Amount<Integer,Time> DEFAULT_ZK_SESSION_TIMEOUT = Amount.of(15, Time.SECONDS);
+
+  public static final Amount<Integer,Time> DEFAULT_ZK_CONNECTION_TIMEOUT = Amount.of(10, Time.SECONDS);
 
   /**
    * The magic version number that allows any mutation to always succeed regardless of actual

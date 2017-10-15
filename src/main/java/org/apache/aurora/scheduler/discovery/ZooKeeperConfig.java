@@ -37,6 +37,10 @@ public class ZooKeeperConfig {
       ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT.getValue(),
         ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT.getUnit());
 
+  public static final TimeAmount DEFAULT_CONNECTION_TIMEOUT = new TimeAmount(
+      ZooKeeperUtils.DEFAULT_ZK_CONNECTION_TIMEOUT.getValue(),
+        ZooKeeperUtils.DEFAULT_ZK_CONNECTION_TIMEOUT.getUnit());
+
   /**
    * Creates a new client configuration with defaults for the session timeout and credentials.
    *
@@ -51,6 +55,7 @@ public class ZooKeeperConfig {
         Optional.absent(), // chrootPath
         false,
         ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT,
+        ZooKeeperUtils.DEFAULT_ZK_CONNECTION_TIMEOUT,
         Optional.absent()); // credentials
   }
 
@@ -58,6 +63,7 @@ public class ZooKeeperConfig {
   private final Iterable<InetSocketAddress> servers;
   private final boolean inProcess;
   private final Amount<Integer, Time> sessionTimeout;
+  private final Amount<Integer, Time> connectionTimeout;
   private final Optional<String> chrootPath;
   private final Optional<Credentials> credentials;
 
@@ -76,6 +82,7 @@ public class ZooKeeperConfig {
       Optional<String> chrootPath,
       boolean inProcess,
       Amount<Integer, Time> sessionTimeout,
+      Amount<Integer, Time> connectionTimeout,
       Optional<Credentials> credentials) {
 
     this.useCurator = useCurator;
@@ -83,6 +90,7 @@ public class ZooKeeperConfig {
     this.chrootPath = requireNonNull(chrootPath);
     this.inProcess = inProcess;
     this.sessionTimeout = requireNonNull(sessionTimeout);
+    this.connectionTimeout = requireNonNull(connectionTimeout);
     this.credentials = requireNonNull(credentials);
   }
 
@@ -100,6 +108,7 @@ public class ZooKeeperConfig {
         chrootPath,
         inProcess,
         sessionTimeout,
+        connectionTimeout,
         Optional.of(newCredentials));
   }
 
@@ -117,6 +126,10 @@ public class ZooKeeperConfig {
 
   public Amount<Integer, Time> getSessionTimeout() {
     return sessionTimeout;
+  }
+
+  public Amount<Integer, Time> getConnectionTimeout() {
+    return connectionTimeout;
   }
 
   Optional<String> getChrootPath() {

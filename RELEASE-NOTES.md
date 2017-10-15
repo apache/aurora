@@ -15,6 +15,8 @@
   `stop_timeout_in_secs` flag.
 - Added the `thrift_method_interceptor_modules` scheduler flag that lets cluster operators inject
   custom Thrift method interceptors.
+- Increase default ZooKeeper session timeout from 4 to 15 seconds.
+- Add option `-zk_connection_timeout` to control the connection timeout of ZooKeeper connections.
 
 ### Deprecations and removals
 

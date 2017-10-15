@@ -135,6 +135,7 @@ class CuratorServiceDiscoveryModule extends PrivateModule {
         .connectString(connectString)
         .canBeReadOnly(false) // We must be able to write to perform leader election.
         .sessionTimeoutMs(zooKeeperConfig.getSessionTimeout().as(Time.MILLISECONDS))
+        .connectionTimeoutMs(zooKeeperConfig.getConnectionTimeout().as(Time.MILLISECONDS))
         .retryPolicy(retryPolicy)
         .aclProvider(aclProvider);
 

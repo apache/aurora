@@ -29,6 +29,7 @@ import org.apache.aurora.common.zookeeper.Credentials;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.config.validators.NotEmptyIterable;
 
+import static org.apache.aurora.scheduler.discovery.ZooKeeperConfig.DEFAULT_CONNECTION_TIMEOUT;
 import static org.apache.aurora.scheduler.discovery.ZooKeeperConfig.DEFAULT_SESSION_TIMEOUT;
 
 /**
@@ -67,6 +68,9 @@ public final class FlaggedZooKeeperConfig {
     @Parameter(names = "-zk_session_timeout", description = "The ZooKeeper session timeout.")
     public TimeAmount sessionTimeout = DEFAULT_SESSION_TIMEOUT;
 
+    @Parameter(names = "-zk_connection_timeout", description = "The ZooKeeper connection timeout.")
+    public TimeAmount connectionTimeout = DEFAULT_CONNECTION_TIMEOUT;
+
     @Parameter(names = "-zk_digest_credentials",
         description = "user:password to use when authenticating with ZooKeeper.")
     public String digestCredentials;
@@ -88,6 +92,7 @@ public final class FlaggedZooKeeperConfig {
         Optional.fromNullable(opts.chrootPath),
         opts.inProcess,
         Amount.of(opts.sessionTimeout.getValue().intValue(), opts.sessionTimeout.getUnit()),
+        Amount.of(opts.connectionTimeout.getValue().intValue(), opts.connectionTimeout.getUnit()),
         getCredentials(opts.digestCredentials));
   }
 
