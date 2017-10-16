@@ -32,4 +32,9 @@ describe('RoleQuota', () => {
       </tr>)).toBe(true);
     });
   });
+
+  it('Renders when quota is null', () => {
+    const el = shallow(<RoleQuota />);
+    expect(el.contains(<div />)).toBe(true);
+  });
 });

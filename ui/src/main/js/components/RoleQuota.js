@@ -50,6 +50,10 @@ function findResource(resource) {
 const totalResources = (resources) => resources.map(findResource).reduce((acc, val) => acc + val);
 
 export default function RoleQuota({ quota }) {
+  if (isNully(quota)) {
+    return <div />;
+  }
+
   // Only show quota types with non-zero values.
   const quotas = QUOTA_TYPE_ORDER.filter((t) => totalResources(quota[t].resources) > 0);
 
