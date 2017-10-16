@@ -5,6 +5,7 @@
 *.pyc
 *~
 *bundle.js*
+*.svg
 .gradle
 /.cache/
 /.coverage
