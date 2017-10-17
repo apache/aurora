@@ -9,7 +9,9 @@ export default function InstanceViz({ instances, jobKey }) {
 
   return (<ul className={`instance-grid ${className}`}>
     {instances.map((i) => {
-      return (<Link key={i} to={`/beta/scheduler/${role}/${environment}/${name}/${i.instanceId}`}>
+      return (<Link
+        key={i.instanceId}
+        to={`/beta/scheduler/${role}/${environment}/${name}/${i.instanceId}`}>
         <li className={i.className} title={i.title} />
       </Link>);
     })}

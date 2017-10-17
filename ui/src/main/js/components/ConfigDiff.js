@@ -1,5 +1,6 @@
 import React from 'react';
-import { diffJson } from 'diff';
+
+import Diff from 'components/Diff';
 
 import { instanceRangeToString } from 'utils/Task';
 
@@ -52,17 +53,12 @@ export default class ConfigDiff extends React.Component {
     if (this.props.groups.length < 2) {
       return <div />;
     }
-    const result = diffJson(
-      this.props.groups[this.state.leftGroupIdx].config,
-      this.props.groups[this.state.rightGroupIdx].config);
+
     return (<div className='task-diff'>
       {this.diffNavigation()}
-      <div className='diff-view'>
-        {result.map((r, i) => (
-          <span className={r.added ? 'added' : r.removed ? 'removed' : 'same'} key={i}>
-            {r.value}
-          </span>))}
-      </div>
+      <Diff
+        left={this.props.groups[this.state.leftGroupIdx].config}
+        right={this.props.groups[this.state.rightGroupIdx].config} />
     </div>);
   }
 }

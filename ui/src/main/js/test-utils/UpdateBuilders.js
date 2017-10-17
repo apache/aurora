@@ -77,6 +77,13 @@ export const UpdateDetailsBuilder = createBuilder({
   instanceEvents: [InstanceUpdateEventBuilder.build()]
 });
 
+export function createInstanceTaskGroup(taskBuilder, ...instances) {
+  return {
+    task: taskBuilder.build(),
+    instances: instances.map((pair) => { return {first: pair[0], last: pair[1]}; })
+  };
+}
+
 export function builderWithStatus(updateStatus) {
   return UpdateDetailsBuilder.update(
     UpdateBuilder.summary(

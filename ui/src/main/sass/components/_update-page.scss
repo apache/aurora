@@ -148,4 +148,11 @@
       }
     }
   }
+
+  .update-diff-picker {
+    padding: 10px 20px;
+    background-color: $grid_color;
+    border-bottom: 1px solid $grid_highlight_color;
+    font-family: $font_stack;
+  }
 }
