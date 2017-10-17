@@ -49,6 +49,7 @@ scheduler itself, you may want to explore developing your own
 ### Companies using Aurora
 Are you using Aurora too?  Let us know, or submit a patch to join the list!
 
+- [Amperity](https://amperity.com)
 - [Blue Yonder](http://www.blue-yonder.com)
 - [Boxever](http://www.boxever.com)
 - [Criteo](http://www.criteo.com)
