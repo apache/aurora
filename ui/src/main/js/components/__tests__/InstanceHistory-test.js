@@ -19,6 +19,11 @@ describe('InstanceHistory', () => {
 
   it('Should handle empty lists', () => {
     const el = shallow(<InstanceHistory tasks={[]} />);
-    expect(el.contains(<div>No task history found.</div>)).toBe(true);
+    expect(el.contains(<div />)).toBe(true);
+  });
+
+  it('Should handle undefined tasks', () => {
+    const el = shallow(<InstanceHistory />);
+    expect(el.contains(<div />)).toBe(true);
   });
 });
