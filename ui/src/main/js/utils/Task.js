@@ -44,7 +44,7 @@ export function getDuration(task) {
 }
 
 export function instanceRangeToString(ranges) {
-  return ranges.map(({first, last}) => (first === last) ? first : `${first} - ${last}`);
+  return ranges.map(({first, last}) => (first === last) ? first : `${first} - ${last}`).join(', ');
 }
 
 export function getActiveResource(resource) {
