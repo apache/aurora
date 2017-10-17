@@ -21,11 +21,13 @@ export function PageNavigation({currentPage, maxPages, numPages, onClick}) {
     ? <li key='next'><a onClick={(e) => onClick(currentPage + 1)}>&raquo;</a></li>
     : '';
 
-  return (<ul className='pagination'>
-    {prevPage}
-    {pages}
-    {nextPage}
-  </ul>);
+  return (<div className='pagination-wrapper'>
+    <ul className='pagination'>
+      {prevPage}
+      {pages}
+      {nextPage}
+    </ul>
+  </div>);
 }
 
 export default class Pagination extends React.Component {
