@@ -30,7 +30,7 @@ export default function TaskConfigSummary({ config, instances }) {
       <tr>
         <th>Constraints</th>
         <td colSpan='2'>
-          {config.constraints.map((t) => (<span key={t.name}>
+          {config.constraints.map((t) => (<span className='task-constraint' key={t.name}>
             {t.name}: {constraintToString(t.constraint)}
           </span>))}
         </td>

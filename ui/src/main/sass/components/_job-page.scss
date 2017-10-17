@@ -62,6 +62,10 @@
       border: 1px solid $grid_color;
       margin-right: 20px;
       margin-bottom: 20px;
+
+      .tast-constraint {
+        display: block;
+      }
     }
 
     tr:first-child {
