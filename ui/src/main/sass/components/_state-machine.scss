@@ -1,88 +1,105 @@
 .state-machine {
   position: relative;
-  margin-top: 20px;
-  padding-left: 120px;
+  padding-left: 100px;
+  margin: 20px 0px;
 
   ul {
     list-style-type: none;
-    padding: 0;
-  }
-
-  ul:before {
-    position: absolute;
-    top: 10px;
-    bottom: 25px;
-    display: block;
-    width: 3px;
-    content: "";
-    background-color: $grid_color;
-  }
-
-  ul.okay:before {
-    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_success);
-  }
-
-  ul.error:before {
-    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_error);
-  }
-
-  ul.attention:before {
-    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_warning);
-  }
-
-  ul.in-progress:before {
-    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_highlight);
   }
 
   li {
-    margin: 20px 0px;
-    position: relative;
+    position:relative;
+    margin-bottom: 0;
+    min-height: 45px;
+    padding-bottom: 10px;
     color: $secondary_font_color;
-    min-height: 30px;
   }
 
   li.active {
     color: $primary_font_color;
   }
 
-  .state-machine-item {
-    display: flex;
-    flex-direction: row;
+  /* Bullets */
+  li:after {
+    content: '';
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background-color: #EEE;
+    border: 2px solid #DDD;
+    position: absolute;
+    left: -20px;
+    top: 5px;
   }
 
-  svg {
-    width: 15px;
-    height: 15px;
-    margin-left: -4px;
-    margin-right: 5px;
-    display: inline-block;
-    margin-top: 4px;
+  li.active.error:after {
+    background-color: $colors_error_light;
+    border-color: $colors_error;
   }
 
-  .state-machine-bullet {
-    fill: $grid_color;
-    stroke: $grid_highlight_color;
-    stroke-width: 2;
+  li.active.okay:after {
+    background-color: $colors_success_light;
+    border-color: $colors_success;
   }
 
-  .active.okay .state-machine-bullet {
-    fill: $colors_success_light;
-    stroke: $colors_success;
+  li.active.in-progress:after {
+    background-color: $colors_highlight_light;
+    border-color: $colors_highlight;
   }
 
-  .active.attention .state-machine-bullet {
-    fill: #f3bc88;
-    stroke: #FA9F47;
+  li.active.attention:after {
+    background-color: $colors_warning_light;
+    border-color: $colors_warning;
   }
 
-  .active.error .state-machine-bullet {
-    fill: $colors_error_light;
-    stroke: $colors_error;
+  /* Lines */
+  li:before {
+    content:"";
+    position: absolute;
+    left: -16px;
+    background-color: #DDD;
+    height: 100%;
+    width: 3px;
   }
 
-  .active.in-progress .state-machine-bullet {
-    fill: $colors_highlight_light;
-    stroke: $colors_highlight;
+  ul.okay li:nth-last-child(2):before {
+    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_success);
+  }
+
+  ul.error li:nth-last-child(2):before {
+    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_error);
+  }
+
+  ul.attention li:nth-last-child(2):before {
+    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_warning);
+  }
+
+  ul.in-progress li:nth-last-child(2):before {
+    background: linear-gradient($grid_highlight_color, $grid_highlight_color, $colors_highlight);
+  }
+
+  ul.error li:last-child:before {
+    background-color: $colors_error;
+  }
+
+  ul.okay li:last-child:before {
+    background-color: $colors_success;
+  }
+
+  ul.attention li:last-child:before {
+    background-color: $colors_warning;
+  }
+
+  ul.in-progress li:last-child:before {
+    background-color: $colors_highlight;
+  }
+
+  li:first-child:before {
+    top: 6px;
+  }
+
+  li:last-child:before {
+    height: 6px;
   }
 
   .state-machine-item-details {

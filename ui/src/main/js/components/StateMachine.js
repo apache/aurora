@@ -4,7 +4,6 @@ import moment from 'moment';
 function StateItem({ className, state, message, timestamp }) {
   return (<li className={className}>
     <div className='state-machine-item'>
-      <svg><circle className='state-machine-bullet' cx={6} cy={6} r={5} /></svg>
       <div className='state-machine-item-details'>
         <span className='state-machine-item-state'>{state}</span>
         <span className='state-machine-item-time'>

@@ -76,7 +76,7 @@
   }
 }
 
-.success {
+.content-icon-title.success {
   .content-icon-title-text {
     background-color: $colors_success !important;
   }
@@ -86,7 +86,7 @@
   }
 }
 
-.error {
+.content-icon-title.error {
   .content-icon-title-text {
     background-color: $colors_error !important;
   }
@@ -96,7 +96,7 @@
   }
 }
 
-.highlight {
+.content-icon-title.highlight {
   .content-icon-title-text {
     background-color: $colors_highlight !important;
   }
@@ -106,7 +106,7 @@
   }
 }
 
-.attention {
+.content-icon-title.attention {
   .content-icon-title-text {
     background-color: $colors_warning !important;
   }
