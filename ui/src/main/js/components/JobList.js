@@ -55,6 +55,7 @@ export default class JobList extends React.Component {
         <Pagination
           data={this.props.jobs}
           filter={filterFn}
+          hideIfSinglePage
           isTable
           numberPerPage={25}
           renderer={this._renderRow}

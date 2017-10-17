@@ -53,6 +53,7 @@ export default class RoleList extends React.Component {
         <Pagination
           data={this.props.roles}
           filter={(r) => (this.state.filter) ? r.role.startsWith(this.state.filter) : true}
+          hideIfSinglePage
           isTable
           numberPerPage={25}
           renderer={this._renderRow}
