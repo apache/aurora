@@ -27,10 +27,17 @@ function apiSpy() {
   };
 }
 
-describe('Update', () => {
+describe('Job', () => {
   // basic props to force render of all components
   const props = (tasks = []) => {
-    return {api: apiSpy(), cluster: 'test', match: {params: params}, tasks: tasks};
+    return {
+      api: apiSpy(),
+      cluster: 'test',
+      history: jest.fn(),
+      location: {},
+      match: {params: params},
+      tasks: tasks
+    };
   };
 
   it('Should render Loading and fire off calls for data', () => {
@@ -41,7 +48,7 @@ describe('Update', () => {
   });
 
   it('Should render breadcrumb with correct values', () => {
-    const el = shallow(<Job api={apiSpy()} cluster='test' match={{params: params}} tasks={[]} />);
+    const el = shallow(<Job {...props()} />);
     expect(el.contains(<Breadcrumb
       cluster='test'
       env={params.environment}
@@ -97,5 +104,18 @@ describe('Update', () => {
     expect(el.find(Tabs).props().tabs[1].name).toEqual('Job History (1)');
     const taskList = el.find(Tabs).props().tabs[1].content.props.children;
     expect(taskList.props.tasks).toEqual([tasks[1]]);
+  });
+
+  it('Should set default active tabs based on URL query parameters', () => {
+    const tasks = [
+      ScheduledTaskBuilder.status(ScheduleStatus.PENDING).build(),
+      ScheduledTaskBuilder.status(ScheduleStatus.FINISHED).build()
+    ];
+    const p = props(tasks);
+    p.location.search = '?taskView=config&jobView=history';
+    const el = shallow(<Job {...p} />);
+    expect(el.find(Tabs).props().activeTab).toEqual('history');
+    const nestedTab = el.find(Tabs).props().tabs[0].content.props.children.props.activeTab;
+    expect(nestedTab).toEqual('config');
   });
 });

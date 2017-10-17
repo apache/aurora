@@ -6,9 +6,9 @@ import Tabs from '../Tabs';
 const DummyTab = ({ number }) => <span>Hello, {number}</span>;
 
 const tabs = [
-  {name: 'one', content: <DummyTab number={1} />},
-  {name: 'two', content: <DummyTab number={2} />},
-  {name: 'three', content: <DummyTab number={3} />}
+  {id: 'one', name: 'one', content: <DummyTab number={1} />},
+  {id: 'two', name: 'two', content: <DummyTab number={2} />},
+  {id: 'three', name: 'three', content: <DummyTab number={3} />}
 ];
 
 describe('Tabs', () => {

@@ -1,4 +1,5 @@
 import React from 'react';
+import queryString from 'query-string';
 
 import Breadcrumb from 'components/Breadcrumb';
 import JobConfig from 'components/JobConfig';
@@ -12,6 +13,11 @@ import UpdatePreview from 'components/UpdatePreview';
 import { isNully, sort } from 'utils/Common';
 import { getLastEventTime, isActive } from 'utils/Task';
 import { isInProgressUpdate } from 'utils/Update';
+
+export const TASK_CONFIG_TAB = 'config';
+export const TASK_LIST_TAB = 'tasks';
+export const JOB_STATUS_TAB = 'status';
+export const JOB_HISTORY_TAB = 'history';
 
 export default class Job extends React.Component {
   constructor(props) {
@@ -100,24 +106,46 @@ export default class Job extends React.Component {
       this.state.tasks.filter((t) => !isActive(t)), (t) => getLastEventTime(t), true);
 
     return {
+      id: JOB_HISTORY_TAB,
       name: `Job History (${terminalTasks.length})`,
       content: <PanelGroup><TaskList tasks={terminalTasks} /></PanelGroup>
     };
+  }
+
+  setJobView(tabId) {
+    const {match: {params: {role, environment, name}}} = this.props;
+    this.props.history.push(`/beta/scheduler/${role}/${environment}/${name}?jobView=${tabId}`);
+  }
+
+  setTaskView(tabId) {
+    const {match: {params: {role, environment, name}}} = this.props;
+    this.props.history.push(`/beta/scheduler/${role}/${environment}/${name}?taskView=${tabId}`);
   }
 
   jobStatusTab() {
     const activeTasks = sort(this.state.tasks.filter(isActive), (t) => t.assignedTask.instanceId);
     const numberConfigs = isNully(this.state.configGroups) ? '' : this.state.configGroups.length;
     return {
+      id: JOB_STATUS_TAB,
       name: 'Job Status',
       content: (<PanelGroup>
-        <Tabs className='task-status-tabs' tabs={[
-          {icon: 'th-list', name: 'Tasks', content: <TaskList tasks={activeTasks} />},
-          {
-            icon: 'info-sign',
-            name: `Configuration (${numberConfigs})`,
-            content: <JobConfig groups={this.state.configGroups} />
-          }]} />
+        <Tabs
+          activeTab={queryString.parse(this.props.location.search).taskView}
+          className='task-status-tabs'
+          onChange={(t) => this.setTaskView(t.id)}
+          tabs={[
+            {
+              icon: 'th-list',
+              id: TASK_LIST_TAB,
+              name: 'Tasks',
+              content: <TaskList tasks={activeTasks} />
+            },
+            {
+              icon: 'info-sign',
+              id: TASK_CONFIG_TAB,
+              name: `Configuration (${numberConfigs})`,
+              content: <JobConfig groups={this.state.configGroups} />
+            }]} />
       </PanelGroup>)
     };
   }
@@ -126,7 +154,11 @@ export default class Job extends React.Component {
     if (isNully(this.state.tasks)) {
       return <Loading />;
     }
-    return <Tabs className='job-overview' tabs={[this.jobStatusTab(), this.jobHistoryTab()]} />;
+    return <Tabs
+      activeTab={queryString.parse(this.props.location.search).jobView}
+      className='job-overview'
+      onChange={(t) => this.setJobView(t.id)}
+      tabs={[this.jobStatusTab(), this.jobHistoryTab()]} />;
   }
 
   render() {
