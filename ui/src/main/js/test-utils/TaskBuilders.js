@@ -31,7 +31,8 @@ export const TaskConfigBuilder = createBuilder({
   tier: TIER,
   resources: [{numCpus: 1}, {ramMb: 1024}, {diskMb: 1024}],
   constraints: [],
-  requestedPorts: []
+  requestedPorts: [],
+  executorConfig: {data: {}, name: 'TestExecutor'}
 });
 
 export const AssignedTaskBuilder = createBuilder({

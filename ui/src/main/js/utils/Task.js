@@ -64,3 +64,7 @@ export function getResource(resources, key) {
 export function getResources(resources, key) {
   return resources.filter((r) => !isNully(r[key]));
 }
+
+export function isThermos(task) {
+  return task && task.executorConfig && task.executorConfig.name === 'AuroraExecutor';
+}

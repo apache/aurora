@@ -32,11 +32,11 @@
     }
 
     span.removed {
-      background-color: $colors_error_light;
+      background-color: #ffd7dc;
     }
 
     span.added {
-      background-color: $colors_success_light;
+      background-color: #c8f7d5;
     }
   }
 }
