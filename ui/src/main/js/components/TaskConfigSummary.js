@@ -46,7 +46,7 @@ export default function TaskConfigSummary({ config, instances }) {
       <tr>
         <th>Metadata</th>
         <td colSpan='2'>
-          {config.metadata.map((m) => <span key={m.key}>{m.key}: {m.value}</span>)}
+          {config.metadata.map((m, i) => <span key={`${m.key}-${i}`}>{m.key}: {m.value}</span>)}
         </td>
       </tr>
       <tr>

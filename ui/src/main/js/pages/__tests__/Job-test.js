@@ -76,7 +76,7 @@ describe('Job', () => {
     ];
     const el = shallow(<Job {...props()} updates={updates} />);
     expect(el.contains(<JobUpdateList
-      updates={[updates[1].update.summary, updates[2].update.summary]} />)).toBe(true);
+      updates={[updates[1], updates[2]]} />)).toBe(true);
   });
 
   it('Should not render JobUpdateList if no terminal updates', () => {

@@ -37,9 +37,6 @@ export class TaskListItem extends React.Component {
         <div className='task-list-item'>
           <span className='task-list-item-status'>
             {SCHEDULE_STATUS[task.status]}
-            <span className='task-list-item-expander' onClick={(e) => this.toggleExpand()}>
-              ...
-            </span>
           </span>
           <span className={`img-circle ${getClassForScheduleStatus(task.status)}`} />
           <span className='task-list-item-time'>
@@ -47,6 +44,9 @@ export class TaskListItem extends React.Component {
           </span>
           {active ? ''
             : <span className='task-list-item-duration'>(ran for {getDuration(task)})</span>}
+          <span className='task-list-item-expander' onClick={(e) => this.toggleExpand()}>
+            ...
+          </span>
           <span className='task-list-item-message'>
             {latestEvent.message}
           </span>

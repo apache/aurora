@@ -87,8 +87,7 @@ export default class Job extends React.Component {
     }
 
     const terminalUpdates = this.state.updates
-      .filter((u) => !isInProgressUpdate(u))
-      .map((u) => u.update.summary);
+      .filter((u) => !isInProgressUpdate(u));
 
     if (terminalUpdates.length === 0) {
       return '';
@@ -152,8 +151,9 @@ export default class Job extends React.Component {
 
   jobOverview() {
     if (isNully(this.state.tasks)) {
-      return <Loading />;
+      return <PanelGroup><Loading /></PanelGroup>;
     }
+
     return <Tabs
       activeTab={queryString.parse(this.props.location.search).jobView}
       className='job-overview'

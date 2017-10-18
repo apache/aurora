@@ -7,7 +7,7 @@ import { RelativeTime } from 'components/Time';
 
 import { isNully } from 'utils/Common';
 import { UPDATE_STATUS } from 'utils/Thrift';
-import { getClassForUpdateStatus } from 'utils/Update';
+import { getClassForUpdateStatus, updateStats } from 'utils/Update';
 
 function UpdateListItem({ summary, titleFn }) {
   const {job: {role, environment, name}, id} = summary.key;
@@ -35,13 +35,39 @@ function UpdateListItem({ summary, titleFn }) {
   </div>);
 }
 
+function JobUpdateListItem({ update }) {
+  const summary = update.update.summary;
+  const {job: {role, environment, name}, id} = summary.key;
+  const stats = updateStats(update);
+  return (<div className='job-update-list-item'>
+    <span className={`img-circle ${getClassForUpdateStatus(summary.state.status)}`} />
+    <div className='job-update-list-item-details'>
+      <span>
+        <Link
+          className='job-update-list-id'
+          to={`/beta/scheduler/${role}/${environment}/${name}/update/${id}`}>
+          {id}
+        </Link> &bull; <span className='job-update-list-status'>
+          {UPDATE_STATUS[summary.state.status]}
+        </span>
+      </span>
+    </div>
+    <span className='job-update-list-stats'>
+      {stats.instancesUpdated} / {stats.totalInstancesToBeUpdated}
+    </span>
+    <span className='job-update-list-last-updated'>
+      <RelativeTime ts={summary.state.lastModifiedTimestampMs} />
+    </span>
+  </div>);
+}
+
 export function JobUpdateList({ updates }) {
   if (isNully(updates)) {
     return <Loading />;
   }
 
-  return (<div className='update-list'>
-    {updates.map((u) => <UpdateListItem key={u.key.id} summary={u} titleFn={(u) => u.key.id} />)}
+  return (<div className='job-update-list'>
+    {updates.map((u) => <JobUpdateListItem key={u.update.summary.key.id} update={u} />)}
   </div>);
 }
 

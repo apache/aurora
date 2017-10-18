@@ -36,3 +36,48 @@
     }
   }
 }
+
+.job-update-list {
+  .job-update-list-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid $grid_color;
+
+    .img-circle {
+      margin-right: 10px;
+    }
+
+    a {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .job-update-list-item-status {
+      display: block;
+    }
+
+    &:hover {
+      background-color: #edf5fd;
+    }
+
+    .update-list-status {
+      color: $secondary_font_color;
+    }
+
+    .job-update-list-stats {
+      margin-left: auto;
+      width: 120px;
+      text-align: center;
+      font-weight: 700;
+      color: $secondary_font_color;
+      background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    .job-update-list-last-updated {
+      width: 120px;
+      text-align: center;
+      color: $secondary_font_color;
+    }
+  }
+}
