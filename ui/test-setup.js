@@ -64,3 +64,9 @@ global.JobUpdateAction = {
   'INSTANCE_UPDATE_FAILED' : 5,
   'INSTANCE_ROLLBACK_FAILED' : 6
 };
+
+global.CronCollisionPolicy = {
+  'KILL_EXISTING': 0,
+  'CANCEL_NEW': 1,
+  'RUN_OVERLAP': 2
+};

@@ -23,7 +23,8 @@ function apiSpy() {
     getTasksWithoutConfigs: jest.fn(),
     getPendingReason: jest.fn(),
     getConfigSummary: jest.fn(),
-    getJobUpdateDetails: jest.fn()
+    getJobUpdateDetails: jest.fn(),
+    getJobSummary: jest.fn()
   };
 }
 

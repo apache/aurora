@@ -3,6 +3,7 @@ import { invert } from 'utils/Common';
 export const SCHEDULE_STATUS = invert(ScheduleStatus);
 export const UPDATE_STATUS = invert(JobUpdateStatus);
 export const UPDATE_ACTION = invert(JobUpdateAction);
+export const COLLISION_POLICY = invert(CronCollisionPolicy);
 
 export const OKAY_SCHEDULE_STATUS = [
   ScheduleStatus.RUNNING,

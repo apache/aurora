@@ -68,6 +68,10 @@
       }
     }
 
+    .cron-config-summary {
+      width: 500px !important;
+    }
+
     tr:first-child {
       background-color: $grid_color;
     }

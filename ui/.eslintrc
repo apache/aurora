@@ -11,6 +11,7 @@
   "globals": {
     "ACTIVE_STATES": true,
     "ACTIVE_JOB_UPDATE_STATES": true,
+    "CronCollisionPolicy": true,
     "JobKey": true,
     "JobUpdateAction": true,
     "JobUpdateKey": true,

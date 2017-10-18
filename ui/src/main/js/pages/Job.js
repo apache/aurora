@@ -27,7 +27,8 @@ export default class Job extends React.Component {
       configGroups: props.configGroups,
       tasks: props.tasks,
       updates: props.updates,
-      pendingReasons: props.pendingReasons
+      pendingReasons: props.pendingReasons,
+      cronJob: props.cronJob
     };
   }
 
@@ -57,6 +58,20 @@ export default class Job extends React.Component {
         cluster: response.serverInfo.clusterName,
         configGroups: response.result.configSummaryResult.summary.groups
       });
+    });
+    api.getJobSummary(role, (response) => {
+      const cronJob = response.result.jobSummaryResult.summaries.find((j) => {
+        return j.job.key.environment === that.props.match.params.environment &&
+          j.job.key.name === that.props.match.params.name &&
+          !isNully(j.job.cronSchedule);
+      });
+
+      if (cronJob) {
+        that.setState({
+          cluster: response.serverInfo.clusterName,
+          cronJob
+        });
+      }
     });
 
     const updateQuery = new JobUpdateQuery();
@@ -123,7 +138,9 @@ export default class Job extends React.Component {
 
   jobStatusTab() {
     const activeTasks = sort(this.state.tasks.filter(isActive), (t) => t.assignedTask.instanceId);
-    const numberConfigs = isNully(this.state.configGroups) ? '' : this.state.configGroups.length;
+    const numberConfigs = isNully(this.state.cronJob)
+      ? isNully(this.state.configGroups) ? '' : this.state.configGroups.length
+      : 1;
     return {
       id: JOB_STATUS_TAB,
       name: 'Job Status',
@@ -143,7 +160,7 @@ export default class Job extends React.Component {
               icon: 'info-sign',
               id: TASK_CONFIG_TAB,
               name: `Configuration (${numberConfigs})`,
-              content: <JobConfig groups={this.state.configGroups} />
+              content: <JobConfig cronJob={this.state.cronJob} groups={this.state.configGroups} />
             }]} />
       </PanelGroup>)
     };

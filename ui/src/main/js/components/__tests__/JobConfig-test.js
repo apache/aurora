@@ -2,10 +2,11 @@ import React from 'react';
 import { shallow } from 'enzyme';
 
 import ConfigDiff from '../ConfigDiff';
-import JobConfig from '../JobConfig';
+import JobConfig, { CronJobConfig } from '../JobConfig';
 import Loading from '../Loading';
 import TaskConfigSummary from '../TaskConfigSummary';
 
+import { JobSummaryBuilder } from 'test-utils/JobBuilders';
 import { TaskConfigBuilder, createConfigGroup } from 'test-utils/TaskBuilders';
 
 describe('JobConfig', () => {
@@ -20,8 +21,14 @@ describe('JobConfig', () => {
     expect(el.contains(<ConfigDiff groups={[group0, group1, group2]} />)).toBe(true);
   });
 
-  it('Should render Loading when no groups are supplied', () => {
+  it('Should render Loading when no groups or cronJob are supplied', () => {
     const el = shallow(<JobConfig />);
     expect(el.contains(<Loading />)).toBe(true);
+  });
+
+  it('Should render CronJobConfig when cronJob is supplied', () => {
+    const cron = JobSummaryBuilder.build();
+    const el = shallow(<JobConfig cronJob={cron} />);
+    expect(el.contains(<CronJobConfig cronJob={cron} />)).toBe(true);
   });
 });
