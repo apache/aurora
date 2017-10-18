@@ -12,7 +12,6 @@ import Update from 'pages/Update';
 import Updates from 'pages/Updates';
 
 import 'bootstrap/dist/css/bootstrap.css';
-import '../resources/source-sans-pro.css';
 import '../sass/app.scss';
 
 const injectApi = (Page) => (props) => <Page api={SchedulerClient} {...props} />;
