@@ -48,27 +48,9 @@ td.job-list-type {
   background-color: $colors_error !important;
 }
 
-.job-env {
-  display: inline-block;
+.job-list-env, .job-list-type, .job-list-tier {
   font-size: 11px;
   text-transform: uppercase;
-  overflow: hidden;
-  margin-right: 20px;
-}
-
-.job-tier {
-  display: inline-block;
-  font-size: 11px;
-  text-transform: uppercase;
-  color: #777;
-  padding: 2px;
-}
-
-.job-type {
-  font-size: 11px;
-  text-transform: uppercase;
-  display: inline-block;
-  width: 50px;
   text-align: center;
-  color: $secondary_font_color;
+  padding: 0px 2px;
 }

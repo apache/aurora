@@ -19,26 +19,24 @@ export function JobTaskStats({ stats }) {
 export default function JobListItem(props) {
   const {job: {job: { cronSchedule, key: {role, name, environment}, taskConfig }, stats}} = props;
 
-  const envLink = (props.env) ? '' : (<span className='job-env'>
+  const envLink = (props.env) ? null : (<td className='job-list-env'>
     <Link to={`/beta/scheduler/${role}/${environment}`}>{environment}</Link>
-  </span>);
+  </td>);
 
   return (<tr key={`${environment}/${name}`}>
-    <td className='job-list-type' column='type'>
-      <span className='job-tier'>
-        {taskConfig.isService ? 'service' : (cronSchedule) ? 'cron' : 'adhoc'}
-      </span>
+    <td className='job-list-type'>
+      {taskConfig.isService ? 'service' : (cronSchedule) ? 'cron' : 'adhoc'}
     </td>
-    <td className='job-list-name' column='name' value={name}>
+    {envLink}
+    <td className='job-list-name' value={name}>
       <h4>
-        {envLink}
         <Link to={`/beta/scheduler/${role}/${environment}/${name}`}>
           {name}
           {taskConfig.production ? <Icon name='star' /> : ''}
         </Link>
       </h4>
     </td>
-    <td className='job-list-stats' column='stats'>
+    <td className='job-list-stats'>
       <JobTaskStats stats={stats} />
     </td>
   </tr>);
