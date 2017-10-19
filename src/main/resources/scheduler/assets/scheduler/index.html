@@ -39,6 +39,28 @@
     </div>
   </div>
 </nav>
+<div class='beta-banner'>
+  <div class='container-fluid'>
+    <div class='row'>
+      <!--
+       Licensed under the Apache License, Version 2.0 (the "License");
+       you may not use this file except in compliance with the License.
+       You may obtain a copy of the License at
+
+            http://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing, software
+       distributed under the License is distributed on an "AS IS" BASIS,
+       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+       See the License for the specific language governing permissions and
+       limitations under the License.
+       -->
+      <div class='col-md-12'>
+        <a id='beta-link' href='/beta/scheduler'> <span class='glyphicon glyphicon-hand-right' ></span> Try the Beta of the new Scheduler UI</a>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class='container-fluid'>
   <ng-view></ng-view>
@@ -74,5 +96,8 @@
 <!-- moment.js -->
 <script src='/assets/bower_components/momentjs/moment.js'></script>
 
+<script type='text/javascript'>
+  document.getElementById('beta-link').href = window.location.href.replace('/scheduler', '/beta/scheduler');
+</script>
 </body>
 </html>

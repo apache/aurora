@@ -471,3 +471,14 @@ span.loading {
 .clickable {
   cursor: pointer
 }
+
+.beta-banner {
+  background-color: steelblue;
+  padding: 10px 0;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.beta-banner a {
+  color: white;
+}
