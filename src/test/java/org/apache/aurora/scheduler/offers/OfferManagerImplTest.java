@@ -436,15 +436,19 @@ public class OfferManagerImplTest extends EasyMockTest {
     OfferManager cpuManager = createOrderedManager(ImmutableList.of(OfferOrder.CPU));
 
     HostOffer small = setMode(new HostOffer(
-        offer("host1", mesosScalar(CPUS, 1.0), mesosScalar(CPUS, 24.0, true)),
+        offer(
+            "host1",
+            mesosScalar(CPUS, 1.0),
+            mesosScalar(CPUS, 24.0, true),
+            mesosScalar(RAM_MB, 1024)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     HostOffer medium = setMode(new HostOffer(
-        offer("host2", mesosScalar(CPUS, 5.0)),
+        offer("host2", mesosScalar(CPUS, 5.0), mesosScalar(RAM_MB, 1024)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     HostOffer large = setMode(new HostOffer(
-        offer("host3", mesosScalar(CPUS, 10.0)),
+        offer("host3", mesosScalar(CPUS, 10.0), mesosScalar(RAM_MB, 1024)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     control.replay();
@@ -465,15 +469,23 @@ public class OfferManagerImplTest extends EasyMockTest {
     OfferManager cpuManager = createOrderedManager(ImmutableList.of(OfferOrder.REVOCABLE_CPU));
 
     HostOffer small = setMode(new HostOffer(
-        offer("host2", mesosScalar(CPUS, 5.0), mesosScalar(CPUS, 23.0, true)),
+        offer(
+            "host2",
+            mesosScalar(CPUS, 5.0),
+            mesosScalar(CPUS, 23.0, true),
+            mesosScalar(RAM_MB, 1024)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     HostOffer medium = setMode(new HostOffer(
-        offer("host1", mesosScalar(CPUS, 3.0), mesosScalar(CPUS, 24.0, true)),
+        offer(
+            "host1",
+            mesosScalar(CPUS, 3.0),
+            mesosScalar(CPUS, 24.0, true),
+            mesosScalar(RAM_MB, 1024)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     HostOffer large = setMode(new HostOffer(
-        offer("host3", mesosScalar(CPUS, 1.0)),
+        offer("host3", mesosScalar(CPUS, 1.0), mesosScalar(RAM_MB, 1024)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     control.replay();
@@ -493,15 +505,15 @@ public class OfferManagerImplTest extends EasyMockTest {
     OfferManager cpuManager = createOrderedManager(ImmutableList.of(OfferOrder.DISK));
 
     HostOffer small = setMode(new HostOffer(
-        offer("host1", mesosScalar(DISK_MB, 1.0)),
+        offer("host1", mesosScalar(CPUS, 1), mesosScalar(RAM_MB, 1), mesosScalar(DISK_MB, 1.0)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     HostOffer medium = setMode(new HostOffer(
-        offer("host2", mesosScalar(DISK_MB, 5.0)),
+        offer("host2", mesosScalar(CPUS, 1), mesosScalar(RAM_MB, 1), mesosScalar(DISK_MB, 5.0)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     HostOffer large = setMode(new HostOffer(
-        offer("host3", mesosScalar(DISK_MB, 10.0)),
+        offer("host3", mesosScalar(CPUS, 1), mesosScalar(RAM_MB, 1), mesosScalar(DISK_MB, 10.0)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     control.replay();
@@ -521,15 +533,15 @@ public class OfferManagerImplTest extends EasyMockTest {
     OfferManager cpuManager = createOrderedManager(ImmutableList.of(OfferOrder.MEMORY));
 
     HostOffer small = setMode(new HostOffer(
-        offer("host1", mesosScalar(RAM_MB, 1.0)),
+        offer("host1", mesosScalar(CPUS, 10), mesosScalar(RAM_MB, 1.0)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     HostOffer medium = setMode(new HostOffer(
-        offer("host2", mesosScalar(RAM_MB, 5.0)),
+        offer("host2", mesosScalar(CPUS, 10), mesosScalar(RAM_MB, 5.0)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     HostOffer large = setMode(new HostOffer(
-        offer("host3", mesosScalar(RAM_MB, 10.0)),
+        offer("host3", mesosScalar(CPUS, 10), mesosScalar(RAM_MB, 10.0)),
         HOST_ATTRIBUTES_A), DRAINING);
 
     control.replay();
@@ -567,6 +579,7 @@ public class OfferManagerImplTest extends EasyMockTest {
         offer("host3",
             mesosScalar(CPUS, 10.0),
             mesosScalar(CPUS, 1.0),
+            mesosScalar(RAM_MB, 1024),
             mesosScalar(DISK_MB, 1.0)),
         HOST_ATTRIBUTES_A), DRAINING);
 

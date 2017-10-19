@@ -292,7 +292,12 @@ public interface TaskAssigner {
       if (remainingTasks.hasNext()) {
         IAssignedTask task = remainingTasks.next();
         for (HostOffer offer : offerManager.getOffers(groupKey)) {
-          evaluatedOffers.incrementAndGet();
+
+          if (!offer.hasCpuAndMem()) {
+            // This offer lacks any type of CPU or mem resource, and therefore will never match
+            // a task.
+            continue;
+          }
 
           String agentId = offer.getOffer().getAgentId().getValue();
 
@@ -309,6 +314,7 @@ public interface TaskAssigner {
             continue;
           }
 
+          evaluatedOffers.incrementAndGet();
           try {
             boolean offerUsed = evaluateOffer(
                 storeProvider, tierInfo, resourceRequest, groupKey, task, offer, assignmentResult);

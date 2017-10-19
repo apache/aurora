@@ -24,6 +24,7 @@ import com.google.common.cache.LoadingCache;
 
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
 import static java.util.Objects.requireNonNull;
@@ -40,9 +41,17 @@ public class HostOffer {
   private final IHostAttributes hostAttributes;
   private final LoadingCache<TierInfo, ResourceBag> resourceBagCache;
 
+  // Offers lacking CPU or mem are flagged so that they may be efficiently ignored during
+  // scheduling.  However, they are retained for other purposes such as preemption and cluster
+  // stats.
+  // When nonZeroCpuAndMem=true, it means that _any_ CPU or mem resource is available, regardless
+  // of whether the resource is revocable.
+  private final boolean nonZeroCpuAndMem;
+
   public HostOffer(Offer offer, IHostAttributes hostAttributes) {
     this.offer = requireNonNull(offer);
     this.hostAttributes = requireNonNull(hostAttributes);
+    this.nonZeroCpuAndMem = offerHasCpuAndMem(offer);
     this.resourceBagCache = CacheBuilder.newBuilder().build(
         new CacheLoader<TierInfo, ResourceBag>() {
           @Override
@@ -52,12 +61,22 @@ public class HostOffer {
         });
   }
 
+  private static boolean offerHasCpuAndMem(Offer offer) {
+    ResourceBag resources = bagFromMesosResources(offer.getResourcesList());
+    return resources.valueOf(ResourceType.CPUS) > 0.0
+        && resources.valueOf(ResourceType.RAM_MB) > 0.0;
+  }
+
   public Offer getOffer() {
     return offer;
   }
 
   public IHostAttributes getAttributes() {
     return hostAttributes;
+  }
+
+  public boolean hasCpuAndMem() {
+    return nonZeroCpuAndMem;
   }
 
   public ResourceBag getResourceBag(TierInfo tierInfo) {
@@ -79,7 +98,8 @@ public class HostOffer {
     }
     HostOffer other = (HostOffer) o;
     return Objects.equals(offer, other.offer)
-        && Objects.equals(hostAttributes, other.hostAttributes);
+        && Objects.equals(hostAttributes, other.hostAttributes)
+        && nonZeroCpuAndMem == other.nonZeroCpuAndMem;
   }
 
   @Override
@@ -92,6 +112,7 @@ public class HostOffer {
     return MoreObjects.toStringHelper(this)
         .add("offer", offer)
         .add("hostAttributes", hostAttributes)
+        .add("nonZeroCpuAndMem", nonZeroCpuAndMem)
         .toString();
   }
 }

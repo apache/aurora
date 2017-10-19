@@ -136,7 +136,7 @@ public class Utilization {
     }
 
     private long valueOf(ResourceType type) {
-      return getBag().valueOf(type).longValue();
+      return (long) getBag().valueOf(type);
     }
 
     @Override

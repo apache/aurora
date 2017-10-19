@@ -45,7 +45,7 @@ class TaskStatCalculator implements Runnable {
       ResourceType type = r.getKey();
       String metricName =
           Joiner.on("_").join(prefix, type.getAuroraName(), type.getAuroraStatUnit()).toLowerCase();
-      counters.get(metricName).set(metric.getBag().valueOf(type).longValue());
+      counters.get(metricName).set((long) metric.getBag().valueOf(type));
     });
   }
 

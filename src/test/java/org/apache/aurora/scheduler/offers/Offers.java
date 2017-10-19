@@ -13,10 +13,15 @@
  */
 package org.apache.aurora.scheduler.offers;
 
+import com.google.common.collect.ImmutableList;
+
+import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.mesos.v1.Protos.AgentID;
 import org.apache.mesos.v1.Protos.FrameworkID;
 import org.apache.mesos.v1.Protos.Offer;
 import org.apache.mesos.v1.Protos.OfferID;
+
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
 
 /**
  * Utility class for creating resource offers in unit tests.
@@ -38,6 +43,9 @@ public final class Offers {
         .setFrameworkId(FrameworkID.newBuilder().setValue("framework_id"))
         .setAgentId(AgentID.newBuilder().setValue("slave_id-" + offerId))
         .setHostname(hostName)
+        .addAllResources(ImmutableList.of(
+            mesosScalar(ResourceType.CPUS, 10),
+            mesosScalar(ResourceType.RAM_MB, 1024)))
         .build();
   }
 }

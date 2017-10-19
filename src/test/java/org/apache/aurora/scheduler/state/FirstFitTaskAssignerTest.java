@@ -50,12 +50,8 @@ import org.apache.aurora.scheduler.updater.UpdateAgentReserver;
 import org.apache.mesos.v1.Protos.AgentID;
 import org.apache.mesos.v1.Protos.FrameworkID;
 import org.apache.mesos.v1.Protos.OfferID;
-import org.apache.mesos.v1.Protos.Resource;
 import org.apache.mesos.v1.Protos.TaskID;
 import org.apache.mesos.v1.Protos.TaskInfo;
-import org.apache.mesos.v1.Protos.Value.Range;
-import org.apache.mesos.v1.Protos.Value.Ranges;
-import org.apache.mesos.v1.Protos.Value.Type;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -67,8 +63,11 @@ import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.empty;
 import static org.apache.aurora.scheduler.resources.ResourceManager.bagFromMesosResources;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosRange;
+import static org.apache.aurora.scheduler.resources.ResourceTestUtil.mesosScalar;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.offer;
+import static org.apache.aurora.scheduler.resources.ResourceType.CPUS;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
+import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 import static org.apache.aurora.scheduler.state.TaskAssigner.FirstFitTaskAssigner.ASSIGNER_EVALUATED_OFFERS;
 import static org.apache.aurora.scheduler.state.TaskAssigner.FirstFitTaskAssigner.ASSIGNER_LAUNCH_FAILURES;
 import static org.apache.aurora.scheduler.state.TaskAssigner.FirstFitTaskAssigner.LAUNCH_FAILED_MSG;
@@ -85,7 +84,8 @@ import static org.junit.Assert.assertNotEquals;
 public class FirstFitTaskAssignerTest extends EasyMockTest {
 
   private static final int PORT = 1000;
-  private static final Offer MESOS_OFFER = offer(mesosRange(PORTS, PORT));
+  private static final Offer MESOS_OFFER =
+      offer(mesosScalar(CPUS, 1), mesosScalar(RAM_MB, 1024), mesosRange(PORTS, PORT));
   private static final String SLAVE_ID = MESOS_OFFER.getAgentId().getValue();
   private static final HostOffer OFFER =
       new HostOffer(MESOS_OFFER, IHostAttributes.build(new HostAttributes()
@@ -108,15 +108,13 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
   private static final HostOffer OFFER_2 = new HostOffer(
       Offer.newBuilder()
           .setId(OfferID.newBuilder().setValue("offerId0"))
-              .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
-              .setAgentId(AgentID.newBuilder().setValue("slaveId0"))
-              .setHostname("hostName0")
-          .addResources(Resource.newBuilder()
-          .setName("ports")
-          .setType(Type.RANGES)
-          .setRanges(
-              Ranges.newBuilder().addRange(Range.newBuilder().setBegin(PORT).setEnd(PORT))))
-              .build(),
+          .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
+          .setAgentId(AgentID.newBuilder().setValue("slaveId0"))
+          .setHostname("hostName0")
+          .addResources(mesosRange(PORTS, PORT))
+          .addResources(mesosScalar(CPUS, 1))
+          .addResources(mesosScalar(RAM_MB, 1024))
+          .build(),
       IHostAttributes.build(new HostAttributes()));
 
   private static final Set<String> NO_ASSIGNMENT = ImmutableSet.of();
@@ -298,7 +296,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
             ImmutableSet.of(TASK.getAssignedTask()),
             ImmutableMap.of(SLAVE_ID, TaskGroupKey.from(
                 ITaskConfig.build(new TaskConfig().setJob(new JobKey("other", "e", "n")))))));
-    assertEquals(1L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
+    assertEquals(0, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
   }
 
   @Test
@@ -342,11 +340,9 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
             .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
             .setAgentId(AgentID.newBuilder().setValue("slaveId0"))
             .setHostname("hostName0")
-            .addResources(Resource.newBuilder()
-                .setName("ports")
-                .setType(Type.RANGES)
-                .setRanges(
-                    Ranges.newBuilder().addRange(Range.newBuilder().setBegin(PORT).setEnd(PORT))))
+            .addResources(mesosRange(PORTS, PORT))
+            .addResources(mesosScalar(CPUS, 1))
+            .addResources(mesosScalar(RAM_MB, 1024))
             .build(),
         IHostAttributes.build(new HostAttributes()));
 
@@ -496,6 +492,33 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
             ImmutableMap.of(SLAVE_ID, GROUP_KEY)));
     assertNotEquals(empty(), aggregate);
     assertEquals(1L, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
+  }
+
+  @Test
+  public void testSkipsOffersWithNoMemAndNoCpu() {
+    expectNoUpdateReservations(0);
+    expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
+
+    // Offer lacks CPU.
+    Offer mesosOffer = offer(mesosScalar(RAM_MB, 1024), mesosRange(PORTS, PORT));
+    HostOffer offer = new HostOffer(mesosOffer, IHostAttributes.build(new HostAttributes()
+        .setHost(mesosOffer.getHostname())
+        .setAttributes(ImmutableSet.of(
+            new Attribute("host", ImmutableSet.of(mesosOffer.getHostname()))))));
+
+    expect(offerManager.getOffers(GROUP_KEY)).andReturn(ImmutableSet.of(offer));
+
+    control.replay();
+
+    assertEquals(
+        NO_ASSIGNMENT,
+        assigner.maybeAssign(
+            storeProvider,
+            resourceRequest,
+            TaskGroupKey.from(TASK.getAssignedTask().getTask()),
+            ImmutableSet.of(TASK.getAssignedTask()),
+            NO_RESERVATION));
+    assertEquals(0, statsProvider.getLongValue(ASSIGNER_EVALUATED_OFFERS));
   }
 
   private void expectAssignTask(Offer offer) {

@@ -150,7 +150,7 @@ public interface PreemptionVictimFilter {
         boolean allLessOrEqual = true;
 
         for (ResourceType type : types) {
-          int compare = left.valueOf(type).compareTo(right.valueOf(type));
+          int compare = Double.compare(left.valueOf(type), right.valueOf(type));
           if (compare != 0) {
             allZero = false;
           }
