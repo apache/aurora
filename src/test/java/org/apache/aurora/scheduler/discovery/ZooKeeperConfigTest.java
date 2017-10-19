@@ -37,7 +37,6 @@ public class ZooKeeperConfigTest {
   @Test(expected = IllegalArgumentException.class)
   public void testEmptyServers() {
     new ZooKeeperConfig(
-        false,
         ImmutableList.of(),
         Optional.absent(),
         false,
@@ -50,7 +49,6 @@ public class ZooKeeperConfigTest {
   public void testWithCredentials() {
     ZooKeeperConfig config =
         new ZooKeeperConfig(
-            false,
             SERVERS,
             Optional.absent(),
             false,
@@ -72,9 +70,8 @@ public class ZooKeeperConfigTest {
 
   @Test
   public void testCreateFactory() {
-    ZooKeeperConfig config = ZooKeeperConfig.create(true, SERVERS);
+    ZooKeeperConfig config = ZooKeeperConfig.create(SERVERS);
 
-    assertTrue(config.isUseCurator());
     assertEquals(SERVERS, ImmutableList.copyOf(config.getServers()));
     assertFalse(config.getChrootPath().isPresent());
     assertFalse(config.isInProcess());

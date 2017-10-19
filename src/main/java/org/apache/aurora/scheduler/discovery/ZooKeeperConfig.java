@@ -44,13 +44,11 @@ public class ZooKeeperConfig {
   /**
    * Creates a new client configuration with defaults for the session timeout and credentials.
    *
-   * @param useCurator {@code true} to use Apache Curator; otherwise commons/zookeeper is used.
    * @param servers ZooKeeper server addresses.
    * @return A new configuration.
    */
-  public static ZooKeeperConfig create(boolean useCurator, Iterable<InetSocketAddress> servers) {
+  public static ZooKeeperConfig create(Iterable<InetSocketAddress> servers) {
     return new ZooKeeperConfig(
-        useCurator,
         servers,
         Optional.absent(), // chrootPath
         false,
@@ -59,7 +57,6 @@ public class ZooKeeperConfig {
         Optional.absent()); // credentials
   }
 
-  private final boolean useCurator;
   private final Iterable<InetSocketAddress> servers;
   private final boolean inProcess;
   private final Amount<Integer, Time> sessionTimeout;
@@ -77,7 +74,6 @@ public class ZooKeeperConfig {
    * @param credentials ZooKeeper authentication credentials.
    */
   ZooKeeperConfig(
-      boolean useCurator,
       Iterable<InetSocketAddress> servers,
       Optional<String> chrootPath,
       boolean inProcess,
@@ -85,7 +81,6 @@ public class ZooKeeperConfig {
       Amount<Integer, Time> connectionTimeout,
       Optional<Credentials> credentials) {
 
-    this.useCurator = useCurator;
     this.servers = MorePreconditions.checkNotBlank(servers);
     this.chrootPath = requireNonNull(chrootPath);
     this.inProcess = inProcess;
@@ -103,17 +98,12 @@ public class ZooKeeperConfig {
    */
   public ZooKeeperConfig withCredentials(Credentials newCredentials) {
     return new ZooKeeperConfig(
-        useCurator,
         servers,
         chrootPath,
         inProcess,
         sessionTimeout,
         connectionTimeout,
         Optional.of(newCredentials));
-  }
-
-  boolean isUseCurator() {
-    return useCurator;
   }
 
   Iterable<InetSocketAddress> getServers() {

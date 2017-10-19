@@ -19,46 +19,24 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Map;
 
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
-
-import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
-import org.apache.zookeeper.data.ACL;
 
 /**
- * Common ServerSet related functions
+ * Utility class for encoding and decoding data stored in ZooKeeper nodes.
  */
-public class ServerSets {
-
-  private ServerSets() {
-    // Utility class.
-  }
-
+public class Encoding {
   /**
-   * A function that invokes {@link #toEndpoint(InetSocketAddress)}.
-   */
-  public static final Function<InetSocketAddress, Endpoint> TO_ENDPOINT =
-      ServerSets::toEndpoint;
-
-  /**
-   * Creates a server set that registers at a single path applying the given ACL to all nodes
-   * created in the path.
+   * Encodes a {@link ServiceInstance} as a JSON object.
    *
-   * @param zkClient ZooKeeper client to register with.
-   * @param acl The ACL to apply to the {@code zkPath} nodes the ServerSet creates.
-   * @param zkPath Path to register at.  @see #create(ZooKeeperClient, java.util.Set)
-   * @return A server set that registers at {@code zkPath}.
+   * This is the default encoding for service instance data in ZooKeeper.
    */
-  public static ServerSet create(ZooKeeperClient zkClient, Iterable<ACL> acl, String zkPath) {
-    Preconditions.checkNotNull(zkClient);
-    MorePreconditions.checkNotBlank(acl);
-    MorePreconditions.checkNotBlank(zkPath);
+  public static final Codec<ServiceInstance> JSON_CODEC = new JsonCodec();
 
-    return new ServerSetImpl(zkClient, acl, zkPath);
+  private Encoding() {
+    // Utility class.
   }
 
   /**
@@ -68,7 +46,7 @@ public class ServerSets {
    * @param codec the codec to use to serialize a Thrift service instance object
    * @return byte array that contains a serialized Thrift service instance
    */
-  public static byte[] serializeServiceInstance(
+  static byte[] serializeServiceInstance(
       ServiceInstance serviceInstance, Codec<ServiceInstance> codec) throws IOException {
 
     ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -84,14 +62,14 @@ public class ServerSets {
    * @param additionalEndpoints additional endpoints of the service instance
    * @param status service status
    */
-  public static byte[] serializeServiceInstance(
+  static byte[] serializeServiceInstance(
       InetSocketAddress address,
       Map<String, Endpoint> additionalEndpoints,
       Status status,
       Codec<ServiceInstance> codec) throws IOException {
 
-    ServiceInstance serviceInstance =
-        new ServiceInstance(toEndpoint(address), additionalEndpoints, status);
+    ServiceInstance serviceInstance = new ServiceInstance(
+        new Endpoint(address.getHostName(), address.getPort()), additionalEndpoints, status);
     return serializeServiceInstance(serviceInstance, codec);
   }
 
@@ -101,18 +79,9 @@ public class ServerSets {
    * @param data the byte array contains a serialized Thrift service instance
    * @param codec the codec to use to deserialize the byte array
    */
-  public static ServiceInstance deserializeServiceInstance(
+  static ServiceInstance deserializeServiceInstance(
       byte[] data, Codec<ServiceInstance> codec) throws IOException {
 
     return codec.deserialize(new ByteArrayInputStream(data));
-  }
-
-  /**
-   * Creates an endpoint for the given InetSocketAddress.
-   *
-   * @param address the target address to create the endpoint for
-   */
-  public static Endpoint toEndpoint(InetSocketAddress address) {
-    return new Endpoint(address.getHostName(), address.getPort());
   }
 }

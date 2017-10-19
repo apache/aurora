@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.app;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Set;
@@ -47,9 +48,7 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.zookeeper.Credentials;
-import org.apache.aurora.common.zookeeper.ServerSetImpl;
-import org.apache.aurora.common.zookeeper.ZooKeeperClient;
-import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperClientTest;
+import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -110,10 +109,9 @@ import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-public class SchedulerIT extends BaseZooKeeperClientTest {
+public class SchedulerIT extends BaseZooKeeperTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchedulerIT.class);
 
@@ -153,7 +151,6 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
   private Stream logStream;
   private StreamMatcher streamMatcher;
   private EntrySerializer entrySerializer;
-  private ZooKeeperClient zkClient;
   private File backupDir;
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -181,11 +178,9 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     entrySerializer = new EntrySerializer.EntrySerializerImpl(
         Amount.of(512, Data.KB),
         Hashing.md5());
-
-    zkClient = createZkClient();
   }
 
-  private void startScheduler() throws Exception {
+  private Injector startScheduler() throws Exception {
     // TODO(wfarner): Try to accomplish all this by subclassing SchedulerMain and actually using
     // AppLauncher.
     Module testModule = new AbstractModule() {
@@ -215,8 +210,8 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     };
     ZooKeeperConfig zkClientConfig =
         ZooKeeperConfig.create(
-            true, // useCurator
-            ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
+            ImmutableList.of(
+                InetSocketAddress.createUnresolved("localhost", getServer().getPort())))
             .withCredentials(Credentials.digestCredentials("mesos", "mesos"));
     SchedulerMain main = SchedulerMain.class.newInstance();
     Injector injector = Guice.createInjector(
@@ -245,21 +240,35 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     });
     injector.getInstance(Key.get(GuavaUtils.ServiceManagerIface.class, AppStartup.class))
         .awaitHealthy();
+    return injector;
   }
 
-  private void awaitSchedulerReady() throws Exception {
+  private void awaitSchedulerReady(Injector injector) throws Exception {
     executor.submit(() -> {
-      ServerSetImpl schedulerService = new ServerSetImpl(zkClient, SERVERSET_PATH);
-      final CountDownLatch schedulerReady = new CountDownLatch(1);
-      schedulerService.watch(hostSet -> {
-        if (!hostSet.isEmpty()) {
-          schedulerReady.countDown();
+      ServiceGroupMonitor groupMonitor = injector.getInstance(ServiceGroupMonitor.class);
+      try {
+        // A timeout is used because certain types of assertion errors (mocks) will not surface
+        // until the main test thread exits this body of code.
+        long waited = 0;
+        while (waited < 5000) {
+          if (groupMonitor.get().isEmpty()) {
+            try {
+              Thread.sleep(100);
+              waited += 100;
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          } else {
+            break;
+          }
         }
-      });
-      // A timeout is used because certain types of assertion errors (mocks) will not surface
-      // until the main test thread exits this body of code.
-      assertTrue(schedulerReady.await(5L, TimeUnit.MINUTES));
-      return null;
+      } finally {
+        try {
+          groupMonitor.close();
+        } catch (IOException e) {
+          LOG.info("Failed to close:" + e, e);
+        }
+      }
     }).get();
   }
 
@@ -345,7 +354,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
     expect(driver.stop(true)).andReturn(Protos.Status.DRIVER_STOPPED).anyTimes();
 
     control.replay();
-    startScheduler();
+    Injector injector = startScheduler();
 
     driverStarted.await();
     scheduler.getValue().registered(
@@ -353,7 +362,7 @@ public class SchedulerIT extends BaseZooKeeperClientTest {
         Protos.FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
         MASTER);
 
-    awaitSchedulerReady();
+    awaitSchedulerReady(injector);
 
     assertEquals(0L, Stats.<Long>getVariable("task_store_PENDING").read().longValue());
     assertEquals(1L, Stats.<Long>getVariable("task_store_ASSIGNED").read().longValue());

@@ -18,8 +18,10 @@
 - Increase default ZooKeeper session timeout from 4 to 15 seconds.
 - Add option `-zk_connection_timeout` to control the connection timeout of ZooKeeper connections.
 
-### Deprecations and removals
+### Deprecations and removals:
 
+- Removed the deprecated command line argument `-zk_use_curator`, removing the choice to use the
+  legacy ZooKeeper client.
 - Removed the `rewriteConfigs` thrift API call in the scheduler. This was a last-ditch mechanism
   to modify scheduler state on the fly. It was considered extremely risky to use since its
   inception, and is safer to abandon due to its lack of use and likelihood for code rot.

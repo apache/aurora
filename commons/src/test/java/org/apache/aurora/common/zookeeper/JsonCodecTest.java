@@ -52,25 +52,25 @@ public class JsonCodecTest {
         ImmutableMap.of("http", new Endpoint("foo", 8080)),
         Status.ALIVE)
         .setShard(0);
-    byte[] data = ServerSets.serializeServiceInstance(instance1, codec);
-    assertTrue(ServerSets.deserializeServiceInstance(data, codec).getServiceEndpoint().isSetPort());
-    assertTrue(ServerSets.deserializeServiceInstance(data, codec).isSetShard());
+    byte[] data = Encoding.serializeServiceInstance(instance1, codec);
+    assertTrue(Encoding.deserializeServiceInstance(data, codec).getServiceEndpoint().isSetPort());
+    assertTrue(Encoding.deserializeServiceInstance(data, codec).isSetShard());
 
     ServiceInstance instance2 = new ServiceInstance(
         new Endpoint("foo", 1000),
         ImmutableMap.of("http-admin1", new Endpoint("foo", 8080)),
         Status.ALIVE);
-    data = ServerSets.serializeServiceInstance(instance2, codec);
-    assertTrue(ServerSets.deserializeServiceInstance(data, codec).getServiceEndpoint().isSetPort());
-    assertFalse(ServerSets.deserializeServiceInstance(data, codec).isSetShard());
+    data = Encoding.serializeServiceInstance(instance2, codec);
+    assertTrue(Encoding.deserializeServiceInstance(data, codec).getServiceEndpoint().isSetPort());
+    assertFalse(Encoding.deserializeServiceInstance(data, codec).isSetShard());
 
     ServiceInstance instance3 = new ServiceInstance(
         new Endpoint("foo", 1000),
         ImmutableMap.<String, Endpoint>of(),
         Status.ALIVE);
-    data = ServerSets.serializeServiceInstance(instance3, codec);
-    assertTrue(ServerSets.deserializeServiceInstance(data, codec).getServiceEndpoint().isSetPort());
-    assertFalse(ServerSets.deserializeServiceInstance(data, codec).isSetShard());
+    data = Encoding.serializeServiceInstance(instance3, codec);
+    assertTrue(Encoding.deserializeServiceInstance(data, codec).getServiceEndpoint().isSetPort());
+    assertFalse(Encoding.deserializeServiceInstance(data, codec).isSetShard());
   }
 
   @Test

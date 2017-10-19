@@ -25,17 +25,17 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class ServerSetsTest {
+public class EncodingTest {
   @Test
   public void testSimpleSerialization() throws Exception {
     InetSocketAddress endpoint = new InetSocketAddress(12345);
     Map<String, Endpoint > additionalEndpoints = ImmutableMap.of();
     Status status = Status.ALIVE;
 
-    byte[] data = ServerSets.serializeServiceInstance(
-        endpoint, additionalEndpoints, status, ServerSet.JSON_CODEC);
+    byte[] data = Encoding.serializeServiceInstance(
+        endpoint, additionalEndpoints, status, Encoding.JSON_CODEC);
 
-    ServiceInstance instance = ServerSets.deserializeServiceInstance(data, ServerSet.JSON_CODEC);
+    ServiceInstance instance = Encoding.deserializeServiceInstance(data, Encoding.JSON_CODEC);
 
     assertEquals(endpoint.getPort(), instance.getServiceEndpoint().getPort());
     assertEquals(additionalEndpoints, instance.getAdditionalEndpoints());

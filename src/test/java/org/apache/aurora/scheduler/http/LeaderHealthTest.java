@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.http;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.Response;
 
-import org.apache.aurora.common.net.pool.DynamicHostSet.MonitorException;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.http.LeaderRedirect.LeaderStatus;
 import org.junit.Before;
@@ -31,7 +30,7 @@ public class LeaderHealthTest extends EasyMockTest {
   private LeaderHealth leaderHealth;
 
   @Before
-  public void setUp() throws MonitorException {
+  public void setUp() {
     leaderRedirect = createMock(LeaderRedirect.class);
     leaderHealth = new LeaderHealth(leaderRedirect);
   }

@@ -25,7 +25,7 @@ import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.thrift.Endpoint;
 import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.thrift.Status;
-import org.apache.aurora.common.zookeeper.ServerSet;
+import org.apache.aurora.common.zookeeper.Encoding;
 import org.apache.aurora.common.zookeeper.testing.BaseZooKeeperTest;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.curator.framework.CuratorFramework;
@@ -38,7 +38,7 @@ class BaseCuratorDiscoveryTest extends BaseZooKeeperTest {
 
   static final String GROUP_PATH = "/group/root";
   static final String MEMBER_TOKEN = "member_";
-  static final Codec<ServiceInstance> CODEC = ServerSet.JSON_CODEC;
+  static final Codec<ServiceInstance> CODEC = Encoding.JSON_CODEC;
   static final int PRIMARY_PORT = 42;
 
   private CuratorFramework client;
@@ -55,7 +55,7 @@ class BaseCuratorDiscoveryTest extends BaseZooKeeperTest {
     groupCache.getListenable().addListener((c, event) -> groupEvents.put(event));
 
     Predicate<String> memberSelector = name -> name.contains(MEMBER_TOKEN);
-    groupMonitor = new CuratorServiceGroupMonitor(groupCache, memberSelector, ServerSet.JSON_CODEC);
+    groupMonitor = new CuratorServiceGroupMonitor(groupCache, memberSelector, Encoding.JSON_CODEC);
   }
 
   final CuratorFramework startNewClient() {

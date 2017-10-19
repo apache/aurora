@@ -40,13 +40,6 @@ public final class FlaggedZooKeeperConfig {
 
   @Parameters(separators = "=")
   public static class Options {
-    @Parameter(names = "-zk_use_curator",
-        description =
-            "DEPRECATED: Uses Apache Curator as the zookeeper client; otherwise a copy of Twitter "
-                + "commons/zookeeper (the legacy library) is used.",
-        arity = 1)
-    public boolean useCurator = true;
-
     @Parameter(names = "-zk_in_proc",
         description =
             "Launches an embedded zookeeper server for local testing causing -zk_endpoints "
@@ -87,7 +80,6 @@ public final class FlaggedZooKeeperConfig {
    */
   public static ZooKeeperConfig create(Options opts) {
     return new ZooKeeperConfig(
-        opts.useCurator,
         opts.zkEndpoints,
         Optional.fromNullable(opts.chrootPath),
         opts.inProcess,

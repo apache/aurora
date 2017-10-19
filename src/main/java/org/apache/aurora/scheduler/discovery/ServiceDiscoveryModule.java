@@ -28,7 +28,6 @@ import com.google.common.io.Files;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
-import com.google.inject.Module;
 import com.google.inject.Provider;
 import com.google.inject.Provides;
 import com.google.inject.binder.LinkedBindingBuilder;
@@ -85,15 +84,7 @@ public class ServiceDiscoveryModule extends AbstractModule {
       clusterBinder.toInstance(zooKeeperConfig.getServers());
     }
 
-    install(discoveryModule());
-  }
-
-  private Module discoveryModule() {
-    if (zooKeeperConfig.isUseCurator()) {
-      return new CuratorServiceDiscoveryModule(discoveryPath, zooKeeperConfig);
-    } else {
-      return new CommonsServiceDiscoveryModule(discoveryPath, zooKeeperConfig);
-    }
+    install(new CuratorServiceDiscoveryModule(discoveryPath, zooKeeperConfig));
   }
 
   @Provides

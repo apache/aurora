@@ -159,7 +159,6 @@ public class CommandLineTest {
     expected.scheduling.schedulingMaxBatchSize = 42;
     expected.scheduling.maxTasksPerScheduleAttempt = 42;
     expected.async.asyncWorkerThreads = 42;
-    expected.zk.useCurator = false;
     expected.zk.inProcess = true;
     expected.zk.zkEndpoints = ImmutableList.of(InetSocketAddress.createUnresolved("testing", 42));
     expected.zk.chrootPath = "testing";
@@ -311,7 +310,6 @@ public class CommandLineTest {
         "-scheduling_max_batch_size=42",
         "-max_tasks_per_schedule_attempt=42",
         "-async_worker_threads=42",
-        "-zk_use_curator=false",
         "-zk_in_proc=true",
         "-zk_endpoints=testing:42",
         "-zk_chroot_path=testing",
