@@ -18,6 +18,10 @@
   color: $content_box_color;
 }
 
+.navbar-nav>li> a:hover {
+  background-color: #444;
+}
+
 .navbar img {
   height: 50px;
 }

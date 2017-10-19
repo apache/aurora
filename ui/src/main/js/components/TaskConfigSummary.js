@@ -44,7 +44,9 @@ function Metadata({ config }) {
   return (<tr>
     <th>Metadata</th>
     <td colSpan='2'>
-      {config.metadata.map((m, i) => <span key={`${m.key}-${i}`}>{m.key}: {m.value}</span>)}
+      {config.metadata.map((m, i) => (<span className='task-metadata' key={`${m.key}-${i}`}>
+        {m.key}: {m.value}
+      </span>))}
     </td>
   </tr>);
 }

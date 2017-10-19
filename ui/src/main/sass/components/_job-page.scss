@@ -63,8 +63,12 @@
       margin-right: 20px;
       margin-bottom: 20px;
 
-      .task-constraint {
+      .task-constraint, .task-metadata {
         display: block;
+      }
+
+      .task-metadata + .task-metadata {
+        margin: 5px 0px;
       }
     }
 
