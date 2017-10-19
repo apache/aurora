@@ -124,11 +124,11 @@ class TestBase(unittest.TestCase):
   @mock.patch('apache.aurora.client.base.log.info')
   @mock.patch('apache.aurora.client.base.sys.exit')
   def test_check_and_log_response(self, mock_sys_exit, mock_log):
-    resp = Response(responseCode=ResponseCode.LOCK_ERROR)
+    resp = Response(responseCode=ResponseCode.JOB_UPDATING_ERROR)
     out = base.check_and_log_response(resp)
     self.assertIsNone(out)
     mock_sys_exit.assert_called_once_with(1)
-    mock_log.assert_any_call('Response from scheduler: LOCK_ERROR (message: )')
+    mock_log.assert_any_call('Response from scheduler: JOB_UPDATING_ERROR (message: )')
 
   @mock.patch('apache.aurora.client.base.sys.exit')
   @mock.patch('apache.aurora.client.base.log.fatal')

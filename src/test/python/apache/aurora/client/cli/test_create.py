@@ -67,7 +67,7 @@ class TestCreateJobCommand(AuroraClientCommandTest):
     mock_api = fake_context.get_api("test")
 
     mock_api.create_job.return_value = AuroraClientCommandTest.create_blank_response(
-      ResponseCode.LOCK_ERROR, "Error.")
+      ResponseCode.JOB_UPDATING_ERROR, "Error.")
 
     with pytest.raises(Context.CommandError):
       command.execute(fake_context)

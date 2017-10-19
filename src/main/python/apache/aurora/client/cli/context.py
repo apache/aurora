@@ -73,7 +73,7 @@ def add_auth_error_handler(api):
 
 class AuroraCommandContext(Context):
 
-  LOCK_ERROR_MSG = """Error: job is locked by an active update.
+  JOB_UPDATING_ERROR_MSG = """Error: job is locked by an active update.
       Run 'aurora update abort' or wait for the active update to finish."""
 
   """A context object used by Aurora commands to manage command processing state
@@ -109,8 +109,8 @@ class AuroraCommandContext(Context):
     else:
       self.print_err(err_msg)
       self.print_err("\t%s" % combine_messages(resp))
-      if resp.responseCode == ResponseCode.LOCK_ERROR:
-        self.print_err("\t%s" % self.LOCK_ERROR_MSG)
+      if resp.responseCode == ResponseCode.JOB_UPDATING_ERROR:
+        self.print_err("\t%s" % self.JOB_UPDATING_ERROR_MSG)
       raise self.CommandErrorLogged(err_code, err_msg)
 
   def _get_tier_configurations(self, cluster):

@@ -83,14 +83,6 @@ public interface JobUpdateStore {
   Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails();
 
   /**
-   * Gets the lock token associated with a job update.
-   *
-   * @param key Update identifier.
-   * @return the token associated with the update id, if it exists.
-   */
-  Optional<String> getLockToken(IJobUpdateKey key);
-
-  /**
    * Fetches the events that have affected an instance within a job update.
    *
    * @param key Update identifier.

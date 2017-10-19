@@ -92,8 +92,6 @@ public class DbJobUpdateStoreTest {
   private static final IJobKey JOB = JobKeys.from("testRole", "testEnv", "job");
   private static final IJobUpdateKey UPDATE1 =
       IJobUpdateKey.build(new JobUpdateKey(JOB.newBuilder(), "update1"));
-  private static final IJobUpdateKey UPDATE2 = IJobUpdateKey.build(
-      new JobUpdateKey(JobKeys.from("testRole", "testEnv", "job2").newBuilder(), "update2"));
   private static final long CREATED_MS = 111L;
   private static final IJobUpdateEvent FIRST_EVENT =
       makeJobUpdateEvent(ROLLING_FORWARD, CREATED_MS);
@@ -657,39 +655,6 @@ public class DbJobUpdateStoreTest {
 
     // If the lock has been released for this job, we can start another update.
     saveUpdate(makeJobUpdate(makeKey("update2")), Optional.of("lock2"));
-  }
-
-  private static final Optional<String> NO_TOKEN = Optional.absent();
-
-  @Test
-  public void testGetLockToken() {
-    storage.write((NoResult.Quiet) storeProvider -> {
-      IJobUpdate update1 = makeJobUpdate(UPDATE1);
-      IJobUpdate update2 = makeJobUpdate(UPDATE2);
-      saveUpdate(update1, Optional.of("lock1"));
-      assertEquals(
-          Optional.of("lock1"),
-          storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
-      assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
-
-      saveUpdate(update2, Optional.of("lock2"));
-      assertEquals(
-          Optional.of("lock1"),
-          storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
-      assertEquals(
-          Optional.of("lock2"),
-          storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
-
-      storeProvider.getLockStore().removeLock(makeLock(update1, "lock1").getKey());
-      assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
-      assertEquals(
-          Optional.of("lock2"),
-          storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
-
-      storeProvider.getLockStore().removeLock(makeLock(update2, "lock2").getKey());
-      assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE1));
-      assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken(UPDATE2));
-    });
   }
 
   @Test

@@ -13,46 +13,31 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.entities.ILockKey;
 
 /**
  * Defines all {@link ILock} primitives like: acquire, release, validate.
  */
 public interface LockManager {
   /**
-   * Creates, saves and returns a new {@link ILock} with the specified {@link ILockKey}.
+   * Creates, saves and returns a new {@link ILock} with the specified {@link IJobKey}.
    * This method is not re-entrant, i.e. attempting to acquire a lock with the
    * same key would throw a {@link LockException}.
    *
-   * @param lockKey A key uniquely identify the lock to be created.
+   * @param job The job being locked.
    * @param user Name of the user requesting a lock.
    * @return A new ILock instance.
    * @throws LockException In case the lock with specified key already exists.
    */
-  ILock acquireLock(ILockKey lockKey, String user) throws LockException;
+  ILock acquireLock(IJobKey job, String user) throws LockException;
 
   /**
-   * Releases (removes) the specified {@link ILock} from the system.
+   * Releases (removes) the lock associated with {@code job} from the system.
    *
-   * @param lock {@link ILock} to remove from the system.
+   * @param job the job to unlock.
    */
-  void releaseLock(ILock lock);
-
-  /**
-   * Asserts that an entity is not locked.
-   *
-   * @param context Operation context to validate with the provided lock.
-   * @throws LockException If provided context is locked.
-   */
-  void assertNotLocked(ILockKey context) throws LockException;
-
-  /**
-   * Returns all available locks stored.
-   *
-   * @return Set of {@link ILock} instances.
-   */
-  Iterable<ILock> getLocks();
+  void releaseLock(IJobKey job);
 
   /**
    * Thrown when {@link ILock} related operation failed.

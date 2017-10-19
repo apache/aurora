@@ -269,15 +269,6 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
         .toSet();
   }
 
-  @Timed("job_update_store_get_lock_token")
-  @Override
-  public Optional<String> getLockToken(IJobUpdateKey key) {
-    // We assume here that cascading deletes will cause a lock-update associative row to disappear
-    // when the lock is invalidated.  This further assumes that a lock row is deleted when a lock
-    // is no longer valid.
-    return Optional.fromNullable(detailsMapper.selectLockToken(key));
-  }
-
   @Timed("job_update_store_fetch_instance_events")
   @Override
   public List<IJobInstanceUpdateEvent> fetchInstanceEvents(IJobUpdateKey key, int instanceId) {

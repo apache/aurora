@@ -117,7 +117,7 @@ class TestStartUpdate(AuroraClientCommandTest):
     mock_config = self.create_mock_config()
     self._fake_context.get_job_config = Mock(return_value=mock_config)
     self._mock_api.start_job_update.return_value = AuroraClientCommandTest.create_blank_response(
-        ResponseCode.LOCK_ERROR,
+        ResponseCode.JOB_UPDATING_ERROR,
         "Error.")
 
     with patch('apache.aurora.client.cli.update.DiffFormatter'):

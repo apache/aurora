@@ -198,15 +198,6 @@ interface JobUpdateDetailsMapper {
   Set<DbStoredJobUpdateDetails> selectAllDetails();
 
   /**
-   * Gets the token associated with an update.
-   *
-   * @param key Update identifier.
-   * @return The associated lock token, or {@code null} if no association exists.
-   */
-  @Nullable
-  String selectLockToken(@Param("key") IJobUpdateKey key);
-
-  /**
    * Gets job instance update events for a specific instance within an update.
    *
    * @param key Update identifier.

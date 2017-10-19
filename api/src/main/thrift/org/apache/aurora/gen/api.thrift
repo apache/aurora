@@ -27,8 +27,8 @@ enum ResponseCode {
   ERROR           = 2,
   WARNING         = 3,
   AUTH_FAILED     = 4,
-  /** Raised when a Lock-protected operation failed due to lock validation. */
-  LOCK_ERROR      = 5,
+  /** Raised when an operation was unable to proceed due to an in-progress job update. */
+  JOB_UPDATING_ERROR = 5,
   /** Raised when a scheduler is transiently unavailable and later retry is recommended. */
   ERROR_TRANSIENT = 6
 }

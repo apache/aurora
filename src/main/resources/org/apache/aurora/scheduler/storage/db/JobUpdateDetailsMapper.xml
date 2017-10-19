@@ -446,15 +446,6 @@
     <include refid="unscoped_details_select"/>
   </select>
 
-  <select id="selectLockToken" resultType="String">
-    SELECT
-      lock_token
-    FROM job_update_locks AS l
-    INNER JOIN job_updates u ON l.update_row_id = u.id
-    <include refid="job_key_inner_join" />
-    WHERE <include refid="filter_by_update_key"/>
-  </select>
-
   <select id="selectInstanceConfigs" resultMap="instanceConfigMap">
     SELECT
       co.id,

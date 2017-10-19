@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 
 import org.apache.aurora.gen.JobUpdatePulseStatus;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -85,6 +86,24 @@ public interface JobUpdateController {
    *                              job.
    */
   void start(IJobUpdate update, AuditData auditData) throws UpdateStateException;
+
+  /**
+   * Thrown when {@link #assertNotUpdating(IJobKey)} is called and a job was updating.
+   */
+  class JobUpdatingException extends Exception {
+    public JobUpdatingException(String msg) {
+      super(msg);
+    }
+  }
+
+  /**
+   * Indicates whether a job is actively updating.  Note that this may include 'paused' update
+   * states.
+   *
+   * @param job Job to check.
+   * @throws JobUpdatingException if the job is actively updating.
+   */
+  void assertNotUpdating(IJobKey job) throws JobUpdatingException;
 
   /**
    * Pauses an in-progress update.

@@ -457,9 +457,4 @@ class WriteAheadStorage implements
   public List<IJobInstanceUpdateEvent> fetchInstanceEvents(IJobUpdateKey key, int instanceId) {
     return this.jobUpdateStore.fetchInstanceEvents(key, instanceId);
   }
-
-  @Override
-  public Optional<String> getLockToken(IJobUpdateKey key) {
-    return this.jobUpdateStore.getLockToken(key);
-  }
 }

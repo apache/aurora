@@ -43,8 +43,6 @@ import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.JobUpdatePulseStatus;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateStatus;
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.scheduler.BatchWorker;
 import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.base.InstanceKeys;
@@ -68,7 +66,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
 import org.slf4j.Logger;
@@ -194,9 +191,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       LOG.info("Starting update for job " + job);
       ILock lock;
       try {
-        lock = lockManager.acquireLock(
-            ILockKey.build(LockKey.job(job.newBuilder())),
-            auditData.getUser());
+        lock = lockManager.acquireLock(job, auditData.getUser());
       } catch (LockException e) {
         throw new UpdateStateException(e.getMessage(), e);
       }
@@ -216,6 +211,17 @@ class JobUpdateControllerImpl implements JobUpdateController {
           summary.getKey(),
           addAuditData(newEvent(status), auditData));
     });
+  }
+
+  @Override
+  public void assertNotUpdating(IJobKey job) throws JobUpdatingException {
+    requireNonNull(job);
+
+    if (storage.read(p -> !p.getJobUpdateStore()
+        .fetchJobUpdateSummaries(queryActiveByJob(job)).isEmpty())) {
+
+      throw new JobUpdatingException("Job is currently updating");
+    }
   }
 
   @Override
@@ -476,21 +482,10 @@ class JobUpdateControllerImpl implements JobUpdateController {
       MutableStoreProvider storeProvider,
       IJobUpdateKey key,
       JobUpdateEvent proposedEvent,
-      boolean recordChange) throws UpdateStateException {
+      boolean record) throws UpdateStateException {
 
-    JobUpdateStatus status;
-    boolean record;
-
+    JobUpdateStatus status = proposedEvent.getStatus();
     JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
-    Optional<String> updateLock = updateStore.getLockToken(key);
-    if (updateLock.isPresent()) {
-      status = proposedEvent.getStatus();
-      record = recordChange;
-    } else {
-      LOG.error("Update " + key + " does not have a lock");
-      status = ERROR;
-      record = true;
-    }
 
     LOG.info("Update {} is now in state {}", key, status);
     if (record) {
@@ -500,12 +495,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     }
 
     if (TERMINAL_STATES.contains(status)) {
-      if (updateLock.isPresent()) {
-        lockManager.releaseLock(ILock.build(new Lock()
-            .setKey(LockKey.job(key.getJob().newBuilder()))
-            .setToken(updateLock.get())));
-      }
-
+      lockManager.releaseLock(key.getJob());
       pulseHandler.remove(key);
     } else {
       pulseHandler.updatePulseStatus(key, status);
@@ -590,13 +580,6 @@ class JobUpdateControllerImpl implements JobUpdateController {
     final IJobUpdateKey key = summary.getKey();
 
     JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
-    if (!updateStore.getLockToken(key).isPresent()) {
-      recordAndChangeJobUpdateStatus(
-          storeProvider,
-          key,
-          newEvent(ERROR).setMessage(LOST_LOCK_MESSAGE));
-      return;
-    }
 
     IJobUpdateInstructions instructions = updateStore.fetchJobUpdateInstructions(key).get();
     if (isCoordinatedAndPulseExpired(key, instructions)) {

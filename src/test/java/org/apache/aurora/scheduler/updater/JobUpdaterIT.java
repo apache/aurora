@@ -55,7 +55,6 @@ import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateState;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
-import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -93,7 +92,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
@@ -221,18 +219,18 @@ public class JobUpdaterIT extends EasyMockTest {
   @After
   public void validateExitState() {
     clock.assertEmpty();
-    assertEquals(ImmutableList.of(), ImmutableList.copyOf(lockManager.getLocks()));
+    assertEquals(ImmutableSet.of(), storage.read(p -> p.getLockStore().fetchLocks()));
   }
 
   @Test(expected = UpdateStateException.class)
   public void testJobLocked() throws Exception {
     control.replay();
 
-    ILock lock = lockManager.acquireLock(ILockKey.build(LockKey.job(JOB.newBuilder())), USER);
+    lockManager.acquireLock(JOB, USER);
     try {
       updater.start(makeJobUpdate(makeInstanceConfig(0, 0, NEW_CONFIG)), AUDIT);
     } finally {
-      lockManager.releaseLock(lock);
+      lockManager.releaseLock(JOB);
     }
   }
 
@@ -1086,13 +1084,17 @@ public class JobUpdaterIT extends EasyMockTest {
   }
 
   private void releaseAllLocks() {
-    for (ILock lock : lockManager.getLocks()) {
-      lockManager.releaseLock(lock);
+    for (ILock lock : storage.read(p -> p.getLockStore().fetchLocks())) {
+      lockManager.releaseLock(lock.getKey().getJob());
     }
   }
 
   @Test
   public void testLostLock() throws Exception {
+    // Validates the 'write-only' nature of locks in relation to job updates.  We are in backwards
+    // compatibility mode for LockStore, so it is not used to control behavior of updates.
+    // As a result, out-of-band removal of locks will not impact the progress of job updates.
+
     expectTaskKilled();
 
     control.replay();
@@ -1111,8 +1113,7 @@ public class JobUpdaterIT extends EasyMockTest {
     changeState(JOB, 0, KILLED);
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
     actions.putAll(0, INSTANCE_UPDATING);
-    assertState(ERROR, actions.build());
-    assertLatestUpdateMessage(JobUpdateControllerImpl.LOST_LOCK_MESSAGE);
+    assertState(ROLLING_FORWARD, actions.build());
   }
 
   private void expectInvalid(JobUpdate update)
@@ -1167,9 +1168,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
       JobUpdate builder = update.newBuilder();
       builder.getInstructions().getSettings().setUpdateGroupSize(0);
-      for (ILock lock : lockManager.getLocks()) {
-        lockManager.releaseLock(lock);
-      }
+      releaseAllLocks();
       saveJobUpdate(store, IJobUpdate.build(builder), ROLLING_FORWARD);
     });
 
@@ -1194,8 +1193,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     ILock lock;
     try {
-      lock = lockManager.acquireLock(
-          ILockKey.build(LockKey.job(update.getSummary().getKey().getJob().newBuilder())), USER);
+      lock = lockManager.acquireLock(update.getSummary().getKey().getJob(), USER);
     } catch (LockManager.LockException e) {
       throw Throwables.propagate(e);
     }
@@ -1258,7 +1256,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     storage.write((NoResult.Quiet) storeProvider -> {
       ILock lock = saveJobUpdate(storeProvider.getJobUpdateStore(), update, ROLLING_FORWARD);
-      lockManager.releaseLock(lock);
+      lockManager.releaseLock(lock.getKey().getJob());
     });
 
     subscriber.startAsync().awaitRunning();
@@ -1409,7 +1407,7 @@ public class JobUpdaterIT extends EasyMockTest {
     releaseAllLocks();
     updater.abort(update.getSummary().getKey(), AUDIT);
     clock.advance(WATCH_TIMEOUT);
-    assertState(ERROR, actions.build());
+    assertState(ABORTED, actions.build());
   }
 
   @Test
@@ -1674,9 +1672,9 @@ public class JobUpdaterIT extends EasyMockTest {
       assertEquals(
           inProgress.getSummary().newBuilder().setState(new JobUpdateState(ROLLING_FORWARD, 0, 0)),
           e.getInProgressUpdateSummary().newBuilder());
-      assertEquals(ImmutableList.of(lock), ImmutableList.copyOf(lockManager.getLocks()));
+      assertEquals(ImmutableSet.of(lock), storage.read(p -> p.getLockStore().fetchLocks()));
     } finally {
-      lockManager.releaseLock(lock);
+      lockManager.releaseLock(lock.getKey().getJob());
     }
   }
 

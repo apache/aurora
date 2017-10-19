@@ -50,7 +50,7 @@ class TestInstancesParser(unittest.TestCase):
 
 class TestKillCommand(AuroraClientCommandTest):
 
-  def test_kill_lock_error_nobatch(self):
+  def test_kill_updating_error_nobatch(self):
     """Verify that the no batch code path correctly includes the lock error message."""
     command = KillCommand()
     mock_options = mock_verb_options(command)
@@ -62,7 +62,7 @@ class TestKillCommand(AuroraClientCommandTest):
 
     mock_api = fake_context.get_api('test')
     mock_api.kill_job.return_value = AuroraClientCommandTest.create_blank_response(
-      ResponseCode.LOCK_ERROR, "Error.")
+      ResponseCode.JOB_UPDATING_ERROR, "Error.")
 
     with pytest.raises(Context.CommandError):
       command.execute(fake_context)
@@ -75,7 +75,7 @@ class TestKillCommand(AuroraClientCommandTest):
 
     self.assert_lock_message(fake_context)
 
-  def test_kill_lock_error_batches(self):
+  def test_kill_updating_error_batches(self):
     """Verify that the batch kill path short circuits and includes the lock error message."""
     command = KillCommand()
     mock_options = mock_verb_options(command)
@@ -91,7 +91,7 @@ class TestKillCommand(AuroraClientCommandTest):
 
     mock_api = fake_context.get_api('test')
     mock_api.kill_job.return_value = AuroraClientCommandTest.create_blank_response(
-      ResponseCode.LOCK_ERROR, "Error.")
+      ResponseCode.JOB_UPDATING_ERROR, "Error.")
 
     with pytest.raises(Context.CommandError):
       command.execute(fake_context)

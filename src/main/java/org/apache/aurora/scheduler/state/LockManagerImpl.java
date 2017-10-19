@@ -22,11 +22,13 @@ import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.Lock;
+import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.LockKey._Fields;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 
@@ -50,10 +52,11 @@ public class LockManagerImpl implements LockManager {
   }
 
   @Override
-  public ILock acquireLock(final ILockKey lockKey, final String user) throws LockException {
+  public ILock acquireLock(IJobKey job, final String user) throws LockException {
     return storage.write(storeProvider -> {
 
       LockStore.Mutable lockStore = storeProvider.getLockStore();
+      ILockKey lockKey = ILockKey.build(LockKey.job(job.newBuilder()));
       Optional<ILock> existingLock = lockStore.fetchLock(lockKey);
 
       if (existingLock.isPresent()) {
@@ -76,25 +79,10 @@ public class LockManagerImpl implements LockManager {
   }
 
   @Override
-  public void releaseLock(final ILock lock) {
-    storage.write(
-        (NoResult.Quiet) storeProvider -> storeProvider.getLockStore().removeLock(lock.getKey()));
-  }
-
-  @Override
-  public void assertNotLocked(final ILockKey context) throws LockException {
-    Optional<ILock> stored = storage.read(
-        storeProvider -> storeProvider.getLockStore().fetchLock(context));
-    if (stored.isPresent()) {
-      throw new LockException(String.format(
-          "Unable to perform operation for %s due to active lock held",
-          formatLockKey(context)));
-    }
-  }
-
-  @Override
-  public Iterable<ILock> getLocks() {
-    return storage.read(storeProvider -> storeProvider.getLockStore().fetchLocks());
+  public void releaseLock(IJobKey job) {
+    storage.write((NoResult.Quiet) storeProvider -> {
+      storeProvider.getLockStore().removeLock(ILockKey.build(LockKey.job(job.newBuilder())));
+    });
   }
 
   private static String formatLockKey(ILockKey lockKey) {

@@ -54,7 +54,6 @@ import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.ListBackupsResult;
-import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.MaintenanceStatusResult;
 import org.apache.aurora.gen.PulseJobUpdateResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
@@ -80,8 +79,6 @@ import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.reconciliation.TaskReconciler;
-import org.apache.aurora.scheduler.state.LockManager;
-import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -98,7 +95,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
-import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -110,6 +106,7 @@ import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 import org.apache.aurora.scheduler.updater.JobDiff;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
 import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
+import org.apache.aurora.scheduler.updater.JobUpdateController.JobUpdatingException;
 import org.apache.aurora.scheduler.updater.UpdateInProgressException;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.thrift.TException;
@@ -120,7 +117,7 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.base.MorePreconditions.checkNotBlank;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
-import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
+import static org.apache.aurora.gen.ResponseCode.JOB_UPDATING_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.apache.aurora.scheduler.base.Numbers.convertRanges;
 import static org.apache.aurora.scheduler.base.Numbers.toRanges;
@@ -170,7 +167,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   private final ConfigurationManager configurationManager;
   private final Thresholds thresholds;
   private final NonVolatileStorage storage;
-  private final LockManager lockManager;
   private final StorageBackup backup;
   private final Recovery recovery;
   private final MaintenanceController maintenance;
@@ -199,7 +195,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       ConfigurationManager configurationManager,
       Thresholds thresholds,
       NonVolatileStorage storage,
-      LockManager lockManager,
       StorageBackup backup,
       Recovery recovery,
       CronJobManager cronJobManager,
@@ -216,7 +211,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     this.configurationManager = requireNonNull(configurationManager);
     this.thresholds = requireNonNull(thresholds);
     this.storage = requireNonNull(storage);
-    this.lockManager = requireNonNull(lockManager);
     this.backup = requireNonNull(backup);
     this.recovery = requireNonNull(recovery);
     this.maintenance = requireNonNull(maintenance);
@@ -260,7 +254,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       IJobConfiguration job = sanitized.getJobConfig();
 
       try {
-        lockManager.assertNotLocked(ILockKey.build(LockKey.job(job.getKey().newBuilder())));
+        jobUpdateController.assertNotUpdating(job.getKey());
 
         checkJobExists(storeProvider, job.getKey());
 
@@ -279,8 +273,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         createJobCounter.addAndGet(sanitized.getInstanceIds().size());
 
         return ok();
-      } catch (LockException e) {
-        return error(LOCK_ERROR, e);
+      } catch (JobUpdatingException e) {
+        return error(JOB_UPDATING_ERROR, e);
       } catch (JobExistsException | TaskValidationException e) {
         return error(INVALID_REQUEST, e);
       }
@@ -321,7 +315,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
     return storage.write(storeProvider -> {
       try {
-        lockManager.assertNotLocked(ILockKey.build(LockKey.job(jobKey.newBuilder())));
+        jobUpdateController.assertNotUpdating(jobKey);
 
         int count = sanitized.getJobConfig().getInstanceCount();
 
@@ -340,8 +334,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         createOrUpdateCronCounter.addAndGet(count);
 
         return ok();
-      } catch (LockException e) {
-        return error(LOCK_ERROR, e);
+      } catch (JobUpdatingException e) {
+        return error(JOB_UPDATING_ERROR, e);
       } catch (JobExistsException | TaskValidationException | CronException e) {
         return error(INVALID_REQUEST, e);
       }
@@ -362,15 +356,15 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   public Response descheduleCronJob(JobKey mutableJobKey) {
     try {
       IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
-      lockManager.assertNotLocked(ILockKey.build(LockKey.job(jobKey.newBuilder())));
+      jobUpdateController.assertNotUpdating(jobKey);
 
       if (cronJobManager.deleteJob(jobKey)) {
         return ok();
       } else {
         return addMessage(empty(), OK, notScheduledCronMessage(jobKey));
       }
-    } catch (LockException e) {
-      return error(LOCK_ERROR, e);
+    } catch (JobUpdatingException e) {
+      return error(JOB_UPDATING_ERROR, e);
     }
   }
 
@@ -444,14 +438,14 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return readOnlyScheduler.getTierConfigs();
   }
 
-  private void validateLockForTasks(Iterable<IScheduledTask> tasks) throws LockException {
+  private void validateLockForTasks(Iterable<IScheduledTask> tasks) throws JobUpdatingException {
     ImmutableSet<IJobKey> uniqueKeys = FluentIterable.from(tasks)
         .transform(Tasks::getJob)
         .toSet();
 
     // Validate lock against every unique job key derived from the tasks.
     for (IJobKey key : uniqueKeys) {
-      lockManager.assertNotLocked(ILockKey.build(LockKey.job(key.newBuilder())));
+      jobUpdateController.assertNotUpdating(key);
     }
   }
 
@@ -479,8 +473,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(query);
       try {
         validateLockForTasks(tasks);
-      } catch (LockException e) {
-        return error(LOCK_ERROR, e);
+      } catch (JobUpdatingException e) {
+        return error(JOB_UPDATING_ERROR, e);
       }
 
       LOG.info("Killing tasks matching " + query);
@@ -511,9 +505,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
     return storage.write(storeProvider -> {
       try {
-        lockManager.assertNotLocked(ILockKey.build(LockKey.job(jobKey.newBuilder())));
-      } catch (LockException e) {
-        return error(LOCK_ERROR, e);
+        jobUpdateController.assertNotUpdating(jobKey);
+      } catch (JobUpdatingException e) {
+        return error(JOB_UPDATING_ERROR, e);
       }
 
       Query.Builder query = Query.instanceScoped(jobKey, shardIds).active();
@@ -691,7 +685,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
           return invalidRequest("Instances may not be added to cron jobs.");
         }
 
-        lockManager.assertNotLocked(ILockKey.build(LockKey.job(jobKey.newBuilder())));
+        jobUpdateController.assertNotUpdating(jobKey);
 
         FluentIterable<IScheduledTask> currentTasks = FluentIterable.from(
             storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()));
@@ -726,8 +720,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         addInstancesCounter.addAndGet(instanceIds.size());
 
         return response.setResponseCode(OK);
-      } catch (LockException e) {
-        return error(LOCK_ERROR, e);
+      } catch (JobUpdatingException e) {
+        return error(JOB_UPDATING_ERROR, e);
       } catch (TaskValidationException | IllegalArgumentException e) {
         return error(INVALID_REQUEST, e);
       }
