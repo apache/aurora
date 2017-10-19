@@ -95,7 +95,7 @@ export default class Pagination extends React.Component {
     const numPages = Math.ceil(filtered.length / numberPerPage);
 
     // The clickable page list.
-    const pagination = (numPages === 1 && hideIfSinglePage) ? '' : <PageNavigation
+    const pagination = (numPages === 1 && hideIfSinglePage) ? null : <PageNavigation
       currentPage={page}
       maxPages={maxPages || 8}
       numPages={Math.ceil(filtered.length / numberPerPage)}
@@ -106,7 +106,9 @@ export default class Pagination extends React.Component {
     if (isTable) {
       return (<tbody>
         {elements}
-        {pagination ? <tr className='pagination-row'><td colSpan='100%'>{pagination}</td></tr> : ''}
+        {pagination
+          ? <tr className='pagination-row'><td colSpan='100%'>{pagination}</td></tr>
+          : null}
       </tbody>);
     }
     return <div>{elements}{pagination}</div>;
