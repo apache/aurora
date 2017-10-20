@@ -37,8 +37,6 @@ import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -165,7 +163,7 @@ public interface OfferManager extends EventSubscriber {
 
     private final Driver driver;
     private final OfferSettings offerSettings;
-    private final DelayExecutor executor;
+    private final Deferment offerDecline;
 
     @Inject
     @VisibleForTesting
@@ -173,36 +171,28 @@ public interface OfferManager extends EventSubscriber {
         Driver driver,
         OfferSettings offerSettings,
         StatsProvider statsProvider,
-        @AsyncExecutor DelayExecutor executor) {
+        Deferment offerDecline) {
 
       this.driver = requireNonNull(driver);
       this.offerSettings = requireNonNull(offerSettings);
-      this.executor = requireNonNull(executor);
       this.hostOffers = new HostOffers(statsProvider, offerSettings.getOfferOrder());
       this.offerRaces = statsProvider.makeCounter(OFFER_ACCEPT_RACES);
       this.offerCancelFailures = statsProvider.makeCounter(OFFER_CANCEL_FAILURES);
+      this.offerDecline = requireNonNull(offerDecline);
     }
 
     @Override
-    public void addOffer(final HostOffer offer) {
-      // We run a slight risk of a race here, which is acceptable.  The worst case is that we
-      // temporarily hold two offers for the same host, which should be corrected when we return
-      // them after the return delay.
-      // There's also a chance that we return an offer for compaction ~simultaneously with the
-      // same-host offer being cancelled/returned.  This is also fine.
-      Optional<HostOffer> sameSlave = hostOffers.get(offer.getOffer().getAgentId());
-      if (sameSlave.isPresent()) {
-        // If there are existing offers for the slave, decline all of them so the master can
-        // compact all of those offers into a single offer and send them back.
+    public void addOffer(HostOffer offer) {
+      Optional<HostOffer> sameAgent = hostOffers.addAndPreventAgentCollision(offer);
+      if (sameAgent.isPresent()) {
+        // We have an existing offer for the same agent.  We choose to return both offers so that
+        // they may be combined into a single offer.
         LOG.info("Returning offers for " + offer.getOffer().getAgentId().getValue()
             + " for compaction.");
         decline(offer.getOffer().getId());
-        removeAndDecline(sameSlave.get().getOffer().getId());
+        decline(sameAgent.get().getOffer().getId());
       } else {
-        hostOffers.add(offer);
-        executor.execute(
-            () -> removeAndDecline(offer.getOffer().getId()),
-            offerSettings.getOfferReturnDelay());
+        offerDecline.defer(() -> removeAndDecline(offer.getOffer().getId()));
       }
     }
 
@@ -326,7 +316,27 @@ public interface OfferManager extends EventSubscriber {
         return Optional.of(offer);
       }
 
-      synchronized void add(HostOffer offer) {
+      /**
+       * Adds an offer while maintaining a guarantee that no two offers may exist with the same
+       * agent ID.  If an offer exists with the same agent ID, the existing offer is removed
+       * and returned, and {@code offer} is not added.
+       *
+       * @param offer Offer to add.
+       * @return The pre-existing offer with the same agent ID as {@code offer}, if one exists,
+       *         which will also be removed prior to returning.
+       */
+      synchronized Optional<HostOffer> addAndPreventAgentCollision(HostOffer offer) {
+        HostOffer sameAgent = offersBySlave.get(offer.getOffer().getAgentId());
+        if (sameAgent != null) {
+          remove(sameAgent.getOffer().getId());
+          return Optional.of(sameAgent);
+        }
+
+        addInternal(offer);
+        return Optional.absent();
+      }
+
+      private void addInternal(HostOffer offer) {
         offers.add(offer);
         offersById.put(offer.getOffer().getId(), offer);
         offersBySlave.put(offer.getOffer().getAgentId(), offer);
@@ -350,7 +360,7 @@ public interface OfferManager extends EventSubscriber {
         if (offer != null) {
           // Remove and re-add a host's offer to re-sort based on its new hostStatus
           remove(offer.getOffer().getId());
-          add(new HostOffer(offer.getOffer(), attributes));
+          addInternal(new HostOffer(offer.getOffer(), attributes));
         }
       }
 

@@ -117,6 +117,7 @@ public class CommandLineTest {
     expected.reconciliation.reconciliationScheduleSpread = TEST_TIME;
     expected.reconciliation.reconciliationBatchSize = 42;
     expected.reconciliation.reconciliationBatchInterval = TEST_TIME;
+    expected.offer.holdOffersForever = true;
     expected.offer.minOfferHoldTime = TEST_TIME;
     expected.offer.offerHoldJitterWindow = TEST_TIME;
     expected.offer.offerFilterDuration = TEST_TIME;
@@ -269,6 +270,7 @@ public class CommandLineTest {
         "-reconciliation_schedule_spread=42days",
         "-reconciliation_explicit_batch_size=42",
         "-reconciliation_explicit_batch_interval=42days",
+        "-hold_offers_forever=true",
         "-min_offer_hold_time=42days",
         "-offer_hold_jitter_window=42days",
         "-offer_filter_duration=42days",

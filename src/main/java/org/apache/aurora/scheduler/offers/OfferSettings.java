@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.offers;
 
 import java.util.List;
 
-import com.google.common.base.Supplier;
 import com.google.common.collect.Ordering;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -30,24 +29,14 @@ import static java.util.Objects.requireNonNull;
 public class OfferSettings {
 
   private final Amount<Long, Time> offerFilterDuration;
-  private final Supplier<Amount<Long, Time>> returnDelaySupplier;
   private final Ordering<HostOffer> offerOrder;
 
-  public OfferSettings(
-      Amount<Long, Time> offerFilterDuration,
-      Supplier<Amount<Long, Time>> returnDelaySupplier,
-      List<OfferOrder> offerOrder) {
-
-    this(offerFilterDuration, returnDelaySupplier, OfferOrderBuilder.create(offerOrder));
+  public OfferSettings(Amount<Long, Time> offerFilterDuration, List<OfferOrder> offerOrder) {
+    this(offerFilterDuration, OfferOrderBuilder.create(offerOrder));
   }
 
-  OfferSettings(
-      Amount<Long, Time> offerFilterDuration,
-      Supplier<Amount<Long, Time>> returnDelaySupplier,
-      Ordering<HostOffer> offerOrder) {
-
+  OfferSettings(Amount<Long, Time> offerFilterDuration, Ordering<HostOffer> offerOrder) {
     this.offerFilterDuration = requireNonNull(offerFilterDuration);
-    this.returnDelaySupplier = requireNonNull(returnDelaySupplier);
     this.offerOrder = requireNonNull(offerOrder);
   }
 
@@ -56,14 +45,6 @@ public class OfferSettings {
    */
   public Amount<Long, Time> getOfferFilterDuration() {
     return offerFilterDuration;
-  }
-
-  /**
-   * The amount of time after which an unused offer should be 'returned' to Mesos by declining it.
-   * The delay is calculated for each offer using a random duration within a fixed window.
-   */
-  public Amount<Long, Time> getOfferReturnDelay() {
-    return returnDelaySupplier.get();
   }
 
   /**

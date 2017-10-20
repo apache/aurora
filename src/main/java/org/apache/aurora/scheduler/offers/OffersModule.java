@@ -22,6 +22,7 @@ import javax.inject.Singleton;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import com.google.inject.AbstractModule;
@@ -55,6 +56,12 @@ public class OffersModule extends AbstractModule {
 
   @Parameters(separators = "=")
   public static class Options {
+    @Parameter(names = "-hold_offers_forever",
+        description =
+            "Hold resource offers indefinitely, disabling automatic offer decline settings.",
+        arity = 1)
+    public boolean holdOffersForever = false;
+
     @Parameter(names = "-min_offer_hold_time",
         validateValueWith = NotNegativeAmount.class,
         description = "Minimum amount of time to hold a resource offer before declining.")
@@ -122,15 +129,17 @@ public class OffersModule extends AbstractModule {
   @Override
   protected void configure() {
     Options options = cliOptions.offer;
-    long offerHoldTime =
-        options.offerHoldJitterWindow.as(Time.SECONDS) + options.minOfferHoldTime.as(Time.SECONDS);
-    if (options.unavailabilityThreshold.as(Time.SECONDS) < offerHoldTime) {
-      LOG.warn("unavailability_threshold ({}) is less than the sum of min_offer_hold_time ({}) and"
-          + "offer_hold_jitter_window ({}). This creates risks of races between launching and"
-          + "draining",
-          options.unavailabilityThreshold,
-          options.minOfferHoldTime,
-          options.offerHoldJitterWindow);
+    if (!options.holdOffersForever) {
+      long offerHoldTime = options.offerHoldJitterWindow.as(Time.SECONDS)
+          + options.minOfferHoldTime.as(Time.SECONDS);
+      if (options.unavailabilityThreshold.as(Time.SECONDS) < offerHoldTime) {
+        LOG.warn("unavailability_threshold ({}) is less than the sum of min_offer_hold_time ({})"
+                + " and offer_hold_jitter_window ({}). This creates risks of races between "
+                + "launching and draining",
+            options.unavailabilityThreshold,
+            options.minOfferHoldTime,
+            options.offerHoldJitterWindow);
+      }
     }
 
     for (Module module: MoreModules.instantiateAll(options.offerOrderModules, cliOptions)) {
@@ -144,6 +153,17 @@ public class OffersModule extends AbstractModule {
     install(new PrivateModule() {
       @Override
       protected void configure() {
+        if (options.holdOffersForever) {
+          bind(Deferment.class).to(Deferment.Noop.class);
+        } else {
+          bind(new TypeLiteral<Supplier<Amount<Long, Time>>>() { }).toInstance(
+              new RandomJitterReturnDelay(
+                  options.minOfferHoldTime.as(Time.MILLISECONDS),
+                  options.offerHoldJitterWindow.as(Time.MILLISECONDS),
+                  Random.Util.newDefaultRandom()));
+          bind(Deferment.class).to(Deferment.DelayedDeferment.class);
+        }
+
         bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
         bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
         expose(OfferManager.class);
@@ -155,12 +175,6 @@ public class OffersModule extends AbstractModule {
   @Provides
   @Singleton
   OfferSettings provideOfferSettings(Ordering<HostOffer> offerOrdering) {
-    return new OfferSettings(
-        cliOptions.offer.offerFilterDuration,
-        new RandomJitterReturnDelay(
-            cliOptions.offer.minOfferHoldTime.as(Time.MILLISECONDS),
-            cliOptions.offer.offerHoldJitterWindow.as(Time.MILLISECONDS),
-            Random.Util.newDefaultRandom()),
-        offerOrdering);
+    return new OfferSettings(cliOptions.offer.offerFilterDuration, offerOrdering);
   }
 }

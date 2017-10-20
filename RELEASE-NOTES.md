@@ -16,7 +16,10 @@
 - Added the `thrift_method_interceptor_modules` scheduler flag that lets cluster operators inject
   custom Thrift method interceptors.
 - Increase default ZooKeeper session timeout from 4 to 15 seconds.
-- Add option `-zk_connection_timeout` to control the connection timeout of ZooKeeper connections.
+- Added option `-zk_connection_timeout` to control the connection timeout of ZooKeeper connections.
+- Added scheduler command line argument `-hold_offers_forever`, suitable for use in clusters where
+  Aurora is the only framework.  This setting disables other options such as `-min_offer_hold_time`,
+  and allows the scheduler to more efficiently cache scheduling attempts.
 
 ### Deprecations and removals:
 
