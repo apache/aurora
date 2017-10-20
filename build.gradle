@@ -139,7 +139,7 @@ project(':ui') {
   }
 
   task test(type: NpmTask, overwrite: true) {
-    inputs.files(fileTree('src'))
+    inputs.files(fileTree('src'), fileTree('plugin'))
     outputs.files(fileTree('dist'))
     args = ['test']
   }
@@ -152,13 +152,13 @@ project(':ui') {
   }
 
   task lint(type: NpmTask, dependsOn: 'install') {
-    inputs.files(fileTree('src'))
+    inputs.files(fileTree('src'), fileTree('plugin'))
     outputs.files(fileTree('.'))
     args = ['run', 'lint']
   }
 
   task webpack(type: NodeTask, dependsOn: 'install') {
-    inputs.files(fileTree('src'))
+    inputs.files(fileTree('src'), fileTree('plugin'))
     outputs.files(sourceSets.main.java)
     script = file('node_modules/.bin/webpack')
   }

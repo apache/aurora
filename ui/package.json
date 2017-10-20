@@ -55,8 +55,8 @@
     ]
   },
   "scripts": {
-    "lint": "eslint src/main/js --ext .js",
-    "test": "jest src/"
+    "lint": "eslint src/main/js plugin/ --ext .js",
+    "test": "jest src/ plugin/"
   },
   "repository": {
     "type": "git",
