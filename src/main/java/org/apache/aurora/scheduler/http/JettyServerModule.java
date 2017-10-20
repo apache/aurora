@@ -280,6 +280,7 @@ public class JettyServerModule extends AbstractModule {
 
                 serve("/assets", "/assets/*")
                     .with(new DefaultServlet(), ImmutableMap.of(
+                        "cacheControl", "max-age=3600",
                         "resourceBase", STATIC_ASSETS_ROOT,
                         "dirAllowed", "false"));
 
