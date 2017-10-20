@@ -71,7 +71,7 @@ export function CronConfigSummary({ cronJob }) {
       <tr>
         <th>Next Cron Run</th>
         <td colSpan='2'>
-          {moment(cronJob.nextCronRunMs).format('MMMM Do YYYY, h:mm:ss a')} UTC (
+          {moment(cronJob.nextCronRunMs).utc().format('MMMM Do YYYY, h:mm:ss a')} UTC (
           <RelativeTime ts={cronJob.nextCronRunMs} />)
         </td>
       </tr>
