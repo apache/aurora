@@ -2,6 +2,10 @@ export function isNully(value) {
   return typeof value === 'undefined' || value === null;
 }
 
+export function isNullyOrEmpty(value) {
+  return isNully(value) || value.length === 0;
+}
+
 export function invert(obj) {
   const inverted = {};
   Object.keys(obj).forEach((key) => {

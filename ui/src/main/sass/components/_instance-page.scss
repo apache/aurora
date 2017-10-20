@@ -20,6 +20,20 @@
     }
   }
 
+  .active-task-neighbors {
+    h5 {
+      text-transform: uppercase;
+      margin: 0;
+      margin-bottom: 3px;
+      font-weight: 700;
+    }
+
+    .task-neighbors-task-key {
+      margin: 10;
+      margin-bottom: 3px;
+    }
+  }
+
   .instance-history {
     .state-machine, .state-machine ul, .state-machine li {
       margin: 0 !important;

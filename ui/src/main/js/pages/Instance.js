@@ -10,7 +10,7 @@ import { isActive } from 'utils/Task';
 export default class Instance extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {cluster: '', tasks: [], loading: true};
+    this.state = {cluster: '', tasks: [], loading: true, loadingNeighbors: true};
   }
 
   componentWillMount(props) {
@@ -31,6 +31,26 @@ export default class Instance extends React.Component {
     });
   }
 
+  componentWillUpdate(nextProps, nextState) {
+    if (this.state.loading && !nextState.loading) {
+      const activeTask = nextState.tasks.find(isActive);
+
+      const query = new TaskQuery();
+      query.statuses = [ScheduleStatus.RUNNING];
+      query.slaveHosts = [activeTask.assignedTask.slaveHost];
+
+      const that = this;
+      this.props.api.getTasksWithoutConfigs(query, (rsp) => {
+        const tasksOnAgent = rsp.result.scheduleStatusResult.tasks;
+        that.setState({
+          neighborTasks: tasksOnAgent.filter(function (el) {
+            return el.assignedTask.taskId !== activeTask.assignedTask.taskId;
+          })
+        });
+      });
+    }
+  }
+
   render() {
     const { role, environment, name, instance } = this.props.match.params;
     if (this.state.loading) {
@@ -46,7 +66,7 @@ export default class Instance extends React.Component {
         instance={instance}
         name={name}
         role={role} />
-      <TaskStatus task={activeTask} />
+      <TaskStatus neighbors={this.state.neighborTasks} task={activeTask} />
       <InstanceHistory tasks={terminalTasks} />
     </div>);
   }
