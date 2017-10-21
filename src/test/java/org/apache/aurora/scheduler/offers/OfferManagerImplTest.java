@@ -42,6 +42,7 @@ import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.v1.Protos;
 import org.apache.mesos.v1.Protos.Filters;
 import org.apache.mesos.v1.Protos.Offer.Operation;
+import org.apache.mesos.v1.Protos.OfferID;
 import org.apache.mesos.v1.Protos.TaskInfo;
 import org.apache.mesos.v1.Protos.TimeInfo;
 import org.apache.mesos.v1.Protos.Unavailability;
@@ -544,5 +545,30 @@ public class OfferManagerImplTest extends EasyMockTest {
     clock.advance(RETURN_DELAY);
     assertEquals(0, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
+  }
+
+  @Test
+  public void testTwoOffersPerHost() {
+    // Test for regression of AURORA-1952, where a specific call order could cause OfferManager
+    // to violate its one-offer-per-host invariant.
+
+    HostOffer sameAgent = new HostOffer(
+        OFFER_A.getOffer().toBuilder().setId(OfferID.newBuilder().setValue("sameAgent")).build(),
+        HOST_ATTRIBUTES_A);
+    HostOffer sameAgent2 = new HostOffer(
+        OFFER_A.getOffer().toBuilder().setId(OfferID.newBuilder().setValue("sameAgent2")).build(),
+        HOST_ATTRIBUTES_A);
+
+    driver.declineOffer(OFFER_A_ID, OFFER_FILTER);
+    driver.declineOffer(sameAgent.getOffer().getId(), OFFER_FILTER);
+
+    control.replay();
+
+    offerManager.banOffer(OFFER_A_ID);
+    offerManager.addOffer(OFFER_A);
+    offerManager.addOffer(sameAgent);
+    offerManager.cancelOffer(OFFER_A_ID);
+    offerManager.addOffer(sameAgent2);
+    assertEquals(ImmutableSet.of(sameAgent2), offerManager.getOffers());
   }
 }
