@@ -142,6 +142,7 @@ public class CommandLineTest {
     expected.app.requireDockerUseExecutor = false;
     expected.app.enableMesosFetcher = true;
     expected.app.allowContainerVolumes = true;
+    expected.app.allowedJobEnvironments = "^(foo|bar|zaa)$";
     expected.main.clusterName = "testing";
     expected.main.serversetPath = "testing";
     expected.main.serversetEndpointName = "testing";
@@ -294,6 +295,7 @@ public class CommandLineTest {
         "-require_docker_use_executor=false",
         "-enable_mesos_fetcher=true",
         "-allow_container_volumes=true",
+        "-allowed_job_environments=^(foo|bar|zaa)$",
         "-cluster_name=testing",
         "-serverset_path=testing",
         "-serverset_endpoint_name=testing",

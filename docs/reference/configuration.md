@@ -339,7 +339,7 @@ Job Schema
   ```name``` | String | Job name. (Default: inherited from the task attribute's name)
   ```role``` | String | Job role account. Required.
   ```cluster``` | String | Cluster in which this job is scheduled. Required.
-  ```environment``` | String | Job environment, default ```devel```. Must be one of ```prod```, ```devel```, ```test``` or ```staging<number>```.
+  ```environment``` | String | Job environment, default ```devel```. By default must be one of ```prod```, ```devel```, ```test``` or ```staging<number>``` but it can be changed by the Cluster operator using the scheduler option `allowed_job_environments`.
   ```contact``` | String | Best email address to reach the owner of the job. For production jobs, this is usually a team mailing list.
   ```instances```| Integer | Number of instances (sometimes referred to as replicas or shards) of the task to create. (Default: 1)
   ```cron_schedule``` | String | Cron schedule in cron format. May only be used with non-service jobs. See [Cron Jobs](../features/cron-jobs.md) for more information. Default: None (not a cron job.)

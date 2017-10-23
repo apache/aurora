@@ -33,7 +33,7 @@ import org.quartz.JobKey;
  * Fixtures used across quartz tests.
  */
 final class QuartzTestUtil {
-  static final IJobKey AURORA_JOB_KEY = JobKeys.from("role", "env", "job");
+  static final IJobKey AURORA_JOB_KEY = JobKeys.from("role", "prod", "job");
   static final IJobConfiguration JOB = IJobConfiguration.build(
       new JobConfiguration()
           .setCronSchedule("* * * * SUN")

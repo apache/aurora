@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.configuration;
 
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
@@ -66,6 +67,7 @@ import static org.apache.aurora.scheduler.resources.ResourceType.RAM_MB;
 public class ConfigurationManager {
 
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
+  public static final String DEFAULT_ALLOWED_JOB_ENVIRONMENTS = "^(prod|devel|test|staging\\d*)$";
 
   private interface Validator<T> {
     void validate(T value) throws TaskDescriptionException;
@@ -96,6 +98,7 @@ public class ConfigurationManager {
     private final boolean allowGpuResource;
     private final boolean enableMesosFetcher;
     private final boolean allowContainerVolumes;
+    private final Pattern allowedJobEnvironments;
 
     public ConfigurationManagerSettings(
         ImmutableSet<Container._Fields> allowedContainerTypes,
@@ -104,7 +107,8 @@ public class ConfigurationManager {
         boolean requireDockerUseExecutor,
         boolean allowGpuResource,
         boolean enableMesosFetcher,
-        boolean allowContainerVolumes) {
+        boolean allowContainerVolumes,
+        String allowedJobEnvironment) {
 
       this.allowedContainerTypes = requireNonNull(allowedContainerTypes);
       this.allowDockerParameters = allowDockerParameters;
@@ -113,6 +117,7 @@ public class ConfigurationManager {
       this.allowGpuResource = allowGpuResource;
       this.enableMesosFetcher = enableMesosFetcher;
       this.allowContainerVolumes = allowContainerVolumes;
+      this.allowedJobEnvironments = Pattern.compile(requireNonNull(allowedJobEnvironment));
     }
   }
 
@@ -177,6 +182,12 @@ public class ConfigurationManager {
 
     if (!JobKeys.isValid(job.getKey())) {
       throw new TaskDescriptionException("Job key " + job.getKey() + " is invalid.");
+    }
+
+    if (!settings.allowedJobEnvironments.matcher(job.getKey().getEnvironment()).matches()) {
+      throw new TaskDescriptionException(String.format(
+              "Job environment %s doesn't match: %s", job.getKey().getEnvironment(),
+              settings.allowedJobEnvironments.toString()));
     }
 
     if (job.isSetOwner() && !UserProvidedStrings.isGoodIdentifier(job.getOwner().getUser())) {

@@ -38,6 +38,7 @@ import org.apache.aurora.scheduler.app.SchedulerMain.Options.DriverKind;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.config.validators.PositiveNumber;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
@@ -111,6 +112,10 @@ public class AppModule extends AbstractModule {
             + "escalation threat.",
         arity = 1)
     public boolean allowContainerVolumes = false;
+
+    @Parameter(names = "-allowed_job_environments", description = "Regular expression describing "
+            + "the environments that are allowed to be used by jobs.")
+    public String allowedJobEnvironments = ConfigurationManager.DEFAULT_ALLOWED_JOB_ENVIRONMENTS;
   }
 
   private final ConfigurationManagerSettings configurationManagerSettings;
@@ -135,7 +140,8 @@ public class AppModule extends AbstractModule {
             opts.app.requireDockerUseExecutor,
             opts.main.allowGpuResource,
             opts.app.enableMesosFetcher,
-            opts.app.allowContainerVolumes),
+            opts.app.allowContainerVolumes,
+            opts.app.allowedJobEnvironments),
         opts.main.driverImpl,
         opts);
   }

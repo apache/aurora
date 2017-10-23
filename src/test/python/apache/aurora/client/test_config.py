@@ -141,25 +141,6 @@ def test_include():
           get_aurora_config('hello_world', hello_include_fname_fp)
 
 
-BAD_ENV = ('Prod', ' prod', 'prod ', 'tEst', 'production', 'staging 2', 'stagingA')
-GOOD_ENV = ('prod', 'devel', 'test', 'staging', 'staging001', 'staging1', 'staging1234')
-
-
-def test_environment_names():
-  base_job = Job(
-      name='hello_world', role='john_doe', cluster='test-cluster',
-      task=Task(name='main', processes=[],
-                resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-
-  with pytest.raises(ValueError):
-    config._validate_environment_name(AuroraConfig(base_job))
-  for env_name in GOOD_ENV:
-    config._validate_environment_name(AuroraConfig(base_job(environment=env_name)))
-  for env_name in BAD_ENV:
-    with pytest.raises(ValueError):
-      config._validate_environment_name(AuroraConfig(base_job(environment=env_name)))
-
-
 def test_dedicated_portmap():
   base_job = Job(
       name='hello_world', role='john_doe', cluster='test-cluster',

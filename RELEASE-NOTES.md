@@ -28,6 +28,9 @@
 - Removed the `rewriteConfigs` thrift API call in the scheduler. This was a last-ditch mechanism
   to modify scheduler state on the fly. It was considered extremely risky to use since its
   inception, and is safer to abandon due to its lack of use and likelihood for code rot.
+- Removed the Job environment validation from the command line client. Validation was moved to the
+  the scheduler side through the `allowed_job_environments` option. By default allowing any of
+  `devel`, `test`, `production`, and any value matching the regular expression `staging[0-9]*`.
 
 0.18.0
 ======

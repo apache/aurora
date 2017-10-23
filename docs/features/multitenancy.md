@@ -24,8 +24,9 @@ assignment of [quota](#preemption). If you don't know what accounts are availabl
 sysadmin.
 
 The environment component in the job key, serves as a namespace. The values for
-environment are validated in the client and the scheduler so as to allow any of `devel`, `test`,
-`production`, and any value matching the regular expression `staging[0-9]*`.
+environment are validated in the scheduler. By default allowing any of `devel`, `test`,
+`production`, and any value matching the regular expression `staging[0-9]*`. This validation can be
+changed to allow any arbitrary regular expression by setting the scheduler option `allowed_job_environments`.
 
 None of the values imply any difference in the scheduling behavior. Conventionally, the
 "environment" is set so as to indicate a certain level of stability in the behavior of the job
