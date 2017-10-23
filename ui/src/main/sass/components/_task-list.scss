@@ -89,3 +89,31 @@
     }
   }
 }
+
+.task-list-controls {
+  display: flex;
+  justify-content: space-between;
+  text-transform: lowercase;
+  margin-bottom: 10px;
+
+  ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+
+    li {
+      float: left;
+      padding: 0px 5px;
+    }
+
+    li.active {
+      font-weight: 600;
+    }
+  }
+
+  .img-circle {
+    margin-right: 3px;
+    width: 7px;
+    height: 7px;
+  }
+}

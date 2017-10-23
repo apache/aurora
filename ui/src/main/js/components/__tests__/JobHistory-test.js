@@ -13,6 +13,6 @@ describe('JobHistory', () => {
       ScheduledTaskBuilder.status(ScheduleStatus.FINISHED).build()
     ];
     const el = shallow(JobHistory({tasks}));
-    expect(el.contains(<TaskList tasks={[tasks[1]]} />)).toBe(true);
+    expect(el.contains(<TaskList sortBy='latest' tasks={[tasks[1]]} />)).toBe(true);
   });
 });

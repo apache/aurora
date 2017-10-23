@@ -37,6 +37,14 @@ export function sort(arr, prop, reverse = false) {
   });
 }
 
+export function pluralize(elements, singular, plural) {
+  if (elements.length === 1) {
+    return singular;
+  }
+
+  return (isNully(plural)) ? `${singular}s` : plural;
+}
+
 export function range(start, end) {
   return [...Array(1 + end - start).keys()].map((i) => start + i);
 }
