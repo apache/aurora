@@ -24,6 +24,15 @@ export default class Tabs extends React.Component {
     }
   }
 
+  componentWillReceiveProps(nextProps) {
+    // Because this component manages its own state, we need to listen to changes to the activeTab
+    // property - as the changes will not propagate without the component being remounted.
+    if (nextProps.activeTab !== this.props.activeTab &&
+        nextProps.activeTab !== this.state.activeTab) {
+      this.setState({active: nextProps.activeTab});
+    }
+  }
+
   render() {
     const that = this;
     const isActive = (t) => t.id === that.state.active;
