@@ -54,7 +54,7 @@ function build_scheduler {
     rm -rf $hot_resources_dir && mkdir -p $hot_resources_dir
     ln -s /vagrant/dist/resources/main/scheduler $hot_resources_dir/scheduler
   fi
-  CLASSPATH_PREFIX=$hot_resources_dir ./gradlew installDist
+  CLASSPATH_PREFIX=$hot_resources_dir ./gradlew installDist --no-daemon
 
   sudo mkdir -p /var/db/aurora
   if sudo mesos-log initialize --path="/var/db/aurora"
