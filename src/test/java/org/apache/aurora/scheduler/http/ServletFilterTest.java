@@ -117,7 +117,7 @@ public class ServletFilterTest extends AbstractJettyTest {
                 LeaderRedirectFilter.NO_LEADER_PAGE)));
 
     // This process is leading
-    setLeadingScheduler(httpServer.getHostText(), httpServer.getPort());
+    setLeadingScheduler(httpServer.getHost(), httpServer.getPort());
     leaderRedirectSmokeTest(Status.OK, Optional.absent());
 
     setLeadingScheduler("otherHost", 1234);

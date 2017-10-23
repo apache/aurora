@@ -106,7 +106,9 @@ public class LogStorageModule extends PrivateModule {
     bind(EntrySerializer.class).to(EntrySerializerImpl.class);
     // TODO(ksweeney): We don't need a cryptographic checksum here - assess performance of MD5
     // versus a faster error-detection checksum like CRC32 for large Snapshots.
-    bind(HashFunction.class).annotatedWith(LogEntryHashFunction.class).toInstance(Hashing.md5());
+    @SuppressWarnings("deprecation")
+    HashFunction hashFunction = Hashing.md5();
+    bind(HashFunction.class).annotatedWith(LogEntryHashFunction.class).toInstance(hashFunction);
 
     bind(SnapshotDeduplicator.class).to(SnapshotDeduplicatorImpl.class);
 

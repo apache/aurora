@@ -149,7 +149,7 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
     try {
       jaasConfFile = File.createTempFile("jaas", "conf");
       jaasConfFile.deleteOnExit();
-      Files.write(jaasConf, jaasConfFile, StandardCharsets.UTF_8);
+      Files.asCharSink(jaasConfFile, StandardCharsets.UTF_8).write(jaasConf);
     } catch (IOException e) {
       addError(e);
       return;

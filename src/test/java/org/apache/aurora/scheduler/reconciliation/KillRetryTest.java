@@ -89,7 +89,7 @@ public class KillRetryTest extends EasyMockTest {
             bind(UncaughtExceptionHandler.class)
                 .toInstance(createMock(UncaughtExceptionHandler.class));
             bind(Executor.class).annotatedWith(AsyncExecutor.class)
-                .toInstance(MoreExecutors.sameThreadExecutor());
+                .toInstance(MoreExecutors.directExecutor());
           }
         }
     );

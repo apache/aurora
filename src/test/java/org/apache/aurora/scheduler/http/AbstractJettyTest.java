@@ -174,11 +174,11 @@ public abstract class AbstractJettyTest extends EasyMockTest {
     httpServer = injector.getInstance(HttpService.class).getAddress();
 
     // By default we'll set this instance to be the leader.
-    setLeadingScheduler(httpServer.getHostText(), httpServer.getPort());
+    setLeadingScheduler(httpServer.getHost(), httpServer.getPort());
   }
 
   protected String makeUrl(String path) {
-    return String.format("http://%s:%s%s", httpServer.getHostText(), httpServer.getPort(), path);
+    return String.format("http://%s:%s%s", httpServer.getHost(), httpServer.getPort(), path);
   }
 
   protected WebResource.Builder getPlainRequestBuilder(String path) {

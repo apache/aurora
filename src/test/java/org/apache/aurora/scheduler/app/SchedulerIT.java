@@ -291,9 +291,10 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
   private Iterable<Entry> toEntries(LogEntry... entries) {
     return Iterables.transform(Arrays.asList(entries),
-        entry -> () -> {
+        entry -> {
           try {
-            return Iterables.getFirst(entrySerializer.serialize(entry), null);
+            byte[] data = Iterables.getFirst(entrySerializer.serialize(entry), null);
+            return (Entry) () -> data;
           } catch (CodingException e) {
             throw Throwables.propagate(e);
           }

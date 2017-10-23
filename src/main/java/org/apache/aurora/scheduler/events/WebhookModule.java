@@ -63,7 +63,7 @@ public class WebhookModule extends AbstractModule {
     this.webhookConfig = Optional.fromNullable(options.webhookConfigFile)
         .transform(f -> {
           try {
-            return Files.toString(options.webhookConfigFile, StandardCharsets.UTF_8);
+            return Files.asCharSource(options.webhookConfigFile, StandardCharsets.UTF_8).read();
           } catch (IOException e) {
             throw new RuntimeException(e);
           }

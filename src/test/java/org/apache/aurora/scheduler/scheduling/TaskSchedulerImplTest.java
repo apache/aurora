@@ -109,7 +109,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
           protected void configure() {
 
             bind(Executor.class).annotatedWith(AsyncExecutor.class)
-                .toInstance(MoreExecutors.sameThreadExecutor());
+                .toInstance(MoreExecutors.directExecutor());
             bind(new TypeLiteral<BiCache<String, TaskGroupKey>>() { }).toInstance(reservations);
             bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
             bind(Preemptor.class).toInstance(preemptor);

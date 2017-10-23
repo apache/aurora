@@ -104,7 +104,7 @@ public class PubsubEventModuleTest extends EasyMockTest {
           @Override
           protected void configure() {
             bind(Executor.class).annotatedWith(AsyncExecutor.class)
-                .toInstance(MoreExecutors.sameThreadExecutor());
+                .toInstance(MoreExecutors.directExecutor());
 
             bind(UncaughtExceptionHandler.class).toInstance(exceptionHandler);
 

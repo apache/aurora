@@ -177,7 +177,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
   }
 
   private String formatUrl(String endpoint) {
-    return "http://" + httpServer.getHostText() + ":" + httpServer.getPort() + endpoint;
+    return "http://" + httpServer.getHost() + ":" + httpServer.getPort() + endpoint;
   }
 
   private AuroraAdmin.Client getClient(HttpClient httpClient) throws TTransportException {

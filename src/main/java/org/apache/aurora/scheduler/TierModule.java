@@ -77,7 +77,7 @@ public class TierModule extends AbstractModule {
           ? Resources.toString(
               TierModule.class.getClassLoader().getResource(TIER_CONFIG_PATH),
               StandardCharsets.UTF_8)
-          : Files.toString(tierConfig, StandardCharsets.UTF_8);
+          : Files.asCharSource(tierConfig, StandardCharsets.UTF_8).read();
     } catch (IOException e) {
       LOG.error("Error loading tier configuration file.");
       throw new RuntimeException(e);

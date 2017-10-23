@@ -43,7 +43,7 @@ public class LeaderRedirectTest extends EasyMockTest {
 
   private static final Function<HostAndPort, ServiceInstance> CREATE_INSTANCE =
       endpoint -> new ServiceInstance()
-          .setServiceEndpoint(new Endpoint(endpoint.getHostText(), endpoint.getPort()));
+          .setServiceEndpoint(new Endpoint(endpoint.getHost(), endpoint.getPort()));
 
   private AtomicReference<ImmutableSet<ServiceInstance>> schedulers;
   private ServiceGroupMonitor serviceGroupMonitor;

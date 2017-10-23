@@ -78,9 +78,9 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   }
 
   ext.commonsLangRev = '2.6'
-  ext.curatorRev = '2.11.1'
+  ext.curatorRev = '2.12.0'
   ext.gsonRev = '2.3.1'
-  ext.guavaRev = '20.0'
+  ext.guavaRev = '23.2-jre'
   ext.guiceRev = '3.0'
   ext.asyncHttpclientRev = '2.0.37'
   ext.jacksonRev = '2.5.1'
@@ -112,6 +112,7 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
         failOnVersionConflict()
         force "com.fasterxml.jackson.core:jackson-annotations:${jacksonRev}"
         force "com.fasterxml.jackson.core:jackson-core:${jacksonRev}"
+        force "com.google.code.findbugs:jsr305:${jsrRev}"
         force "com.google.code.gson:gson:${gsonRev}"
         force "com.google.guava:guava:${guavaRev}"
         force "com.google.protobuf:protobuf-java:${protobufRev}"

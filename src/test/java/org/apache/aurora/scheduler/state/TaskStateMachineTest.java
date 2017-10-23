@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import com.google.common.base.Function;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -382,7 +383,7 @@ public class TaskStateMachineTest {
 
     @Override
     public String toString() {
-      return com.google.common.base.Objects.toStringHelper(this)
+      return MoreObjects.toStringHelper(this)
           .add("taskPresent", taskPresent)
           .add("from", from)
           .add("to", to)
