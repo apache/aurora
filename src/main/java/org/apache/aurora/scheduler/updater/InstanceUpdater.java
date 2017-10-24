@@ -123,6 +123,10 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
         .greaterThanOrEqualTo(bagFromResources(desired.getResources()));
   }
 
+  private boolean constraintsMatch(ITaskConfig desired, ITaskConfig existing) {
+    return desired.getConstraints().equals(existing.getConstraints());
+  }
+
   private StateEvaluator.Result handleActualAndDesiredPresent(IScheduledTask actualState) {
     Preconditions.checkState(desiredState.isPresent());
     Preconditions.checkArgument(!actualState.getTaskEvents().isEmpty());
@@ -151,7 +155,8 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
       // This is not the configuration that we would like to run.
       if (isKillable(status)) {
         // Task is active, kill it.
-        if (resourceFits(desiredState.get(), actualState.getAssignedTask().getTask())) {
+        if (resourceFits(desiredState.get(), actualState.getAssignedTask().getTask())
+            && constraintsMatch(desiredState.get(), actualState.getAssignedTask().getTask())) {
           // If the desired task fits into the existing offer, we reserve the offer.
           return KILL_TASK_WITH_RESERVATION_AND_EVALUATE_ON_STATE_CHANGE;
         } else {

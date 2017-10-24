@@ -25,10 +25,13 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -61,6 +64,9 @@ public class InstanceUpdaterTest {
           .setResources(ImmutableSet.of(numCpus(1.0))));
   private static final ITaskConfig NEW_EXTRA_RESOURCES = ITaskConfig.build(new TaskConfig()
       .setResources(ImmutableSet.of(numCpus(2.0))));
+  private static final ITaskConfig NEW_DIFFERENT_CONSTRAINTS = ITaskConfig.build(new TaskConfig()
+      .setConstraints(ImmutableSet.of(new Constraint("different",
+          TaskConstraint.value(new ValueConstraint(false, ImmutableSet.of("test")))))));
 
   private static final Amount<Long, Time> MIN_RUNNING_TIME = Amount.of(1L, Time.MINUTES);
   private static final Amount<Long, Time> A_LONG_TIME = Amount.of(1L, Time.DAYS);
@@ -143,6 +149,20 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW_EXTRA_RESOURCES);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
+    f.advanceTime(MIN_RUNNING_TIME);
+    f.evaluateCurrentState(SUCCEEDED);
+  }
+
+  @Test
+  public void testUpdateWithConstraintChange() {
+    TestFixture f = new TestFixture(NEW_DIFFERENT_CONSTRAINTS, 1);
+    f.setActualState(OLD);
+    f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
+    f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
+    f.setActualState(NEW_DIFFERENT_CONSTRAINTS);
     f.evaluate(EVALUATE_ON_STATE_CHANGE, PENDING, ASSIGNED, STARTING);
     f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
