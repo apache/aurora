@@ -22,6 +22,11 @@
 td.job-list-name {
   width: 99%;
 
+  a {
+    display: block;
+    margin-top: -4px;
+  }
+
   .glyphicon {
     font-size: 12px;
     margin-left: 3px;
