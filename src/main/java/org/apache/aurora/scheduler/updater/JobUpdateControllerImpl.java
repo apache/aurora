@@ -77,8 +77,6 @@ import static com.google.common.base.Preconditions.checkState;
 
 import static org.apache.aurora.gen.JobUpdateStatus.ABORTED;
 import static org.apache.aurora.gen.JobUpdateStatus.ERROR;
-import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
-import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE;
@@ -470,14 +468,6 @@ class JobUpdateControllerImpl implements JobUpdateController {
     changeJobUpdateStatus(storeProvider, key, event, true);
   }
 
-  private static final Set<JobUpdateStatus> TERMINAL_STATES = ImmutableSet.of(
-      ROLLED_FORWARD,
-      ROLLED_BACK,
-      ABORTED,
-      JobUpdateStatus.FAILED,
-      ERROR
-  );
-
   private void changeJobUpdateStatus(
       MutableStoreProvider storeProvider,
       IJobUpdateKey key,
@@ -494,7 +484,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
           IJobUpdateEvent.build(proposedEvent.setTimestampMs(clock.nowMillis()).setStatus(status)));
     }
 
-    if (TERMINAL_STATES.contains(status)) {
+    if (JobUpdateStore.TERMINAL_STATES.contains(status)) {
       lockManager.releaseLock(key.getJob());
       pulseHandler.remove(key);
     } else {

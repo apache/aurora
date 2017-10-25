@@ -195,7 +195,6 @@ public class JettyServerModule extends AbstractModule {
               parentInjector,
               Modules.combine(
                   new ApiModule(options.api),
-                  new H2ConsoleModule(options.h2Console),
                   new HttpSecurityModule(options),
                   new ThriftModule(),
                   new AopModule(options)));

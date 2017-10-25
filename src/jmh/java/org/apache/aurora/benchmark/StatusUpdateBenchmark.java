@@ -75,9 +75,9 @@ import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.v1.Protos;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -177,7 +177,7 @@ public class StatusUpdateBenchmark {
   @Setup(Level.Trial)
   public void setUpBenchmark() {
     eventBus = new EventBus();
-    storage = new SlowStorageWrapper(DbUtil.createStorage());
+    storage = new SlowStorageWrapper(MemStorageModule.newEmptyStorage());
 
     Injector injector = Guice.createInjector(
         new StateModule(new CliOptions()),

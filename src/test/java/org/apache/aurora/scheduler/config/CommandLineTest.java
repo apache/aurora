@@ -29,7 +29,6 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.inject.AbstractModule;
@@ -170,17 +169,9 @@ public class CommandLineTest {
     expected.updater.enableAffinity = true;
     expected.updater.affinityExpiration = TEST_TIME;
     expected.state.taskAssignerModules = ImmutableList.of(NoopModule.class);
-    expected.db.useDbTaskStore = true;
-    expected.db.enableDbMetrics = false;
-    expected.db.slowQueryLogThreshold = TEST_TIME;
-    expected.db.dbRowGcInterval = TEST_TIME;
-    expected.db.h2LockTimeout = TEST_TIME;
-    expected.db.mybatisMaxActiveConnectionCount = 42;
-    expected.db.mybatisMaxIdleConnectionCount = 42;
     expected.logStorage.shutdownGracePeriod = TEST_TIME;
     expected.logStorage.snapshotInterval = TEST_TIME;
     expected.logStorage.maxLogEntrySize = TEST_DATA;
-    expected.logStorage.hydrateSnapshotFields = ImmutableSet.of("testing");
     expected.backup.backupInterval = TEST_TIME;
     expected.backup.maxSavedBackups = 42;
     expected.backup.backupDir = new File("testing");
@@ -225,7 +216,6 @@ public class CommandLineTest {
     expected.iniShiroRealm.shiroIniPath = testIni;
     expected.iniShiroRealm.shiroCredentialsMatcher = AllowAllCredentialsMatcher.class;
     expected.api.enableCorsFor = "testing";
-    expected.h2Console.enableH2Console = true;
     expected.preemptor.enablePreemptor = false;
     expected.preemptor.preemptionDelay = TEST_TIME;
     expected.preemptor.preemptionSlotHoldTime = TEST_TIME;
@@ -323,17 +313,9 @@ public class CommandLineTest {
         "-enable_update_affinity=true",
         "-update_affinity_reservation_hold_time=42days",
         "-task_assigner_modules=org.apache.aurora.scheduler.config.CommandLineTest$NoopModule",
-        "-use_beta_db_task_store=true",
-        "-enable_db_metrics=false",
-        "-slow_query_log_threshold=42days",
-        "-db_row_gc_interval=42days",
-        "-db_lock_timeout=42days",
-        "-db_max_active_connection_count=42",
-        "-db_max_idle_connection_count=42",
         "-dlog_shutdown_grace_period=42days",
         "-dlog_snapshot_interval=42days",
         "-dlog_max_entry_size=42GB",
-        "-snapshot_hydrate_stores=testing",
         "-backup_interval=42days",
         "-max_saved_backups=42",
         "-backup_dir=testing",
@@ -366,7 +348,6 @@ public class CommandLineTest {
         "-shiro_credentials_matcher="
             + "org.apache.shiro.authc.credential.AllowAllCredentialsMatcher",
         "-enable_cors_for=testing",
-        "-enable_h2_console=true",
         "-enable_preemptor=false",
         "-preemption_delay=42days",
         "-preemption_slot_hold_time=42days",

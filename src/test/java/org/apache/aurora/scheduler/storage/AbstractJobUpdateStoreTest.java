@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 
-package org.apache.aurora.scheduler.storage.db;
+package org.apache.aurora.scheduler.storage;
 
 import java.util.List;
 import java.util.Map;
@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -48,7 +49,6 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -59,8 +59,10 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateState;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
+import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.After;
@@ -83,11 +85,11 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
 import static org.apache.aurora.gen.Resource.diskMb;
 import static org.apache.aurora.gen.Resource.numCpus;
 import static org.apache.aurora.gen.Resource.ramMb;
-import static org.apache.aurora.scheduler.storage.db.DbJobUpdateStore.jobUpdateActionStatName;
+import static org.apache.aurora.scheduler.storage.Util.jobUpdateActionStatName;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class DbJobUpdateStoreTest {
+public abstract class AbstractJobUpdateStoreTest {
 
   private static final IJobKey JOB = JobKeys.from("testRole", "testEnv", "job");
   private static final IJobUpdateKey UPDATE1 =
@@ -103,10 +105,12 @@ public class DbJobUpdateStoreTest {
 
   @Before
   public void setUp() throws Exception {
-    Injector injector = DbUtil.createStorageInjector(DbModule.testModuleWithWorkQueue());
+    Injector injector = createStorageInjector();
     storage = injector.getInstance(Storage.class);
     stats = injector.getInstance(FakeStatsProvider.class);
   }
+
+  protected abstract Injector createStorageInjector();
 
   @After
   public void tearDown() throws Exception {
@@ -332,7 +336,7 @@ public class DbJobUpdateStoreTest {
     for (Map.Entry<JobUpdateStatus, T> entry : expected.entrySet()) {
       assertEquals(
           entry.getValue().longValue(),
-          stats.getLongValue(DbJobUpdateStore.jobUpdateStatusStatName(entry.getKey())));
+          stats.getLongValue(Util.jobUpdateStatusStatName(entry.getKey())));
     }
   }
 
@@ -383,17 +387,6 @@ public class DbJobUpdateStoreTest {
 
     // Assert state fields were ignored.
     assertUpdate(update);
-  }
-
-  @Test
-  public void testSaveJobUpdateWithoutEventFailsSelect() {
-    IJobUpdateKey updateId = makeKey("u3");
-    storage.write((NoResult.Quiet) storeProvider -> {
-      IJobUpdate update = makeJobUpdate(updateId);
-      storeProvider.getLockStore().saveLock(makeLock(update, "lock1"));
-      storeProvider.getJobUpdateStore().saveJobUpdate(update, Optional.of("lock1"));
-    });
-    assertEquals(Optional.absent(), getUpdateDetails(updateId));
   }
 
   @Test
@@ -595,13 +588,6 @@ public class DbJobUpdateStoreTest {
   }
 
   @Test(expected = StorageException.class)
-  public void testSaveUpdateWithoutLock() {
-    IJobUpdate update = makeJobUpdate(makeKey("updateId"));
-    storage.write((NoResult.Quiet) storeProvider ->
-        storeProvider.getJobUpdateStore().saveJobUpdate(update, Optional.of("lock")));
-  }
-
-  @Test(expected = StorageException.class)
   public void testSaveTwoUpdatesForOneJob() {
     IJobUpdate update = makeJobUpdate(makeKey("updateId"));
     saveUpdate(update, Optional.of("lock1"));
@@ -630,31 +616,6 @@ public class DbJobUpdateStoreTest {
 
     saveUpdate(update, Optional.of("lock1"));
     assertUpdate(update);
-  }
-
-  @Test
-  public void testLockCleared() {
-    IJobUpdate update = makeJobUpdate(makeKey("update1"));
-    saveUpdate(update, Optional.of("lock1"));
-
-    removeLock(update, "lock1");
-
-    assertEquals(
-        Optional.of(updateJobDetails(populateExpected(update), FIRST_EVENT)),
-        getUpdateDetails(makeKey("update1")));
-    assertEquals(
-        ImmutableSet.of(
-            new StoredJobUpdateDetails(
-                updateJobDetails(populateExpected(update), FIRST_EVENT).newBuilder(),
-                null)),
-        getAllUpdateDetails());
-
-    assertEquals(
-        ImmutableList.of(populateExpected(update).getSummary()),
-        getSummaries(new JobUpdateQuery().setKey(UPDATE1.newBuilder())));
-
-    // If the lock has been released for this job, we can start another update.
-    saveUpdate(makeJobUpdate(makeKey("update2")), Optional.of("lock2"));
   }
 
   @Test
@@ -814,6 +775,50 @@ public class DbJobUpdateStoreTest {
         queryDetails(new JobUpdateQuery().setRole("no match")));
   }
 
+  @Test
+  public void testLockAssociation() {
+    IJobKey jobKey = JobKeys.from("role1", "env", "name1");
+    IJobUpdateKey updateId1 = makeKey(jobKey, "u1");
+    IJobUpdateKey updateId2 = makeKey(jobKey, "u2");
+
+    IJobUpdate update1 = makeJobUpdate(updateId1);
+
+    saveUpdate(update1, Optional.of("lock1"));
+    saveJobEvent(makeJobUpdateEvent(ABORTED, 568L), updateId1);
+    storage.write((NoResult.Quiet) storeProvider -> {
+      storeProvider.getLockStore().removeLock(ILockKey.build(LockKey.job(jobKey.newBuilder())));
+    });
+
+    IJobUpdate update2 = makeJobUpdate(updateId2);
+    saveUpdate(update2, Optional.of("lock2"));
+
+    assertEquals(
+        ImmutableSet.of(Optional.absent(), Optional.of("lock2")),
+        FluentIterable.from(getAllUpdateDetails())
+            .transform(u -> Optional.fromNullable(u.getLockToken())).toSet());
+  }
+
+  @Test
+  public void testSaveEventsOutOfChronologicalOrder() {
+    IJobUpdate update1 = makeJobUpdate(UPDATE1);
+    saveUpdate(update1, Optional.of("lock1"));
+
+    IJobUpdateEvent event2 = makeJobUpdateEvent(ROLLING_FORWARD, 124);
+    IJobUpdateEvent event1 = makeJobUpdateEvent(ROLL_FORWARD_PAUSED, 122);
+    saveJobEvent(event2, UPDATE1);
+    saveJobEvent(event1, UPDATE1);
+
+    IJobInstanceUpdateEvent instanceEvent2 = makeJobInstanceEvent(0, 125, INSTANCE_UPDATED);
+    IJobInstanceUpdateEvent instanceEvent1 = makeJobInstanceEvent(0, 124, INSTANCE_UPDATING);
+
+    saveJobInstanceEvent(instanceEvent2, UPDATE1);
+    saveJobInstanceEvent(instanceEvent1, UPDATE1);
+
+    IJobUpdateState state = getUpdateDetails(UPDATE1).get().getUpdate().getSummary().getState();
+    assertEquals(ROLLING_FORWARD, state.getStatus());
+    assertEquals(125, state.getLastModifiedTimestampMs());
+  }
+
   private static IJobUpdateKey makeKey(String id) {
     return makeKey(JOB, id);
   }
@@ -914,11 +919,6 @@ public class DbJobUpdateStoreTest {
   private Set<IJobUpdateKey> pruneHistory(int retainCount, long pruningThresholdMs) {
     return storage.write(storeProvider ->
         storeProvider.getJobUpdateStore().pruneHistory(retainCount, pruningThresholdMs));
-  }
-
-  private void removeLock(IJobUpdate update, String lockToken) {
-    storage.write((NoResult.Quiet) storeProvider ->
-        storeProvider.getLockStore().removeLock(makeLock(update, lockToken).getKey()));
   }
 
   private IJobUpdate populateExpected(IJobUpdate update) {

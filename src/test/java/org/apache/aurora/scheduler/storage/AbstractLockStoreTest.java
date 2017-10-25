@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db;
+package org.apache.aurora.scheduler.storage;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -22,7 +22,6 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
@@ -33,7 +32,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class DbLockStoreTest {
+public abstract class AbstractLockStoreTest {
 
   private Storage storage;
 
@@ -76,8 +75,10 @@ public class DbLockStoreTest {
 
   @Before
   public void setUp() throws IOException {
-    storage = DbUtil.createStorage();
+    storage = createStorage();
   }
+
+  protected abstract Storage createStorage();
 
   @Test
   public void testLocks() throws Exception {

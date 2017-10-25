@@ -26,9 +26,9 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -44,7 +44,7 @@ public class MaintenanceTest {
 
   @Before
   public void setUp() {
-    storage = DbUtil.createStorage();
+    storage = MemStorageModule.newEmptyStorage();
     maintenance = new Maintenance(storage);
   }
 

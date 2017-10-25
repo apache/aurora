@@ -26,7 +26,6 @@ import com.google.inject.Injector;
 import org.apache.aurora.benchmark.fakes.FakeDriver;
 import org.apache.aurora.benchmark.fakes.FakeEventSink;
 import org.apache.aurora.benchmark.fakes.FakeRescheduleCalculator;
-import org.apache.aurora.common.inject.Bindings;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -39,9 +38,9 @@ import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.StateManagerImpl;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -185,7 +184,7 @@ public class StateManagerBenchmarks {
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
           }
         },
-        DbModule.productionModule(Bindings.KeyFactory.PLAIN, new DbModule.Options()),
+        new MemStorageModule(),
         // This is needed for storage
         new AsyncModule(new AsyncModule.Options())
     );

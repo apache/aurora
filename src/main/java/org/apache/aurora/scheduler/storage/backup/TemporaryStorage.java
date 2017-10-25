@@ -17,7 +17,6 @@ import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 
 import org.apache.aurora.common.util.BuildInfo;
@@ -28,11 +27,10 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
-import org.apache.aurora.scheduler.storage.db.EnumBackfill;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 
 import static java.util.Objects.requireNonNull;
 
@@ -72,17 +70,15 @@ interface TemporaryStorage {
   class TemporaryStorageFactory implements Function<Snapshot, TemporaryStorage> {
 
     private final ThriftBackfill thriftBackfill;
-    private final EnumBackfill enumBackfill;
 
     @Inject
-    TemporaryStorageFactory(ThriftBackfill thriftBackfill, EnumBackfill enumBackfill) {
+    TemporaryStorageFactory(ThriftBackfill thriftBackfill) {
       this.thriftBackfill = requireNonNull(thriftBackfill);
-      this.enumBackfill = requireNonNull(enumBackfill);
     }
 
     @Override
     public TemporaryStorage apply(Snapshot snapshot) {
-      final Storage storage = DbUtil.createFlaggedStorage();
+      final Storage storage = MemStorageModule.newEmptyStorage();
       final BuildInfo buildInfo = generateBuildInfo();
       FakeClock clock = new FakeClock();
       clock.setNowMillis(snapshot.getTimestamp());
@@ -90,17 +86,7 @@ interface TemporaryStorage {
           buildInfo,
           clock,
           storage,
-          // Safe to pass false here to default to the non-experimental task store
-          // during restore from backup procedure.
-          false /** useDbSnapshotForTaskStore */,
-          // Safe to pass empty set here because during backup restore we are not deciding which
-          // fields to write to the snapshot.
-          ImmutableSet.of() /** hydrateFields */,
-          // We can just pass an empty lambda for the MigrationManager as migration is a no-op
-          // when restoring from backup.
-          () -> { } /** migrationManager */,
-          thriftBackfill,
-          enumBackfill);
+          thriftBackfill);
       snapshotStore.applySnapshot(snapshot);
 
       return new TemporaryStorage() {

@@ -19,7 +19,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
@@ -34,6 +33,7 @@ import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
+import org.apache.aurora.scheduler.storage.Util;
 import org.apache.aurora.scheduler.storage.db.views.DbJobUpdate;
 import org.apache.aurora.scheduler.storage.db.views.DbJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.db.views.DbStoredJobUpdateDetails;
@@ -84,7 +84,7 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
         .build(new CacheLoader<JobUpdateStatus, AtomicLong>() {
           @Override
           public AtomicLong load(JobUpdateStatus status) {
-            return statsProvider.makeCounter(jobUpdateStatusStatName(status));
+            return statsProvider.makeCounter(Util.jobUpdateStatusStatName(status));
           }
         });
     for (JobUpdateStatus status : JobUpdateStatus.values()) {
@@ -94,7 +94,7 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
         .build(new CacheLoader<JobUpdateAction, AtomicLong>() {
           @Override
           public AtomicLong load(JobUpdateAction action) {
-            return statsProvider.makeCounter(jobUpdateActionStatName(action));
+            return statsProvider.makeCounter(Util.jobUpdateActionStatName(action));
           }
         });
     for (JobUpdateAction action : JobUpdateAction.values()) {
@@ -165,21 +165,11 @@ public class DbJobUpdateStore implements JobUpdateStore.Mutable {
     }
   }
 
-  @VisibleForTesting
-  static String jobUpdateStatusStatName(JobUpdateStatus status) {
-    return "update_transition_" + status;
-  }
-
   @Timed("job_update_store_save_event")
   @Override
   public void saveJobUpdateEvent(IJobUpdateKey key, IJobUpdateEvent event) {
     jobEventMapper.insert(key, event.newBuilder());
     jobUpdateEventStats.getUnchecked(event.getStatus()).incrementAndGet();
-  }
-
-  @VisibleForTesting
-  static String jobUpdateActionStatName(JobUpdateAction action) {
-    return "update_instance_transition_" + action;
   }
 
   @Timed("job_update_store_save_instance_event")

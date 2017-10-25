@@ -82,7 +82,6 @@ import org.apache.aurora.scheduler.state.UUIDGenerator;
 import org.apache.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -94,6 +93,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.aurora.scheduler.updater.JobUpdateController.AuditData;
@@ -183,7 +183,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     Injector injector = Guice.createInjector(
         new UpdaterModule(executor, options),
-        DbModule.testModuleWithWorkQueue(),
+        new MemStorageModule(),
         new AbstractModule() {
           @Override
           protected void configure() {

@@ -20,6 +20,7 @@
 - Added scheduler command line argument `-hold_offers_forever`, suitable for use in clusters where
   Aurora is the only framework.  This setting disables other options such as `-min_offer_hold_time`,
   and allows the scheduler to more efficiently cache scheduling attempts.
+- The schduler no longer uses an internal H2 database for storage.
 
 ### Deprecations and removals:
 
@@ -31,6 +32,17 @@
 - Removed the Job environment validation from the command line client. Validation was moved to the
   the scheduler side through the `allowed_job_environments` option. By default allowing any of
   `devel`, `test`, `production`, and any value matching the regular expression `staging[0-9]*`.
+- Removed scheduler command line arguments related to the internal H2 database, which is no longer
+  used:
+  - `-use_beta_db_task_store`
+  - `-enable_db_metrics`
+  - `-slow_query_log_threshold`
+  - `-db_row_gc_interval`
+  - `-db_lock_timeout`
+  - `-db_max_active_connection_count`
+  - `-db_max_idle_connection_count`
+  - `-snapshot_hydrate_stores`
+  - `-enable_h2_console`
 
 0.18.0
 ======

@@ -39,9 +39,9 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.junit.Before;
 import org.junit.Test;
 import org.quartz.JobExecutionContext;
@@ -79,7 +79,7 @@ public class CronIT extends EasyMockTest {
   @Before
   public void setUp() throws Exception {
     stateManager = createMock(StateManager.class);
-    storage = DbUtil.createStorage();
+    storage = MemStorageModule.newEmptyStorage();
     auroraCronJob = createMock(AuroraCronJob.class);
 
     injector = Guice.createInjector(

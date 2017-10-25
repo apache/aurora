@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db;
+package org.apache.aurora.scheduler.storage;
 
 import java.io.IOException;
 import java.util.Map;
@@ -20,7 +20,6 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.testing.StorageEntityUtil;
@@ -29,7 +28,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class DbQuotaStoreTest {
+public abstract class AbstractQuotaStoreTest {
 
   private static final String ROLE_A = "roleA";
   private static final String ROLE_B = "roleB";
@@ -40,8 +39,10 @@ public class DbQuotaStoreTest {
 
   @Before
   public void setUp() throws IOException {
-    storage = DbUtil.createStorage();
+    storage = createStorage();
   }
+
+  protected abstract Storage createStorage();
 
   @Test
   public void testCrud() {

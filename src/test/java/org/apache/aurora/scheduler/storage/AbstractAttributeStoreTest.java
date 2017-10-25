@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db;
+package org.apache.aurora.scheduler.storage;
 
 import java.io.IOException;
 import java.util.Set;
@@ -25,7 +25,6 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -35,7 +34,7 @@ import org.junit.Test;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.junit.Assert.assertEquals;
 
-public class DbAttributeStoreTest {
+public abstract class AbstractAttributeStoreTest {
 
   private static final String HOST_A = "hostA";
   private static final String HOST_B = "hostB";
@@ -59,8 +58,10 @@ public class DbAttributeStoreTest {
 
   @Before
   public void setUp() throws IOException {
-    storage = DbUtil.createStorage();
+    storage = createStorage();
   }
+
+  protected abstract Storage createStorage();
 
   @Test
   public void testCrud() {

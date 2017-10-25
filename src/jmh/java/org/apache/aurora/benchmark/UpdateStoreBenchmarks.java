@@ -20,9 +20,9 @@ import com.google.common.collect.Iterables;
 
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.thrift.TException;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -54,7 +54,7 @@ public class UpdateStoreBenchmarks {
 
     @Setup(Level.Trial)
     public void setUp() {
-      storage = DbUtil.createStorage();
+      storage = MemStorageModule.newEmptyStorage();
     }
 
     @Setup(Level.Iteration)
@@ -94,7 +94,7 @@ public class UpdateStoreBenchmarks {
 
     @Setup(Level.Trial)
     public void setUp() {
-      storage = DbUtil.createStorage();
+      storage = MemStorageModule.newEmptyStorage();
     }
 
     @Setup(Level.Iteration)
@@ -134,7 +134,7 @@ public class UpdateStoreBenchmarks {
 
     @Setup(Level.Trial)
     public void setUp() {
-      storage = DbUtil.createStorage();
+      storage = MemStorageModule.newEmptyStorage();
     }
 
     @Setup(Level.Iteration)

@@ -41,7 +41,6 @@ import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import org.apache.aurora.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
-import org.apache.aurora.scheduler.storage.db.EnumBackfill;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.easymock.Capture;
@@ -82,9 +81,8 @@ public class RecoveryTest extends EasyMockTest {
     shutDownNow = createMock(Command.class);
     ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
     clock = FakeScheduledExecutor.scheduleExecutor(executor);
-    final EnumBackfill enumBackfill = createMock(EnumBackfill.class);
     TemporaryStorageFactory factory =
-        new TemporaryStorageFactory(TaskTestUtil.THRIFT_BACKFILL, enumBackfill);
+        new TemporaryStorageFactory(TaskTestUtil.THRIFT_BACKFILL);
     storageBackup = new StorageBackupImpl(
         snapshotStore,
         clock,
@@ -173,6 +171,10 @@ public class RecoveryTest extends EasyMockTest {
             FakeBuildInfo.GIT_TAG, FakeBuildInfo.GIT_TAG));
 
     return new Snapshot()
+        .setHostAttributes(ImmutableSet.of())
+        .setQuotaConfigurations(ImmutableSet.of())
+        .setLocks(ImmutableSet.of())
+        .setJobUpdateDetails(ImmutableSet.of())
         .setCronJobs(ImmutableSet.of())
         .setSchedulerMetadata(metadata)
         .setTasks(IScheduledTask.toBuildersSet(ImmutableSet.copyOf(tasks)));

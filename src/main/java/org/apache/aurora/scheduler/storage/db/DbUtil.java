@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
-import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -25,7 +24,6 @@ import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 
-import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
 import static org.apache.aurora.scheduler.storage.db.DbModule.testModuleWithWorkQueue;
 
 /**
@@ -74,15 +72,5 @@ public final class DbUtil {
    */
   public static Storage createStorage() {
     return createStorageInjector(testModuleWithWorkQueue()).getInstance(Storage.class);
-  }
-
-  /**
-   * Creates a new, empty storage system with a task store defined by the command line flag.
-   *
-   * @return A new storage instance.
-   */
-  public static Storage createFlaggedStorage() {
-    return createStorageInjector(testModuleWithWorkQueue(PLAIN, Optional.absent()))
-        .getInstance(Storage.class);
   }
 }

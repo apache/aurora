@@ -13,8 +13,6 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.util.Set;
-
 import javax.inject.Singleton;
 
 import com.beust.jcommander.Parameter;
@@ -36,8 +34,6 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
 import org.apache.aurora.scheduler.storage.log.LogStorage.Settings;
-import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.ExperimentalTaskStore;
-import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.HydrateSnapshotFields;
 
 import static org.apache.aurora.scheduler.storage.log.EntrySerializer.EntrySerializerImpl;
 import static org.apache.aurora.scheduler.storage.log.LogManager.LogEntryHashFunction;
@@ -65,18 +61,12 @@ public class LogStorageModule extends PrivateModule {
             "Specifies the maximum entry size to append to the log. Larger entries will be "
                 + "split across entry Frames.")
     public DataAmount maxLogEntrySize = new DataAmount(512, Data.KB);
-
-    @Parameter(names = "-snapshot_hydrate_stores",
-        description = "Which H2-backed stores to fully hydrate on the Snapshot.")
-    public Set<String> hydrateSnapshotFields = SnapshotStoreImpl.ALL_H2_STORE_FIELDS;
   }
 
   private final Options options;
-  private final boolean useDbTaskStore;
 
-  public LogStorageModule(Options options, boolean useDbTaskStore) {
+  public LogStorageModule(Options options) {
     this.options = options;
-    this.useDbTaskStore = useDbTaskStore;
   }
 
   @Override
@@ -84,24 +74,16 @@ public class LogStorageModule extends PrivateModule {
     bind(Settings.class)
         .toInstance(new Settings(options.shutdownGracePeriod, options.snapshotInterval));
 
-    bind(new TypeLiteral<Boolean>() { }).annotatedWith(ExperimentalTaskStore.class)
-        .toInstance(useDbTaskStore);
-
     bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
         .toInstance(options.maxLogEntrySize);
     bind(LogManager.class).in(Singleton.class);
     bind(LogStorage.class).in(Singleton.class);
-
-    bind(new TypeLiteral<Set<String>>() { }).annotatedWith(HydrateSnapshotFields.class)
-        .toInstance(options.hydrateSnapshotFields);
 
     install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));
     bind(DistributedSnapshotStore.class).to(LogStorage.class);
     expose(Storage.class);
     expose(NonVolatileStorage.class);
     expose(DistributedSnapshotStore.class);
-    expose(new TypeLiteral<Boolean>() { }).annotatedWith(ExperimentalTaskStore.class);
-    expose(new TypeLiteral<Set<String>>() { }).annotatedWith(HydrateSnapshotFields.class);
 
     bind(EntrySerializer.class).to(EntrySerializerImpl.class);
     // TODO(ksweeney): We don't need a cryptographic checksum here - assess performance of MD5

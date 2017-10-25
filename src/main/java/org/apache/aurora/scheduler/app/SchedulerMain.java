@@ -60,12 +60,12 @@ import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
 import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory.FrameworkInfoFactoryImpl.SchedulerProtocol;
 import org.apache.aurora.scheduler.mesos.LibMesosLoadingModule;
 import org.apache.aurora.scheduler.stats.StatsModule;
-import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.Volatile;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
-import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -189,9 +189,7 @@ public class SchedulerMain {
         new StatsModule(options.stats),
         new AppModule(options),
         new CronModule(options.cron),
-        new DbModule.MigrationManagerModule(),
-        DbModule.productionModule(Bindings.annotatedKeyFactory(Storage.Volatile.class), options.db),
-        new DbModule.GarbageCollectorModule(options.db));
+        new MemStorageModule(Bindings.annotatedKeyFactory(Volatile.class)));
   }
 
   /**
@@ -277,7 +275,7 @@ public class SchedulerMain {
             new CommandLineDriverSettingsModule(options.driver, options.main.allowGpuResource),
             new LibMesosLoadingModule(options.main.driverImpl),
             new MesosLogStreamModule(options.mesosLog, FlaggedZooKeeperConfig.create(options.zk)),
-            new LogStorageModule(options.logStorage, options.db.useDbTaskStore),
+            new LogStorageModule(options.logStorage),
             new TierModule(options.tiers),
             new WebhookModule(options.webhook)
         )

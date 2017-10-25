@@ -57,7 +57,7 @@ import static org.apache.ibatis.mapping.SqlCommandType.UPDATE;
  * <p>
  * Delegates read and write concurrency semantics to the underlying database.
  */
-class DbStorage extends AbstractIdleService implements Storage {
+public class DbStorage extends AbstractIdleService implements Storage {
 
   private final SqlSessionFactory sessionFactory;
   private final EnumBackfill enumBackfill;
@@ -129,14 +129,13 @@ class DbStorage extends AbstractIdleService implements Storage {
       public JobUpdateStore.Mutable getJobUpdateStore() {
         return jobUpdateStore;
       }
-
-      @Override
-      @SuppressWarnings("unchecked")
-      public <T> T getUnsafeStoreAccess() {
-        return (T) sessionFactory.getConfiguration().getEnvironment().getDataSource();
-      }
     };
     this.statsProvider = requireNonNull(statsProvider);
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T> T getUnsafeStoreAccess() {
+    return (T) sessionFactory.getConfiguration().getEnvironment().getDataSource();
   }
 
   @Timed("db_storage_read_operation")

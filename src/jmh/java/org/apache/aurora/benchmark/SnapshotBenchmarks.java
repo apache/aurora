@@ -17,22 +17,18 @@ import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
-import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
-import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
-import org.apache.aurora.common.inject.Bindings;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
-import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.ExperimentalTaskStore;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.thrift.TException;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -85,7 +81,6 @@ public class SnapshotBenchmarks {
     }
 
     private SnapshotStoreImpl getSnapshotStore() {
-      Bindings.KeyFactory keyFactory = Bindings.annotatedKeyFactory(Storage.Volatile.class);
       Injector injector = Guice.createInjector(
           new AbstractModule() {
             @Override
@@ -93,13 +88,9 @@ public class SnapshotBenchmarks {
               bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
               bind(StatsProvider.class).toInstance(new FakeStatsProvider());
               bind(SnapshotStoreImpl.class).in(Singleton.class);
-              bind(new TypeLiteral<Boolean>() { }).annotatedWith(ExperimentalTaskStore.class)
-                  .toInstance(true);
             }
           },
-          DbModule.testModuleWithWorkQueue(
-              keyFactory,
-              Optional.of(new DbModule.TaskStoreModule(keyFactory))));
+          new MemStorageModule());
 
       storage = injector.getInstance(Key.get(Storage.class, Storage.Volatile.class));
       storage.prepare();

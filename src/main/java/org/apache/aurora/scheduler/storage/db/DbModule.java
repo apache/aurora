@@ -23,7 +23,6 @@ import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AbstractScheduledService;
@@ -50,7 +49,6 @@ import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.db.typehandlers.TypeHandlers;
-import org.apache.aurora.scheduler.storage.mem.InMemStoresModule;
 import org.apache.ibatis.migration.JavaMigrationLoader;
 import org.apache.ibatis.migration.MigrationLoader;
 import org.apache.ibatis.session.AutoMappingBehavior;
@@ -71,11 +69,6 @@ public final class DbModule extends PrivateModule {
 
   @Parameters(separators = "=")
   public static class Options {
-    @Parameter(names = "-use_beta_db_task_store",
-        description = "Whether to use the experimental database-backed task store.",
-        arity = 1)
-    public boolean useDbTaskStore = false;
-
     @Parameter(names = "-enable_db_metrics",
         description =
             "Whether to use MyBatis interceptor to measure the timing of intercepted Statements.",
@@ -121,19 +114,16 @@ public final class DbModule extends PrivateModule {
 
   private final Options options;
   private final KeyFactory keyFactory;
-  private final Module taskStoresModule;
   private final String jdbcSchema;
 
   private DbModule(
       Options options,
       KeyFactory keyFactory,
-      Module taskStoresModule,
       String dbName,
       Map<String, String> jdbcUriArgs) {
 
     this.options = requireNonNull(options);
     this.keyFactory = requireNonNull(keyFactory);
-    this.taskStoresModule = requireNonNull(taskStoresModule);
 
     Map<String, String> args = ImmutableMap.<String, String>builder()
         .putAll(jdbcUriArgs)
@@ -162,19 +152,16 @@ public final class DbModule extends PrivateModule {
     return new DbModule(
         options,
         keyFactory,
-        getTaskStoreModule(options, keyFactory),
         "aurora",
         ImmutableMap.of("DB_CLOSE_DELAY", "-1"));
   }
 
   @VisibleForTesting
-  public static Module testModule(KeyFactory keyFactory, Optional<Module> taskStoreModule) {
+  public static Module testModule(KeyFactory keyFactory) {
     DbModule.Options options = new DbModule.Options();
     return new DbModule(
         options,
         keyFactory,
-        taskStoreModule.isPresent()
-            ? taskStoreModule.get() : getTaskStoreModule(options, keyFactory),
         "testdb-" + UUID.randomUUID().toString(),
         // A non-zero close delay is used here to avoid eager database cleanup in tests that
         // make use of multiple threads.  Since all test databases are separately scoped by the
@@ -184,14 +171,14 @@ public final class DbModule extends PrivateModule {
   }
 
   /**
-   * Same as {@link #testModuleWithWorkQueue(KeyFactory, Optional)} but with default task store and
+   * Same as {@link #testModuleWithWorkQueue(KeyFactory)} but with default task store and
    * key factory.
    *
    * @return A new database module for testing.
    */
   @VisibleForTesting
   public static Module testModule() {
-    return testModule(KeyFactory.PLAIN, Optional.of(new TaskStoreModule(KeyFactory.PLAIN)));
+    return testModule(KeyFactory.PLAIN);
   }
 
   /**
@@ -199,14 +186,10 @@ public final class DbModule extends PrivateModule {
    * implementation bound within the key factory and provided module.
    *
    * @param keyFactory Key factory to use.
-   * @param taskStoreModule Module providing task store bindings.
    * @return A new database module for testing.
    */
   @VisibleForTesting
-  public static Module testModuleWithWorkQueue(
-      KeyFactory keyFactory,
-      Optional<Module> taskStoreModule) {
-
+  public static Module testModuleWithWorkQueue(KeyFactory keyFactory) {
     return Modules.combine(
         new AbstractModule() {
           @Override
@@ -222,27 +205,18 @@ public final class DbModule extends PrivateModule {
                 });
           }
         },
-        testModule(keyFactory, taskStoreModule)
+        testModule(keyFactory)
     );
   }
 
   /**
-   * Same as {@link #testModuleWithWorkQueue(KeyFactory, Optional)} but with default task store and
-   * key factory.
+   * Same as {@link #testModuleWithWorkQueue(KeyFactory)} but with default key factory.
    *
    * @return A new database module for testing.
    */
   @VisibleForTesting
   public static Module testModuleWithWorkQueue() {
-    return testModuleWithWorkQueue(
-        KeyFactory.PLAIN,
-        Optional.of(new TaskStoreModule(KeyFactory.PLAIN)));
-  }
-
-  private static Module getTaskStoreModule(Options options, KeyFactory keyFactory) {
-    return options.useDbTaskStore
-        ? new TaskStoreModule(keyFactory)
-        : new InMemStoresModule(options, keyFactory);
+    return testModuleWithWorkQueue(KeyFactory.PLAIN);
   }
 
   private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {
@@ -308,7 +282,6 @@ public final class DbModule extends PrivateModule {
         expose(JobKeyMapper.class);
       }
     });
-    install(taskStoresModule);
     expose(keyFactory.create(CronJobStore.Mutable.class));
     expose(keyFactory.create(TaskStore.Mutable.class));
 
@@ -317,6 +290,8 @@ public final class DbModule extends PrivateModule {
     bindStore(QuotaStore.Mutable.class, DbQuotaStore.class);
     bindStore(SchedulerStore.Mutable.class, DbSchedulerStore.class);
     bindStore(JobUpdateStore.Mutable.class, DbJobUpdateStore.class);
+    bindStore(TaskStore.Mutable.class, DbTaskStore.class);
+    bindStore(CronJobStore.Mutable.class, DbCronJobStore.class);
 
     Key<Storage> storageKey = keyFactory.create(Storage.class);
     bind(storageKey).to(DbStorage.class);
@@ -332,35 +307,6 @@ public final class DbModule extends PrivateModule {
     expose(TaskMapper.class);
     expose(TaskConfigMapper.class);
     expose(JobKeyMapper.class);
-  }
-
-  /**
-   * A module that binds a database task store.
-   * <p/>
-   * TODO(wfarner): Inline these bindings once there is only one task store implementation.
-   */
-  public static class TaskStoreModule extends PrivateModule {
-    private final KeyFactory keyFactory;
-
-    public TaskStoreModule(KeyFactory keyFactory) {
-      this.keyFactory = requireNonNull(keyFactory);
-    }
-
-    private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {
-      bind(binding).to(impl);
-      bind(impl).in(Singleton.class);
-      Key<T> key = keyFactory.create(binding);
-      bind(key).to(impl);
-      expose(key);
-    }
-
-    @Override
-    protected void configure() {
-      bindStore(TaskStore.Mutable.class, DbTaskStore.class);
-      expose(TaskStore.Mutable.class);
-      bindStore(CronJobStore.Mutable.class, DbCronJobStore.class);
-      expose(DbCronJobStore.Mutable.class);
-    }
   }
 
   /**

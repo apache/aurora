@@ -32,6 +32,10 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
  */
 public interface Storage {
 
+  /**
+   * Provider for read-only stores.  Store implementations must be thread-safe, and should support
+   * concurrent reads where appropriate.
+   */
   interface StoreProvider {
     SchedulerStore getSchedulerStore();
     CronJobStore getCronJobStore();
@@ -42,6 +46,10 @@ public interface Storage {
     JobUpdateStore getJobUpdateStore();
   }
 
+  /**
+   * Provider for stores that permit mutations.  Store implementations need not support concurrent
+   * writes, as a global reentrant write lock is used to serialize write operations.
+   */
   interface MutableStoreProvider extends StoreProvider {
     SchedulerStore.Mutable getSchedulerStore();
     CronJobStore.Mutable getCronJobStore();
@@ -65,19 +73,6 @@ public interface Storage {
     QuotaStore.Mutable getQuotaStore();
     AttributeStore.Mutable getAttributeStore();
     JobUpdateStore.Mutable getJobUpdateStore();
-
-    /**
-     * Gets direct low level access to the underlying storage.
-     * <p>
-     * This grants a potentially dangerous direct access to the underlying storage and should
-     * only be used during storage initialization when unstructured bulk data manipulations
-     * are required.
-     * </p>
-     *
-     * @param <T> Direct access type.
-     * @return Direct read/write accessor to the storage.
-     */
-    <T> T getUnsafeStoreAccess();
   }
 
   /**

@@ -218,7 +218,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         ImmutableList.<Module>builder()
             .add(SchedulerMain.getUniversalModule(new CliOptions()))
             .add(new TierModule(TaskTestUtil.TIER_CONFIG))
-            .add(new LogStorageModule(new LogStorageModule.Options(), false))
+            .add(new LogStorageModule(new LogStorageModule.Options()))
             .add(new ServiceDiscoveryModule(zkClientConfig, SERVERSET_PATH))
             .add(testModule)
             .build()

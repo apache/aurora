@@ -23,9 +23,9 @@ import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -55,7 +55,7 @@ public class LockManagerImplTest extends EasyMockTest {
     UUIDGenerator tokenGenerator = createMock(UUIDGenerator.class);
     expect(tokenGenerator.createNew()).andReturn(TOKEN).anyTimes();
 
-    lockManager = new LockManagerImpl(DbUtil.createStorage(), clock, tokenGenerator);
+    lockManager = new LockManagerImpl(MemStorageModule.newEmptyStorage(), clock, tokenGenerator);
   }
 
   @Test

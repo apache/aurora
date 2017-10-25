@@ -358,12 +358,6 @@ class WriteAheadStorage implements
   }
 
   @Override
-  public <T> T getUnsafeStoreAccess() {
-    throw new UnsupportedOperationException(
-        "Unsupported since casual storage users should never be doing this.");
-  }
-
-  @Override
   public Optional<String> fetchFrameworkId() {
     return this.schedulerStore.fetchFrameworkId();
   }

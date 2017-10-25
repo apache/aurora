@@ -11,28 +11,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db;
+package org.apache.aurora.scheduler.storage.mem;
 
 import com.google.inject.AbstractModule;
-import com.google.inject.Module;
-import com.google.inject.util.Modules;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.common.util.Clock;
-import org.apache.aurora.common.util.testing.FakeClock;
-import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
+import org.apache.aurora.scheduler.storage.AbstractJobUpdateStoreTest;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 
-public class DbTaskStoreTest extends AbstractTaskStoreTest {
+public class MemJobUpdateStoreTest extends AbstractJobUpdateStoreTest {
   @Override
-  protected Module getStorageModule() {
-    return Modules.combine(
-        DbModule.testModuleWithWorkQueue(),
+  protected Injector createStorageInjector() {
+    return Guice.createInjector(
+        new MemStorageModule(),
         new AbstractModule() {
           @Override
           protected void configure() {
-            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
-            bind(Clock.class).toInstance(new FakeClock());
+            FakeStatsProvider stats = new FakeStatsProvider();
+            bind(StatsProvider.class).toInstance(stats);
+            bind(FakeStatsProvider.class).toInstance(stats);
           }
         });
   }

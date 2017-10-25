@@ -18,21 +18,23 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.apache.aurora.common.testing.TearDownTestCase;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.base.TaskTestUtil;
-import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
+import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
 import org.junit.Test;
@@ -42,9 +44,8 @@ import static org.junit.Assert.fail;
 
 /**
  * TODO(William Farner): Wire a mechanism to allow verification of synchronized writers.
- * TODO(wfarner): Merge this with DbStorageTest.
  */
-public class StorageTransactionTest extends TearDownTestCase {
+public class MemStorageTest extends TearDownTestCase {
 
   private ExecutorService executor;
   private Storage storage;
@@ -53,7 +54,7 @@ public class StorageTransactionTest extends TearDownTestCase {
   public void setUp() {
     executor = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder().setNameFormat("SlowRead-%d").setDaemon(true).build());
-    addTearDown(() -> MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS));
+    addTearDown(() -> executor.shutdown());
     storage = MemStorageModule.newEmptyStorage();
   }
 
@@ -61,10 +62,10 @@ public class StorageTransactionTest extends TearDownTestCase {
   public void testConcurrentReaders() throws Exception {
     // Validate that a slow read does not block another read.
 
-    CountDownLatch slowReadStarted = new CountDownLatch(1);
-    CountDownLatch slowReadFinished = new CountDownLatch(1);
+    final CountDownLatch slowReadStarted = new CountDownLatch(1);
+    final CountDownLatch slowReadFinished = new CountDownLatch(1);
 
-    Future<String> future = executor.submit(() -> storage.read(storeProvider -> {
+    Future<String> future = executor.submit(() -> storage.read((Quiet<String>) storeProvider -> {
       slowReadStarted.countDown();
       try {
         slowReadFinished.await();
@@ -76,14 +77,22 @@ public class StorageTransactionTest extends TearDownTestCase {
 
     slowReadStarted.await();
 
-    String fastResult = storage.read(storeProvider -> "fastResult");
+    String fastResult = storage.read((Quiet<String>) storeProvider -> "fastResult");
     assertEquals("fastResult", fastResult);
     slowReadFinished.countDown();
     assertEquals("slowResult", future.get());
   }
 
   private IScheduledTask makeTask(String taskId) {
-    return TaskTestUtil.makeTask(taskId, TaskTestUtil.JOB);
+    return IScheduledTask.build(new ScheduledTask().setAssignedTask(
+        new AssignedTask()
+            .setTaskId(taskId)
+            .setTask(new TaskConfig()
+                .setOwner(new Identity().setUser("owner-" + taskId))
+                .setJob(new JobKey()
+                    .setRole("role-" + taskId)
+                    .setEnvironment("env-" + taskId)
+                    .setName("job-" + taskId)))));
   }
 
   private static class CustomException extends RuntimeException {
@@ -98,11 +107,11 @@ public class StorageTransactionTest extends TearDownTestCase {
     }
   }
 
-  private void expectTasks(String... taskIds) {
-    storage.read(storeProvider -> {
+  private void expectTasks(final String... taskIds) {
+    storage.read((Work.Quiet<Void>) storeProvider -> {
       Query.Builder query = Query.unscoped();
       Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
-          .transform(Tasks::id)
+          .transform(t -> t.getAssignedTask().getTaskId())
           .toSet();
       assertEquals(ImmutableSet.<String>builder().add(taskIds).build(), ids);
       return null;
@@ -110,62 +119,41 @@ public class StorageTransactionTest extends TearDownTestCase {
   }
 
   @Test
-  public void testWritesUnderTransaction() {
-    try {
-      storage.write(storeProvider -> {
-        storeProvider.getQuotaStore().saveQuota("a", ResourceTestUtil.aggregate(2.0, 512, 100));
-        throw new CustomException();
-      });
-      fail("Expected CustomException to be thrown.");
-    } catch (CustomException e) {
-      // Expected
-    }
-
-    storage.read(storeProvider -> {
-      // Since the previous write was not transactional, the quota record remains.
-      assertEquals(ImmutableSet.of("a"),
-          storeProvider.getQuotaStore().fetchQuotas().keySet());
-      return null;
-    });
-  }
-
-  @Test
   public void testOperations() {
-    expectWriteFail(storeProvider -> {
+    expectWriteFail((MutateWork.NoResult.Quiet) storeProvider -> {
       storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
       throw new CustomException();
     });
-    // The in-memory storage is not transactional, so the writes are retained despite the write
-    // operation failing.
     expectTasks("a", "b");
 
-    storage.write((NoResult.Quiet) storeProvider ->
-        storeProvider.getUnsafeTaskStore().saveTasks(
-            ImmutableSet.of(makeTask("a"), makeTask("b"))));
+    storage.write((MutateWork.NoResult.Quiet) storeProvider -> {
+      storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a"), makeTask("b")));
+    });
     expectTasks("a", "b");
 
-    expectWriteFail(storeProvider -> {
+    expectWriteFail((MutateWork.NoResult.Quiet) storeProvider -> {
       storeProvider.getUnsafeTaskStore().deleteAllTasks();
       throw new CustomException();
     });
     expectTasks();
 
-    storage.write(
-        (NoResult.Quiet) storeProvider -> storeProvider.getUnsafeTaskStore().deleteAllTasks());
-
-    expectWriteFail(storeProvider -> {
+    expectWriteFail((MutateWork.NoResult.Quiet) storeProvider -> {
       storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a")));
       throw new CustomException();
     });
     expectTasks("a");
-
-    storage.write((NoResult.Quiet) storeProvider ->
-        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a"))));
+    storage.read((Work.Quiet<Void>) storeProvider -> {
+      assertEquals(
+          makeTask("a"),
+          Iterables.getOnlyElement(storeProvider.getTaskStore().fetchTasks(
+              Query.taskScoped("a"))));
+      return null;
+    });
 
     // Nested transaction where inner transaction fails.
-    expectWriteFail((NoResult.Quiet) storeProvider -> {
+    expectWriteFail((MutateWork.NoResult.Quiet) storeProvider -> {
       storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
-      storage.write(storeProvider1 -> {
+      storage.write((MutateWork.NoResult.Quiet) storeProvider1 -> {
         storeProvider1.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
         throw new CustomException();
       });
@@ -173,10 +161,11 @@ public class StorageTransactionTest extends TearDownTestCase {
     expectTasks("a", "c", "d");
 
     // Nested transaction where outer transaction fails.
-    expectWriteFail(storeProvider -> {
+    expectWriteFail((MutateWork.NoResult.Quiet) storeProvider -> {
       storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("c")));
-      storage.write((NoResult.Quiet) storeProvider1 ->
-          storeProvider1.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("d"))));
+      storage.write((MutateWork.NoResult.Quiet) storeProvider12 -> {
+        storeProvider12.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("d")));
+      });
       throw new CustomException();
     });
     expectTasks("a", "c", "d");

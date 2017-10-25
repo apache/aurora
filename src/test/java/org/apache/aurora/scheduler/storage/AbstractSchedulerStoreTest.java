@@ -11,27 +11,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db;
+package org.apache.aurora.scheduler.storage;
 
 import java.io.IOException;
 
 import com.google.common.base.Optional;
 
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class DbSchedulerStoreTest {
+public abstract class AbstractSchedulerStoreTest {
 
   private Storage storage;
 
   @Before
   public void setUp() throws IOException {
-    storage = DbUtil.createStorage();
+    storage = createStorage();
   }
+
+  protected abstract Storage createStorage();
 
   @Test
   public void testSchedulerStore() {

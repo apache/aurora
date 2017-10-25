@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.storage.mem;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
@@ -26,16 +25,14 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.db.InstrumentingInterceptor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
-import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
 import static org.easymock.EasyMock.createMock;
 import static org.junit.Assert.assertEquals;
 
-public class InMemTaskStoreTest extends AbstractTaskStoreTest {
+public class MemTaskStoreTest extends AbstractTaskStoreTest {
 
   private FakeStatsProvider statsProvider;
 
@@ -43,9 +40,7 @@ public class InMemTaskStoreTest extends AbstractTaskStoreTest {
   protected Module getStorageModule() {
     statsProvider = new FakeStatsProvider();
     return Modules.combine(
-        DbModule.testModuleWithWorkQueue(
-            PLAIN,
-            Optional.of(new InMemStoresModule(new DbModule.Options(), PLAIN))),
+        new MemStorageModule(),
         new AbstractModule() {
           @Override
           protected void configure() {

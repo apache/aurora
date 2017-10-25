@@ -24,7 +24,6 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 
 import org.apache.aurora.benchmark.fakes.FakeStatsProvider;
-import org.apache.aurora.common.inject.Bindings;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.ReadOnlyScheduler;
@@ -38,8 +37,8 @@ import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.thrift.ThriftModule;
 import org.apache.thrift.TException;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -155,7 +154,7 @@ public class ThriftApiBenchmarks {
           }
         },
         new AsyncModule(new AsyncModule.Options()),
-        DbModule.productionModule(Bindings.KeyFactory.PLAIN, new DbModule.Options()),
+        new MemStorageModule(),
         new ThriftModule.ReadOnly());
   }
 

@@ -20,10 +20,10 @@ import com.google.inject.util.Modules;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.common.util.testing.FakeClock;
-import org.apache.aurora.scheduler.storage.AbstractCronJobStoreTest;
+import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 
-public class DbCronJobStoreTest extends AbstractCronJobStoreTest {
+public class TaskStoreTest extends AbstractTaskStoreTest {
   @Override
   protected Module getStorageModule() {
     return Modules.combine(

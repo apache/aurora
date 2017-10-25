@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.storage.mem;
 
-import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
@@ -22,12 +21,10 @@ import org.apache.aurora.common.stats.SlidingStats;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.storage.AbstractCronJobStoreTest;
-import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.db.InstrumentingInterceptor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
-import static org.apache.aurora.common.inject.Bindings.KeyFactory.PLAIN;
 import static org.apache.aurora.scheduler.storage.mem.MemCronJobStore.CRON_JOBS_SIZE;
 import static org.easymock.EasyMock.createMock;
 import static org.junit.Assert.assertEquals;
@@ -40,9 +37,7 @@ public class MemCronJobStoreTest extends AbstractCronJobStoreTest {
   protected Module getStorageModule() {
     statsProvider = new FakeStatsProvider();
     return Modules.combine(
-        DbModule.testModuleWithWorkQueue(
-            PLAIN,
-            Optional.of(new InMemStoresModule(new DbModule.Options(), PLAIN))),
+        new MemStorageModule(),
         new AbstractModule() {
           @Override
           protected void configure() {

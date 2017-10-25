@@ -13,11 +13,13 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Optional;
 
+import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
@@ -28,10 +30,24 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 
+import static org.apache.aurora.gen.JobUpdateStatus.ABORTED;
+import static org.apache.aurora.gen.JobUpdateStatus.ERROR;
+import static org.apache.aurora.gen.JobUpdateStatus.FAILED;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
+
 /**
  * Stores all job updates and defines methods for saving, updating and fetching job updates.
  */
 public interface JobUpdateStore {
+
+  EnumSet<JobUpdateStatus> TERMINAL_STATES = EnumSet.of(
+      ROLLED_FORWARD,
+      ROLLED_BACK,
+      ABORTED,
+      FAILED,
+      ERROR
+  );
 
   /**
    * Fetches a read-only view of job update summaries.

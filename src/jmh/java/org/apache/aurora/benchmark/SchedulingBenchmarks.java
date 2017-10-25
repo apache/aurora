@@ -69,10 +69,10 @@ import org.apache.aurora.scheduler.scheduling.TaskScheduler.TaskSchedulerImpl.Re
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.updater.UpdateAgentReserver;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -116,7 +116,7 @@ public class SchedulingBenchmarks {
      */
     @Setup(Level.Trial)
     public void setUpBenchmark() {
-      storage = DbUtil.createFlaggedStorage();
+      storage = MemStorageModule.newEmptyStorage();
       eventBus = new EventBus();
       final FakeClock clock = new FakeClock();
       clock.setNowMillis(System.currentTimeMillis());

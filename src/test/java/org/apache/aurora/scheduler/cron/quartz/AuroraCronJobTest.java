@@ -33,8 +33,8 @@ import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
@@ -65,7 +65,7 @@ public class AuroraCronJobTest extends EasyMockTest {
 
   @Before
   public void setUp() throws Exception {
-    storage = DbUtil.createStorage();
+    storage = MemStorageModule.newEmptyStorage();
     stateManager = createMock(StateManager.class);
     backoffHelper = createMock(BackoffHelper.class);
     context = createMock(JobExecutionContext.class);
@@ -101,11 +101,11 @@ public class AuroraCronJobTest extends EasyMockTest {
     populateStorage(CronCollisionPolicy.CANCEL_NEW);
     auroraCronJob.doExecute(context);
 
-    storage = DbUtil.createStorage();
+    storage = MemStorageModule.newEmptyStorage();
     populateStorage(CronCollisionPolicy.KILL_EXISTING);
     auroraCronJob.doExecute(context);
 
-    storage = DbUtil.createStorage();
+    storage = MemStorageModule.newEmptyStorage();
     populateStorage(CronCollisionPolicy.RUN_OVERLAP);
     auroraCronJob.doExecute(context);
   }
