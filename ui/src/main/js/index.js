@@ -21,19 +21,19 @@ const SchedulerUI = () => (
   <Router>
     <div>
       <Navigation />
-      <Route component={injectApi(Home)} exact path='/beta/scheduler' />
-      <Route component={injectApi(Jobs)} exact path='/beta/scheduler/:role' />
-      <Route component={injectApi(Jobs)} exact path='/beta/scheduler/:role/:environment' />
-      <Route component={injectApi(Job)} exact path='/beta/scheduler/:role/:environment/:name' />
+      <Route component={injectApi(Home)} exact path='/scheduler' />
+      <Route component={injectApi(Jobs)} exact path='/scheduler/:role' />
+      <Route component={injectApi(Jobs)} exact path='/scheduler/:role/:environment' />
+      <Route component={injectApi(Job)} exact path='/scheduler/:role/:environment/:name' />
       <Route
         component={injectApi(Instance)}
         exact
-        path='/beta/scheduler/:role/:environment/:name/:instance' />
+        path='/scheduler/:role/:environment/:name/:instance' />
       <Route
         component={injectApi(Update)}
         exact
-        path='/beta/scheduler/:role/:environment/:name/update/:uid' />
-      <Route component={injectApi(Updates)} exact path='/beta/updates' />
+        path='/scheduler/:role/:environment/:name/update/:uid' />
+      <Route component={injectApi(Updates)} exact path='/updates' />
     </div>
   </Router>
 );

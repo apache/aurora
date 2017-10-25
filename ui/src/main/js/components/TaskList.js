@@ -30,7 +30,7 @@ export class TaskListItem extends React.Component {
       <td>
         <div className='task-list-item-instance'>
           <Link
-            to={`/beta/scheduler/${role}/${environment}/${name}/${task.assignedTask.instanceId}`}>
+            to={`/scheduler/${role}/${environment}/${name}/${task.assignedTask.instanceId}`}>
             {task.assignedTask.instanceId}
           </Link>
         </div>

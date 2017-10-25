@@ -108,12 +108,12 @@ export default class Job extends React.Component {
 
   setJobView(tabId) {
     const {match: {params: {role, environment, name}}} = this.props;
-    this.props.history.push(`/beta/scheduler/${role}/${environment}/${name}?jobView=${tabId}`);
+    this.props.history.push(`/scheduler/${role}/${environment}/${name}?jobView=${tabId}`);
   }
 
   setTaskView(tabId) {
     const {match: {params: {role, environment, name}}} = this.props;
-    this.props.history.push(`/beta/scheduler/${role}/${environment}/${name}?taskView=${tabId}`);
+    this.props.history.push(`/scheduler/${role}/${environment}/${name}?taskView=${tabId}`);
   }
 
   render() {

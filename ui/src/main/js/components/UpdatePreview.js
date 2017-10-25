@@ -14,7 +14,7 @@ export default function UpdatePreview({ update }) {
       <div
         className={`update-preview ${getClassForUpdateStatus(update.update.summary.state.status)}`}>
         <Link
-          to={`/beta/scheduler/${role}/${environment}/${name}/update/${id}`}>
+          to={`/scheduler/${role}/${environment}/${name}/update/${id}`}>
          Update In Progress
         </Link>
         <span className='update-preview-details'>

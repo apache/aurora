@@ -68,9 +68,6 @@ public class ServletFilterTest extends AbstractJettyTest {
 
     assertGzipEncodedGet("/updates");
     assertGzipEncodedGet("/updates/");
-
-    assertGzipEncodedGet("/assets/bower_components/angular/angular.js");
-
   }
 
   private void assertResponseStatus(

@@ -3,101 +3,27 @@
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
-
       http://www.apache.org/licenses/LICENSE-2.0
-
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
  limitations under the License.
  -->
-<html lang='en' ng-app='auroraUI'>
-<head>
-  <meta charset='utf-8'>
-  <meta name='google' value='notranslate'>
-  <link rel='icon' href='/assets/images/aurora.png' type='image/png'/>
-  <title>Aurora</title>
-
-  <!-- Load our css at the end so we can override bootstrap css properties as needed -->
-  <link href='/assets/bower_components/bootstrap/dist/css/bootstrap.min.css' rel='stylesheet'>
-  <link rel='stylesheet' href='/assets/css/app.css'/>
-
-</head>
-<body class='ng-cloak'>
-
-<nav class="navbar navbar-static-top header" role="navigation">
-  <div class="container-fluid">
-    <div class="navbar-header">
-      <a href="/scheduler"><img class="logo" src="/assets/images/aurora_logo.png"/></a>
-    </div>
-
-    <div class="collapse navbar-collapse">
-      <ul class="nav navbar-nav">
-        <li><a href="/updates">updates</a></li>
-      </ul>
-    </div>
-  </div>
-</nav>
-<div class='beta-banner'>
-  <div class='container-fluid'>
-    <div class='row'>
-      <!--
-       Licensed under the Apache License, Version 2.0 (the "License");
-       you may not use this file except in compliance with the License.
-       You may obtain a copy of the License at
-
-            http://www.apache.org/licenses/LICENSE-2.0
-
-       Unless required by applicable law or agreed to in writing, software
-       distributed under the License is distributed on an "AS IS" BASIS,
-       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-       See the License for the specific language governing permissions and
-       limitations under the License.
-       -->
-      <div class='col-md-12'>
-        <a id='beta-link' href='/beta/scheduler'> <span class='glyphicon glyphicon-hand-right' ></span> Try the Beta of the new Scheduler UI</a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class='container-fluid'>
-  <ng-view></ng-view>
-</div>
-
-<!-- Thrift -->
-<script src='/assets/js/thrift.js'></script>
-<script src='/apiclient/api_types.js'></script>
-<script src='/apiclient/ReadOnlyScheduler.js'></script>
-
-<!-- Angular -->
-<script src='/assets/bower_components/angular/angular.js'></script>
-<script src='/assets/bower_components/angular-route/angular-route.js'></script>
-<script src='/assets/js/app.js'></script>
-<script src='/assets/js/controllers.js'></script>
-<script src='/assets/js/directives.js'></script>
-<script src='/assets/js/services.js'></script>
-<script src='/assets/js/filters.js'></script>
-
-<!-- Bootstrap -->
-<script src='/assets/bower_components/jquery/dist/jquery.js'></script>
-<script src='/assets/bower_components/bootstrap/dist/js/bootstrap.min.js'></script>
-
-<!-- Angular bootstrap -->
-<script src='/assets/bower_components/angular-bootstrap/ui-bootstrap-tpls.min.js'></script>
-
-<!-- smart table -->
-<script src='/assets/bower_components/smart-table/Smart-Table.debug.js'></script>
-
-<!-- underscore -->
-<script src='/assets/bower_components/underscore/underscore.js'></script>
-
-<!-- moment.js -->
-<script src='/assets/bower_components/momentjs/moment.js'></script>
-
-<script type='text/javascript'>
-  document.getElementById('beta-link').href = window.location.href.replace('/scheduler', '/beta/scheduler');
-</script>
-</body>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8'>
+    <meta name='google' value='notranslate'>
+    <link rel='icon' href='/assets/images/aurora.png' type='image/png'/>
+    <title>Aurora</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src='/assets/bower_components/jquery/dist/jquery.js'></script>
+    <!-- Thrift -->
+    <script src='/assets/js/thrift.js'></script>
+    <script src='/apiclient/api_types.js'></script>
+    <script src='/apiclient/ReadOnlyScheduler.js'></script>
+    <script src="/assets/js/bundle.js"></script>
+  </body>
 </html>

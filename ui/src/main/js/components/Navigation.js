@@ -6,12 +6,12 @@ export default function Navigation({ fluid }) {
     <nav className='navbar'>
       <div className={fluid ? 'container-fluid' : 'container'}>
         <div className='navbar-header'>
-          <Link className='navbar-brand' to='/beta/scheduler'>
+          <Link className='navbar-brand' to='/scheduler'>
             <img alt='Brand' src='/assets/images/aurora_logo_white.png' />
           </Link>
         </div>
         <ul className='nav navbar-nav navbar-right'>
-          <li><Link to='/beta/updates'>updates</Link></li>
+          <li><Link to='/updates'>updates</Link></li>
         </ul>
       </div>
     </nav>

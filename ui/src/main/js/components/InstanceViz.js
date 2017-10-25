@@ -11,7 +11,7 @@ export default function InstanceViz({ instances, jobKey }) {
     {instances.map((i) => {
       return (<Link
         key={i.instanceId}
-        to={`/beta/scheduler/${role}/${environment}/${name}/${i.instanceId}`}>
+        to={`/scheduler/${role}/${environment}/${name}/${i.instanceId}`}>
         <li className={i.className} title={i.title} />
       </Link>);
     })}

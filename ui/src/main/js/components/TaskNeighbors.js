@@ -9,7 +9,7 @@ export function NeighborTaskItem({ assignedTask }) {
   return (
     <div>
       <span className='task-neighbors-task-key'>
-        <Link to={`/beta/scheduler/${taskKey}`}>
+        <Link to={`/scheduler/${taskKey}`}>
           {taskKey}
         </Link>
       </span>

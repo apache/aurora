@@ -26,7 +26,7 @@ export default class RoleList extends React.Component {
 
   _renderRow(r) {
     return (<tr key={r.role}>
-      <td><Link to={`/beta/scheduler/${r.role}`}>{r.role}</Link></td>
+      <td><Link to={`/scheduler/${r.role}`}>{r.role}</Link></td>
       <td>{r.jobCount}</td>
       <td>{r.cronJobCount}</td>
     </tr>);

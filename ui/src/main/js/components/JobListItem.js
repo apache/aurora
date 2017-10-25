@@ -20,7 +20,7 @@ export default function JobListItem(props) {
   const {job: {job: { cronSchedule, key: {role, name, environment}, taskConfig }, stats}} = props;
 
   const envLink = (props.env) ? null : (<td className='job-list-env'>
-    <Link to={`/beta/scheduler/${role}/${environment}`}>{environment}</Link>
+    <Link to={`/scheduler/${role}/${environment}`}>{environment}</Link>
   </td>);
 
   return (<tr key={`${environment}/${name}`}>
@@ -30,7 +30,7 @@ export default function JobListItem(props) {
     {envLink}
     <td className='job-list-name' value={name}>
       <h4>
-        <Link to={`/beta/scheduler/${role}/${environment}/${name}`}>
+        <Link to={`/scheduler/${role}/${environment}/${name}`}>
           {name}
           {taskConfig.production ? <Icon name='star' /> : ''}
         </Link>

@@ -20,7 +20,7 @@ function UpdateListItem({ summary, titleFn }) {
       <span className='update-list-item-status'>
         <Link
           className='update-list-job'
-          to={`/beta/scheduler/${role}/${environment}/${name}/update/${id}`}>
+          to={`/scheduler/${role}/${environment}/${name}/update/${id}`}>
           {title(summary)}
         </Link> &bull; <span className='update-list-status'>
           {UPDATE_STATUS[summary.state.status]}
@@ -45,7 +45,7 @@ function JobUpdateListItem({ update }) {
       <span>
         <Link
           className='job-update-list-id'
-          to={`/beta/scheduler/${role}/${environment}/${name}/update/${id}`}>
+          to={`/scheduler/${role}/${environment}/${name}/update/${id}`}>
           {id}
         </Link> &bull; <span className='job-update-list-status'>
           {UPDATE_STATUS[summary.state.status]}

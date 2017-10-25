@@ -55,7 +55,7 @@ export class InstanceEvent extends React.Component {
       <div className='update-instance-event' onClick={(e) => this.expand()}>
         {icon}
         <span className='update-instance-event-id'>
-          <Link to={`/beta/scheduler/${role}/${environment}/${name}/${instanceId}`}>
+          <Link to={`/scheduler/${role}/${environment}/${name}/${instanceId}`}>
             #{instanceId}
           </Link>
         </span>
