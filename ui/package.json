@@ -5,6 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "bootstrap": "^3.3.7",
+    "deep-equal": "^1.0.1",
     "diff": "^3.4.0",
     "es6-shim": "^0.35.3",
     "moment": "^2.18.1",
@@ -23,7 +24,6 @@
     "babel-preset-es2015": "^6.24.1",
     "babel-preset-react": "^6.24.1",
     "css-loader": "^0.28.5",
-    "deep-equal": "^1.0.1",
     "enzyme": "^3.0.0",
     "enzyme-adapter-react-16": "^1.0.0",
     "eslint": "^4.4.1",

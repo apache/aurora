@@ -1,4 +1,5 @@
 import React from 'react';
+import deepEqual from 'deep-equal';
 
 import Breadcrumb from 'components/Breadcrumb';
 import InstanceHistory from 'components/InstanceHistory';
@@ -8,13 +9,16 @@ import TaskStatus from 'components/TaskStatus';
 import { isActive } from 'utils/Task';
 
 export default class Instance extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {cluster: '', tasks: [], loading: true, loadingNeighbors: true};
+  getInitialState() {
+    return {cluster: '', tasks: [], loading: true};
   }
 
-  componentWillMount(props) {
-    const { role, environment, name, instance } = this.props.match.params;
+  constructor(props) {
+    super(props);
+    this.state = this.getInitialState();
+  }
+
+  fetchTask(role, environment, name, instance) {
     const query = new TaskQuery();
     query.role = role;
     query.environment = environment;
@@ -29,6 +33,11 @@ export default class Instance extends React.Component {
         tasks: rsp.result.scheduleStatusResult.tasks
       });
     });
+  }
+
+  componentWillMount(props) {
+    const { role, environment, name, instance } = this.props.match.params;
+    this.fetchTask(role, environment, name, instance);
   }
 
   componentWillUpdate(nextProps, nextState) {
@@ -48,6 +57,12 @@ export default class Instance extends React.Component {
           })
         });
       });
+    }
+
+    if (!deepEqual(this.props.match.params, nextProps.match.params)) {
+      const { role, environment, name, instance } = nextProps.match.params;
+      this.setState(this.getInitialState());
+      this.fetchTask(role, environment, name, instance);
     }
   }
 
