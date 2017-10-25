@@ -20,7 +20,9 @@
 - Added scheduler command line argument `-hold_offers_forever`, suitable for use in clusters where
   Aurora is the only framework.  This setting disables other options such as `-min_offer_hold_time`,
   and allows the scheduler to more efficiently cache scheduling attempts.
-- The schduler no longer uses an internal H2 database for storage.
+- The scheduler no longer uses an internal H2 database for storage.
+- There is a new Scheduler UI which, in addition to the facelift, provides the ability to inject your
+  own custom UI components.
 
 ### Deprecations and removals:
 
