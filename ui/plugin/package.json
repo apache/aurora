@@ -1,0 +1,9 @@
+{
+  "name": "aurora-ui-plugin",
+  "version": "1.0.0",
+  "description": "Use this package.json to enter your own custom npm dependencies (for custom UIs)",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {}
+}

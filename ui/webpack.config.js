@@ -2,7 +2,7 @@ var path = require('path');
 var webpack = require('webpack');
 
 var SOURCE_PATH = path.resolve(__dirname, 'src/main/js');
-var EXTENSION_PATH = path.resolve(__dirname, 'plugin/js')
+var EXTENSION_PATH = path.resolve(__dirname, 'plugin/js');
 
 module.exports = {
   devtool: 'source-map',

@@ -145,7 +145,14 @@ project(':ui') {
     args = ['test']
   }
 
-  task install(type: NpmTask) {
+  task pluginInstall(type: NpmTask) {
+    inputs.files(file('plugin/package.json'))
+    outputs.files(fileTree('node_modules'))
+
+    args = ['install', 'plugin/']
+  }
+
+  task install(type: NpmTask, dependsOn: 'pluginInstall') {
     inputs.files(file('package.json'))
     outputs.files(fileTree('node_modules'))
     // Install into the project dir to sandbox everything under ui/
