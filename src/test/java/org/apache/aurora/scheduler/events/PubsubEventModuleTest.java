@@ -32,7 +32,6 @@ import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.EasyMock;
 import org.junit.Before;
@@ -47,14 +46,12 @@ public class PubsubEventModuleTest extends EasyMockTest {
   private FakeStatsProvider statsProvider;
   private Logger logger;
   private UncaughtExceptionHandler exceptionHandler;
-  private SchedulingFilter schedulingFilter;
 
   @Before
   public void setUp() {
     statsProvider = new FakeStatsProvider();
     logger = createMock(Logger.class);
     exceptionHandler = createMock(UncaughtExceptionHandler.class);
-    schedulingFilter = createMock(SchedulingFilter.class);
   }
 
   @Test
@@ -109,7 +106,6 @@ public class PubsubEventModuleTest extends EasyMockTest {
             bind(UncaughtExceptionHandler.class).toInstance(exceptionHandler);
 
             bind(StatsProvider.class).toInstance(statsProvider);
-            PubsubEventModule.bindSchedulingFilterDelegate(binder()).toInstance(schedulingFilter);
             for (Module module : additionalModules) {
               install(module);
             }

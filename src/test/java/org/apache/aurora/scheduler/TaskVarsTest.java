@@ -28,10 +28,8 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
@@ -123,10 +121,8 @@ public class TaskVarsTest extends EasyMockTest {
         task.getStatus()));
   }
 
-  private void applyVeto(IScheduledTask task, Veto... vetoes) {
-    vars.taskVetoed(new PubsubEvent.Vetoed(
-        TaskGroupKey.from(task.getAssignedTask().getTask()),
-        ImmutableSet.copyOf(vetoes)));
+  private void applyVeto(Veto... vetoes) {
+    vars.taskVetoed(ImmutableSet.copyOf(vetoes));
   }
 
   private void schedulerActivated(IScheduledTask... initialTasks) {
@@ -222,9 +218,7 @@ public class TaskVarsTest extends EasyMockTest {
     replayAndBuild();
     schedulerActivated();
 
-    applyVeto(
-        makeTask(JOB_A, PENDING),
-        Veto.insufficientResources("ram", 500),
+    applyVeto(Veto.insufficientResources("ram", 500),
         Veto.insufficientResources("cpu", 500));
 
     assertEquals(1, getValue(STATIC_COUNTER));
@@ -240,7 +234,7 @@ public class TaskVarsTest extends EasyMockTest {
     replayAndBuild();
     schedulerActivated();
 
-    applyVeto(makeTask(JOB_A, PENDING), Veto.unsatisfiedLimit("constraint"));
+    applyVeto(Veto.unsatisfiedLimit("constraint"));
     assertEquals(1, getValue(DYNAMIC_COUNTER));
     assertEquals(1, getValue(LIMIT_NOT_SATISFIED_COUNTER));
   }
@@ -255,8 +249,7 @@ public class TaskVarsTest extends EasyMockTest {
     replayAndBuild();
     schedulerActivated();
 
-    applyVeto(makeTask(JOB_A, PENDING),
-        Veto.unsatisfiedLimit("constraint"),
+    applyVeto(Veto.unsatisfiedLimit("constraint"),
         Veto.insufficientResources("ram", 500));
 
     assertEquals(1, getValue(MIXED_COUNTER));

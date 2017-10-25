@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.metadata;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -42,7 +41,6 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
-import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.scheduling.TaskGroup;
 
@@ -83,7 +81,7 @@ public class NearestFit implements EventSubscriber {
    * @return The nearest fit vetoes for the given task.  This will return an empty set if
    *         no vetoes have been recorded for the task.
    */
-  public synchronized ImmutableSet<Veto> getNearestFit(TaskGroupKey groupKey) {
+  public ImmutableSet<Veto> getNearestFit(TaskGroupKey groupKey) {
     Fit fit = fitByGroupKey.getIfPresent(groupKey);
     return (fit == null) ? NO_VETO : fit.vetoes;
   }
@@ -94,7 +92,7 @@ public class NearestFit implements EventSubscriber {
    * @param deletedEvent Task deleted event.
    */
   @Subscribe
-  public synchronized void remove(TasksDeleted deletedEvent) {
+  public void remove(TasksDeleted deletedEvent) {
     fitByGroupKey.invalidateAll(Iterables.transform(deletedEvent.getTasks(), Functions.compose(
         TaskGroupKey::from,
         Tasks::getConfig)));
@@ -107,21 +105,20 @@ public class NearestFit implements EventSubscriber {
    * @param event Task state change.
    */
   @Subscribe
-  public synchronized void stateChanged(TaskStateChange event) {
+  public void stateChanged(TaskStateChange event) {
     if (event.isTransition() && event.getOldState().get() == ScheduleStatus.PENDING) {
       fitByGroupKey.invalidate(TaskGroupKey.from(event.getTask().getAssignedTask().getTask()));
     }
   }
 
   /**
-   * Records a task veto event.
+   * Records vetoes for a {@link TaskGroupKey}.
    *
-   * @param vetoEvent Veto event.
+   * @param taskGroupKey The TaskGroupKey that is being vetoed.
+   * @param vetoes The vetoes.
    */
-  @Subscribe
-  public synchronized void vetoed(Vetoed vetoEvent) {
-    Objects.requireNonNull(vetoEvent);
-    fitByGroupKey.getUnchecked(vetoEvent.getGroupKey()).maybeUpdate(vetoEvent.getVetoes());
+  public void vetoed(TaskGroupKey taskGroupKey, Set<Veto> vetoes) {
+    fitByGroupKey.getUnchecked(taskGroupKey).maybeUpdate(vetoes);
   }
 
   /**

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
@@ -40,7 +41,6 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
-import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoGroup;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType;
@@ -56,7 +56,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * A container that tracks and exports stat counters for tasks.
  */
-class TaskVars extends AbstractIdleService implements EventSubscriber {
+public class TaskVars extends AbstractIdleService implements EventSubscriber {
   private static final Logger LOG = LoggerFactory.getLogger(TaskVars.class);
   private static final ImmutableSet<ScheduleStatus> TRACKED_JOB_STATES =
       ImmutableSet.of(ScheduleStatus.LOST, ScheduleStatus.FAILED);
@@ -221,13 +221,12 @@ class TaskVars extends AbstractIdleService implements EventSubscriber {
     }
   }
 
-  @Subscribe
-  public void taskVetoed(Vetoed event) {
-    VetoGroup vetoGroup = Veto.identifyGroup(event.getVetoes());
+  public void taskVetoed(Set<Veto> vetoes) {
+    VetoGroup vetoGroup = Veto.identifyGroup(vetoes);
     if (vetoGroup != VetoGroup.EMPTY) {
       counters.getUnchecked(VETO_GROUPS_TO_COUNTERS.get(vetoGroup)).increment();
     }
-    for (Veto veto : event.getVetoes()) {
+    for (Veto veto : vetoes) {
       counters.getUnchecked(VETO_TYPE_TO_COUNTERS.get(veto.getVetoType())).increment();
     }
   }

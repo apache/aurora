@@ -40,7 +40,9 @@ import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.config.validators.PositiveNumber;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
+import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.http.JettyServerModule;
 import org.apache.aurora.scheduler.mesos.SchedulerDriverModule;
@@ -160,11 +162,15 @@ public class AppModule extends AbstractModule {
     GuiceUtils.bindExceptionTrap(binder(), Scheduler.class);
 
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
-    install(new PubsubEventModule());
     // Filter layering: notifier filter -> base impl
-    PubsubEventModule.bindSchedulingFilterDelegate(binder()).to(SchedulingFilterImpl.class);
+    bind(SchedulingFilter.class).to(NotifyingSchedulingFilter.class);
+    bind(NotifyingSchedulingFilter.class).in(Singleton.class);
+    bind(SchedulingFilter.class)
+        .annotatedWith(NotifyingSchedulingFilter.NotifyDelegate.class)
+        .to(SchedulingFilterImpl.class);
     bind(SchedulingFilterImpl.class).in(Singleton.class);
 
+    install(new PubsubEventModule());
     install(new AsyncModule(options.async));
     install(new OffersModule(options));
     install(new PruningModule(options.pruning));

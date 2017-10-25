@@ -152,16 +152,16 @@ public class PendingTasksTest extends EasyMockTest {
     ImmutableSet<Veto> vetoes = ImmutableSet.<Veto>builder()
         .add(Veto.insufficientResources("CPU", 1))
         .add(Veto.insufficientResources("RAM", 1)).build();
-    nearestFit.vetoed(new PubsubEvent.Vetoed(taskGroupKey0, vetoes));
+    nearestFit.vetoed(taskGroupKey0, vetoes);
     // Creating vetoes for CPU and DISK, corresponding to task1.
     ImmutableSet<Veto> vetoes1 = ImmutableSet.<Veto>builder()
         .add(Veto.insufficientResources("CPU", 1))
         .add(Veto.insufficientResources("DISK", 1)).build();
-    nearestFit.vetoed(new PubsubEvent.Vetoed(taskGroupKey1, vetoes1));
+    nearestFit.vetoed(taskGroupKey1, vetoes1);
       // Creating vetoes for CPU, corresponding to task2.
     ImmutableSet<Veto> vetoes2 = ImmutableSet.<Veto>builder()
         .add(Veto.insufficientResources("CPU", 1)).build();
-    nearestFit.vetoed(new PubsubEvent.Vetoed(taskGroupKey2, vetoes2));
+    nearestFit.vetoed(taskGroupKey2, vetoes2);
     replay(pendingTaskGroups);
 
     // Testing.

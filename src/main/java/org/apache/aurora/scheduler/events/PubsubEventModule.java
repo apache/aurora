@@ -29,15 +29,12 @@ import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.Provides;
-import com.google.inject.binder.LinkedBindingBuilder;
 import com.google.inject.multibindings.Multibinder;
 
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,19 +124,6 @@ public final class PubsubEventModule extends AbstractModule {
     protected void shutDown() {
       // Nothing to do - await VM shutdown.
     }
-  }
-
-  /**
-   * Gets a binding builder that must be used to wire up the scheduling filter implementation
-   * that backs the delegating scheduling filter that fires pubsub events.
-   *
-   * @param binder Binder to create a binding against.
-   * @return A linked binding builder that may be used to wire up the scheduling filter.
-   */
-  public static LinkedBindingBuilder<SchedulingFilter> bindSchedulingFilterDelegate(Binder binder) {
-    binder.bind(SchedulingFilter.class).to(NotifyingSchedulingFilter.class);
-    binder.bind(NotifyingSchedulingFilter.class).in(Singleton.class);
-    return binder.bind(SchedulingFilter.class).annotatedWith(NotifyDelegate.class);
   }
 
   /**

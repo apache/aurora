@@ -20,9 +20,11 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
+import org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import org.apache.aurora.scheduler.TaskVars;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
-import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
+import org.apache.aurora.scheduler.metadata.NearestFit;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -31,9 +33,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 /**
- * A decorating scheduling filter that sends an event when a scheduling assignment is vetoed.
+ * A decorating scheduling filter that notifies metadata classes when a scheduling assignment is
+ * vetoed.
  */
-class NotifyingSchedulingFilter implements SchedulingFilter {
+public class NotifyingSchedulingFilter implements SchedulingFilter {
 
   /**
    * Binding annotation that the underlying {@link SchedulingFilter} must be bound with.
@@ -43,22 +46,27 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   public @interface NotifyDelegate { }
 
   private final SchedulingFilter delegate;
-  private final EventSink eventSink;
+  private final NearestFit nearestFit;
+  private final TaskVars taskVars;
 
   @Inject
   NotifyingSchedulingFilter(
       @NotifyDelegate SchedulingFilter delegate,
-      EventSink eventSink) {
+      NearestFit nearestFit,
+      TaskVars taskVars) {
 
     this.delegate = requireNonNull(delegate);
-    this.eventSink = requireNonNull(eventSink);
+    this.nearestFit = requireNonNull(nearestFit);
+    this.taskVars = requireNonNull(taskVars);
   }
 
+  @Timed("notifying_scheduling_filter")
   @Override
   public Set<Veto> filter(UnusedResource resource, ResourceRequest request) {
     Set<Veto> vetoes = delegate.filter(resource, request);
     if (!vetoes.isEmpty()) {
-      eventSink.post(new Vetoed(TaskGroupKey.from(request.getTask()), vetoes));
+      nearestFit.vetoed(TaskGroupKey.from(request.getTask()), vetoes);
+      taskVars.taskVetoed(vetoes);
     }
 
     return vetoes;
