@@ -6,6 +6,7 @@ import InstanceHistory from 'components/InstanceHistory';
 import Loading from 'components/Loading';
 import TaskStatus from 'components/TaskStatus';
 
+import { isNully } from 'utils/Common';
 import { isActive } from 'utils/Task';
 
 export default class Instance extends React.Component {
@@ -44,19 +45,21 @@ export default class Instance extends React.Component {
     if (this.state.loading && !nextState.loading) {
       const activeTask = nextState.tasks.find(isActive);
 
-      const query = new TaskQuery();
-      query.statuses = [ScheduleStatus.RUNNING];
-      query.slaveHosts = [activeTask.assignedTask.slaveHost];
+      if (!isNully(activeTask)) {
+        const query = new TaskQuery();
+        query.statuses = [ScheduleStatus.RUNNING];
+        query.slaveHosts = [activeTask.assignedTask.slaveHost];
 
-      const that = this;
-      this.props.api.getTasksWithoutConfigs(query, (rsp) => {
-        const tasksOnAgent = rsp.result.scheduleStatusResult.tasks;
-        that.setState({
-          neighborTasks: tasksOnAgent.filter(function (el) {
-            return el.assignedTask.taskId !== activeTask.assignedTask.taskId;
-          })
+        const that = this;
+        this.props.api.getTasksWithoutConfigs(query, (rsp) => {
+          const tasksOnAgent = rsp.result.scheduleStatusResult.tasks;
+          that.setState({
+            neighborTasks: tasksOnAgent.filter(function (el) {
+              return el.assignedTask.taskId !== activeTask.assignedTask.taskId;
+            })
+          });
         });
-      });
+      }
     }
 
     if (!deepEqual(this.props.match.params, nextProps.match.params)) {
