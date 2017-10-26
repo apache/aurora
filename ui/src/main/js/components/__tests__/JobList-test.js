@@ -36,6 +36,7 @@ describe('searchJob', () => {
     expect(searchJob(job, '___notfound__')).toBe(false);
     expect(searchJob(job, 'zzz')).toBe(true);
     expect(searchJob(job, 'yyy')).toBe(true);
+    expect(searchJob(job, 'y-n')).toBe(true);
   });
 
   it('Should match jobs by tier', () => {

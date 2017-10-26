@@ -11,7 +11,7 @@ import { TASK_COUNTS } from 'utils/Job';
 export function searchJob(job, query) {
   const taskConfig = job.job.taskConfig;
   const jobType = taskConfig.isService ? 'service' : job.job.cronSchedule ? 'cron' : 'adhoc';
-  return (job.job.key.name.startsWith(query) ||
+  return (job.job.key.name.includes(query) ||
     taskConfig.tier.startsWith(query) ||
     job.job.key.environment.startsWith(query) ||
     jobType.startsWith(query));
