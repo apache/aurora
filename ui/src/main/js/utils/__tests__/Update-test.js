@@ -268,6 +268,23 @@ describe('updateStats', () => {
     expect(stats).toEqual({totalInstancesToBeUpdated: 10, instancesUpdated: 2, progress: 20});
   });
 
+  it('Should respect when there are exclusively deleted instances', () => {
+    const instructions = UpdateInstructionsBuilder
+      .initialState([InstanceTaskConfigBuilder.instances([{first: 0, last: 1}]).build()])
+      .desiredState(null)
+      .build();
+
+    const update = UpdateDetailsBuilder
+      .update(UpdateBuilder.instructions(instructions).build())
+      .instanceEvents([
+        instanceUpdated.instanceId(0).build(),
+        instanceUpdated.instanceId(1).build()
+      ])
+      .build();
+    const stats = updateStats(update);
+    expect(stats).toEqual({totalInstancesToBeUpdated: 2, instancesUpdated: 2, progress: 100});
+  });
+
   it('Any instances updated should show up in stats, even if rolled back', () => {
     const instructions = UpdateInstructionsBuilder
       .initialState([InstanceTaskConfigBuilder.instances([{first: 0, last: 9}]).build()])

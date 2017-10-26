@@ -1,4 +1,4 @@
-import { sort } from 'utils/Common';
+import { isNully, sort } from 'utils/Common';
 import Thrift, { UPDATE_ACTION } from 'utils/Thrift';
 
 export function isSuccessfulUpdate(update) {
@@ -22,10 +22,12 @@ function getAllInstanceIds(update) {
   const newIds = {};
   const oldIds = {};
 
-  processInstanceIdsFromRanges(update.instructions.desiredState.instances, (id) => {
-    newIds[id] = true;
-    allIds[id] = true;
-  });
+  if (!isNully(update.instructions.desiredState)) {
+    processInstanceIdsFromRanges(update.instructions.desiredState.instances, (id) => {
+      newIds[id] = true;
+      allIds[id] = true;
+    });
+  }
 
   update.instructions.initialState.forEach((task) => {
     processInstanceIdsFromRanges(task.instances, (id) => {
