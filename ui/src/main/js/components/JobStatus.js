@@ -11,7 +11,7 @@ import { isActive } from 'utils/Task';
 export default function ({ configGroups, cronJob, onTaskViewChange, queryParams, tasks }) {
   const activeTasks = sort(tasks.filter(isActive), (t) => t.assignedTask.instanceId);
   const numberConfigs = isNully(cronJob) ? (isNully(configGroups) ? '' : configGroups.length) : 1;
-  return (<Tab id='status' name='Job Status'>
+  return (<Tab id='status' name={`Active Tasks (${activeTasks.length})`}>
     <PanelGroup>
       <Tabs
         activeTab={queryParams.taskView}

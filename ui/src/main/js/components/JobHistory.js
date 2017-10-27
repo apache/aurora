@@ -9,7 +9,7 @@ import { getLastEventTime, isActive } from 'utils/Task';
 
 export default function ({ tasks }) {
   const terminalTasks = sort(tasks.filter((t) => !isActive(t)), (t) => getLastEventTime(t), true);
-  return (<Tab id='history' name={`Job History (${terminalTasks.length})`}>
+  return (<Tab id='history' name={`Completed Tasks (${terminalTasks.length})`}>
     <PanelGroup><TaskList sortBy='latest' tasks={terminalTasks} /></PanelGroup>
   </Tab>);
 }
