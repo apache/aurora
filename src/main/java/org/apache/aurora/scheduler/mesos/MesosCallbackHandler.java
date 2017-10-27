@@ -38,6 +38,7 @@ import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.offers.OffersModule;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -90,6 +91,7 @@ public interface MesosCallbackHandler {
     private final Clock clock;
     private final MaintenanceController maintenanceController;
     private final Amount<Long, Time> unavailabilityThreshold;
+    private final EventSink registeredEventSink;
 
     private final AtomicLong offersRescinded;
     private final AtomicLong slavesLost;
@@ -124,7 +126,8 @@ public interface MesosCallbackHandler {
         Driver driver,
         Clock clock,
         MaintenanceController controller,
-        @OffersModule.UnavailabilityThreshold Amount<Long, Time> unavailabilityThreshold) {
+        @OffersModule.UnavailabilityThreshold Amount<Long, Time> unavailabilityThreshold,
+        @PubsubEventModule.RegisteredEvents EventSink registeredEventSink) {
 
       this(
           storage,
@@ -138,7 +141,8 @@ public interface MesosCallbackHandler {
           driver,
           clock,
           controller,
-          unavailabilityThreshold);
+          unavailabilityThreshold,
+          registeredEventSink);
     }
 
     @VisibleForTesting
@@ -154,7 +158,8 @@ public interface MesosCallbackHandler {
         Driver driver,
         Clock clock,
         MaintenanceController maintenanceController,
-        Amount<Long, Time> unavailabilityThreshold) {
+        Amount<Long, Time> unavailabilityThreshold,
+        EventSink registeredEventSink) {
 
       this.storage = requireNonNull(storage);
       this.lifecycle = requireNonNull(lifecycle);
@@ -167,6 +172,7 @@ public interface MesosCallbackHandler {
       this.clock = requireNonNull(clock);
       this.maintenanceController = requireNonNull(maintenanceController);
       this.unavailabilityThreshold = requireNonNull(unavailabilityThreshold);
+      this.registeredEventSink = requireNonNull(registeredEventSink);
 
       this.offersRescinded = statsProvider.makeCounter("offers_rescinded");
       this.slavesLost = statsProvider.makeCounter("slaves_lost");
@@ -189,7 +195,7 @@ public interface MesosCallbackHandler {
           (Storage.MutateWork.NoResult.Quiet) storeProvider ->
               storeProvider.getSchedulerStore().saveFrameworkId(frameworkId.getValue()));
       frameworkRegistered.set(true);
-      eventSink.post(new PubsubEvent.DriverRegistered());
+      registeredEventSink.post(new PubsubEvent.DriverRegistered());
     }
 
     @Override

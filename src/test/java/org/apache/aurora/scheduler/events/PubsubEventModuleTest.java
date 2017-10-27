@@ -39,6 +39,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 
 import static org.easymock.EasyMock.anyString;
+import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 
 public class PubsubEventModuleTest extends EasyMockTest {
@@ -57,16 +58,22 @@ public class PubsubEventModuleTest extends EasyMockTest {
   @Test
   public void testHandlesDeadEvent() {
     logger.warn(String.format(PubsubEventModule.DEAD_EVENT_MESSAGE, "hello"));
+    logger.warn(String.format(PubsubEventModule.DEAD_EVENT_MESSAGE, "hello2"));
 
     control.replay();
 
-    getInjector().getInstance(EventBus.class).post("hello");
-    assertEquals(1L, statsProvider.getLongValue(PubsubEventModule.EVENT_BUS_DEAD_EVENTS));
+    Injector injector = getInjector();
+    injector.getInstance(EventBus.class).post("hello");
+    assertEquals(1, statsProvider.getLongValue(PubsubEventModule.EVENT_BUS_DEAD_EVENTS));
+    injector.getInstance(Key.get(EventBus.class, PubsubEventModule.RegisteredEvents.class))
+        .post("hello2");
+    assertEquals(2, statsProvider.getLongValue(PubsubEventModule.EVENT_BUS_DEAD_EVENTS));
   }
 
   @Test
   public void testPubsubExceptionTracking() throws Exception {
     logger.error(anyString(), EasyMock.<Throwable>anyObject());
+    expectLastCall().times(2);
 
     control.replay();
 
@@ -75,14 +82,18 @@ public class PubsubEventModuleTest extends EasyMockTest {
           @Override
           protected void configure() {
             PubsubEventModule.bindSubscriber(binder(), ThrowingSubscriber.class);
+            PubsubEventModule.bindRegisteredSubscriber(binder(), ThrowingSubscriber.class);
           }
         });
     injector.getInstance(Key.get(GuavaUtils.ServiceManagerIface.class, AppStartup.class))
         .startAsync().awaitHealthy();
-    assertEquals(0L, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
+    assertEquals(0, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
     injector.getInstance(EventBus.class).post("hello");
-    assertEquals(1L, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
-    assertEquals(0L, statsProvider.getLongValue(PubsubEventModule.EVENT_BUS_DEAD_EVENTS));
+    assertEquals(1, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
+    injector.getInstance(Key.get(EventBus.class, PubsubEventModule.RegisteredEvents.class))
+        .post("hello2");
+    assertEquals(2, statsProvider.getLongValue(PubsubEventModule.EXCEPTIONS_STAT));
+    assertEquals(0, statsProvider.getLongValue(PubsubEventModule.EVENT_BUS_DEAD_EVENTS));
   }
 
   static class ThrowingSubscriber implements PubsubEvent.EventSubscriber {
@@ -95,7 +106,7 @@ public class PubsubEventModuleTest extends EasyMockTest {
   public Injector getInjector(Module... additionalModules) {
     return Guice.createInjector(
         new LifecycleModule(),
-        new PubsubEventModule(logger),
+        new PubsubEventModule(logger, MoreExecutors.directExecutor()),
         new SchedulerServicesModule(),
         new AbstractModule() {
           @Override

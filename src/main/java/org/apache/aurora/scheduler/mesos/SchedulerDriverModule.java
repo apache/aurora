@@ -76,12 +76,12 @@ public class SchedulerDriverModule extends AbstractModule {
       case V0_DRIVER:
         bind(Driver.class).to(VersionedSchedulerDriverService.class);
         bind(VersionedSchedulerDriverService.class).in(Singleton.class);
-        PubsubEventModule.bindSubscriber(binder(), VersionedSchedulerDriverService.class);
+        PubsubEventModule.bindRegisteredSubscriber(binder(), VersionedSchedulerDriverService.class);
         break;
       case V1_DRIVER:
         bind(Driver.class).to(VersionedSchedulerDriverService.class);
         bind(VersionedSchedulerDriverService.class).in(Singleton.class);
-        PubsubEventModule.bindSubscriber(binder(), VersionedSchedulerDriverService.class);
+        PubsubEventModule.bindRegisteredSubscriber(binder(), VersionedSchedulerDriverService.class);
         break;
       default:
         checkState(false, "Unknown driver kind.");

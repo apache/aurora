@@ -165,6 +165,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
   private Logger injectedLog;
   private FakeClock clock;
   private MaintenanceController controller;
+  private EventSink registeredEventSink;
 
   private MesosCallbackHandler handler;
 
@@ -179,6 +180,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     driver = createMock(Driver.class);
     clock = new FakeClock();
     controller = createMock(MaintenanceController.class);
+    registeredEventSink = createMock(EventSink.class);
     createHandler(false);
   }
 
@@ -205,7 +207,8 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
         driver,
         clock,
         controller,
-        DRAIN_THRESHOLD);
+        DRAIN_THRESHOLD,
+        registeredEventSink);
   }
 
   @Test
@@ -216,7 +219,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     storageUtil.schedulerStore.saveFrameworkId(FRAMEWORK_ID);
     expectLastCall();
 
-    eventSink.post(new PubsubEvent.DriverRegistered());
+    registeredEventSink.post(new PubsubEvent.DriverRegistered());
 
     control.replay();
 

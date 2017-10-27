@@ -97,7 +97,7 @@ public class SchedulerModule extends AbstractModule {
       }
     });
 
-    PubsubEventModule.bindSubscriber(binder(), SchedulerLifecycle.class);
+    PubsubEventModule.bindRegisteredSubscriber(binder(), SchedulerLifecycle.class);
     bind(TaskVars.class).in(Singleton.class);
     PubsubEventModule.bindSubscriber(binder(), TaskVars.class);
     addSchedulerActiveServiceBinding(binder()).to(TaskVars.class);
