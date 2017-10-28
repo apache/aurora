@@ -298,7 +298,11 @@ public interface MesosCallbackHandler {
         message.append(" with ").append(status.getReason());
       }
       if (status.hasMessage()) {
-        message.append(": ").append(status.getMessage());
+        String[] lines = status.getMessage().split("\n");
+        message.append(": ").append(lines[0]);
+        if (lines.length > 1) {
+          message.append(" (truncated)");
+        }
       }
       if (debugLevel) {
         logger.debug(message.toString());
@@ -335,7 +339,7 @@ public interface MesosCallbackHandler {
 
     @Override
     public void handleLostAgent(AgentID agentId) {
-      log.info("Received notification of lost agent: " + agentId);
+      log.info("Received notification of lost agent: " + agentId.getValue());
       slavesLost.incrementAndGet();
     }
 
@@ -344,7 +348,9 @@ public interface MesosCallbackHandler {
       // With the current implementation of MESOS-313, Mesos is also reporting clean terminations of
       // custom executors via the executorLost callback.
       if (status != 0) {
-        log.warn("Lost executor " + executorID + " on slave " + slaveID + " with status " + status);
+        log.warn("Lost executor " + executorID.getValue()
+            + " on slave " + slaveID.getValue()
+            + " with status " + status);
         executorsLost.incrementAndGet();
       }
     }

@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
+import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.replay;
@@ -217,7 +218,6 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     storageUtil.expectOperations();
 
     storageUtil.schedulerStore.saveFrameworkId(FRAMEWORK_ID);
-    expectLastCall();
 
     registeredEventSink.post(new PubsubEvent.DriverRegistered());
 
@@ -465,7 +465,6 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
         + "SOURCE_AGENT with REASON_RECONCILIATION: message";
 
     injectedLog.debug(expectedMsg);
-    expectLastCall().once();
 
     eventSink.post(new PubsubEvent.TaskStatusReceived(
         STATUS_RECONCILIATION.getState(),
@@ -480,6 +479,31 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
     handler.handleUpdate(STATUS_RECONCILIATION);
     assertEquals(1L, statsProvider.getLongValue("scheduler_status_update"));
+  }
+
+  @Test
+  public void testNoMultilineLogging() {
+    createHandler(true);
+
+    injectedLog.info("Received status update for task task-id in state "
+        + "TASK_RUNNING from SOURCE_AGENT: A (truncated)");
+    injectedLog.info("Received status update for task task-id in state "
+        + "TASK_RUNNING from SOURCE_AGENT: A string with one line");
+    eventSink.post(anyObject());
+    expectLastCall().anyTimes();
+    statusHandler.statusUpdate(anyObject());
+    expectLastCall().anyTimes();
+
+    control.replay();
+
+    handler.handleUpdate(STATUS_NO_REASON
+        .toBuilder()
+        .setMessage("A\nstring\nwith\nmany\nlines")
+        .build());
+    handler.handleUpdate(STATUS_NO_REASON
+        .toBuilder()
+        .setMessage("A string with one line")
+        .build());
   }
 
   @Test
