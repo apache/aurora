@@ -46,6 +46,13 @@
   - `-snapshot_hydrate_stores`
   - `-enable_h2_console`
 
+0.18.1
+======
+
+### New/updated:
+
+- Update to Shiro 1.2.5
+
 0.18.0
 ======
 
