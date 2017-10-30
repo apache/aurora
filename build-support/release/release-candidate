@@ -95,12 +95,16 @@ fi
 git fetch --all -q
 git fetch --tags -q
 
+starting_git_branch=$(git rev-parse --abbrev-ref HEAD)
+
 # Verify that this is a clean repository
 if [[ -n "`git status --porcelain`" ]]; then
   echo "ERROR: Please run from a clean git repository."
   exit 1
-elif [[ "`git rev-parse --abbrev-ref HEAD`" != "master" ]]; then
-  echo "ERROR: This script must be run from master."
+# A patch release may be performed from the patched git SHA, but all other releases
+# should be from master.
+elif [[ "$starting_git_branch" != "master" && "$increment_level" != 'patch' ]]; then
+  echo "ERROR: This script must be run from master when not creating a patch release"
   exit 1
 fi
 
@@ -111,7 +115,10 @@ fi
 
 # Calculate the new version string
 current_version=$(cat .auroraversion | tr '[a-z]' '[A-Z]')
-if ! [[ $current_version =~ .*-SNAPSHOT ]]; then
+# When patching a release, we may be cherry-picking on the released git tag,
+# which would not contain a -SNAPSHOT version identifier.  Other releases,
+# however, should start from a git tree with a -SNAPSHOT version.
+if ! [[ $current_version =~ .*-SNAPSHOT || "$increment_level" == 'patch' ]]; then
   echo "ERROR: .auroraversion is required to contain 'SNAPSHOT', it is ${current_version}"
   exit 1
 else
@@ -139,6 +146,13 @@ else
   new_snapshot_version="${new_master_version}-SNAPSHOT"
 fi
 
+if [[ "$increment_level" == 'patch' && "$starting_git_branch" != 'master' ]]; then
+  echo 'NOTE: This release candidate is patching a non-master branch.'
+  echo '.auroraversion will be treated as the patched release, rather'
+  echo 'than the to-be-released version.'
+  current_version="$new_master_version"
+fi
+
 # Add the rc tag to the current version
 rc_version="${current_version}-rc${rc_number}"
 rc_version_tag="rel/${rc_version}"
@@ -159,7 +173,7 @@ function print_reset_instructions {
 cat <<EOF
 To roll back your local repo you will need to run:
 
-  git checkout master
+  git checkout "$starting_git_branch"
   git reset --hard ${current_git_rev}
   git branch -D "stage_${rc_version_tag}"
   git tag -d ${rc_version_tag}
@@ -235,9 +249,14 @@ if [[ $publish == 1 ]]; then
     -m "Apache Aurora ${current_version} release candidate ${rc_version_tag}"
   git push origin "${rc_version_tag}"
 
-  echo "Pushing updated .auroraversion to master"
-  git checkout master
-  git push origin master
+  if [[ "$starting_git_branch" = "master" ]]; then
+    echo "Pushing updated .auroraversion to master"
+    git checkout master
+    git push origin master
+  else
+    echo 'This is a patch release not starting from master, so an updated .auroraversion'
+    echo 'will not be pushed to master.'
+  fi
 fi
 
 echo "Done creating the release candidate. The following draft email has been created"
