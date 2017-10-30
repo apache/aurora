@@ -21,7 +21,7 @@
   }
 
   td {
-    padding: 5px;
+    padding: 3px 5px;
   }
 
   td:first-child {
@@ -63,7 +63,7 @@
 
   .task-list-item {
     align-items: center;
-    padding: 5px 0;
+    padding: 2px 0;
 
     .task-list-item-time {
       color: $secondary_font_color;

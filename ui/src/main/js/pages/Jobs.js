@@ -2,7 +2,7 @@ import React from 'react';
 
 import Breadcrumb from 'components/Breadcrumb';
 import JobList from 'components/JobList';
-import PanelGroup, { StandardPanelTitle } from 'components/Layout';
+import PanelGroup, { PanelSubtitle, StandardPanelTitle } from 'components/Layout';
 import Loading from 'components/Loading';
 import RoleQuota from 'components/RoleQuota';
 
@@ -41,8 +41,8 @@ export default class Jobs extends React.Component {
         role={this.props.match.params.role} />
       <div className='container'>
         <div className='row'>
-          <div className='col-md-12'>
-            <PanelGroup title={<StandardPanelTitle title='Resources' />}>
+          <div className='col-md-6'>
+            <PanelGroup noPadding title={<PanelSubtitle title='Resources' />}>
               <RoleQuota quota={this.state.quota} />
             </PanelGroup>
           </div>

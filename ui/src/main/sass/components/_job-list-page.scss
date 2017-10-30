@@ -19,6 +19,20 @@
   }
 }
 
+.role-quota {
+  table {
+    td, th {
+      padding: 3px 20px;
+      text-align: center;
+    }
+
+    tr > td:first-child {
+      width: 99%;
+      text-align: left;
+    }
+  }
+}
+
 td.job-list-name {
   width: 99%;
 
