@@ -3,6 +3,7 @@ import React from 'react';
 
 import { RelativeTime } from 'components/Time';
 
+import { formatMb } from 'utils/Quota';
 import { constraintToString, getResource, getResources, instanceRangeToString } from 'utils/Task';
 import { COLLISION_POLICY } from 'utils/Thrift';
 
@@ -16,11 +17,11 @@ function Resources({ config }) {
   </tr>,
   <tr>
     <td>ram</td>
-    <td>{getResource(config.resources, 'ramMb').ramMb}</td>
+    <td>{formatMb(getResource(config.resources, 'ramMb').ramMb)}</td>
   </tr>,
   <tr>
     <td>disk</td>
-    <td>{getResource(config.resources, 'diskMb').diskMb}</td>
+    <td>{formatMb(getResource(config.resources, 'diskMb').diskMb)}</td>
   </tr>,
   <tr>
     <td>ports</td>

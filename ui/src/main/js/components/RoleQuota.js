@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { isNully } from 'utils/Common';
+import { formatMb } from 'utils/Quota';
 
 const QUOTA_TYPE_ORDER = [
   'quota',
@@ -18,13 +19,6 @@ export const QUOTA_TYPE_MAP = {
   'prodDedicatedConsumption': 'Production Dedicated',
   'nonProdDedicatedConsumption': 'Non-Production Dedicated'
 };
-
-const UNITS = ['MiB', 'GiB', 'TiB', 'PiB', 'EiB'];
-
-function formatMb(sizeInMb) {
-  const unitIdx = (sizeInMb > 0) ? Math.floor(Math.log(sizeInMb) / Math.log(1024)) : 0;
-  return (sizeInMb / Math.pow(1024, unitIdx)).toFixed(2) + '' + UNITS[unitIdx];
-}
 
 const CONVERSIONS = {
   diskMb: formatMb,
