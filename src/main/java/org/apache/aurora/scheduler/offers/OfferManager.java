@@ -22,17 +22,15 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.cache.Cache;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
-import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 
+import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
@@ -153,6 +151,8 @@ public interface OfferManager extends EventSubscriber {
     @VisibleForTesting
     static final String STATICALLY_BANNED_OFFERS = "statically_banned_offers_size";
     @VisibleForTesting
+    static final String STATICALLY_BANNED_OFFERS_HIT_RATE = "statically_banned_offers_hit_rate";
+    @VisibleForTesting
     static final String OFFER_CANCEL_FAILURES = "offer_cancel_failures";
     @VisibleForTesting
     static final String GLOBALLY_BANNED_OFFERS = "globally_banned_offers_size";
@@ -175,7 +175,7 @@ public interface OfferManager extends EventSubscriber {
 
       this.driver = requireNonNull(driver);
       this.offerSettings = requireNonNull(offerSettings);
-      this.hostOffers = new HostOffers(statsProvider, offerSettings.getOfferOrder());
+      this.hostOffers = new HostOffers(statsProvider, offerSettings);
       this.offerRaces = statsProvider.makeCounter(OFFER_ACCEPT_RACES);
       this.offerCancelFailures = statsProvider.makeCounter(OFFER_CANCEL_FAILURES);
       this.offerDecline = requireNonNull(offerDecline);
@@ -209,7 +209,7 @@ public interface OfferManager extends EventSubscriber {
 
     private Protos.Filters getOfferFilter() {
       return Protos.Filters.newBuilder()
-          .setRefuseSeconds(offerSettings.getOfferFilterDuration().as(Time.SECONDS))
+          .setRefuseSeconds(offerSettings.getFilterDuration().as(Time.SECONDS))
           .build();
     }
 
@@ -279,6 +279,15 @@ public interface OfferManager extends EventSubscriber {
     }
 
     /**
+     * Used for testing to ensure that the underlying cache's `size` method returns an accurate
+     * value by not including evicted entries.
+     */
+    @VisibleForTesting
+    public void cleanupStaticBans() {
+      hostOffers.staticallyBannedOffers.cleanUp();
+    }
+
+    /**
      * A container for the data structures used by this class, to make it easier to reason about
      * the different indices used and their consistency.
      */
@@ -289,22 +298,25 @@ public interface OfferManager extends EventSubscriber {
       private final Map<AgentID, HostOffer> offersBySlave = Maps.newHashMap();
       private final Map<String, HostOffer> offersByHost = Maps.newHashMap();
 
-      // TODO(maxim): Expose via a debug endpoint. AURORA-1136.
       // Keep track of offer->groupKey mappings that will never be matched to avoid redundant
       // scheduling attempts. See VetoGroup for more details on static ban.
-      private final Multimap<OfferID, TaskGroupKey> staticallyBannedOffers =
-          Multimaps.synchronizedMultimap(HashMultimap.create());
+      private final Cache<Pair<OfferID, TaskGroupKey>, Boolean> staticallyBannedOffers;
 
       // Keep track of globally banned offers that will never be matched to anything.
       private final Set<OfferID> globallyBannedOffers = Sets.newConcurrentHashSet();
 
-      HostOffers(StatsProvider statsProvider, Ordering<HostOffer> offerOrder) {
-        offers = new ConcurrentSkipListSet<>(offerOrder);
+      HostOffers(StatsProvider statsProvider, OfferSettings offerSettings) {
+        offers = new ConcurrentSkipListSet<>(offerSettings.getOrdering());
+        staticallyBannedOffers = offerSettings
+            .getStaticBanCacheBuilder()
+            .build();
         // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
         // Could track this separately if it turns out to pose problems.
         statsProvider.exportSize(OUTSTANDING_OFFERS, offers);
-        statsProvider.makeGauge(STATICALLY_BANNED_OFFERS, () -> staticallyBannedOffers.size());
-        statsProvider.makeGauge(GLOBALLY_BANNED_OFFERS, () -> globallyBannedOffers.size());
+        statsProvider.makeGauge(STATICALLY_BANNED_OFFERS, staticallyBannedOffers::size);
+        statsProvider.makeGauge(STATICALLY_BANNED_OFFERS_HIT_RATE,
+            () -> staticallyBannedOffers.stats().hitRate());
+        statsProvider.makeGauge(GLOBALLY_BANNED_OFFERS, globallyBannedOffers::size);
       }
 
       synchronized Optional<HostOffer> get(AgentID slaveId) {
@@ -350,7 +362,6 @@ public interface OfferManager extends EventSubscriber {
           offersBySlave.remove(removed.getOffer().getAgentId());
           offersByHost.remove(removed.getOffer().getHostname());
         }
-        staticallyBannedOffers.removeAll(id);
         globallyBannedOffers.remove(id);
         return removed != null;
       }
@@ -387,8 +398,8 @@ public interface OfferManager extends EventSubscriber {
        * @return The offers a given task group can use.
        */
       synchronized Iterable<HostOffer> getWeaklyConsistentOffers(TaskGroupKey groupKey) {
-        return Iterables.unmodifiableIterable(FluentIterable.from(offers).filter(
-            e -> !staticallyBannedOffers.containsEntry(e.getOffer().getId(), groupKey)
+        return Iterables.unmodifiableIterable(FluentIterable.from(offers).filter(e ->
+            staticallyBannedOffers.getIfPresent(Pair.of(e.getOffer().getId(), groupKey)) == null
                 && !globallyBannedOffers.contains(e.getOffer().getId())));
       }
 
@@ -398,7 +409,7 @@ public interface OfferManager extends EventSubscriber {
 
       synchronized void addStaticGroupBan(OfferID offerId, TaskGroupKey groupKey) {
         if (offersById.containsKey(offerId)) {
-          staticallyBannedOffers.put(offerId, groupKey);
+          staticallyBannedOffers.put(Pair.of(offerId, groupKey), true);
         }
       }
 
@@ -407,7 +418,7 @@ public interface OfferManager extends EventSubscriber {
         offersById.clear();
         offersBySlave.clear();
         offersByHost.clear();
-        staticallyBannedOffers.clear();
+        staticallyBannedOffers.invalidateAll();
         globallyBannedOffers.clear();
       }
     }

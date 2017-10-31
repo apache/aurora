@@ -23,6 +23,7 @@ import javax.inject.Singleton;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.base.Supplier;
+import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import com.google.inject.AbstractModule;
@@ -39,6 +40,7 @@ import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.config.validators.NotNegativeAmount;
+import org.apache.aurora.scheduler.config.validators.NotNegativeNumber;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,6 +99,14 @@ public class OffersModule extends AbstractModule {
         description = "Custom Guice module to provide an offer ordering.")
     @SuppressWarnings("rawtypes")
     public List<Class> offerOrderModules = ImmutableList.of(OfferOrderModule.class);
+
+    @Parameter(names = "-offer_static_ban_cache_max_size",
+        validateValueWith = NotNegativeNumber.class,
+        description =
+            "The number of offers to hold in the static ban cache. If no value is specified, "
+                + "the cache will grow indefinitely. However, entries will expire within "
+                + "'min_offer_hold_time' + 'offer_hold_jitter_window' of being written.")
+    public long offerStaticBanCacheMaxSize = Long.MAX_VALUE;
   }
 
   public static class OfferOrderModule extends AbstractModule {
@@ -175,6 +185,27 @@ public class OffersModule extends AbstractModule {
   @Provides
   @Singleton
   OfferSettings provideOfferSettings(Ordering<HostOffer> offerOrdering) {
-    return new OfferSettings(cliOptions.offer.offerFilterDuration, offerOrdering);
+    // We have a dual eviction strategy for the static ban cache in OfferManager that is based on
+    // both maximum size of the cache and the length an offer is valid. We do this in order to
+    // satisfy requirements in both single- and multi-framework environments. If offers are held for
+    // a finite duration, then we can expire cache entries after offerMaxHoldTime since that is the
+    // longest it will be valid for. Additionally, cluster operators will most likely not have to
+    // worry about cache size in this case as this behavior mimics current behavior. If offers are
+    // held indefinitely, then we never expire cache entries but the cluster operator can specify a
+    // maximum size to avoid a memory leak.
+    long maxOfferHoldTime;
+    if (cliOptions.offer.holdOffersForever) {
+      maxOfferHoldTime = Long.MAX_VALUE;
+    } else {
+      maxOfferHoldTime = cliOptions.offer.minOfferHoldTime.as(Time.SECONDS)
+          + cliOptions.offer.offerHoldJitterWindow.as(Time.SECONDS);
+    }
+
+    return new OfferSettings(
+        cliOptions.offer.offerFilterDuration,
+        offerOrdering,
+        Amount.of(maxOfferHoldTime, Time.SECONDS),
+        cliOptions.offer.offerStaticBanCacheMaxSize,
+        Ticker.systemTicker());
   }
 }

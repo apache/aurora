@@ -15,6 +15,9 @@ package org.apache.aurora.scheduler.offers;
 
 import java.util.List;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Ticker;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Ordering;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -28,29 +31,58 @@ import static java.util.Objects.requireNonNull;
  */
 public class OfferSettings {
 
-  private final Amount<Long, Time> offerFilterDuration;
-  private final Ordering<HostOffer> offerOrder;
+  private final Amount<Long, Time> filterDuration;
+  private final Ordering<HostOffer> ordering;
+  private final CacheBuilder<Object, Object> staticBanCacheBuilder;
 
-  public OfferSettings(Amount<Long, Time> offerFilterDuration, List<OfferOrder> offerOrder) {
-    this(offerFilterDuration, OfferOrderBuilder.create(offerOrder));
+  @VisibleForTesting
+  public OfferSettings(Amount<Long, Time> filterDuration,
+                       List<OfferOrder> ordering,
+                       Amount<Long, Time> maxHoldTime,
+                       long staticBanCacheMaxSize,
+                       Ticker staticBanCacheTicker) {
+
+    this(filterDuration,
+        OfferOrderBuilder.create(ordering),
+        maxHoldTime,
+        staticBanCacheMaxSize,
+        staticBanCacheTicker);
   }
 
-  OfferSettings(Amount<Long, Time> offerFilterDuration, Ordering<HostOffer> offerOrder) {
-    this.offerFilterDuration = requireNonNull(offerFilterDuration);
-    this.offerOrder = requireNonNull(offerOrder);
+  OfferSettings(Amount<Long, Time> filterDuration,
+                Ordering<HostOffer> ordering,
+                Amount<Long, Time> maxHoldTime,
+                long staticBanCacheMaxSize,
+                Ticker staticBanTicker) {
+
+    this.filterDuration = requireNonNull(filterDuration);
+    this.ordering = requireNonNull(ordering);
+    this.staticBanCacheBuilder = CacheBuilder.newBuilder()
+        .expireAfterWrite(maxHoldTime.as(Time.SECONDS), Time.SECONDS.getTimeUnit())
+        .maximumSize(staticBanCacheMaxSize)
+        .ticker(staticBanTicker)
+        .recordStats();
   }
 
   /**
    * Duration after which we want Mesos to re-offer unused or declined resources.
    */
-  public Amount<Long, Time> getOfferFilterDuration() {
-    return offerFilterDuration;
+  public Amount<Long, Time> getFilterDuration() {
+    return filterDuration;
   }
 
   /**
    * The ordering to use when fetching offers from OfferManager.
    */
-  public Ordering<HostOffer> getOfferOrder() {
-    return offerOrder;
+  public Ordering<HostOffer> getOrdering() {
+    return ordering;
+  }
+
+  /**
+   * The builder for the static ban cache. Cache settings (e.g. max size, entry expiration) should
+   * already be added to the builder by this point.
+   */
+  public CacheBuilder<Object, Object> getStaticBanCacheBuilder() {
+    return staticBanCacheBuilder;
   }
 }

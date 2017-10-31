@@ -119,6 +119,7 @@ public class CommandLineTest {
     expected.offer.holdOffersForever = true;
     expected.offer.minOfferHoldTime = TEST_TIME;
     expected.offer.offerHoldJitterWindow = TEST_TIME;
+    expected.offer.offerStaticBanCacheMaxSize = 42L;
     expected.offer.offerFilterDuration = TEST_TIME;
     expected.offer.unavailabilityThreshold = TEST_TIME;
     expected.offer.offerOrder = ImmutableList.of(OfferOrder.CPU, OfferOrder.DISK);
@@ -264,6 +265,7 @@ public class CommandLineTest {
         "-hold_offers_forever=true",
         "-min_offer_hold_time=42days",
         "-offer_hold_jitter_window=42days",
+        "-offer_static_ban_cache_max_size=42",
         "-offer_filter_duration=42days",
         "-unavailability_threshold=42days",
         "-offer_order=CPU,DISK",

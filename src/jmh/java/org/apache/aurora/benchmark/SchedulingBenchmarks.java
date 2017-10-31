@@ -40,6 +40,7 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.common.util.testing.FakeClock;
+import org.apache.aurora.common.util.testing.FakeTicker;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskIdGenerator;
@@ -153,7 +154,11 @@ public class SchedulingBenchmarks {
               bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
               bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
               bind(OfferSettings.class).toInstance(
-                  new OfferSettings(NO_DELAY, ImmutableList.of(OfferOrder.RANDOM)));
+                  new OfferSettings(NO_DELAY,
+                      ImmutableList.of(OfferOrder.RANDOM),
+                      Amount.of(Long.MAX_VALUE, Time.SECONDS),
+                      Long.MAX_VALUE,
+                      new FakeTicker()));
               bind(BiCache.BiCacheSettings.class).toInstance(
                   new BiCache.BiCacheSettings(DELAY_FOREVER, ""));
               bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
