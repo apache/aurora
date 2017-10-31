@@ -26,18 +26,14 @@ import com.google.common.collect.FluentIterable;
 import com.google.inject.Exposed;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
-import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.base.MorePreconditions;
-import org.apache.aurora.common.io.Codec;
 import org.apache.aurora.common.net.InetSocketAddressHelper;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.zookeeper.Credentials;
-import org.apache.aurora.common.zookeeper.Encoding;
 import org.apache.aurora.common.zookeeper.SingletonService;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.curator.RetryPolicy;
@@ -75,8 +71,6 @@ class CuratorServiceDiscoveryModule extends PrivateModule {
   protected void configure() {
     requireBinding(ServiceDiscoveryBindings.ZOO_KEEPER_CLUSTER_KEY);
     requireBinding(ServiceDiscoveryBindings.ZOO_KEEPER_ACL_KEY);
-
-    bind(new TypeLiteral<Codec<ServiceInstance>>() { }).toInstance(Encoding.JSON_CODEC);
   }
 
   @Provides
@@ -216,8 +210,7 @@ class CuratorServiceDiscoveryModule extends PrivateModule {
   @Exposed
   ServiceGroupMonitor provideServiceGroupMonitor(
       ShutdownRegistry shutdownRegistry,
-      CuratorFramework client,
-      Codec<ServiceInstance> codec) {
+      CuratorFramework client) {
 
     PathChildrenCache groupCache =
         new PathChildrenCache(client, discoveryPath, true /* cacheData */);
@@ -230,7 +223,7 @@ class CuratorServiceDiscoveryModule extends PrivateModule {
     // when it is closed to avoid errors in those clients when attempting to use it.
 
     ServiceGroupMonitor serviceGroupMonitor =
-        new CuratorServiceGroupMonitor(groupCache, MEMBER_SELECTOR, codec);
+        new CuratorServiceGroupMonitor(groupCache, MEMBER_SELECTOR);
     shutdownRegistry.addAction(groupCache::close);
 
     return serviceGroupMonitor;
@@ -239,8 +232,8 @@ class CuratorServiceDiscoveryModule extends PrivateModule {
   @Provides
   @Singleton
   @Exposed
-  SingletonService provideSingletonService(CuratorFramework client, Codec<ServiceInstance> codec) {
-    return new CuratorSingletonService(client, discoveryPath, MEMBER_TOKEN, codec);
+  SingletonService provideSingletonService(CuratorFramework client) {
+    return new CuratorSingletonService(client, discoveryPath, MEMBER_TOKEN);
   }
 
   private String zkConnectionStateCounterName(ConnectionState state) {

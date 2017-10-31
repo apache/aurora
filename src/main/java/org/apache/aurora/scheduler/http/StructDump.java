@@ -23,8 +23,9 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Optional;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
-import org.apache.aurora.common.thrift.Util;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
@@ -98,12 +99,14 @@ public class StructDump extends JerseyTemplateServlet {
             .transform(IJobConfiguration::newBuilder));
   }
 
-  private Response dumpEntity(final String id, final Quiet<Optional<? extends TBase<?, ?>>> work) {
+  private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+  private Response dumpEntity(String id, Quiet<Optional<? extends TBase<?, ?>>> work) {
     return fillTemplate(template -> {
       template.setAttribute("id", id);
       Optional<? extends TBase<?, ?>> struct = storage.read(work);
       if (struct.isPresent()) {
-        template.setAttribute("structPretty", Util.prettyPrint(struct.get()));
+        template.setAttribute("structPretty", GSON.toJson(struct.get()));
         template.setAttribute("exception", null);
       } else {
         template.setAttribute("exception", "Entity not found");

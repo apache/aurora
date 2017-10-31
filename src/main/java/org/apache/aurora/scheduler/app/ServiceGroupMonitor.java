@@ -18,7 +18,7 @@ import java.util.function.Supplier;
 
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.common.thrift.ServiceInstance;
+import org.apache.aurora.scheduler.discovery.ServiceInstance;
 
 /**
  * Monitors a service group's membership and supplies a live view of the most recent set.

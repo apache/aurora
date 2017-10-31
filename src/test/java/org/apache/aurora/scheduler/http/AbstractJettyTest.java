@@ -20,6 +20,7 @@ import javax.servlet.ServletContextListener;
 import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.RateLimiter;
@@ -40,8 +41,6 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.common.thrift.Endpoint;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.common.util.BackoffStrategy;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.AppStartup;
@@ -52,6 +51,8 @@ import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.cron.CronJobManager;
+import org.apache.aurora.scheduler.discovery.ServiceInstance;
+import org.apache.aurora.scheduler.discovery.ServiceInstance.Endpoint;
 import org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler;
 import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
@@ -151,8 +152,8 @@ public abstract class AbstractJettyTest extends EasyMockTest {
   }
 
   protected void setLeadingScheduler(String host, int port) {
-    schedulers.set(
-        ImmutableSet.of(new ServiceInstance().setServiceEndpoint(new Endpoint(host, port))));
+    schedulers.set(ImmutableSet.of(
+        new ServiceInstance(new Endpoint(host, port), ImmutableMap.of())));
   }
 
   protected void unsetLeadingSchduler() {

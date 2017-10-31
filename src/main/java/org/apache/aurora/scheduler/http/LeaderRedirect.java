@@ -25,10 +25,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
 
-import org.apache.aurora.common.thrift.Endpoint;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor.MonitorException;
+import org.apache.aurora.scheduler.discovery.ServiceInstance;
+import org.apache.aurora.scheduler.discovery.ServiceInstance.Endpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,11 +85,9 @@ class LeaderRedirect implements Closeable {
   private Optional<HostAndPort> getLeaderHttp() {
     Optional<ServiceInstance> leadingScheduler = getLeader();
 
-    if (leadingScheduler.isPresent() && leadingScheduler.get().isSetServiceEndpoint()) {
+    if (leadingScheduler.isPresent()) {
       Endpoint leaderHttp = leadingScheduler.get().getServiceEndpoint();
-      if (leaderHttp != null && leaderHttp.isSetHost() && leaderHttp.isSetPort()) {
-        return Optional.of(HostAndPort.fromParts(leaderHttp.getHost(), leaderHttp.getPort()));
-      }
+      return Optional.of(HostAndPort.fromParts(leaderHttp.getHost(), leaderHttp.getPort()));
     }
 
     LOG.warn("Leader service instance seems to be incomplete: " + leadingScheduler);
@@ -134,11 +132,6 @@ class LeaderRedirect implements Closeable {
   LeaderStatus getLeaderStatus() {
     Optional<ServiceInstance> leadingScheduler = getLeader();
     if (!leadingScheduler.isPresent()) {
-      return LeaderStatus.NO_LEADER;
-    }
-
-    if (!leadingScheduler.get().isSetServiceEndpoint()) {
-      LOG.warn("Leader service instance seems to be incomplete: " + leadingScheduler);
       return LeaderStatus.NO_LEADER;
     }
 

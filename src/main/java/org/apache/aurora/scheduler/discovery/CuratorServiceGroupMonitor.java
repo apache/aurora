@@ -13,16 +13,14 @@
  */
 package org.apache.aurora.scheduler.discovery;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.function.Predicate;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.gson.JsonSyntaxException;
 
 import org.apache.aurora.GuavaUtils;
-import org.apache.aurora.common.io.Codec;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.aurora.scheduler.app.ServiceGroupMonitor;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
@@ -37,7 +35,6 @@ class CuratorServiceGroupMonitor implements ServiceGroupMonitor {
 
   private final PathChildrenCache groupCache;
   private final Predicate<String> memberSelector;
-  private final Codec<ServiceInstance> codec;
 
   /**
    * Creates a {@code ServiceGroupMonitor} backed by Curator.
@@ -54,16 +51,10 @@ class CuratorServiceGroupMonitor implements ServiceGroupMonitor {
    * @param memberSelector A predicate that returns {@code true} for group node names that represent
    *                       group members.  Here the name is just the `basename` of the node's full
    *                       ZooKeeper path.
-   * @param codec A codec that can be used to deserialize group member {@link ServiceInstance} data.
    */
-  CuratorServiceGroupMonitor(
-      PathChildrenCache groupCache,
-      Predicate<String> memberSelector,
-      Codec<ServiceInstance> codec) {
-
+  CuratorServiceGroupMonitor(PathChildrenCache groupCache, Predicate<String> memberSelector) {
     this.groupCache = requireNonNull(groupCache);
     this.memberSelector = requireNonNull(memberSelector);
-    this.codec = requireNonNull(codec);
   }
 
   @Override
@@ -104,10 +95,9 @@ class CuratorServiceGroupMonitor implements ServiceGroupMonitor {
   }
 
   private Optional<ServiceInstance> extractServiceInstance(ChildData data) {
-    ByteArrayInputStream source = new ByteArrayInputStream(data.getData());
     try {
-      return Optional.of(codec.deserialize(source));
-    } catch (IOException e) {
+      return Optional.of(Encoding.decode(data.getData()));
+    } catch (JsonSyntaxException e) {
       LOG.error("Failed to deserialize ServiceInstance from " + data, e);
       return Optional.empty();
     }

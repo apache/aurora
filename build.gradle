@@ -180,11 +180,6 @@ project(':ui') {
 tasks.processResources.dependsOn(':ui:webpack')
 
 project(':commons') {
-  apply plugin: org.apache.aurora.build.ThriftPlugin
-  thrift {
-    version = thriftRev
-  }
-
   apply plugin: 'license'
   license {
     header rootProject.file('config/checkstyle/apache.header')
@@ -192,17 +187,13 @@ project(':commons') {
   }
 
   dependencies {
-    compile project(':commons-args')
-
     compile "com.google.code.findbugs:jsr305:${jsrRev}"
     compile "com.google.code.gson:gson:${gsonRev}"
     compile "com.google.guava:guava:${guavaRev}"
-    compile "com.google.inject.extensions:guice-multibindings:${guiceRev}"
     compile "com.google.inject:guice:${guiceRev}"
     compile "com.sun.jersey:jersey-core:${jerseyRev}"
     compile "commons-lang:commons-lang:${commonsLangRev}"
     compile "javax.servlet:javax.servlet-api:${servletRev}"
-    compile "joda-time:joda-time:2.9.1"
     compile "org.antlr:stringtemplate:${stringTemplateRev}"
     compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"
     compile "org.easymock:easymock:3.4"
@@ -213,8 +204,6 @@ project(':commons') {
     compile "junit:junit:${junitRev}"
 
     testCompile "junit:junit:${junitRev}"
-    testCompile "org.powermock:powermock-module-junit4:1.6.4"
-    testCompile "org.powermock:powermock-api-easymock:1.6.4"
   }
 }
 

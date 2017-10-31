@@ -13,10 +13,9 @@
  */
 package org.apache.aurora.scheduler.discovery;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.common.thrift.ServiceInstance;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.apache.curator.utils.ZKPaths;
 import org.apache.zookeeper.CreateMode;
@@ -98,7 +97,7 @@ public class CuratorServiceGroupMonitorTest extends BaseCuratorDiscoveryTest {
   public void testInvalidMemberNode() throws Exception {
     startGroupMonitor();
 
-    createMember(ThriftBinaryCodec.encode(serviceInstance("invalid")));
+    createMember("invalid".getBytes(Charsets.UTF_8));
 
     ServiceInstance member = serviceInstance("member");
     createMember(member);
@@ -134,7 +133,7 @@ public class CuratorServiceGroupMonitorTest extends BaseCuratorDiscoveryTest {
   private String createMember(ServiceInstance serviceInstance, boolean waitForGroupEvent)
       throws Exception {
 
-    return createMember(serialize(serviceInstance), waitForGroupEvent);
+    return createMember(Encoding.encode(serviceInstance), waitForGroupEvent);
   }
 
   private String createMember(byte[] nodeData) throws Exception {

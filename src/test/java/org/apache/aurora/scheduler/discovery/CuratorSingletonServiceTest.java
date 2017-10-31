@@ -67,7 +67,7 @@ public class CuratorSingletonServiceTest extends BaseCuratorDiscoveryTest {
       throws Exception {
 
     CuratorSingletonService singletonService =
-        new CuratorSingletonService(client, GROUP_PATH, MEMBER_TOKEN, CODEC);
+        new CuratorSingletonService(client, GROUP_PATH, MEMBER_TOKEN);
     InetSocketAddress leaderEndpoint = InetSocketAddress.createUnresolved(hostName, PRIMARY_PORT);
     singletonService.lead(leaderEndpoint, ImmutableMap.of(), listener);
   }

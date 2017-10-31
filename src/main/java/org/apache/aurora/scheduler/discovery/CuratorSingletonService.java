@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.discovery;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Map;
@@ -25,12 +24,9 @@ import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
 
 import org.apache.aurora.common.base.MorePreconditions;
-import org.apache.aurora.common.io.Codec;
-import org.apache.aurora.common.thrift.Endpoint;
-import org.apache.aurora.common.thrift.ServiceInstance;
-import org.apache.aurora.common.thrift.Status;
 import org.apache.aurora.common.zookeeper.SingletonService;
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.discovery.ServiceInstance.Endpoint;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.leader.CancelLeadershipException;
 import org.apache.curator.framework.recipes.leader.LeaderSelector;
@@ -56,18 +52,11 @@ class CuratorSingletonService implements SingletonService {
     private final String groupPath;
     private final String memberToken;
     private final CuratorFramework client;
-    private final Codec<ServiceInstance> codec;
 
-    Advertiser(
-        CuratorFramework client,
-        String groupPath,
-        String memberToken,
-        Codec<ServiceInstance> codec) {
-
+    Advertiser(CuratorFramework client, String groupPath, String memberToken) {
       this.client = requireNonNull(client);
       this.groupPath = PathUtils.validatePath(groupPath);
       this.memberToken = MorePreconditions.checkNotBlank(memberToken);
-      this.codec = requireNonNull(codec);
     }
 
     void advertise(
@@ -109,17 +98,14 @@ class CuratorSingletonService implements SingletonService {
       ServiceInstance serviceInstance =
           new ServiceInstance(
               asEndpoint(endpoint),
-              Maps.transformValues(additionalEndpoints, Advertiser::asEndpoint),
-              Status.ALIVE);
+              Maps.transformValues(additionalEndpoints, Advertiser::asEndpoint));
 
-      ByteArrayOutputStream sink = new ByteArrayOutputStream();
       try {
-        codec.serialize(serviceInstance, sink);
+        return Encoding.encode(serviceInstance);
       } catch (IOException e) {
         throw new AdvertiseException(
             "Problem serializing service instance data for " + serviceInstance, e);
       }
-      return sink.toByteArray();
     }
 
     private static Endpoint asEndpoint(InetSocketAddress endpoint) {
@@ -137,14 +123,9 @@ class CuratorSingletonService implements SingletonService {
    * @param client A client to interact with a ZooKeeper ensemble.
    * @param groupPath The root ZooKeeper path service members advertise their presence under.
    * @param memberToken A token used to form service member node names.
-   * @param codec A codec that can be used to deserialize group member {@link ServiceInstance} data.
    */
-  CuratorSingletonService(
-      CuratorFramework client,
-      String groupPath,
-      String memberToken,
-      Codec<ServiceInstance> codec) {
-    advertiser = new Advertiser(client, groupPath, memberToken, codec);
+  CuratorSingletonService(CuratorFramework client, String groupPath, String memberToken) {
+    advertiser = new Advertiser(client, groupPath, memberToken);
     this.client = client;
     this.groupPath = PathUtils.validatePath(groupPath);
   }
