@@ -95,7 +95,7 @@ class AuroraExecutor(ExecutorBase, Observable):
         - Set up necessary HealthCheckers
         - Set up StatusManager, and attach HealthCheckers
     """
-    self.send_update(driver, self._task_id, mesos_pb2.TASK_STARTING, 'Initializing sandbox.')
+    self.send_update(driver, self._task_id, mesos_pb2.TASK_STARTING)
 
     if not self._initialize_sandbox(driver, assigned_task, mounted_volume_paths):
       return
