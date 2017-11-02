@@ -48,7 +48,7 @@ class MemAttributeStore implements AttributeStore.Mutable {
     IHostAttributes previous = hostAttributes.put(
         attributes.getHost(),
         merge(attributes, Optional.fromNullable(hostAttributes.get(attributes.getHost()))));
-    return attributes.equals(previous);
+    return !attributes.equals(previous);
   }
 
   private IHostAttributes merge(IHostAttributes newAttributes, Optional<IHostAttributes> previous) {

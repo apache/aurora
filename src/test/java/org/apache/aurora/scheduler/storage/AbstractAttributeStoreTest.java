@@ -33,6 +33,8 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public abstract class AbstractAttributeStoreTest {
 
@@ -64,27 +66,39 @@ public abstract class AbstractAttributeStoreTest {
   protected abstract Storage createStorage();
 
   @Test
+  public void testSaveAttributes() {
+    assertEquals(Optional.absent(), read(HOST_A));
+
+    // Initial save returns true since it changes previous attributes
+    assertTrue(insert(HOST_A_ATTRS));
+    assertEquals(Optional.of(HOST_A_ATTRS), read(HOST_A));
+
+    // Second save returns false since it does not change previous attributes
+    assertFalse(insert(HOST_A_ATTRS));
+  }
+
+  @Test
   public void testCrud() {
     assertEquals(Optional.absent(), read(HOST_A));
     assertEquals(ImmutableSet.of(), readAll());
 
-    insert(HOST_A_ATTRS);
+    assertTrue(insert(HOST_A_ATTRS));
     assertEquals(Optional.of(HOST_A_ATTRS), read(HOST_A));
     assertEquals(ImmutableSet.of(HOST_A_ATTRS), readAll());
 
-    insert(HOST_B_ATTRS);
-    insert(HOST_B_ATTRS);  // Double insert should be allowed.
+    assertTrue(insert(HOST_B_ATTRS));
+    assertFalse(insert(HOST_B_ATTRS));  // Double insert should be allowed.
     assertEquals(Optional.of(HOST_B_ATTRS), read(HOST_B));
     assertEquals(ImmutableSet.of(HOST_A_ATTRS, HOST_B_ATTRS), readAll());
 
     IHostAttributes updatedA = IHostAttributes.build(
         HOST_A_ATTRS.newBuilder().setAttributes(ImmutableSet.of(ATTR1, ATTR3)));
-    insert(updatedA);
+    assertTrue(insert(updatedA));
     assertEquals(Optional.of(updatedA), read(HOST_A));
     assertEquals(ImmutableSet.of(updatedA, HOST_B_ATTRS), readAll());
 
     IHostAttributes updatedMode = IHostAttributes.build(updatedA.newBuilder().setMode(DRAINED));
-    insert(updatedMode);
+    assertTrue(insert(updatedMode));
     assertEquals(Optional.of(updatedMode), read(HOST_A));
     assertEquals(ImmutableSet.of(updatedMode, HOST_B_ATTRS), readAll());
 
@@ -104,7 +118,7 @@ public abstract class AbstractAttributeStoreTest {
   public void testNoAttributes() {
     IHostAttributes attributes = IHostAttributes.build(
         HOST_A_ATTRS.newBuilder().setAttributes(ImmutableSet.of()));
-    insert(attributes);
+    assertTrue(insert(attributes));
     assertEquals(Optional.of(attributes), read(HOST_A));
   }
 
@@ -121,15 +135,15 @@ public abstract class AbstractAttributeStoreTest {
     HostAttributes attributes = HOST_A_ATTRS.newBuilder();
     attributes.unsetAttributes();
 
-    insert(IHostAttributes.build(attributes));
+    assertTrue(insert(IHostAttributes.build(attributes)));
     assertEquals(Optional.of(IHostAttributes.build(attributes)), read(HOST_A));
   }
 
   @Test
   public void testSlaveIdChanges() {
-    insert(HOST_A_ATTRS);
+    assertTrue(insert(HOST_A_ATTRS));
     IHostAttributes updated = IHostAttributes.build(HOST_A_ATTRS.newBuilder().setSlaveId(SLAVE_B));
-    insert(updated);
+    assertTrue(insert(updated));
     assertEquals(Optional.of(updated), read(HOST_A));
   }
 
@@ -137,7 +151,7 @@ public abstract class AbstractAttributeStoreTest {
   public void testUpdateAttributesWithRelations() {
     // Test for regression of AURORA-1379, where host attribute mutation performed a delete,
     // violating foreign key constraints.
-    insert(HOST_A_ATTRS);
+    assertTrue(insert(HOST_A_ATTRS));
 
     ScheduledTask builder = TaskTestUtil.makeTask("a", JobKeys.from("role", "env", "job"))
         .newBuilder();
@@ -152,12 +166,12 @@ public abstract class AbstractAttributeStoreTest {
     HostAttributes attributeBuilder = HOST_A_ATTRS.newBuilder().setMode(DRAINED);
     attributeBuilder.addToAttributes(new Attribute("newAttr", ImmutableSet.of("a", "b")));
     IHostAttributes hostAUpdated = IHostAttributes.build(attributeBuilder);
-    insert(hostAUpdated);
+    assertTrue(insert(hostAUpdated));
     assertEquals(Optional.of(hostAUpdated), read(HOST_A));
   }
 
-  private void insert(IHostAttributes attributes) {
-    storage.write(
+  private boolean insert(IHostAttributes attributes) {
+    return storage.write(
         storeProvider -> storeProvider.getAttributeStore().saveHostAttributes(attributes));
   }
 
