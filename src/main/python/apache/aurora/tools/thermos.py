@@ -20,6 +20,7 @@ from twitter.common.log.options import LogOptions
 from apache.aurora.executor.common.path_detector import MesosPathDetector
 from apache.thermos.cli.common import register_path_detector
 from apache.thermos.cli.main import register_commands, register_options
+from apache.thermos.common.excepthook import ExceptionTerminationHandler
 
 register_commands(app)
 register_options(app)
@@ -46,4 +47,5 @@ register_path_detector(MesosPathDetector())
 LogOptions.disable_disk_logging()
 LogOptions.set_stderr_log_level('google:INFO')
 
+app.register_module(ExceptionTerminationHandler())
 app.main()

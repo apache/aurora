@@ -22,6 +22,7 @@ import traceback
 
 from twitter.common import app, log
 
+from apache.thermos.common.excepthook import ExceptionTerminationHandler
 from apache.thermos.common.options import add_port_to
 from apache.thermos.common.planner import TaskPlanner
 from apache.thermos.common.statuses import (
@@ -264,4 +265,5 @@ def main(args, opts):
   return proxy_main(args, opts)
 
 
+app.register_module(ExceptionTerminationHandler())
 app.main()

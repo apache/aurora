@@ -26,6 +26,7 @@ import sys
 import traceback
 
 from twitter.common import app, log
+from twitter.common.exceptions import ExceptionalThread
 from twitter.common.log.options import LogOptions
 
 from apache.aurora.config.schema.base import LoggerDestination, LoggerMode
@@ -40,6 +41,7 @@ from apache.aurora.executor.thermos_task_runner import (
     DefaultThermosTaskRunnerProvider,
     UserOverrideThermosTaskRunnerProvider
 )
+from apache.thermos.common.excepthook import ExceptionTerminationHandler
 
 try:
   from mesos.executor import MesosExecutorDriver
@@ -290,6 +292,21 @@ def initialize(options):
   return thermos_executor
 
 
+class ExecutorDriverThread(ExceptionalThread):
+  """ Start the executor and wait until it is stopped.
+
+  This is decoupled from the main thread, because only the main thread can receive signals
+  and we would miss those when blocking in the driver run method.
+  """
+
+  def __init__(self, driver):
+    self._driver = driver
+    super(ExecutorDriverThread, self).__init__()
+
+  def run(self):
+    self._driver.run()
+
+
 def proxy_main():
   def main(args, options):
     if MesosExecutorDriver is None:
@@ -304,9 +321,17 @@ def proxy_main():
     # time period
     ExecutorTimeout(thermos_executor.launched, driver).start()
 
-    # Start executor
-    driver.run()
+    # Start executor and wait until it is stopped.
+    driver_thread = ExecutorDriverThread(driver)
+    driver_thread.start()
+    try:
+      while driver_thread.isAlive():
+        driver_thread.join(5)
+    except (KeyboardInterrupt, SystemExit):
+      driver.stop()
+      raise
 
     log.info('MesosExecutorDriver.run() has finished.')
 
+  app.register_module(ExceptionTerminationHandler())
   app.main()
