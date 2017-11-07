@@ -17,11 +17,11 @@ plugins {
   id 'com.github.hierynomus.license' version '0.11.0'
   id 'com.moowork.node' version '1.2.0'
   id 'me.champeau.gradle.jmh' version '0.4.4'
+  id "com.github.spotbugs" version "1.6.0"
 }
 
 apply plugin: 'application'
 apply plugin: 'checkstyle'
-apply plugin: 'findbugs'
 apply plugin: 'jacoco'
 apply plugin: 'pmd'
 
@@ -85,7 +85,6 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.asyncHttpclientRev = '2.0.37'
   ext.jacksonRev = '2.5.1'
   ext.jerseyRev = '1.19'
-  ext.jsrRev = '3.0.1'
   ext.junitRev = '4.12'
   ext.logbackRev = '1.2.3'
   ext.mybatisRev = '3.4.1'
@@ -112,7 +111,6 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
         failOnVersionConflict()
         force "com.fasterxml.jackson.core:jackson-annotations:${jacksonRev}"
         force "com.fasterxml.jackson.core:jackson-core:${jacksonRev}"
-        force "com.google.code.findbugs:jsr305:${jsrRev}"
         force "com.google.code.gson:gson:${gsonRev}"
         force "com.google.guava:guava:${guavaRev}"
         force "com.google.protobuf:protobuf-java:${protobufRev}"
@@ -187,7 +185,6 @@ project(':commons') {
   }
 
   dependencies {
-    compile "com.google.code.findbugs:jsr305:${jsrRev}"
     compile "com.google.code.gson:gson:${gsonRev}"
     compile "com.google.guava:guava:${guavaRev}"
     compile "com.google.inject:guice:${guiceRev}"
@@ -373,7 +370,6 @@ dependencies {
   compile 'aopalliance:aopalliance:1.0'
   compile "ch.qos.logback:logback-classic:${logbackRev}"
   compile "com.beust:jcommander:1.72"
-  compile "com.google.code.findbugs:jsr305:${jsrRev}"
   compile "com.google.inject:guice:${guiceRev}"
   compile "com.google.inject.extensions:guice-assistedinject:${guiceRev}"
   compile "com.google.protobuf:protobuf-java:${protobufRev}"
@@ -417,7 +413,7 @@ dependencies {
 def runCodeQuality = project.hasProperty('q')
 def codeQualityTasks = [
     Checkstyle,
-    FindBugs,
+    com.github.spotbugs.SpotBugsTask,
     nl.javadude.gradle.plugins.license.License,
     Pmd
 ]
@@ -432,18 +428,18 @@ checkstyle {
   toolVersion = '7.3'
 }
 
-findbugs {
-  toolVersion = '3.0.1'
+spotbugs {
+  toolVersion = '3.1.0'
   effort = "max"
 }
 
-tasks.withType(FindBugs) {
+tasks.withType(com.github.spotbugs.SpotBugsTask) {
   reports {
     xml.enabled = false
     html.enabled = true
   }
-  maxHeapSize = '2g'
-  excludeFilter = rootProject.file('config/findbugs/excludeFilter.xml')
+  maxHeapSize = '1g'
+  excludeFilter = rootProject.file('config/spotbugs/excludeFilter.xml')
 }
 
 pmd {

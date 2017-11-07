@@ -126,4 +126,11 @@ limitations under the License.
     <Class name="~org.apache.aurora.scheduler.*Options" />
     <Bug pattern="UWF_NULL_FIELD" />
   </Match>
+
+  <Match>
+    <!-- FIXME: We ignore return values of guava collection builders and thus trip this warning.
+         We need to wait until either https://github.com/spotbugs/spotbugs/issues/463 or
+         https://github.com/google/guava/issues/2960 has been resolved -->
+    <Bug pattern="RV_RETURN_VALUE_IGNORED" />
+  </Match>
 </FindBugsFilter>

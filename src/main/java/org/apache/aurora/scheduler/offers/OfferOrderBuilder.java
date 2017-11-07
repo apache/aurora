@@ -74,11 +74,11 @@ final class OfferOrderBuilder {
     return Ordering
         .natural()
         .onResultOf(o -> {
-          Double resource = bagFromMesosResources(
+          double resource = bagFromMesosResources(
               getRevocableOfferResources(o.getOffer())).valueOf(resourceType);
           // resource will be 0.0 if there is no revocable cpus available. Since the purpose of
           // this ordering is to bin-pack revocable then we push those offers to the back.
-          return resource.equals(0.0) ? Double.MAX_VALUE : resource;
+          return resource == 0.0 ? Double.MAX_VALUE : resource;
         });
   }
 
