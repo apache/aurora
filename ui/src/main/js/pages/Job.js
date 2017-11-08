@@ -39,10 +39,16 @@ export default class Job extends React.Component {
       });
     });
     api.getPendingReason(taskQuery, (response) => {
-      that.setState({
-        cluster: response.serverInfo.clusterName,
-        pendingReasons: response.result.getPendingReasonResult.reasons
-      });
+      if (response.result.getPendingReasonResult.reasons) {
+        const reasons = response.result.getPendingReasonResult.reasons.reduce((res, reason) => {
+          res[reason.taskId] = reason.reason;
+          return res;
+        }, {});
+        that.setState({
+          cluster: response.serverInfo.clusterName,
+          pendingReasons: reasons
+        });
+      }
     });
     api.getConfigSummary(key, (response) => {
       that.setState({
@@ -131,6 +137,7 @@ export default class Job extends React.Component {
           cronJob={this.state.cronJob}
           onTaskViewChange={(t) => that.setTaskView(t.id)}
           onViewChange={(t) => that.setJobView(t.id)}
+          pendingReasons={this.state.pendingReasons}
           queryParams={queryString.parse(this.props.location.search)}
           tasks={this.state.tasks} />
       </Container>

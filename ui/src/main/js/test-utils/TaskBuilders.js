@@ -45,6 +45,7 @@ export const AssignedTaskBuilder = createBuilder({
 });
 
 export const TaskEventBuilder = createBuilder({
+  message: '',
   timestamp: 0,
   status: ScheduleStatus.PENDING
 });

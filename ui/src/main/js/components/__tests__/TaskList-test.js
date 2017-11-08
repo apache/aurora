@@ -1,14 +1,56 @@
 import React from 'react';
 import { shallow } from 'enzyme';
 
-import {
+import TaskList, {
   TaskListControls,
   TaskListStatusFilter,
   TaskListStatus,
   searchTask
 } from '../TaskList';
 
-import { AssignedTaskBuilder, ScheduledTaskBuilder } from 'test-utils/TaskBuilders';
+import {
+  AssignedTaskBuilder,
+  ScheduledTaskBuilder,
+  TaskEventBuilder
+} from 'test-utils/TaskBuilders';
+
+describe('TaskList', () => {
+  it('Should set pending reasons on PENDING tasks', () => {
+    const tasks = [
+      ScheduledTaskBuilder.status(ScheduleStatus.PENDING)
+        .taskEvents([TaskEventBuilder.build()])
+        .assignedTask(AssignedTaskBuilder.taskId('one').build())
+        .build(),
+      ScheduledTaskBuilder.status(ScheduleStatus.RUNNING)
+        .taskEvents([TaskEventBuilder.message('running').build()])
+        .assignedTask(AssignedTaskBuilder.taskId('two').build())
+        .build()
+    ];
+    const reasons = {
+      [tasks[0].assignedTask.taskId]: 'Test Reason',
+      [tasks[1].assignedTask.taskId]: 'I should never be used'
+    };
+    shallow(<TaskList pendingReasons={reasons} tasks={tasks} />);
+    expect(tasks[0].taskEvents[0].message).toBe('Test Reason');
+    expect(tasks[1].taskEvents[0].message).toBe('running');
+  });
+
+  it('Should handle null pendingReasons', () => {
+    const tasks = [
+      ScheduledTaskBuilder.status(ScheduleStatus.PENDING)
+        .taskEvents([TaskEventBuilder.build()])
+        .assignedTask(AssignedTaskBuilder.taskId('one').build())
+        .build(),
+      ScheduledTaskBuilder.status(ScheduleStatus.RUNNING)
+        .taskEvents([TaskEventBuilder.message('running').build()])
+        .assignedTask(AssignedTaskBuilder.taskId('two').build())
+        .build()
+    ];
+    const el = shallow(<TaskList pendingReasons={null} tasks={tasks} />);
+    // basic check for successful rendering
+    expect(el.find(TaskListControls).length).toBe(1);
+  });
+});
 
 describe('TaskListControls', () => {
   it('Should attach active to default list element', () => {

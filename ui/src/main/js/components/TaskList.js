@@ -4,7 +4,7 @@ import Icon from 'components/Icon';
 import Pagination from 'components/Pagination';
 import TaskListItem from 'components/TaskListItem';
 
-import { pluralize } from 'utils/Common';
+import { isNully, pluralize } from 'utils/Common';
 import { getClassForScheduleStatus, getLastEventTime } from 'utils/Task';
 import { SCHEDULE_STATUS } from 'utils/Thrift';
 
@@ -103,6 +103,13 @@ export default class TaskList extends React.Component {
     const sortFn = this.state.sortBy === 'latest'
       ? (t) => getLastEventTime(t) * -1
       : (t) => t.assignedTask.instanceId;
+
+    const reasons = isNully(this.props.pendingReasons) ? {} : this.props.pendingReasons;
+    this.props.tasks.forEach((t) => {
+      if (t.status === ScheduleStatus.PENDING && reasons[t.assignedTask.taskId]) {
+        t.taskEvents[t.taskEvents.length - 1].message = reasons[t.assignedTask.taskId];
+      }
+    });
 
     return (<div>
       <TaskListFilter
