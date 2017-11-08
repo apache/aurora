@@ -5,6 +5,8 @@ import Loading from 'components/Loading';
 import UpdateConfig from 'components/UpdateConfig';
 import UpdateDetails from 'components/UpdateDetails';
 
+import { isInProgressUpdate } from 'utils/Update';
+
 export default class Update extends React.Component {
   constructor(props) {
     super(props);
@@ -12,6 +14,17 @@ export default class Update extends React.Component {
   }
 
   componentWillMount() {
+    this.fetchUpdateDetails();
+  }
+
+  componentWillUpdate(nextProps, nextState) {
+    if (!nextState.loading && isInProgressUpdate(nextState.update)) {
+      // refetch update details in 60 seconds
+      setTimeout(() => { this.fetchUpdateDetails(); }, 60000);
+    }
+  }
+
+  fetchUpdateDetails() {
     const { role, environment, name, uid } = this.props.match.params;
 
     const job = new JobKey();

@@ -20,20 +20,23 @@ const params = {
 
 function createMockApi(update) {
   const api = {};
-  api.getJobUpdateDetails = (id, query, handler) => handler({
-    result: {
-      getJobUpdateDetailsResult: {
-        detailsList: [update]
+  const mockGetJobUpdateDetails = jest.fn().mockImplementation(
+    (id, query, handler) => handler({
+      result: {
+        getJobUpdateDetailsResult: {
+          detailsList: [update]
+        }
+      },
+      serverInfo: {
+        clusterName: TEST_CLUSTER
       }
-    },
-    serverInfo: {
-      clusterName: TEST_CLUSTER
-    }
-  });
+    })
+  );
+  api.getJobUpdateDetails = mockGetJobUpdateDetails;
   return api;
 }
 
-const update = {}; // only testing pass-through here...
+const update = {update: {summary: {state: {status: JobUpdateStatus.ROLLING_FORWARD}}}};
 
 describe('Update', () => {
   it('Should render Loading before data is fetched', () => {
@@ -52,5 +55,34 @@ describe('Update', () => {
       update={params.uid} />)).toBe(true);
     expect(el.contains(<UpdateConfig update={update} />)).toBe(true);
     expect(el.contains(<UpdateDetails update={update} />)).toBe(true);
+  });
+
+  it('Should poll an inprogress update in 60 seconds', () => {
+    jest.useFakeTimers();
+    const apiSpy = createMockApi(update);
+    const el = shallow(<Update api={apiSpy} match={{params: params}} />,
+      { lifecycleExperimental: true });
+    el.setState({update: update});
+
+    expect(setTimeout.mock.calls.length).toBe(1);
+    expect(setTimeout.mock.calls[0][1]).toBe(60000);
+    expect(apiSpy.getJobUpdateDetails.mock.calls.length).toBe(1);
+
+    jest.runOnlyPendingTimers();
+    expect(apiSpy.getJobUpdateDetails.mock.calls.length).toBe(2);
+    expect(setTimeout.mock.calls.length).toBe(2);
+    expect(setTimeout.mock.calls[1][1]).toBe(60000);
+  });
+
+  it('Should not poll when update is not inprogress', () => {
+    jest.useFakeTimers();
+    const terminatedUpdate = {update: {summary: {state: {status: JobUpdateStatus.ABORTED}}}};
+    const apiSpy = createMockApi(terminatedUpdate);
+    const el = shallow(<Update api={apiSpy} match={{params: params}} />,
+      { lifecycleExperimental: true });
+    el.setState({update: terminatedUpdate});
+
+    expect(setTimeout.mock.calls.length).toBe(0);
+    expect(apiSpy.getJobUpdateDetails.mock.calls.length).toBe(1);
   });
 });
