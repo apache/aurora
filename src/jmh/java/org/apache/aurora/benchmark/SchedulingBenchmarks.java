@@ -49,6 +49,7 @@ import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.CommandLine;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -117,6 +118,7 @@ public class SchedulingBenchmarks {
      */
     @Setup(Level.Trial)
     public void setUpBenchmark() {
+      CommandLine.initializeForTest();
       storage = MemStorageModule.newEmptyStorage();
       eventBus = new EventBus();
       final FakeClock clock = new FakeClock();

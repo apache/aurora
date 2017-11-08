@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.v1.Protos;
 import org.apache.mesos.v1.Protos.Resource;
@@ -74,7 +73,7 @@ public class AcceptedOfferTest {
         offer(),
         IAssignedTask.build(new AssignedTask().setTask(new TaskConfig())),
         ResourceBag.EMPTY,
-        DEV_TIER);
+        DEV_TIER.isRevocable());
     assertEquals(Collections.emptyList(), acceptedOffer.getTaskResources());
     assertEquals(Collections.emptyList(), acceptedOffer.getExecutorResources());
   }
@@ -94,8 +93,7 @@ public class AcceptedOfferTest {
         mesosScalar(DISK_MB, TOTAL_BAG.valueOf(DISK_MB), false),
         mesosRange(PORTS, role, TASK_PORTS));
 
-    AcceptedOffer offerAllocation = AcceptedOffer.create(
-        offer, TASK, EXECUTOR_BAG, new TierInfo(false, revocable));
+    AcceptedOffer offerAllocation = AcceptedOffer.create(offer, TASK, EXECUTOR_BAG, revocable);
 
     ResourceBag bag = bagFromResources(TASK.getTask().getResources());
     Set<Resource> taskResources = ImmutableSet.<Resource>builder()
@@ -132,8 +130,7 @@ public class AcceptedOfferTest {
         mesosScalar(DISK_MB, TEST_ROLE, false, TOTAL_BAG.valueOf(DISK_MB)),
         mesosRange(PORTS, TEST_ROLE, TASK_PORTS));
 
-    AcceptedOffer offerAllocation = AcceptedOffer.create(
-        offer, TASK, EXECUTOR_BAG, new TierInfo(false, revocable));
+    AcceptedOffer offerAllocation = AcceptedOffer.create(offer, TASK, EXECUTOR_BAG, revocable);
 
     Set<Resource> taskSet = ImmutableSet.<Resource>builder()
         .add(mesosScalar(CPUS, TEST_ROLE, revocable, EXECUTOR_BAG.valueOf(CPUS)))

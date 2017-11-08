@@ -172,7 +172,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
     expect(filter.filter(UNUSED, resourceRequest)).andReturn(ImmutableSet.of());
     expectAssignTask(MESOS_OFFER);
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER, false))
         .andReturn(TASK_INFO);
 
     control.replay();
@@ -255,7 +255,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
         LOST,
         LAUNCH_FAILED_MSG))
         .andReturn(StateChangeResult.SUCCESS);
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER, false))
         .andReturn(TASK_INFO);
 
     control.replay();
@@ -313,7 +313,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
             OFFER_2.getAttributes()),
         resourceRequest)).andReturn(ImmutableSet.of());
     expectAssignTask(OFFER_2.getOffer());
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), OFFER_2.getOffer()))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), OFFER_2.getOffer(), false))
         .andReturn(TASK_INFO);
     offerManager.launchTask(OFFER_2.getOffer().getId(), TASK_INFO);
 
@@ -363,7 +363,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
         .andReturn(ImmutableSet.of());
 
     expectAssignTask(MESOS_OFFER);
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), OFFER.getOffer()))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), OFFER.getOffer(), false))
         .andReturn(TASK_INFO);
     offerManager.launchTask(OFFER.getOffer().getId(), TASK_INFO);
 
@@ -404,7 +404,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
     offerManager.launchTask(MESOS_OFFER.getId(), TASK_INFO);
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
 
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER, false))
         .andReturn(TASK_INFO);
 
     control.replay();
@@ -465,7 +465,7 @@ public class FirstFitTaskAssignerTest extends EasyMockTest {
     offerManager.launchTask(MESOS_OFFER.getId(), TASK_INFO);
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
 
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER))
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER, false))
         .andReturn(TASK_INFO);
 
     // Normal scheduling loop for the remaining task...

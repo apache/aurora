@@ -26,7 +26,6 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.ResourceAggregate;
-import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IResource;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -118,11 +117,12 @@ public final class ResourceManager {
    * Gets offer resources filtered by the provided {@code tierInfo} instance.
    *
    * @param offer Offer to get resources from.
-   * @param tierInfo Tier info.
+   * @param revocable if {@code true} return only revocable resources,
+   *                  if {@code false} return non-revocable.
    * @return Offer resources filtered by {@code tierInfo}.
    */
-  public static Iterable<Resource> getOfferResources(Offer offer, TierInfo tierInfo) {
-    return tierInfo.isRevocable()
+  public static Iterable<Resource> getOfferResources(Offer offer, boolean revocable) {
+    return revocable
         ? getRevocableOfferResources(offer)
         : getNonRevocableOfferResources(offer);
   }
@@ -131,16 +131,17 @@ public final class ResourceManager {
    * Gets offer resoruces filtered by the {@code tierInfo} and {@code type}.
    *
    * @param offer Offer to get resources from.
-   * @param tierInfo Tier info.
+   * @param revocable if {@code true} return only revocable resources,
+   *                  if {@code false} return non-revocable.
    * @param type Resource type.
    * @return Offer resources filtered by {@code tierInfo} and {@code type}.
    */
   public static Iterable<Resource> getOfferResources(
       Offer offer,
-      TierInfo tierInfo,
+      boolean revocable,
       ResourceType type) {
 
-    return Iterables.filter(getOfferResources(offer, tierInfo), r -> fromResource(r).equals(type));
+    return Iterables.filter(getOfferResources(offer, revocable), r -> fromResource(r).equals(type));
   }
 
   /**

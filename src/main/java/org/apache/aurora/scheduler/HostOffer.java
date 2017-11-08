@@ -15,12 +15,11 @@ package org.apache.aurora.scheduler;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import com.google.common.base.Suppliers;
 
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.resources.ResourceBag;
@@ -39,7 +38,8 @@ import static org.apache.mesos.v1.Protos.Offer;
 public class HostOffer {
   private final Offer offer;
   private final IHostAttributes hostAttributes;
-  private final LoadingCache<TierInfo, ResourceBag> resourceBagCache;
+  private final Supplier<ResourceBag> revocableResources;
+  private final Supplier<ResourceBag> nonRevocableResources;
 
   // Offers lacking CPU or mem are flagged so that they may be efficiently ignored during
   // scheduling.  However, they are retained for other purposes such as preemption and cluster
@@ -52,13 +52,10 @@ public class HostOffer {
     this.offer = requireNonNull(offer);
     this.hostAttributes = requireNonNull(hostAttributes);
     this.nonZeroCpuAndMem = offerHasCpuAndMem(offer);
-    this.resourceBagCache = CacheBuilder.newBuilder().build(
-        new CacheLoader<TierInfo, ResourceBag>() {
-          @Override
-          public ResourceBag load(TierInfo tierInfo) {
-            return bagFromMesosResources(getOfferResources(offer, tierInfo));
-          }
-        });
+    this.revocableResources =
+        Suppliers.memoize(() -> bagFromMesosResources(getOfferResources(offer, true)));
+    this.nonRevocableResources =
+        Suppliers.memoize(() -> bagFromMesosResources(getOfferResources(offer, false)));
   }
 
   private static boolean offerHasCpuAndMem(Offer offer) {
@@ -79,8 +76,8 @@ public class HostOffer {
     return nonZeroCpuAndMem;
   }
 
-  public ResourceBag getResourceBag(TierInfo tierInfo) {
-    return resourceBagCache.getUnchecked(tierInfo);
+  public ResourceBag getResourceBag(boolean revocable) {
+    return revocable ? revocableResources.get() : nonRevocableResources.get();
   }
 
   public Optional<Instant> getUnavailabilityStart() {

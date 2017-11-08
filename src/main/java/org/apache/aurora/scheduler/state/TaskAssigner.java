@@ -28,7 +28,6 @@ import com.google.common.collect.Iterables;
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.TierInfo;
 import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
@@ -133,7 +132,8 @@ public interface TaskAssigner {
     private TaskInfo assign(
         MutableStoreProvider storeProvider,
         Offer offer,
-        String taskId) {
+        String taskId,
+        boolean revocable) {
 
       String host = offer.getHostname();
       IAssignedTask assigned = stateManager.assignTask(
@@ -145,12 +145,12 @@ public interface TaskAssigner {
       LOG.info(
           "Offer on agent {} (id {}) is being assigned task for {}.",
           host, offer.getAgentId().getValue(), taskId);
-      return taskFactory.createFrom(assigned, offer);
+      return taskFactory.createFrom(assigned, offer, revocable);
     }
 
     private boolean evaluateOffer(
         MutableStoreProvider storeProvider,
-        TierInfo tierInfo,
+        boolean revocable,
         ResourceRequest resourceRequest,
         TaskGroupKey groupKey,
         IAssignedTask task,
@@ -160,7 +160,7 @@ public interface TaskAssigner {
       String taskId = task.getTaskId();
       Set<Veto> vetoes = filter.filter(
           new UnusedResource(
-              offer.getResourceBag(tierInfo),
+              offer.getResourceBag(revocable),
               offer.getAttributes(),
               offer.getUnavailabilityStart()),
           resourceRequest);
@@ -169,7 +169,8 @@ public interface TaskAssigner {
         TaskInfo taskInfo = assign(
             storeProvider,
             offer.getOffer(),
-            taskId);
+            taskId,
+            revocable);
         resourceRequest.getJobState().updateAttributeAggregate(offer.getAttributes());
 
         try {
@@ -206,7 +207,7 @@ public interface TaskAssigner {
     private Iterable<IAssignedTask> maybeAssignReserved(
         Iterable<IAssignedTask> tasks,
         MutableStoreProvider storeProvider,
-        TierInfo tierInfo,
+        boolean revocable,
         ResourceRequest resourceRequest,
         TaskGroupKey groupKey,
         ImmutableSet.Builder<String> assignmentResult) {
@@ -233,7 +234,7 @@ public interface TaskAssigner {
               // Scheduler hasn't been updated by Mesos yet...
               if (evaluateOffer(
                   storeProvider,
-                  tierInfo,
+                  revocable,
                   resourceRequest,
                   groupKey,
                   task,
@@ -276,13 +277,13 @@ public interface TaskAssigner {
         return ImmutableSet.of();
       }
 
-      TierInfo tierInfo = tierManager.getTier(groupKey.getTask());
+      boolean revocable = tierManager.getTier(groupKey.getTask()).isRevocable();
       ImmutableSet.Builder<String> assignmentResult = ImmutableSet.builder();
 
       Iterable<IAssignedTask> nonReservedTasks = maybeAssignReserved(
           tasks,
           storeProvider,
-          tierInfo,
+          revocable,
           resourceRequest,
           groupKey,
           assignmentResult);
@@ -317,7 +318,7 @@ public interface TaskAssigner {
           evaluatedOffers.incrementAndGet();
           try {
             boolean offerUsed = evaluateOffer(
-                storeProvider, tierInfo, resourceRequest, groupKey, task, offer, assignmentResult);
+                storeProvider, revocable, resourceRequest, groupKey, task, offer, assignmentResult);
             if (offerUsed) {
               if (remainingTasks.hasNext()) {
                 task = remainingTasks.next();

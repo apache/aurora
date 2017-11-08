@@ -27,7 +27,6 @@ import com.google.protobuf.ByteString;
 
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -77,7 +76,7 @@ public interface MesosTaskFactory {
    * @return A new task.
    * @throws SchedulerException If the task could not be encoded.
    */
-  TaskInfo createFrom(IAssignedTask task, Offer offer) throws SchedulerException;
+  TaskInfo createFrom(IAssignedTask task, Offer offer, boolean revocable) throws SchedulerException;
 
   // TODO(wfarner): Move this class to its own file to reduce visibility to package private.
   class MesosTaskFactoryImpl implements MesosTaskFactory {
@@ -100,17 +99,11 @@ public interface MesosTaskFactory {
     static final String TIER_LABEL = AURORA_LABEL_PREFIX + ".tier";
 
     private final ExecutorSettings executorSettings;
-    private final TierManager tierManager;
     private final IServerInfo serverInfo;
 
     @Inject
-    MesosTaskFactoryImpl(
-        ExecutorSettings executorSettings,
-        TierManager tierManager,
-        IServerInfo serverInfo) {
-
+    MesosTaskFactoryImpl(ExecutorSettings executorSettings, IServerInfo serverInfo) {
       this.executorSettings = requireNonNull(executorSettings);
-      this.tierManager = requireNonNull(tierManager);
       this.serverInfo = requireNonNull(serverInfo);
     }
 
@@ -151,7 +144,9 @@ public interface MesosTaskFactory {
     }
 
     @Override
-    public TaskInfo createFrom(IAssignedTask task, Offer offer) throws SchedulerException {
+    public TaskInfo createFrom(IAssignedTask task, Offer offer, boolean revocable)
+        throws SchedulerException {
+
       requireNonNull(task);
       requireNonNull(offer);
 
@@ -171,7 +166,7 @@ public interface MesosTaskFactory {
             offer,
             task,
             executorOverhead,
-            tierManager.getTier(task.getTask()));
+            revocable);
       } catch (ResourceManager.InsufficientResourcesException e) {
         throw new SchedulerException(e);
       }
