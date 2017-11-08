@@ -1,3 +1,31 @@
+Aurora 0.19.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-1953] - Scheduler livelock during startup
+    * [AURORA-1944] - Aurora is unable to elect leader after losing ZK for an extended period of time
+    * [AURORA-1950] - Exceptions in LogStorage.prepare() cause scheduler die and stay in DEAD state
+    * [AURORA-1955] - thermos should exit on irrecoverable errors to avoid zombies
+    * [AURORA-1943] - PreemptionVictimFilter does not handle varied ResourceTypes
+    * [AURORA-1939] - Thermos landing (host) page reports incorrect CPU rates when it is busy
+    * [AURORA-1945] - Rescinds received but not processed in time before offer accept
+
+## Story
+    * [AURORA-319] - Allow job environments other than prod, devel, test or staging<number>
+    * [AURORA-1947] - Improve in-process ZooKeeper support for local development
+
+## Sub-task
+    * [AURORA-1773] - Asynchronously call webhook endpoint not to block EventBus
+
+## Task
+    * [AURORA-1951] - UI build broken in gradle 4.2
+    * [AURORA-1937] - Add metrics for status updates before switching to V1 Mesos Driver implementaion
+    * [AURORA-1940] - aurora job restart request should be retryable
+    * [AURORA-1934] - Add a whitelist for TaskStateChange events in Aurora Scheduler WebHooks
+    * [AURORA-1931] - Configurable wait period for graceful shutdown
+    * [AURORA-1669] - Kill twitter/commons ZK libs when Curator replacements are vetted
+    * [AURORA-1897] - Remove task length restrictions.
+
+
 Aurora 0.18.0
 --------------------------------------------------------------------------------
 ## Bug
