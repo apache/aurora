@@ -131,7 +131,7 @@ await_task_in_state $JOB_KEY FAILED
 
 # Fix the bug in our test script.
 perl -pi -e 's|xrang\(|xrange\(|g' hello_world.py
-aurora_command update "job update $JOB_KEY /vagrant/hello_world.aurora"
+aurora_command update "update start $JOB_KEY /vagrant/hello_world.aurora"
 await_task_in_state $JOB_KEY RUNNING
 
 aurora_command killall "job killall $JOB_KEY"
