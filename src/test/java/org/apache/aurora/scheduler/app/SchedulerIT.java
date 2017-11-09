@@ -22,7 +22,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.base.Optional;
@@ -272,23 +271,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
     }).get();
   }
 
-  private final AtomicInteger curPosition = new AtomicInteger();
-  private static class IntPosition implements Position {
-    private final int pos;
-
-    IntPosition(int pos) {
-      this.pos = pos;
-    }
-
-    @Override
-    public int compareTo(Position position) {
-      return pos - ((IntPosition) position).pos;
-    }
-  }
-  private IntPosition nextPosition() {
-    return new IntPosition(curPosition.incrementAndGet());
-  }
-
   private Iterable<Entry> toEntries(LogEntry... entries) {
     return Iterables.transform(Arrays.asList(entries),
         entry -> {
@@ -337,7 +319,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
     expect(log.open()).andReturn(logStream);
     expect(logStream.readAll()).andReturn(recoveredEntries.iterator()).anyTimes();
     streamMatcher.expectTransaction(Op.saveFrameworkId(new SaveFrameworkId(FRAMEWORK_ID)))
-        .andReturn(nextPosition());
+        .andReturn(new Position() { });
 
     CountDownLatch driverStarted = new CountDownLatch(1);
     expect(driver.start()).andAnswer(() -> {

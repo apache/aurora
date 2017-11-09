@@ -21,7 +21,6 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSortedSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -273,18 +272,5 @@ public class MesosLogTest extends EasyMockTest {
 
     // So close!  The implementation requires that hasNext() is called first.
     logStream.readAll().next();
-  }
-
-  @Test
-  public void testSortOrder() throws Exception {
-    control.replay();
-
-    LogPosition a = new LogPosition(makePosition(5));
-    LogPosition b = new LogPosition(makePosition(10));
-    LogPosition c = new LogPosition(makePosition(3));
-    assertEquals(
-        ImmutableList.of(c, a, b),
-        ImmutableList.copyOf(ImmutableSortedSet.of(a, b, c))
-    );
   }
 }

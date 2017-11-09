@@ -376,12 +376,6 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       Log.Position unwrap() {
         return underlying;
       }
-
-      @Override
-      public int compareTo(Position o) {
-        Preconditions.checkArgument(o instanceof LogPosition);
-        return underlying.compareTo(((LogPosition) o).underlying);
-      }
     }
 
     private static class LogEntry implements org.apache.aurora.scheduler.log.Log.Entry {

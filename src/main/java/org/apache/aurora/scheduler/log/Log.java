@@ -28,7 +28,7 @@ public interface Log {
   /**
    * An opaque ordered handle to a log entry's position in the log stream.
    */
-  interface Position extends Comparable<Position> {
+  interface Position {
   }
 
   /**
