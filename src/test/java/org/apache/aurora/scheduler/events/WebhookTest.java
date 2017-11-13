@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -180,16 +181,20 @@ public class WebhookTest {
 
   @Test
   public void testTaskChangedWithOldStateError() throws Exception {
-    // We have a special handler here to cause a TimeoutException to trigger `onThrowable`
+    // We have a special handler here to trigger `onThrowable` on the client.
     jettyServer.setHandler(new AbstractHandler() {
       @Override
       public void handle(String target, Request baseRequest, HttpServletRequest request,
                          HttpServletResponse response) throws IOException, ServletException {
-        try {
-          Thread.sleep(TIMEOUT + 100);
-        } catch (InterruptedException e) {
-          // Should never get here.
-        }
+
+        Stream.of(jettyServer.getConnectors())
+            .forEach(c -> {
+              try {
+                c.stop();
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+            });
       }
     });
     jettyServer.start();
