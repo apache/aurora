@@ -151,7 +151,7 @@ public class ExecutorModule extends AbstractModule {
                 v -> Protos.Volume.newBuilder()
                     .setHostPath(v.getHostPath())
                     .setContainerPath(v.getContainerPath())
-                    .setMode(Protos.Volume.Mode.valueOf(v.getMode().getValue()))
+                    .setMode(Protos.Volume.Mode.forNumber(v.getMode().getValue()))
                     .build()))
             .build();
 

@@ -17,7 +17,7 @@ set -o errexit
 set -o nounset
 set -o verbose
 
-readonly MESOS_VERSION=1.2.0
+readonly MESOS_VERSION=1.4.0
 
 function remove_unused {
   # The default ubuntu/trusty64 image includes juju-core, which adds ~300 MB to our image.
@@ -147,6 +147,7 @@ function warm_artifact_cache {
 }
 
 function compact_box {
+  apt-get autoremove -y --purge
   apt-get clean
 
   # By design, this will fail as it writes until the disk is full.

@@ -1,3 +1,10 @@
+0.20.0 (unreleased)
+===================
+
+### New/updated:
+
+- Updated to Mesos 1.4.0.
+
 0.19.0
 ======
 

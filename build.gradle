@@ -89,7 +89,7 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.logbackRev = '1.2.3'
   ext.mybatisRev = '3.4.1'
   ext.nettyRev = '4.0.52.Final'
-  ext.protobufRev = '2.6.1'
+  ext.protobufRev = '3.3.0'
   ext.servletRev = '3.1.0'
   ext.slf4jRev = '1.7.25'
   ext.stringTemplateRev = '3.2.1'
@@ -387,7 +387,7 @@ dependencies {
   compile "org.apache.curator:curator-client:${curatorRev}"
   compile "org.apache.curator:curator-framework:${curatorRev}"
   compile "org.apache.curator:curator-recipes:${curatorRev}"
-  compile 'org.apache.mesos:mesos:1.2.0'
+  compile 'org.apache.mesos:mesos:1.4.0'
   compile "org.asynchttpclient:async-http-client:${asyncHttpclientRev}"
   compile "org.apache.shiro:shiro-guice:${shiroRev}"
   compile "org.apache.shiro:shiro-web:${shiroRev}"

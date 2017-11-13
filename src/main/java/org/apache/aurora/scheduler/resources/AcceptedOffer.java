@@ -37,6 +37,10 @@ public final class AcceptedOffer {
    * Reserved resource filter.
    */
   @VisibleForTesting
+  // See: https://github.com/apache/mesos/commit/d06d05c76eca13745ca73039b93ad684b9d07196
+  // The role field has been deprecated. We'll need to migrate to the roles field instead
+  // and enable it via the MULTI_ROLES capability.
+  @SuppressWarnings("deprecation")
   static final Predicate<Resource> RESERVED = e -> e.hasRole() && !e.getRole().equals("*");
 
   /**
