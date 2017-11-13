@@ -14,7 +14,9 @@
 
 import os
 from tempfile import mkstemp
+from unittest import TestCase
 
+from twitter.common import dirutil
 from twitter.common.dirutil import safe_mkdtemp
 from twitter.common.quantity import Amount, Data
 
@@ -29,6 +31,11 @@ def make_file(size, dir):
   _, filename = mkstemp(dir=dir)
   with open(filename, 'w') as f:
     f.write('0' * int(size.as_(Data.BYTES)))
+
+    # Workaround for AURORA-1956.  On macOS 10.13 with APFS, st_blocks is not
+    # consistent with st_size.
+    while dirutil.safe_size(filename) < int(size.as_(Data.BYTES)):
+      f.write('0' * 1024)
   return filename
 
 
@@ -52,13 +59,14 @@ def _run_collector_tests(collector, target, wait):
   assert TEST_AMOUNT_SUM.as_(Data.BYTES) > collector.value >= TEST_AMOUNT_2.as_(Data.BYTES)
 
 
-def test_du_diskcollector():
-  target = safe_mkdtemp()
-  collector = DiskCollector(target)
+class TestDiskCollector(TestCase):
+  def test_du_diskcollector(self):
+    target = safe_mkdtemp()
+    collector = DiskCollector(target)
 
-  def wait():
-    collector.sample()
-    if collector._thread is not None:
-      collector._thread.event.wait()
+    def wait():
+      collector.sample()
+      if collector._thread is not None:
+        collector._thread.event.wait()
 
-  _run_collector_tests(collector, target, wait)
+    _run_collector_tests(collector, target, wait)

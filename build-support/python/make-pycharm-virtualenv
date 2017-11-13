@@ -29,13 +29,19 @@ pushd "$BUILDROOT"
   # TODO(John Sirois): Either get this info from the current pants install itself instead of
   # using a parallel ephemeral install like we do here (slow), or else invert things and
   # allow user-control of the pytest lib versions within reason.
-  rm -rf "$VENV_DIR"
-  ./build-support/virtualenv "$VENV_DIR"
-  source $VENV_DIR/bin/activate
-    python -m pip install pantsbuild.pants==$(./pants --version)
-    pytest_requirement=$(python -m pip freeze | grep pytest==)
-    pytest_cov_requirement=$(python -m pip freeze | grep pytest-cov==)
-  deactivate
+
+  #rm -rf "$VENV_DIR"
+  #./build-support/virtualenv "$VENV_DIR"
+  #source $VENV_DIR/bin/activate
+  #  python -m pip install pantsbuild.pants==$(./pants --version)
+  #  pytest_requirement=$(python -m pip freeze | grep pytest==)
+  #  pytest_cov_requirement=$(python -m pip freeze | grep pytest-cov==)
+  #deactivate
+  # TODO(wfarner): The above attempt to fetch pytest versions from pants stopped
+  # working with commit 0c177058.  As a workaround, manually specify the versions
+  # for now.
+  pytest_requirement='pytest==3.2.3'
+  pytest_cov_requirement='pytest-cov==2.5.1'
 
   rm -rf "$VENV_DIR"
   ./build-support/virtualenv "$VENV_DIR"
