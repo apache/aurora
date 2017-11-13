@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.reconciliation;
 
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
@@ -21,13 +23,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
 
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.BackoffStrategy;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -50,7 +49,7 @@ public class KillRetry implements EventSubscriber {
 
   private final Driver driver;
   private final Storage storage;
-  private final DelayExecutor executor;
+  private final ScheduledExecutorService executor;
   private final BackoffStrategy backoffStrategy;
   private final AtomicLong killRetries;
 
@@ -58,7 +57,7 @@ public class KillRetry implements EventSubscriber {
   KillRetry(
       Driver driver,
       Storage storage,
-      @AsyncExecutor DelayExecutor executor,
+      @AsyncExecutor ScheduledExecutorService executor,
       BackoffStrategy backoffStrategy,
       StatsProvider statsProvider) {
 
@@ -86,7 +85,7 @@ public class KillRetry implements EventSubscriber {
 
     void tryLater() {
       retryInMs.set(backoffStrategy.calculateBackoffMs(retryInMs.get()));
-      executor.execute(this, Amount.of(retryInMs.get(), Time.MILLISECONDS));
+      executor.schedule(this, retryInMs.get(), TimeUnit.MILLISECONDS);
     }
 
     @Override

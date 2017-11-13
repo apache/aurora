@@ -31,7 +31,6 @@ import com.google.inject.Module;
 import com.google.inject.name.Named;
 import com.google.inject.name.Names;
 import com.google.inject.util.Modules;
-import com.sun.jersey.api.client.ClientResponse;
 
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.JobKey;
@@ -39,18 +38,15 @@ import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.http.AbstractJettyTest;
-import org.apache.aurora.scheduler.http.H2ConsoleModule;
 import org.apache.aurora.scheduler.http.api.ApiModule;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.aurora.scheduler.thrift.aop.MockDecoratedThrift;
-import org.apache.http.HttpResponse;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.shiro.authc.credential.CredentialsMatcher;
@@ -66,8 +62,6 @@ import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PATH;
-import static org.apache.aurora.scheduler.http.H2ConsoleModule.H2_PERM;
 import static org.apache.aurora.scheduler.http.api.ApiModule.API_PATH;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -89,8 +83,6 @@ public class HttpSecurityIT extends AbstractJettyTest {
       new UsernamePasswordCredentials("backupsvc", "s3cret!!1");
   private static final UsernamePasswordCredentials DEPLOY_SERVICE =
       new UsernamePasswordCredentials("deploysvc", "0_0-x_0");
-  private static final UsernamePasswordCredentials H2_USER =
-      new UsernamePasswordCredentials("dbuser", "pwd");
 
   private static final UsernamePasswordCredentials INCORRECT =
       new UsernamePasswordCredentials("root", "wrong");
@@ -110,7 +102,6 @@ public class HttpSecurityIT extends AbstractJettyTest {
   private static final String ENG_ROLE = "eng";
   private static final String BACKUP_ROLE = "backup";
   private static final String DEPLOY_ROLE = "deploy";
-  private static final String H2_ROLE = "h2access";
   private static final Named SHIRO_AFTER_AUTH_FILTER_ANNOTATION = Names.named("shiro_post_filter");
 
   private Ini ini;
@@ -133,7 +124,6 @@ public class HttpSecurityIT extends AbstractJettyTest {
     users.put(
         DEPLOY_SERVICE.getUserName(),
         COMMA_JOINER.join(DEPLOY_SERVICE.getPassword(), DEPLOY_ROLE));
-    users.put(H2_USER.getUserName(), COMMA_JOINER.join(H2_USER.getPassword(), H2_ROLE));
 
     Ini.Section roles = ini.addSection(IniRealm.ROLES_SECTION_NAME);
     roles.put(ADMIN_ROLE, "*");
@@ -147,7 +137,6 @@ public class HttpSecurityIT extends AbstractJettyTest {
             + ADS_STAGING_JOB.getEnvironment()
             + ":"
             + ADS_STAGING_JOB.getName());
-    roles.put(H2_ROLE, H2_PERM);
 
     auroraAdmin = createMock(AnnotatedAuroraAdmin.class);
     shiroAfterAuthFilter = createMock(Filter.class);
@@ -157,7 +146,6 @@ public class HttpSecurityIT extends AbstractJettyTest {
   protected Module getChildServletModule() {
     return Modules.combine(
         new ApiModule(new ApiModule.Options()),
-        new H2ConsoleModule(true),
         new HttpSecurityModule(
             new IniShiroRealmModule(ini, credentialsMatcher),
             Key.get(Filter.class, SHIRO_AFTER_AUTH_FILTER_ANNOTATION)),
@@ -316,41 +304,5 @@ public class HttpSecurityIT extends AbstractJettyTest {
     }
 
     assertEquals(OK, getAuthenticatedClient(BACKUP_SERVICE).listBackups());
-  }
-
-  private HttpResponse callH2Console(Credentials credentials) throws Exception {
-    DefaultHttpClient defaultHttpClient = new DefaultHttpClient();
-
-    CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-    credentialsProvider.setCredentials(AuthScope.ANY, credentials);
-    defaultHttpClient.setCredentialsProvider(credentialsProvider);
-    return defaultHttpClient.execute(new HttpPost(formatUrl(H2_PATH + "/")));
-  }
-
-  @Test
-  public void testH2ConsoleUser() throws Exception {
-    replayAndStart();
-
-    assertEquals(
-        ClientResponse.Status.OK.getStatusCode(),
-        callH2Console(H2_USER).getStatusLine().getStatusCode());
-  }
-
-  @Test
-  public void testH2ConsoleAdmin() throws Exception {
-    replayAndStart();
-
-    assertEquals(
-        ClientResponse.Status.OK.getStatusCode(),
-        callH2Console(ROOT).getStatusLine().getStatusCode());
-  }
-
-  @Test
-  public void testH2ConsoleUnauthorized() throws Exception {
-    replayAndStart();
-
-    assertEquals(
-        ClientResponse.Status.UNAUTHORIZED.getStatusCode(),
-        callH2Console(UNPRIVILEGED).getStatusLine().getStatusCode());
   }
 }

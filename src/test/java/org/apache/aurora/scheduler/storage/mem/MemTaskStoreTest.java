@@ -18,18 +18,14 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
 
-import org.apache.aurora.common.stats.SlidingStats;
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AbstractTaskStoreTest;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.db.InstrumentingInterceptor;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
-import static org.easymock.EasyMock.createMock;
 import static org.junit.Assert.assertEquals;
 
 public class MemTaskStoreTest extends AbstractTaskStoreTest {
@@ -45,12 +41,6 @@ public class MemTaskStoreTest extends AbstractTaskStoreTest {
           @Override
           protected void configure() {
             bind(StatsProvider.class).toInstance(statsProvider);
-
-            // bindings for mybatis interceptor
-            SlidingStats slidingStats = createMock(SlidingStats.class);
-            bind(InstrumentingInterceptor.class).toInstance(new InstrumentingInterceptor(
-                Clock.SYSTEM_CLOCK, s -> slidingStats
-            ));
           }
         });
   }

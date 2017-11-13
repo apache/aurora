@@ -27,7 +27,6 @@ import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.testing.FakeClock;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 
@@ -64,17 +63,21 @@ public final class FakeScheduledExecutor extends FakeClock {
       Object[] args = EasyMock.getCurrentArguments();
       Runnable work = (Runnable) args[0];
       @SuppressWarnings("unchecked")
-      Amount<Long, Time> delay = (Amount<Long, Time>) args[1];
-      addDelayedWork(executor, delay.as(Time.MILLISECONDS), work);
+      long value = (long) args[1];
+      @SuppressWarnings("unchecked")
+      TimeUnit unit = (TimeUnit) args[2];
+
+      addDelayedWork(executor, TimeUnit.MILLISECONDS.convert(value, unit), work);
       return null;
     };
   }
 
-  public static FakeScheduledExecutor fromDelayExecutor(DelayExecutor mock) {
+  public static FakeScheduledExecutor fromScheduledExecutorService(ScheduledExecutorService mock) {
     FakeScheduledExecutor executor = new FakeScheduledExecutor();
-    mock.execute(
+    mock.schedule(
         EasyMock.<Runnable>anyObject(),
-        EasyMock.<Amount<Long, Time>>anyObject());
+        EasyMock.anyLong(),
+        EasyMock.<TimeUnit>anyObject());
     expectLastCall().andAnswer(answerExecuteWithDelay(executor)).anyTimes();
 
     mock.execute(EasyMock.anyObject());

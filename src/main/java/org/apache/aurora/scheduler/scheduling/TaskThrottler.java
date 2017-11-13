@@ -13,19 +13,19 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
 import com.google.common.eventbus.Subscribe;
 
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.SlidingStats;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.BatchWorker;
 import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -46,7 +46,7 @@ class TaskThrottler implements EventSubscriber {
 
   private final RescheduleCalculator rescheduleCalculator;
   private final Clock clock;
-  private final DelayExecutor executor;
+  private final ScheduledExecutorService executor;
   private final StateManager stateManager;
   private final TaskEventBatchWorker batchWorker;
 
@@ -56,7 +56,7 @@ class TaskThrottler implements EventSubscriber {
   TaskThrottler(
       RescheduleCalculator rescheduleCalculator,
       Clock clock,
-      @AsyncExecutor DelayExecutor executor,
+      @AsyncExecutor ScheduledExecutorService executor,
       StateManager stateManager,
       TaskEventBatchWorker batchWorker) {
 
@@ -74,7 +74,7 @@ class TaskThrottler implements EventSubscriber {
           + rescheduleCalculator.getFlappingPenaltyMs(stateChange.getTask());
       long delayMs = Math.max(0, readyAtMs - clock.nowMillis());
       throttleStats.accumulate(delayMs);
-      executor.execute(() ->
+      executor.schedule((Runnable) () ->
               batchWorker.execute(storeProvider -> {
                 stateManager.changeState(
                     storeProvider,
@@ -84,7 +84,8 @@ class TaskThrottler implements EventSubscriber {
                     Optional.absent());
                 return BatchWorker.NO_RESULT;
               }),
-          Amount.of(delayMs, Time.MILLISECONDS));
+          delayMs,
+          TimeUnit.MILLISECONDS);
     }
   }
 }

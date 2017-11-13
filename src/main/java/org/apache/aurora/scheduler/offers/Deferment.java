@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.offers;
 
+import java.util.concurrent.ScheduledExecutorService;
+
 import javax.inject.Inject;
 
 import com.google.common.base.Supplier;
@@ -20,7 +22,6 @@ import com.google.common.base.Supplier;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 
 import static java.util.Objects.requireNonNull;
 
@@ -51,12 +52,12 @@ public interface Deferment {
    */
   class DelayedDeferment implements Deferment {
     private final Supplier<Amount<Long, Time>> delay;
-    private final DelayExecutor executor;
+    private final ScheduledExecutorService executor;
 
     @Inject
     public DelayedDeferment(
         Supplier<Amount<Long, Time>> delay,
-        @AsyncExecutor DelayExecutor executor) {
+        @AsyncExecutor ScheduledExecutorService executor) {
 
       this.delay = requireNonNull(delay);
       this.executor = requireNonNull(executor);
@@ -64,7 +65,8 @@ public interface Deferment {
 
     @Override
     public void defer(Runnable action) {
-      executor.execute(action, delay.get());
+      Amount<Long, Time> actionDelay = delay.get();
+      executor.schedule(action, actionDelay.getValue(), actionDelay.getUnit().getTimeUnit());
     }
   }
 }

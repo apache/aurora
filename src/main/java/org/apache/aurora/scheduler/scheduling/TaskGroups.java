@@ -19,6 +19,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
@@ -39,7 +41,6 @@ import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.BackoffStrategy;
 import org.apache.aurora.scheduler.BatchWorker;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -73,7 +74,7 @@ public class TaskGroups implements EventSubscriber {
   static final String SCHEDULE_ATTEMPTS_BLOCKS = "schedule_attempts_blocks";
 
   private final ConcurrentMap<TaskGroupKey, TaskGroup> groups = Maps.newConcurrentMap();
-  private final DelayExecutor executor;
+  private final ScheduledExecutorService executor;
   private final TaskGroupsSettings settings;
   private final TaskScheduler taskScheduler;
   private final RescheduleCalculator rescheduleCalculator;
@@ -134,7 +135,7 @@ public class TaskGroups implements EventSubscriber {
   @VisibleForTesting
   @Inject
   public TaskGroups(
-      @AsyncExecutor DelayExecutor executor,
+      @AsyncExecutor ScheduledExecutorService executor,
       TaskGroupsSettings settings,
       TaskScheduler taskScheduler,
       RescheduleCalculator rescheduleCalculator,
@@ -153,7 +154,7 @@ public class TaskGroups implements EventSubscriber {
     // Avoid check-then-act by holding the intrinsic lock.  If not done atomically, we could
     // remove a group while a task is being added to it.
     if (group.hasMore()) {
-      executor.execute(evaluate, Amount.of(group.getPenaltyMs(), Time.MILLISECONDS));
+      executor.schedule(evaluate, group.getPenaltyMs(), TimeUnit.MILLISECONDS);
     } else {
       groups.remove(group.getKey());
     }

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.offers;
 
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -27,7 +28,6 @@ import org.apache.aurora.common.util.testing.FakeTicker;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
@@ -538,8 +538,8 @@ public class OfferManagerImplTest extends EasyMockTest {
         RETURN_DELAY,
         Long.MAX_VALUE,
         FAKE_TICKER);
-    DelayExecutor executorMock = createMock(DelayExecutor.class);
-    FakeScheduledExecutor clock = FakeScheduledExecutor.fromDelayExecutor(executorMock);
+    ScheduledExecutorService executorMock = createMock(ScheduledExecutorService.class);
+    FakeScheduledExecutor clock = FakeScheduledExecutor.fromScheduledExecutorService(executorMock);
     addTearDown(clock::assertEmpty);
     offerManager = new OfferManagerImpl(
         driver,

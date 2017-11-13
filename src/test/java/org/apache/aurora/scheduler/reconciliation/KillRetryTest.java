@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.reconciliation;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 
 import javax.inject.Singleton;
 
@@ -34,7 +35,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.app.LifecycleModule;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
@@ -68,8 +68,8 @@ public class KillRetryTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     backoffStrategy = createMock(BackoffStrategy.class);
-    final DelayExecutor executorMock = createMock(DelayExecutor.class);
-    clock = FakeScheduledExecutor.fromDelayExecutor(executorMock);
+    final ScheduledExecutorService executorMock = createMock(ScheduledExecutorService.class);
+    clock = FakeScheduledExecutor.fromScheduledExecutorService(executorMock);
     addTearDown(clock::assertEmpty);
     statsProvider = new FakeStatsProvider();
 
@@ -81,7 +81,8 @@ public class KillRetryTest extends EasyMockTest {
           protected void configure() {
             bind(Driver.class).toInstance(driver);
             bind(Storage.class).toInstance(storageUtil.storage);
-            bind(DelayExecutor.class).annotatedWith(AsyncExecutor.class).toInstance(executorMock);
+            bind(ScheduledExecutorService.class).annotatedWith(AsyncExecutor.class)
+                .toInstance(executorMock);
             PubsubEventModule.bindSubscriber(binder(), KillRetry.class);
             bind(KillRetry.class).in(Singleton.class);
             bind(BackoffStrategy.class).toInstance(backoffStrategy);

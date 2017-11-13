@@ -15,6 +15,10 @@ package org.apache.aurora.benchmark;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
@@ -46,7 +50,6 @@ import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.async.AsyncModule;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.config.CommandLine;
@@ -138,20 +141,11 @@ public class SchedulingBenchmarks {
           new PrivateModule() {
             @Override
             protected void configure() {
+
               // We use a no-op executor for async work, as this benchmark is focused on the
               // synchronous scheduling operations.
-              bind(DelayExecutor.class).annotatedWith(AsyncModule.AsyncExecutor.class)
-                  .toInstance(new DelayExecutor() {
-                    @Override
-                    public void execute(Runnable work, Amount<Long, Time> minDelay) {
-                      // No-op.
-                    }
-
-                    @Override
-                    public void execute(Runnable command) {
-                      // No-op.
-                    }
-                  });
+              bind(ScheduledExecutorService.class).annotatedWith(AsyncModule.AsyncExecutor.class)
+                  .toInstance(new NoopExecutor());
               bind(Deferment.class).to(Deferment.Noop.class);
               bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
               bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
@@ -398,6 +392,60 @@ public class SchedulingBenchmarks {
       pendingTaskProcessor.run();
       // Return non-guessable result to satisfy "blackhole" requirement.
       return ImmutableSet.of("" + System.currentTimeMillis());
+    }
+  }
+
+  private static class NoopExecutor extends AbstractExecutorService
+      implements ScheduledExecutorService {
+
+    @Override
+    public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+      return null;
+    }
+
+    @Override
+    public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
+      return null;
+    }
+
+    @Override
+    public ScheduledFuture<?> scheduleAtFixedRate(
+        Runnable command, long initialDelay, long period, TimeUnit unit) {
+      return null;
+    }
+
+    @Override
+    public ScheduledFuture<?> scheduleWithFixedDelay(
+        Runnable command, long initialDelay, long delay, TimeUnit unit) {
+      return null;
+    }
+
+    @Override
+    public void shutdown() {
+    }
+
+    @Override
+    public List<Runnable> shutdownNow() {
+      return null;
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return false;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return false;
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+      return false;
+    }
+
+    @Override
+    public void execute(Runnable command) {
     }
   }
 }

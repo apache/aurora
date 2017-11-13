@@ -144,7 +144,7 @@ struct Snapshot {
   8: set<QuotaConfiguration> quotaConfigurations
   9: set<api.Lock> locks
   10: set<StoredJobUpdateDetails> jobUpdateDetails
-  11: list<string> dbScript
+  //11: removed
   //12: removed
 }
 

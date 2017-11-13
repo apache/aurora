@@ -27,7 +27,6 @@ import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
@@ -92,31 +91,6 @@ public class TaskStoreBenchmarks {
               }))
           .getInstance(Storage.class);
 
-    }
-
-    @Setup(Level.Iteration)
-    public void setUpIteration() {
-      createTasks(numTasks);
-    }
-
-    @TearDown(Level.Iteration)
-    public void tearDownIteration() {
-      deleteTasks();
-    }
-
-    @Benchmark
-    public int run() {
-      // Iterate through results in case the result is lazily computed.
-      return Iterables.size(
-          storage.read(store -> store.getTaskStore().fetchTasks(Query.unscoped())));
-    }
-  }
-
-  public static class DBFetchTasksBenchmark extends AbstractFetchTasksBenchmark {
-    @Setup(Level.Trial)
-    @Override
-    public void setUp() {
-      storage = DbUtil.createStorage();
     }
 
     @Setup(Level.Iteration)

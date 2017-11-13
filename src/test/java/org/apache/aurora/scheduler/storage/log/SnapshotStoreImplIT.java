@@ -13,15 +13,8 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Map;
 
-import javax.sql.DataSource;
-
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -64,9 +57,6 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.db.DbModule;
-import org.apache.aurora.scheduler.storage.db.DbStorage;
-import org.apache.aurora.scheduler.storage.db.DbUtil;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -82,7 +72,6 @@ import org.junit.Test;
 
 import static org.apache.aurora.common.util.testing.FakeBuildInfo.generateBuildInfo;
 import static org.apache.aurora.scheduler.resources.ResourceManager.aggregateFromBag;
-import static org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import static org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.SNAPSHOT_RESTORE;
 import static org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.SNAPSHOT_SAVE;
 import static org.junit.Assert.assertEquals;
@@ -93,7 +82,6 @@ public class SnapshotStoreImplIT {
   private static final long NOW = 10335463456L;
   private static final IJobKey JOB_KEY = JobKeys.from("role", "env", "job");
 
-  private Storage storage;
   private SnapshotStoreImpl snapshotStore;
 
   private void setUpStore() {
@@ -105,73 +93,15 @@ public class SnapshotStoreImplIT {
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
           }
         });
-    storage = injector.getInstance(Storage.class);
 
     FakeClock clock = new FakeClock();
     clock.setNowMillis(NOW);
     snapshotStore = new SnapshotStoreImpl(
         generateBuildInfo(),
         clock,
-        storage,
+        injector.getInstance(Storage.class),
         TaskTestUtil.THRIFT_BACKFILL);
     Stats.flush();
-  }
-
-  private static Snapshot makeComparable(Snapshot snapshot) {
-    Snapshot copy = snapshot.deepCopy();
-    // Ignore DB snapshot. It will be tested by asserting the DB data.
-    copy.unsetDbScript();
-    return copy;
-  }
-
-  @Test
-  public void testNoDBTaskStore() {
-    setUpStore();
-    populateStore(storage);
-
-    Snapshot snapshot1 = snapshotStore.createSnapshot();
-    assertEquals(expected(), makeComparable(snapshot1));
-    assertSnapshotSaveStats(1L);
-
-    snapshotStore.applySnapshot(snapshot1);
-    Snapshot snapshot2 = snapshotStore.createSnapshot();
-    assertEquals(expected(), makeComparable(snapshot2));
-    assertEquals(makeComparable(snapshot1), makeComparable(snapshot2));
-    assertSnapshotRestoreStats(1L);
-    assertSnapshotSaveStats(2L);
-  }
-
-  @Test
-  public void testMigrateFromDBStores() {
-    // Produce a snapshot from DbStorage, populating the dbScript field.
-    Injector injector = DbUtil.createStorageInjector(DbModule.testModuleWithWorkQueue());
-    DbStorage dbStorage = injector.getInstance(DbStorage.class);
-    populateStore(dbStorage);
-
-    Snapshot dbScriptSnapshot = new Snapshot();
-    try (Connection c = ((DataSource) dbStorage.getUnsafeStoreAccess()).getConnection()) {
-      try (PreparedStatement ps = c.prepareStatement("SCRIPT")) {
-        try (ResultSet rs = ps.executeQuery()) {
-          ImmutableList.Builder<String> builder = ImmutableList.builder();
-          while (rs.next()) {
-            String columnValue = rs.getString("SCRIPT");
-            builder.add(columnValue + "\n");
-          }
-          dbScriptSnapshot.setDbScript(builder.build());
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    }
-
-    // Verify that the dbScript snapshot can be loaded into a storage, and the resulting snapshot
-    // fills thrift fields.
-    setUpStore();
-    snapshotStore.applySnapshot(dbScriptSnapshot);
-    Snapshot snapshot2 = snapshotStore.createSnapshot();
-    assertEquals(expected(), makeComparable(snapshot2));
-    assertSnapshotRestoreStats(2L);
-    assertSnapshotSaveStats(2L);
   }
 
   @Test
@@ -180,7 +110,7 @@ public class SnapshotStoreImplIT {
     snapshotStore.applySnapshot(makeNonBackfilled());
 
     Snapshot backfilled = snapshotStore.createSnapshot();
-    assertEquals(expected(), makeComparable(backfilled));
+    assertEquals(expected(), backfilled);
     assertSnapshotRestoreStats(1L);
     assertSnapshotSaveStats(1L);
   }
@@ -258,25 +188,6 @@ public class SnapshotStoreImplIT {
 
   private Snapshot makeNonBackfilled() {
     return expected();
-  }
-
-  private void populateStore(Storage toPopulate) {
-    toPopulate.write((NoResult.Quiet) store -> {
-      store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(TASK));
-      store.getCronJobStore().saveAcceptedJob(CRON_JOB);
-      store.getQuotaStore().saveQuota(ROLE, QUOTA);
-      store.getAttributeStore().saveHostAttributes(ATTRIBUTES);
-      store.getSchedulerStore().saveFrameworkId(FRAMEWORK_ID);
-      store.getLockStore().saveLock(LOCK);
-      store.getJobUpdateStore().saveJobUpdate(UPDATE.getUpdate(), Optional.of(LOCK.getToken()));
-      store.getJobUpdateStore().saveJobUpdateEvent(
-          UPDATE.getUpdate().getSummary().getKey(),
-          UPDATE.getUpdateEvents().get(0));
-      store.getJobUpdateStore().saveJobInstanceUpdateEvent(
-          UPDATE.getUpdate().getSummary().getKey(),
-          UPDATE.getInstanceEvents().get(0)
-      );
-    });
   }
 
   private void assertSnapshotSaveStats(long count) {

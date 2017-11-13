@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.reconciliation;
 
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Optional;
@@ -28,7 +30,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -59,7 +60,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   private static final Amount<Long, Time> TIMEOUT = Amount.of(1L, Time.MINUTES);
 
   private AtomicLong timedOutTaskCounter;
-  private DelayExecutor executor;
+  private ScheduledExecutorService executor;
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private FakeClock clock;
@@ -68,7 +69,7 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    executor = createMock(DelayExecutor.class);
+    executor = createMock(ScheduledExecutorService.class);
     storageUtil = new StorageTestUtil(this);
     stateManager = createMock(StateManager.class);
     clock = new FakeClock();
@@ -91,7 +92,11 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   private Capture<Runnable> expectTaskWatch(Amount<Long, Time> expireIn) {
     Capture<Runnable> capture = createCapture();
-    executor.execute(EasyMock.capture(capture), eq(expireIn));
+    expect(executor.schedule(
+        EasyMock.capture(capture),
+        eq(expireIn.as(Time.MILLISECONDS).longValue()),
+        eq(TimeUnit.MILLISECONDS)))
+        .andReturn(null);
     return capture;
   }
 

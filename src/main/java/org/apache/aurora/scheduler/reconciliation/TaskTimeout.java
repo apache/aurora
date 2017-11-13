@@ -15,6 +15,8 @@ package org.apache.aurora.scheduler.reconciliation;
 
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
@@ -29,7 +31,6 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.AsyncModule.AsyncExecutor;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateChangeResult;
@@ -65,7 +66,7 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
       ScheduleStatus.KILLING,
       ScheduleStatus.DRAINING);
 
-  private final DelayExecutor executor;
+  private final ScheduledExecutorService executor;
   private final Storage storage;
   private final StateManager stateManager;
   private final Amount<Long, Time> timeout;
@@ -73,7 +74,7 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
 
   @Inject
   TaskTimeout(
-      @AsyncExecutor DelayExecutor executor,
+      @AsyncExecutor ScheduledExecutorService executor,
       Storage storage,
       StateManager stateManager,
       Amount<Long, Time> timeout,
@@ -140,7 +141,7 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
         LOG.debug("Retrying timeout of task {} in {}", taskId, NOT_STARTED_RETRY);
         // TODO(wfarner): This execution should not wait for a transaction, but a second executor
         // would be weird.
-        executor.execute(this, NOT_STARTED_RETRY);
+        executor.schedule(this, NOT_STARTED_RETRY.as(Time.MILLISECONDS), TimeUnit.MILLISECONDS);
       }
     }
   }
@@ -148,9 +149,10 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
   @Subscribe
   public void recordStateChange(TaskStateChange change) {
     if (isTransient(change.getNewState())) {
-      executor.execute(
+      executor.schedule(
           new TimedOutTaskHandler(change.getTaskId(), change.getNewState()),
-          timeout);
+          timeout.as(Time.MILLISECONDS),
+          TimeUnit.MILLISECONDS);
     }
   }
 }

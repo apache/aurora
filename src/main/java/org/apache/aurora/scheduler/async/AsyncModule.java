@@ -81,20 +81,15 @@ public class AsyncModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(ScheduledThreadPoolExecutor.class).toInstance(afterTransaction);
-        bind(ScheduledExecutorService.class).toInstance(afterTransaction);
-
-        bind(GatingDelayExecutor.class).in(Singleton.class);
-        expose(GatingDelayExecutor.class);
-
         bind(RegisterGauges.class).in(Singleton.class);
         expose(RegisterGauges.class);
       }
     });
     SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RegisterGauges.class);
 
-    bind(Executor.class).annotatedWith(AsyncExecutor.class).to(GatingDelayExecutor.class);
-    bind(DelayExecutor.class).annotatedWith(AsyncExecutor.class).to(GatingDelayExecutor.class);
-    bind(GatedWorkQueue.class).annotatedWith(AsyncExecutor.class).to(GatingDelayExecutor.class);
+    bind(Executor.class).annotatedWith(AsyncExecutor.class).toInstance(afterTransaction);
+    bind(ScheduledExecutorService.class).annotatedWith(AsyncExecutor.class)
+        .toInstance(afterTransaction);
   }
 
   static class RegisterGauges extends AbstractIdleService {
@@ -104,31 +99,19 @@ public class AsyncModule extends AbstractModule {
     @VisibleForTesting
     static final String ASYNC_TASKS_GAUGE = "async_tasks_completed";
 
-    @VisibleForTesting
-    static final String DELAY_QUEUE_GAUGE = "delay_executor_queue_size";
-
     private final StatsProvider statsProvider;
     private final ScheduledThreadPoolExecutor executor;
-    private final GatingDelayExecutor delayExecutor;
 
     @Inject
-    RegisterGauges(
-        StatsProvider statsProvider,
-        ScheduledThreadPoolExecutor executor,
-        GatingDelayExecutor delayExecutor) {
-
+    RegisterGauges(StatsProvider statsProvider, ScheduledThreadPoolExecutor executor) {
       this.statsProvider = requireNonNull(statsProvider);
       this.executor = requireNonNull(executor);
-      this.delayExecutor = requireNonNull(delayExecutor);
     }
 
     @Override
     protected void startUp() {
       statsProvider.makeGauge(TIMEOUT_QUEUE_GAUGE, () -> executor.getQueue().size());
       statsProvider.makeGauge(ASYNC_TASKS_GAUGE, executor::getCompletedTaskCount);
-      // Using a lambda rather than method ref to sidestep a bug in PMD that makes it think
-      // delayExecutor is unused.
-      statsProvider.makeGauge(DELAY_QUEUE_GAUGE, delayExecutor::getQueueSize);
     }
 
     @Override

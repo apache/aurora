@@ -87,8 +87,7 @@ public class AsyncModuleTest extends EasyMockTest {
     assertEquals(
         ImmutableMap.of(
             RegisterGauges.TIMEOUT_QUEUE_GAUGE, 0,
-            RegisterGauges.ASYNC_TASKS_GAUGE, 0L,
-            RegisterGauges.DELAY_QUEUE_GAUGE, 0),
+            RegisterGauges.ASYNC_TASKS_GAUGE, 0L),
         statsProvider.getAllValues()
     );
   }

@@ -117,7 +117,6 @@ public class RecoveryTest extends EasyMockTest {
     recovery.commit();
     transaction.getValue().apply(storeProvider);
 
-    snapshot.getValue().unsetDbScript();
     assertEquals(SNAPSHOT1, snapshot.getValue());
   }
 
@@ -147,7 +146,6 @@ public class RecoveryTest extends EasyMockTest {
     recovery.commit();
     transaction.getValue().apply(storeProvider);
 
-    snapshot.getValue().unsetDbScript();
     assertEquals(modified, snapshot.getValue());
   }
 

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.scheduling;
 
 import java.util.Set;
+import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
@@ -27,7 +28,6 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.async.DelayExecutor;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -70,8 +70,8 @@ public class TaskGroupsTest extends EasyMockTest {
   public void setUp() throws Exception {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
-    DelayExecutor executor = createMock(DelayExecutor.class);
-    clock = FakeScheduledExecutor.fromDelayExecutor(executor);
+    ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
+    clock = FakeScheduledExecutor.fromScheduledExecutorService(executor);
     backoffStrategy = createMock(BackoffStrategy.class);
     taskScheduler = createMock(TaskScheduler.class);
     rateLimiter = createMock(RateLimiter.class);
