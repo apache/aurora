@@ -35,7 +35,6 @@ import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.TaskStore;
@@ -73,7 +72,6 @@ public class WriteAheadStorageTest extends EasyMockTest {
         createMock(SchedulerStore.Mutable.class),
         createMock(CronJobStore.Mutable.class),
         taskStore,
-        createMock(LockStore.Mutable.class),
         createMock(QuotaStore.Mutable.class),
         attributeStore,
         jobUpdateStore,
@@ -169,12 +167,6 @@ public class WriteAheadStorageTest extends EasyMockTest {
   public void testDeleteQuotas() {
     control.replay();
     storage.deleteQuotas();
-  }
-
-  @Test(expected = UnsupportedOperationException.class)
-  public void testDeleteLocks() {
-    control.replay();
-    storage.deleteLocks();
   }
 
   @Test(expected = UnsupportedOperationException.class)

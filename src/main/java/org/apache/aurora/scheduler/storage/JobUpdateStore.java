@@ -20,7 +20,6 @@ import java.util.Set;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.JobUpdateStatus;
-import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
@@ -96,8 +95,7 @@ public interface JobUpdateStore {
    *
    * @return A read-only view of all job update details.
    */
-  Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails();
-
+  Set<IJobUpdateDetails> fetchAllJobUpdateDetails();
   /**
    * Fetches the events that have affected an instance within a job update.
    *
@@ -125,11 +123,8 @@ public interface JobUpdateStore {
      * without having at least one {@link IJobUpdateEvent} present in the store will return empty.
      *
      * @param update Update to save.
-     * @param lockToken Optional UUID identifying the lock associated with this update.
-     *                  The {@code lockToken} can be absent when terminal updates are re-inserted
-     *                  during snapshot restore.
      */
-    void saveJobUpdate(IJobUpdate update, Optional<String> lockToken);
+    void saveJobUpdate(IJobUpdate update);
 
     /**
      * Saves a new job update event.

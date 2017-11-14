@@ -44,8 +44,6 @@ import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateState;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
@@ -62,7 +60,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -136,11 +133,6 @@ public class SnapshotStoreImplIT {
           FakeBuildInfo.DATE, FakeBuildInfo.DATE,
           FakeBuildInfo.GIT_REVISION, FakeBuildInfo.GIT_REVISION,
           FakeBuildInfo.GIT_TAG, FakeBuildInfo.GIT_TAG);
-  private static final ILock LOCK = ILock.build(new Lock()
-      .setKey(LockKey.job(JobKeys.from("role", "env", "job").newBuilder()))
-      .setToken("lockId")
-      .setUser("testUser")
-      .setTimestampMs(12345L));
   private static final IJobUpdateKey UPDATE_ID =
       IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), "updateId1"));
   private static final IJobUpdateDetails UPDATE = IJobUpdateDetails.build(new JobUpdateDetails()
@@ -181,9 +173,8 @@ public class SnapshotStoreImplIT {
         .setHostAttributes(ImmutableSet.of(ATTRIBUTES.newBuilder()))
         .setCronJobs(ImmutableSet.of(new StoredCronJob(CRON_JOB.newBuilder())))
         .setSchedulerMetadata(new SchedulerMetadata(FRAMEWORK_ID, METADATA))
-        .setLocks(ImmutableSet.of(LOCK.newBuilder()))
         .setJobUpdateDetails(ImmutableSet.of(
-            new StoredJobUpdateDetails(UPDATE.newBuilder(), LOCK.getToken())));
+            new StoredJobUpdateDetails().setDetails(UPDATE.newBuilder())));
   }
 
   private Snapshot makeNonBackfilled() {

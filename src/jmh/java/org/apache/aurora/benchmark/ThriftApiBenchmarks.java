@@ -35,7 +35,6 @@ import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.quota.QuotaManager;
-import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
@@ -148,7 +147,6 @@ public class ThriftApiBenchmarks {
             bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
             bind(CronPredictor.class).toInstance(createThrowingFake(CronPredictor.class));
             bind(QuotaManager.class).toInstance(createThrowingFake(QuotaManager.class));
-            bind(LockManager.class).toInstance(createThrowingFake(LockManager.class));
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(ConfigurationManager.class).toInstance(TaskTestUtil.CONFIGURATION_MANAGER);
           }

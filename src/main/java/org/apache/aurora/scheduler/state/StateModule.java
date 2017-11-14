@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.state;
 
 import java.util.List;
-
 import javax.inject.Singleton;
 
 import com.beust.jcommander.Parameter;
@@ -64,8 +63,6 @@ public class StateModule extends AbstractModule {
 
     bind(UUIDGenerator.class).to(UUIDGeneratorImpl.class);
     bind(UUIDGeneratorImpl.class).in(Singleton.class);
-    bind(LockManager.class).to(LockManagerImpl.class);
-    bind(LockManagerImpl.class).in(Singleton.class);
 
     bindMaintenanceController(binder());
   }

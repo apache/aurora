@@ -28,14 +28,6 @@ struct SaveCronJob {
   2: api.JobConfiguration jobConfig
 }
 
-struct SaveLock {
-  1: api.Lock lock
-}
-
-struct RemoveLock {
-  1: api.LockKey lockKey
-}
-
 struct RemoveJob {
   2: api.JobKey jobKey
 }
@@ -63,13 +55,12 @@ struct SaveHostAttributes {
 
 struct SaveJobUpdate {
   1: api.JobUpdate jobUpdate
-  2: string lockToken
+  // 2: deleted
 }
 
 struct StoredJobUpdateDetails {
   1: api.JobUpdateDetails details
-  /** ID of the lock associated with this update. */
-  2: string lockToken
+  // 2: deleted
 }
 
 struct SaveJobUpdateEvent {
@@ -97,8 +88,8 @@ union Op {
   9: RemoveQuota removeQuota
   10: SaveHostAttributes saveHostAttributes
   // 11: removed
-  12: SaveLock saveLock
-  13: RemoveLock removeLock
+  // 12: deleted
+  // 13: deleted
   14: SaveJobUpdate saveJobUpdate
   15: SaveJobUpdateEvent saveJobUpdateEvent
   16: SaveJobInstanceUpdateEvent saveJobInstanceUpdateEvent
@@ -142,7 +133,7 @@ struct Snapshot {
   5: set<StoredCronJob> cronJobs
   6: SchedulerMetadata schedulerMetadata
   8: set<QuotaConfiguration> quotaConfigurations
-  9: set<api.Lock> locks
+  // 9: deleted
   10: set<StoredJobUpdateDetails> jobUpdateDetails
   //11: removed
   //12: removed

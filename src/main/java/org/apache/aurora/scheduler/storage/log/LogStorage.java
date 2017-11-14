@@ -24,7 +24,6 @@ import java.util.function.Consumer;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -51,7 +50,6 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
@@ -64,8 +62,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,7 +174,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   private final SchedulerStore.Mutable writeBehindSchedulerStore;
   private final CronJobStore.Mutable writeBehindJobStore;
   private final TaskStore.Mutable writeBehindTaskStore;
-  private final LockStore.Mutable writeBehindLockStore;
   private final QuotaStore.Mutable writeBehindQuotaStore;
   private final AttributeStore.Mutable writeBehindAttributeStore;
   private final JobUpdateStore.Mutable writeBehindJobUpdateStore;
@@ -211,7 +206,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       @Volatile SchedulerStore.Mutable schedulerStore,
       @Volatile CronJobStore.Mutable jobStore,
       @Volatile TaskStore.Mutable taskStore,
-      @Volatile LockStore.Mutable lockStore,
       @Volatile QuotaStore.Mutable quotaStore,
       @Volatile AttributeStore.Mutable attributeStore,
       @Volatile JobUpdateStore.Mutable jobUpdateStore,
@@ -227,7 +221,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         schedulerStore,
         jobStore,
         taskStore,
-        lockStore,
         quotaStore,
         attributeStore,
         jobUpdateStore,
@@ -246,7 +239,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       SchedulerStore.Mutable schedulerStore,
       CronJobStore.Mutable jobStore,
       TaskStore.Mutable taskStore,
-      LockStore.Mutable lockStore,
       QuotaStore.Mutable quotaStore,
       AttributeStore.Mutable attributeStore,
       JobUpdateStore.Mutable jobUpdateStore,
@@ -267,7 +259,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     this.writeBehindSchedulerStore = requireNonNull(schedulerStore);
     this.writeBehindJobStore = requireNonNull(jobStore);
     this.writeBehindTaskStore = requireNonNull(taskStore);
-    this.writeBehindLockStore = requireNonNull(lockStore);
     this.writeBehindQuotaStore = requireNonNull(quotaStore);
     this.writeBehindAttributeStore = requireNonNull(attributeStore);
     this.writeBehindJobUpdateStore = requireNonNull(jobUpdateStore);
@@ -289,7 +280,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         schedulerStore,
         jobStore,
         taskStore,
-        lockStore,
         quotaStore,
         attributeStore,
         jobUpdateStore,
@@ -360,16 +350,9 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
             LOG.info("Dropping host attributes with no agent ID: " + attributes);
           }
         })
-        .put(
-            Op._Fields.SAVE_LOCK,
-            op -> writeBehindLockStore.saveLock(ILock.build(op.getSaveLock().getLock())))
-        .put(
-            Op._Fields.REMOVE_LOCK,
-            op -> writeBehindLockStore.removeLock(ILockKey.build(op.getRemoveLock().getLockKey())))
         .put(Op._Fields.SAVE_JOB_UPDATE, op ->
           writeBehindJobUpdateStore.saveJobUpdate(
-              thriftBackfill.backFillJobUpdate(op.getSaveJobUpdate().getJobUpdate()),
-              Optional.fromNullable(op.getSaveJobUpdate().getLockToken())))
+              thriftBackfill.backFillJobUpdate(op.getSaveJobUpdate().getJobUpdate())))
         .put(Op._Fields.SAVE_JOB_UPDATE_EVENT, op -> {
           SaveJobUpdateEvent event = op.getSaveJobUpdateEvent();
           writeBehindJobUpdateStore.saveJobUpdateEvent(
@@ -487,7 +470,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       LOG.info("Snapshot complete."
           + " host attrs: " + snapshot.getHostAttributesSize()
           + ", cron jobs: " + snapshot.getCronJobsSize()
-          + ", locks: " + snapshot.getLocksSize()
           + ", quota confs: " + snapshot.getQuotaConfigurationsSize()
           + ", tasks: " + snapshot.getTasksSize()
           + ", updates: " + snapshot.getJobUpdateDetailsSize());

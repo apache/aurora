@@ -48,8 +48,6 @@ import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ResourceAggregate;
@@ -61,7 +59,6 @@ import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.RemoveJob;
-import org.apache.aurora.gen.storage.RemoveLock;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.SaveCronJob;
@@ -70,7 +67,6 @@ import org.apache.aurora.gen.storage.SaveHostAttributes;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
-import org.apache.aurora.gen.storage.SaveLock;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.gen.storage.Snapshot;
@@ -99,8 +95,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.log.LogStorage.SchedulingService;
@@ -174,7 +168,6 @@ public class LogStorageTest extends EasyMockTest {
         storageUtil.schedulerStore,
         storageUtil.jobStore,
         storageUtil.taskStore,
-        storageUtil.lockStore,
         storageUtil.quotaStore,
         storageUtil.attributeStore,
         storageUtil.jobUpdateStore,
@@ -327,14 +320,6 @@ public class LogStorageTest extends EasyMockTest {
     expect(storageUtil.attributeStore.saveHostAttributes(
         IHostAttributes.build(hostAttributes2.getHostAttributes()))).andReturn(true);
 
-    SaveLock saveLock = new SaveLock(new Lock().setKey(LockKey.job(JOB_KEY.newBuilder())));
-    builder.add(createTransaction(Op.saveLock(saveLock)));
-    storageUtil.lockStore.saveLock(ILock.build(saveLock.getLock()));
-
-    RemoveLock removeLock = new RemoveLock(LockKey.job(JOB_KEY.newBuilder()));
-    builder.add(createTransaction(Op.removeLock(removeLock)));
-    storageUtil.lockStore.removeLock(ILockKey.build(removeLock.getLockKey()));
-
     JobUpdate actualUpdate = new JobUpdate()
         .setSummary(new JobUpdateSummary().setKey(UPDATE_ID.newBuilder()))
         .setInstructions(new JobUpdateInstructions()
@@ -345,11 +330,9 @@ public class LogStorageTest extends EasyMockTest {
     expectedUpdate.getInstructions().getDesiredState().setTask(makeConfig(JOB_KEY).newBuilder());
     expectedUpdate.getInstructions().getInitialState()
         .forEach(e -> e.setTask(makeConfig(JOB_KEY).newBuilder()));
-    SaveJobUpdate saveUpdate = new SaveJobUpdate(actualUpdate, "token");
+    SaveJobUpdate saveUpdate = new SaveJobUpdate().setJobUpdate(actualUpdate);
     builder.add(createTransaction(Op.saveJobUpdate(saveUpdate)));
-    storageUtil.jobUpdateStore.saveJobUpdate(
-        IJobUpdate.build(expectedUpdate),
-        Optional.of(saveUpdate.getLockToken()));
+    storageUtil.jobUpdateStore.saveJobUpdate(IJobUpdate.build(expectedUpdate));
 
     SaveJobUpdateEvent saveUpdateEvent =
         new SaveJobUpdateEvent(new JobUpdateEvent(), UPDATE_ID.newBuilder());
@@ -745,48 +728,6 @@ public class LogStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testSaveLock() throws Exception {
-    ILock lock = ILock.build(new Lock()
-        .setKey(LockKey.job(JOB_KEY.newBuilder()))
-        .setToken("testLockId")
-        .setUser("testUser")
-        .setTimestampMs(12345L));
-    new AbstractMutationFixture() {
-      @Override
-      protected void setupExpectations() throws Exception {
-        storageUtil.expectWrite();
-        storageUtil.lockStore.saveLock(lock);
-        streamMatcher.expectTransaction(Op.saveLock(new SaveLock(lock.newBuilder())))
-            .andReturn(position);
-      }
-
-      @Override
-      protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getLockStore().saveLock(lock);
-      }
-    }.run();
-  }
-
-  @Test
-  public void testRemoveLock() throws Exception {
-    ILockKey lockKey = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
-    new AbstractMutationFixture() {
-      @Override
-      protected void setupExpectations() throws Exception {
-        storageUtil.expectWrite();
-        storageUtil.lockStore.removeLock(lockKey);
-        streamMatcher.expectTransaction(Op.removeLock(new RemoveLock(lockKey.newBuilder())))
-            .andReturn(position);
-      }
-
-      @Override
-      protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getLockStore().removeLock(lockKey);
-      }
-    }.run();
-  }
-
-  @Test
   public void testSaveHostAttributes() throws Exception {
     String host = "hostname";
     Set<Attribute> attributes =
@@ -834,16 +775,7 @@ public class LogStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testSaveUpdateWithLockToken() throws Exception {
-    saveAndAssertJobUpdate(Optional.of("token"));
-  }
-
-  @Test
-  public void testSaveUpdateWithNullLockToken() throws Exception {
-    saveAndAssertJobUpdate(Optional.absent());
-  }
-
-  private void saveAndAssertJobUpdate(Optional<String> lockToken) throws Exception {
+  public void testSaveUpdate() throws Exception {
     IJobUpdate update = IJobUpdate.build(new JobUpdate()
         .setSummary(new JobUpdateSummary()
             .setKey(UPDATE_ID.newBuilder())
@@ -861,15 +793,15 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
-        storageUtil.jobUpdateStore.saveJobUpdate(update, lockToken);
+        storageUtil.jobUpdateStore.saveJobUpdate(update);
         streamMatcher.expectTransaction(
-            Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder(), lockToken.orNull())))
+            Op.saveJobUpdate(new SaveJobUpdate().setJobUpdate(update.newBuilder())))
             .andReturn(position);
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
+        storeProvider.getJobUpdateStore().saveJobUpdate(update);
       }
     }.run();
   }

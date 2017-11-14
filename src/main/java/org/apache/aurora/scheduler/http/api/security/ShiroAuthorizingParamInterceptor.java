@@ -43,8 +43,6 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateRequest;
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.TaskConfig;
@@ -106,12 +104,6 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
   private static final FieldGetter<JobConfiguration, JobKey> JOB_CONFIGURATION_GETTER =
       new ThriftFieldGetter<>(JobConfiguration.class, JobConfiguration._Fields.KEY, JobKey.class);
 
-  private static final FieldGetter<Lock, LockKey> LOCK_GETTER =
-      new ThriftFieldGetter<>(Lock.class, Lock._Fields.KEY, LockKey.class);
-
-  private static final FieldGetter<LockKey, JobKey> LOCK_KEY_GETTER =
-      new ThriftFieldGetter<>(LockKey.class, LockKey._Fields.JOB, JobKey.class);
-
   private static final FieldGetter<JobUpdateKey, JobKey> JOB_UPDATE_KEY_GETTER =
       new ThriftFieldGetter<>(JobUpdateKey.class, JobUpdateKey._Fields.JOB, JobKey.class);
 
@@ -124,8 +116,6 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
           FieldGetters.compose(UPDATE_REQUEST_GETTER, TASK_CONFIG_GETTER),
           TASK_CONFIG_GETTER,
           JOB_CONFIGURATION_GETTER,
-          FieldGetters.compose(LOCK_GETTER, LOCK_KEY_GETTER),
-          LOCK_KEY_GETTER,
           JOB_UPDATE_KEY_GETTER,
           INSTANCE_KEY_GETTER,
           new IdentityFieldGetter<>(JobKey.class));

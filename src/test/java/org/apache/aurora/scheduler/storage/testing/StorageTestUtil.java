@@ -21,7 +21,6 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -50,7 +49,6 @@ public class StorageTestUtil {
   public final QuotaStore.Mutable quotaStore;
   public final AttributeStore.Mutable attributeStore;
   public final CronJobStore.Mutable jobStore;
-  public final LockStore.Mutable lockStore;
   public final SchedulerStore.Mutable schedulerStore;
   public final JobUpdateStore.Mutable jobUpdateStore;
   public final NonVolatileStorage storage;
@@ -67,7 +65,6 @@ public class StorageTestUtil {
     this.quotaStore = easyMock.createMock(QuotaStore.Mutable.class);
     this.attributeStore = easyMock.createMock(AttributeStore.Mutable.class);
     this.jobStore = easyMock.createMock(CronJobStore.Mutable.class);
-    this.lockStore = easyMock.createMock(LockStore.Mutable.class);
     this.schedulerStore = easyMock.createMock(SchedulerStore.Mutable.class);
     this.jobUpdateStore = easyMock.createMock(JobUpdateStore.Mutable.class);
     this.storage = easyMock.createMock(NonVolatileStorage.class);
@@ -93,7 +90,6 @@ public class StorageTestUtil {
     expect(storeProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
     expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
     expect(storeProvider.getCronJobStore()).andReturn(jobStore).anyTimes();
-    expect(storeProvider.getLockStore()).andReturn(lockStore).anyTimes();
     expect(storeProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
     expect(storeProvider.getJobUpdateStore()).andReturn(jobUpdateStore).anyTimes();
     expect(mutableStoreProvider.getTaskStore()).andReturn(taskStore).anyTimes();
@@ -101,7 +97,6 @@ public class StorageTestUtil {
     expect(mutableStoreProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
     expect(mutableStoreProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
     expect(mutableStoreProvider.getCronJobStore()).andReturn(jobStore).anyTimes();
-    expect(mutableStoreProvider.getLockStore()).andReturn(lockStore).anyTimes();
     expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
     expect(mutableStoreProvider.getJobUpdateStore()).andReturn(jobUpdateStore).anyTimes();
     expectRead().anyTimes();

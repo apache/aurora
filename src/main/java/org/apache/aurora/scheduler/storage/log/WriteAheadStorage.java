@@ -25,7 +25,6 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.RemoveJob;
-import org.apache.aurora.gen.storage.RemoveLock;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.SaveCronJob;
@@ -34,17 +33,14 @@ import org.apache.aurora.gen.storage.SaveHostAttributes;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
-import org.apache.aurora.gen.storage.SaveLock;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.SaveTasks;
-import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -60,8 +56,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
-import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.slf4j.Logger;
@@ -80,7 +74,6 @@ class WriteAheadStorage implements
     SchedulerStore.Mutable,
     CronJobStore.Mutable,
     TaskStore.Mutable,
-    LockStore.Mutable,
     QuotaStore.Mutable,
     AttributeStore.Mutable,
     JobUpdateStore.Mutable {
@@ -89,7 +82,6 @@ class WriteAheadStorage implements
   private final SchedulerStore.Mutable schedulerStore;
   private final CronJobStore.Mutable jobStore;
   private final TaskStore.Mutable taskStore;
-  private final LockStore.Mutable lockStore;
   private final QuotaStore.Mutable quotaStore;
   private final AttributeStore.Mutable attributeStore;
   private final JobUpdateStore.Mutable jobUpdateStore;
@@ -103,7 +95,6 @@ class WriteAheadStorage implements
    * @param schedulerStore Delegate.
    * @param jobStore       Delegate.
    * @param taskStore      Delegate.
-   * @param lockStore      Delegate.
    * @param quotaStore     Delegate.
    * @param attributeStore Delegate.
    * @param jobUpdateStore Delegate.
@@ -113,7 +104,6 @@ class WriteAheadStorage implements
       SchedulerStore.Mutable schedulerStore,
       CronJobStore.Mutable jobStore,
       TaskStore.Mutable taskStore,
-      LockStore.Mutable lockStore,
       QuotaStore.Mutable quotaStore,
       AttributeStore.Mutable attributeStore,
       JobUpdateStore.Mutable jobUpdateStore,
@@ -124,7 +114,6 @@ class WriteAheadStorage implements
     this.schedulerStore = requireNonNull(schedulerStore);
     this.jobStore = requireNonNull(jobStore);
     this.taskStore = requireNonNull(taskStore);
-    this.lockStore = requireNonNull(lockStore);
     this.quotaStore = requireNonNull(quotaStore);
     this.attributeStore = requireNonNull(attributeStore);
     this.jobUpdateStore = requireNonNull(jobUpdateStore);
@@ -221,27 +210,11 @@ class WriteAheadStorage implements
   }
 
   @Override
-  public void saveLock(final ILock lock) {
-    requireNonNull(lock);
-
-    write(Op.saveLock(new SaveLock(lock.newBuilder())));
-    lockStore.saveLock(lock);
-  }
-
-  @Override
-  public void removeLock(final ILockKey lockKey) {
-    requireNonNull(lockKey);
-
-    write(Op.removeLock(new RemoveLock(lockKey.newBuilder())));
-    lockStore.removeLock(lockKey);
-  }
-
-  @Override
-  public void saveJobUpdate(IJobUpdate update, Optional<String> lockToken) {
+  public void saveJobUpdate(IJobUpdate update) {
     requireNonNull(update);
 
-    write(Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder(), lockToken.orNull())));
-    jobUpdateStore.saveJobUpdate(update, lockToken);
+    write(Op.saveJobUpdate(new SaveJobUpdate().setJobUpdate(update.newBuilder())));
+    jobUpdateStore.saveJobUpdate(update);
   }
 
   @Override
@@ -306,12 +279,6 @@ class WriteAheadStorage implements
   }
 
   @Override
-  public void deleteLocks() {
-    throw new UnsupportedOperationException(
-        "Unsupported since casual storage users should never be doing this.");
-  }
-
-  @Override
   public void deleteAllUpdatesAndEvents() {
     throw new UnsupportedOperationException(
         "Unsupported since casual storage users should never be doing this.");
@@ -329,11 +296,6 @@ class WriteAheadStorage implements
 
   @Override
   public TaskStore.Mutable getUnsafeTaskStore() {
-    return this;
-  }
-
-  @Override
-  public LockStore.Mutable getLockStore() {
     return this;
   }
 
@@ -398,16 +360,6 @@ class WriteAheadStorage implements
   }
 
   @Override
-  public Set<ILock> fetchLocks() {
-    return this.lockStore.fetchLocks();
-  }
-
-  @Override
-  public java.util.Optional<ILock> fetchLock(ILockKey lockKey) {
-    return this.lockStore.fetchLock(lockKey);
-  }
-
-  @Override
   public Optional<IHostAttributes> getHostAttributes(String host) {
     return this.attributeStore.getHostAttributes(host);
   }
@@ -443,7 +395,7 @@ class WriteAheadStorage implements
   }
 
   @Override
-  public Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails() {
+  public Set<IJobUpdateDetails> fetchAllJobUpdateDetails() {
     return this.jobUpdateStore.fetchAllJobUpdateDetails();
   }
 

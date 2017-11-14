@@ -68,7 +68,6 @@ public class UpdateStoreBenchmarks {
     public void tearDownIteration() {
       storage.write((NoResult.Quiet) storeProvider -> {
         storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
-        storeProvider.getLockStore().deleteLocks();
       });
     }
 
@@ -108,7 +107,6 @@ public class UpdateStoreBenchmarks {
     public void tearDownIteration() {
       storage.write((NoResult.Quiet) storeProvider -> {
         storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
-        storeProvider.getLockStore().deleteLocks();
       });
     }
 
@@ -148,7 +146,6 @@ public class UpdateStoreBenchmarks {
     public void tearDownIteration() {
       storage.write((NoResult.Quiet) storeProvider -> {
         storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
-        storeProvider.getLockStore().deleteLocks();
       });
     }
 

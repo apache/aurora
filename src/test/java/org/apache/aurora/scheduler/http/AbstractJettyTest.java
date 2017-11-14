@@ -59,7 +59,6 @@ import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.scheduling.TaskGroups;
 import org.apache.aurora.scheduler.scheduling.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.scheduling.TaskScheduler;
-import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.stats.StatsModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
@@ -128,7 +127,6 @@ public abstract class AbstractJettyTest extends EasyMockTest {
                     5));
             bind(ServiceGroupMonitor.class).toInstance(serviceGroupMonitor);
             bindMock(CronJobManager.class);
-            bindMock(LockManager.class);
             bindMock(OfferManager.class);
             bindMock(RescheduleCalculator.class);
             bindMock(TaskScheduler.class);

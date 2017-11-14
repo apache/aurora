@@ -48,8 +48,6 @@ import org.apache.aurora.scheduler.SchedulerModule.TaskEventBatchWorker;
 import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.state.LockManager;
-import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -65,7 +63,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
-import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.updater.StateEvaluator.Failure;
 import org.slf4j.Logger;
@@ -112,7 +109,6 @@ class JobUpdateControllerImpl implements JobUpdateController {
       "Unexpected problem running asynchronous updater for: %s. Triggering shutdown";
 
   private final UpdateFactory updateFactory;
-  private final LockManager lockManager;
   private final Storage storage;
   private final ScheduledExecutorService executor;
   private final StateManager stateManager;
@@ -130,7 +126,6 @@ class JobUpdateControllerImpl implements JobUpdateController {
   @Inject
   JobUpdateControllerImpl(
       UpdateFactory updateFactory,
-      LockManager lockManager,
       Storage storage,
       ScheduledExecutorService executor,
       StateManager stateManager,
@@ -140,7 +135,6 @@ class JobUpdateControllerImpl implements JobUpdateController {
       TaskEventBatchWorker batchWorker) {
 
     this.updateFactory = requireNonNull(updateFactory);
-    this.lockManager = requireNonNull(lockManager);
     this.storage = requireNonNull(storage);
     this.executor = requireNonNull(executor);
     this.stateManager = requireNonNull(stateManager);
@@ -187,16 +181,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
       }
 
       LOG.info("Starting update for job " + job);
-      ILock lock;
-      try {
-        lock = lockManager.acquireLock(job, auditData.getUser());
-      } catch (LockException e) {
-        throw new UpdateStateException(e.getMessage(), e);
-      }
 
-      storeProvider.getJobUpdateStore().saveJobUpdate(
-          update,
-          Optional.of(requireNonNull(lock.getToken())));
+      storeProvider.getJobUpdateStore().saveJobUpdate(update);
 
       JobUpdateStatus status = ROLLING_FORWARD;
       if (isCoordinatedUpdate(instructions)) {
@@ -474,8 +460,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
       JobUpdateEvent proposedEvent,
       boolean record) throws UpdateStateException {
 
-    JobUpdateStatus status = proposedEvent.getStatus();
     JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
+    JobUpdateStatus status = proposedEvent.getStatus();
 
     LOG.info("Update {} is now in state {}", key, status);
     if (record) {
@@ -485,7 +471,6 @@ class JobUpdateControllerImpl implements JobUpdateController {
     }
 
     if (JobUpdateStore.TERMINAL_STATES.contains(status)) {
-      lockManager.releaseLock(key.getJob());
       pulseHandler.remove(key);
     } else {
       pulseHandler.updatePulseStatus(key, status);

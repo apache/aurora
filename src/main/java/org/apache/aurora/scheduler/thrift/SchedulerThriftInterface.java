@@ -438,17 +438,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return readOnlyScheduler.getTierConfigs();
   }
 
-  private void validateLockForTasks(Iterable<IScheduledTask> tasks) throws JobUpdatingException {
-    ImmutableSet<IJobKey> uniqueKeys = FluentIterable.from(tasks)
-        .transform(Tasks::getJob)
-        .toSet();
-
-    // Validate lock against every unique job key derived from the tasks.
-    for (IJobKey key : uniqueKeys) {
-      jobUpdateController.assertNotUpdating(key);
-    }
-  }
-
   private static Query.Builder implicitKillQuery(Query.Builder query) {
     // Unless statuses were specifically supplied, only attempt to kill active tasks.
     return query.get().getStatuses().isEmpty() ? query.byStatus(ACTIVE_STATES) : query;
@@ -470,12 +459,13 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     }
 
     return storage.write(storeProvider -> {
-      Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(query);
       try {
-        validateLockForTasks(tasks);
+        jobUpdateController.assertNotUpdating(jobKey);
       } catch (JobUpdatingException e) {
         return error(JOB_UPDATING_ERROR, e);
       }
+
+      Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(query);
 
       LOG.info("Killing tasks matching " + query);
 
@@ -678,6 +668,10 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   public Response addInstances(InstanceKey key, int count) {
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(key.getJobKey()));
 
+    if (count <= 0) {
+      return invalidRequest(INVALID_INSTANCE_COUNT);
+    }
+
     Response response = empty();
     return storage.write(storeProvider -> {
       try {
@@ -689,10 +683,6 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
         FluentIterable<IScheduledTask> currentTasks = FluentIterable.from(
             storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()));
-
-        if (count <= 0) {
-          return invalidRequest(INVALID_INSTANCE_COUNT);
-        }
 
         Optional<IScheduledTask> templateTask = Iterables.tryFind(
             currentTasks,

@@ -32,7 +32,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -50,10 +49,7 @@ import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.JobUpdateState;
 import org.apache.aurora.gen.JobUpdateStatus;
-import org.apache.aurora.gen.LockKey;
-import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -64,8 +60,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
-import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.entities.ILockKey;
 
 import static java.util.Objects.requireNonNull;
 
@@ -78,14 +72,12 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
       .reverse()
       .onResultOf(u -> u.getUpdate().getSummary().getState().getLastModifiedTimestampMs());
 
-  private final Map<IJobUpdateKey, UpdateAndLock> updates = Maps.newConcurrentMap();
-  private final LockStore lockStore;
+  private final Map<IJobUpdateKey, IJobUpdateDetails> updates = Maps.newConcurrentMap();
   private final LoadingCache<JobUpdateStatus, AtomicLong> jobUpdateEventStats;
   private final LoadingCache<JobUpdateAction, AtomicLong> jobUpdateActionStats;
 
   @Inject
-  public MemJobUpdateStore(LockStore.Mutable lockStore, StatsProvider statsProvider) {
-    this.lockStore = lockStore;
+  public MemJobUpdateStore(StatsProvider statsProvider) {
     this.jobUpdateEventStats = CacheBuilder.newBuilder()
         .build(new CacheLoader<JobUpdateStatus, AtomicLong>() {
           @Override
@@ -125,13 +117,13 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
   @Timed("job_update_store_fetch_details")
   @Override
   public synchronized Optional<IJobUpdateDetails> fetchJobUpdateDetails(IJobUpdateKey key) {
-    return Optional.fromNullable(updates.get(key)).transform(u -> u.details);
+    return Optional.fromNullable(updates.get(key));
   }
 
   @Timed("job_update_store_fetch_update")
   @Override
   public synchronized Optional<IJobUpdate> fetchJobUpdate(IJobUpdateKey key) {
-    return Optional.fromNullable(updates.get(key)).transform(u -> u.details.getUpdate());
+    return Optional.fromNullable(updates.get(key)).transform(IJobUpdateDetails::getUpdate);
   }
 
   @Timed("job_update_store_fetch_instructions")
@@ -140,37 +132,13 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
       IJobUpdateKey key) {
 
     return Optional.fromNullable(updates.get(key))
-        .transform(u -> u.details.getUpdate().getInstructions());
-  }
-
-  private void refreshLocks() {
-    // Simulate database behavior of join performed against locks, used to populate lockToken field.
-
-    ImmutableMap.Builder<IJobUpdateKey, UpdateAndLock> refreshed = ImmutableMap.builder();
-    for (Map.Entry<IJobUpdateKey, UpdateAndLock> entry : updates.entrySet()) {
-      IJobUpdateDetails update = entry.getValue().details;
-      Optional<String> updateLock = entry.getValue().lockToken;
-      if (updateLock.isPresent()) {
-        // Determine if token needs to be cleared to reflect lock store state.  The token may only
-        // remain if the lock store token exists and matches.
-        Optional<String> storedLock = Optional.fromNullable(lockStore.fetchLock(ILockKey.build(
-            LockKey.job(entry.getKey().getJob().newBuilder()))).map(ILock::getToken).orElse(null));
-        if (!storedLock.isPresent() || !updateLock.equals(storedLock)) {
-          refreshed.put(entry.getKey(), new UpdateAndLock(update, Optional.absent()));
-        }
-      }
-    }
-
-    updates.putAll(refreshed.build());
+        .transform(u -> u.getUpdate().getInstructions());
   }
 
   @Timed("job_update_store_fetch_all_details")
   @Override
-  public synchronized Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails() {
-    refreshLocks();
-    return updates.values().stream()
-        .map(u -> new StoredJobUpdateDetails(u.details.newBuilder(), u.lockToken.orNull()))
-        .collect(Collectors.toSet());
+  public synchronized Set<IJobUpdateDetails> fetchAllJobUpdateDetails() {
+    return ImmutableSet.copyOf(updates.values());
   }
 
   @Timed("job_update_store_fetch_instance_events")
@@ -180,7 +148,7 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
       int instanceId) {
 
     return java.util.Optional.ofNullable(updates.get(key))
-        .map(u -> u.details.getInstanceEvents())
+        .map(IJobUpdateDetails::getInstanceEvents)
         .orElse(ImmutableList.of())
         .stream()
         .filter(e -> e.getInstanceId() == instanceId)
@@ -210,7 +178,7 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
 
   @Timed("job_update_store_save_update")
   @Override
-  public synchronized void saveJobUpdate(IJobUpdate update, Optional<String> lockToken) {
+  public synchronized void saveJobUpdate(IJobUpdate update) {
     requireNonNull(update);
     validateInstructions(update.getInstructions());
 
@@ -224,9 +192,7 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
         .setInstanceEvents(ImmutableList.of());
     mutable.getUpdate().getSummary().setState(synthesizeUpdateState(mutable));
 
-    updates.put(
-        update.getSummary().getKey(),
-        new UpdateAndLock(IJobUpdateDetails.build(mutable), lockToken));
+    updates.put(update.getSummary().getKey(), IJobUpdateDetails.build(mutable));
   }
 
   private static final Ordering<JobUpdateEvent> EVENT_ORDERING = Ordering.natural()
@@ -235,16 +201,16 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
   @Timed("job_update_store_save_event")
   @Override
   public synchronized void saveJobUpdateEvent(IJobUpdateKey key, IJobUpdateEvent event) {
-    UpdateAndLock update = updates.get(key);
+    IJobUpdateDetails update = updates.get(key);
     if (update == null) {
       throw new StorageException("Update not found: " + key);
     }
 
-    JobUpdateDetails mutable = update.details.newBuilder();
+    JobUpdateDetails mutable = update.newBuilder();
     mutable.addToUpdateEvents(event.newBuilder());
     mutable.setUpdateEvents(EVENT_ORDERING.sortedCopy(mutable.getUpdateEvents()));
     mutable.getUpdate().getSummary().setState(synthesizeUpdateState(mutable));
-    updates.put(key, new UpdateAndLock(IJobUpdateDetails.build(mutable), update.lockToken));
+    updates.put(key, IJobUpdateDetails.build(mutable));
     jobUpdateEventStats.getUnchecked(event.getStatus()).incrementAndGet();
   }
 
@@ -257,16 +223,16 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
       IJobUpdateKey key,
       IJobInstanceUpdateEvent event) {
 
-    UpdateAndLock update = updates.get(key);
+    IJobUpdateDetails update = updates.get(key);
     if (update == null) {
       throw new StorageException("Update not found: " + key);
     }
 
-    JobUpdateDetails mutable = update.details.newBuilder();
+    JobUpdateDetails mutable = update.newBuilder();
     mutable.addToInstanceEvents(event.newBuilder());
     mutable.setInstanceEvents(INSTANCE_EVENT_ORDERING.sortedCopy(mutable.getInstanceEvents()));
     mutable.getUpdate().getSummary().setState(synthesizeUpdateState(mutable));
-    updates.put(key, new UpdateAndLock(IJobUpdateDetails.build(mutable), update.lockToken));
+    updates.put(key, IJobUpdateDetails.build(mutable));
     jobUpdateActionStats.getUnchecked(event.getAction()).incrementAndGet();
   }
 
@@ -283,7 +249,7 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
       long historyPruneThresholdMs) {
 
     Supplier<Stream<IJobUpdateSummary>> completedUpdates = () -> updates.values().stream()
-        .map(u -> u.details.getUpdate().getSummary())
+        .map(u -> u.getUpdate().getSummary())
         .filter(s -> TERMINAL_STATES.contains(s.getState().getStatus()));
 
     Predicate<IJobUpdateSummary> expiredFilter =
@@ -311,7 +277,7 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
         pruneBuilder.addAll(creationOrder
             .leastOf(entry.getValue(), entry.getValue().size() - perJobRetainCount)
             .stream()
-            .map(s -> s.getKey())
+            .map(IJobUpdateSummary::getKey)
             .iterator());
       }
     }
@@ -372,7 +338,6 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
     // TODO(wfarner): Modification time is not a stable ordering for pagination, but we use it as
     // such here.  The behavior is carried over from DbJobupdateStore; determine if it is desired.
     Stream<IJobUpdateDetails> matches = updates.values().stream()
-        .map(u -> u.details)
         .filter(filter)
         .sorted(REVERSE_LAST_MODIFIED_ORDER)
         .skip(query.getOffset());
@@ -382,15 +347,5 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
     }
 
     return matches;
-  }
-
-  private static final class UpdateAndLock {
-    private final IJobUpdateDetails details;
-    private final Optional<String> lockToken;
-
-    UpdateAndLock(IJobUpdateDetails details, Optional<String> lockToken) {
-      this.details = details;
-      this.lockToken = lockToken;
-    }
   }
 }

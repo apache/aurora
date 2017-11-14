@@ -40,7 +40,6 @@ from gen.apache.aurora.api.ttypes import (
     JobKey,
     JobUpdateQuery,
     JobUpdateRequest,
-    Lock,
     ResourceAggregate,
     Response,
     ResponseCode,
@@ -99,10 +98,9 @@ class TestSchedulerProxyInjection(unittest.TestCase):
 
   def test_replaceCronTemplate(self):
     self.mock_thrift_client.replaceCronTemplate(
-        IsA(JobConfiguration),
-        IsA(Lock)).AndReturn(DEFAULT_RESPONSE)
+        IsA(JobConfiguration)).AndReturn(DEFAULT_RESPONSE)
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().replaceCronTemplate(JobConfiguration(), Lock())
+    self.make_scheduler_proxy().replaceCronTemplate(JobConfiguration())
 
   def test_scheduleCronJob(self):
     self.mock_thrift_client.scheduleCronJob(

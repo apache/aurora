@@ -16,11 +16,11 @@ package org.apache.aurora.scheduler.storage.log;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -36,7 +36,6 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateEvent;
-import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
@@ -54,7 +53,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.slf4j.Logger;
@@ -75,7 +73,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
   private static final Logger LOG = LoggerFactory.getLogger(SnapshotStoreImpl.class);
 
-  private static final String LOCK_FIELD = "locks";
   private static final String HOST_ATTRIBUTES_FIELD = "hosts";
   private static final String QUOTA_FIELD = "quota";
   private static final String TASK_FIELD = "tasks";
@@ -91,29 +88,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   }
 
   private final Iterable<SnapshotField> snapshotFields = Arrays.asList(
-      new SnapshotField() {
-        @Override
-        public String getName() {
-          return LOCK_FIELD;
-        }
-
-        // It's important for locks to be replayed first, since there are relations that expect
-        // references to be valid on insertion.
-        @Override
-        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-          snapshot.setLocks(ILock.toBuildersSet(store.getLockStore().fetchLocks()));
-        }
-
-        @Override
-        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-          if (snapshot.getLocksSize() > 0) {
-            store.getLockStore().deleteLocks();
-            for (Lock lock : snapshot.getLocks()) {
-              store.getLockStore().saveLock(ILock.build(lock));
-            }
-          }
-        }
-      },
       new SnapshotField() {
         @Override
         public String getName() {
@@ -243,7 +217,10 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
         @Override
         public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-          snapshot.setJobUpdateDetails(store.getJobUpdateStore().fetchAllJobUpdateDetails());
+          snapshot.setJobUpdateDetails(
+              store.getJobUpdateStore().fetchAllJobUpdateDetails().stream()
+                  .map(u -> new StoredJobUpdateDetails().setDetails(u.newBuilder()))
+                  .collect(Collectors.toSet()));
         }
 
         @Override
@@ -253,9 +230,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
             updateStore.deleteAllUpdatesAndEvents();
             for (StoredJobUpdateDetails storedDetails : snapshot.getJobUpdateDetails()) {
               JobUpdateDetails details = storedDetails.getDetails();
-              updateStore.saveJobUpdate(
-                  thriftBackfill.backFillJobUpdate(details.getUpdate()),
-                  Optional.fromNullable(storedDetails.getLockToken()));
+              updateStore.saveJobUpdate(thriftBackfill.backFillJobUpdate(details.getUpdate()));
 
               if (details.getUpdateEventsSize() > 0) {
                 for (JobUpdateEvent updateEvent : details.getUpdateEvents()) {

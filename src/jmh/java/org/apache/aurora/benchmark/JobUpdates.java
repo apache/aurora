@@ -17,7 +17,6 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -33,8 +32,6 @@ import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
-import org.apache.aurora.gen.Lock;
-import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
@@ -46,7 +43,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.entities.ILock;
 
 /**
  * Job update factory.
@@ -71,14 +67,7 @@ final class JobUpdates {
       for (IJobUpdateDetails details : updates) {
         IJobUpdateKey key = details.getUpdate().getSummary().getKey();
         keyBuilder.add(key);
-        String lockToken = UUID.randomUUID().toString();
-        store.getLockStore().saveLock(ILock.build(new Lock()
-            .setKey(LockKey.job(key.getJob().newBuilder()))
-            .setToken(lockToken)
-            .setUser(Builder.USER)
-            .setTimestampMs(0L)));
-
-        updateStore.saveJobUpdate(details.getUpdate(), Optional.of(lockToken));
+        updateStore.saveJobUpdate(details.getUpdate());
 
         for (IJobUpdateEvent updateEvent : details.getUpdateEvents()) {
           updateStore.saveJobUpdateEvent(key, updateEvent);

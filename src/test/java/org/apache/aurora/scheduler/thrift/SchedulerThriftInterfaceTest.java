@@ -253,7 +253,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testCreateJobNoLock() throws Exception {
+  public void testCreateJob() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeProdJob());
     SanitizedConfiguration sanitized = fromUnsanitized(job);
     jobUpdateController.assertNotUpdating(JOB_KEY);
@@ -273,26 +273,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testCreateJobWithLock() throws Exception {
-    IJobConfiguration job = IJobConfiguration.build(makeProdJob());
-    SanitizedConfiguration sanitized = fromUnsanitized(job);
-    jobUpdateController.assertNotUpdating(JOB_KEY);
-    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expectNoCronJob();
-    expectInstanceQuotaCheck(sanitized, ENOUGH_QUOTA);
-
-    stateManager.insertPendingTasks(
-        storageUtil.mutableStoreProvider,
-        sanitized.getJobConfig().getTaskConfig(),
-        sanitized.getInstanceIds());
-
-    control.replay();
-
-    assertOkResponse(thrift.createJob(job.newBuilder()));
-    assertEquals(1L, statsProvider.getLongValue(CREATE_JOB));
-  }
-
-  @Test
   public void testCreateJobFailsForCron() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeProdJob().setCronSchedule(""));
 
@@ -308,18 +288,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertResponse(INVALID_REQUEST, thrift.createJob(job.newBuilder()));
-    assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
-  }
-
-  @Test
-  public void testCreateJobFailsLockCheck() throws Exception {
-    IJobConfiguration job = IJobConfiguration.build(makeJob());
-    jobUpdateController.assertNotUpdating(JOB_KEY);
-    expectLastCall().andThrow(new JobUpdatingException("Job is updating"));
-
-    control.replay();
-
-    assertResponse(JOB_UPDATING_ERROR, thrift.createJob(job.newBuilder()));
     assertEquals(0L, statsProvider.getLongValue(CREATE_JOB));
   }
 
@@ -636,7 +604,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testInstanceScoped() throws Exception {
+  public void testKillTasksInstanceScoped() throws Exception {
     Query.Builder query = Query.instanceScoped(JOB_KEY, ImmutableSet.of(1)).active();
     storageUtil.expectTaskFetch(query, buildScheduledTask());
     jobUpdateController.assertNotUpdating(JOB_KEY);
@@ -649,19 +617,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testKillTasksLockCheckFailed() throws Exception {
-    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-    IScheduledTask task2 = buildScheduledTask("job_bar", TASK_ID);
-    storageUtil.expectTaskFetch(query, buildScheduledTask(), task2);
+  public void testKillTasksWhileJobUpdating() throws Exception {
     jobUpdateController.assertNotUpdating(JOB_KEY);
-    jobUpdateController.assertNotUpdating(task2.getAssignedTask().getTask().getJob());
-    expectLastCall().andThrow(new JobUpdatingException("Job is updating"));
+    expectLastCall().andThrow(new JobUpdatingException("job is updating"));
 
     control.replay();
 
-    assertResponse(
-        JOB_UPDATING_ERROR,
-        thrift.killTasks(JOB_KEY.newBuilder(), null, null));
+    assertResponse(JOB_UPDATING_ERROR, thrift.killTasks(JOB_KEY.newBuilder(), null, null));
     assertEquals(0L, statsProvider.getLongValue(KILL_TASKS));
   }
 
@@ -669,6 +631,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testKillNonExistentTasks() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     storageUtil.expectTaskFetch(query);
+    jobUpdateController.assertNotUpdating(JOB_KEY);
 
     control.replay();
 
@@ -891,7 +854,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testRestartShardsLockCheckFails() throws Exception {
+  public void testRestartShardsWhileJobUpdating() throws Exception {
     Set<Integer> shards = ImmutableSet.of(1, 6);
 
     jobUpdateController.assertNotUpdating(JOB_KEY);
@@ -931,16 +894,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertOkResponse(thrift.replaceCronTemplate(CRON_JOB));
     assertEquals(1L, statsProvider.getLongValue(CREATE_OR_UPDATE_CRON));
-  }
-
-  @Test
-  public void testReplaceCronTemplateFailedLockValidation() throws Exception {
-    jobUpdateController.assertNotUpdating(JOB_KEY);
-    expectLastCall().andThrow(new JobUpdatingException("job is updating"));
-    control.replay();
-
-    assertResponse(JOB_UPDATING_ERROR, thrift.replaceCronTemplate(CRON_JOB));
-    assertEquals(0L, statsProvider.getLongValue(CREATE_OR_UPDATE_CRON));
   }
 
   @Test
@@ -1024,14 +977,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testScheduleCronJobFailsLockValidation() throws Exception {
-    jobUpdateController.assertNotUpdating(JOB_KEY);
-    expectLastCall().andThrow(new JobUpdatingException("job is updating"));
-    control.replay();
-    assertResponse(JOB_UPDATING_ERROR, thrift.scheduleCronJob(CRON_JOB));
-  }
-
-  @Test
   public void testScheduleCronJobFailsWithNoCronSchedule() throws Exception {
     control.replay();
 
@@ -1062,7 +1007,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testDescheduleCronJobFailsLockValidation() throws Exception {
+  public void testDescheduleCronJobWhileJobUpdating() throws Exception {
     jobUpdateController.assertNotUpdating(JOB_KEY);
     expectLastCall().andThrow(new JobUpdatingException("job is updating"));
     control.replay();
@@ -1268,10 +1213,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testAddInstancesWithInstanceKeyFailsInvalidCount() throws Exception {
-    expectNoCronJob();
-    jobUpdateController.assertNotUpdating(JOB_KEY);
-    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-
     control.replay();
 
     assertEquals(
@@ -1299,7 +1240,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testAddInstancesLockCheckFails() throws Exception {
+  public void testAddInstancesWhileJobUpdating() throws Exception {
     expectNoCronJob();
     jobUpdateController.assertNotUpdating(JOB_KEY);
     expectLastCall().andThrow(new JobUpdatingException("job is updating"));

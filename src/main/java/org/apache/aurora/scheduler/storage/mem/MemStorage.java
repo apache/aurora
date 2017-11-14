@@ -19,7 +19,6 @@ import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.CronJobStore;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -36,7 +35,6 @@ public class MemStorage implements Storage {
       @Volatile final SchedulerStore.Mutable schedulerStore,
       @Volatile final CronJobStore.Mutable jobStore,
       @Volatile final TaskStore.Mutable taskStore,
-      @Volatile final LockStore.Mutable lockStore,
       @Volatile final QuotaStore.Mutable quotaStore,
       @Volatile final AttributeStore.Mutable attributeStore,
       @Volatile final JobUpdateStore.Mutable updateStore) {
@@ -60,11 +58,6 @@ public class MemStorage implements Storage {
       @Override
       public TaskStore.Mutable getUnsafeTaskStore() {
         return taskStore;
-      }
-
-      @Override
-      public LockStore.Mutable getLockStore() {
-        return lockStore;
       }
 
       @Override
