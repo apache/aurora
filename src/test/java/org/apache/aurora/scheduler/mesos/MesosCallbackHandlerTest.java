@@ -13,8 +13,10 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.LinkedList;
+import java.util.NoSuchElementException;
+import java.util.Queue;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -56,6 +58,7 @@ import static org.easymock.EasyMock.replay;
 import static org.easymock.EasyMock.strictMock;
 import static org.easymock.EasyMock.verify;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class MesosCallbackHandlerTest extends EasyMockTest {
   private static final Protos.AgentID AGENT_ID =
@@ -298,7 +301,6 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     control.replay();
     handler.handleOffers(ImmutableList.of(HOST_OFFER.getOffer()));
     assertEquals(1L, statsProvider.getLongValue("scheduler_resource_offers"));
-
   }
 
   @Test
@@ -331,8 +333,8 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     // We want to observe the order of the offerManager calls to we create a strict mock.
     offerManager = strictMock(OfferManager.class);
 
-    long delayInMilliseconds = 50;
-    createHandler(false, new DelayExecutor(delayInMilliseconds));
+    FakeScheduledThreadPoolExecutor fakeExecutor = new FakeScheduledThreadPoolExecutor();
+    createHandler(false, fakeExecutor);
 
     expect(offerManager.cancelOffer(OFFER_ID)).andReturn(false);
     offerManager.banOffer(OFFER_ID);
@@ -353,10 +355,12 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     // Eventually, we unban the offer.
     handler.handleRescind(OFFER_ID);
 
-    // 2 commands executed (addOffer and unbanOffer) so we wait the length of 3.
-    Thread.sleep(delayInMilliseconds * 3);
+    // 2 commands executed (addOffer and unbanOffer).
+    fakeExecutor.advance();
+    fakeExecutor.advance();
 
     assertEquals(1L, statsProvider.getLongValue("offers_rescinded"));
+    assertTrue(fakeExecutor.isEmpty());
     verify(offerManager);
   }
 
@@ -563,28 +567,32 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
   }
 
   /**
-   * Test executor that will execute commands after waiting {@code delayTimeInMilliseconds}.
+   * Test executor that will execute commands when {@code advance} is called.
    */
-  private static final class DelayExecutor implements Executor {
-    private final Executor executor = Executors.newSingleThreadExecutor();
-    private final long delayTimeInMilliseconds;
-
-    DelayExecutor(long delayTimeInMilliseconds) {
-      this.delayTimeInMilliseconds = delayTimeInMilliseconds;
-    }
+  private static class FakeScheduledThreadPoolExecutor implements Executor {
+    private final Queue<Runnable> workQueue = new LinkedList<>();
 
     @Override
     public void execute(Runnable command) {
-      executor.execute(() -> {
-        try {
-          Thread.sleep(delayTimeInMilliseconds);
-        } catch (InterruptedException e) {
-          // Do not interrupt this thread.
-          throw new RuntimeException("DelayExecutor sleep interrupted.", e);
-        }
+      workQueue.add(command);
+    }
 
-        command.run();
-      });
+    /**
+     * Returns whether or not the work queue is empty.
+     */
+    public boolean isEmpty() {
+      return workQueue.isEmpty();
+    }
+
+    /**
+     * Execute a single item from the work queue.
+     */
+    public void advance() {
+      if (workQueue.isEmpty()) {
+        throw new NoSuchElementException("No commands to execute");
+      }
+
+      workQueue.poll().run();
     }
   }
 }
