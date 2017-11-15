@@ -92,10 +92,10 @@ public class Webhook extends AbstractIdleService implements EventSubscriber {
   @Subscribe
   public void taskChangedState(TaskStateChange stateChange) {
     LOG.debug("Got an event: {}", stateChange);
-    // Old state is not present because a scheduler just failed over. In that case we do not want to
-    // resend the entire state. This check also ensures that only whitelisted statuses will be sent
-    // to the configured endpoint.
-    if (stateChange.getOldState().isPresent() && isWhitelisted.apply(stateChange.getNewState())) {
+    // Ensure that this state change event is a transition, and not an event from when the scheduler
+    // first initializes. In that case we do not want to resend the entire state. This check also
+    // ensures that only whitelisted statuses will be sent to the configured endpoint.
+    if (stateChange.isTransition() && isWhitelisted.apply(stateChange.getNewState())) {
       attemptsCounter.incrementAndGet();
       try {
         // We don't care about the response body, so only listen for the HTTP status code.
