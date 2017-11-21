@@ -49,6 +49,7 @@ import static org.apache.aurora.scheduler.state.SideEffect.Action.INCREMENT_FAIL
 import static org.apache.aurora.scheduler.state.SideEffect.Action.KILL;
 import static org.apache.aurora.scheduler.state.SideEffect.Action.RESCHEDULE;
 import static org.apache.aurora.scheduler.state.SideEffect.Action.SAVE_STATE;
+import static org.apache.aurora.scheduler.state.SideEffect.Action.TRANSITION_TO_LOST;
 import static org.apache.aurora.scheduler.state.StateChangeResult.ILLEGAL;
 import static org.apache.aurora.scheduler.state.StateChangeResult.ILLEGAL_WITH_SIDE_EFFECTS;
 import static org.apache.aurora.scheduler.state.StateChangeResult.NOOP;
@@ -62,6 +63,7 @@ import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.INIT;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.KILLED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.KILLING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.LOST;
+import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PARTITIONED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PENDING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PREEMPTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.RESTARTING;
@@ -117,6 +119,7 @@ class TaskStateMachine {
     KILLED(Optional.of(ScheduleStatus.KILLED)),
     KILLING(Optional.of(ScheduleStatus.KILLING)),
     LOST(Optional.of(ScheduleStatus.LOST)),
+    PARTITIONED(Optional.of(ScheduleStatus.PARTITIONED)),
     /**
      * The task does not have an associated state as it has been deleted from the store.
      */
@@ -170,6 +173,19 @@ class TaskStateMachine {
 
     Consumer<Transition<TaskState>> manageTerminatedTasks = Consumers.combine(
         ImmutableList.<Consumer<Transition<TaskState>>>builder()
+            .add(transition -> {
+              // The transition from KILLING -> PARTITIONED needs to be handled separately, in
+              // order to mark the task as terminal and unblock any operations that depend on
+              // kills (e.g. job updates). Just sending a KILL signal alone is insufficient,
+              // as any partitioned task will be on an agent that is unreachable.
+              if (transition.getTo() == PARTITIONED) {
+                if (transition.getFrom() == KILLING) {
+                  addFollowup(TRANSITION_TO_LOST);
+                } else {
+                  addFollowup(KILL);
+                }
+              }
+            })
             // Kill a task that we believe to be terminated when an attempt is made to revive.
             .add(
                 Consumers.filter(Transition.to(ASSIGNED, STARTING, RUNNING),
@@ -191,6 +207,14 @@ class TaskStateMachine {
 
             case RUNNING:
               addFollowup(KILL);
+              break;
+
+            case PARTITIONED:
+              // When a task becomes partitioned during a user or operator-initiated action, we
+              // bypass their partition policy and immediately transition to lost. This is to
+              // prevent a situation where a task becoming partitioned could indefinitely block
+              // machine maintenance, preemption or a job restart.
+              addFollowup(TRANSITION_TO_LOST);
               break;
 
             case LOST:
@@ -261,9 +285,34 @@ class TaskStateMachine {
             .to(PENDING, KILLING)
             .withCallback(deleteIfKilling))
         .addState(
+            Rule.from(PARTITIONED)
+                .to(LOST, FAILED, FINISHED, RUNNING, ASSIGNED, STARTING, RESTARTING, DRAINING,
+                    PREEMPTING, KILLING)
+                .withCallback(
+                    transition -> {
+                      switch (transition.getTo()) {
+                        case LOST:
+                          addFollowup(KILL);
+                          addFollowup(RESCHEDULE);
+                          break;
+                        case KILLING:
+                        case RESTARTING:
+                        case DRAINING:
+                        case PREEMPTING:
+                          addFollowup(TRANSITION_TO_LOST);
+                          break;
+                        case FAILED:
+                          incrementFailuresMaybeReschedule.execute();
+                          break;
+                        default:
+                          // No-op
+                      }
+                    }
+                ))
+        .addState(
             Rule.from(ASSIGNED)
                 .to(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, DRAINING,
-                    KILLED, KILLING, LOST, PREEMPTING)
+                    KILLED, KILLING, LOST, PREEMPTING, PARTITIONED)
                 .withCallback(
                     transition -> {
                       switch (transition.getTo()) {
@@ -308,7 +357,7 @@ class TaskStateMachine {
         .addState(
             Rule.from(STARTING)
                 .to(RUNNING, FINISHED, FAILED, RESTARTING, DRAINING, KILLING,
-                    KILLED, LOST, PREEMPTING)
+                    KILLED, LOST, PREEMPTING, PARTITIONED)
                 .withCallback(
                     transition -> {
                       switch (transition.getTo()) {
@@ -351,7 +400,8 @@ class TaskStateMachine {
                 ))
         .addState(
             Rule.from(RUNNING)
-                .to(FINISHED, RESTARTING, DRAINING, FAILED, KILLING, KILLED, LOST, PREEMPTING)
+                .to(FINISHED, RESTARTING, DRAINING, FAILED, KILLING, KILLED, LOST,
+                    PREEMPTING, PARTITIONED)
                 .withCallback(
                     transition -> {
                       switch (transition.getTo()) {
@@ -398,15 +448,15 @@ class TaskStateMachine {
                 .withCallback(manageTerminatedTasks))
         .addState(
             Rule.from(PREEMPTING)
-                .to(FINISHED, FAILED, KILLING, KILLED, LOST)
+                .to(FINISHED, FAILED, KILLING, KILLED, LOST, PARTITIONED)
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(RESTARTING)
-                .to(FINISHED, FAILED, KILLING, KILLED, LOST)
+                .to(FINISHED, FAILED, KILLING, KILLED, LOST, PARTITIONED)
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(DRAINING)
-                .to(FINISHED, FAILED, KILLING, KILLED, LOST)
+                .to(FINISHED, FAILED, KILLING, KILLED, LOST, PARTITIONED)
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(FAILED)
@@ -419,7 +469,7 @@ class TaskStateMachine {
         // TODO(maxim): Re-evaluate if *DELETED states are valid transitions here.
         .addState(
             Rule.from(KILLING)
-                .to(FINISHED, FAILED, KILLED, LOST, DELETED)
+                .to(FINISHED, FAILED, KILLED, LOST, DELETED, PARTITIONED)
                 .withCallback(manageTerminatedTasks))
         .addState(
             Rule.from(LOST)
@@ -505,7 +555,6 @@ class TaskStateMachine {
     if (stateMachine.getState() == taskState) {
       return new TransitionResult(NOOP, ImmutableSet.of());
     }
-
     boolean success = stateMachine.transition(taskState);
     ImmutableSet<SideEffect> transitionEffects = ImmutableSet.copyOf(sideEffects);
     sideEffects.clear();

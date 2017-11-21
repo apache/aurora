@@ -95,7 +95,7 @@ class TestRunCommand(AuroraClientCommandTest):
       mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(
           jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING]),
+              ScheduleStatus.PREEMPTING, ScheduleStatus.PARTITIONED, ScheduleStatus.DRAINING]),
           instanceIds=instances),
           retry=True)
 
@@ -150,7 +150,7 @@ class TestSshCommand(AuroraClientCommandTest):
           jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
           instanceIds=set([1]),
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING])),
+              ScheduleStatus.PREEMPTING, ScheduleStatus.PARTITIONED, ScheduleStatus.DRAINING])),
           retry=True)
       mock_subprocess.assert_called_with(['ssh', '-t', '-v', 'bozo@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
@@ -178,7 +178,7 @@ class TestSshCommand(AuroraClientCommandTest):
           jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
           instanceIds=None,
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING])),
+              ScheduleStatus.PREEMPTING, ScheduleStatus.PARTITIONED, ScheduleStatus.DRAINING])),
           retry=True)
       mock_subprocess.assert_called_with(['ssh', '-t', '-v', 'bozo@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'

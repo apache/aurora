@@ -105,6 +105,31 @@ agent go into `LOST` state and new `Task`s are created in their place.
 From `PENDING` state, there is no guarantee a `Task` will be reassigned
 to the same machine unless job constraints explicitly force it there.
 
+
+## RUNNING to PARTITIONED states
+If Aurora is configured to enable partition awareness, a task which is in a
+running state can transition to `PARTITIONED`. This happens when the state
+of the task in Mesos becomes unknown. By default Aurora errs on the side of
+availability, so all tasks that transition to `PARTITIONED` are immediately
+transitioned to `LOST`.
+
+This policy is not ideal for all types of workloads you may wish to run in
+your Aurora cluster, e.g. for jobs where task failures are very expensive.
+So job owners may set their own `PartitionPolicy` where they can control
+how long to remain in `PARTITIONED` before transitioning to `LOST`. Or they
+can disable any automatic attempts to `reschedule` when in `PARTITIONED`,
+effectively waiting out the partition for as long as possible.
+
+
+## PARTITIONED and transient states
+The `PartitionPolicy` provided by users only applies to tasks which are
+currently running. When tasks are moving in and out of transient states,
+e.g. tasks being updated, restarted, preempted, etc., `PARTITIONED` tasks
+are moved immediately to `LOST`. This prevents situations where system
+or user-initiated actions are blocked indefinitely waiting for partitions
+to resolve (that may never be resolved).
+
+
 ### Giving Priority to Production Tasks: PREEMPTING
 
 Sometimes a Task needs to be interrupted, such as when a non-production

@@ -304,6 +304,43 @@ test_update_fail() {
   fi
 }
 
+test_partition_awareness() {
+  local _config=$1 _cluster=$2 _default_jobkey=$3 _disabled_jobkey=$4 _delay_jobkey=$5
+
+  # create three jobs with different partition policies
+  aurora update start --wait $_default_jobkey $_config
+  aurora update start --wait $_disabled_jobkey $_config
+  aurora update start --wait $_delay_jobkey $_config
+
+  # partition the agent
+  sudo stop mesos-slave
+
+  # the default job should become LOST and then transition to PENDING
+  wait_until_task_status $_default_jobkey "0" "PENDING"
+
+  # the other two should be PARTITIONED
+  assert_task_status $_disabled_jobkey "0" "PARTITIONED"
+  assert_task_status $_delay_jobkey "0" "PARTITIONED"
+
+  # start the agent back up
+  sudo start mesos-slave
+
+  # This can be removed when https://issues.apache.org/jira/browse/MESOS-6406 is resolved.
+  # We have to pause and let the agent reregister with Mesos, then ask Aurora to explicitly
+  # reconcile to get the RUNNING status update.
+  sleep 30
+  aurora_admin reconcile_tasks $_cluster
+
+  # the PARTITIONED tasks should now be running
+  assert_task_status $_disabled_jobkey "0" "RUNNING"
+  assert_task_status $_delay_jobkey "0" "RUNNING"
+
+  # Clean up
+  aurora job killall $_default_jobkey
+  aurora job killall $_disabled_jobkey
+  aurora job killall $_delay_jobkey
+}
+
 test_announce() {
   local _role=$1 _env=$2 _job=$3
 
@@ -668,6 +705,10 @@ TEST_EPHEMERAL_DAEMON_WITH_FINAL_JOB=ephemeral_daemon_with_final
 TEST_EPHEMERAL_DAEMON_WITH_FINAL_CONFIG_FILE=$TEST_ROOT/ephemeral_daemon_with_final.aurora
 TEST_DAEMONIZING_PROCESS_JOB=daemonize
 TEST_DAEMONIZING_PROCESS_CONFIG_FILE=$TEST_ROOT/test_daemonizing_process.aurora
+TEST_PARTITION_AWARENESS_CONFIG_FILE=$TEST_ROOT/partition_aware.aurora
+TEST_JOB_PA_DEFAULT=$TEST_CLUSTER/$TEST_ROLE/$TEST_ENV/partition_aware_default
+TEST_JOB_PA_DISABLED=$TEST_CLUSTER/$TEST_ROLE/$TEST_ENV/partition_aware_disabled
+TEST_JOB_PA_DELAY=$TEST_CLUSTER/$TEST_ROLE/$TEST_ENV/partition_aware_delay
 
 BASE_ARGS=(
   $TEST_CLUSTER
@@ -708,6 +749,14 @@ TEST_DAEMONIZING_PROCESS_ARGS=(
   $TEST_DAEMONIZING_PROCESS_CONFIG_FILE
 )
 
+TEST_PARTITION_AWARENESS_ARGS=(
+  $TEST_PARTITION_AWARENESS_CONFIG_FILE
+  $TEST_CLUSTER
+  $TEST_JOB_PA_DEFAULT
+  $TEST_JOB_PA_DISABLED
+  $TEST_JOB_PA_DELAY
+)
+
 TEST_JOB_KILL_MESSAGE_ARGS=("${TEST_JOB_ARGS[@]}" "--message='Test message'")
 
 trap collect_result EXIT
@@ -715,6 +764,8 @@ trap collect_result EXIT
 aurorabuild all
 setup_ssh
 setup_docker_registry
+
+test_partition_awareness "${TEST_PARTITION_AWARENESS_ARGS[@]}"
 
 test_version
 test_http_example "${TEST_JOB_ARGS[@]}"

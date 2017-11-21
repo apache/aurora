@@ -97,6 +97,11 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
         arity = 1)
     public boolean receiveRevocableResources = false;
 
+    @Parameter(names = "-partition_aware",
+        description = "Enable paritition-aware status updates.",
+        arity = 1)
+    public boolean isPartitionAware = false;
+
     @Parameter(names = "-mesos_role",
         description =
             "The Mesos role this framework will register as. The default is to left this empty, "
@@ -132,6 +137,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
             options.frameworkFailoverTimeout,
             options.receiveRevocableResources,
             allowGpuResource,
+            options.isPartitionAware,
             role);
     bind(FrameworkInfo.class)
         .annotatedWith(FrameworkInfoFactory.FrameworkInfoFactoryImpl.BaseFrameworkInfo.class)
@@ -176,6 +182,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
       Amount<Long, Time> failoverTimeout,
       boolean revocable,
       boolean allowGpu,
+      boolean enablePartitionAwareness,
       Optional<String> role) {
 
     FrameworkInfo.Builder infoBuilder = FrameworkInfo.newBuilder()
@@ -194,6 +201,11 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
 
     if (allowGpu) {
       infoBuilder.addCapabilities(Capability.newBuilder().setType(GPU_RESOURCES));
+    }
+
+    if (enablePartitionAwareness) {
+      infoBuilder.addCapabilities(
+          Capability.newBuilder().setType(Capability.Type.PARTITION_AWARE).build());
     }
 
     if (role.isPresent()) {

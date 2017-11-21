@@ -49,6 +49,7 @@ import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.INIT;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.KILLED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.KILLING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.LOST;
+import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PARTITIONED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PENDING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PREEMPTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.RESTARTING;
@@ -344,6 +345,10 @@ public class TaskStateMachineTest {
   private static final TransitionResult ILLEGAL_KILL = new TransitionResult(
       ILLEGAL_WITH_SIDE_EFFECTS,
       ImmutableSet.of(new SideEffect(Action.KILL, Optional.absent())));
+  private static final TransitionResult TRANSITION_TO_LOST = new TransitionResult(
+      SUCCESS,
+      ImmutableSet.of(new SideEffect(Action.TRANSITION_TO_LOST, Optional.absent()),
+          new SideEffect(Action.SAVE_STATE, Optional.absent())));
   private static final TransitionResult RECORD_FAILURE = new TransitionResult(
       SUCCESS,
       ImmutableSet.of(
@@ -398,15 +403,18 @@ public class TaskStateMachineTest {
           .put(new TestCase(false, INIT, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, INIT, STARTING), ILLEGAL_KILL)
           .put(new TestCase(false, INIT, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, INIT, PARTITIONED), ILLEGAL_KILL)
           .put(new TestCase(true, THROTTLED, PENDING), SAVE)
           .put(new TestCase(true, THROTTLED, KILLING), DELETE_TASK)
           .put(new TestCase(false, THROTTLED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, THROTTLED, STARTING), ILLEGAL_KILL)
           .put(new TestCase(false, THROTTLED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, THROTTLED, PARTITIONED), ILLEGAL_KILL)
           .put(new TestCase(true, PENDING, ASSIGNED), SAVE)
           .put(new TestCase(false, PENDING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, PENDING, STARTING), ILLEGAL_KILL)
           .put(new TestCase(false, PENDING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, PENDING, PARTITIONED), ILLEGAL_KILL)
           .put(new TestCase(true, PENDING, KILLING), DELETE_TASK)
           .put(new TestCase(false, ASSIGNED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, ASSIGNED, STARTING), SAVE)
@@ -421,6 +429,8 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, ASSIGNED, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, ASSIGNED, KILLING), SAVE_AND_KILL)
           .put(new TestCase(true, ASSIGNED, LOST), SAVE_KILL_AND_RESCHEDULE)
+          .put(new TestCase(false, ASSIGNED, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, ASSIGNED, PARTITIONED), SAVE)
           .put(new TestCase(false, STARTING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, STARTING, STARTING), ILLEGAL_KILL)
           .put(new TestCase(true, STARTING, RUNNING), SAVE)
@@ -433,6 +443,8 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, STARTING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, STARTING, KILLING), SAVE_AND_KILL)
           .put(new TestCase(true, STARTING, LOST), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(false, STARTING, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, STARTING, PARTITIONED), SAVE)
           .put(new TestCase(false, RUNNING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, RUNNING, STARTING), ILLEGAL_KILL)
           .put(new TestCase(false, RUNNING, RUNNING), ILLEGAL_KILL)
@@ -444,6 +456,8 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, RUNNING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, RUNNING, KILLING), SAVE_AND_KILL)
           .put(new TestCase(true, RUNNING, LOST), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(false, RUNNING, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, RUNNING, PARTITIONED), SAVE)
           .put(new TestCase(true, FINISHED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, FINISHED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, FINISHED, STARTING), ILLEGAL_KILL)
@@ -451,6 +465,8 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, FINISHED, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(false, FINISHED, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(true, FINISHED, DELETED), DELETE_TASK)
+          .put(new TestCase(false, FINISHED, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, FINISHED, PARTITIONED), ILLEGAL_KILL)
           .put(new TestCase(true, PREEMPTING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, PREEMPTING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, PREEMPTING, STARTING), ILLEGAL_KILL)
@@ -462,6 +478,8 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, PREEMPTING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, PREEMPTING, KILLING), SAVE)
           .put(new TestCase(true, PREEMPTING, LOST), SAVE_KILL_AND_RESCHEDULE)
+          .put(new TestCase(false, PREEMPTING, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, PREEMPTING, PARTITIONED), TRANSITION_TO_LOST)
           .put(new TestCase(true, RESTARTING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, RESTARTING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, RESTARTING, STARTING), ILLEGAL_KILL)
@@ -473,6 +491,8 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, RESTARTING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, RESTARTING, KILLING), SAVE)
           .put(new TestCase(true, RESTARTING, LOST), SAVE_KILL_AND_RESCHEDULE)
+          .put(new TestCase(false, RESTARTING, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, RESTARTING, PARTITIONED), TRANSITION_TO_LOST)
           .put(new TestCase(true, DRAINING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, DRAINING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, DRAINING, STARTING), ILLEGAL_KILL)
@@ -484,6 +504,8 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, DRAINING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, DRAINING, KILLING), SAVE)
           .put(new TestCase(true, DRAINING, LOST), SAVE_KILL_AND_RESCHEDULE)
+          .put(new TestCase(false, DRAINING, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, DRAINING, PARTITIONED), TRANSITION_TO_LOST)
           .put(new TestCase(true, FAILED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, FAILED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, FAILED, STARTING), ILLEGAL_KILL)
@@ -491,6 +513,8 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, FAILED, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(false, FAILED, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(true, FAILED, DELETED), DELETE_TASK)
+          .put(new TestCase(false, FAILED, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, FAILED, PARTITIONED), ILLEGAL_KILL)
           .put(new TestCase(true, KILLED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, KILLED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, KILLED, STARTING), ILLEGAL_KILL)
@@ -498,6 +522,8 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, KILLED, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(false, KILLED, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(true, KILLED, DELETED), DELETE_TASK)
+          .put(new TestCase(false, KILLED, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, KILLED, PARTITIONED), ILLEGAL_KILL)
           .put(new TestCase(true, KILLING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, KILLING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, KILLING, STARTING), ILLEGAL_KILL)
@@ -509,6 +535,22 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, KILLING, KILLED), SAVE)
           .put(new TestCase(true, KILLING, LOST), SAVE)
           .put(new TestCase(true, KILLING, DELETED), DELETE_TASK)
+          .put(new TestCase(false, KILLING, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, KILLING, PARTITIONED), TRANSITION_TO_LOST)
+          .put(new TestCase(false, PARTITIONED, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, PARTITIONED, ASSIGNED), SAVE)
+          .put(new TestCase(false, PARTITIONED, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, PARTITIONED, STARTING), SAVE)
+          .put(new TestCase(false, PARTITIONED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, PARTITIONED, RUNNING), SAVE)
+          .put(new TestCase(true, PARTITIONED, PREEMPTING), TRANSITION_TO_LOST)
+          .put(new TestCase(true, PARTITIONED, RESTARTING), TRANSITION_TO_LOST)
+          .put(new TestCase(true, PARTITIONED, DRAINING), TRANSITION_TO_LOST)
+          .put(new TestCase(true, PARTITIONED, KILLING), TRANSITION_TO_LOST)
+          .put(new TestCase(true, PARTITIONED, FAILED), RECORD_FAILURE)
+          .put(new TestCase(true, PARTITIONED, FINISHED), SAVE)
+          .put(new TestCase(true, PARTITIONED, LOST), SAVE_KILL_AND_RESCHEDULE)
+          .put(new TestCase(false, PARTITIONED, PARTITIONED), ILLEGAL_KILL)
           .put(new TestCase(true, LOST, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, LOST, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, LOST, STARTING), ILLEGAL_KILL)
@@ -516,9 +558,12 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, LOST, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(false, LOST, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(true, LOST, DELETED), DELETE_TASK)
+          .put(new TestCase(false, LOST, PARTITIONED), ILLEGAL_KILL)
+          .put(new TestCase(true, LOST, PARTITIONED), ILLEGAL_KILL)
           .put(new TestCase(false, DELETED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, DELETED, STARTING), ILLEGAL_KILL)
           .put(new TestCase(false, DELETED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, DELETED, PARTITIONED), ILLEGAL_KILL)
           .build();
 
   @Test

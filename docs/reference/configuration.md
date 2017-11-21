@@ -356,6 +356,7 @@ Job Schema
   ```tier``` | String | Task tier type. The default scheduler tier configuration allows for 3 tiers: `revocable`, `preemptible`, and `preferred`. If a tier is not elected, Aurora assigns the task to a tier based on its choice of `production` (that is `preferred` for production and `preemptible` for non-production jobs). See the section on [Configuration Tiers](../features/multitenancy.md#configuration-tiers) for more information.
   ```announce``` | ```Announcer``` object | Optionally enable Zookeeper ServerSet announcements. See [Announcer Objects] for more information.
   ```enable_hooks``` | Boolean | Whether to enable [Client Hooks](client-hooks.md) for this job. (Default: False)
+  ```partition_policy``` | ```PartitionPolicy``` object | An optional partition policy that allows job owners to define how to handle partitions for running tasks (in partition-aware Aurora clusters)
 
 
 ### UpdateConfig Objects
@@ -402,6 +403,12 @@ Parameters for controlling a task's health checks via HTTP or a shell command.
 | param                          | type      | description
 | -------                        | :-------: | --------
 | ```shell_command```            | String    | An alternative to HTTP health checking. Specifies a shell command that will be executed. Any non-zero exit status will be interpreted as a health check failure.
+
+### PartitionPolicy Objects
+| param                          | type      | description
+| -------                        | :-------: | --------
+| ```reschedule```               | Boolean   | Whether or not to reschedule when running tasks become partitioned (Default: True)
+| ```delay_secs```               | Integer   | How long to delay transitioning to LOST when running tasks are partitioned. (Default: 0)
 
 
 ### Announcer Objects

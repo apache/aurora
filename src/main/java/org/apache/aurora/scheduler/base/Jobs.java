@@ -65,6 +65,7 @@ public final class Jobs {
       case RUNNING:
       case KILLING:
       case DRAINING:
+      case PARTITIONED:
       case PREEMPTING:
         stats.setActiveTaskCount(stats.getActiveTaskCount() + 1);
         break;

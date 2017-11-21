@@ -176,6 +176,8 @@ Optional flags:
 	Maximum amount of random jitter to add to the offer hold time window.
 -offer_reservation_duration (default (3, mins))
 	Time to reserve a agent's offers while trying to satisfy a task preempting another.
+-partition_aware (default false)
+  Whether or not to integrate with the partition-aware Mesos capabilities.
 -populate_discovery_info (default false)
 	If true, Aurora populates DiscoveryInfo field of Mesos TaskInfo.
 -preemption_delay (default (3, mins))

@@ -4,6 +4,14 @@
 ### New/updated:
 
 - Updated to Mesos 1.4.0.
+- Added experimental support for the Mesos partition-aware APIs. The key idea is a new ScheduleStatus
+  PARTITIONED that represents a task in an unknown state. Users of Aurora can have per-job policies
+  of whether or not to reschedule and how long to wait for the partition to heal. Backwards
+  compatibility with existing behavior (i.e. transition to LOST immediately on a partition) is
+  maintained. The support is experimental due to bugs found in Mesos that would cause issues in
+  a production cluster. For that reason, the functionality is behind a new flag `-partition_aware`
+  that is disabled by default. When Mesos support is improved and the new behavior is vetted in
+  production clusters, we'll enable this by default.
 
 ### Deprecations and removals:
 

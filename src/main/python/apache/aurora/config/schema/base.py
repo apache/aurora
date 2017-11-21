@@ -154,6 +154,11 @@ class Container(Struct):
   docker = Docker
 
 
+class PartitionPolicy(Struct):
+  reschedule = Default(Boolean, True)
+  delay_secs = Default(Integer, 0)
+
+
 class MesosJob(Struct):
   name          = Default(String, '{{task.name}}')
   role          = Required(String)
@@ -181,6 +186,8 @@ class MesosJob(Struct):
   task_links                 = Map(String, String)  # Unsupported.  See AURORA-739
 
   enable_hooks = Default(Boolean, False)  # enable client API hooks; from env python-list 'hooks'
+
+  partition_policy = PartitionPolicy
 
   # Specifying a `Container` with a `docker` property for Docker jobs is deprecated, instead just
   # specify the value of the container property to be a `Docker` container directly.

@@ -232,6 +232,7 @@ public class StateManagerImpl implements StateManager {
       Action.INCREMENT_FAILURES,
       Action.SAVE_STATE,
       Action.RESCHEDULE,
+      Action.TRANSITION_TO_LOST,
       Action.KILL,
       Action.DELETE);
 
@@ -289,6 +290,12 @@ public class StateManagerImpl implements StateManager {
           Optional<IScheduledTask> mutated = taskStore.mutateTask(taskId, task1 -> {
             ScheduledTask mutableTask = task1.newBuilder();
             mutableTask.setStatus(targetState.get());
+            if (targetState.get() == ScheduleStatus.PARTITIONED) {
+              mutableTask.setTimesPartitioned(mutableTask.getTimesPartitioned() + 1);
+              // If we're moving to partitioned state, remove any existing partition transitions
+              // in order to prevent the event history growing unbounded.
+              mutableTask.setTaskEvents(compactPartitionEvents(mutableTask.getTaskEvents()));
+            }
             mutableTask.addToTaskEvents(new TaskEvent()
                 .setTimestamp(clock.nowMillis())
                 .setStatus(targetState.get())
@@ -297,6 +304,15 @@ public class StateManagerImpl implements StateManager {
             return IScheduledTask.build(mutableTask);
           });
           events.add(TaskStateChange.transition(mutated.get(), stateMachine.getPreviousState()));
+          break;
+
+        case TRANSITION_TO_LOST:
+          updateTaskAndExternalState(
+              taskStore,
+              Optional.absent(),
+              taskId,
+              ScheduleStatus.LOST,
+              Optional.of("Action performed on partitioned task, marking as LOST."));
           break;
 
         case RESCHEDULE:
@@ -364,6 +380,32 @@ public class StateManagerImpl implements StateManager {
     }
 
     return result.getResult();
+  }
+
+  /*
+   * Compact cyclical transitions into PARTITIONED into a single event in order to place an upper
+   * bound on the number of task events for a task. We do not want to lose unique transitions.
+   * So consider the following history:
+   *
+   *  ... ->  RUNNING -> PARTITIONED -> RUNNING -> PARTITIONED -> RUNNING -> PARTITIONED
+   *
+   * We'd want to compact this into a single RUNNING -> PARTITIONED where RUNNING is the first
+   * occurence of RUNNING. But consider another example:
+   *
+   * ... -> RUNNING -> PARTITIONED -> RUNNING -> DRAINING -> PARTITIONED
+   *
+   * In this case, there is no compaction to be done because there is no cycle.
+   */
+  private List<TaskEvent> compactPartitionEvents(List<TaskEvent> taskEvents) {
+    int size = taskEvents.size();
+    // We only compact as we're transitioning into PARTITIONED. So cycles happen when the second
+    // last event is PARTITIONED and the last and third last statuses are the same.
+    if (size >= 3 && taskEvents.get(size - 2).getStatus().equals(ScheduleStatus.PARTITIONED)
+        && taskEvents.get(size - 3).getStatus().equals(taskEvents.get(size - 1).getStatus())) {
+      // Drop the last two elements off taskEvents.
+      return taskEvents.subList(0, size - 2);
+    }
+    return taskEvents;
   }
 
   @Override

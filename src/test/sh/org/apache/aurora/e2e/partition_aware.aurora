@@ -1,0 +1,22 @@
+# run the script
+hello_world = Process(
+  name = 'hello_world',
+  cmdline = 'while :; do   sleep 10; done')
+
+# describe the task
+hello_world_task = SequentialTask(
+  processes = [hello_world],
+  resources = Resources(cpu = 0.2, ram = 1 * MB, disk = 8 * MB))
+
+base = Service(
+  cluster = 'devcluster',
+  environment = 'test',
+  role = 'vagrant',
+  task = hello_world_task
+)
+
+jobs = [
+  base(name='partition_aware_default'),
+  base(name='partition_aware_disabled', partition_policy=PartitionPolicy(reschedule=False)),
+  base(name='partition_aware_delay', partition_policy=PartitionPolicy(delay_secs=60 * 60 * 24))
+]

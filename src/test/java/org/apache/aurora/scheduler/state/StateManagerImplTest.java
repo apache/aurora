@@ -70,8 +70,11 @@ import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
+import static org.apache.aurora.gen.ScheduleStatus.PARTITIONED;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.resetPorts;
 import static org.apache.aurora.scheduler.resources.ResourceType.PORTS;
@@ -352,6 +355,84 @@ public class StateManagerImplTest extends EasyMockTest {
     IScheduledTask rescheduledTask = Storage.Util.fetchTask(storage, taskId2).get();
     assertEquals(taskId, rescheduledTask.getAncestorId());
     assertEquals(1, rescheduledTask.getFailureCount());
+  }
+
+  @Test
+  public void testIncrementPartitionCount() {
+    String taskId = "a";
+    expect(taskIdGenerator.generate(SERVICE_CONFIG, 0)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, PARTITIONED);
+    control.replay();
+
+    insertTask(SERVICE_CONFIG, 0);
+
+    assignTask(taskId, HOST_A);
+    changeState(taskId, RUNNING);
+    changeState(taskId, PARTITIONED);
+    IScheduledTask updatedTask = Storage.Util.fetchTask(storage, taskId).get();
+    assertEquals(1, updatedTask.getTimesPartitioned());
+  }
+
+  @Test
+  public void testTransitionToLost() {
+    String taskId = "a";
+    expect(taskIdGenerator.generate(SERVICE_CONFIG, 0)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RESTARTING, PARTITIONED, LOST);
+    driver.killTask(EasyMock.anyObject());
+    driver.killTask(EasyMock.anyObject());
+    String taskId2 = "a2";
+    expect(taskIdGenerator.generate(SERVICE_CONFIG, 0)).andReturn(taskId2);
+    noFlappingPenalty();
+    expectStateTransitions(taskId2, INIT, PENDING);
+
+    control.replay();
+
+    insertTask(SERVICE_CONFIG, 0);
+
+    assignTask(taskId, HOST_A);
+    changeState(taskId, ASSIGNED);
+    changeState(taskId, RESTARTING);
+    changeState(taskId, PARTITIONED);
+    IScheduledTask updatedTask = Storage.Util.fetchTask(storage, taskId).get();
+    assertEquals(LOST, updatedTask.getStatus());
+  }
+
+  @Test
+  public void testCompactPartitionCycles() {
+    String taskId = "a";
+    expect(taskIdGenerator.generate(SERVICE_CONFIG, 0)).andReturn(taskId);
+    expectStateTransitions(
+        taskId,
+        INIT,
+        PENDING,
+        ASSIGNED,
+        STARTING,
+        PARTITIONED,
+        RUNNING,
+        PARTITIONED,
+        RUNNING,
+        PARTITIONED,
+        RUNNING,
+        PARTITIONED);
+
+    control.replay();
+
+    insertTask(SERVICE_CONFIG, 0);
+    assignTask(taskId, HOST_A);
+    changeState(taskId, STARTING);
+    changeState(taskId, PARTITIONED);
+    changeState(taskId, RUNNING);
+    changeState(taskId, PARTITIONED);
+    changeState(taskId, RUNNING);
+    changeState(taskId, PARTITIONED);
+    changeState(taskId, RUNNING);
+    changeState(taskId, PARTITIONED);
+    IScheduledTask updatedTask = Storage.Util.fetchTask(storage, taskId).get();
+    assertEquals(
+        ImmutableList.of(PENDING, ASSIGNED, STARTING, PARTITIONED, RUNNING, PARTITIONED),
+        updatedTask.getTaskEvents().stream()
+            .map(e -> e.getStatus())
+            .collect(Collectors.toList()));
   }
 
   private static ITaskConfig setMaxFailures(ITaskConfig config, int maxFailures) {

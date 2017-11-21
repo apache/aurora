@@ -254,6 +254,11 @@ class InspectCommand(Verb):
       context.print_out("constraints:", indent=2)
       for constraint, value in job.constraints().get().items():
         context.print_out("'%s': '%s'" % (constraint, value), indent=4)
+    if job.has_partition_policy():
+      context.print_out("partition_policy:", indent=2)
+      context.print_out("reschedule: %s" % job.partition_policy().reschedule(), indent=4)
+      context.print_out("delay_secs: '%s'" % job.partition_policy().delay_secs(), indent=4)
+
     context.print_out("service:    %s" % job_thrift.taskConfig.isService, indent=2)
     context.print_out("production: %s" % bool(job.production().get()), indent=2)
     context.print_out("")

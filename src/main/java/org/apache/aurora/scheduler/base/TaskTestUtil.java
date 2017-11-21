@@ -31,6 +31,7 @@ import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.MesosFetcherURI;
 import org.apache.aurora.gen.Metadata;
+import org.apache.aurora.gen.PartitionPolicy;
 import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
@@ -122,6 +123,7 @@ public final class TaskTestUtil {
         .setMaxTaskFailures(-1)
         .setProduction(true)
         .setTier(PROD_TIER_NAME)
+        .setPartitionPolicy(new PartitionPolicy().setDelaySecs(5).setReschedule(true))
         .setConstraints(ImmutableSet.of(
             new Constraint(
                 "valueConstraint",
@@ -198,6 +200,7 @@ public final class TaskTestUtil {
                 .setScheduler("scheduler2")))
         .setAncestorId("ancestor")
         .setFailureCount(3)
+        .setTimesPartitioned(2)
         .setAssignedTask(assignedTask));
   }
 

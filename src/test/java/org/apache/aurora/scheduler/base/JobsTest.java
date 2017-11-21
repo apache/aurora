@@ -38,7 +38,7 @@ public class JobsTest {
                 addStateTransition(makeTask("id", TaskTestUtil.JOB), status, 100L)).toList();
 
     IJobStats expectedStats = IJobStats.build(new JobStats()
-        .setActiveTaskCount(7)
+        .setActiveTaskCount(8)
         .setFailedTaskCount(2)
         .setFinishedTaskCount(2)
         .setPendingTaskCount(3));

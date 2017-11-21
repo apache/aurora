@@ -68,6 +68,11 @@ class SideEffect {
     KILL,
 
     /**
+     * Transition a task to LOST.
+     */
+    TRANSITION_TO_LOST,
+
+    /**
      * Create a new state machine with a copy of this task.
      */
     RESCHEDULE,

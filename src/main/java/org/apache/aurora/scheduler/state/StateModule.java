@@ -64,6 +64,8 @@ public class StateModule extends AbstractModule {
     bind(UUIDGenerator.class).to(UUIDGeneratorImpl.class);
     bind(UUIDGeneratorImpl.class).in(Singleton.class);
 
+    PubsubEventModule.bindSubscriber(binder(), PartitionManager.class);
+
     bindMaintenanceController(binder());
   }
 

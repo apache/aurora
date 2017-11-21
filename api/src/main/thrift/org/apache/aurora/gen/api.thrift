@@ -219,6 +219,11 @@ union Resource {
   5: i64 numGpus
 }
 
+struct PartitionPolicy {
+  1: bool reschedule
+  2: optional i64 delaySecs
+}
+
 /** Description of the tasks contained within a job. */
 struct TaskConfig {
  /** Job task belongs to. */
@@ -259,6 +264,8 @@ struct TaskConfig {
  25: optional ExecutorConfig executorConfig
  /** Used to display additional details in the UI. */
  27: optional set<Metadata> metadata
+ /** Policy for how to deal with task partitions */
+ 34: optional PartitionPolicy partitionPolicy
 
  // This field is deliberately placed at the end to work around a bug in the immutable wrapper
  // code generator.  See AURORA-1185 for details.
@@ -403,7 +410,11 @@ enum ScheduleStatus {
   /** A fault in the task environment has caused the system to believe the task no longer exists.
    * This can happen, for example, when a slave process disappears.
    */
-  LOST             = 7
+  LOST             = 7,
+  /**
+   * The task is currently partitioned and in an unknown state.
+   **/
+  PARTITIONED      = 18
 }
 
 // States that a task may be in while still considered active.
@@ -415,6 +426,7 @@ const set<ScheduleStatus> ACTIVE_STATES = [ScheduleStatus.ASSIGNED,
                                            ScheduleStatus.RESTARTING
                                            ScheduleStatus.RUNNING,
                                            ScheduleStatus.STARTING,
+                                           ScheduleStatus.PARTITIONED,
                                            ScheduleStatus.THROTTLED]
 
 // States that a task may be in while associated with a slave machine and non-terminal.
@@ -424,6 +436,7 @@ const set<ScheduleStatus> SLAVE_ASSIGNED_STATES = [ScheduleStatus.ASSIGNED,
                                                    ScheduleStatus.PREEMPTING,
                                                    ScheduleStatus.RESTARTING,
                                                    ScheduleStatus.RUNNING,
+                                                   ScheduleStatus.PARTITIONED,
                                                    ScheduleStatus.STARTING]
 
 // States that a task may be in while in an active sandbox.
@@ -431,6 +444,7 @@ const set<ScheduleStatus> LIVE_STATES = [ScheduleStatus.KILLING,
                                          ScheduleStatus.PREEMPTING,
                                          ScheduleStatus.RESTARTING,
                                          ScheduleStatus.DRAINING,
+                                         ScheduleStatus.PARTITIONED,
                                          ScheduleStatus.RUNNING]
 
 // States a completed task may be in.
@@ -499,6 +513,11 @@ struct ScheduledTask {
    * this task.
    */
   3: i32 failureCount
+  /**
+   * The number of partitions this task has accumulated over its lifetime.
+   */
+  6: i32 timesPartitioned
+
   /** State change history for this task. */
   4: list<TaskEvent> taskEvents
   /**

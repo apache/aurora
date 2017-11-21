@@ -191,6 +191,7 @@ public class CommandLineTest {
     expected.driver.executorUser = "testing";
     expected.driver.receiveRevocableResources = true;
     expected.driver.mesosRole = "testing";
+    expected.driver.isPartitionAware = true;
     expected.jetty.hostnameOverride = "testing";
     expected.jetty.httpPort = 42;
     expected.jetty.listenIp = "testing";
@@ -383,7 +384,8 @@ public class CommandLineTest {
         "-cron_start_max_backoff=42days",
         "-cron_scheduling_max_batch_size=42",
         "-enable_revocable_cpus=false",
-        "-enable_revocable_ram=true"
+        "-enable_revocable_ram=true",
+        "-partition_aware=true"
     );
     assertEqualOptions(expected, parsed);
   }

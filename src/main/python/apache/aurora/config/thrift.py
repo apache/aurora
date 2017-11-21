@@ -48,6 +48,7 @@ from gen.apache.aurora.api.ttypes import (
     MesosContainer,
     Metadata,
     Mode,
+    PartitionPolicy,
     Resource,
     TaskConfig,
     TaskConstraint,
@@ -267,6 +268,11 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   task.priority = fully_interpolated(job.priority())
   task.contactEmail = not_empty_or(job.contact(), None)
   task.tier = not_empty_or(job.tier(), None)
+
+  if job.has_partition_policy():
+    task.partitionPolicy = PartitionPolicy(
+      fully_interpolated(job.partition_policy().reschedule()),
+      fully_interpolated(job.partition_policy().delay_secs()))
 
   # Add metadata to a task, to display in the scheduler UI.
   task.metadata = frozenset(Metadata(key=str(key), value=str(value)) for key, value in metadata)

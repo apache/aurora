@@ -29,6 +29,7 @@ import org.junit.Test;
 import static org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule.Options.PRINCIPAL_KEY;
 import static org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule.Options.SECRET_KEY;
 import static org.apache.mesos.v1.Protos.FrameworkInfo.Capability.Type.GPU_RESOURCES;
+import static org.apache.mesos.v1.Protos.FrameworkInfo.Capability.Type.PARTITION_AWARE;
 import static org.apache.mesos.v1.Protos.FrameworkInfo.Capability.Type.REVOCABLE_RESOURCES;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -82,6 +83,7 @@ public class CommandLineDriverSettingsModuleTest {
         Amount.of(1L, Time.MINUTES),
         false, // revocable
         false, // allow gpu
+        false, // partition aware
         Optional.absent());
     assertEquals("", info.getPrincipal());
     assertEquals(0, info.getCapabilitiesCount());
@@ -97,6 +99,7 @@ public class CommandLineDriverSettingsModuleTest {
         Amount.of(1L, Time.MINUTES),
         true, // revocable
         false, // allow gpu
+        false, // partition aware
         Optional.absent());
     assertEquals("", info.getPrincipal());
     assertEquals(1, info.getCapabilitiesCount());
@@ -113,10 +116,28 @@ public class CommandLineDriverSettingsModuleTest {
         Amount.of(1L, Time.MINUTES),
         false, // revocable
         true, // allow gpu
+        false, // partition aware
         Optional.absent());
     assertEquals("", info.getPrincipal());
     assertEquals(1, info.getCapabilitiesCount());
     assertEquals(GPU_RESOURCES, info.getCapabilities(0).getType());
+    assertFalse(info.hasRole());
+  }
+
+  @Test
+  public void testFrameworkInfoPartitionAware() {
+    Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
+        "aurora",
+        "user",
+        Optional.absent(),
+        Amount.of(1L, Time.MINUTES),
+        false, // revocable
+        false, // allow gpu
+        true, // partition aware
+        Optional.absent());
+    assertEquals("", info.getPrincipal());
+    assertEquals(1, info.getCapabilitiesCount());
+    assertEquals(PARTITION_AWARE, info.getCapabilities(0).getType());
     assertFalse(info.hasRole());
   }
 
@@ -129,6 +150,7 @@ public class CommandLineDriverSettingsModuleTest {
         Amount.of(1L, Time.MINUTES),
         false, // revocable
         false, // allow gpu
+        false, // partition aware
         Optional.absent());
     assertEquals("auroraprincipal", info.getPrincipal());
     assertEquals(0, info.getCapabilitiesCount());
@@ -144,6 +166,7 @@ public class CommandLineDriverSettingsModuleTest {
         Amount.of(1L, Time.MINUTES),
         true, // revocable
         true, // allow gpu
+        false, // partition aware
         Optional.of(TEST_ROLE));
     assertEquals("auroraprincipal", info.getPrincipal());
     assertEquals(2, info.getCapabilitiesCount());

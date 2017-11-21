@@ -18,6 +18,7 @@ import re
 import pytest
 
 from apache.aurora.config import AuroraConfig
+from apache.aurora.config.schema.base import PartitionPolicy as PystachioPartitionPolicy
 from apache.aurora.config.schema.base import (
     AppcImage,
     Container,
@@ -37,7 +38,13 @@ from apache.thermos.config.schema import Process, Resources, Task
 
 from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
 from gen.apache.aurora.api.ttypes import Mode as ThriftMode
-from gen.apache.aurora.api.ttypes import CronCollisionPolicy, Identity, JobKey, Resource
+from gen.apache.aurora.api.ttypes import (
+    CronCollisionPolicy,
+    Identity,
+    JobKey,
+    PartitionPolicy,
+    Resource
+)
 from gen.apache.aurora.test.constants import INVALID_IDENTIFIERS, VALID_IDENTIFIERS
 
 HELLO_WORLD = Job(
@@ -143,6 +150,7 @@ def test_config_with_options():
     priority=200,
     service=True,
     cron_collision_policy='RUN_OVERLAP',
+    partition_policy=PystachioPartitionPolicy(delay_secs=10),
     constraints={
       'dedicated': 'root',
       'cpu': 'x86_64'
@@ -159,6 +167,24 @@ def test_config_with_options():
   assert job.cronCollisionPolicy == CronCollisionPolicy.RUN_OVERLAP
   assert len(tti.constraints) == 2
   assert job.key.environment == 'prod'
+  assert tti.partitionPolicy == PartitionPolicy(True, 10)
+
+
+def test_disable_partition_policy():
+  hwc = HELLO_WORLD(
+    production=True,
+    priority=200,
+    service=True,
+    cron_collision_policy='RUN_OVERLAP',
+    partition_policy=PystachioPartitionPolicy(reschedule=False),
+    constraints={
+      'dedicated': 'root',
+      'cpu': 'x86_64'
+    },
+    environment='prod'
+  )
+  job = convert_pystachio_to_thrift(hwc)
+  assert job.taskConfig.partitionPolicy == PartitionPolicy(False, 0)
 
 
 def test_config_with_ports():
