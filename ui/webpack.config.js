@@ -28,7 +28,7 @@ module.exports = {
       }, {
         loader: 'css-loader'
       }, {
-        loader: 'sass-loader',
+        loader: 'sassjs-loader',
         options: {
           includePaths: [path.resolve(__dirname, 'src/main/sass')]
         }

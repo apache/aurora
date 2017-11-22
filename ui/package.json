@@ -38,9 +38,9 @@
     "file-loader": "^1.1.5",
     "jest": "^21.2.0",
     "jest-cli": "^21.2.0",
-    "node-sass": "^4.5.3",
     "react-test-renderer": "^16.0.0",
-    "sass-loader": "^6.0.6",
+    "sass.js": "^0.10.7",
+    "sassjs-loader": "^1.0.0",
     "style-loader": "^0.18.2",
     "url-loader": "^0.6.2",
     "webpack": "^2.6.1"
