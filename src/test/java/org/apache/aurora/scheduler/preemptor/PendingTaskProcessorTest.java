@@ -300,7 +300,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
   }
 
   private void expectOffers(HostOffer... offers) {
-    expect(offerManager.getOffers()).andReturn(ImmutableSet.copyOf(offers));
+    expect(offerManager.getAll()).andReturn(ImmutableSet.copyOf(offers));
   }
 
   private void expectGetClusterState(IScheduledTask... returnedTasks) {

@@ -49,19 +49,8 @@ public final class AttributeAggregate {
    */
   private Supplier<Multiset<Pair<String, String>>> aggregate;
 
-  private boolean isInitialized = false;
-
   private AttributeAggregate(Supplier<Multiset<Pair<String, String>>> aggregate) {
-    this.aggregate = Suppliers.memoize(
-        () -> {
-          initialize();
-          return aggregate.get();
-        }
-    );
-  }
-
-  private void initialize() {
-    isInitialized = true; // inlining this assignment yields a PMD false positive
+    this.aggregate = Suppliers.memoize(aggregate);
   }
 
   /**
@@ -123,21 +112,16 @@ public final class AttributeAggregate {
   }
 
   public void updateAttributeAggregate(IHostAttributes attributes) {
-    // If the aggregate supplier has not been populated there is no need to update it here.
-    // All tasks attributes will be picked up by the wrapped task query if executed at a
-    // later point in time.
-    if (isInitialized) {
-      final Supplier<Multiset<Pair<String, String>>> previous = aggregate;
-      aggregate = Suppliers.memoize(
-          () -> {
-            ImmutableMultiset.Builder<Pair<String, String>> builder
-                = new ImmutableMultiset.Builder<>();
-            builder.addAll(previous.get());
-            addAttributes(builder, attributes.getAttributes());
-            return builder.build();
-          }
-      );
-    }
+    final Supplier<Multiset<Pair<String, String>>> previous = aggregate;
+    aggregate = Suppliers.memoize(
+        () -> {
+          ImmutableMultiset.Builder<Pair<String, String>> builder
+              = new ImmutableMultiset.Builder<>();
+          builder.addAll(previous.get());
+          addAttributes(builder, attributes.getAttributes());
+          return builder.build();
+        }
+    );
   }
 
   @VisibleForTesting

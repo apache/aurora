@@ -62,15 +62,17 @@ import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.offers.Deferment;
 import org.apache.aurora.scheduler.offers.OfferManager;
+import org.apache.aurora.scheduler.offers.OfferManagerImpl;
+import org.apache.aurora.scheduler.offers.OfferManagerModule;
 import org.apache.aurora.scheduler.offers.OfferOrder;
 import org.apache.aurora.scheduler.offers.OfferSettings;
-import org.apache.aurora.scheduler.offers.OffersModule;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
 import org.apache.aurora.scheduler.preemptor.PreemptorModule;
 import org.apache.aurora.scheduler.scheduling.RescheduleCalculator;
 import org.apache.aurora.scheduler.scheduling.TaskScheduler;
-import org.apache.aurora.scheduler.scheduling.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
+import org.apache.aurora.scheduler.scheduling.TaskSchedulerImpl;
+import org.apache.aurora.scheduler.scheduling.TaskSchedulerImpl.ReservationDuration;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
@@ -147,8 +149,8 @@ public class SchedulingBenchmarks {
               bind(ScheduledExecutorService.class).annotatedWith(AsyncModule.AsyncExecutor.class)
                   .toInstance(new NoopExecutor());
               bind(Deferment.class).to(Deferment.Noop.class);
-              bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
-              bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
+              bind(OfferManager.class).to(OfferManagerImpl.class);
+              bind(OfferManagerImpl.class).in(Singleton.class);
               bind(OfferSettings.class).toInstance(
                   new OfferSettings(NO_DELAY,
                       ImmutableList.of(OfferOrder.RANDOM),
@@ -157,8 +159,8 @@ public class SchedulingBenchmarks {
                       new FakeTicker()));
               bind(BiCache.BiCacheSettings.class).toInstance(
                   new BiCache.BiCacheSettings(DELAY_FOREVER, ""));
-              bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
-              bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
+              bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
+              bind(TaskSchedulerImpl.class).in(Singleton.class);
               expose(TaskScheduler.class);
               expose(OfferManager.class);
             }
@@ -171,7 +173,7 @@ public class SchedulingBenchmarks {
                   .toInstance(DELAY_FOREVER);
               bind(TaskIdGenerator.class).to(TaskIdGenerator.TaskIdGeneratorImpl.class);
               bind(new TypeLiteral<Amount<Long, Time>>() { })
-                  .annotatedWith(OffersModule.UnavailabilityThreshold.class)
+                  .annotatedWith(OfferManagerModule.UnavailabilityThreshold.class)
                   .toInstance(Amount.of(1L, Time.MINUTES));
               bind(UpdateAgentReserver.class).to(UpdateAgentReserver.NullAgentReserver.class);
               bind(UpdateAgentReserver.NullAgentReserver.class).in(Singleton.class);

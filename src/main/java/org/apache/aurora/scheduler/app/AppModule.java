@@ -47,7 +47,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.http.JettyServerModule;
 import org.apache.aurora.scheduler.mesos.SchedulerDriverModule;
 import org.apache.aurora.scheduler.metadata.MetadataModule;
-import org.apache.aurora.scheduler.offers.OffersModule;
+import org.apache.aurora.scheduler.offers.OfferManagerModule;
 import org.apache.aurora.scheduler.preemptor.PreemptorModule;
 import org.apache.aurora.scheduler.pruning.PruningModule;
 import org.apache.aurora.scheduler.quota.QuotaModule;
@@ -172,7 +172,7 @@ public class AppModule extends AbstractModule {
 
     install(new PubsubEventModule());
     install(new AsyncModule(options.async));
-    install(new OffersModule(options));
+    install(new OfferManagerModule(options));
     install(new PruningModule(options.pruning));
     install(new ReconciliationModule(options.reconciliation));
     install(new SchedulingModule(options.scheduling));

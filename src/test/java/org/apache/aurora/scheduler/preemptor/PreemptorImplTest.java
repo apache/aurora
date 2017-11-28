@@ -82,7 +82,7 @@ public class PreemptorImplTest extends EasyMockTest {
     slotCache = createMock(new Clazz<BiCache<PreemptionProposal, TaskGroupKey>>() { });
     statsProvider = new FakeStatsProvider();
     OfferManager offerManager = createMock(OfferManager.class);
-    expect(offerManager.getOffer(anyObject(Protos.AgentID.class)))
+    expect(offerManager.get(anyObject(Protos.AgentID.class)))
         .andReturn(Optional.of(OFFER))
         .anyTimes();
 

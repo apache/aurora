@@ -49,7 +49,7 @@ public class OffersTest extends EasyMockTest {
 
   @Test
   public void testNoOffers() throws Exception {
-    expect(offerManager.getOffers()).andReturn(ImmutableSet.of());
+    expect(offerManager.getAll()).andReturn(ImmutableSet.of());
 
     control.replay();
 
@@ -134,7 +134,7 @@ public class OffersTest extends EasyMockTest {
             .build(),
         IHostAttributes.build(new HostAttributes().setMode(NONE)));
 
-    expect(offerManager.getOffers()).andReturn(ImmutableSet.of(offer));
+    expect(offerManager.getAll()).andReturn(ImmutableSet.of(offer));
 
     control.replay();
 

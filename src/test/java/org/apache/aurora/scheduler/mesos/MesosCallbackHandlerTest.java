@@ -259,7 +259,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
   public void testOffers() {
     storageUtil.expectOperations();
     expectOfferAttributesSaved(HOST_OFFER);
-    offerManager.addOffer(HOST_OFFER);
+    offerManager.add(HOST_OFFER);
 
     control.replay();
 
@@ -272,8 +272,8 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     storageUtil.expectOperations();
     expectOfferAttributesSaved(HOST_OFFER);
     expectOfferAttributesSaved(HOST_OFFER_2);
-    offerManager.addOffer(HOST_OFFER);
-    offerManager.addOffer(HOST_OFFER_2);
+    offerManager.add(HOST_OFFER);
+    offerManager.add(HOST_OFFER_2);
 
     control.replay();
 
@@ -296,7 +296,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     expect(storageUtil.attributeStore.saveHostAttributes(saved)).andReturn(true);
 
     // If the host is in draining, then the offer manager should get an offer with that attribute
-    offerManager.addOffer(DRAINING_HOST_OFFER);
+    offerManager.add(DRAINING_HOST_OFFER);
 
     control.replay();
     handler.handleOffers(ImmutableList.of(HOST_OFFER.getOffer()));
@@ -316,7 +316,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
   @Test
   public void testRescind() {
-    expect(offerManager.cancelOffer(OFFER_ID)).andReturn(true);
+    expect(offerManager.cancel(OFFER_ID)).andReturn(true);
 
     control.replay();
 
@@ -336,12 +336,12 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     FakeScheduledThreadPoolExecutor fakeExecutor = new FakeScheduledThreadPoolExecutor();
     createHandler(false, fakeExecutor);
 
-    expect(offerManager.cancelOffer(OFFER_ID)).andReturn(false);
-    offerManager.banOffer(OFFER_ID);
+    expect(offerManager.cancel(OFFER_ID)).andReturn(false);
+    offerManager.ban(OFFER_ID);
     storageUtil.expectOperations();
     expectOfferAttributesSaved(HOST_OFFER);
-    offerManager.addOffer(HOST_OFFER);
-    expect(offerManager.cancelOffer(OFFER_ID)).andReturn(true);
+    offerManager.add(HOST_OFFER);
+    expect(offerManager.cancel(OFFER_ID)).andReturn(true);
 
     control.replay();
     replay(offerManager);
@@ -355,7 +355,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
     // Eventually, we unban the offer.
     handler.handleRescind(OFFER_ID);
 
-    // 2 commands executed (addOffer and unbanOffer).
+    // 2 commands executed (add and unbanOffer).
     fakeExecutor.advance();
     fakeExecutor.advance();
 

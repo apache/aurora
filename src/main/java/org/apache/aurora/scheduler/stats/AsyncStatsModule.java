@@ -157,7 +157,7 @@ public class AsyncStatsModule extends AbstractModule {
 
     @Override
     public Iterable<MachineResource> get() {
-      Iterable<HostOffer> offers = offerManager.getOffers();
+      Iterable<HostOffer> offers = offerManager.getAll();
 
       ImmutableList.Builder<MachineResource> builder = ImmutableList.builder();
       for (HostOffer offer : offers) {

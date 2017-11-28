@@ -59,7 +59,7 @@ public class Offers {
   public Response getOffers() throws JsonProcessingException {
     return Response.ok(
         mapper.writeValueAsString(
-            StreamSupport.stream(offerManager.getOffers().spliterator(), false)
+            StreamSupport.stream(offerManager.getAll().spliterator(), false)
                 .map(o -> o.getOffer())
                 .collect(Collectors.toList())))
         .build();

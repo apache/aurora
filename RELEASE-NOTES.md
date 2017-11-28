@@ -12,6 +12,9 @@
   a production cluster. For that reason, the functionality is behind a new flag `-partition_aware`
   that is disabled by default. When Mesos support is improved and the new behavior is vetted in
   production clusters, we'll enable this by default.
+- Added the ability to "score" offers for a given scheduling assignment via the `OfferSelector`
+  interface. The default implementation is first fit, but cluster operators can inject a custom
+  scoring algorithm through the `-offer_selector_modules` flag.
 
 ### Deprecations and removals:
 

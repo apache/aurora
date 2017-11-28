@@ -11,21 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.state;
-
-import javax.inject.Singleton;
+package org.apache.aurora.scheduler.scheduling;
 
 import com.google.inject.AbstractModule;
+import com.google.inject.Singleton;
 
-import org.apache.aurora.scheduler.state.TaskAssigner.FirstFitTaskAssigner;
+public class FirstFitOfferSelectorModule extends AbstractModule {
 
-/**
- *  Exposes the default TaskAssigner implementation, which is a first-fit scheduling algorithm.
- */
-public class FirstFitTaskAssignerModule extends AbstractModule {
   @Override
   protected void configure() {
-    bind(TaskAssigner.class).to(FirstFitTaskAssigner.class);
-    bind(FirstFitTaskAssigner.class).in(Singleton.class);
+    bind(OfferSelector.class).to(FirstFitOfferSelector.class);
+    bind(FirstFitOfferSelector.class).in(Singleton.class);
   }
 }

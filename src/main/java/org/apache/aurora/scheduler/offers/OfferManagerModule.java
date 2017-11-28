@@ -53,8 +53,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * Binding module for resource offer management.
  */
-public class OffersModule extends AbstractModule {
-  private static final Logger LOG = LoggerFactory.getLogger(OffersModule.class);
+public class OfferManagerModule extends AbstractModule {
+  private static final Logger LOG = LoggerFactory.getLogger(OfferManagerModule.class);
 
   @Parameters(separators = "=")
   public static class Options {
@@ -109,6 +109,13 @@ public class OffersModule extends AbstractModule {
     public long offerStaticBanCacheMaxSize = Long.MAX_VALUE;
   }
 
+  /**
+   * Binding annotation for the threshold to veto tasks with unavailability.
+   */
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  public @interface UnavailabilityThreshold { }
+
   public static class OfferOrderModule extends AbstractModule {
     private final CliOptions options;
 
@@ -123,16 +130,9 @@ public class OffersModule extends AbstractModule {
     }
   }
 
-  /**
-   * Binding annotation for the threshold to veto tasks with unavailability.
-   */
-  @Qualifier
-  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  public @interface UnavailabilityThreshold { }
-
   private final CliOptions cliOptions;
 
-  public OffersModule(CliOptions cliOptions) {
+  public OfferManagerModule(CliOptions cliOptions) {
     this.cliOptions = cliOptions;
   }
 
@@ -174,8 +174,8 @@ public class OffersModule extends AbstractModule {
           bind(Deferment.class).to(Deferment.DelayedDeferment.class);
         }
 
-        bind(OfferManager.class).to(OfferManager.OfferManagerImpl.class);
-        bind(OfferManager.OfferManagerImpl.class).in(Singleton.class);
+        bind(OfferManager.class).to(OfferManagerImpl.class);
+        bind(OfferManagerImpl.class).in(Singleton.class);
         expose(OfferManager.class);
       }
     });

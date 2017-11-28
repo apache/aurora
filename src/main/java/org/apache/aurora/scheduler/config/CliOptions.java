@@ -36,12 +36,13 @@ import org.apache.aurora.scheduler.http.api.security.IniShiroRealmModule;
 import org.apache.aurora.scheduler.http.api.security.Kerberos5ShiroRealmModule;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
-import org.apache.aurora.scheduler.offers.OffersModule;
+import org.apache.aurora.scheduler.offers.OfferManagerModule;
 import org.apache.aurora.scheduler.preemptor.PreemptorModule;
 import org.apache.aurora.scheduler.pruning.PruningModule;
 import org.apache.aurora.scheduler.reconciliation.ReconciliationModule;
 import org.apache.aurora.scheduler.resources.ResourceSettings;
 import org.apache.aurora.scheduler.scheduling.SchedulingModule;
+import org.apache.aurora.scheduler.scheduling.TaskAssignerImplModule;
 import org.apache.aurora.scheduler.sla.SlaModule;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.stats.AsyncStatsModule;
@@ -54,7 +55,7 @@ import org.apache.aurora.scheduler.updater.UpdaterModule;
 public class CliOptions {
   public final ReconciliationModule.Options reconciliation =
       new ReconciliationModule.Options();
-  public final OffersModule.Options offer = new OffersModule.Options();
+  public final OfferManagerModule.Options offer = new OfferManagerModule.Options();
   public final ExecutorModule.Options executor = new ExecutorModule.Options();
   public final AppModule.Options app = new AppModule.Options();
   public final SchedulerMain.Options main = new SchedulerMain.Options();
@@ -84,6 +85,7 @@ public class CliOptions {
   public final StatsModule.Options stats = new StatsModule.Options();
   public final CronModule.Options cron = new CronModule.Options();
   public final ResourceSettings resourceSettings = new ResourceSettings();
+  public final TaskAssignerImplModule.Options taskAssigner = new TaskAssignerImplModule.Options();
   final List<Object> custom;
 
   public CliOptions() {

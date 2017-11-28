@@ -50,7 +50,7 @@ final class Offers {
    */
   static void addOffers(OfferManager offerManager, Iterable<HostOffer> offers) {
     for (HostOffer offer : offers) {
-      offerManager.addOffer(offer);
+      offerManager.add(offer);
     }
   }
 

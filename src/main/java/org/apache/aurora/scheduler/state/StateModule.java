@@ -29,6 +29,7 @@ import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
+import org.apache.aurora.scheduler.scheduling.TaskAssignerImplModule;
 import org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
 import org.apache.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
 
@@ -42,7 +43,7 @@ public class StateModule extends AbstractModule {
     @Parameter(names = "-task_assigner_modules",
         description = "Guice modules for customizing task assignment.")
     @SuppressWarnings("rawtypes")
-    public List<Class> taskAssignerModules = ImmutableList.of(FirstFitTaskAssignerModule.class);
+    public List<Class> taskAssignerModules = ImmutableList.of(TaskAssignerImplModule.class);
   }
 
   private final CliOptions options;

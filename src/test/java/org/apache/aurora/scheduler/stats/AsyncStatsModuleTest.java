@@ -45,7 +45,7 @@ public class AsyncStatsModuleTest extends EasyMockTest {
   @Test
   public void testOfferAdapter() {
     OfferManager offerManager = createMock(OfferManager.class);
-    expect(offerManager.getOffers()).andReturn(ImmutableList.of(
+    expect(offerManager.getAll()).andReturn(ImmutableList.of(
         new HostOffer(Protos.Offer.newBuilder()
             .setId(Protos.OfferID.newBuilder().setValue("offerId"))
             .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("frameworkId"))

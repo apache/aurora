@@ -94,7 +94,7 @@ public interface Preemptor {
                 pendingTask.getTask(),
                 slot.getVictims(),
                 jobState,
-                offerManager.getOffer(slaveId),
+                offerManager.get(slaveId),
                 store);
 
         metrics.recordSlotValidationResult(validatedVictims);

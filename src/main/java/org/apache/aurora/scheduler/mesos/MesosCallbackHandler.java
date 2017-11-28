@@ -40,7 +40,7 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.offers.OfferManager;
-import org.apache.aurora.scheduler.offers.OffersModule;
+import org.apache.aurora.scheduler.offers.OfferManagerModule;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -126,7 +126,7 @@ public interface MesosCallbackHandler {
         Driver driver,
         Clock clock,
         MaintenanceController controller,
-        @OffersModule.UnavailabilityThreshold Amount<Long, Time> unavailabilityThreshold,
+        @OfferManagerModule.UnavailabilityThreshold Amount<Long, Time> unavailabilityThreshold,
         @PubsubEventModule.RegisteredEvents EventSink registeredEventSink) {
 
       this(
@@ -226,7 +226,7 @@ public interface MesosCallbackHandler {
             storeProvider.getAttributeStore().saveHostAttributes(attributes);
             log.info("Received offer: {}", offer.getId().getValue());
             offersReceived.incrementAndGet();
-            offerManager.addOffer(new HostOffer(offer, attributes));
+            offerManager.add(new HostOffer(offer, attributes));
           }
         });
       });
@@ -244,15 +244,15 @@ public interface MesosCallbackHandler {
       //      In this scenario, we want to ensure that we do not use it/accept it when the executor
       //      finally processes the offer. We will temporarily ban it and add a command for the
       //      executor to unban it so future offers can be processed normally.
-      boolean offerCancelled = offerManager.cancelOffer(offerId);
+      boolean offerCancelled = offerManager.cancel(offerId);
       if (!offerCancelled) {
         log.info(
             "Received rescind before adding offer: {}, temporarily banning.",
             offerId.getValue());
-        offerManager.banOffer(offerId);
+        offerManager.ban(offerId);
         executor.execute(() -> {
           log.info("Cancelling and unbanning offer: {}.", offerId.getValue());
-          offerManager.cancelOffer(offerId);
+          offerManager.cancel(offerId);
         });
       }
       offersRescinded.incrementAndGet();

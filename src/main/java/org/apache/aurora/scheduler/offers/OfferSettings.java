@@ -29,6 +29,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Settings required to create an OfferManager.
  */
+@VisibleForTesting
 public class OfferSettings {
 
   private final Amount<Long, Time> filterDuration;
@@ -67,14 +68,14 @@ public class OfferSettings {
   /**
    * Duration after which we want Mesos to re-offer unused or declined resources.
    */
-  public Amount<Long, Time> getFilterDuration() {
+  Amount<Long, Time> getFilterDuration() {
     return filterDuration;
   }
 
   /**
    * The ordering to use when fetching offers from OfferManager.
    */
-  public Ordering<HostOffer> getOrdering() {
+  Ordering<HostOffer> getOrdering() {
     return ordering;
   }
 
@@ -82,7 +83,7 @@ public class OfferSettings {
    * The builder for the static ban cache. Cache settings (e.g. max size, entry expiration) should
    * already be added to the builder by this point.
    */
-  public CacheBuilder<Object, Object> getStaticBanCacheBuilder() {
+  CacheBuilder<Object, Object> getStaticBanCacheBuilder() {
     return staticBanCacheBuilder;
   }
 }

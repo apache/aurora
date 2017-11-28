@@ -143,7 +143,7 @@ public class PendingTaskProcessor implements Runnable {
 
       // Group the offers by slave id so they can be paired with active tasks from the same slave.
       Map<String, HostOffer> slavesToOffers =
-          Maps.uniqueIndex(offerManager.getOffers(), OFFER_TO_SLAVE_ID);
+          Maps.uniqueIndex(offerManager.getAll(), OFFER_TO_SLAVE_ID);
 
       Set<String> allSlaves = Sets.newHashSet(Iterables.concat(
           slavesToOffers.keySet(),

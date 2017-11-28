@@ -160,6 +160,7 @@ public class CommandLineTest {
     expected.scheduling.reservationDuration = TEST_TIME;
     expected.scheduling.schedulingMaxBatchSize = 42;
     expected.scheduling.maxTasksPerScheduleAttempt = 42;
+    expected.taskAssigner.offerSelectorModules = ImmutableList.of(NoopModule.class);
     expected.async.asyncWorkerThreads = 42;
     expected.zk.inProcess = true;
     expected.zk.zkEndpoints = ImmutableList.of(InetSocketAddress.createUnresolved("testing", 42));
@@ -266,11 +267,11 @@ public class CommandLineTest {
         "-hold_offers_forever=true",
         "-min_offer_hold_time=42days",
         "-offer_hold_jitter_window=42days",
-        "-offer_static_ban_cache_max_size=42",
         "-offer_filter_duration=42days",
         "-unavailability_threshold=42days",
         "-offer_order=CPU,DISK",
         "-offer_order_modules=org.apache.aurora.scheduler.config.CommandLineTest$NoopModule",
+        "-offer_static_ban_cache_max_size=42",
         "-custom_executor_config=" + tempFile.getAbsolutePath(),
         "-thermos_executor_path=testing",
         "-thermos_executor_resources=testing",
@@ -306,6 +307,7 @@ public class CommandLineTest {
         "-offer_reservation_duration=42days",
         "-scheduling_max_batch_size=42",
         "-max_tasks_per_schedule_attempt=42",
+        "-offer_selector_modules=org.apache.aurora.scheduler.config.CommandLineTest$NoopModule",
         "-async_worker_threads=42",
         "-zk_in_proc=true",
         "-zk_endpoints=testing:42",

@@ -32,7 +32,7 @@ import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
-import org.apache.aurora.scheduler.offers.OffersModule.UnavailabilityThreshold;
+import org.apache.aurora.scheduler.offers.OfferManagerModule.UnavailabilityThreshold;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;

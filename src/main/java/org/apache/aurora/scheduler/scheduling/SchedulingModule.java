@@ -139,8 +139,8 @@ public class SchedulingModule extends AbstractModule {
         bind(new TypeLiteral<BiCache<String, TaskGroupKey>>() { }).in(Singleton.class);
         bind(BiCache.BiCacheSettings.class).toInstance(
             new BiCache.BiCacheSettings(options.reservationDuration, "reservation"));
-        bind(TaskScheduler.class).to(TaskScheduler.TaskSchedulerImpl.class);
-        bind(TaskScheduler.TaskSchedulerImpl.class).in(Singleton.class);
+        bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
+        bind(TaskSchedulerImpl.class).in(Singleton.class);
         expose(TaskScheduler.class);
       }
     });
