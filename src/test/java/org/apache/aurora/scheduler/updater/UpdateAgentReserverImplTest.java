@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
+import org.apache.aurora.gen.Resource;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.JobKeys;
@@ -46,9 +47,10 @@ public class UpdateAgentReserverImplTest extends EasyMockTest {
     return TaskGroupKey.from(ITaskConfig.build(
         new TaskConfig()
             .setJob(key.getJobKey().newBuilder())
-            .setNumCpus(1.0)
-            .setRamMb(1L)
-            .setDiskMb(1L)));
+            .setResources(ImmutableSet.of(
+                Resource.numCpus(1.0),
+                Resource.ramMb(1L),
+                Resource.diskMb(1L)))));
   }
 
   @Before

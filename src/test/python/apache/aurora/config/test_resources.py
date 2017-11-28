@@ -15,7 +15,7 @@ import unittest
 
 from apache.aurora.config.resource import ResourceDetails, ResourceManager, ResourceType
 
-from gen.apache.aurora.api.ttypes import Resource, ResourceAggregate, TaskConfig
+from gen.apache.aurora.api.ttypes import Resource, ResourceAggregate
 
 
 class TestResourceType(unittest.TestCase):
@@ -48,13 +48,4 @@ class TestResourceManager(unittest.TestCase):
         ResourceDetails(ResourceType.CPUS, 1.0),
         ResourceDetails(ResourceType.RAM_MB, 2),
         ResourceDetails(ResourceType.DISK_MB, 3)
-    ]
-
-  def test_backfill_task(self):
-    task = TaskConfig(numCpus=1.0, ramMb=2, diskMb=3, requestedPorts=frozenset(['http']))
-    assert ResourceManager.resource_details_from_quota(task) == [
-        ResourceDetails(ResourceType.CPUS, 1.0),
-        ResourceDetails(ResourceType.RAM_MB, 2),
-        ResourceDetails(ResourceType.DISK_MB, 3),
-        ResourceDetails(ResourceType.PORTS, 'http'),
     ]

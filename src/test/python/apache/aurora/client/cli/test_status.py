@@ -31,6 +31,7 @@ from gen.apache.aurora.api.ttypes import (
     JobConfiguration,
     JobKey,
     Metadata,
+    Resource,
     ResponseCode,
     Result,
     ScheduledTask,
@@ -148,13 +149,13 @@ class TestJobStatus(AuroraClientCommandTest):
           task=TaskConfig(
             job=JobKey(role="nobody", environment="prod", name='flibber'),
             isService=False,
-            numCpus=2,
-            ramMb=2048,
-            diskMb=4096,
+            resources=frozenset(
+              [Resource(numCpus=2),
+               Resource(ramMb=2048),
+               Resource(diskMb=4096)]),
             priority=7,
             maxTaskFailures=3,
-            production=False,
-            requestedPorts=["http"]),
+            production=False),
           assignedPorts={"http": 1001},
           instanceId=instance),
         status=2,
@@ -426,6 +427,7 @@ class TestJobStatus(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', '--write-json', 'west/bozo/test/hello'])
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
+      actual_sorted = json.loads(actual)
       expected = [
           {
             "active": [
@@ -437,9 +439,7 @@ class TestJobStatus(AuroraClientCommandTest):
                     "container": {
                       "mesos": {}
                     },
-                    "requestedPorts": [
-                      "http"
-                    ],
+                    "maxTaskFailures": 3,
                     "priority": 7,
                     "job": {
                       "environment": "prod",
@@ -447,10 +447,17 @@ class TestJobStatus(AuroraClientCommandTest):
                       "name": "flibber"
                     },
                     "production": False,
-                    "diskMb": 4096,
-                    "ramMb": 2048,
-                    "maxTaskFailures": 3,
-                    "numCpus": 2
+                    "resources": [
+                      {
+                        "numCpus": 2
+                      },
+                      {
+                        "ramMb": 2048
+                      },
+                      {
+                        "diskMb": 4096
+                      }
+                    ]
                   },
                   "taskId": "task_0",
                   "instanceId": 0,
@@ -488,9 +495,7 @@ class TestJobStatus(AuroraClientCommandTest):
                     "container": {
                       "mesos": {}
                     },
-                    "requestedPorts": [
-                      "http"
-                    ],
+                    "maxTaskFailures": 3,
                     "priority": 7,
                     "job": {
                       "environment": "prod",
@@ -498,10 +503,17 @@ class TestJobStatus(AuroraClientCommandTest):
                       "name": "flibber"
                     },
                     "production": False,
-                    "diskMb": 4096,
-                    "ramMb": 2048,
-                    "maxTaskFailures": 3,
-                    "numCpus": 2
+                    "resources": [
+                      {
+                        "numCpus": 2
+                      },
+                      {
+                        "ramMb": 2048
+                      },
+                      {
+                        "diskMb": 4096
+                      }
+                    ]
                   },
                   "taskId": "task_1",
                   "instanceId": 1,
@@ -536,7 +548,14 @@ class TestJobStatus(AuroraClientCommandTest):
             "inactive": []
           }
       ]
-      assert json.loads(actual) == expected
+    for entry in actual_sorted[0]["active"]:
+      entry["assignedTask"]["task"]["resources"] = sorted(
+        entry["assignedTask"]["task"]["resources"], key=str)
+    for entry in expected[0]["active"]:
+      entry["assignedTask"]["task"]["resources"] = sorted(
+        entry["assignedTask"]["task"]["resources"], key=str)
+
+    assert actual_sorted == expected
 
   def test_status_job_not_found(self):
     """Regression test: there was a crasher bug when metadata was None."""

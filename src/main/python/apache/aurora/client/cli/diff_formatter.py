@@ -63,9 +63,6 @@ class DiffFormatter(object):
     if task.resources:
       task.resources = sorted(task.resources, key=str)
 
-    if task.requestedPorts:
-      task.requestedPorts = sorted(task.requestedPorts, key=str)
-
     if task.mesosFetcherUris:
       task.mesosFetcherUris = sorted(task.mesosFetcherUris, key=str)
 
@@ -129,6 +126,8 @@ class DiffFormatter(object):
           format_ranges(r for r in chain.from_iterable(s.instances for s in summaries)))
 
   def diff_no_update_details(self, local_tasks):
+    # Deepcopy is important here as tasks will be modified for printing.
+    local_tasks = [deepcopy(t) for t in local_tasks]
     api = self.context.get_api(self.cluster)
     resp = api.query(api.build_query(self.role, self.name, env=self.env, statuses=ACTIVE_STATES))
     self.context.log_response_and_raise(

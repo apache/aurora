@@ -32,6 +32,7 @@ from gen.apache.aurora.api.ttypes import (
     GetTierConfigResult,
     JobKey,
     JobUpdateSummary,
+    Resource,
     Response,
     ResponseCode,
     ResponseDetail,
@@ -227,9 +228,10 @@ class AuroraClientCommandTest(unittest.TestCase):
         executorConfig=ExecutorConfig(data='{"fake": "data"}'),
         metadata=[],
         job=JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name),
-        numCpus=2,
-        ramMb=2,
-        diskMb=2)
+        resources=frozenset(
+            [Resource(numCpus=2),
+             Resource(ramMb=2),
+             Resource(diskMb=2)]))
 
   @classmethod
   def create_scheduled_tasks(cls):

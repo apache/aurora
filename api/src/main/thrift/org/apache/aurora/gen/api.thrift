@@ -232,12 +232,6 @@ struct TaskConfig {
  /** contains the role component of JobKey */
  17: Identity owner
   7: bool isService
-  // TODO(maxim): Deprecated. See AURORA-1707.
-  8: double numCpus
-  // TODO(maxim): Deprecated. See AURORA-1707.
-  9: i64 ramMb
-  // TODO(maxim): Deprecated. See AURORA-1707.
- 10: i64 diskMb
  11: i32 priority
  13: i32 maxTaskFailures
  // TODO(mnurolahzade): Deprecated. See AURORA-1708.
@@ -249,8 +243,6 @@ struct TaskConfig {
  32: set<Resource> resources
 
  20: set<Constraint> constraints
- /** a list of named ports this task requests */
- 21: set<string> requestedPorts
  /** Resources to retrieve with Mesos Fetcher */
  33: optional set<MesosFetcherURI> mesosFetcherUris
  /**

@@ -15,12 +15,18 @@ package org.apache.aurora.scheduler.http;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import com.google.common.collect.ImmutableSet;
+
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+
+import static org.apache.aurora.gen.Resource.diskMb;
+import static org.apache.aurora.gen.Resource.numCpus;
+import static org.apache.aurora.gen.Resource.ramMb;
 
 public final class TestUtils {
 
@@ -49,8 +55,9 @@ public final class TestUtils {
             .setTaskId(id)
             .setTask(new TaskConfig()
                 .setJob(jobKey.newBuilder())
-                .setNumCpus(numCPUs)
-                .setRamMb(ramMB)
-                .setDiskMb(diskMB))));
+                    .setResources(ImmutableSet.of(
+                        numCpus(numCPUs),
+                        ramMb(ramMB),
+                        diskMb(diskMB))))));
   }
 }

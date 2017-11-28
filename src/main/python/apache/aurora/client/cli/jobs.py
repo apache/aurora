@@ -20,7 +20,6 @@ import pprint
 import textwrap
 import webbrowser
 from collections import namedtuple
-from copy import deepcopy
 from datetime import datetime
 
 from thrift.protocol import TJSONProtocol
@@ -201,10 +200,7 @@ class DiffCommand(Verb):
         err_code=EXIT_INVALID_CONFIGURATION,
         err_msg="Error loading configuration")
     local_task = resp.result.populateJobResult.taskConfig
-    # Deepcopy is important here as tasks will be modified for printing.
-    local_tasks = [
-        deepcopy(local_task) for _ in range(config.instances())
-    ]
+    local_tasks = [local_task for _ in range(config.instances())]
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
                  context.options.instance_spec.instance)
     formatter = DiffFormatter(context, config, cluster, role, env, name)

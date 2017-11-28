@@ -116,9 +116,6 @@ public final class TaskTestUtil {
         .setJob(job.newBuilder())
         .setOwner(new Identity().setUser(job.getRole() + "-user"))
         .setIsService(true)
-        .setNumCpus(1.0)
-        .setRamMb(1024)
-        .setDiskMb(1024)
         .setPriority(1)
         .setMaxTaskFailures(-1)
         .setProduction(true)
@@ -132,7 +129,6 @@ public final class TaskTestUtil {
             new Constraint(
                 "limitConstraint",
                 TaskConstraint.limit(new LimitConstraint(5)))))
-        .setRequestedPorts(ImmutableSet.of("http"))
         .setTaskLinks(ImmutableMap.of("http", "link", "admin", "otherLink"))
         .setContactEmail("foo@bar.com")
         .setMetadata(ImmutableSet.of(new Metadata("key", "value")))

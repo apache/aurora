@@ -17,6 +17,7 @@
 
 - Removed the ability to recover from SQL-based backups and snapshots.  An 0.20.0 scheduler
   will not be able to recover backups or replicated log data created prior to 0.19.0.
+- Removed task level resource fields (`numCpus`, `ramMb`, `diskMb`, `requestedPorts`).
 
 0.19.0
 ======
