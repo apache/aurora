@@ -13,17 +13,23 @@
  */
 package org.apache.aurora.scheduler.updater;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -36,6 +42,7 @@ import org.apache.aurora.common.application.Lifecycle;
 import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
+import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdateAction;
@@ -80,6 +87,8 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_AWAITING_PULSE;
 import static org.apache.aurora.scheduler.base.AsyncUtil.shutdownOnError;
 import static org.apache.aurora.scheduler.base.Jobs.AWAITING_PULSE_STATES;
 import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import static org.apache.aurora.scheduler.storage.Util.jobUpdateActionStatName;
+import static org.apache.aurora.scheduler.storage.Util.jobUpdateStatusStatName;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.ACTIVE_QUERY;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.AUTO_RESUME_STATES;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.GET_ACTIVE_RESUME_STATE;
@@ -123,6 +132,9 @@ class JobUpdateControllerImpl implements JobUpdateController {
   private final Map<IJobKey, UpdateFactory.Update> updates =
       Collections.synchronizedMap(Maps.newHashMap());
 
+  private final LoadingCache<JobUpdateStatus, AtomicLong> jobUpdateEventStats;
+  private final LoadingCache<JobUpdateAction, AtomicLong> jobUpdateActionStats;
+
   @Inject
   JobUpdateControllerImpl(
       UpdateFactory updateFactory,
@@ -132,7 +144,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
       UpdateAgentReserver updateAgentReserver,
       Clock clock,
       Lifecycle lifecycle,
-      TaskEventBatchWorker batchWorker) {
+      TaskEventBatchWorker batchWorker,
+      StatsProvider statsProvider) {
 
     this.updateFactory = requireNonNull(updateFactory);
     this.storage = requireNonNull(storage);
@@ -143,6 +156,26 @@ class JobUpdateControllerImpl implements JobUpdateController {
     this.batchWorker = requireNonNull(batchWorker);
     this.pulseHandler = new PulseHandler(clock);
     this.updateAgentReserver = requireNonNull(updateAgentReserver);
+
+    this.jobUpdateEventStats = CacheBuilder.newBuilder()
+        .build(new CacheLoader<JobUpdateStatus, AtomicLong>() {
+          @Override
+          public AtomicLong load(JobUpdateStatus status) {
+            return statsProvider.makeCounter(jobUpdateStatusStatName(status));
+          }
+        });
+    Arrays.stream(JobUpdateStatus.values())
+        .forEach(status -> jobUpdateEventStats.getUnchecked(status).get());
+
+    this.jobUpdateActionStats = CacheBuilder.newBuilder()
+        .build(new CacheLoader<JobUpdateAction, AtomicLong>() {
+          @Override
+          public AtomicLong load(JobUpdateAction action) {
+            return statsProvider.makeCounter(jobUpdateActionStatName(action));
+          }
+        });
+    Arrays.stream(JobUpdateAction.values())
+        .forEach(action -> jobUpdateActionStats.getUnchecked(action).get());
   }
 
   @Override
@@ -164,8 +197,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
         throw new IllegalArgumentException("Update instruction is a no-op.");
       }
 
-      List<IJobUpdateSummary> activeJobUpdates =
-          storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(queryActiveByJob(job));
+      List<IJobUpdateDetails> activeJobUpdates =
+          storeProvider.getJobUpdateStore().fetchJobUpdates(queryActiveByJob(job));
       if (!activeJobUpdates.isEmpty()) {
         if (activeJobUpdates.size() > 1) {
           LOG.error("Multiple active updates exist for this job. {}", activeJobUpdates);
@@ -173,11 +206,11 @@ class JobUpdateControllerImpl implements JobUpdateController {
               String.format("Multiple active updates exist for this job. %s", activeJobUpdates));
         }
 
-        IJobUpdateSummary activeJobUpdate = activeJobUpdates.get(0);
+        IJobUpdateDetails activeUpdate = activeJobUpdates.stream().findFirst().get();
         throw new UpdateInProgressException("An active update already exists for this job, "
             + "please terminate it before starting another. "
             + "Active updates are those in states " + Updates.ACTIVE_JOB_UPDATE_STATES,
-            activeJobUpdate);
+            activeUpdate.getUpdate().getSummary());
       }
 
       LOG.info("Starting update for job " + job);
@@ -202,7 +235,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     requireNonNull(job);
 
     if (storage.read(p -> !p.getJobUpdateStore()
-        .fetchJobUpdateSummaries(queryActiveByJob(job)).isEmpty())) {
+        .fetchJobUpdates(queryActiveByJob(job)).isEmpty())) {
 
       throw new JobUpdatingException("Job is currently updating");
     }
@@ -225,14 +258,13 @@ class JobUpdateControllerImpl implements JobUpdateController {
     requireNonNull(auditData);
     LOG.info("Attempting to resume update " + key);
     storage.write((NoResult<UpdateStateException>) storeProvider -> {
-      IJobUpdateDetails details = Iterables.getOnlyElement(
-          storeProvider.getJobUpdateStore().fetchJobUpdateDetails(queryByUpdate(key)), null);
+      Optional<IJobUpdateDetails> details = storeProvider.getJobUpdateStore().fetchJobUpdate(key);
 
-      if (details == null) {
+      if (!details.isPresent()) {
         throw new UpdateStateException("Update does not exist: " + key);
       }
 
-      IJobUpdate update = details.getUpdate();
+      IJobUpdate update = details.get().getUpdate();
       IJobUpdateKey key1 = update.getSummary().getKey();
       Function<JobUpdateStatus, JobUpdateStatus> stateChange =
           isCoordinatedAndPulseExpired(key1, update.getInstructions())
@@ -294,7 +326,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   public void systemResume() {
     storage.write((NoResult.Quiet) storeProvider -> {
       for (IJobUpdateDetails details
-          : storeProvider.getJobUpdateStore().fetchJobUpdateDetails(ACTIVE_QUERY)) {
+          : storeProvider.getJobUpdateStore().fetchJobUpdates(ACTIVE_QUERY)) {
 
         IJobUpdateSummary summary = details.getUpdate().getSummary();
         IJobUpdateInstructions instructions = details.getUpdate().getInstructions();
@@ -396,7 +428,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   private IJobUpdateSummary getOnlyMatch(JobUpdateStore store, IJobUpdateQuery query) {
-    return Iterables.getOnlyElement(store.fetchJobUpdateSummaries(query));
+    return Iterables.getOnlyElement(store.fetchJobUpdates(query)).getUpdate().getSummary();
   }
 
   @VisibleForTesting
@@ -423,13 +455,13 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     storage.write((NoResult<UpdateStateException>) storeProvider -> {
 
-      IJobUpdateSummary update = Iterables.getOnlyElement(
-          storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(queryByUpdate(key)), null);
-      if (update == null) {
+      Optional<IJobUpdateDetails> update = storeProvider.getJobUpdateStore().fetchJobUpdate(key);
+      if (!update.isPresent()) {
         throw new UpdateStateException("Update does not exist " + key);
       }
 
-      changeUpdateStatus(storeProvider, update, stateChange.apply(update.getState().getStatus()));
+      IJobUpdateSummary summary = update.get().getUpdate().getSummary();
+      changeUpdateStatus(storeProvider, summary, stateChange.apply(summary.getState().getStatus()));
     });
   }
 
@@ -468,6 +500,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       updateStore.saveJobUpdateEvent(
           key,
           IJobUpdateEvent.build(proposedEvent.setTimestampMs(clock.nowMillis()).setStatus(status)));
+      jobUpdateEventStats.getUnchecked(status).incrementAndGet();
     }
 
     if (JobUpdateStore.TERMINAL_STATES.contains(status)) {
@@ -487,7 +520,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
         checkState(!updates.containsKey(job), "Updater already exists for %s", job);
       }
 
-      IJobUpdate jobUpdate = updateStore.fetchJobUpdate(key).get();
+      IJobUpdate jobUpdate = updateStore.fetchJobUpdate(key).get().getUpdate();
       UpdateFactory.Update update;
       try {
         update = updateFactory.newUpdate(jobUpdate.getInstructions(), action == ROLL_FORWARD);
@@ -556,7 +589,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
 
-    IJobUpdateInstructions instructions = updateStore.fetchJobUpdateInstructions(key).get();
+    IJobUpdateInstructions instructions = updateStore.fetchJobUpdate(key).get()
+        .getUpdate().getInstructions();
     if (isCoordinatedAndPulseExpired(key, instructions)) {
       // Move coordinated update into awaiting pulse state.
       JobUpdateStatus blockedStatus = getBlockedState(summary.getState().getStatus());
@@ -578,7 +612,11 @@ class JobUpdateControllerImpl implements JobUpdateController {
       Iterable<InstanceUpdateStatus> statusChanges;
 
       int instanceId = entry.getKey();
-      List<IJobInstanceUpdateEvent> savedEvents = updateStore.fetchInstanceEvents(key, instanceId);
+      List<IJobInstanceUpdateEvent> savedEvents = updateStore.fetchJobUpdate(key).get()
+          .getInstanceEvents()
+          .stream()
+          .filter(e -> e.getInstanceId() == instanceId)
+          .collect(Collectors.toList());
 
       Set<JobUpdateAction> savedActions =
           FluentIterable.from(savedEvents).transform(EVENT_TO_ACTION).toSet();
@@ -609,6 +647,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
                   .setTimestampMs(clock.nowMillis())
                   .setAction(action));
           updateStore.saveJobInstanceUpdateEvent(summary.getKey(), event);
+          jobUpdateActionStats.getUnchecked(action).incrementAndGet();
         }
       }
     }
@@ -701,11 +740,6 @@ class JobUpdateControllerImpl implements JobUpdateController {
               JobUpdateAction.INSTANCE_ROLLBACK_FAILED)
           .build();
 
-  @VisibleForTesting
-  static IJobUpdateQuery queryByUpdate(IJobUpdateKey key) {
-    return IJobUpdateQuery.build(new JobUpdateQuery().setKey(key.newBuilder()));
-  }
-
   private static JobUpdateEvent newEvent(JobUpdateStatus status) {
     return new JobUpdateEvent().setStatus(status);
   }
@@ -722,7 +756,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
         String.format(FATAL_ERROR_FORMAT, "Key: " + key + " Instance key: " + instance),
         () -> storage.write((NoResult.Quiet) storeProvider -> {
           IJobUpdateSummary summary =
-              getOnlyMatch(storeProvider.getJobUpdateStore(), queryByUpdate(key));
+              storeProvider.getJobUpdateStore().fetchJobUpdate(key).get().getUpdate().getSummary();
           JobUpdateStatus status = summary.getState().getStatus();
           // Suppress this evaluation if the updater is not currently active.
           if (JobUpdateStateMachine.isActive(status)) {

@@ -13,67 +13,157 @@
  */
 package org.apache.aurora.scheduler.pruning;
 
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.common.util.Clock;
-import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.common.util.testing.FakeClock;
+import org.apache.aurora.gen.InstanceTaskConfig;
+import org.apache.aurora.gen.JobUpdate;
+import org.apache.aurora.gen.JobUpdateDetails;
+import org.apache.aurora.gen.JobUpdateEvent;
+import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateKey;
+import org.apache.aurora.gen.JobUpdateState;
+import org.apache.aurora.gen.JobUpdateStatus;
+import org.apache.aurora.gen.JobUpdateSummary;
+import org.apache.aurora.gen.Range;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.pruning.JobUpdateHistoryPruner.HistoryPrunerSettings;
+import org.apache.aurora.scheduler.storage.JobUpdateStore;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
-import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
+import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.pruning.JobUpdateHistoryPruner.JOB_UPDATES_PRUNED;
-import static org.easymock.EasyMock.expect;
+import static org.apache.aurora.gen.JobUpdateStatus.ABORTED;
+import static org.apache.aurora.gen.JobUpdateStatus.ERROR;
+import static org.apache.aurora.gen.JobUpdateStatus.FAILED;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.junit.Assert.assertEquals;
 
-public class JobUpdateHistoryPrunerTest extends EasyMockTest {
+public class JobUpdateHistoryPrunerTest {
+
+  private Storage storage;
+
+  @Before
+  public void setUp() {
+    storage = MemStorageModule.newEmptyStorage();
+  }
+
   @Test
-  public void testExecution() throws Exception {
-    StorageTestUtil storageUtil = new StorageTestUtil(this);
-    storageUtil.expectOperations();
+  public void testPruneHistory() {
+    IJobKey job2 = JobKeys.from("testRole2", "testEnv2", "job2");
 
-    final FakeStatsProvider statsProvider = new FakeStatsProvider();
+    IJobUpdateDetails update1 = makeAndSave(makeKey("u1"), ROLLING_BACK, 123L, 123L);
+    IJobUpdateDetails update2 = makeAndSave(makeKey("u2"), ABORTED, 124L, 124L);
+    IJobUpdateDetails update3 = makeAndSave(makeKey("u3"), ROLLED_BACK, 125L, 125L);
+    IJobUpdateDetails update4 = makeAndSave(makeKey("u4"), FAILED, 126L, 126L);
+    IJobUpdateDetails update5 = makeAndSave(makeKey(job2, "u5"), ERROR, 123L, 123L);
+    IJobUpdateDetails update6 = makeAndSave(makeKey(job2, "u6"), FAILED, 125L, 125L);
+    IJobUpdateDetails update7 = makeAndSave(makeKey(job2, "u7"), ROLLING_FORWARD, 126L, 126L);
 
-    final ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
-    FakeScheduledExecutor executorClock =
-        FakeScheduledExecutor.scheduleAtFixedRateExecutor(executor, 2);
+    long pruningThreshold = 120;
 
-    Clock mockClock = createMock(Clock.class);
-    expect(mockClock.nowMillis()).andReturn(2L).times(2);
+    // No updates pruned.
+    pruneHistory(3, pruningThreshold);
+    assertRetainedUpdates(update1, update2, update3, update4, update5, update6, update7);
 
-    expect(storageUtil.jobUpdateStore.pruneHistory(1, 1))
-        .andReturn(ImmutableSet.of(
-            IJobUpdateKey.build(
-                new JobUpdateKey().setJob(new JobKey("role", "env", "job")).setId("id1"))));
-    expect(storageUtil.jobUpdateStore.pruneHistory(1, 1)).andReturn(ImmutableSet.of());
+    // 1 update pruned.
+    pruneHistory(2, pruningThreshold);
+    assertRetainedUpdates(update1, update3, update4, update5, update6, update7);
 
-    control.replay();
+    // 2 update pruned.
+    pruneHistory(1, pruningThreshold);
+    assertRetainedUpdates(update1, update4, update6, update7);
 
-    executorClock.assertEmpty();
+    // The oldest update is pruned.
+    pruneHistory(1, 126);
+    assertRetainedUpdates(update1, update4, update7);
+
+    // Nothing survives the 0 per job count.
+    pruneHistory(0, pruningThreshold);
+    assertRetainedUpdates(update1, update7);
+  }
+
+  private void pruneHistory(int retainCount, long pruningThresholdMs) {
+    FakeClock clock = new FakeClock();
+    clock.setNowMillis(100 + pruningThresholdMs);
     JobUpdateHistoryPruner pruner = new JobUpdateHistoryPruner(
-        mockClock,
-        executor,
-        storageUtil.storage,
+        clock,
+        storage,
         new HistoryPrunerSettings(
-            Amount.of(1L, Time.MILLISECONDS),
-            Amount.of(1L, Time.MILLISECONDS),
-            1),
-        statsProvider);
+            Amount.of(1L, Time.DAYS),
+            Amount.of(100L, Time.MILLISECONDS),
+            retainCount),
+        new FakeStatsProvider());
+    pruner.runForTest();
+  }
 
-    pruner.startAsync().awaitRunning();
+  private void assertRetainedUpdates(IJobUpdateDetails... updates) {
+    storage.read(store -> {
+      assertEquals(
+          Stream.of(updates).map(u -> u.getUpdate().getSummary().getKey())
+              .collect(Collectors.toSet()),
+          store.getJobUpdateStore().fetchJobUpdates(JobUpdateStore.MATCH_ALL).stream()
+              .map(u -> u.getUpdate().getSummary().getKey())
+              .collect(Collectors.toSet()));
+      return null;
+    });
+  }
 
-    assertEquals(0L, statsProvider.getValue(JOB_UPDATES_PRUNED));
-    executorClock.advance(Amount.of(1L, Time.MILLISECONDS));
-    assertEquals(1L, statsProvider.getValue(JOB_UPDATES_PRUNED));
-    executorClock.advance(Amount.of(1L, Time.MILLISECONDS));
-    assertEquals(1L, statsProvider.getValue(JOB_UPDATES_PRUNED));
+  private static IJobUpdateKey makeKey(String id) {
+    return makeKey(JOB, id);
+  }
+
+  private static IJobUpdateKey makeKey(IJobKey job, String id) {
+    return IJobUpdateKey.build(new JobUpdateKey().setJob(job.newBuilder()).setId(id));
+  }
+
+  private IJobUpdateDetails makeAndSave(
+      IJobUpdateKey key,
+      JobUpdateStatus status,
+      long createdMs,
+      long lastMs) {
+
+    IJobUpdateDetails update = IJobUpdateDetails.build(new JobUpdateDetails()
+        .setUpdateEvents(ImmutableList.of(
+            new JobUpdateEvent(status, lastMs)
+                .setUser("user")
+                .setMessage("message")
+        ))
+        .setInstanceEvents(ImmutableList.of())
+        .setUpdate(new JobUpdate()
+            .setInstructions(new JobUpdateInstructions()
+                .setDesiredState(new InstanceTaskConfig()
+                    .setTask(new TaskConfig())
+                    .setInstances(ImmutableSet.of(new Range()))))
+            .setSummary(new JobUpdateSummary()
+                .setKey(key.newBuilder())
+                .setState(new JobUpdateState()
+                    .setCreatedTimestampMs(createdMs)
+                    .setLastModifiedTimestampMs(lastMs)
+                    .setStatus(status)))));
+
+    storage.write((NoResult.Quiet) storeProvider -> {
+      JobUpdateStore.Mutable store = storeProvider.getJobUpdateStore();
+      store.saveJobUpdate(update.getUpdate());
+      update.getUpdateEvents().forEach(event -> store.saveJobUpdateEvent(key, event));
+      update.getInstanceEvents().forEach(event -> store.saveJobInstanceUpdateEvent(key, event));
+    });
+    return update;
   }
 }

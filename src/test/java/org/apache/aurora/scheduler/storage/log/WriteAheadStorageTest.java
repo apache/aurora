@@ -25,10 +25,8 @@ import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobUpdateKey;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.storage.Op;
-import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
 import org.apache.aurora.gen.storage.SaveTasks;
-import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
@@ -85,26 +83,16 @@ public class WriteAheadStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testPruneHistory() {
-    Set<IJobUpdateKey> pruned = ImmutableSet.of(
-        IJobUpdateKey.build(new JobUpdateKey(JobKeys.from("role", "env", "job").newBuilder(), "a")),
-        IJobUpdateKey.build(
-            new JobUpdateKey(JobKeys.from("role", "env", "job").newBuilder(), "b")));
-    expect(jobUpdateStore.pruneHistory(1, 1)).andReturn(pruned);
-    expectOp(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory(1, 1)));
+  public void testRemoveUpdates() {
+    Set<IJobUpdateKey> removed = ImmutableSet.of(
+        IJobUpdateKey.build(new JobUpdateKey(TaskTestUtil.JOB.newBuilder(), "a")),
+        IJobUpdateKey.build(new JobUpdateKey(TaskTestUtil.JOB.newBuilder(), "b")));
+    jobUpdateStore.removeJobUpdates(removed);
+    // No operation is written since this Op is in read-only compatibility mode.
 
     control.replay();
 
-    storage.pruneHistory(1, 1);
-  }
-
-  @Test
-  public void testNoopPruneHistory() {
-    expect(jobUpdateStore.pruneHistory(1, 1)).andReturn(ImmutableSet.of());
-
-    control.replay();
-
-    storage.pruneHistory(1, 1);
+    storage.removeJobUpdates(removed);
   }
 
   @Test
@@ -172,6 +160,6 @@ public class WriteAheadStorageTest extends EasyMockTest {
   @Test(expected = UnsupportedOperationException.class)
   public void testDeleteAllUpdatesAndEvents() {
     control.replay();
-    storage.deleteAllUpdatesAndEvents();
+    storage.deleteAllUpdates();
   }
 }

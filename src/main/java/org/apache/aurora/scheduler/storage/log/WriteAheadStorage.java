@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.storage.Op;
-import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.RemoveJob;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
@@ -52,10 +51,8 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.slf4j.Logger;
@@ -237,21 +234,12 @@ class WriteAheadStorage implements
   }
 
   @Override
-  public Set<IJobUpdateKey> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs) {
-    Set<IJobUpdateKey> prunedUpdates = jobUpdateStore.pruneHistory(
-        perJobRetainCount,
-        historyPruneThresholdMs);
+  public void removeJobUpdates(Set<IJobUpdateKey> keys) {
+    requireNonNull(keys);
 
-    if (!prunedUpdates.isEmpty()) {
-      // Pruned updates will eventually go away from persisted storage when a new snapshot is cut.
-      // So, persisting pruning attempts is not strictly necessary as the periodic pruner will
-      // provide eventual consistency between volatile and persistent storage upon scheduler
-      // restart. By generating an out of band pruning during log replay the consistency is
-      // achieved sooner without potentially exposing pruned but not yet persisted data.
-      write(Op.pruneJobUpdateHistory(
-          new PruneJobUpdateHistory(perJobRetainCount, historyPruneThresholdMs)));
-    }
-    return prunedUpdates;
+    // Compatibility mode - RemoveJobUpdates is not yet written since older versions cannot
+    // read it.  JobUpdates are only removed implicitly when a snapshot is taken.
+    jobUpdateStore.removeJobUpdates(keys);
   }
 
   @Override
@@ -279,7 +267,7 @@ class WriteAheadStorage implements
   }
 
   @Override
-  public void deleteAllUpdatesAndEvents() {
+  public void deleteAllUpdates() {
     throw new UnsupportedOperationException(
         "Unsupported since casual storage users should never be doing this.");
   }
@@ -370,37 +358,12 @@ class WriteAheadStorage implements
   }
 
   @Override
-  public List<IJobUpdateSummary> fetchJobUpdateSummaries(IJobUpdateQuery query) {
-    return this.jobUpdateStore.fetchJobUpdateSummaries(query);
+  public List<IJobUpdateDetails> fetchJobUpdates(IJobUpdateQuery query) {
+    return this.jobUpdateStore.fetchJobUpdates(query);
   }
 
   @Override
-  public List<IJobUpdateDetails> fetchJobUpdateDetails(IJobUpdateQuery query) {
-    return this.jobUpdateStore.fetchJobUpdateDetails(query);
-  }
-
-  @Override
-  public Optional<IJobUpdateDetails> fetchJobUpdateDetails(IJobUpdateKey key) {
-    return this.jobUpdateStore.fetchJobUpdateDetails(key);
-  }
-
-  @Override
-  public Optional<IJobUpdate> fetchJobUpdate(IJobUpdateKey key) {
+  public Optional<IJobUpdateDetails> fetchJobUpdate(IJobUpdateKey key) {
     return this.jobUpdateStore.fetchJobUpdate(key);
-  }
-
-  @Override
-  public Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(IJobUpdateKey key) {
-    return this.jobUpdateStore.fetchJobUpdateInstructions(key);
-  }
-
-  @Override
-  public Set<IJobUpdateDetails> fetchAllJobUpdateDetails() {
-    return this.jobUpdateStore.fetchAllJobUpdateDetails();
-  }
-
-  @Override
-  public List<IJobInstanceUpdateEvent> fetchInstanceEvents(IJobUpdateKey key, int instanceId) {
-    return this.jobUpdateStore.fetchInstanceEvents(key, instanceId);
   }
 }

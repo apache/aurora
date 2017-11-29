@@ -27,7 +27,6 @@ import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
-import org.apache.aurora.scheduler.pruning.TaskHistoryPruner.HistoryPrunnerSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,11 +78,11 @@ public class PruningModule extends AbstractModule {
       protected void configure() {
         // TODO(ksweeney): Create a configuration validator module so this can be injected.
         // TODO(William Farner): Revert this once large task counts is cheap ala hierarchichal store
-        bind(HistoryPrunnerSettings.class).toInstance(new HistoryPrunnerSettings(
-            options.historyPruneThreshold,
-            options.historyMinRetentionThreshold,
-            options.historyMaxPerJobThreshold
-        ));
+        bind(TaskHistoryPruner.HistoryPrunerSettings.class).toInstance(
+            new TaskHistoryPruner.HistoryPrunerSettings(
+                options.historyPruneThreshold,
+                options.historyMinRetentionThreshold,
+                options.historyMaxPerJobThreshold));
 
         bind(TaskHistoryPruner.class).in(Singleton.class);
         expose(TaskHistoryPruner.class);

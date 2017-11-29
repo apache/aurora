@@ -59,6 +59,7 @@ import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.RemoveJob;
+import org.apache.aurora.gen.storage.RemoveJobUpdates;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.SaveCronJob;
@@ -126,7 +127,7 @@ public class LogStorageTest extends EasyMockTest {
   private static final IJobKey JOB_KEY = JobKeys.from("role", "env", "name");
   private static final IJobUpdateKey UPDATE_ID =
       IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), "testUpdateId"));
-  private static final long NOW = 42L;
+  private static final long NOW = 42;
 
   private LogStorage logStorage;
   private Log log;
@@ -350,8 +351,11 @@ public class LogStorageTest extends EasyMockTest {
         IJobInstanceUpdateEvent.build(saveInstanceEvent.getEvent()));
 
     builder.add(createTransaction(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory(5, 10L))));
-    expect(storageUtil.jobUpdateStore.pruneHistory(5, 10L))
-        .andReturn(ImmutableSet.of(IJobUpdateKey.build(UPDATE_ID.newBuilder())));
+    // No expectation - this op is ignored.
+
+    builder.add(createTransaction(Op.removeJobUpdate(
+        new RemoveJobUpdates().setKeys(ImmutableSet.of(UPDATE_ID.newBuilder())))));
+    storageUtil.jobUpdateStore.removeJobUpdates(ImmutableSet.of(UPDATE_ID));
 
     // NOOP LogEntry
     builder.add(LogEntry.noop(true));
@@ -856,28 +860,24 @@ public class LogStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testPruneHistory() throws Exception {
-    PruneJobUpdateHistory pruneHistory = new PruneJobUpdateHistory()
-        .setHistoryPruneThresholdMs(1L)
-        .setPerJobRetainCount(1);
+  public void testRemoveJobUpdates() throws Exception {
+    IJobUpdateKey key = IJobUpdateKey.build(new JobUpdateKey()
+        .setJob(JOB_KEY.newBuilder())
+        .setId("update-id"));
 
     new AbstractMutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
-        expect(storageUtil.jobUpdateStore.pruneHistory(
-            pruneHistory.getPerJobRetainCount(),
-            pruneHistory.getHistoryPruneThresholdMs()))
-            .andReturn(ImmutableSet.of(UPDATE_ID));
+        storageUtil.jobUpdateStore.removeJobUpdates(ImmutableSet.of(key));
 
-        streamMatcher.expectTransaction(Op.pruneJobUpdateHistory(pruneHistory)).andReturn(position);
+        // No log transaction is generated since this version is currently in 'read-only'
+        // compatibility mode for this operation type.
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().pruneHistory(
-            pruneHistory.getPerJobRetainCount(),
-            pruneHistory.getHistoryPruneThresholdMs());
+        storeProvider.getJobUpdateStore().removeJobUpdates(ImmutableSet.of(key));
       }
     }.run();
   }

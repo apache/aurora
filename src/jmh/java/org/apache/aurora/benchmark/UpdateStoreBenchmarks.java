@@ -67,13 +67,13 @@ public class UpdateStoreBenchmarks {
     @TearDown(Level.Iteration)
     public void tearDownIteration() {
       storage.write((NoResult.Quiet) storeProvider -> {
-        storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+        storeProvider.getJobUpdateStore().deleteAllUpdates();
       });
     }
 
     @Benchmark
     public IJobUpdateDetails run() throws TException {
-      return storage.read(store -> store.getJobUpdateStore().fetchJobUpdateDetails(
+      return storage.read(store -> store.getJobUpdateStore().fetchJobUpdate(
           Iterables.getOnlyElement(keys)).get());
     }
   }
@@ -106,13 +106,13 @@ public class UpdateStoreBenchmarks {
     @TearDown(Level.Iteration)
     public void tearDownIteration() {
       storage.write((NoResult.Quiet) storeProvider -> {
-        storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+        storeProvider.getJobUpdateStore().deleteAllUpdates();
       });
     }
 
     @Benchmark
     public IJobUpdateDetails run() throws TException {
-      return storage.read(store -> store.getJobUpdateStore().fetchJobUpdateDetails(
+      return storage.read(store -> store.getJobUpdateStore().fetchJobUpdate(
           Iterables.getOnlyElement(keys)).get());
     }
   }
@@ -145,13 +145,13 @@ public class UpdateStoreBenchmarks {
     @TearDown(Level.Iteration)
     public void tearDownIteration() {
       storage.write((NoResult.Quiet) storeProvider -> {
-        storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+        storeProvider.getJobUpdateStore().deleteAllUpdates();
       });
     }
 
     @Benchmark
     public IJobUpdateDetails run() throws TException {
-      return storage.read(store -> store.getJobUpdateStore().fetchJobUpdateDetails(
+      return storage.read(store -> store.getJobUpdateStore().fetchJobUpdate(
           Iterables.getOnlyElement(keys)).get());
     }
   }

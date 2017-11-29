@@ -249,12 +249,12 @@ public class JobUpdaterIT extends EasyMockTest {
 
   private IJobUpdateDetails getDetails() {
     return storage.read(
-        storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdateDetails(UPDATE_ID).get());
+        storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdate(UPDATE_ID).get());
   }
 
   private IJobUpdateDetails getDetails(IJobUpdateKey key) {
     return storage.read(
-        storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdateDetails(key).get());
+        storeProvider -> storeProvider.getJobUpdateStore().fetchJobUpdate(key).get());
   }
 
   private void assertLatestUpdateMessage(String expected) {
@@ -709,7 +709,7 @@ public class JobUpdaterIT extends EasyMockTest {
     assertState(ROLL_FORWARD_AWAITING_PULSE, actions.build());
 
     storage.write((NoResult.Quiet) storeProvider -> {
-      storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+      storeProvider.getJobUpdateStore().deleteAllUpdates();
     });
 
     // The pulse still returns OK but the error is handled.
@@ -1099,7 +1099,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     storage.write((NoResult.Quiet) storeProvider -> {
       JobUpdateStore.Mutable store = storeProvider.getJobUpdateStore();
-      store.deleteAllUpdatesAndEvents();
+      store.deleteAllUpdates();
 
       JobUpdate builder = update.newBuilder();
       builder.getInstructions().getSettings().setUpdateGroupSize(0);

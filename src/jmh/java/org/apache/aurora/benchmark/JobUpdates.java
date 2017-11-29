@@ -63,7 +63,7 @@ final class JobUpdates {
     ImmutableSet.Builder<IJobUpdateKey> keyBuilder = ImmutableSet.builder();
     storage.write((Storage.MutateWork.NoResult.Quiet) store -> {
       JobUpdateStore.Mutable updateStore = store.getJobUpdateStore();
-      updateStore.deleteAllUpdatesAndEvents();
+      updateStore.deleteAllUpdates();
       for (IJobUpdateDetails details : updates) {
         IJobUpdateKey key = details.getUpdate().getSummary().getKey();
         keyBuilder.add(key);

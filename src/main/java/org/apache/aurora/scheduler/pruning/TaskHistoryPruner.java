@@ -65,7 +65,7 @@ public class TaskHistoryPruner implements EventSubscriber {
   private final ScheduledExecutorService executor;
   private final StateManager stateManager;
   private final Clock clock;
-  private final HistoryPrunnerSettings settings;
+  private final HistoryPrunerSettings settings;
   private final Storage storage;
   private final Lifecycle lifecycle;
   private final TaskEventBatchWorker batchWorker;
@@ -79,12 +79,12 @@ public class TaskHistoryPruner implements EventSubscriber {
     }
   };
 
-  static class HistoryPrunnerSettings {
+  static class HistoryPrunerSettings {
     private final long pruneThresholdMillis;
     private final long minRetentionThresholdMillis;
     private final int perJobHistoryGoal;
 
-    HistoryPrunnerSettings(
+    HistoryPrunerSettings(
         Amount<Long, Time> inactivePruneThreshold,
         Amount<Long, Time> minRetentionThreshold,
         int perJobHistoryGoal) {
@@ -100,7 +100,7 @@ public class TaskHistoryPruner implements EventSubscriber {
       @AsyncExecutor ScheduledExecutorService executor,
       StateManager stateManager,
       Clock clock,
-      HistoryPrunnerSettings settings,
+      HistoryPrunerSettings settings,
       Storage storage,
       Lifecycle lifecycle,
       TaskEventBatchWorker batchWorker,
