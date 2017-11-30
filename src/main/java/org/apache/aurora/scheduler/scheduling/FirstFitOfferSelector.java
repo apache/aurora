@@ -16,8 +16,8 @@ package org.apache.aurora.scheduler.scheduling;
 import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
 
-import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
+import org.apache.aurora.scheduler.offers.HostOffer;
 
 public class FirstFitOfferSelector implements OfferSelector {
 

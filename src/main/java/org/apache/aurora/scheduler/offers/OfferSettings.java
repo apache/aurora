@@ -22,7 +22,6 @@ import com.google.common.collect.Ordering;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
-import org.apache.aurora.scheduler.HostOffer;
 
 import static java.util.Objects.requireNonNull;
 

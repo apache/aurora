@@ -18,6 +18,7 @@ import java.util.List;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.scheduler.offers.HostOffer;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.junit.Test;
 

@@ -15,8 +15,8 @@ package org.apache.aurora.scheduler.scheduling;
 
 import com.google.common.base.Optional;
 
-import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
+import org.apache.aurora.scheduler.offers.HostOffer;
 
 /**
  * Injected into {@link TaskAssignerImpl}, this class scores the offers available and returns an

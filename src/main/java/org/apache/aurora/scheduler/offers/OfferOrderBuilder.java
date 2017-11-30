@@ -18,7 +18,6 @@ import java.util.List;
 
 import com.google.common.collect.Ordering;
 
-import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.resources.ResourceType;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;

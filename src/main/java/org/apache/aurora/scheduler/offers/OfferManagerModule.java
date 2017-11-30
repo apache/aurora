@@ -35,7 +35,6 @@ import com.google.inject.TypeLiteral;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.util.Random;
-import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.config.CliOptions;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
