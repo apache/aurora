@@ -16,13 +16,8 @@ package org.apache.aurora.scheduler.storage.log;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.Collections;
-import java.util.Deque;
-import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingDeque;
 
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -61,24 +56,12 @@ import org.junit.Test;
 
 import static org.apache.aurora.scheduler.storage.log.SnapshotDeduplicator.SnapshotDeduplicatorImpl;
 import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
 
 public class LogManagerTest extends EasyMockTest {
 
   private static final Amount<Integer, Data> NO_FRAMES_EVER_SIZE =
       Amount.of(Integer.MAX_VALUE, Data.GB);
-
-  private static final Function<LogEntry, byte[]> ENCODER = entry -> {
-    try {
-      return encode(entry);
-    } catch (CodingException e) {
-      throw new RuntimeException(e);
-    }
-  };
 
   private Stream stream;
   private Position position1;
@@ -139,41 +122,10 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   @Test
-  public void testStreamManagerSuccessiveCommits() throws CodingException {
-    control.replay();
-
-    StreamManager streamManager = createNoMessagesStreamManager();
-    StreamTransaction streamTransaction = streamManager.startTransaction();
-    streamTransaction.commit();
-
-    assertNotSame("Expected a new transaction to be started after a commit",
-        streamTransaction, streamManager.startTransaction());
-  }
-
-  @Test
   public void testTransactionEmpty() throws CodingException {
     control.replay();
 
-    Position position = createNoMessagesStreamManager().startTransaction().commit();
-    assertNull(position);
-  }
-
-  @Test(expected = IllegalStateException.class)
-  public void testTransactionDoubleCommit() throws CodingException {
-    control.replay();
-
-    StreamTransaction streamTransaction = createNoMessagesStreamManager().startTransaction();
-    streamTransaction.commit();
-    streamTransaction.commit();
-  }
-
-  @Test(expected = IllegalStateException.class)
-  public void testTransactionAddAfterCommit() throws CodingException {
-    control.replay();
-
-    StreamTransaction streamTransaction = createNoMessagesStreamManager().startTransaction();
-    streamTransaction.commit();
-    streamTransaction.add(Op.saveFrameworkId(new SaveFrameworkId("don't allow this")));
+    createNoMessagesStreamManager().commit(ImmutableList.of());
   }
 
   private static class LogEntryMatcher implements IArgumentMatcher {
@@ -228,12 +180,7 @@ public class LogManagerTest extends EasyMockTest {
     StreamManager streamManager = createNoMessagesStreamManager();
     control.replay();
 
-    StreamTransaction transaction = streamManager.startTransaction();
-    transaction.add(saveFrameworkId);
-    transaction.add(deleteJob);
-
-    Position position = transaction.commit();
-    assertSame(position1, position);
+    streamManager.commit(ImmutableList.of(saveFrameworkId, deleteJob));
   }
 
   static class Message {
@@ -281,97 +228,7 @@ public class LogManagerTest extends EasyMockTest {
     StreamManager streamManager = createStreamManager(message.chunkSize);
     control.replay();
 
-    StreamTransaction transaction = streamManager.startTransaction();
-    transaction.add(saveFrameworkId);
-
-    Position position = transaction.commit();
-    assertSame(position1, position);
-  }
-
-  @Test
-  public void testConcurrentWrites() throws Exception {
-    control.replay(); // No easymock expectations used here
-
-    Op op1 = Op.removeJob(new RemoveJob(JobKeys.from("r1", "env", "name").newBuilder()));
-    final Op op2 = Op.removeJob(new RemoveJob(JobKeys.from("r2", "env", "name").newBuilder()));
-
-    LogEntry transaction1 = createLogEntry(op1);
-    LogEntry transaction2 = createLogEntry(op2);
-
-    final CountDownLatch message1Started = new CountDownLatch(1);
-
-    Message message1 = frame(transaction1);
-    Message message2 = frame(transaction2);
-
-    List<byte[]> expectedAppends =
-        ImmutableList.<byte[]>builder()
-            .add(encode(message1.header))
-            .addAll(Iterables.transform(message1.chunks, ENCODER))
-            .add(encode(message2.header))
-            .addAll(Iterables.transform(message2.chunks, ENCODER))
-            .build();
-
-    final Deque<byte[]> actualAppends = new LinkedBlockingDeque<>();
-
-    Stream mockStream = new Stream() {
-      @Override
-      public Position append(byte[] contents) throws StreamAccessException {
-        actualAppends.addLast(contents);
-        message1Started.countDown();
-        try {
-          // If a chunked message is not properly serialized to the log, this sleep all but ensures
-          // interleaved chunk writes and a test failure.
-          Thread.sleep(100);
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
-        }
-        return null;
-      }
-
-      @Override
-      public Iterator<Entry> readAll() throws InvalidPositionException, StreamAccessException {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public void truncateBefore(Position position)
-          throws InvalidPositionException, StreamAccessException {
-        throw new UnsupportedOperationException();
-      }
-    };
-
-    final StreamManagerImpl streamManager = new StreamManagerImpl(
-        mockStream,
-        new EntrySerializer.EntrySerializerImpl(message1.chunkSize, Hashing.md5()),
-        Hashing.md5(),
-        new SnapshotDeduplicatorImpl());
-    StreamTransaction tr1 = streamManager.startTransaction();
-    tr1.add(op1);
-
-    Thread snapshotThread = new Thread() {
-      @Override
-      public void run() {
-        StreamTransaction tr2 = streamManager.startTransaction();
-        tr2.add(op2);
-        try {
-          message1Started.await();
-          tr2.commit();
-        } catch (CodingException | InterruptedException e) {
-          throw new RuntimeException(e);
-        }
-      }
-    };
-    snapshotThread.setDaemon(true);
-    snapshotThread.start();
-
-    tr1.commit();
-
-    snapshotThread.join();
-
-    assertEquals(expectedAppends.size(), actualAppends.size());
-    for (byte[] expectedData : expectedAppends) {
-      assertArrayEquals(expectedData, actualAppends.removeFirst());
-    }
+    streamManager.commit(ImmutableList.of(saveFrameworkId));
   }
 
   @Test

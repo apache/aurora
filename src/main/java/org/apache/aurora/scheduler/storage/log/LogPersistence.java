@@ -18,6 +18,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -99,10 +100,8 @@ class LogPersistence implements Persistence, DistributedSnapshotStore {
 
   @Override
   public void persist(Stream<Op> mutations) throws PersistenceException {
-    StreamTransaction transaction = streamManager.startTransaction();
-    mutations.forEach(transaction::add);
     try {
-      transaction.commit();
+      streamManager.commit(mutations.collect(Collectors.toList()));
     } catch (CodingException e) {
       throw new PersistenceException(e);
     }

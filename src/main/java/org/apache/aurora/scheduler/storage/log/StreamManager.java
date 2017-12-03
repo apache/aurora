@@ -14,8 +14,10 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.aurora.gen.storage.LogEntry;
+import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.log.Log;
 
@@ -52,12 +54,11 @@ public interface StreamManager {
   void truncateBefore(Log.Position position);
 
   /**
-   * Starts a transaction that can be used to commit a series of ops to the log stream atomically.
+   * Saves operations to the log stream.
    *
-   * @return StreamTransaction A transaction manager to handle batching up commits to the
-   *    underlying stream.
+   * @param mutations Operations to save.
    */
-  StreamTransaction startTransaction();
+  void commit(List<Op> mutations);
 
   /**
    * Adds a snapshot to the log and if successful, truncates the log entries preceding the
