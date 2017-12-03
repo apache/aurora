@@ -162,6 +162,8 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   static final String ADD_INSTANCES = STAT_PREFIX + "addInstances";
   @VisibleForTesting
   static final String START_JOB_UPDATE = STAT_PREFIX + "startJobUpdate";
+  @VisibleForTesting
+  static final String PRUNE_TASKS = STAT_PREFIX + "pruneTasks";
 
   private static final Logger LOG = LoggerFactory.getLogger(SchedulerThriftInterface.class);
 
@@ -191,6 +193,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   private final AtomicLong endMaintenanceCounter;
   private final AtomicLong addInstancesCounter;
   private final AtomicLong startJobUpdateCounter;
+  private final AtomicLong pruneTasksCounter;
 
   @Inject
   SchedulerThriftInterface(
@@ -237,6 +240,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     this.endMaintenanceCounter = statsProvider.makeCounter(END_MAINTENANCE);
     this.addInstancesCounter = statsProvider.makeCounter(ADD_INSTANCES);
     this.startJobUpdateCounter = statsProvider.makeCounter(START_JOB_UPDATE);
+    this.pruneTasksCounter = statsProvider.makeCounter(PRUNE_TASKS);
   }
 
   @Override
@@ -972,7 +976,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         task -> task.getAssignedTask().getTaskId());
 
     return storage.write(storeProvider -> {
-      stateManager.deleteTasks(storeProvider, Sets.newHashSet(taskIds));
+      Set<String> taskIdsSet = Sets.newHashSet(taskIds);
+      stateManager.deleteTasks(storeProvider, taskIdsSet);
+      pruneTasksCounter.addAndGet(taskIdsSet.size());
       return ok();
     });
   }

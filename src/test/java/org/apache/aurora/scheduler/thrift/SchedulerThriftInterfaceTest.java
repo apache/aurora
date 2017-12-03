@@ -151,6 +151,7 @@ import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.KILL_T
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAINTENANCE_STATUS;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NO_CRON;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.PRUNE_TASKS;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.RESTART_SHARDS;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.START_JOB_UPDATE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.START_MAINTENANCE;
@@ -663,6 +664,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
     Response rsp = thrift.pruneTasks(new TaskQuery().setStatuses(Tasks.ACTIVE_STATES));
     assertResponse(ResponseCode.ERROR, rsp);
+    assertEquals(0L, statsProvider.getLongValue(PRUNE_TASKS));
   }
 
   @Test
@@ -671,6 +673,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Response rsp = thrift.pruneTasks(new TaskQuery().setStatuses(
         ImmutableSet.of(ScheduleStatus.FINISHED, ScheduleStatus.KILLING)));
     assertResponse(ResponseCode.ERROR, rsp);
+    assertEquals(0L, statsProvider.getLongValue(PRUNE_TASKS));
   }
 
   @Test
@@ -684,6 +687,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertOkResponse(thrift.pruneTasks(new TaskQuery()));
+    assertEquals(1L, statsProvider.getLongValue(PRUNE_TASKS));
   }
 
   @Test
@@ -698,6 +702,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     assertOkResponse(thrift.pruneTasks(
         new TaskQuery().setStatuses(ImmutableSet.of(ScheduleStatus.FAILED))));
+    assertEquals(1L, statsProvider.getLongValue(PRUNE_TASKS));
   }
 
   @Test
@@ -716,6 +721,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertOkResponse(thrift.pruneTasks(query));
+    assertEquals(3L, statsProvider.getLongValue(PRUNE_TASKS));
   }
 
   @Test
