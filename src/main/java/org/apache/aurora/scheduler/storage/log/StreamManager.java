@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.util.function.Consumer;
+import java.util.Iterator;
 
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Snapshot;
@@ -25,23 +25,21 @@ import static org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 
 /**
  * Manages interaction with the log stream.  Log entries can be
- * {@link #readFromBeginning(Consumer) read from} the beginning,
+ * {@link #readFromBeginning() read from} the beginning,
  * a {@link #startTransaction() transaction} consisting of one or more local storage
  * operations can be committed atomically, or the log can be compacted by
  * {@link #snapshot(org.apache.aurora.gen.storage.Snapshot) snapshotting}.
  */
 public interface StreamManager {
   /**
-   * Reads all entries in the log stream after the given position.  If the position
-   * supplied is {@code null} then all log entries in the stream will be read.
+   * Reads all entries in the log stream.
    *
-   * @param reader A reader that will be handed log entries decoded from the stream.
+   * @return All stored log entries.
    * @throws CodingException if there was a problem decoding a log entry from the stream.
    * @throws InvalidPositionException if the given position is not found in the log.
    * @throws StreamAccessException if there is a problem reading from the log.
    */
-  void readFromBeginning(Consumer<LogEntry> reader)
-      throws CodingException, InvalidPositionException, StreamAccessException;
+  Iterator<LogEntry> readFromBeginning() throws CodingException, StreamAccessException;
 
   /**
    * Truncates all entries in the log stream occuring before the given position.  The entry at the
@@ -54,8 +52,7 @@ public interface StreamManager {
   void truncateBefore(Log.Position position);
 
   /**
-   * Starts a transaction that can be used to commit a series of {@link Op}s to the log stream
-   * atomically.
+   * Starts a transaction that can be used to commit a series of ops to the log stream atomically.
    *
    * @return StreamTransaction A transaction manager to handle batching up commits to the
    *    underlying stream.

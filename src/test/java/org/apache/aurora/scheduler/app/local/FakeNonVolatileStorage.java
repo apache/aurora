@@ -36,11 +36,6 @@ public class FakeNonVolatileStorage implements NonVolatileStorage {
   }
 
   @Override
-  public void snapshot() throws StorageException {
-    // No-op.
-  }
-
-  @Override
   public void start(Quiet initializationLogic) throws StorageException {
     // No-op.
   }

@@ -21,7 +21,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.function.Consumer;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
@@ -37,10 +36,8 @@ import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.storage.DeduplicatedSnapshot;
 import org.apache.aurora.gen.storage.Frame;
 import org.apache.aurora.gen.storage.FrameChunk;
@@ -48,9 +45,7 @@ import org.apache.aurora.gen.storage.FrameHeader;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.RemoveJob;
-import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
-import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
@@ -112,11 +107,11 @@ public class LogManagerTest extends EasyMockTest {
   public void testStreamManagerReadFromUnknownNone() throws CodingException {
     expect(stream.readAll()).andReturn(Collections.emptyIterator());
 
-    Consumer<LogEntry> reader = createMock(new Clazz<Consumer<LogEntry>>() { });
-
     control.replay();
 
-    createNoMessagesStreamManager().readFromBeginning(reader);
+    assertEquals(
+        ImmutableList.of(),
+        ImmutableList.copyOf(createNoMessagesStreamManager().readFromBeginning()));
   }
 
   @Test
@@ -127,12 +122,11 @@ public class LogManagerTest extends EasyMockTest {
     expect(entry1.contents()).andReturn(encode(transaction1));
     expect(stream.readAll()).andReturn(Iterators.singletonIterator(entry1));
 
-    Consumer<LogEntry> reader = createMock(new Clazz<Consumer<LogEntry>>() { });
-    reader.accept(transaction1);
-
     control.replay();
 
-    createNoMessagesStreamManager().readFromBeginning(reader);
+    assertEquals(
+        ImmutableList.of(transaction1),
+        ImmutableList.copyOf(createNoMessagesStreamManager().readFromBeginning()));
   }
 
   @Test
@@ -211,50 +205,6 @@ public class LogManagerTest extends EasyMockTest {
   private static byte[] entryEq(LogEntry expected) {
     EasyMock.reportMatcher(new LogEntryMatcher(expected));
     return new byte[] {};
-  }
-
-  @Test
-  public void testCoalesce() throws CodingException {
-    SaveTasks saveTasks1 = createSaveTasks("1", "2");
-    createSaveTasks("2");
-    SaveTasks saveTasks2 = createSaveTasks("1", "3");
-    SaveTasks saveTasks3 = createSaveTasks("4", "5");
-
-    // saveTasks1 is unrepresented because both of its operations were trumped.
-    // saveTasks3 is unrepresented because its operations were deleted.
-    SaveTasks coalescedSaves = createSaveTasks("3", "2", "1");
-
-    RemoveTasks removeTasks1 = createRemoveTasks("1", "2");
-    RemoveTasks removeTasks2 = createRemoveTasks("3");
-    RemoveTasks removeTasks3 = createRemoveTasks("4", "5");
-
-    RemoveTasks coalescedRemoves =
-        new RemoveTasks(ImmutableSet.copyOf(Iterables.concat(removeTasks2.getTaskIds(),
-            removeTasks3.getTaskIds())));
-
-    expectAppend(position1,
-        createLogEntry(
-            Op.saveTasks(coalescedSaves),
-            Op.removeTasks(removeTasks1),
-            Op.saveTasks(saveTasks3),
-            Op.removeTasks(coalescedRemoves)));
-
-    control.replay();
-
-    StreamTransaction streamTransaction = createNoMessagesStreamManager().startTransaction();
-
-    // The next 2 saves should coalesce
-    streamTransaction.add(Op.saveTasks(saveTasks1));
-    streamTransaction.add(Op.saveTasks(saveTasks2));
-
-    streamTransaction.add(Op.removeTasks(removeTasks1));
-    streamTransaction.add(Op.saveTasks(saveTasks3));
-
-    // The next 2 removes should coalesce
-    streamTransaction.add(Op.removeTasks(removeTasks2));
-    streamTransaction.add(Op.removeTasks(removeTasks3));
-
-    assertEquals(position1, streamTransaction.commit());
   }
 
   @Test
@@ -469,14 +419,12 @@ public class LogManagerTest extends EasyMockTest {
 
     expect(stream.readAll()).andReturn(entries.iterator());
 
-    Consumer<LogEntry> reader = createMock(new Clazz<Consumer<LogEntry>>() { });
-    reader.accept(transaction1);
-    reader.accept(transaction2);
-
     StreamManager streamManager = createStreamManager(message.chunkSize);
     control.replay();
 
-    streamManager.readFromBeginning(reader);
+    assertEquals(
+        ImmutableList.of(transaction1, transaction2),
+        ImmutableList.copyOf(streamManager.readFromBeginning()));
   }
 
   @Test
@@ -494,9 +442,6 @@ public class LogManagerTest extends EasyMockTest {
 
     expect(stream.readAll()).andReturn(ImmutableList.of(snapshotEntry).iterator());
 
-    Consumer<LogEntry> reader = createMock(new Clazz<Consumer<LogEntry>>() { });
-    reader.accept(snapshotLogEntry);
-
     control.replay();
 
     HashFunction md5 = Hashing.md5();
@@ -506,7 +451,9 @@ public class LogManagerTest extends EasyMockTest {
         md5,
         new SnapshotDeduplicatorImpl());
     streamManager.snapshot(snapshot);
-    streamManager.readFromBeginning(reader);
+    assertEquals(
+        ImmutableList.of(snapshotLogEntry),
+        ImmutableList.copyOf(streamManager.readFromBeginning()));
   }
 
   private Snapshot createSnapshot() {
@@ -515,15 +462,6 @@ public class LogManagerTest extends EasyMockTest {
         .setHostAttributes(ImmutableSet.of(new HostAttributes("host",
             ImmutableSet.of(new Attribute("hostname", ImmutableSet.of("abc"))))))
         .setTasks(ImmutableSet.of(TaskTestUtil.makeTask("task_id", TaskTestUtil.JOB).newBuilder()));
-  }
-
-  private SaveTasks createSaveTasks(String... taskIds) {
-    return new SaveTasks(ImmutableSet.copyOf(Iterables.transform(ImmutableList.copyOf(taskIds),
-        taskId -> new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(taskId)))));
-  }
-
-  private RemoveTasks createRemoveTasks(String... taskIds) {
-    return new RemoveTasks(ImmutableSet.copyOf(taskIds));
   }
 
   private void expectFrames(Position position, Message message) throws CodingException {

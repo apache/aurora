@@ -98,7 +98,7 @@ public class RecoveryTest extends EasyMockTest {
     Capture<MutateWork<Object, Exception>> transaction = createCapture();
     expect(primaryStorage.write(capture(transaction))).andReturn(null);
     Capture<Snapshot> snapshot = createCapture();
-    distributedStore.persist(capture(snapshot));
+    distributedStore.snapshotWith(capture(snapshot));
     shutDownNow.execute();
 
     control.replay();
@@ -127,7 +127,7 @@ public class RecoveryTest extends EasyMockTest {
     Capture<MutateWork<Object, Exception>> transaction = createCapture();
     expect(primaryStorage.write(capture(transaction))).andReturn(null);
     Capture<Snapshot> snapshot = createCapture();
-    distributedStore.persist(capture(snapshot));
+    distributedStore.snapshotWith(capture(snapshot));
     shutDownNow.execute();
 
     control.replay();

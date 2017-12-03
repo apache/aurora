@@ -26,6 +26,7 @@ import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.util.Modules;
 
+import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.app.local.simulator.ClusterSimulatorModule;
@@ -82,7 +83,17 @@ public final class LocalSchedulerMain {
       protected void configure() {
         bind(Storage.class).to(Key.get(Storage.class, Storage.Volatile.class));
         bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
-        bind(DistributedSnapshotStore.class).toInstance(snapshot -> { });
+        bind(DistributedSnapshotStore.class).toInstance(new DistributedSnapshotStore() {
+          @Override
+          public void snapshot() throws Storage.StorageException {
+            // no-op
+          }
+
+          @Override
+          public void snapshotWith(Snapshot snapshot) {
+            // no-op
+          }
+        });
       }
     };
 

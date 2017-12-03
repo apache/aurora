@@ -84,6 +84,7 @@ import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
+import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
@@ -176,6 +177,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       ImmutableSet.of(new Metadata("k1", "v1"), new Metadata("k2", "v2"));
 
   private StorageTestUtil storageUtil;
+  private DistributedSnapshotStore snapshotStore;
   private StorageBackup backup;
   private Recovery recovery;
   private MaintenanceController maintenance;
@@ -194,6 +196,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void setUp() throws Exception {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
+    snapshotStore = createMock(DistributedSnapshotStore.class);
     backup = createMock(StorageBackup.class);
     recovery = createMock(Recovery.class);
     maintenance = createMock(MaintenanceController.class);
@@ -212,6 +215,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             TaskTestUtil.CONFIGURATION_MANAGER,
             THRESHOLDS,
             storageUtil.storage,
+            snapshotStore,
             backup,
             recovery,
             cronJobManager,
@@ -1105,10 +1109,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testSnapshot() throws Exception {
-    storageUtil.storage.snapshot();
+    snapshotStore.snapshot();
     expectLastCall();
 
-    storageUtil.storage.snapshot();
+    snapshotStore.snapshot();
     expectLastCall().andThrow(new StorageException("mock error!"));
 
     control.replay();

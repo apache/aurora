@@ -83,11 +83,13 @@ import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateChangeResult;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
+import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
+import org.apache.aurora.scheduler.storage.durability.ThriftBackfill;
 import org.apache.aurora.scheduler.storage.entities.IHostStatus;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -99,7 +101,6 @@ import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.aurora.scheduler.storage.log.ThriftBackfill;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.aurora.scheduler.thrift.aop.ThriftWorkload;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
@@ -167,6 +168,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
   private final ConfigurationManager configurationManager;
   private final Thresholds thresholds;
   private final NonVolatileStorage storage;
+  private final DistributedSnapshotStore snapshotStore;
   private final StorageBackup backup;
   private final Recovery recovery;
   private final MaintenanceController maintenance;
@@ -195,6 +197,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
       ConfigurationManager configurationManager,
       Thresholds thresholds,
       NonVolatileStorage storage,
+      DistributedSnapshotStore snapshotStore,
       StorageBackup backup,
       Recovery recovery,
       CronJobManager cronJobManager,
@@ -211,6 +214,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     this.configurationManager = requireNonNull(configurationManager);
     this.thresholds = requireNonNull(thresholds);
     this.storage = requireNonNull(storage);
+    this.snapshotStore = requireNonNull(snapshotStore);
     this.backup = requireNonNull(backup);
     this.recovery = requireNonNull(recovery);
     this.maintenance = requireNonNull(maintenance);
@@ -635,7 +639,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
   @Override
   public Response snapshot() {
-    storage.snapshot();
+    snapshotStore.snapshot();
     return ok();
   }
 

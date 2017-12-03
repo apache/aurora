@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.durability;
 
 import java.util.Set;
 
@@ -36,6 +36,7 @@ import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.durability.DurableStorage.TransactionManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -50,7 +51,7 @@ import static org.junit.Assert.assertTrue;
 
 public class WriteAheadStorageTest extends EasyMockTest {
 
-  private LogStorage.TransactionManager transactionManager;
+  private TransactionManager transactionManager;
   private TaskStore.Mutable taskStore;
   private AttributeStore.Mutable attributeStore;
   private JobUpdateStore.Mutable jobUpdateStore;
@@ -59,7 +60,7 @@ public class WriteAheadStorageTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    transactionManager = createMock(LogStorage.TransactionManager.class);
+    transactionManager = createMock(TransactionManager.class);
     taskStore = createMock(TaskStore.Mutable.class);
     attributeStore = createMock(AttributeStore.Mutable.class);
     jobUpdateStore = createMock(JobUpdateStore.Mutable.class);

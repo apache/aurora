@@ -197,7 +197,7 @@ public interface Recovery {
       void commit() {
         primaryStorage.write((NoResult.Quiet) storeProvider -> {
           try {
-            distributedStore.persist(tempStorage.toSnapshot());
+            distributedStore.snapshotWith(tempStorage.toSnapshot());
             shutDownNow.execute();
           } catch (CodingException e) {
             throw new IllegalStateException("Failed to encode snapshot.", e);

@@ -217,7 +217,7 @@ public final class ThriftBinaryCodec {
   /**
    * Thrown when serialization or deserialization failed.
    */
-  public static class CodingException extends Exception {
+  public static class CodingException extends RuntimeException {
     public CodingException(String message) {
       super(message);
     }

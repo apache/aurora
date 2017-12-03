@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.durability;
 
 import java.util.EnumSet;
 import java.util.Set;
@@ -162,7 +162,7 @@ public final class ThriftBackfill {
    * @param update JobUpdate to backfill.
    * @return Backfilled job update.
    */
-  IJobUpdate backFillJobUpdate(JobUpdate update) {
+  public IJobUpdate backFillJobUpdate(JobUpdate update) {
     JobUpdateInstructions instructions = update.getInstructions();
     if (instructions.isSetDesiredState()) {
       backfillTask(instructions.getDesiredState().getTask());

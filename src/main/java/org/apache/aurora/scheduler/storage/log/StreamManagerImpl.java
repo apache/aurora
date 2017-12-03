@@ -19,12 +19,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -95,31 +95,37 @@ class StreamManagerImpl implements StreamManager {
   }
 
   @Override
-  public void readFromBeginning(Consumer<LogEntry> reader)
+  public Iterator<LogEntry> readFromBeginning()
       throws CodingException, InvalidPositionException, StreamAccessException {
 
     Iterator<Log.Entry> entries = stream.readAll();
 
-    while (entries.hasNext()) {
-      LogEntry logEntry = decodeLogEntry(entries.next());
-      while (logEntry != null && isFrame(logEntry)) {
-        logEntry = tryDecodeFrame(logEntry.getFrame(), entries);
-      }
-      if (logEntry != null) {
-        if (logEntry.isSet(LogEntry._Fields.DEFLATED_ENTRY)) {
-          logEntry = Entries.inflate(logEntry);
-          vars.deflatedEntriesRead.incrementAndGet();
-        }
+    return new AbstractIterator<LogEntry>() {
+      @Override
+      protected LogEntry computeNext() {
+        while (entries.hasNext()) {
+          LogEntry logEntry = decodeLogEntry(entries.next());
+          while (logEntry != null && isFrame(logEntry)) {
+            logEntry = tryDecodeFrame(logEntry.getFrame(), entries);
+          }
+          if (logEntry != null) {
+            if (logEntry.isSet(LogEntry._Fields.DEFLATED_ENTRY)) {
+              logEntry = Entries.inflate(logEntry);
+              vars.deflatedEntriesRead.incrementAndGet();
+            }
 
-        if (logEntry.isSetDeduplicatedSnapshot()) {
-          logEntry = LogEntry.snapshot(
-              snapshotDeduplicator.reduplicate(logEntry.getDeduplicatedSnapshot()));
-        }
+            if (logEntry.isSetDeduplicatedSnapshot()) {
+              logEntry = LogEntry.snapshot(
+                  snapshotDeduplicator.reduplicate(logEntry.getDeduplicatedSnapshot()));
+            }
 
-        reader.accept(logEntry);
-        vars.entriesRead.incrementAndGet();
+            vars.entriesRead.incrementAndGet();
+            return logEntry;
+          }
+        }
+        return endOfData();
       }
-    }
+    };
   }
 
   @Nullable

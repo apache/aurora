@@ -15,18 +15,25 @@ package org.apache.aurora.scheduler.storage;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.scheduler.storage.Storage.StorageException;
 
 /**
  * A distributed snapshot store that supports persisting globally-visible snapshots.
  */
 public interface DistributedSnapshotStore {
+
   /**
-   * Writes a snapshot to the distributed storage system.
-   * TODO(William Farner): Currently we're hiding some exceptions (which happen to be
-   * RuntimeExceptions).  Clean these up to be checked, and throw another exception type here.
+   * Clean up the underlying storage by optimizing internal data structures. Does not change
+   * externally-visible state but might not run concurrently with write operations.
+   */
+  void snapshot() throws StorageException;
+
+  /**
+   * Identical to {@link #snapshot()}, using a custom {@link Snapshot} rather than an
+   * internally-generated one based on the current state.
    *
    * @param snapshot Snapshot to write.
    * @throws CodingException If the snapshot could not be serialized.
    */
-  void persist(Snapshot snapshot) throws CodingException;
+  void snapshotWith(Snapshot snapshot) throws CodingException;
 }

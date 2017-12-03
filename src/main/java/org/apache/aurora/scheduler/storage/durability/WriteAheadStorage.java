@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.durability;
 
 import java.util.List;
 import java.util.Map;
@@ -44,6 +44,7 @@ import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.durability.DurableStorage.TransactionManager;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -59,14 +60,12 @@ import org.slf4j.Logger;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.storage.log.LogStorage.TransactionManager;
-
 /**
  * Mutable stores implementation that translates all operations to {@link Op}s (which are passed
  * to a provided {@link TransactionManager}) before forwarding the operations to delegate mutable
  * stores.
  */
-class WriteAheadStorage implements
+public class WriteAheadStorage implements
     MutableStoreProvider,
     SchedulerStore.Mutable,
     CronJobStore.Mutable,
@@ -96,7 +95,7 @@ class WriteAheadStorage implements
    * @param attributeStore Delegate.
    * @param jobUpdateStore Delegate.
    */
-  WriteAheadStorage(
+  public WriteAheadStorage(
       TransactionManager transactionManager,
       SchedulerStore.Mutable schedulerStore,
       CronJobStore.Mutable jobStore,

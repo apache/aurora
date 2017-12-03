@@ -132,12 +132,6 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
     return wrapped.write(work);
   }
 
-  @Override
-  public void snapshot() throws StorageException {
-    checkState(State.READY);
-    wrapped.snapshot();
-  }
-
   /**
    * Creates a binding module that will wrap a storage class with {@link CallOrderEnforcingStorage},
    * exposing the order-enforced storage as {@link Storage} and {@link NonVolatileStorage}.

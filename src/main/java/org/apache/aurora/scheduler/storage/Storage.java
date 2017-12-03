@@ -196,10 +196,6 @@ public interface Storage {
    * Executes the unit of read-only {@code work}.  The consistency model creates the possibility
    * for a reader to read uncommitted state from a concurrent writer.
    * <p>
-   * TODO(wfarner): Update this documentation once all stores are backed by
-   * {@link org.apache.aurora.scheduler.storage.db.DbStorage}, as the concurrency behavior will then
-   * be dictated by the {@link org.mybatis.guice.transactional.Transactional#isolation()} used.
-   * <p>
    * TODO(wfarner): This method no longer needs to exist now that there is no global locking for
    * reads.  We could instead directly inject the individual stores where they are used, as long
    * as the stores have a layer to replicate what is currently done by
@@ -251,12 +247,6 @@ public interface Storage {
      * @throws StorageException if there was a starting storage.
      */
     void start(MutateWork.NoResult.Quiet initializationLogic) throws StorageException;
-
-    /**
-     * Clean up the underlying storage by optimizing internal data structures. Does not change
-     * externally-visible state but might not run concurrently with write operations.
-     */
-    void snapshot() throws StorageException;
 
     /**
      * Prepares the underlying storage system for clean shutdown.

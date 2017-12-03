@@ -42,6 +42,7 @@ import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
+import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
@@ -61,6 +62,7 @@ public class NonVolatileStorageTest extends TearDownTestCase {
   private FakeLog log;
   private Runnable teardown = () -> { };
   private NonVolatileStorage storage;
+  private DistributedSnapshotStore snapshotStore;
 
   @Before
   public void setUp() {
@@ -95,6 +97,7 @@ public class NonVolatileStorageTest extends TearDownTestCase {
         }
     );
     storage = injector.getInstance(NonVolatileStorage.class);
+    snapshotStore = injector.getInstance(DistributedSnapshotStore.class);
     storage.prepare();
     storage.start(w -> { });
 
@@ -147,7 +150,7 @@ public class NonVolatileStorageTest extends TearDownTestCase {
           });
 
           // Result should survive another reset.
-          storage.snapshot();
+          snapshotStore.snapshot();
           resetStorage();
           storage.read(stores -> {
             transaction.getSecond().accept(stores);

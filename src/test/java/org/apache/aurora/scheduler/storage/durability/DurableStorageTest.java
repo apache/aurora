@@ -11,28 +11,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.durability;
 
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
-import com.google.common.hash.HashFunction;
-import com.google.common.hash.Hashing;
 
-import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
-import org.apache.aurora.common.quantity.Amount;
-import org.apache.aurora.common.quantity.Data;
-import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
@@ -54,8 +47,6 @@ import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.storage.DeduplicatedSnapshot;
-import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.RemoveJob;
@@ -70,21 +61,13 @@ import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.SaveTasks;
-import org.apache.aurora.gen.storage.Snapshot;
-import org.apache.aurora.gen.storage.Transaction;
-import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
-import org.apache.aurora.scheduler.log.Log;
-import org.apache.aurora.scheduler.log.Log.Entry;
-import org.apache.aurora.scheduler.log.Log.Position;
-import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.storage.AttributeStore;
-import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
@@ -98,12 +81,10 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.log.LogStorage.SchedulingService;
-import org.apache.aurora.scheduler.storage.log.SnapshotDeduplicator.SnapshotDeduplicatorImpl;
-import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
-import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.Capture;
+import org.easymock.EasyMock;
+import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -112,59 +93,33 @@ import static org.apache.aurora.gen.Resource.numCpus;
 import static org.apache.aurora.gen.Resource.ramMb;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeConfig;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
+import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.easymock.EasyMock.notNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class LogStorageTest extends EasyMockTest {
+public class DurableStorageTest extends EasyMockTest {
 
-  private static final Amount<Long, Time> SNAPSHOT_INTERVAL = Amount.of(1L, Time.MINUTES);
   private static final IJobKey JOB_KEY = JobKeys.from("role", "env", "name");
   private static final IJobUpdateKey UPDATE_ID =
       IJobUpdateKey.build(new JobUpdateKey(JOB_KEY.newBuilder(), "testUpdateId"));
-  private static final long NOW = 42;
 
-  private LogStorage logStorage;
-  private Log log;
-  private SnapshotDeduplicator deduplicator;
-  private Stream stream;
-  private Position position;
-  private StreamMatcher streamMatcher;
-  private SchedulingService schedulingService;
-  private SnapshotStore<Snapshot> snapshotStore;
+  private DurableStorage durableStorage;
+  private Persistence persistence;
   private StorageTestUtil storageUtil;
   private EventSink eventSink;
 
   @Before
   public void setUp() {
-    log = createMock(Log.class);
-    deduplicator = createMock(SnapshotDeduplicator.class);
-
-    StreamManagerFactory streamManagerFactory = logStream -> {
-      HashFunction md5 = Hashing.md5();
-      return new StreamManagerImpl(
-          logStream,
-          new EntrySerializer.EntrySerializerImpl(Amount.of(1, Data.GB), md5),
-          md5,
-          deduplicator);
-    };
-    LogManager logManager = new LogManager(log, streamManagerFactory);
-
-    schedulingService = createMock(SchedulingService.class);
-    snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
+    persistence = createMock(Persistence.class);
     storageUtil = new StorageTestUtil(this);
     eventSink = createMock(EventSink.class);
 
-    logStorage = new LogStorage(
-        logManager,
-        schedulingService,
-        snapshotStore,
-        SNAPSHOT_INTERVAL,
+    durableStorage = new DurableStorage(
+        persistence,
         storageUtil.storage,
         storageUtil.schedulerStore,
         storageUtil.jobStore,
@@ -176,19 +131,15 @@ public class LogStorageTest extends EasyMockTest {
         new ReentrantLock(),
         TaskTestUtil.THRIFT_BACKFILL);
 
-    stream = createMock(Stream.class);
-    streamMatcher = LogOpMatcher.matcherFor(stream);
-    position = createMock(Position.class);
-
     storageUtil.storage.prepare();
   }
 
   @Test
   public void testStart() throws Exception {
-    // We should open the log and arrange for its clean shutdown.
-    expect(log.open()).andReturn(stream);
+    // We should initialize persistence.
+    persistence.prepare();
 
-    // Our start should recover the log and then forward to the underlying storage start of the
+    // Our start should recover persistence and then forward to the underlying storage start of the
     // supplied initialization logic.
     AtomicBoolean initialized = new AtomicBoolean(false);
     MutateWork.NoResult.Quiet initializationLogic = provider -> {
@@ -204,13 +155,6 @@ public class LogStorageTest extends EasyMockTest {
       return null;
     });
 
-    Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
-    expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
-        () -> {
-          recoveryWork.getValue().apply(storageUtil.mutableStoreProvider);
-          return null;
-        });
-
     Capture<MutateWork<Void, RuntimeException>> initializationWork = createCapture();
     expect(storageUtil.storage.write(capture(initializationWork))).andAnswer(
         () -> {
@@ -218,79 +162,47 @@ public class LogStorageTest extends EasyMockTest {
           return null;
         });
 
-    // We should perform a snapshot when the snapshot thread runs.
-    Capture<Runnable> snapshotAction = createCapture();
-    schedulingService.doEvery(eq(SNAPSHOT_INTERVAL), capture(snapshotAction));
-    Snapshot snapshotContents = new Snapshot()
-        .setTimestamp(NOW)
-        .setTasks(ImmutableSet.of(makeTask("task_id", TaskTestUtil.JOB).newBuilder()));
-    expect(snapshotStore.createSnapshot()).andReturn(snapshotContents);
-    DeduplicatedSnapshot deduplicated =
-        new SnapshotDeduplicatorImpl().deduplicate(snapshotContents);
-    expect(deduplicator.deduplicate(snapshotContents)).andReturn(deduplicated);
-    streamMatcher.expectSnapshot(deduplicated).andReturn(position);
-    stream.truncateBefore(position);
-    Capture<MutateWork<Void, RuntimeException>> snapshotWork = createCapture();
-    expect(storageUtil.storage.write(capture(snapshotWork))).andAnswer(
-        () -> {
-          snapshotWork.getValue().apply(storageUtil.mutableStoreProvider);
-          return null;
-        }).anyTimes();
-
-    // Populate all LogEntry types.
-    buildReplayLogEntries();
+    // Populate all Op types.
+    buildReplayOps();
 
     control.replay();
 
-    logStorage.prepare();
-    logStorage.start(initializationLogic);
+    durableStorage.prepare();
+    durableStorage.start(initializationLogic);
     assertTrue(initialized.get());
-
-    // Run the snapshot thread.
-    snapshotAction.getValue().run();
-
-    // Assert all LogEntry types have handlers defined.
-    // Our current StreamManagerImpl.readFromBeginning() does not let some entries escape
-    // the decoding routine making handling them in replay unnecessary.
-    assertEquals(
-        Sets.complementOf(EnumSet.of(
-            LogEntry._Fields.FRAME,
-            LogEntry._Fields.DEDUPLICATED_SNAPSHOT,
-            LogEntry._Fields.DEFLATED_ENTRY)),
-        EnumSet.copyOf(logStorage.buildLogEntryReplayActions().keySet()));
 
     // Assert all Transaction types have handlers defined.
     assertEquals(
         EnumSet.allOf(Op._Fields.class),
-        EnumSet.copyOf(logStorage.buildTransactionReplayActions().keySet()));
+        EnumSet.copyOf(durableStorage.buildTransactionReplayActions().keySet()));
   }
 
-  private void buildReplayLogEntries() throws Exception {
-    ImmutableSet.Builder<LogEntry> builder = ImmutableSet.builder();
+  private void buildReplayOps() throws Exception {
+    ImmutableSet.Builder<Op> builder = ImmutableSet.builder();
 
-    builder.add(createTransaction(Op.saveFrameworkId(new SaveFrameworkId("bob"))));
+    builder.add(Op.saveFrameworkId(new SaveFrameworkId("bob")));
     storageUtil.schedulerStore.saveFrameworkId("bob");
 
     JobConfiguration actualJob = new JobConfiguration().setTaskConfig(nonBackfilledConfig());
     JobConfiguration expectedJob =
         new JobConfiguration().setTaskConfig(makeConfig(JOB_KEY).newBuilder());
     SaveCronJob cronJob = new SaveCronJob().setJobConfig(actualJob);
-    builder.add(createTransaction(Op.saveCronJob(cronJob)));
+    builder.add(Op.saveCronJob(cronJob));
     storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(expectedJob));
 
     RemoveJob removeJob = new RemoveJob(JOB_KEY.newBuilder());
-    builder.add(createTransaction(Op.removeJob(removeJob)));
+    builder.add(Op.removeJob(removeJob));
     storageUtil.jobStore.removeJob(JOB_KEY);
 
     ScheduledTask actualTask = makeTask("id", JOB_KEY).newBuilder();
     actualTask.getAssignedTask().setTask(nonBackfilledConfig());
     IScheduledTask expectedTask = makeTask("id", JOB_KEY);
     SaveTasks saveTasks = new SaveTasks(ImmutableSet.of(actualTask));
-    builder.add(createTransaction(Op.saveTasks(saveTasks)));
+    builder.add(Op.saveTasks(saveTasks));
     storageUtil.taskStore.saveTasks(ImmutableSet.of(expectedTask));
 
     RemoveTasks removeTasks = new RemoveTasks(ImmutableSet.of("taskId1"));
-    builder.add(createTransaction(Op.removeTasks(removeTasks)));
+    builder.add(Op.removeTasks(removeTasks));
     storageUtil.taskStore.deleteTasks(removeTasks.getTaskIds());
 
     ResourceAggregate nonBackfilled = new ResourceAggregate()
@@ -298,26 +210,26 @@ public class LogStorageTest extends EasyMockTest {
         .setRamMb(32)
         .setDiskMb(64);
     SaveQuota saveQuota = new SaveQuota(JOB_KEY.getRole(), nonBackfilled);
-    builder.add(createTransaction(Op.saveQuota(saveQuota)));
+    builder.add(Op.saveQuota(saveQuota));
     storageUtil.quotaStore.saveQuota(
         saveQuota.getRole(),
         IResourceAggregate.build(nonBackfilled.deepCopy()
             .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)))));
 
-    builder.add(createTransaction(Op.removeQuota(new RemoveQuota(JOB_KEY.getRole()))));
+    builder.add(Op.removeQuota(new RemoveQuota(JOB_KEY.getRole())));
     storageUtil.quotaStore.removeQuota(JOB_KEY.getRole());
 
     // This entry lacks a slave ID, and should therefore be discarded.
     SaveHostAttributes hostAttributes1 = new SaveHostAttributes(new HostAttributes()
         .setHost("host1")
         .setMode(MaintenanceMode.DRAINED));
-    builder.add(createTransaction(Op.saveHostAttributes(hostAttributes1)));
+    builder.add(Op.saveHostAttributes(hostAttributes1));
 
     SaveHostAttributes hostAttributes2 = new SaveHostAttributes(new HostAttributes()
         .setHost("host2")
         .setSlaveId("slave2")
         .setMode(MaintenanceMode.DRAINED));
-    builder.add(createTransaction(Op.saveHostAttributes(hostAttributes2)));
+    builder.add(Op.saveHostAttributes(hostAttributes2));
     expect(storageUtil.attributeStore.saveHostAttributes(
         IHostAttributes.build(hostAttributes2.getHostAttributes()))).andReturn(true);
 
@@ -332,12 +244,12 @@ public class LogStorageTest extends EasyMockTest {
     expectedUpdate.getInstructions().getInitialState()
         .forEach(e -> e.setTask(makeConfig(JOB_KEY).newBuilder()));
     SaveJobUpdate saveUpdate = new SaveJobUpdate().setJobUpdate(actualUpdate);
-    builder.add(createTransaction(Op.saveJobUpdate(saveUpdate)));
+    builder.add(Op.saveJobUpdate(saveUpdate));
     storageUtil.jobUpdateStore.saveJobUpdate(IJobUpdate.build(expectedUpdate));
 
     SaveJobUpdateEvent saveUpdateEvent =
         new SaveJobUpdateEvent(new JobUpdateEvent(), UPDATE_ID.newBuilder());
-    builder.add(createTransaction(Op.saveJobUpdateEvent(saveUpdateEvent)));
+    builder.add(Op.saveJobUpdateEvent(saveUpdateEvent));
     storageUtil.jobUpdateStore.saveJobUpdateEvent(
         UPDATE_ID,
         IJobUpdateEvent.build(saveUpdateEvent.getEvent()));
@@ -345,34 +257,19 @@ public class LogStorageTest extends EasyMockTest {
     SaveJobInstanceUpdateEvent saveInstanceEvent = new SaveJobInstanceUpdateEvent(
         new JobInstanceUpdateEvent(),
         UPDATE_ID.newBuilder());
-    builder.add(createTransaction(Op.saveJobInstanceUpdateEvent(saveInstanceEvent)));
+    builder.add(Op.saveJobInstanceUpdateEvent(saveInstanceEvent));
     storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(
         UPDATE_ID,
         IJobInstanceUpdateEvent.build(saveInstanceEvent.getEvent()));
 
-    builder.add(createTransaction(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory(5, 10L))));
+    builder.add(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory(5, 10L)));
     // No expectation - this op is ignored.
 
-    builder.add(createTransaction(Op.removeJobUpdate(
-        new RemoveJobUpdates().setKeys(ImmutableSet.of(UPDATE_ID.newBuilder())))));
+    builder.add(Op.removeJobUpdate(
+        new RemoveJobUpdates().setKeys(ImmutableSet.of(UPDATE_ID.newBuilder()))));
     storageUtil.jobUpdateStore.removeJobUpdates(ImmutableSet.of(UPDATE_ID));
 
-    // NOOP LogEntry
-    builder.add(LogEntry.noop(true));
-
-    // Snapshot LogEntry
-    Snapshot snapshot = new Snapshot();
-    builder.add(LogEntry.snapshot(snapshot));
-    snapshotStore.applySnapshot(snapshot);
-
-    ImmutableSet.Builder<Entry> entryBuilder = ImmutableSet.builder();
-    for (LogEntry logEntry : builder.build()) {
-      Entry entry = createMock(Entry.class);
-      entryBuilder.add(entry);
-      expect(entry.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(logEntry));
-    }
-
-    expect(stream.readAll()).andReturn(entryBuilder.build().iterator());
+    expect(persistence.recover()).andReturn(builder.build().stream());
   }
 
   private TaskConfig nonBackfilledConfig() {
@@ -399,10 +296,10 @@ public class LogStorageTest extends EasyMockTest {
 
       // Expect basic start operations.
 
-      // Open the log stream.
-      expect(log.open()).andReturn(stream);
+      // Initialize persistence.
+      persistence.prepare();
 
-      // Replay the log and perform and supplied initializationWork.
+      // Replay the ops and perform and supplied initializationWork.
       // Simulate NOOP initialization work
       // Creating a mock and expecting apply(storeProvider) does not work here for whatever
       // reason.
@@ -417,7 +314,7 @@ public class LogStorageTest extends EasyMockTest {
         return null;
       });
 
-      expect(stream.readAll()).andReturn(Collections.emptyIterator());
+      expect(persistence.recover()).andReturn(Stream.empty());
       Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
       expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
           () -> {
@@ -425,17 +322,14 @@ public class LogStorageTest extends EasyMockTest {
             return null;
           });
 
-      // Schedule snapshots.
-      schedulingService.doEvery(eq(SNAPSHOT_INTERVAL), notNull(Runnable.class));
-
       // Setup custom test expectations.
       setupExpectations();
 
       control.replay();
 
       // Start the system.
-      logStorage.prepare();
-      logStorage.start(initializationLogic);
+      durableStorage.prepare();
+      durableStorage.start(initializationLogic);
 
       // Exercise the system.
       runTest();
@@ -451,10 +345,26 @@ public class LogStorageTest extends EasyMockTest {
   abstract class AbstractMutationFixture extends AbstractStorageFixture {
     @Override
     protected void runTest() {
-      logStorage.write((Quiet) AbstractMutationFixture.this::performMutations);
+      durableStorage.write((Quiet) AbstractMutationFixture.this::performMutations);
     }
 
     protected abstract void performMutations(MutableStoreProvider storeProvider);
+  }
+
+  private void expectPersist(Op op, Op... ops) {
+    try {
+      // Workaround for comparing streams.
+      persistence.persist(anyObject());
+      expectLastCall().andAnswer((IAnswer<Void>) () -> {
+        assertEquals(
+            ImmutableList.<Op>builder().add(op).add(ops).build(),
+            ((Stream<Op>) EasyMock.getCurrentArguments()[0]).collect(Collectors.toList()));
+
+        return null;
+      });
+    } catch (Persistence.PersistenceException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Test
@@ -462,11 +372,10 @@ public class LogStorageTest extends EasyMockTest {
     String frameworkId = "bob";
     new AbstractMutationFixture() {
       @Override
-      protected void setupExpectations() throws CodingException {
+      protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.schedulerStore.saveFrameworkId(frameworkId);
-        streamMatcher.expectTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)))
-            .andReturn(position);
+        expectPersist(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
       }
 
       @Override
@@ -485,9 +394,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.jobStore.saveAcceptedJob(jobConfig);
-        streamMatcher.expectTransaction(
-            Op.saveCronJob(new SaveCronJob(jobConfig.newBuilder())))
-            .andReturn(position);
+        expectPersist(Op.saveCronJob(new SaveCronJob(jobConfig.newBuilder())));
       }
 
       @Override
@@ -504,9 +411,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.jobStore.removeJob(JOB_KEY);
-        streamMatcher.expectTransaction(
-            Op.removeJob(new RemoveJob().setJobKey(JOB_KEY.newBuilder())))
-            .andReturn(position);
+        expectPersist(Op.removeJob(new RemoveJob().setJobKey(JOB_KEY.newBuilder())));
       }
 
       @Override
@@ -524,9 +429,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.taskStore.saveTasks(tasks);
-        streamMatcher.expectTransaction(
-            Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(tasks))))
-            .andReturn(position);
+        expectPersist(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(tasks))));
       }
 
       @Override
@@ -546,9 +449,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         expect(storageUtil.taskStore.mutateTask(taskId, mutation)).andReturn(mutated);
-        streamMatcher.expectTransaction(
-            Op.saveTasks(new SaveTasks(ImmutableSet.of(mutated.get().newBuilder()))))
-            .andReturn(null);
+        expectPersist(Op.saveTasks(new SaveTasks(ImmutableSet.of(mutated.get().newBuilder()))));
       }
 
       @Override
@@ -573,17 +474,16 @@ public class LogStorageTest extends EasyMockTest {
 
         storageUtil.taskStore.deleteTasks(tasksToRemove);
 
-        streamMatcher.expectTransaction(
+        expectPersist(
             Op.saveTasks(new SaveTasks(ImmutableSet.of(mutated.get().newBuilder()))),
-            Op.removeTasks(new RemoveTasks(tasksToRemove)))
-            .andReturn(position);
+            Op.removeTasks(new RemoveTasks(tasksToRemove)));
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
         assertEquals(mutated, storeProvider.getUnsafeTaskStore().mutateTask(taskId, mutation));
 
-        logStorage.write((NoResult.Quiet)
+        durableStorage.write((NoResult.Quiet)
             innerProvider -> innerProvider.getUnsafeTaskStore().deleteTasks(tasksToRemove));
       }
     }.run();
@@ -606,9 +506,7 @@ public class LogStorageTest extends EasyMockTest {
         expect(storageUtil.taskStore.mutateTask(taskId, mutation)).andReturn(mutated);
 
         // Resulting stream operation.
-        streamMatcher.expectTransaction(Op.saveTasks(
-            new SaveTasks(ImmutableSet.of(mutated.get().newBuilder()))))
-            .andReturn(null);
+        expectPersist(Op.saveTasks(new SaveTasks(ImmutableSet.of(mutated.get().newBuilder()))));
       }
 
       @Override
@@ -636,13 +534,11 @@ public class LogStorageTest extends EasyMockTest {
         expect(storageUtil.taskStore.mutateTask(taskId, mutation)).andReturn(mutated);
 
         // Resulting stream operation.
-        streamMatcher.expectTransaction(
-            Op.saveTasks(new SaveTasks(
+        expectPersist(Op.saveTasks(new SaveTasks(
                 ImmutableSet.<ScheduledTask>builder()
                     .addAll(IScheduledTask.toBuildersList(saved))
                     .add(mutated.get().newBuilder())
-                    .build())))
-            .andReturn(position);
+                    .build())));
       }
 
       @Override
@@ -662,8 +558,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.taskStore.deleteTasks(taskIds);
-        streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
-            .andReturn(position);
+        expectPersist(Op.removeTasks(new RemoveTasks(taskIds)));
       }
 
       @Override
@@ -681,8 +576,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.taskStore.deleteTasks(taskIds);
-        streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
-            .andReturn(position);
+        expectPersist(Op.removeTasks(new RemoveTasks(taskIds)));
       }
 
       @Override
@@ -702,8 +596,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.quotaStore.saveQuota(role, quota);
-        streamMatcher.expectTransaction(Op.saveQuota(new SaveQuota(role, quota.newBuilder())))
-            .andReturn(position);
+        expectPersist(Op.saveQuota(new SaveQuota(role, quota.newBuilder())));
       }
 
       @Override
@@ -721,7 +614,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.quotaStore.removeQuota(role);
-        streamMatcher.expectTransaction(Op.removeQuota(new RemoveQuota(role))).andReturn(position);
+        expectPersist(Op.removeQuota(new RemoveQuota(role)));
       }
 
       @Override
@@ -752,9 +645,8 @@ public class LogStorageTest extends EasyMockTest {
 
         expect(storageUtil.attributeStore.saveHostAttributes(hostAttributes.get())).andReturn(true);
         eventSink.post(new PubsubEvent.HostAttributesChanged(hostAttributes.get()));
-        streamMatcher.expectTransaction(
-            Op.saveHostAttributes(new SaveHostAttributes(hostAttributes.get().newBuilder())))
-            .andReturn(position);
+        expectPersist(
+            Op.saveHostAttributes(new SaveHostAttributes(hostAttributes.get().newBuilder())));
 
         expect(storageUtil.attributeStore.saveHostAttributes(hostAttributes.get()))
             .andReturn(false);
@@ -798,9 +690,7 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.jobUpdateStore.saveJobUpdate(update);
-        streamMatcher.expectTransaction(
-            Op.saveJobUpdate(new SaveJobUpdate().setJobUpdate(update.newBuilder())))
-            .andReturn(position);
+        expectPersist(Op.saveJobUpdate(new SaveJobUpdate().setJobUpdate(update.newBuilder())));
       }
 
       @Override
@@ -821,9 +711,9 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.jobUpdateStore.saveJobUpdateEvent(UPDATE_ID, event);
-        streamMatcher.expectTransaction(Op.saveJobUpdateEvent(new SaveJobUpdateEvent(
+        expectPersist(Op.saveJobUpdateEvent(new SaveJobUpdateEvent(
             event.newBuilder(),
-            UPDATE_ID.newBuilder()))).andReturn(position);
+            UPDATE_ID.newBuilder())));
       }
 
       @Override
@@ -845,11 +735,10 @@ public class LogStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(UPDATE_ID, event);
-        streamMatcher.expectTransaction(Op.saveJobInstanceUpdateEvent(
+        expectPersist(Op.saveJobInstanceUpdateEvent(
             new SaveJobInstanceUpdateEvent(
                 event.newBuilder(),
-                UPDATE_ID.newBuilder())))
-            .andReturn(position);
+                UPDATE_ID.newBuilder())));
       }
 
       @Override
@@ -871,7 +760,7 @@ public class LogStorageTest extends EasyMockTest {
         storageUtil.expectWrite();
         storageUtil.jobUpdateStore.removeJobUpdates(ImmutableSet.of(key));
 
-        // No log transaction is generated since this version is currently in 'read-only'
+        // No transaction is generated since this version is currently in 'read-only'
         // compatibility mode for this operation type.
       }
 
@@ -880,11 +769,6 @@ public class LogStorageTest extends EasyMockTest {
         storeProvider.getJobUpdateStore().removeJobUpdates(ImmutableSet.of(key));
       }
     }.run();
-  }
-
-  private LogEntry createTransaction(Op... ops) {
-    return LogEntry.transaction(
-        new Transaction(ImmutableList.copyOf(ops), storageConstants.CURRENT_SCHEMA_VERSION));
   }
 
   private static IScheduledTask task(String id, ScheduleStatus status) {

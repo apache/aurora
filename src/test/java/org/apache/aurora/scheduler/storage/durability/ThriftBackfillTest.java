@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.durability;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;

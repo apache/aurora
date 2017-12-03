@@ -32,8 +32,10 @@ import org.apache.aurora.scheduler.storage.CallOrderEnforcingStorage;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
+import org.apache.aurora.scheduler.storage.durability.DurableStorage;
+import org.apache.aurora.scheduler.storage.durability.Persistence;
 import org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
-import org.apache.aurora.scheduler.storage.log.LogStorage.Settings;
+import org.apache.aurora.scheduler.storage.log.LogPersistence.Settings;
 
 import static org.apache.aurora.scheduler.storage.log.EntrySerializer.EntrySerializerImpl;
 import static org.apache.aurora.scheduler.storage.log.LogManager.LogEntryHashFunction;
@@ -77,10 +79,13 @@ public class LogStorageModule extends PrivateModule {
     bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
         .toInstance(options.maxLogEntrySize);
     bind(LogManager.class).in(Singleton.class);
-    bind(LogStorage.class).in(Singleton.class);
+    bind(DurableStorage.class).in(Singleton.class);
 
-    install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));
-    bind(DistributedSnapshotStore.class).to(LogStorage.class);
+    install(CallOrderEnforcingStorage.wrappingModule(DurableStorage.class));
+    bind(LogPersistence.class).in(Singleton.class);
+    bind(Persistence.class).to(LogPersistence.class);
+    bind(DistributedSnapshotStore.class).to(LogPersistence.class);
+    expose(Persistence.class);
     expose(Storage.class);
     expose(NonVolatileStorage.class);
     expose(DistributedSnapshotStore.class);
