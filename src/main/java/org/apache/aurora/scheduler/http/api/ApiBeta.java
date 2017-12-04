@@ -107,7 +107,7 @@ public class ApiBeta {
     return params.toArray();
   }
 
-  private Method getApiMethod(String name, Class<?>[] parameterTypes) {
+  private Method getApiMethod(String name, Class<?>... parameterTypes) {
     try {
       return Iface.class.getMethod(name, parameterTypes);
     } catch (NoSuchMethodException e) {

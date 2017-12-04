@@ -27,7 +27,7 @@ public class AuthorizeHeaderTokenTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void testInvalidScheme() {
-    new AuthorizeHeaderToken("Basic " + ALADDIN_OPEN_SESAME).getAuthorizeHeaderValue();
+    new AuthorizeHeaderToken("Basic " + ALADDIN_OPEN_SESAME);
   }
 
   @Test(expected = IllegalArgumentException.class)

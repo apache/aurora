@@ -21,12 +21,6 @@ limitations under the License.
       <Package name="org.apache.aurora.gen.test" />
       <Package name="org.apache.aurora.benchmark.generated" />
       <Package name="org.openjdk.jmh.infra.generated" />
-      <!-- Un-namespaced structs used by the executor. -->
-      <Class name="ProcessState" />
-      <Class name="ProcessStatus" />
-      <Class name="RunnerHeader" />
-      <Class name="RunnerState" />
-      <Class name="TaskStatus" />
     </Or>
     <Or>
       <Bug pattern="BC_IMPOSSIBLE_CAST" />
@@ -35,18 +29,6 @@ limitations under the License.
       <Bug pattern="NM_CLASS_NAMING_CONVENTION" />
       <Bug pattern="UUF_UNUSED_FIELD" />
       <Bug pattern="URF_UNREAD_FIELD" />
-    </Or>
-  </Match>
-
-  <!-- Warnings triggered for mybatis shim classes. -->
-  <Match>
-    <Package name="org.apache.aurora.scheduler.storage.db.views" />
-    <Or>
-      <!-- The shim classes trip these warnings since we have no code that explicitly sets fields,
-           but mybatis reflects and sets them for us.
-       -->
-      <Bug pattern="NP_UNWRITTEN_FIELD" />
-      <Bug pattern="UWF_UNWRITTEN_FIELD" />
     </Or>
   </Match>
 
@@ -80,10 +62,6 @@ limitations under the License.
     <Bug pattern="IS2_INCONSISTENT_SYNC" />
   </Match>
   <Match>
-    <Class name="org.apache.aurora.scheduler.http.Utilization" />
-    <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
-  </Match>
-  <Match>
     <Class name="~org\.apache\.aurora.*$" />
     <Bug pattern="NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE" />
   </Match>
@@ -110,15 +88,6 @@ limitations under the License.
       <Class name="org.apache.aurora.scheduler.thrift.ThriftIT$1" />
     </Or>
     <Bug pattern="DM_DEFAULT_ENCODING" />
-  </Match>
-
-  <Match>
-    <!-- False positives on a check introduced in findbugs 3.0.1 -->
-    <Or>
-      <Class name="org.apache.aurora.scheduler.storage.db.DbStorage$3" />
-      <Class name="org.apache.aurora.scheduler.http.api.security.AuthorizeHeaderTokenTest" />
-    </Or>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
 
   <Match>

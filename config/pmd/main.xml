@@ -23,10 +23,6 @@ limitations under the License.
   </description>
 
   <rule ref="rulesets/java/design.xml">
-    <!-- This rule suffers from false positivies in cases where we are implementing a third-party
-         interface. -->
-    <exclude name="UseVarargs"/>
-
     <!-- We're not currently focusing on localization. -->
     <exclude name="SimpleDateFormatNeedsLocale"/>
     <exclude name="UseLocaleWithCaseConversions"/>
@@ -40,9 +36,6 @@ limitations under the License.
     <!-- Unfortunately we have several large classes that trip this rule.
          TODO(wfarner): Break apart god classes. -->
     <exclude name="GodClass"/>
-
-    <!-- Classes that are only meant to be managed by mybatis with reflection trip this rule. -->
-    <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
   </rule>
 
   <!-- Custom rules -->

@@ -178,12 +178,13 @@ public class Utilization {
   }
 
   private MetricType getTypeByName(String name) throws WebApplicationException {
-    MetricType type = MetricType.valueOf(name.toUpperCase(Locale.ENGLISH));
-    if (type == null) {
+    try {
+      return MetricType.valueOf(name.toUpperCase(Locale.ENGLISH));
+    } catch (IllegalArgumentException e) {
       throw new WebApplicationException(
+          e,
           Response.status(Status.BAD_REQUEST).entity("Invalid metric type.").build());
     }
-    return type;
   }
 
   /**
