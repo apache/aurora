@@ -28,12 +28,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HostAndPort;
 import com.google.inject.AbstractModule;
-import com.google.inject.CreationException;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
-import com.google.inject.ProvisionException;
-import com.google.inject.spi.Message;
 import com.google.inject.util.Modules;
 
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
@@ -204,29 +201,7 @@ public class SchedulerMain {
     Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
       uncaughtExceptions.incrementAndGet();
 
-      if (e instanceof CreationException) {
-        try {
-          LOG.error("Uncaught exception from " + t + ":" + e, e);
-        } catch (RuntimeException ex) {
-          LOG.warn("Using fallback printer for guice CreationException");
-
-          // Special handling for guice creation exceptions, which break in guice 3 when java 8
-          // lambdas are used.  Remove this once using guice >=4.0.
-          CreationException creationException = (CreationException) e;
-          for (Message m : creationException.getErrorMessages()) {
-            LOG.error(m.getMessage());
-            LOG.error("  source: " + m.getSource());
-          }
-        }
-      } else if (e instanceof ProvisionException) {
-        // More special handling for guice 3 + java 8.  Remove this once using guice >=4.0.
-        ProvisionException pe = (ProvisionException) e;
-        for (Message message : pe.getErrorMessages()) {
-          LOG.error(message.getMessage());
-        }
-      } else {
-        LOG.error("Uncaught exception from " + t + ":" + e, e);
-      }
+      LOG.error("Uncaught exception from " + t + ":" + e, e);
     });
 
     Module module = Modules.combine(
