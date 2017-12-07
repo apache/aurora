@@ -14,7 +14,9 @@
 package org.apache.aurora.scheduler.http.api.security;
 
 import java.io.IOException;
+import java.util.function.Function;
 
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -52,8 +54,8 @@ public class ShiroKerberosPermissiveAuthenticationFilterTest extends AbstractJet
   }
 
   @Override
-  public Module getChildServletModule() {
-    return new ServletModule() {
+  public Function<ServletContext, Module> getChildServletModule() {
+    return (servletContext) -> new ServletModule() {
       @Override
       protected void configureServlets() {
         filter(PATH).through(filter);

@@ -13,6 +13,9 @@
  */
 package org.apache.aurora.scheduler.http.api;
 
+import java.util.function.Function;
+
+import javax.servlet.ServletContext;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
 
@@ -64,8 +67,8 @@ public class ApiBetaTest extends AbstractJettyTest {
   }
 
   @Override
-  protected Module getChildServletModule() {
-    return Modules.combine(
+  protected Function<ServletContext, Module> getChildServletModule() {
+    return (servletContext) -> Modules.combine(
         new ApiModule(new ApiModule.Options()),
         new AbstractModule() {
           @Override

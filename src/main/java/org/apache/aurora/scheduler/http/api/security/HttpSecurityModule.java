@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import javax.servlet.Filter;
+import javax.servlet.ServletContext;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
@@ -118,32 +119,38 @@ public class HttpSecurityModule extends ServletModule {
   private final HttpAuthenticationMechanism mechanism;
   private final Set<Module> shiroConfigurationModules;
   private final Optional<Key<? extends Filter>> shiroAfterAuthFilterKey;
+  private final ServletContext servletContext;
 
-  public HttpSecurityModule(CliOptions options) {
+  public HttpSecurityModule(CliOptions options, ServletContext servletContext) {
     this(
         options.httpSecurity.httpAuthenticationMechanism,
         MoreModules.instantiateAll(options.httpSecurity.shiroRealmModule, options),
-        Optional.ofNullable(options.httpSecurity.shiroAfterAuthFilter).map(Key::get).orElse(null));
+        Optional.ofNullable(options.httpSecurity.shiroAfterAuthFilter).map(Key::get).orElse(null),
+        servletContext);
   }
 
   @VisibleForTesting
   HttpSecurityModule(
       Module shiroConfigurationModule,
-      Key<? extends Filter> shiroAfterAuthFilterKey) {
+      Key<? extends Filter> shiroAfterAuthFilterKey,
+      ServletContext servletContext) {
 
     this(HttpAuthenticationMechanism.BASIC,
         ImmutableSet.of(shiroConfigurationModule),
-        shiroAfterAuthFilterKey);
+        shiroAfterAuthFilterKey,
+        servletContext);
   }
 
   private HttpSecurityModule(
       HttpAuthenticationMechanism mechanism,
       Set<Module> shiroConfigurationModules,
-      Key<? extends Filter> shiroAfterAuthFilterKey) {
+      Key<? extends Filter> shiroAfterAuthFilterKey,
+      ServletContext servletContext) {
 
     this.mechanism = requireNonNull(mechanism);
     this.shiroConfigurationModules = requireNonNull(shiroConfigurationModules);
     this.shiroAfterAuthFilterKey = Optional.ofNullable(shiroAfterAuthFilterKey);
+    this.servletContext = requireNonNull(servletContext);
   }
 
   @Override
@@ -171,7 +178,7 @@ public class HttpSecurityModule extends ServletModule {
       }
     });
     install(guiceFilterModule(API_PATH));
-    install(new ShiroWebModule(getServletContext()) {
+    install(new ShiroWebModule(servletContext) {
 
       // Replace the ServletContainerSessionManager which causes subject.runAs(...) in a
       // downstream user-defined filter to fail. See also: SHIRO-554
@@ -193,11 +200,11 @@ public class HttpSecurityModule extends ServletModule {
         // more specific pattern first.
         switch (mechanism) {
           case BASIC:
-            addFilterChainWithAfterAuthFilter(config(AUTHC_BASIC, PERMISSIVE));
+            addFilterChainWithAfterAuthFilter(filterConfig(AUTHC_BASIC, PERMISSIVE));
             break;
 
           case NEGOTIATE:
-            addFilterChainWithAfterAuthFilter(K_PERMISSIVE);
+            addFilterChainWithAfterAuthFilter(filterConfig(K_PERMISSIVE));
             break;
 
           default:
@@ -206,22 +213,31 @@ public class HttpSecurityModule extends ServletModule {
         }
       }
 
-      private void addFilterChainWithAfterAuthFilter(Key<? extends Filter> filter) {
+      private void addFilterChainWithAfterAuthFilter(FilterConfig<? extends Filter> filter) {
         if (shiroAfterAuthFilterKey.isPresent()) {
-          addFilterChain(filter, shiroAfterAuthFilterKey.get());
+          addFilterChain(filter, filterConfig(shiroAfterAuthFilterKey.get()));
         } else {
           addFilterChain(filter);
         }
       }
 
       @SuppressWarnings("unchecked")
-      private void addFilterChain(Key<? extends Filter> filter) {
-        addFilterChain(ALL_PATTERN, NO_SESSION_CREATION, filter);
+      private void addFilterChain(FilterConfig<? extends Filter> filter) {
+        addFilterChain(
+            ALL_PATTERN,
+            filterConfig(NO_SESSION_CREATION),
+            filter);
       }
 
       @SuppressWarnings("unchecked")
-      private void addFilterChain(Key<? extends Filter> filter1, Key<? extends Filter> filter2) {
-        addFilterChain(ALL_PATTERN, NO_SESSION_CREATION, filter1, filter2);
+      private void addFilterChain(
+          FilterConfig<? extends Filter> filter1,
+          FilterConfig<? extends Filter> filter2) {
+        addFilterChain(
+            ALL_PATTERN,
+            filterConfig(NO_SESSION_CREATION),
+            filter1,
+            filter2);
       }
     });
 

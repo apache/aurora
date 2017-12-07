@@ -15,12 +15,15 @@ package org.apache.aurora.scheduler.http.api.security;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
+import javax.inject.Inject;
 import javax.servlet.Filter;
-import javax.servlet.FilterChain;
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
@@ -53,21 +56,19 @@ import org.apache.shiro.authc.credential.CredentialsMatcher;
 import org.apache.shiro.authc.credential.SimpleCredentialsMatcher;
 import org.apache.shiro.config.Ini;
 import org.apache.shiro.realm.text.IniRealm;
+import org.apache.shiro.web.filter.PathMatchingFilter;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TJSONProtocol;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
-import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.http.api.ApiModule.API_PATH;
 import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
-import static org.easymock.EasyMock.getCurrentArguments;
-import static org.easymock.EasyMock.isA;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class HttpSecurityIT extends AbstractJettyTest {
@@ -107,7 +108,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
   private Ini ini;
   private Class<? extends CredentialsMatcher> credentialsMatcher;
   private AnnotatedAuroraAdmin auroraAdmin;
-  private Filter shiroAfterAuthFilter;
+  private AtomicInteger afterAuthCalls;
 
   @Before
   public void setUp() {
@@ -139,22 +140,42 @@ public class HttpSecurityIT extends AbstractJettyTest {
             + ADS_STAGING_JOB.getName());
 
     auroraAdmin = createMock(AnnotatedAuroraAdmin.class);
-    shiroAfterAuthFilter = createMock(Filter.class);
+    afterAuthCalls = new AtomicInteger();
+  }
+
+  public static class CountingFilter extends PathMatchingFilter {
+    private final AtomicInteger calls;
+
+    @Inject
+    public CountingFilter(AtomicInteger calls) {
+      this.calls = calls;
+    }
+
+    @Override
+    protected boolean onPreHandle(
+        ServletRequest request,
+        ServletResponse response,
+        Object mappedValue) {
+
+      calls.incrementAndGet();
+      return true;
+    }
   }
 
   @Override
-  protected Module getChildServletModule() {
-    return Modules.combine(
+  protected Function<ServletContext, Module> getChildServletModule() {
+    Key<? extends Filter> afterAuthBinding =
+        Key.get(CountingFilter.class, SHIRO_AFTER_AUTH_FILTER_ANNOTATION);
+    return (servletContext) -> Modules.combine(
         new ApiModule(new ApiModule.Options()),
         new HttpSecurityModule(
             new IniShiroRealmModule(ini, credentialsMatcher),
-            Key.get(Filter.class, SHIRO_AFTER_AUTH_FILTER_ANNOTATION)),
+            afterAuthBinding,
+            servletContext),
         new AbstractModule() {
           @Override
           protected void configure() {
-            bind(Filter.class)
-                .annotatedWith(SHIRO_AFTER_AUTH_FILTER_ANNOTATION)
-                .toInstance(shiroAfterAuthFilter);
+            bind(AtomicInteger.class).toInstance(afterAuthCalls);
             MockDecoratedThrift.bindForwardedMock(binder(), auroraAdmin);
           }
         });
@@ -186,25 +207,9 @@ public class HttpSecurityIT extends AbstractJettyTest {
     return getClient(defaultHttpClient);
   }
 
-  private IExpectationSetters<Object> expectShiroAfterAuthFilter()
-      throws ServletException, IOException {
-
-    shiroAfterAuthFilter.doFilter(
-        isA(HttpServletRequest.class),
-        isA(HttpServletResponse.class),
-        isA(FilterChain.class));
-
-    return expectLastCall().andAnswer(() -> {
-      Object[] args = getCurrentArguments();
-      ((FilterChain) args[2]).doFilter((HttpServletRequest) args[0], (HttpServletResponse) args[1]);
-      return null;
-    });
-  }
-
   @Test
   public void testReadOnlyScheduler() throws TException, ServletException, IOException {
     expect(auroraAdmin.getRoleSummary()).andReturn(OK).times(3);
-    expectShiroAfterAuthFilter().times(3);
 
     replayAndStart();
 
@@ -213,6 +218,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
     // Incorrect works because the server doesn't challenge for credentials to execute read-only
     // methods.
     assertEquals(OK, getAuthenticatedClient(INCORRECT).getRoleSummary());
+    assertEquals(3, afterAuthCalls.get());
   }
 
   private void assertKillTasksFails(AuroraAdmin.Client client) throws TException {
@@ -230,7 +236,6 @@ public class HttpSecurityIT extends AbstractJettyTest {
 
     expect(auroraAdmin.killTasks(job, null, null)).andReturn(OK).times(2);
     expect(auroraAdmin.killTasks(ADS_STAGING_JOB.newBuilder(), null, null)).andReturn(OK);
-    expectShiroAfterAuthFilter().atLeastOnce();
 
     replayAndStart();
 
@@ -272,6 +277,7 @@ public class HttpSecurityIT extends AbstractJettyTest {
     assertKillTasksFails(getUnauthenticatedClient());
     assertKillTasksFails(getAuthenticatedClient(INCORRECT));
     assertKillTasksFails(getAuthenticatedClient(NONEXISTENT));
+    assertTrue(afterAuthCalls.get() > 0);
   }
 
   private void assertSnapshotFails(AuroraAdmin.Client client) throws TException {
@@ -287,7 +293,6 @@ public class HttpSecurityIT extends AbstractJettyTest {
   public void testAuroraAdmin() throws TException, ServletException, IOException {
     expect(auroraAdmin.snapshot()).andReturn(OK);
     expect(auroraAdmin.listBackups()).andReturn(OK);
-    expectShiroAfterAuthFilter().times(12);
 
     replayAndStart();
 
@@ -304,5 +309,6 @@ public class HttpSecurityIT extends AbstractJettyTest {
     }
 
     assertEquals(OK, getAuthenticatedClient(BACKUP_SERVICE).listBackups());
+    assertEquals(12, afterAuthCalls.get());
   }
 }

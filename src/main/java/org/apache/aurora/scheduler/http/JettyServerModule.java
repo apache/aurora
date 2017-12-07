@@ -17,12 +17,15 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.servlet.DispatcherType;
+import javax.servlet.ServletContext;
 import javax.servlet.ServletContextListener;
 import javax.ws.rs.HttpMethod;
 
@@ -34,6 +37,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -49,10 +53,8 @@ import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 import com.google.inject.servlet.GuiceFilter;
-import com.google.inject.servlet.GuiceServletContextListener;
+import com.google.inject.servlet.ServletModule;
 import com.google.inject.util.Modules;
-import com.sun.jersey.guice.JerseyServletModule;
-import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
 import org.apache.aurora.common.net.http.handlers.AbortHandler;
 import org.apache.aurora.common.net.http.handlers.ContentionPrinter;
@@ -82,12 +84,12 @@ import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.resource.Resource;
+import org.jboss.resteasy.plugins.guice.GuiceResteasyBootstrapServletContextListener;
+import org.jboss.resteasy.plugins.server.servlet.HttpServletDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
-
-import static com.sun.jersey.api.json.JSONConfiguration.FEATURE_POJO_MAPPING;
 
 /**
  * Binding module for scheduler HTTP servlets.
@@ -120,9 +122,6 @@ public class JettyServerModule extends AbstractModule {
             "The ip address to listen. If not set, the scheduler will listen on all interfaces.")
     public String listenIp;
   }
-
-  public static final Map<String, String> GUICE_CONTAINER_PARAMS = ImmutableMap.of(
-      FEATURE_POJO_MAPPING, Boolean.TRUE.toString());
 
   private static final String STATIC_ASSETS_ROOT = Resource
       .newClassPathResource("scheduler/assets/index.html")
@@ -193,9 +192,9 @@ public class JettyServerModule extends AbstractModule {
         ServletContextListener provideServletContextListener(Injector parentInjector) {
           return makeServletContextListener(
               parentInjector,
-              Modules.combine(
+              (servletContext) -> Modules.combine(
                   new ApiModule(options.api),
-                  new HttpSecurityModule(options),
+                  new HttpSecurityModule(options, servletContext),
                   new ThriftModule(),
                   new AopModule(options)));
         }
@@ -253,15 +252,15 @@ public class JettyServerModule extends AbstractModule {
   // TODO(ksweeney): Factor individual servlet configurations to their own ServletModules.
   @VisibleForTesting
   static ServletContextListener makeServletContextListener(
-      final Injector parentInjector,
-      final Module childModule) {
+      Injector parentInjector,
+      Function<ServletContext, Module> childModuleFactory) {
 
-    return new GuiceServletContextListener() {
+    ServletContextListener contextListener = new GuiceResteasyBootstrapServletContextListener() {
       @Override
-      protected Injector getInjector() {
-        return parentInjector.createChildInjector(
-            childModule,
-            new JerseyServletModule() {
+      protected List<? extends Module> getModules(ServletContext context) {
+        return ImmutableList.of(
+            childModuleFactory.apply(context),
+            new ServletModule() {
               @Override
               protected void configureServlets() {
                 bind(HttpStatsFilter.class).in(Singleton.class);
@@ -270,10 +269,6 @@ public class JettyServerModule extends AbstractModule {
                 bind(LeaderRedirectFilter.class).in(Singleton.class);
                 filterRegex(allOf(LEADER_ENDPOINTS))
                     .through(LeaderRedirectFilter.class);
-
-                bind(GuiceContainer.class).in(Singleton.class);
-                filterRegex(allOf(ImmutableSet.copyOf(JAX_RS_ENDPOINTS.values())))
-                    .through(GuiceContainer.class, GUICE_CONTAINER_PARAMS);
 
                 filterRegex("/assets/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
 
@@ -287,9 +282,15 @@ public class JettyServerModule extends AbstractModule {
                   bind(jaxRsHandler);
                 }
               }
-            });
+            }
+        );
       }
     };
+
+    // Injects the Injector into GuiceResteasyBootstrapServletContextListener.
+    parentInjector.injectMembers(contextListener);
+
+    return contextListener;
   }
 
   static class RedirectMonitor extends AbstractIdleService {
@@ -380,6 +381,7 @@ public class JettyServerModule extends AbstractModule {
       servletHandler.addServlet(DefaultServlet.class, "/");
       servletHandler.addFilter(GuiceFilter.class, "/*", EnumSet.allOf(DispatcherType.class));
       servletHandler.addEventListener(servletContextListener);
+      servletHandler.addServlet(HttpServletDispatcher.class, "/*");
 
       HandlerCollection rootHandler = new HandlerList();
 

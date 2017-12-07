@@ -15,7 +15,9 @@ package org.apache.aurora.scheduler.http;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
+import javax.servlet.ServletContext;
 import javax.servlet.ServletContextListener;
 import javax.ws.rs.core.MediaType;
 
@@ -34,7 +36,6 @@ import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
-import com.sun.jersey.api.json.JSONConfiguration;
 
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
 import org.apache.aurora.common.quantity.Amount;
@@ -88,8 +89,8 @@ public abstract class AbstractJettyTest extends EasyMockTest {
    *
    * @return A module used in the creation of the servlet container's child injector.
    */
-  protected Module getChildServletModule() {
-    return Modules.EMPTY_MODULE;
+  protected Function<ServletContext, Module> getChildServletModule() {
+    return (servletContext) -> Modules.EMPTY_MODULE;
   }
 
   @Before
@@ -189,7 +190,6 @@ public abstract class AbstractJettyTest extends EasyMockTest {
   protected WebResource.Builder getRequestBuilder(String path) {
     assertNotNull("HTTP server must be started first", httpServer);
     ClientConfig config = new DefaultClientConfig();
-    config.getFeatures().put(JSONConfiguration.FEATURE_POJO_MAPPING, Boolean.TRUE);
     config.getClasses().add(GsonMessageBodyHandler.class);
     Client client = Client.create(config);
     // Disable redirects so we can unit test them.

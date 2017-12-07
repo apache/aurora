@@ -81,14 +81,17 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
   ext.curatorRev = '2.12.0'
   ext.gsonRev = '2.3.1'
   ext.guavaRev = '23.2-jre'
-  ext.guiceRev = '3.0'
+  ext.guiceRev = '4.1.0'
+  ext.httpclientRev = '4.5.2'
+  ext.httpcoreRev = '4.4.4'
   ext.asyncHttpclientRev = '2.0.37'
   ext.jacksonRev = '2.5.1'
-  ext.jerseyRev = '1.19'
+  ext.jaxRsRev = '2.0'
   ext.junitRev = '4.12'
   ext.logbackRev = '1.2.3'
   ext.nettyRev = '4.0.52.Final'
   ext.protobufRev = '3.3.0'
+  ext.resteasyRev = '3.1.4.Final'
   ext.servletRev = '3.1.0'
   ext.slf4jRev = '1.7.25'
   ext.stringTemplateRev = '3.2.1'
@@ -107,6 +110,10 @@ For more details, please see https://issues.apache.org/jira/browse/AURORA-1169
     // See http://forums.gradle.org/gradle/topics/shouldnt-resolutionstrategy-affect-depending-projects-transitive-dependencies
     resolutionStrategy {
       failOnVersionConflict()
+      force "com.google.inject:guice:${guiceRev}"
+      force "com.google.inject.extensions:guice-multibindings:${guiceRev}"
+      force "org.apache.httpcomponents:httpclient:${httpclientRev}"
+      force "org.apache.httpcomponents:httpcore:${httpcoreRev}"
       force "com.fasterxml.jackson.core:jackson-annotations:${jacksonRev}"
       force "com.fasterxml.jackson.core:jackson-core:${jacksonRev}"
       force "com.google.code.gson:gson:${gsonRev}"
@@ -185,9 +192,9 @@ project(':commons') {
     compile "com.google.code.gson:gson:${gsonRev}"
     compile "com.google.guava:guava:${guavaRev}"
     compile "com.google.inject:guice:${guiceRev}"
-    compile "com.sun.jersey:jersey-core:${jerseyRev}"
     compile "commons-lang:commons-lang:${commonsLangRev}"
     compile "javax.servlet:javax.servlet-api:${servletRev}"
+    compile "javax.ws.rs:javax.ws.rs-api:${jaxRsRev}"
     compile "org.antlr:stringtemplate:${stringTemplateRev}"
     compile "org.apache.zookeeper:zookeeper:${zookeeperRev}"
     compile "org.easymock:easymock:3.4"
@@ -358,7 +365,7 @@ sourceSets {
 }
 
 dependencies {
-  def shiroRev = '1.2.5'
+  def shiroRev = '1.4.0'
   def jettyDep = '9.3.11.v20160721'
 
   compile project(':api')
@@ -369,14 +376,14 @@ dependencies {
   compile "com.beust:jcommander:1.72"
   compile "com.google.inject:guice:${guiceRev}"
   compile "com.google.inject.extensions:guice-assistedinject:${guiceRev}"
+  compile "com.google.inject.extensions:guice-multibindings:${guiceRev}"
+  compile "com.google.inject.extensions:guice-servlet:${guiceRev}"
   compile "com.google.protobuf:protobuf-java:${protobufRev}"
   compile 'com.hubspot.jackson:jackson-datatype-protobuf:0.9.3'
   compile "com.fasterxml.jackson.core:jackson-core:${jacksonRev}"
-  compile "com.sun.jersey:jersey-core:${jerseyRev}"
-  compile "com.sun.jersey:jersey-json:${jerseyRev}"
-  compile "com.sun.jersey:jersey-server:${jerseyRev}"
-  compile "com.sun.jersey:jersey-servlet:${jerseyRev}"
-  compile "com.sun.jersey.contribs:jersey-guice:${jerseyRev}"
+  compile "org.jboss.resteasy:resteasy-guice:${resteasyRev}"
+  compile "org.jboss.resteasy:resteasy-jackson-provider:${resteasyRev}"
+  compile "org.jboss.resteasy:resteasy-jaxrs:${resteasyRev}"
   compile 'javax.inject:javax.inject:1'
   compile "javax.servlet:javax.servlet-api:${servletRev}"
   compile "org.antlr:stringtemplate:${stringTemplateRev}"
@@ -394,7 +401,7 @@ dependencies {
   compile "org.eclipse.jetty:jetty-servlets:${jettyDep}"
   compile 'org.quartz-scheduler:quartz:2.2.2'
 
-  testCompile "com.sun.jersey:jersey-client:${jerseyRev}"
+  testCompile 'com.sun.jersey:jersey-client:1.19'
   testCompile "junit:junit:${junitRev}"
   testCompile "org.powermock:powermock-module-junit4:1.6.4"
   testCompile "org.powermock:powermock-api-easymock:1.6.4"

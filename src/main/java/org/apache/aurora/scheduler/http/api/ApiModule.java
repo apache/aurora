@@ -21,11 +21,9 @@ import com.beust.jcommander.Parameters;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Provides;
 import com.google.inject.servlet.ServletModule;
-import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.scheduler.http.CorsFilter;
-import org.apache.aurora.scheduler.http.JettyServerModule;
 import org.apache.aurora.scheduler.http.LeaderRedirectFilter;
 import org.apache.aurora.scheduler.http.api.TContentAwareServlet.ContentFactoryPair;
 import org.apache.aurora.scheduler.http.api.TContentAwareServlet.InputConfig;
@@ -75,8 +73,6 @@ public class ApiModule extends ServletModule {
     serve(API_PATH).with(TContentAwareServlet.class);
 
     filter(ApiBeta.PATH, ApiBeta.PATH + "/*").through(LeaderRedirectFilter.class);
-    filter(ApiBeta.PATH, ApiBeta.PATH + "/*")
-        .through(GuiceContainer.class, JettyServerModule.GUICE_CONTAINER_PARAMS);
     bind(ApiBeta.class);
 
     serve("/apiclient", "/apiclient/*")
