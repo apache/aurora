@@ -51,6 +51,7 @@ import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.RemoveJob;
 import org.apache.aurora.gen.storage.RemoveJobUpdates;
+import org.apache.aurora.gen.storage.RemoveLock;
 import org.apache.aurora.gen.storage.RemoveQuota;
 import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.SaveCronJob;
@@ -59,6 +60,7 @@ import org.apache.aurora.gen.storage.SaveHostAttributes;
 import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
+import org.apache.aurora.gen.storage.SaveLock;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.scheduler.base.JobKeys;
@@ -232,6 +234,12 @@ public class DurableStorageTest extends EasyMockTest {
     builder.add(Op.saveHostAttributes(hostAttributes2));
     expect(storageUtil.attributeStore.saveHostAttributes(
         IHostAttributes.build(hostAttributes2.getHostAttributes()))).andReturn(true);
+
+    builder.add(Op.saveLock(new SaveLock()));
+    // TODO(jly): Deprecated, this is a no-op to be removed in 0.21. See AURORA-1959.
+
+    builder.add(Op.removeLock(new RemoveLock()));
+    // TODO(jly): Deprecated, this is a no-op to be removed in 0.21. See AURORA-1959.
 
     JobUpdate actualUpdate = new JobUpdate()
         .setSummary(new JobUpdateSummary().setKey(UPDATE_ID.newBuilder()))

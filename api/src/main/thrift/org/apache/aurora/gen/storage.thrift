@@ -28,6 +28,16 @@ struct SaveCronJob {
   2: api.JobConfiguration jobConfig
 }
 
+// TODO(jly): Deprecated, remove in 0.21. See AURORA-1959.
+struct SaveLock {
+  1: api.Lock lock
+}
+
+// TODO(jly): Deprecated, remove in 0.21. See AURORA-1959.
+struct RemoveLock {
+  1: api.LockKey lockKey
+}
+
 struct RemoveJob {
   2: api.JobKey jobKey
 }
@@ -92,8 +102,8 @@ union Op {
   9: RemoveQuota removeQuota
   10: SaveHostAttributes saveHostAttributes
   // 11: removed
-  // 12: deleted
-  // 13: deleted
+  12: SaveLock saveLock // TODO(jly): Deprecated, remove in 0.21. See AURORA-1959.
+  13: RemoveLock removeLock // TODO(jly): Deprecated, remove in 0.21. See AURORA-1959.
   14: SaveJobUpdate saveJobUpdate
   15: SaveJobUpdateEvent saveJobUpdateEvent
   16: SaveJobInstanceUpdateEvent saveJobInstanceUpdateEvent

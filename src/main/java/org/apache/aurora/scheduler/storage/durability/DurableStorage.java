@@ -221,6 +221,12 @@ public class DurableStorage implements NonVolatileStorage {
             LOG.info("Dropping host attributes with no agent ID: " + attributes);
           }
         })
+        .put(
+            Op._Fields.SAVE_LOCK, // TODO(jly): Deprecated, remove in 0.21. See AURORA-1959.
+            op -> { /* no-op */ })
+        .put(
+            Op._Fields.REMOVE_LOCK, // TODO(jly): Deprecated, remove in 0.21. See AURORA-1959.
+            op -> { /* no-op */ })
         .put(Op._Fields.SAVE_JOB_UPDATE, op ->
           writeBehindJobUpdateStore.saveJobUpdate(
               thriftBackfill.backFillJobUpdate(op.getSaveJobUpdate().getJobUpdate())))
