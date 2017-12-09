@@ -18,6 +18,9 @@ python_library(
   name = 'common',
   sources = rglobs('*.py'),
   dependencies = [
+    '3rdparty/python:certifi',
+    '3rdparty/python:chardet',
+    '3rdparty/python:idna',
     '3rdparty/python:pex',
     '3rdparty/python:pystachio',
     '3rdparty/python:requests',
@@ -26,6 +29,7 @@ python_library(
     '3rdparty/python:twitter.common.collections',
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
+    '3rdparty/python:urllib3',
     'api/src/main/thrift/org/apache/aurora/gen',
   ],
   provides = setup_py(
