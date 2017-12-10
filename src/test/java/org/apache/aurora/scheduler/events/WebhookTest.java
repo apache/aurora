@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -181,26 +180,12 @@ public class WebhookTest {
 
   @Test
   public void testTaskChangedWithOldStateError() throws Exception {
-    // We have a special handler here to trigger `onThrowable` on the client.
-    jettyServer.setHandler(new AbstractHandler() {
-      @Override
-      public void handle(String target, Request baseRequest, HttpServletRequest request,
-                         HttpServletResponse response) throws IOException, ServletException {
-
-        Stream.of(jettyServer.getConnectors())
-            .forEach(c -> {
-              try {
-                c.stop();
-              } catch (Exception e) {
-                throw new RuntimeException(e);
-              }
-            });
-      }
-    });
     jettyServer.start();
     WebhookInfo webhookInfo = buildWebhookInfoWithJettyPort(WEBHOOK_INFO_BUILDER);
     Webhook webhook = new Webhook(httpClient, webhookInfo, statsProvider);
 
+    // Send the event to a stopped server to trigger `onThrowable` of the client.
+    jettyServer.stop();
     webhook.taskChangedState(CHANGE_OLD_STATE);
 
     assertEquals(1, statsProvider.getLongValue(Webhook.ATTEMPTS_STAT_NAME));
