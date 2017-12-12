@@ -178,7 +178,7 @@ class RequestProcessor(object):
       result = subprocess.call([
         'bash',
         '-c',
-        'set -o pipefail; %s 2>&1 | tr -u "\r" "\n" | tee %s' % (self._command, build_output)])
+        'set -o pipefail; %s 2>&1 | tr "\r" "\n" | tee %s' % (self._command, build_output)])
       if result == 0:
         review_text = 'Master (%s) is green with this patch.\n  %s' % (sha, self._command)
         if self._missing_tests(latest_diff):
