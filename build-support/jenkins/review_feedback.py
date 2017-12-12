@@ -172,10 +172,13 @@ class RequestProcessor(object):
       # Pipe to a file in case output is large, also tee the output to simplify
       # debugging.  Since we pipe the output, we must set pipefail to ensure
       # a failing build command fails the bash pipeline.
+      # AURORA-1961: Convert carriage returns to newlines to prevent shell cmds
+      # seing spotbugs output on a single line, which is then translated to
+      # multiple lines by Python subprocess.
       result = subprocess.call([
         'bash',
         '-c',
-        'set -o pipefail; %s 2>&1 | tee %s' % (self._command, build_output)])
+        'set -o pipefail; %s 2>&1 | tr -u "\r" "\n" | tee %s' % (self._command, build_output)])
       if result == 0:
         review_text = 'Master (%s) is green with this patch.\n  %s' % (sha, self._command)
         if self._missing_tests(latest_diff):
