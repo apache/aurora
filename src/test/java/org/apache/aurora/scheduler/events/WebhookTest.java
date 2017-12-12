@@ -17,7 +17,9 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import javax.servlet.ServletException;
@@ -36,6 +38,9 @@ import org.asynchttpclient.AsyncHandler;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
+import org.asynchttpclient.HttpResponseBodyPart;
+import org.asynchttpclient.HttpResponseHeaders;
+import org.asynchttpclient.HttpResponseStatus;
 import org.asynchttpclient.ListenableFuture;
 import org.asynchttpclient.channel.DefaultKeepAliveStrategy;
 import org.eclipse.jetty.server.Request;
@@ -93,6 +98,59 @@ public class WebhookTest {
   private FakeStatsProvider statsProvider;
 
   /**
+   * Wraps an {@link AsyncHandler} to allow the caller to wait for
+   * {@link AsyncHandler#onThrowable} to complete. This is necessary because exceptions cause the
+   * future to complete before {@code onThrowable} can finish. See AURORA-1961 for context.
+   */
+  static class WebhookOnThrowableHandler<T> implements AsyncHandler<T> {
+    private final AsyncHandler<T> handler;
+    private final CountDownLatch latch = new CountDownLatch(1);
+
+    private boolean onThrowableFinished = false;
+
+    WebhookOnThrowableHandler(AsyncHandler<T> handler) {
+      this.handler = handler;
+    }
+
+    boolean hasOnThrowableFinished(long timeout, TimeUnit unit) {
+      try {
+        latch.await(timeout, unit);
+      } catch (InterruptedException e) {
+        // No-op
+      }
+
+      return onThrowableFinished;
+    }
+
+    @Override
+    public void onThrowable(Throwable t) {
+      handler.onThrowable(t);
+      onThrowableFinished = true;
+      latch.countDown();
+    }
+
+    @Override
+    public State onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
+      return handler.onBodyPartReceived(bodyPart);
+    }
+
+    @Override
+    public State onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
+      return handler.onStatusReceived(responseStatus);
+    }
+
+    @Override
+    public State onHeadersReceived(HttpResponseHeaders headers) throws Exception {
+      return handler.onHeadersReceived(headers);
+    }
+
+    @Override
+    public T onCompleted() throws Exception {
+      return handler.onCompleted();
+    }
+  }
+
+  /**
    * Wrap the DefaultAsyncHttpClient for testing so we can complete futures synchronously before
    * validating assertions. Otherwise, we would have to call `Thread.sleep` in our tests after
    * each TaskStateChange.
@@ -106,12 +164,15 @@ public class WebhookTest {
     @Override
     public <T> ListenableFuture<T> executeRequest(org.asynchttpclient.Request request,
                                                   AsyncHandler<T> handler) {
-      ListenableFuture<T> future = super.executeRequest(request, handler);
+
+      WebhookOnThrowableHandler<T> wrapped = new WebhookOnThrowableHandler<>(handler);
+      ListenableFuture<T> future = super.executeRequest(request, wrapped);
       try {
         future.get();
         future.done();
       } catch (InterruptedException | ExecutionException e) {
-        // Ignore, future should not fail to resolve.
+        // The future threw an exception, wait up to 60 seconds for onThrowable to complete.
+        wrapped.hasOnThrowableFinished(60, TimeUnit.SECONDS);
       }
       return future;
     }
@@ -180,12 +241,10 @@ public class WebhookTest {
 
   @Test
   public void testTaskChangedWithOldStateError() throws Exception {
-    jettyServer.start();
-    WebhookInfo webhookInfo = buildWebhookInfoWithJettyPort(WEBHOOK_INFO_BUILDER);
+    // Don't start Jetty server, send the request to an invalid port to force a ConnectError
+    WebhookInfo webhookInfo = buildWebhookInfoWithJettyPort(WEBHOOK_INFO_BUILDER, -1);
     Webhook webhook = new Webhook(httpClient, webhookInfo, statsProvider);
 
-    // Send the event to a stopped server to trigger `onThrowable` of the client.
-    jettyServer.stop();
     webhook.taskChangedState(CHANGE_OLD_STATE);
 
     assertEquals(1, statsProvider.getLongValue(Webhook.ATTEMPTS_STAT_NAME));
@@ -358,7 +417,11 @@ public class WebhookTest {
    * should have been started before this method is called.
    */
   private WebhookInfo buildWebhookInfoWithJettyPort(WebhookInfoBuilder builder) {
-    String fullUrl = String.format("http://localhost:%d", jettyServer.getURI().getPort());
+    return buildWebhookInfoWithJettyPort(builder, jettyServer.getURI().getPort());
+  }
+
+  private WebhookInfo buildWebhookInfoWithJettyPort(WebhookInfoBuilder builder, int port) {
+    String fullUrl = String.format("http://localhost:%d", port);
     return builder
         .setTargetURL(fullUrl)
         .build();
