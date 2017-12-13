@@ -15,10 +15,14 @@
 import os
 
 
+resources(
+  name = 'ui',
+  sources = zglobs('**/assets/*', '**/*.tpl'),
+)
+
 python_library(
   name = 'observer',
   sources = rglobs('*.py'),
-  resources = zglobs('**/assets/*', '**/*.tpl'),
   dependencies = [
     '3rdparty/python:bottle',
     '3rdparty/python:mako',
@@ -36,6 +40,8 @@ python_library(
     'src/main/python/apache/thermos/common',
     'src/main/python/apache/thermos/config',
     'src/main/python/apache/thermos/monitoring',
+
+    ':ui',
   ],
   provides = setup_py(
     name = 'apache.thermos.observer',

@@ -28,7 +28,7 @@ set -o errexit
 
 # Use the convention of a python_library exporting a setup_py alongside each public target
 # to generate the list of setup_pys our project provides.
-TARGETS=($(./pants filter --type=python_binary src/main:: | sed 's@:.*@@'))
+TARGETS=($(./pants filter --type=python_binary src/main:: | sed 's@:.*@@' | sort -u))
 
 cd "`git rev-parse --show-toplevel`"
 # Run in a virtualenv so that we use a consistent version of setuptools to generate the sdist.

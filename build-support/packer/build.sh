@@ -115,10 +115,10 @@ function install_thrift {
   # Install thrift, needed for code generation in the scheduler build.
   curl -sSL http://apache.org/dist/thrift/KEYS | gpg --import -
   gpg --export --armor 66B778F9 | apt-key add -
-  echo 'deb http://www.apache.org/dist/thrift/debian 0.9.1 main' \
+  echo 'deb http://www.apache.org/dist/thrift/debian 0.10.0 main' \
     > /etc/apt/sources.list.d/thrift.list
   apt-get update
-  apt-get install thrift-compiler=0.9.1
+  apt-get install thrift-compiler=0.10.0
 }
 
 function warm_artifact_cache {

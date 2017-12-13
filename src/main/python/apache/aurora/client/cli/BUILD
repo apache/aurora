@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-python_library(
+resources(
   name = 'auroraversion',
-  resources = [ '.auroraversion' ]
+  sources = [ '.auroraversion' ]
 )

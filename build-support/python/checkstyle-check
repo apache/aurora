@@ -20,4 +20,4 @@ HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
 # TODO(John Sirois): Consider using `./pants changed` as a feed for this check.
 # We need not be checking the whole repo on evey commit.
-$HERE/../../pants compile.pythonstyle src/{main,test}/python::
+$HERE/../../pants lint.pythonstyle src/{main,test}/python::

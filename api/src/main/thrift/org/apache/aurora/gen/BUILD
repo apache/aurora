@@ -14,23 +14,21 @@
 
 import os
 
-TEST_DATA = globs('*test.thrift')
-
 python_thrift_library(
   name = '_api',
   sources = [
     'api.thrift',
   ],
   dependencies = [
-    'build-support/thrift',
+    '3rdparty/python:thrift',
   ],
 )
 
 python_thrift_library(
   name = '_test',
-  sources = TEST_DATA,
+  sources = globs('*test.thrift'),
   dependencies = [
-    'build-support/thrift',
+    '3rdparty/python:thrift',
   ],
 )
 
@@ -38,7 +36,7 @@ python_thrift_library(
   name = '_storage',
   sources = ['storage.thrift'],
   dependencies = [
-    'build-support/thrift',
+    '3rdparty/python:thrift',
     ':_api',
   ],
 )

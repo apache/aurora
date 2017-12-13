@@ -41,9 +41,9 @@ from apache.thermos.core.process import (
 from gen.apache.thermos.ttypes import RunnerCkpt
 
 
-class TestProcess(Process):
+class FakeProcess(Process):
   def execute(self):
-    super(TestProcess, self).execute()
+    super(FakeProcess, self).execute()
     os._exit(0)
 
   def finish(self):
@@ -92,7 +92,7 @@ def test_simple_process():
     taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
 
-    p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox)
+    p = FakeProcess('process', 'echo hello world', 0, taskpath, sandbox)
     p.start()
     rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
 
@@ -125,7 +125,7 @@ def test_simple_process_filesystem_isolator_command_info():
 
       chmod_plus_x(test_isolator_path)
 
-      p = TestProcess(
+      p = FakeProcess(
         'process',
         'echo hello world',
         0,
@@ -170,7 +170,7 @@ def test_simple_process_filesystem_isolator_launch_info():
 
       chmod_plus_x(test_isolator_path)
 
-      p = TestProcess(
+      p = FakeProcess(
           'process',
           'echo hello world',
           0,
@@ -201,7 +201,7 @@ def test_simple_process_other_user(*args):
     taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
 
-    p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox, user=some_user.pw_name)
+    p = FakeProcess('process', 'echo hello world', 0, taskpath, sandbox, user=some_user.pw_name)
     p.start()
     wait_for_rc(taskpath.getpath('process_checkpoint'))
 
@@ -215,7 +215,7 @@ def test_other_user_fails_nonroot():
   with temporary_dir() as td:
     taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
-    process = TestProcess(
+    process = FakeProcess(
         'process',
         'echo hello world',
         0,
@@ -231,7 +231,7 @@ def test_log_permissions():
     taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
 
-    p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox)
+    p = FakeProcess('process', 'echo hello world', 0, taskpath, sandbox)
     p.start()
     wait_for_rc(taskpath.getpath('process_checkpoint'))
 
@@ -254,7 +254,7 @@ def test_log_permissions_other_user(*mocks):
     taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
 
-    p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox, user=some_user.pw_name)
+    p = FakeProcess('process', 'echo hello world', 0, taskpath, sandbox, user=some_user.pw_name)
     p.start()
     wait_for_rc(taskpath.getpath('process_checkpoint'))
 
@@ -278,11 +278,11 @@ def test_cloexec():
         p.start()
         return wait_for_rc(taskpath.getpath('process_checkpoint'))
 
-  class TestWithoutCloexec(TestProcess):
+  class TestWithoutCloexec(FakeProcess):
     FD_CLOEXEC = False
 
   assert run_with_class(TestWithoutCloexec) == 0
-  assert run_with_class(TestProcess) != 0
+  assert run_with_class(FakeProcess) != 0
 
 
 STDERR = 'for i in {1..31};do echo "stderr" 1>&2; done;'
@@ -295,7 +295,7 @@ def test_log_standard():
     sandbox = setup_sandbox(td, taskpath)
 
     script = STDERR + STDOUT
-    p = TestProcess('process', script, 0, taskpath, sandbox)
+    p = FakeProcess('process', script, 0, taskpath, sandbox)
     p.start()
 
     rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
@@ -341,7 +341,7 @@ def test_log_rotation():
       taskpath = make_taskpath(td)
       sandbox = setup_sandbox(td, taskpath)
 
-      p = TestProcess(
+      p = FakeProcess(
           'process',
           script,
           0,
@@ -384,7 +384,7 @@ def test_preserve_env(*mocks):
       taskpath = make_taskpath(td)
       sandbox = setup_sandbox(td, taskpath)
 
-      p = TestProcess('process', 'echo $' + var, 0, taskpath, sandbox, preserve_env=preserve)
+      p = FakeProcess('process', 'echo $' + var, 0, taskpath, sandbox, preserve_env=preserve)
       p.start()
       rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
 
@@ -475,7 +475,7 @@ def test_log_none():
     taskpath = make_taskpath(td)
     sandbox = setup_sandbox(td, taskpath)
 
-    p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox,
+    p = FakeProcess('process', 'echo hello world', 0, taskpath, sandbox,
                     logger_destination=LoggerDestination.NONE)
     p.start()
     rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
@@ -491,13 +491,13 @@ def test_log_console():
     sandbox = setup_sandbox(td, taskpath)
 
     # Create file stdout for capturing output. We can't use StringIO mock
-    # because TestProcess is running fork.
+    # because FakeProcess is running fork.
     with open(os.path.join(td, 'sys_stdout'), 'w+') as stdout:
       with open(os.path.join(td, 'sys_stderr'), 'w+') as stderr:
         with mutable_sys():
           sys.stdout, sys.stderr = stdout, stderr
 
-          p = TestProcess('process', 'echo hello world; echo >&2 hello stderr', 0,
+          p = FakeProcess('process', 'echo hello world; echo >&2 hello stderr', 0,
                           taskpath, sandbox, logger_destination=LoggerDestination.CONSOLE)
           p.start()
           rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
@@ -522,13 +522,13 @@ def test_log_tee():
     sandbox = setup_sandbox(td, taskpath)
 
     # Create file stdout for capturing output. We can't use StringIO mock
-    # because TestProcess is running fork.
+    # because FakeProcess is running fork.
     with open(os.path.join(td, 'sys_stdout'), 'w+') as stdout:
       with open(os.path.join(td, 'sys_stderr'), 'w+') as stderr:
         with mutable_sys():
           sys.stdout, sys.stderr = stdout, stderr
 
-          p = TestProcess('process', 'echo hello world; echo >&2 hello stderr', 0,
+          p = FakeProcess('process', 'echo hello world; echo >&2 hello stderr', 0,
                           taskpath, sandbox, logger_destination=LoggerDestination.BOTH)
           p.start()
           rc = wait_for_rc(taskpath.getpath('process_checkpoint'))

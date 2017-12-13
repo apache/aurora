@@ -25,7 +25,7 @@ fi
 expected_version=$1
 shift
 
-HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 function check_thrift_version() {
   local readonly thrift="$1"
@@ -52,29 +52,71 @@ function compatible_thrift() {
 }
 
 function compatible_system_thrift() {
-  which -a thrift | while read thrift; do
-    if compatible_thrift "${thrift}"; then
-       echo "${thrift}"
-       return
-    fi
-  done
+  if compatible_thrift "${HERE}/thrift"; then
+    echo "${HERE}/thrift"
+  else
+    which -a thrift 2> /dev/null | while read thrift; do
+      if compatible_thrift "${thrift}"; then
+         echo "${thrift}"
+         return
+      fi
+    done
+  fi
+}
+
+function run_pants() {
+  pushd "${HERE}/../.." &> /dev/null
+  ./pants --no-colors --no-lock "$@"
+  popd &> /dev/null
+}
+
+function get_pants_option() {
+  local readonly scope="$1"
+  local readonly name="$2"
+
+  run_pants options --output-format=json --scope=${scope} --name=${name} | python <(cat << EOF
+from __future__ import print_function
+
+import json
+import sys
+
+
+object = json.load(sys.stdin)
+key = "${name}" if "${scope}" == "GLOBAL" else "${scope}.${name}"
+value = object[key]["value"]
+print(value)
+EOF
+)
 }
 
 thrift="$(compatible_system_thrift)"
 if [[ -z "${thrift}" ]]; then
-  thrift="${HERE}/thrift-${expected_version}/compiler/cpp/thrift"
-  if ! compatible_thrift "${thrift}"; then
-    make -C "${HERE}" clean
-    make -C "${HERE}"
-    if ! compatible_thrift "${thrift}"; then
-      echo "Failed to find or build a thrift binary compatible with Aurora requirements!"
-      exit 1
-    fi
+  readonly pants_thrift_version="$(get_pants_option thrift-binary version)"
+  if [[ "${expected_version}" != "${pants_thrift_version}" ]]; then
+    echo "Pants thrift version ${pants_thrift_version} does not match expected version ${expected_version}!"
+    exit 1
   fi
+
+  # Bootstrap thrift compiler with pants
+  run_pants --quiet gen --cache-ignore api/src/main/thrift/org/apache/aurora/gen::
+
+  # Without reverse engineering pants custom os-specific path names,
+  # find a suitable thrift compiler
+  readonly pants_cache_dir="$(get_pants_option GLOBAL pants_bootstrapdir)"
+  readonly thrift_bin_dir="$(get_pants_option thrift-binary supportdir)"
+  for candidate in "${pants_cache_dir}/${thrift_bin_dir}"/*/*/"${expected_version}"/thrift; do
+    if compatible_thrift "${candidate}"; then
+      thrift="${candidate}"
+      break
+    fi
+  done
+
+  if ! compatible_thrift "${thrift}"; then
+    echo "Failed to find or build a thrift binary compatible with Aurora requirements!"
+    exit 1
+  fi
+
+  ln -f -s "${thrift}" "${HERE}/thrift"
 fi
 
-if [[ "$@" == "--which" ]]; then
-  echo "${thrift}"
-else
-  exec "${thrift}" "$@"
-fi
+exec "${thrift}" "$@"

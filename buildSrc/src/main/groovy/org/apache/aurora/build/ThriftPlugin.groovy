@@ -42,7 +42,7 @@ class ThriftPlugin implements Plugin<Project> {
           thrift.inputFiles.each { File file ->
             exec {
               commandLine thrift.wrapperPath, thrift.version,
-                  '--gen', 'java:hashcode,private-members',
+                  '--gen', 'java:private-members',
                   '-out', thrift.genJavaDir.path,
                   file.path
             }

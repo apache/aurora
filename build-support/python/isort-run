@@ -14,4 +14,4 @@
 set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-$HERE/isort -ns __init__.py -rc $HERE/../../src
+$HERE/../../pants fmt.isort src/{main,test}/python::

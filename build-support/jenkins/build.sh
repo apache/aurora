@@ -25,8 +25,7 @@ date
 
 # Run remaining Python style checks and all tests
 ./build-support/python/checkstyle-check
-./pants test.pytest --junit-xml-dir="$PWD/dist/test-results" \
-  src/{main,test}/python:: -- -v
+./pants test.pytest --junit-xml-dir="$PWD/dist/test-results" src/test/python:: -- -v
 
 # Ensure we can build python sdists (AURORA-1174)
 ./build-support/release/make-python-sdists
