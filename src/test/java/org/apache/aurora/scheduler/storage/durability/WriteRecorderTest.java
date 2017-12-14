@@ -49,14 +49,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class WriteAheadStorageTest extends EasyMockTest {
+public class WriteRecorderTest extends EasyMockTest {
 
   private TransactionManager transactionManager;
   private TaskStore.Mutable taskStore;
   private AttributeStore.Mutable attributeStore;
   private JobUpdateStore.Mutable jobUpdateStore;
   private EventSink eventSink;
-  private WriteAheadStorage storage;
+  private WriteRecorder storage;
 
   @Before
   public void setUp() {
@@ -66,7 +66,7 @@ public class WriteAheadStorageTest extends EasyMockTest {
     jobUpdateStore = createMock(JobUpdateStore.Mutable.class);
     eventSink = createMock(EventSink.class);
 
-    storage = new WriteAheadStorage(
+    storage = new WriteRecorder(
         transactionManager,
         createMock(SchedulerStore.Mutable.class),
         createMock(CronJobStore.Mutable.class),
@@ -74,7 +74,7 @@ public class WriteAheadStorageTest extends EasyMockTest {
         createMock(QuotaStore.Mutable.class),
         attributeStore,
         jobUpdateStore,
-        LoggerFactory.getLogger(WriteAheadStorageTest.class),
+        LoggerFactory.getLogger(WriteRecorderTest.class),
         eventSink);
   }
 

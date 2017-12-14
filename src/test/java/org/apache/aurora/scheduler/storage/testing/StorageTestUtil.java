@@ -83,9 +83,9 @@ public class StorageTestUtil {
   }
 
   /**
-   * Expects any number of read or write operations.
+   * Expects any number of calls to fetch individual stores.
    */
-  public void expectOperations() {
+  public void expectStoreAccesses() {
     expect(storeProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(storeProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
     expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
@@ -99,6 +99,13 @@ public class StorageTestUtil {
     expect(mutableStoreProvider.getCronJobStore()).andReturn(jobStore).anyTimes();
     expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
     expect(mutableStoreProvider.getJobUpdateStore()).andReturn(jobUpdateStore).anyTimes();
+  }
+
+  /**
+   * Expects any number of read or write operations.
+   */
+  public void expectOperations() {
+    expectStoreAccesses();
     expectRead().anyTimes();
     expectWrite().anyTimes();
   }

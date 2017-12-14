@@ -13,10 +13,11 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.inject.Inject;
 
@@ -24,36 +25,35 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Streams;
 
 import org.apache.aurora.common.inject.TimedInterceptor.Timed;
 import org.apache.aurora.common.stats.SlidingStats;
 import org.apache.aurora.common.stats.SlidingStats.Timeable;
 import org.apache.aurora.common.util.BuildInfo;
 import org.apache.aurora.common.util.Clock;
-import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.JobInstanceUpdateEvent;
-import org.apache.aurora.gen.JobUpdateDetails;
-import org.apache.aurora.gen.JobUpdateEvent;
+import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
+import org.apache.aurora.gen.storage.SaveCronJob;
+import org.apache.aurora.gen.storage.SaveFrameworkId;
+import org.apache.aurora.gen.storage.SaveHostAttributes;
+import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
+import org.apache.aurora.gen.storage.SaveJobUpdate;
+import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
+import org.apache.aurora.gen.storage.SaveQuota;
+import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.StoredCronJob;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
-import org.apache.aurora.scheduler.storage.SnapshotStore;
-import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import org.apache.aurora.scheduler.storage.Storage.Volatile;
-import org.apache.aurora.scheduler.storage.durability.ThriftBackfill;
+import org.apache.aurora.scheduler.storage.Snapshotter;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
-import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.slf4j.Logger;
@@ -65,7 +65,7 @@ import static java.util.Objects.requireNonNull;
  * Snapshot store implementation that delegates to underlying snapshot stores by
  * extracting/applying fields in a snapshot thrift struct.
  */
-public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
+public class SnapshotStoreImpl implements Snapshotter {
 
   @VisibleForTesting
   static final String SNAPSHOT_SAVE = "snapshot_save_";
@@ -83,63 +83,62 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
   @VisibleForTesting
   Set<String> snapshotFieldNames() {
-    return FluentIterable.from(snapshotFields)
-        .transform(SnapshotField::getName)
-        .toSet();
+    return snapshotFields.stream()
+        .map(SnapshotField::getName)
+        .collect(Collectors.toSet());
   }
 
-  private final Iterable<SnapshotField> snapshotFields = Arrays.asList(
+  private final List<SnapshotField> snapshotFields = ImmutableList.of(
       new SnapshotField() {
         @Override
-        public String getName() {
+        String getName() {
           return HOST_ATTRIBUTES_FIELD;
         }
 
         @Override
-        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           snapshot.setHostAttributes(
               IHostAttributes.toBuildersSet(store.getAttributeStore().getHostAttributes()));
         }
 
         @Override
-        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        Stream<Op> doStreamFrom(Snapshot snapshot) {
           if (snapshot.getHostAttributesSize() > 0) {
-            store.getAttributeStore().deleteHostAttributes();
-            for (HostAttributes attributes : snapshot.getHostAttributes()) {
-              store.getAttributeStore().saveHostAttributes(IHostAttributes.build(attributes));
-            }
+            return snapshot.getHostAttributes().stream()
+                .map(attributes -> Op.saveHostAttributes(
+                    new SaveHostAttributes().setHostAttributes(attributes)));
           }
+          return Stream.empty();
         }
       },
       new SnapshotField() {
         @Override
-        public String getName() {
+        String getName() {
           return TASK_FIELD;
         }
 
         @Override
-        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           snapshot.setTasks(
               IScheduledTask.toBuildersSet(store.getTaskStore().fetchTasks(Query.unscoped())));
         }
 
         @Override
-        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        Stream<Op> doStreamFrom(Snapshot snapshot) {
           if (snapshot.getTasksSize() > 0) {
-            store.getUnsafeTaskStore().deleteAllTasks();
-            store.getUnsafeTaskStore()
-                .saveTasks(thriftBackfill.backfillTasks(snapshot.getTasks()));
+            return Stream.of(Op.saveTasks(new SaveTasks().setTasks(snapshot.getTasks())));
           }
+          return Stream.empty();
         }
       },
       new SnapshotField() {
         @Override
-        public String getName() {
+        String getName() {
           return CRON_FIELD;
         }
 
         @Override
-        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<StoredCronJob> jobs = ImmutableSet.builder();
 
           for (IJobConfiguration config : store.getCronJobStore().fetchJobs()) {
@@ -149,46 +148,46 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        Stream<Op> doStreamFrom(Snapshot snapshot) {
           if (snapshot.getCronJobsSize() > 0) {
-            store.getCronJobStore().deleteJobs();
-            for (StoredCronJob job : snapshot.getCronJobs()) {
-              store.getCronJobStore().saveAcceptedJob(
-                  thriftBackfill.backfillJobConfiguration(job.getJobConfiguration()));
-            }
+            return snapshot.getCronJobs().stream()
+                .map(job -> Op.saveCronJob(
+                    new SaveCronJob().setJobConfig(job.getJobConfiguration())));
           }
+          return Stream.empty();
         }
       },
       new SnapshotField() {
         @Override
-        public String getName() {
+        String getName() {
           return SCHEDULER_METADATA_FIELD;
         }
 
         @Override
-        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           // SchedulerMetadata is updated outside of the static list of SnapshotFields
         }
 
         @Override
-        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        Stream<Op> doStreamFrom(Snapshot snapshot) {
           if (snapshot.isSetSchedulerMetadata()
               && snapshot.getSchedulerMetadata().isSetFrameworkId()) {
             // No delete necessary here since this is a single value.
 
-            store.getSchedulerStore()
-                .saveFrameworkId(snapshot.getSchedulerMetadata().getFrameworkId());
+            return Stream.of(Op.saveFrameworkId(
+                new SaveFrameworkId().setId(snapshot.getSchedulerMetadata().getFrameworkId())));
           }
+          return Stream.empty();
         }
       },
       new SnapshotField() {
         @Override
-        public String getName() {
+        String getName() {
           return QUOTA_FIELD;
         }
 
         @Override
-        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<QuotaConfiguration> quotas = ImmutableSet.builder();
           for (Map.Entry<String, IResourceAggregate> entry
               : store.getQuotaStore().fetchQuotas().entrySet()) {
@@ -200,24 +199,24 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        Stream<Op> doStreamFrom(Snapshot snapshot) {
           if (snapshot.getQuotaConfigurationsSize() > 0) {
-            store.getQuotaStore().deleteQuotas();
-            for (QuotaConfiguration quota : snapshot.getQuotaConfigurations()) {
-              store.getQuotaStore()
-                  .saveQuota(quota.getRole(), IResourceAggregate.build(quota.getQuota()));
-            }
+            return snapshot.getQuotaConfigurations().stream()
+                .map(quota -> Op.saveQuota(new SaveQuota()
+                    .setRole(quota.getRole())
+                    .setQuota(quota.getQuota())));
           }
+          return Stream.empty();
         }
       },
       new SnapshotField() {
         @Override
-        public String getName() {
+        String getName() {
           return JOB_UPDATE_FIELD;
         }
 
         @Override
-        public void saveToSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           snapshot.setJobUpdateDetails(
               store.getJobUpdateStore().fetchJobUpdates(JobUpdateStore.MATCH_ALL).stream()
                   .map(u -> new StoredJobUpdateDetails().setDetails(u.newBuilder()))
@@ -225,112 +224,101 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
 
         @Override
-        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        Stream<Op> doStreamFrom(Snapshot snapshot) {
           if (snapshot.getJobUpdateDetailsSize() > 0) {
-            JobUpdateStore.Mutable updateStore = store.getJobUpdateStore();
-            updateStore.deleteAllUpdates();
-            for (StoredJobUpdateDetails storedDetails : snapshot.getJobUpdateDetails()) {
-              JobUpdateDetails details = storedDetails.getDetails();
-              updateStore.saveJobUpdate(thriftBackfill.backFillJobUpdate(details.getUpdate()));
+            return snapshot.getJobUpdateDetails().stream()
+                .flatMap(details -> {
+                  Stream<Op> parent = Stream.of(Op.saveJobUpdate(
+                      new SaveJobUpdate().setJobUpdate(details.getDetails().getUpdate())));
+                  Stream<Op> jobEvents;
+                  if (details.getDetails().getUpdateEventsSize() > 0) {
+                    jobEvents = details.getDetails().getUpdateEvents().stream()
+                        .map(event -> Op.saveJobUpdateEvent(
+                            new SaveJobUpdateEvent()
+                                .setKey(details.getDetails().getUpdate().getSummary().getKey())
+                                .setEvent(event)));
+                  } else {
+                    jobEvents = Stream.empty();
+                  }
 
-              if (details.getUpdateEventsSize() > 0) {
-                for (JobUpdateEvent updateEvent : details.getUpdateEvents()) {
-                  updateStore.saveJobUpdateEvent(
-                      IJobUpdateKey.build(details.getUpdate().getSummary().getKey()),
-                      IJobUpdateEvent.build(updateEvent));
-                }
-              }
+                  Stream<Op> instanceEvents;
+                  if (details.getDetails().getInstanceEventsSize() > 0) {
+                    instanceEvents = details.getDetails().getInstanceEvents().stream()
+                        .map(event -> Op.saveJobInstanceUpdateEvent(
+                            new SaveJobInstanceUpdateEvent()
+                                .setKey(details.getDetails().getUpdate().getSummary().getKey())
+                                .setEvent(event)));
+                  } else {
+                    instanceEvents = Stream.empty();
+                  }
 
-              if (details.getInstanceEventsSize() > 0) {
-                for (JobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
-                  updateStore.saveJobInstanceUpdateEvent(
-                      IJobUpdateKey.build(details.getUpdate().getSummary().getKey()),
-                      IJobInstanceUpdateEvent.build(instanceEvent));
-                }
-              }
-            }
+                  return Streams.concat(parent, jobEvents, instanceEvents);
+                });
           }
+          return Stream.empty();
         }
       }
   );
 
   private final BuildInfo buildInfo;
   private final Clock clock;
-  private final Storage storage;
-  private final ThriftBackfill thriftBackfill;
 
   @Inject
-  public SnapshotStoreImpl(
-      BuildInfo buildInfo,
-      Clock clock,
-      @Volatile Storage storage,
-      ThriftBackfill thriftBackfill) {
-
+  public SnapshotStoreImpl(BuildInfo buildInfo, Clock clock) {
     this.buildInfo = requireNonNull(buildInfo);
     this.clock = requireNonNull(clock);
-    this.storage = requireNonNull(storage);
-    this.thriftBackfill = requireNonNull(thriftBackfill);
   }
 
-  private Snapshot createSnapshot(Storage anyStorage) {
-    // It's important to perform snapshot creation in a write lock to ensure all upstream callers
-    // are correctly synchronized (e.g. during backup creation).
-    return anyStorage.write(storeProvider -> {
-      Snapshot snapshot = new Snapshot();
+  private Snapshot createSnapshot(StoreProvider storeProvider) {
+    Snapshot snapshot = new Snapshot();
 
-      // Capture timestamp to signify the beginning of a snapshot operation, apply after in case
-      // one of the field closures is mean and tries to apply a timestamp.
-      long timestamp = clock.nowMillis();
-      for (SnapshotField field : snapshotFields) {
-        field.save(storeProvider, snapshot);
-      }
+    // Capture timestamp to signify the beginning of a snapshot operation, apply after in case
+    // one of the field closures is mean and tries to apply a timestamp.
+    long timestamp = clock.nowMillis();
+    for (SnapshotField field : snapshotFields) {
+      field.save(storeProvider, snapshot);
+    }
 
-      SchedulerMetadata metadata = new SchedulerMetadata()
-          .setFrameworkId(storeProvider.getSchedulerStore().fetchFrameworkId().orNull())
-          .setDetails(buildInfo.getProperties());
+    SchedulerMetadata metadata = new SchedulerMetadata()
+        .setFrameworkId(storeProvider.getSchedulerStore().fetchFrameworkId().orNull())
+        .setDetails(buildInfo.getProperties());
 
-      snapshot.setSchedulerMetadata(metadata);
-      snapshot.setTimestamp(timestamp);
-      return snapshot;
-    });
+    snapshot.setSchedulerMetadata(metadata);
+    snapshot.setTimestamp(timestamp);
+    return snapshot;
   }
 
   @Timed("snapshot_create")
   @Override
-  public Snapshot createSnapshot() {
-    return createSnapshot(storage);
+  public Snapshot from(StoreProvider stores) {
+    return createSnapshot(stores);
   }
 
   @Timed("snapshot_apply")
   @Override
-  public void applySnapshot(final Snapshot snapshot) {
+  public Stream<Op> asStream(Snapshot snapshot) {
     requireNonNull(snapshot);
 
-    storage.write((NoResult.Quiet) storeProvider -> {
-      LOG.info("Restoring snapshot.");
-
-      for (SnapshotField field : snapshotFields) {
-        field.restore(storeProvider, snapshot);
-      }
-    });
+    LOG.info("Restoring snapshot.");
+    return snapshotFields.stream()
+        .flatMap(field -> field.streamFrom(snapshot));
   }
 
   abstract class SnapshotField {
 
     abstract String getName();
 
-    abstract void saveToSnapshot(MutableStoreProvider storeProvider, Snapshot snapshot);
+    abstract void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot);
 
-    abstract void restoreFromSnapshot(MutableStoreProvider storeProvider, Snapshot snapshot);
+    abstract Stream<Op> doStreamFrom(Snapshot snapshot);
 
-    void save(MutableStoreProvider storeProvider, Snapshot snapshot) {
+    void save(StoreProvider storeProvider, Snapshot snapshot) {
       stats.getUnchecked(SNAPSHOT_SAVE + getName())
           .time((Timeable.NoResult.Quiet) () -> saveToSnapshot(storeProvider, snapshot));
     }
 
-    void restore(MutableStoreProvider storeProvider, Snapshot snapshot) {
-      stats.getUnchecked(SNAPSHOT_RESTORE + getName())
-          .time((Timeable.NoResult.Quiet) () -> restoreFromSnapshot(storeProvider, snapshot));
+    Stream<Op> streamFrom(Snapshot snapshot) {
+      return stats.getUnchecked(SNAPSHOT_RESTORE + getName()).time(() -> doStreamFrom(snapshot));
     }
   }
 

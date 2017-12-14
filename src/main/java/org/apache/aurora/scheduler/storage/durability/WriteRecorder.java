@@ -65,7 +65,7 @@ import static java.util.Objects.requireNonNull;
  * to a provided {@link TransactionManager}) before forwarding the operations to delegate mutable
  * stores.
  */
-public class WriteAheadStorage implements
+public class WriteRecorder implements
     MutableStoreProvider,
     SchedulerStore.Mutable,
     CronJobStore.Mutable,
@@ -95,7 +95,7 @@ public class WriteAheadStorage implements
    * @param attributeStore Delegate.
    * @param jobUpdateStore Delegate.
    */
-  public WriteAheadStorage(
+  public WriteRecorder(
       TransactionManager transactionManager,
       SchedulerStore.Mutable schedulerStore,
       CronJobStore.Mutable jobStore,

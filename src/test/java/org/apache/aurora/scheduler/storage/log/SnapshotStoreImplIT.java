@@ -18,12 +18,8 @@ import java.util.Map;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
 
 import org.apache.aurora.common.stats.Stats;
-import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.util.testing.FakeBuildInfo;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.gen.Attribute;
@@ -55,6 +51,9 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
+import org.apache.aurora.scheduler.storage.durability.Loader;
+import org.apache.aurora.scheduler.storage.durability.Persistence.Edit;
 import org.apache.aurora.scheduler.storage.durability.ThriftBackfill;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -65,10 +64,10 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
-import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Test;
 
 import static org.apache.aurora.common.util.testing.FakeBuildInfo.generateBuildInfo;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.THRIFT_BACKFILL;
 import static org.apache.aurora.scheduler.resources.ResourceManager.aggregateFromBag;
 import static org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.SNAPSHOT_RESTORE;
 import static org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl.SNAPSHOT_SAVE;
@@ -80,35 +79,27 @@ public class SnapshotStoreImplIT {
   private static final long NOW = 10335463456L;
   private static final IJobKey JOB_KEY = JobKeys.from("role", "env", "job");
 
-  private SnapshotStoreImpl snapshotStore;
+  private Storage storage;
+  private SnapshotStoreImpl snapshotter;
 
   private void setUpStore() {
-    Injector injector = Guice.createInjector(
-        new MemStorageModule(),
-        new AbstractModule() {
-          @Override
-          protected void configure() {
-            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
-          }
-        });
-
+    storage = MemStorageModule.newEmptyStorage();
     FakeClock clock = new FakeClock();
     clock.setNowMillis(NOW);
-    snapshotStore = new SnapshotStoreImpl(
-        generateBuildInfo(),
-        clock,
-        injector.getInstance(Storage.class),
-        TaskTestUtil.THRIFT_BACKFILL);
+    snapshotter = new SnapshotStoreImpl(generateBuildInfo(), clock);
     Stats.flush();
   }
 
   @Test
   public void testBackfill() {
     setUpStore();
-    snapshotStore.applySnapshot(makeNonBackfilled());
+    storage.write((NoResult.Quiet) stores ->
+        Loader.load(
+            stores,
+            THRIFT_BACKFILL,
+            snapshotter.asStream(makeNonBackfilled()).map(Edit::op)));
 
-    Snapshot backfilled = snapshotStore.createSnapshot();
-    assertEquals(expected(), backfilled);
+    assertEquals(expected(), storage.write(snapshotter::from));
     assertSnapshotRestoreStats(1L);
     assertSnapshotSaveStats(1L);
   }
@@ -183,14 +174,14 @@ public class SnapshotStoreImplIT {
   }
 
   private void assertSnapshotSaveStats(long count) {
-    for (String stat : snapshotStore.snapshotFieldNames()) {
+    for (String stat : snapshotter.snapshotFieldNames()) {
       assertEquals(count, Stats.getVariable(SNAPSHOT_SAVE + stat + "_events").read());
       assertNotNull(Stats.getVariable(SNAPSHOT_SAVE + stat + "_nanos_total"));
     }
   }
 
   private void assertSnapshotRestoreStats(long count) {
-    for (String stat : snapshotStore.snapshotFieldNames()) {
+    for (String stat : snapshotter.snapshotFieldNames()) {
       assertEquals(count, Stats.getVariable(SNAPSHOT_RESTORE + stat + "_events").read());
       assertNotNull(Stats.getVariable(SNAPSHOT_RESTORE + stat + "_nanos_total"));
     }

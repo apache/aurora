@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -42,8 +43,11 @@ import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.Stats;
 import org.apache.aurora.common.util.Clock;
+import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.Snapshot;
-import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.aurora.scheduler.storage.Snapshotter;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
@@ -69,7 +73,7 @@ public interface StorageBackup {
    */
   void backupNow();
 
-  class StorageBackupImpl implements StorageBackup, SnapshotStore<Snapshot> {
+  class StorageBackupImpl implements StorageBackup, Snapshotter {
     private static final Logger LOG = LoggerFactory.getLogger(StorageBackupImpl.class);
 
     private static final String FILE_PREFIX = "scheduler-backup-";
@@ -93,13 +97,14 @@ public interface StorageBackup {
     }
 
     /**
-     * Binding annotation that the underlying {@link SnapshotStore} must be bound with.
+     * Binding annotation that the underlying {@link Snapshotter} must be bound with.
      */
     @Qualifier
     @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
     @interface SnapshotDelegate { }
 
-    private final SnapshotStore<Snapshot> delegate;
+    private final Storage storage;
+    private final Snapshotter delegate;
     private final Clock clock;
     private final long backupIntervalMs;
     private volatile long lastBackupMs;
@@ -120,11 +125,13 @@ public interface StorageBackup {
 
     @Inject
     StorageBackupImpl(
-        @SnapshotDelegate SnapshotStore<Snapshot> delegate,
+        Storage storage,
+        @SnapshotDelegate Snapshotter delegate,
         Clock clock,
         BackupConfig config,
         Executor executor) {
 
+      this.storage = requireNonNull(storage);
       this.delegate = requireNonNull(delegate);
       this.clock = requireNonNull(clock);
       this.config = requireNonNull(config);
@@ -135,8 +142,8 @@ public interface StorageBackup {
     }
 
     @Override
-    public Snapshot createSnapshot() {
-      final Snapshot snapshot = delegate.createSnapshot();
+    public Snapshot from(StoreProvider stores) {
+      Snapshot snapshot = delegate.from(stores);
       if (clock.nowMillis() >= (lastBackupMs + backupIntervalMs)) {
         executor.execute(() -> save(snapshot));
       }
@@ -145,7 +152,7 @@ public interface StorageBackup {
 
     @Override
     public void backupNow() {
-      save(delegate.createSnapshot());
+      save(storage.write(delegate::from));
     }
 
     @VisibleForTesting
@@ -210,8 +217,8 @@ public interface StorageBackup {
     static final Function<File, String> FILE_NAME = File::getName;
 
     @Override
-    public void applySnapshot(Snapshot snapshot) {
-      delegate.applySnapshot(snapshot);
+    public Stream<Op> asStream(Snapshot snapshot) {
+      return delegate.asStream(snapshot);
     }
   }
 }

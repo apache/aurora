@@ -21,7 +21,6 @@ import com.google.common.collect.Lists;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.TypeLiteral;
 
 import org.apache.aurora.common.application.ShutdownRegistry;
 import org.apache.aurora.common.application.ShutdownRegistry.ShutdownRegistryImpl;
@@ -35,15 +34,14 @@ import org.apache.aurora.common.util.BuildInfo;
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.common.util.testing.FakeBuildInfo;
 import org.apache.aurora.common.util.testing.FakeClock;
-import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.config.types.DataAmount;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
-import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.aurora.scheduler.storage.Snapshotter;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
@@ -62,7 +60,7 @@ public class NonVolatileStorageTest extends TearDownTestCase {
   private FakeLog log;
   private Runnable teardown = () -> { };
   private NonVolatileStorage storage;
-  private DistributedSnapshotStore snapshotStore;
+  private SnapshotStore snapshotStore;
 
   @Before
   public void setUp() {
@@ -92,12 +90,12 @@ public class NonVolatileStorageTest extends TearDownTestCase {
             bind(ShutdownRegistry.class).toInstance(shutdownRegistry);
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(Log.class).toInstance(log);
-            bind(new TypeLiteral<SnapshotStore<Snapshot>>() { }).to(SnapshotStoreImpl.class);
+            bind(Snapshotter.class).to(SnapshotStoreImpl.class);
           }
         }
     );
     storage = injector.getInstance(NonVolatileStorage.class);
-    snapshotStore = injector.getInstance(DistributedSnapshotStore.class);
+    snapshotStore = injector.getInstance(SnapshotStore.class);
     storage.prepare();
     storage.start(w -> { });
 

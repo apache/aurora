@@ -35,7 +35,7 @@ import org.apache.aurora.scheduler.config.CommandLine;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory;
-import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
+import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.mesos.SchedulerDriver;
@@ -83,7 +83,7 @@ public final class LocalSchedulerMain {
       protected void configure() {
         bind(Storage.class).to(Key.get(Storage.class, Storage.Volatile.class));
         bind(NonVolatileStorage.class).to(FakeNonVolatileStorage.class);
-        bind(DistributedSnapshotStore.class).toInstance(new DistributedSnapshotStore() {
+        bind(SnapshotStore.class).toInstance(new SnapshotStore() {
           @Override
           public void snapshot() throws Storage.StorageException {
             // no-op

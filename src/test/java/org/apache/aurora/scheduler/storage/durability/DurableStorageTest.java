@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.storage.durability;
 
-import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -74,6 +73,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
+import org.apache.aurora.scheduler.storage.durability.Persistence.Edit;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -167,44 +167,49 @@ public class DurableStorageTest extends EasyMockTest {
     // Populate all Op types.
     buildReplayOps();
 
+    storageUtil.expectStoreAccesses();
+
     control.replay();
 
     durableStorage.prepare();
     durableStorage.start(initializationLogic);
     assertTrue(initialized.get());
-
-    // Assert all Transaction types have handlers defined.
-    assertEquals(
-        EnumSet.allOf(Op._Fields.class),
-        EnumSet.copyOf(durableStorage.buildTransactionReplayActions().keySet()));
   }
 
   private void buildReplayOps() throws Exception {
-    ImmutableSet.Builder<Op> builder = ImmutableSet.builder();
+    ImmutableSet.Builder<Edit> builder = ImmutableSet.builder();
 
-    builder.add(Op.saveFrameworkId(new SaveFrameworkId("bob")));
+    builder.add(Edit.op(Op.saveFrameworkId(new SaveFrameworkId("bob"))));
     storageUtil.schedulerStore.saveFrameworkId("bob");
 
     JobConfiguration actualJob = new JobConfiguration().setTaskConfig(nonBackfilledConfig());
     JobConfiguration expectedJob =
         new JobConfiguration().setTaskConfig(makeConfig(JOB_KEY).newBuilder());
     SaveCronJob cronJob = new SaveCronJob().setJobConfig(actualJob);
-    builder.add(Op.saveCronJob(cronJob));
+    builder.add(Edit.op(Op.saveCronJob(cronJob)));
     storageUtil.jobStore.saveAcceptedJob(IJobConfiguration.build(expectedJob));
 
     RemoveJob removeJob = new RemoveJob(JOB_KEY.newBuilder());
-    builder.add(Op.removeJob(removeJob));
+    builder.add(Edit.op(Op.removeJob(removeJob)));
     storageUtil.jobStore.removeJob(JOB_KEY);
 
     ScheduledTask actualTask = makeTask("id", JOB_KEY).newBuilder();
     actualTask.getAssignedTask().setTask(nonBackfilledConfig());
     IScheduledTask expectedTask = makeTask("id", JOB_KEY);
     SaveTasks saveTasks = new SaveTasks(ImmutableSet.of(actualTask));
-    builder.add(Op.saveTasks(saveTasks));
+    builder.add(Edit.op(Op.saveTasks(saveTasks)));
     storageUtil.taskStore.saveTasks(ImmutableSet.of(expectedTask));
 
+    // Side-effects from a storage reset, caused by a snapshot.
+    builder.add(Edit.deleteAll());
+    storageUtil.jobStore.deleteJobs();
+    storageUtil.taskStore.deleteAllTasks();
+    storageUtil.quotaStore.deleteQuotas();
+    storageUtil.attributeStore.deleteHostAttributes();
+    storageUtil.jobUpdateStore.deleteAllUpdates();
+
     RemoveTasks removeTasks = new RemoveTasks(ImmutableSet.of("taskId1"));
-    builder.add(Op.removeTasks(removeTasks));
+    builder.add(Edit.op(Op.removeTasks(removeTasks)));
     storageUtil.taskStore.deleteTasks(removeTasks.getTaskIds());
 
     ResourceAggregate nonBackfilled = new ResourceAggregate()
@@ -212,33 +217,33 @@ public class DurableStorageTest extends EasyMockTest {
         .setRamMb(32)
         .setDiskMb(64);
     SaveQuota saveQuota = new SaveQuota(JOB_KEY.getRole(), nonBackfilled);
-    builder.add(Op.saveQuota(saveQuota));
+    builder.add(Edit.op(Op.saveQuota(saveQuota)));
     storageUtil.quotaStore.saveQuota(
         saveQuota.getRole(),
         IResourceAggregate.build(nonBackfilled.deepCopy()
             .setResources(ImmutableSet.of(numCpus(1.0), ramMb(32), diskMb(64)))));
 
-    builder.add(Op.removeQuota(new RemoveQuota(JOB_KEY.getRole())));
+    builder.add(Edit.op(Op.removeQuota(new RemoveQuota(JOB_KEY.getRole()))));
     storageUtil.quotaStore.removeQuota(JOB_KEY.getRole());
 
     // This entry lacks a slave ID, and should therefore be discarded.
     SaveHostAttributes hostAttributes1 = new SaveHostAttributes(new HostAttributes()
         .setHost("host1")
         .setMode(MaintenanceMode.DRAINED));
-    builder.add(Op.saveHostAttributes(hostAttributes1));
+    builder.add(Edit.op(Op.saveHostAttributes(hostAttributes1)));
 
     SaveHostAttributes hostAttributes2 = new SaveHostAttributes(new HostAttributes()
         .setHost("host2")
         .setSlaveId("slave2")
         .setMode(MaintenanceMode.DRAINED));
-    builder.add(Op.saveHostAttributes(hostAttributes2));
+    builder.add(Edit.op(Op.saveHostAttributes(hostAttributes2)));
     expect(storageUtil.attributeStore.saveHostAttributes(
         IHostAttributes.build(hostAttributes2.getHostAttributes()))).andReturn(true);
 
-    builder.add(Op.saveLock(new SaveLock()));
+    builder.add(Edit.op(Op.saveLock(new SaveLock())));
     // TODO(jly): Deprecated, this is a no-op to be removed in 0.21. See AURORA-1959.
 
-    builder.add(Op.removeLock(new RemoveLock()));
+    builder.add(Edit.op(Op.removeLock(new RemoveLock())));
     // TODO(jly): Deprecated, this is a no-op to be removed in 0.21. See AURORA-1959.
 
     JobUpdate actualUpdate = new JobUpdate()
@@ -252,12 +257,12 @@ public class DurableStorageTest extends EasyMockTest {
     expectedUpdate.getInstructions().getInitialState()
         .forEach(e -> e.setTask(makeConfig(JOB_KEY).newBuilder()));
     SaveJobUpdate saveUpdate = new SaveJobUpdate().setJobUpdate(actualUpdate);
-    builder.add(Op.saveJobUpdate(saveUpdate));
+    builder.add(Edit.op(Op.saveJobUpdate(saveUpdate)));
     storageUtil.jobUpdateStore.saveJobUpdate(IJobUpdate.build(expectedUpdate));
 
     SaveJobUpdateEvent saveUpdateEvent =
         new SaveJobUpdateEvent(new JobUpdateEvent(), UPDATE_ID.newBuilder());
-    builder.add(Op.saveJobUpdateEvent(saveUpdateEvent));
+    builder.add(Edit.op(Op.saveJobUpdateEvent(saveUpdateEvent)));
     storageUtil.jobUpdateStore.saveJobUpdateEvent(
         UPDATE_ID,
         IJobUpdateEvent.build(saveUpdateEvent.getEvent()));
@@ -265,16 +270,16 @@ public class DurableStorageTest extends EasyMockTest {
     SaveJobInstanceUpdateEvent saveInstanceEvent = new SaveJobInstanceUpdateEvent(
         new JobInstanceUpdateEvent(),
         UPDATE_ID.newBuilder());
-    builder.add(Op.saveJobInstanceUpdateEvent(saveInstanceEvent));
+    builder.add(Edit.op(Op.saveJobInstanceUpdateEvent(saveInstanceEvent)));
     storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(
         UPDATE_ID,
         IJobInstanceUpdateEvent.build(saveInstanceEvent.getEvent()));
 
-    builder.add(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory(5, 10L)));
+    builder.add(Edit.op(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory(5, 10L))));
     // No expectation - this op is ignored.
 
-    builder.add(Op.removeJobUpdate(
-        new RemoveJobUpdates().setKeys(ImmutableSet.of(UPDATE_ID.newBuilder()))));
+    builder.add(Edit.op(Op.removeJobUpdate(
+        new RemoveJobUpdates().setKeys(ImmutableSet.of(UPDATE_ID.newBuilder())))));
     storageUtil.jobUpdateStore.removeJobUpdates(ImmutableSet.of(UPDATE_ID));
 
     expect(persistence.recover()).andReturn(builder.build().stream());

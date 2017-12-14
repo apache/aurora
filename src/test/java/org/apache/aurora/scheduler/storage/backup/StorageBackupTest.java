@@ -39,9 +39,12 @@ import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.StoredCronJob;
-import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.aurora.scheduler.storage.Snapshotter;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.junit.Before;
 import org.junit.Rule;
@@ -49,6 +52,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import static org.apache.aurora.scheduler.resources.ResourceTestUtil.aggregate;
+import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -58,7 +62,8 @@ public class StorageBackupTest extends EasyMockTest {
   private static final int MAX_BACKUPS = 5;
   private static final Amount<Long, Time> INTERVAL = Amount.of(1L, Time.HOURS);
 
-  private SnapshotStore<Snapshot> delegate;
+  private Storage storage;
+  private Snapshotter delegate;
   private FakeClock clock;
   private BackupConfig config;
   private StorageBackupImpl storageBackup;
@@ -67,29 +72,35 @@ public class StorageBackupTest extends EasyMockTest {
 
   @Before
   public void setUp() throws IOException {
-    delegate = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
+    storage = MemStorageModule.newEmptyStorage();
+    delegate = createMock(Snapshotter.class);
     final File backupDir = temporaryFolder.newFolder();
     ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
     clock = FakeScheduledExecutor.scheduleExecutor(executor);
     config = new BackupConfig(backupDir, MAX_BACKUPS, INTERVAL);
     clock.advance(Amount.of(365 * 30L, Time.DAYS));
-    storageBackup = new StorageBackupImpl(delegate, clock, config, executor);
+    storageBackup = new StorageBackupImpl(storage, delegate, clock, config, executor);
+  }
+
+  private void triggerSnapshot(Snapshot expectedResult) {
+    storage.write((NoResult.Quiet) stores ->
+        assertEquals(expectedResult, storageBackup.from(stores)));
   }
 
   @Test
   public void testBackup() throws Exception {
     Snapshot snapshot = makeSnapshot();
-    expect(delegate.createSnapshot()).andReturn(snapshot).times(3);
+    expect(delegate.from(anyObject())).andReturn(snapshot).times(3);
 
     control.replay();
 
-    assertEquals(snapshot, storageBackup.createSnapshot());
+    triggerSnapshot(snapshot);
     assertBackupCount(0);
     clock.advance(Amount.of(INTERVAL.as(Time.MILLISECONDS) - 1, Time.MILLISECONDS));
-    assertEquals(snapshot, storageBackup.createSnapshot());
+    triggerSnapshot(snapshot);
     assertBackupCount(0);
     clock.advance(Amount.of(1L, Time.MILLISECONDS));
-    assertEquals(snapshot, storageBackup.createSnapshot());
+    triggerSnapshot(snapshot);
     assertBackupCount(1);
     assertEquals(1, storageBackup.getSuccesses().get());
 
@@ -104,34 +115,34 @@ public class StorageBackupTest extends EasyMockTest {
   @Test
   public void testDirectoryMissing() {
     Snapshot snapshot = makeSnapshot();
-    expect(delegate.createSnapshot()).andReturn(snapshot).times(1);
+    expect(delegate.from(anyObject())).andReturn(snapshot).times(1);
 
     control.replay();
 
     clock.advance(INTERVAL);
     config.getDir().delete();
-    assertEquals(snapshot, storageBackup.createSnapshot());
+    triggerSnapshot(snapshot);
     assertEquals(1, storageBackup.getFailures().get());
   }
 
   @Test
   public void testOldBackupsDeleted() {
     Snapshot snapshot = makeSnapshot();
-    expect(delegate.createSnapshot()).andReturn(snapshot).times(MAX_BACKUPS + 1);
+    expect(delegate.from(anyObject())).andReturn(snapshot).times(MAX_BACKUPS + 1);
 
     control.replay();
 
     ImmutableList.Builder<String> nameBuilder = ImmutableList.builder();
     for (int i = 0; i < MAX_BACKUPS; i++) {
       clock.advance(Amount.of(INTERVAL.as(Time.MILLISECONDS), Time.MILLISECONDS));
-      assertEquals(snapshot, storageBackup.createSnapshot());
+      triggerSnapshot(snapshot);
       nameBuilder.add(storageBackup.createBackupName());
       assertBackupCount(i + 1);
       assertEquals(i + 1, storageBackup.getSuccesses().get());
     }
 
     clock.advance(Amount.of(INTERVAL.as(Time.MILLISECONDS), Time.MILLISECONDS));
-    assertEquals(snapshot, storageBackup.createSnapshot());
+    triggerSnapshot(snapshot);
     nameBuilder.add(storageBackup.createBackupName());
     assertBackupCount(MAX_BACKUPS);
     assertEquals(MAX_BACKUPS + 1, storageBackup.getSuccesses().get());
@@ -150,17 +161,17 @@ public class StorageBackupTest extends EasyMockTest {
   public void testInterval() {
     // Ensures that a long initial interval does not result in shortened subsequent intervals.
     Snapshot snapshot = makeSnapshot();
-    expect(delegate.createSnapshot()).andReturn(snapshot).times(3);
+    expect(delegate.from(anyObject())).andReturn(snapshot).times(3);
 
     control.replay();
 
-    assertEquals(snapshot, storageBackup.createSnapshot());
+    triggerSnapshot(snapshot);
     assertBackupCount(0);
     clock.advance(Amount.of(INTERVAL.as(Time.MILLISECONDS) * 3, Time.MILLISECONDS));
-    assertEquals(snapshot, storageBackup.createSnapshot());
+    triggerSnapshot(snapshot);
     assertBackupCount(1);
     assertEquals(1, storageBackup.getSuccesses().get());
-    assertEquals(snapshot, storageBackup.createSnapshot());
+    triggerSnapshot(snapshot);
     assertBackupCount(1);
     assertEquals(1, storageBackup.getSuccesses().get());
   }

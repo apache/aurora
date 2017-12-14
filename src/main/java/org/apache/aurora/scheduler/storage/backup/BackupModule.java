@@ -32,7 +32,7 @@ import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
-import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.aurora.scheduler.storage.Snapshotter;
 import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
@@ -66,9 +66,9 @@ public class BackupModule extends PrivateModule {
   }
 
   private final Options options;
-  private final Class<? extends SnapshotStore<Snapshot>> snapshotStore;
+  private final Class<? extends Snapshotter> snapshotStore;
 
-  public BackupModule(Options options, Class<? extends SnapshotStore<Snapshot>> snapshotStore) {
+  public BackupModule(Options options, Class<? extends Snapshotter> snapshotStore) {
     this.options = options;
     this.snapshotStore = snapshotStore;
   }
@@ -78,13 +78,13 @@ public class BackupModule extends PrivateModule {
     Executor executor = AsyncUtil.singleThreadLoggingScheduledExecutor("StorageBackup-%d", LOG);
     bind(Executor.class).toInstance(executor);
 
-    TypeLiteral<SnapshotStore<Snapshot>> type = new TypeLiteral<SnapshotStore<Snapshot>>() { };
-    bind(type).annotatedWith(StorageBackupImpl.SnapshotDelegate.class).to(snapshotStore);
+    bind(Snapshotter.class).annotatedWith(StorageBackupImpl.SnapshotDelegate.class)
+        .to(snapshotStore);
 
-    bind(type).to(StorageBackupImpl.class);
+    bind(Snapshotter.class).to(StorageBackupImpl.class);
     bind(StorageBackup.class).to(StorageBackupImpl.class);
     bind(StorageBackupImpl.class).in(Singleton.class);
-    expose(type);
+    expose(Snapshotter.class);
     expose(StorageBackup.class);
 
     bind(new TypeLiteral<Function<Snapshot, TemporaryStorage>>() { })

@@ -31,8 +31,8 @@ import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.aurora.scheduler.storage.Snapshotter;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -49,6 +49,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -60,8 +61,8 @@ public class RecoveryTest extends EasyMockTest {
   private static final IScheduledTask TASK2 = TaskTestUtil.makeTask("task2", TaskTestUtil.JOB);
   private static final Snapshot SNAPSHOT1 = makeSnapshot(TASK1, TASK2);
 
-  private SnapshotStore<Snapshot> snapshotStore;
-  private DistributedSnapshotStore distributedStore;
+  private Snapshotter snapshotter;
+  private SnapshotStore distributedStore;
   private Storage primaryStorage;
   private MutableStoreProvider storeProvider;
   private Command shutDownNow;
@@ -74,8 +75,8 @@ public class RecoveryTest extends EasyMockTest {
   @Before
   public void setUp() throws IOException {
     final File backupDir = temporaryFolder.newFolder();
-    snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
-    distributedStore = createMock(DistributedSnapshotStore.class);
+    snapshotter = createMock(Snapshotter.class);
+    distributedStore = createMock(SnapshotStore.class);
     primaryStorage = createMock(Storage.class);
     storeProvider = createMock(MutableStoreProvider.class);
     shutDownNow = createMock(Command.class);
@@ -84,7 +85,8 @@ public class RecoveryTest extends EasyMockTest {
     TemporaryStorageFactory factory =
         new TemporaryStorageFactory(TaskTestUtil.THRIFT_BACKFILL);
     storageBackup = new StorageBackupImpl(
-        snapshotStore,
+        primaryStorage,
+        snapshotter,
         clock,
         new BackupConfig(backupDir, 5, INTERVAL),
         executor);
@@ -94,7 +96,7 @@ public class RecoveryTest extends EasyMockTest {
 
   @Test
   public void testRecover() throws Exception {
-    expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT1);
+    expect(snapshotter.from(anyObject())).andReturn(SNAPSHOT1);
     Capture<MutateWork<Object, Exception>> transaction = createCapture();
     expect(primaryStorage.write(capture(transaction))).andReturn(null);
     Capture<Snapshot> snapshot = createCapture();
@@ -106,7 +108,7 @@ public class RecoveryTest extends EasyMockTest {
     assertEquals(ImmutableSet.of(), recovery.listBackups());
 
     clock.advance(INTERVAL);
-    storageBackup.createSnapshot();
+    storageBackup.from(storeProvider);
     String backup1 = storageBackup.createBackupName();
     assertEquals(ImmutableSet.of(backup1), recovery.listBackups());
 
@@ -122,7 +124,7 @@ public class RecoveryTest extends EasyMockTest {
 
   @Test
   public void testModifySnapshotBeforeCommit() throws Exception {
-    expect(snapshotStore.createSnapshot()).andReturn(SNAPSHOT1);
+    expect(snapshotter.from(anyObject())).andReturn(SNAPSHOT1);
     Snapshot modified = SNAPSHOT1.deepCopy().setTasks(ImmutableSet.of(TASK1.newBuilder()));
     Capture<MutateWork<Object, Exception>> transaction = createCapture();
     expect(primaryStorage.write(capture(transaction))).andReturn(null);
@@ -133,7 +135,7 @@ public class RecoveryTest extends EasyMockTest {
     control.replay();
 
     clock.advance(INTERVAL);
-    storageBackup.createSnapshot();
+    storageBackup.from(storeProvider);
     String backup1 = storageBackup.createBackupName();
     recovery.stage(backup1);
     assertEquals(

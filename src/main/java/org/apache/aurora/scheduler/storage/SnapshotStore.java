@@ -13,24 +13,27 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.scheduler.storage.Storage.StorageException;
+
 /**
- * Storage mechanism that is able to create complete snapshots of the local storage system state
- * and apply these to restore local storage from a snapshotted baseline.
+ * A storage component that applies full-state snapshots.
  */
-public interface SnapshotStore<T> {
+public interface SnapshotStore {
 
   /**
-   * Creates a consistent snapshot of the local storage system.
-   *
-   * @return A blob that can be used to recover local storage via {@link #applySnapshot(Object)}.
+   * Clean up the underlying storage by optimizing internal data structures. Does not change
+   * externally-visible state but might not run concurrently with write operations.
    */
-  T createSnapshot();
+  void snapshot() throws StorageException;
 
   /**
-   * Applies a snapshot blob to the local storage system, wiping out all existing data and
-   * resetting with the contents of the snapshot.
+   * Identical to {@link #snapshot()}, using a custom {@link Snapshot} rather than an
+   * internally-generated one based on the current state.
    *
-   * @param snapshot A snapshot blob created by {@link #createSnapshot()}.
+   * @param snapshot Snapshot to write.
+   * @throws CodingException If the snapshot could not be serialized.
    */
-  void applySnapshot(T snapshot);
+  void snapshotWith(Snapshot snapshot) throws CodingException;
 }

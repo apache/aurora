@@ -62,7 +62,7 @@ import org.apache.aurora.scheduler.quota.QuotaModule;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.stats.StatsModule;
-import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
+import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
@@ -136,7 +136,7 @@ public class ThriftIT extends EasyMockTest {
             bind(FrameworkInfoFactoryImpl.class).in(Singleton.class);
             bindMock(Recovery.class);
             bindMock(StorageBackup.class);
-            bindMock(DistributedSnapshotStore.class);
+            bindMock(SnapshotStore.class);
             bind(IServerInfo.class).toInstance(SERVER_INFO);
           }
 

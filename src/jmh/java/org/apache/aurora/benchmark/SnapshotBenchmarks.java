@@ -75,7 +75,7 @@ public class SnapshotBenchmarks {
 
     @Benchmark
     public boolean run() throws TException {
-      snapshotStore.applySnapshot(snapshot);
+      snapshotStore.asStream(snapshot);
       // Return non-guessable result to satisfy "blackhole" requirement.
       return System.currentTimeMillis() % 5 == 0;
     }
@@ -103,7 +103,7 @@ public class SnapshotBenchmarks {
           .setNumInstanceEvents(instanceEvents)
           .build(updates));
 
-      return snapshotStore.createSnapshot();
+      return storage.write(snapshotStore::from);
     }
   }
 }

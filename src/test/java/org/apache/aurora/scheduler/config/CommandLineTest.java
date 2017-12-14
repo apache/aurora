@@ -171,7 +171,6 @@ public class CommandLineTest {
     expected.updater.enableAffinity = true;
     expected.updater.affinityExpiration = TEST_TIME;
     expected.state.taskAssignerModules = ImmutableList.of(NoopModule.class);
-    expected.logStorage.shutdownGracePeriod = TEST_TIME;
     expected.logStorage.snapshotInterval = TEST_TIME;
     expected.logStorage.maxLogEntrySize = TEST_DATA;
     expected.backup.backupInterval = TEST_TIME;
@@ -318,7 +317,6 @@ public class CommandLineTest {
         "-enable_update_affinity=true",
         "-update_affinity_reservation_hold_time=42days",
         "-task_assigner_modules=org.apache.aurora.scheduler.config.CommandLineTest$NoopModule",
-        "-dlog_shutdown_grace_period=42days",
         "-dlog_snapshot_interval=42days",
         "-dlog_max_entry_size=42GB",
         "-backup_interval=42days",
