@@ -15,8 +15,8 @@ package org.apache.aurora.scheduler.updater;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -55,7 +55,7 @@ import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.SUCCEEDE
 import static org.junit.Assert.assertEquals;
 
 public class InstanceUpdaterTest {
-  private static final Optional<ITaskConfig> NO_CONFIG = Optional.absent();
+  private static final Optional<ITaskConfig> NO_CONFIG = Optional.empty();
 
   private static final ITaskConfig OLD = ITaskConfig.build(new TaskConfig()
           .setResources(ImmutableSet.of(numCpus(1.0))));
@@ -75,7 +75,7 @@ public class InstanceUpdaterTest {
     private final FakeClock clock;
     private final InstanceUpdater updater;
     private final TaskUtil taskUtil;
-    private Optional<IScheduledTask> task = Optional.absent();
+    private Optional<IScheduledTask> task = Optional.empty();
 
     TestFixture(Optional<ITaskConfig> newConfig, int maxToleratedFailures) {
       this.clock = new FakeClock();
@@ -92,7 +92,7 @@ public class InstanceUpdaterTest {
     }
 
     void setActualStateAbsent() {
-      this.task = Optional.absent();
+      this.task = Optional.empty();
     }
 
     private Result changeStatusAndEvaluate(ScheduleStatus status) {

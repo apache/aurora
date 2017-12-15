@@ -16,14 +16,15 @@ package org.apache.aurora.scheduler.mesos;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
 import org.apache.aurora.common.application.Lifecycle;
@@ -322,9 +323,9 @@ public interface MesosCallbackHandler {
       eventSink.post(new PubsubEvent.TaskStatusReceived(
           status.getState(),
           // Source and Reason are enums. They cannot be null so we we need to use `hasXXX`.
-          status.hasSource() ? Optional.of(status.getSource()) : Optional.absent(),
-          status.hasReason() ? Optional.of(status.getReason()) : Optional.absent(),
-          Optional.fromNullable(status.getTimestamp()).transform(SECONDS_TO_MICROS)));
+          status.hasSource() ? Optional.of(status.getSource()) : Optional.empty(),
+          status.hasReason() ? Optional.of(status.getReason()) : Optional.empty(),
+          Optional.ofNullable(status.getTimestamp()).map(SECONDS_TO_MICROS)));
 
       try {
         // The status handler is responsible for acknowledging the update.

@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.resources;
 
 import java.util.Collections;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -45,7 +45,7 @@ import static org.junit.Assert.assertTrue;
 
 public class AcceptedOfferTest {
   private static final Optional<String> TEST_ROLE = Optional.of("test-role");
-  private static final Optional<String> ABSENT_ROLE = Optional.absent();
+  private static final Optional<String> ABSENT_ROLE = Optional.empty();
   private static final IAssignedTask TASK = makeTask("id", JOB).getAssignedTask();
   private static final ResourceBag EXECUTOR_BAG = bag(0.25, 25, 75);
   private static final ResourceBag TOTAL_BAG =

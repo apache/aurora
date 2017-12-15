@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.io.Serializable;
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -98,7 +98,7 @@ interface UpdateFactory {
         if (rollingForward) {
           desiredStateConfig = desiredInstances.contains(instanceId)
               ? Optional.of(instructions.getDesiredState().getTask())
-              : Optional.absent();
+              : Optional.empty();
         } else {
           desiredStateConfig = getConfig(instanceId, instructions.getInitialState());
         }
@@ -152,7 +152,7 @@ interface UpdateFactory {
         }
       }
 
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 

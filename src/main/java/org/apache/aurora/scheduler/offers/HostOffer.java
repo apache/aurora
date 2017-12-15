@@ -15,10 +15,10 @@ package org.apache.aurora.scheduler.offers;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Optional;
 import com.google.common.base.Suppliers;
 
 import org.apache.aurora.scheduler.base.Conversions;
@@ -84,7 +84,7 @@ public class HostOffer {
     if (offer.hasUnavailability()) {
       return Optional.of(Conversions.getStart(offer.getUnavailability()));
     } else {
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 

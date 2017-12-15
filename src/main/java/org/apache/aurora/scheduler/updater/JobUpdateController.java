@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 
 import org.apache.aurora.gen.JobUpdatePulseStatus;

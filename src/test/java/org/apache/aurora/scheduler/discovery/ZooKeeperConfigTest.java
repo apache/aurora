@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -38,11 +38,11 @@ public class ZooKeeperConfigTest {
   public void testEmptyServers() {
     new ZooKeeperConfig(
         ImmutableList.of(),
-        Optional.absent(),
+        Optional.empty(),
         false,
         Amount.of(1, Time.DAYS),
         Amount.of(1, Time.DAYS),
-        Optional.absent());
+        Optional.empty());
   }
 
   @Test
@@ -50,11 +50,11 @@ public class ZooKeeperConfigTest {
     ZooKeeperConfig config =
         new ZooKeeperConfig(
             SERVERS,
-            Optional.absent(),
+            Optional.empty(),
             false,
             Amount.of(1, Time.HOURS),
             Amount.of(1, Time.HOURS),
-            Optional.absent()); // credentials
+            Optional.empty()); // credentials
     assertFalse(config.getCredentials().isPresent());
 
     Credentials joeCreds = Credentials.digestCredentials("Joe", "Schmoe");

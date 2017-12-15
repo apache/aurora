@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.benchmark;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -22,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 
-import com.google.common.base.Optional;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
@@ -120,7 +120,7 @@ public class StatusUpdateBenchmark {
    */
   private static final class SlowStorageWrapper implements Storage {
     private final Storage underlyingStorage;
-    private Optional<Amount<Long, Time>> latency = Optional.absent();
+    private Optional<Amount<Long, Time>> latency = Optional.empty();
 
     private SlowStorageWrapper(Storage underlyingStorage) {
       this.underlyingStorage = requireNonNull(underlyingStorage);
@@ -209,7 +209,7 @@ public class StatusUpdateBenchmark {
             bind(DriverSettings.class).toInstance(
                 new DriverSettings(
                     "fakemaster",
-                    Optional.absent()));
+                    Optional.empty()));
             bind(FrameworkInfoFactory.class).toInstance(() -> Protos.FrameworkInfo.newBuilder()
                     .setUser("framework user")
                     .setName("test framework")

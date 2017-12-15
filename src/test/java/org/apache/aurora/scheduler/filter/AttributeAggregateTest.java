@@ -13,7 +13,9 @@
  */
 package org.apache.aurora.scheduler.filter;
 
-import com.google.common.base.Optional;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.ImmutableSet;
@@ -52,9 +54,9 @@ public class AttributeAggregateTest extends EasyMockTest {
     assertAggregate(aggregate, "none", "alsoNone", 0);
   }
 
-  @Test(expected = IllegalStateException.class)
+  @Test(expected = NoSuchElementException.class)
   public void testAttributesMissing() {
-    expect(attributeStore.getHostAttributes("a")).andReturn(Optional.absent());
+    expect(attributeStore.getHostAttributes("a")).andReturn(Optional.empty());
 
     control.replay();
 

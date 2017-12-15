@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.storage;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -22,7 +23,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -358,7 +358,7 @@ public abstract class AbstractTaskStoreTest extends TearDownTestCase {
         IScheduledTask.build(TASK_A.newBuilder().setStatus(RUNNING)));
 
     assertEquals(
-        Optional.absent(),
+        Optional.empty(),
         mutateTask(
             "nonexistent",
             task -> IScheduledTask.build(task.newBuilder().setStatus(RUNNING))));

@@ -16,9 +16,9 @@ package org.apache.aurora.scheduler.mesos;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.Properties;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -79,12 +79,12 @@ public class CommandLineDriverSettingsModuleTest {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
         "aurora",
         "user",
-        Optional.absent(),
+        Optional.empty(),
         Amount.of(1L, Time.MINUTES),
         false, // revocable
         false, // allow gpu
         false, // partition aware
-        Optional.absent());
+        Optional.empty());
     assertEquals("", info.getPrincipal());
     assertEquals(0, info.getCapabilitiesCount());
     assertFalse(info.hasRole());
@@ -95,12 +95,12 @@ public class CommandLineDriverSettingsModuleTest {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
         "aurora",
         "user",
-        Optional.absent(),
+        Optional.empty(),
         Amount.of(1L, Time.MINUTES),
         true, // revocable
         false, // allow gpu
         false, // partition aware
-        Optional.absent());
+        Optional.empty());
     assertEquals("", info.getPrincipal());
     assertEquals(1, info.getCapabilitiesCount());
     assertEquals(REVOCABLE_RESOURCES, info.getCapabilities(0).getType());
@@ -112,12 +112,12 @@ public class CommandLineDriverSettingsModuleTest {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
         "aurora",
         "user",
-        Optional.absent(),
+        Optional.empty(),
         Amount.of(1L, Time.MINUTES),
         false, // revocable
         true, // allow gpu
         false, // partition aware
-        Optional.absent());
+        Optional.empty());
     assertEquals("", info.getPrincipal());
     assertEquals(1, info.getCapabilitiesCount());
     assertEquals(GPU_RESOURCES, info.getCapabilities(0).getType());
@@ -129,12 +129,12 @@ public class CommandLineDriverSettingsModuleTest {
     Protos.FrameworkInfo info = CommandLineDriverSettingsModule.buildFrameworkInfo(
         "aurora",
         "user",
-        Optional.absent(),
+        Optional.empty(),
         Amount.of(1L, Time.MINUTES),
         false, // revocable
         false, // allow gpu
         true, // partition aware
-        Optional.absent());
+        Optional.empty());
     assertEquals("", info.getPrincipal());
     assertEquals(1, info.getCapabilitiesCount());
     assertEquals(PARTITION_AWARE, info.getCapabilities(0).getType());
@@ -151,7 +151,7 @@ public class CommandLineDriverSettingsModuleTest {
         false, // revocable
         false, // allow gpu
         false, // partition aware
-        Optional.absent());
+        Optional.empty());
     assertEquals("auroraprincipal", info.getPrincipal());
     assertEquals(0, info.getCapabilitiesCount());
     assertFalse(info.hasRole());

@@ -13,10 +13,9 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-
-import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;

@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.gen.MaintenanceMode;
@@ -97,7 +97,7 @@ public interface AttributeStore {
      * @param host The host to merge existing attributes from.
      * @param mode Maintenance mode to save if the host is known.
      * @return The attributes that should be saved if there were already attributes stored for
-     *         the {@code host}, or {@link Optional#absent() none} if the host is unknown and
+     *         the {@code host}, or {@link Optional#empty() none} if the host is unknown and
      *         attributes should not be saved.
      */
     public static Optional<IHostAttributes> mergeMode(
@@ -109,7 +109,7 @@ public interface AttributeStore {
       if (stored.isPresent()) {
         return Optional.of(IHostAttributes.build(stored.get().newBuilder().setMode(mode)));
       } else {
-        return Optional.absent();
+        return Optional.empty();
       }
     }
 
@@ -123,8 +123,8 @@ public interface AttributeStore {
     public static IHostAttributes mergeOffer(AttributeStore store, Protos.Offer offer) {
       IHostAttributes fromOffer = Conversions.getAttributes(offer);
       MaintenanceMode mode = store.getHostAttributes(fromOffer.getHost())
-          .transform(IHostAttributes::getMode)
-          .or(MaintenanceMode.NONE);
+          .map(IHostAttributes::getMode)
+          .orElse(MaintenanceMode.NONE);
       return IHostAttributes.build(fromOffer.newBuilder().setMode(mode));
     }
   }

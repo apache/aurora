@@ -14,8 +14,7 @@
 package org.apache.aurora.scheduler.storage;
 
 import java.util.Map;
-
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 

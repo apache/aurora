@@ -14,11 +14,11 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
@@ -236,9 +236,9 @@ public class JobUpdaterIT extends EasyMockTest {
               stateManager.changeState(
                   storeProvider,
                   getTaskId(job, instanceId),
-                  Optional.absent(),
+                  Optional.empty(),
                   s,
-                  Optional.absent())));
+                  Optional.empty())));
     }
   }
 

@@ -77,7 +77,7 @@ import static org.apache.aurora.common.zookeeper.SingletonService.LeadershipList
  *       {@link LeaderControl#advertise() advertise()}.</li>
  * </ol>
  * If this call order is broken, calls will fail by throwing
- * {@link java.lang.IllegalStateException}.
+ * {@link IllegalStateException}.
  * <p>
  * At any point in the lifecycle, the scheduler will respond to
  * {@link LeadershipListener#onDefeated()

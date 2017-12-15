@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.storage.mem;
 
 import java.util.Map;
+import java.util.Optional;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
@@ -46,7 +46,7 @@ class MemQuotaStore implements QuotaStore.Mutable {
 
   @Override
   public Optional<IResourceAggregate> fetchQuota(String role) {
-    return Optional.fromNullable(quotas.get(role));
+    return Optional.ofNullable(quotas.get(role));
   }
 
   @Override

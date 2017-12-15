@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.spi;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.shiro.authz.Permission;
@@ -93,7 +93,7 @@ public final class Permissions {
         }
       }
 
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 

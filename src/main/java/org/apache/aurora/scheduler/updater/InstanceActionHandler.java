@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
+
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Range;
@@ -55,7 +56,7 @@ interface InstanceActionHandler {
       MutableStoreProvider storeProvider,
       IInstanceKey instance) {
 
-    return Optional.fromNullable(Iterables.getOnlyElement(
+    return Optional.ofNullable(Iterables.getOnlyElement(
         storeProvider.getTaskStore().fetchTasks(Query.instanceScoped(instance).active()), null));
   }
 
@@ -108,7 +109,7 @@ interface InstanceActionHandler {
             ImmutableSet.of(instance.getInstanceId()));
       }
       // A task state transition will trigger re-evaluation in this case, rather than a timer.
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 
@@ -135,7 +136,7 @@ interface InstanceActionHandler {
         stateManager.changeState(
             storeProvider,
             Tasks.id(task.get()),
-            Optional.absent(),
+            Optional.empty(),
             ScheduleStatus.KILLING,
             Optional.of("Killed for job update " + key.getId()));
         if (reserveForReplacement && task.get().getAssignedTask().isSetSlaveId()) {
@@ -147,7 +148,7 @@ interface InstanceActionHandler {
         LOG.info("No active instance " + instance + " to kill while " + status);
       }
       // A task state transition will trigger re-evaluation in this case, rather than a timer.
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 

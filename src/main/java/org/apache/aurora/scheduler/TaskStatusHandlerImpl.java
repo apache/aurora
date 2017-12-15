@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.ArrayDeque;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,7 +25,6 @@ import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -158,7 +158,7 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
             StateChangeResult result = stateManager.changeState(
                 storeProvider,
                 status.getTaskId().getValue(),
-                Optional.absent(),
+                Optional.empty(),
                 translatedState,
                 formatMessage(status));
 
@@ -183,7 +183,7 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
   }
 
   private static Optional<String> formatMessage(TaskStatus status) {
-    Optional<String> message = Optional.absent();
+    Optional<String> message = Optional.empty();
     if (status.hasMessage()) {
       message = Optional.of(status.getMessage());
     }
@@ -206,7 +206,7 @@ public class TaskStatusHandlerImpl extends AbstractExecutionThreadService
 
         case REASON_EXECUTOR_UNREGISTERED:
           // Suppress "Unregistered executor" message as it bears no meaning to the user.
-          message = Optional.absent();
+          message = Optional.empty();
           break;
 
         default:

@@ -15,11 +15,11 @@
 package org.apache.aurora.scheduler.storage;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Injector;
@@ -134,8 +134,8 @@ public abstract class AbstractJobUpdateStoreTest {
     IJobUpdateDetails update1 = makeFullyPopulatedUpdate(updateId1);
     IJobUpdateDetails update2 = makeJobUpdate(updateId2);
 
-    assertEquals(Optional.absent(), getUpdate(updateId1));
-    assertEquals(Optional.absent(), getUpdate(updateId2));
+    assertEquals(Optional.empty(), getUpdate(updateId1));
+    assertEquals(Optional.empty(), getUpdate(updateId2));
 
     StorageEntityUtil.assertFullyPopulated(
         update1,
@@ -381,7 +381,7 @@ public abstract class AbstractJobUpdateStoreTest {
     JobUpdateDetails builder = makeJobUpdate(updateId).newBuilder();
     builder.getUpdate().getSummary().setMetadata(duplicatedMetadata);
 
-    assertEquals(Optional.absent(), getUpdate(updateId));
+    assertEquals(Optional.empty(), getUpdate(updateId));
 
     IJobUpdateDetails update = IJobUpdateDetails.build(builder);
     saveUpdate(update);

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -21,7 +22,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
@@ -142,13 +142,14 @@ public class TaskVars extends AbstractIdleService implements EventSubscriber {
     final String host = task.getAssignedTask().getSlaveHost();
     Optional<String> rack;
     if (Strings.isNullOrEmpty(task.getAssignedTask().getSlaveHost())) {
-      rack = Optional.absent();
+      rack = Optional.empty();
     } else {
       rack = storage.read(storeProvider -> {
         Optional<IAttribute> rack1 = FluentIterable
             .from(AttributeStore.Util.attributesOrNone(storeProvider, host))
-            .firstMatch(IS_RACK);
-        return rack1.transform(ATTR_VALUE);
+            .firstMatch(IS_RACK)
+            .toJavaUtil();
+        return rack1.map(ATTR_VALUE);
       });
     }
 

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.http.api.security;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -22,8 +23,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.HttpHeaders;
-
-import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.http.AbstractFilter;
 import org.apache.shiro.authc.AuthenticationException;
@@ -56,7 +55,7 @@ public class ShiroKerberosAuthenticationFilter extends AbstractFilter {
       FilterChain chain) throws IOException, ServletException {
 
     Optional<String> authorizationHeaderValue =
-        Optional.fromNullable(request.getHeader(HttpHeaders.AUTHORIZATION));
+        Optional.ofNullable(request.getHeader(HttpHeaders.AUTHORIZATION));
     if (authorizationHeaderValue.isPresent()) {
       LOG.debug("Authorization header is present");
       AuthorizeHeaderToken token;

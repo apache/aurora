@@ -13,12 +13,13 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
+import java.util.Optional;
+
 import javax.inject.Singleton;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 
@@ -58,8 +59,8 @@ public class IniShiroRealmModule extends AbstractModule {
 
   public IniShiroRealmModule(CliOptions options) {
     this(
-        Optional.fromNullable(options.iniShiroRealm.shiroIniPath),
-        Optional.fromNullable(options.iniShiroRealm.shiroCredentialsMatcher));
+        Optional.ofNullable(options.iniShiroRealm.shiroIniPath),
+        Optional.ofNullable(options.iniShiroRealm.shiroCredentialsMatcher));
   }
 
   @VisibleForTesting

@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.reconciliation;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -145,7 +145,7 @@ public class TaskReconcilerTest extends EasyMockTest {
     reconciler.triggerImplicitReconciliation();
     assertEquals(3L, implicitRuns.get());
 
-    reconciler.triggerExplicitReconciliation(Optional.absent());
+    reconciler.triggerExplicitReconciliation(Optional.empty());
     assertEquals(7L, explicitRuns.get());
     assertEquals(3L, implicitRuns.get());
   }

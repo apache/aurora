@@ -13,8 +13,9 @@
  */
 package org.apache.aurora.scheduler.quota;
 
+import java.util.Optional;
+
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceType;
@@ -48,7 +49,7 @@ public class QuotaCheckResult {
 
   @VisibleForTesting
   public QuotaCheckResult(Result result) {
-    this(result, Optional.absent());
+    this(result, Optional.empty());
   }
 
   private QuotaCheckResult(Result result, Optional<String> details) {

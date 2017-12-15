@@ -14,12 +14,13 @@
 package org.apache.aurora.scheduler.scheduling;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -216,7 +217,7 @@ public class TaskAssignerImpl implements TaskAssigner {
                                   Map<String, TaskGroupKey> preemptionReservations) {
 
     String agentId = offer.getOffer().getAgentId().getValue();
-    Optional<TaskGroupKey> reservedGroup = Optional.fromNullable(
+    Optional<TaskGroupKey> reservedGroup = Optional.ofNullable(
         preemptionReservations.get(agentId));
 
     return (reservedGroup.isPresent() && !reservedGroup.get().equals(groupKey))

@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.resources;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
@@ -79,11 +79,11 @@ public final class ResourceTestUtil {
   }
 
   public static Protos.Resource mesosScalar(ResourceType type, double value) {
-    return mesosScalar(type, Optional.absent(), false, value);
+    return mesosScalar(type, Optional.empty(), false, value);
   }
 
   public static Protos.Resource mesosScalar(ResourceType type, double value, boolean revocable) {
-    return mesosScalar(type, Optional.absent(), revocable, value);
+    return mesosScalar(type, Optional.empty(), revocable, value);
   }
 
   public static Protos.Resource mesosScalar(
@@ -98,7 +98,7 @@ public final class ResourceTestUtil {
   }
 
   public static Protos.Resource mesosRange(ResourceType type, Integer... values) {
-    return mesosRange(type, Optional.absent(), values);
+    return mesosRange(type, Optional.empty(), values);
   }
 
   public static Protos.Resource mesosRange(

@@ -15,13 +15,13 @@ package org.apache.aurora.scheduler.quota;
 
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
@@ -172,7 +172,7 @@ public interface QuotaManager {
         throw new QuotaException("Negative values in: " + quota.toString());
       }
 
-      QuotaInfo info = getQuotaInfo(ownerRole, Optional.absent(), storeProvider);
+      QuotaInfo info = getQuotaInfo(ownerRole, Optional.empty(), storeProvider);
       ResourceBag prodConsumption = info.getProdSharedConsumption();
       ResourceBag overage = bagFromAggregate(quota).subtract(prodConsumption);
       if (!overage.filter(IS_NEGATIVE).getResourceVectors().isEmpty()) {
@@ -187,7 +187,7 @@ public interface QuotaManager {
 
     @Override
     public QuotaInfo getQuotaInfo(String role, StoreProvider storeProvider) {
-      return getQuotaInfo(role, Optional.absent(), storeProvider);
+      return getQuotaInfo(role, Optional.empty(), storeProvider);
     }
 
     @Override
@@ -237,7 +237,7 @@ public interface QuotaManager {
       }
 
       QuotaInfo quotaInfo =
-          getQuotaInfo(cronConfig.getKey().getRole(), Optional.absent(), storeProvider);
+          getQuotaInfo(cronConfig.getKey().getRole(), Optional.empty(), storeProvider);
 
       Optional<IJobConfiguration> oldCron =
           storeProvider.getCronJobStore().fetchJob(cronConfig.getKey());
@@ -296,8 +296,8 @@ public interface QuotaManager {
 
       return new QuotaInfo(
           storeProvider.getQuotaStore().fetchQuota(role)
-              .transform(ResourceManager::bagFromAggregate)
-              .or(EMPTY),
+              .map(ResourceManager::bagFromAggregate)
+              .orElse(EMPTY),
           getConsumption(tasks, updates, cronTemplates, PROD_SHARED),
           getConsumption(tasks, updates, cronTemplates, PROD_DEDICATED),
           getConsumption(tasks, updates, cronTemplates, NON_PROD_SHARED),
@@ -384,7 +384,7 @@ public interface QuotaManager {
         final Map<IJobKey, IJobUpdateInstructions> roleJobUpdates) {
 
       return task -> {
-        Optional<IJobUpdateInstructions> update = Optional.fromNullable(
+        Optional<IJobUpdateInstructions> update = Optional.ofNullable(
             roleJobUpdates.get(task.getTask().getJob()));
 
         if (update.isPresent()) {
@@ -437,7 +437,9 @@ public interface QuotaManager {
         Iterable<IInstanceTaskConfig> initialState =
             Iterables.filter(instructions.getInitialState(), instanceFilter);
         Iterable<IInstanceTaskConfig> desiredState = Iterables.filter(
-            Optional.fromNullable(instructions.getDesiredState()).asSet(),
+            Optional.ofNullable(instructions.getDesiredState())
+                .map(ImmutableSet::of)
+                .orElse(ImmutableSet.of()),
             instanceFilter);
 
         // Calculate result as max(existing, desired) per resource type.

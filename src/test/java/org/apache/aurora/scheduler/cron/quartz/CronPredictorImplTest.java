@@ -15,9 +15,9 @@ package org.apache.aurora.scheduler.cron.quartz;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.TimeZone;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -66,7 +66,7 @@ public class CronPredictorImplTest {
   public void testInvalidPrediction() {
     // Too far in the future to represent as a Date.
     clock.advance(Amount.of(Long.MAX_VALUE, Time.DAYS));
-    assertEquals(Optional.absent(), cronPredictor.predictNextRun(CrontabEntry.parse("* * * * *")));
+    assertEquals(Optional.empty(), cronPredictor.predictNextRun(CrontabEntry.parse("* * * * *")));
   }
 
   @Test

@@ -18,6 +18,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Optional;
 import java.util.Properties;
 
 import javax.inject.Singleton;
@@ -25,7 +26,6 @@ import javax.inject.Singleton;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.inject.AbstractModule;
 
@@ -121,11 +121,11 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
   @Override
   protected void configure() {
     Optional<Protos.Credential> credentials = getCredentials(options);
-    Optional<String> principal = Optional.absent();
+    Optional<String> principal = Optional.empty();
     if (options.frameworkAnnouncePrincipal && credentials.isPresent()) {
       principal = Optional.of(credentials.get().getPrincipal());
     }
-    Optional<String> role = Optional.fromNullable(options.mesosRole);
+    Optional<String> role = Optional.ofNullable(options.mesosRole);
     DriverSettings settings = new DriverSettings(options.mesosMasterAddress, credentials);
     bind(DriverSettings.class).toInstance(settings);
 
@@ -149,7 +149,7 @@ public class CommandLineDriverSettingsModule extends AbstractModule {
 
   private static Optional<Protos.Credential> getCredentials(Options opts) {
     if (opts.frameworkAuthenticationFile == null) {
-      return Optional.absent();
+      return Optional.empty();
     } else {
       Properties properties;
       try {

@@ -13,12 +13,11 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-
-import com.google.common.base.Optional;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.common.util.testing.FakeClock;
@@ -77,7 +76,7 @@ public class PartitionManagerTest extends EasyMockTest {
   }
 
   private static TaskStateChange makeStateChange(IScheduledTask task, ScheduleStatus newState) {
-    return makeStateChange(task, Optional.absent(), newState);
+    return makeStateChange(task, Optional.empty(), newState);
   }
 
   private static IScheduledTask taskWithoutPartitionPolicy() {

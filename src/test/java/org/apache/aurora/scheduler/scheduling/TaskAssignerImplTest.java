@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.scheduling;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
@@ -288,7 +288,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     expect(updateAgentReserver.hasReservations(GROUP_KEY)).andReturn(true);
     expect(updateAgentReserver.getAgent(INSTANCE_KEY)).andReturn(Optional.of(SLAVE_ID));
     expect(offerManager.getMatching(MESOS_OFFER.getAgentId(), resourceRequest, false))
-        .andReturn(Optional.absent());
+        .andReturn(Optional.empty());
     expect(tierManager.getTier(TASK.getAssignedTask().getTask())).andReturn(DEV_TIER);
     expectLastCall();
 
@@ -326,7 +326,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         .setTaskId(TaskID.newBuilder().setValue(Tasks.id(secondTask)))
         .setAgentId(MESOS_OFFER.getAgentId())
         .build();
-    expect(updateAgentReserver.getAgent(InstanceKeys.from(JOB, 9999))).andReturn(Optional.absent());
+    expect(updateAgentReserver.getAgent(InstanceKeys.from(JOB, 9999))).andReturn(Optional.empty());
     ImmutableSet<HostOffer> matchingOffers = ImmutableSet.of(OFFER);
     expect(offerManager.getAllMatching(GROUP_KEY, resourceRequest, false))
         .andReturn(matchingOffers);

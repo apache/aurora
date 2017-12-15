@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.quota;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -272,7 +273,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   @Test
   public void testCheckQuotaNoQuotaSet() {
     expect(storageUtil.quotaStore.fetchQuota(ROLE))
-        .andReturn(Optional.absent());
+        .andReturn(Optional.empty());
 
     expectNoTasks();
     expectNoJobUpdates();
@@ -886,7 +887,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   private IExpectationSetters<?> expectNoCronJob() {
     return expect(storageUtil.jobStore.fetchJob(anyObject(IJobKey.class)))
-        .andReturn(Optional.absent());
+        .andReturn(Optional.empty());
   }
 
   private IExpectationSetters<Optional<IResourceAggregate>> expectQuota(IResourceAggregate quota) {

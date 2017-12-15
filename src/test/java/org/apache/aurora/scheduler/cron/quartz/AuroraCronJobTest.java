@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.cron.quartz;
 
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
@@ -138,7 +138,7 @@ public class AuroraCronJobTest extends EasyMockTest {
     expect(stateManager.changeState(
         anyObject(),
         eq(TASK_ID),
-        eq(Optional.absent()),
+        eq(Optional.empty()),
         eq(ScheduleStatus.KILLING),
         eq(AuroraCronJob.KILL_AUDIT_MESSAGE)))
         .andReturn(StateChangeResult.SUCCESS);

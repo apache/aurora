@@ -14,11 +14,11 @@
 package org.apache.aurora.scheduler.scheduling;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -223,7 +223,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectAssigned(TASK_A, NO_RESERVATION).andReturn(NOT_SCHEDULED_RESULT);
     expectAsMap(NO_RESERVATION);
     expectNoReservation(TASK_A);
-    expectPreemptorCall(TASK_A, Optional.absent());
+    expectPreemptorCall(TASK_A, Optional.empty());
 
     // Slave is reserved.
     expectTaskStillPendingQuery(TASK_A);

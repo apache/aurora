@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.storage.mem;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
@@ -47,7 +47,7 @@ class MemAttributeStore implements AttributeStore.Mutable {
 
     IHostAttributes previous = hostAttributes.put(
         attributes.getHost(),
-        merge(attributes, Optional.fromNullable(hostAttributes.get(attributes.getHost()))));
+        merge(attributes, Optional.ofNullable(hostAttributes.get(attributes.getHost()))));
     return !attributes.equals(previous);
   }
 
@@ -72,7 +72,7 @@ class MemAttributeStore implements AttributeStore.Mutable {
 
   @Override
   public Optional<IHostAttributes> getHostAttributes(String host) {
-    return Optional.fromNullable(hostAttributes.get(host));
+    return Optional.ofNullable(hostAttributes.get(host));
   }
 
   @Override

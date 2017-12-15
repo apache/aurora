@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 /**
  * Stores data specific to the scheduler itself.

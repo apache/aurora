@@ -14,12 +14,12 @@
 package org.apache.aurora.scheduler.offers;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.cache.Cache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
@@ -98,7 +98,7 @@ class HostOffers {
     }
 
     addInternal(offer);
-    return Optional.absent();
+    return Optional.empty();
   }
 
   private void addInternal(HostOffer offer) {
@@ -135,7 +135,7 @@ class HostOffers {
   synchronized Optional<HostOffer> get(Protos.AgentID slaveId) {
     HostOffer offer = offersBySlave.get(slaveId);
     if (offer == null || globallyBannedOffers.contains(offer.getOffer().getId())) {
-      return Optional.absent();
+      return Optional.empty();
     }
 
     return Optional.of(offer);
@@ -163,9 +163,9 @@ class HostOffers {
       HostOffer offer = optionalOffer.get();
 
       if (isGloballyBanned(offer)
-          || isVetoed(offer, resourceRequest, revocable, Optional.absent())) {
+          || isVetoed(offer, resourceRequest, revocable, Optional.empty())) {
 
-        return Optional.absent();
+        return Optional.empty();
       }
     }
 

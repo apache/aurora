@@ -15,8 +15,8 @@ package org.apache.aurora.scheduler.testing;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
@@ -68,7 +68,7 @@ public class FakeStatsProvider implements StatsProvider {
   }
 
   @Override
-  public <T extends Number> Stat<T> makeGauge(final String name, final Supplier<T> gauge) {
+  public <T extends Number> Stat<T> makeGauge(String name, Supplier<T> gauge) {
     stats.put(name, gauge);
 
     return new Stat<T>() {

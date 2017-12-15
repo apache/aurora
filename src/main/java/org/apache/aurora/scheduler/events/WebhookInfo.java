@@ -19,12 +19,11 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
-
-import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -81,8 +80,8 @@ public class WebhookInfo {
   }
 
   private static final Predicate<List<String>> IS_ALL_WHITELISTED = statuses ->
-      !Optional.fromNullable(statuses).isPresent()
-          || Optional.fromNullable(statuses).get().stream().anyMatch(status -> "*".equals(status));
+      !Optional.ofNullable(statuses).isPresent()
+          || Optional.ofNullable(statuses).get().stream().anyMatch(status -> "*".equals(status));
 
   @JsonCreator
   public WebhookInfo(
@@ -94,8 +93,8 @@ public class WebhookInfo {
     this.headers = ImmutableMap.copyOf(headers);
     this.targetURI = new URI(requireNonNull(targetURL));
     this.connectTimeoutMsec = requireNonNull(timeout);
-    this.whitelistedStatuses = IS_ALL_WHITELISTED.apply(statuses) ? Optional.absent()
-        : Optional.fromNullable(statuses).transform(
+    this.whitelistedStatuses = IS_ALL_WHITELISTED.apply(statuses) ? Optional.empty()
+        : Optional.ofNullable(statuses).map(
             s -> ImmutableList.copyOf(s.stream()
                 .map(ScheduleStatus::valueOf)
                 .collect(Collectors.toList())));
@@ -171,7 +170,7 @@ public class WebhookInfo {
         .add("headers", headers.toString())
         .add("targetURI", targetURI.toString())
         .add("connectTimeoutMsec", connectTimeoutMsec)
-        .add("whitelistedStatuses", whitelistedStatuses.orNull())
+        .add("whitelistedStatuses", whitelistedStatuses.orElse(null))
         .toString();
   }
 }

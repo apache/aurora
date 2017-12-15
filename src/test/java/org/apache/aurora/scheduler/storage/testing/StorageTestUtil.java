@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.storage.testing;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
+
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
@@ -122,7 +123,7 @@ public class StorageTestUtil {
   }
 
   public IExpectationSetters<?> expectTaskFetch(String taskId) {
-    return expect(taskStore.fetchTask(taskId)).andReturn(Optional.absent());
+    return expect(taskStore.fetchTask(taskId)).andReturn(Optional.empty());
   }
 
   public IExpectationSetters<?> expectTaskFetch(Query.Builder query, IScheduledTask... result) {

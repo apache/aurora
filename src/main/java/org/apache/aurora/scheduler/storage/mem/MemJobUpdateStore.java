@@ -16,12 +16,12 @@ package org.apache.aurora.scheduler.storage.mem;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -64,7 +64,7 @@ public class MemJobUpdateStore implements JobUpdateStore.Mutable {
   @Timed("job_update_store_fetch_details")
   @Override
   public synchronized Optional<IJobUpdateDetails> fetchJobUpdate(IJobUpdateKey key) {
-    return Optional.fromNullable(updates.get(key));
+    return Optional.ofNullable(updates.get(key));
   }
 
   private static void validateInstructions(IJobUpdateInstructions instructions) {

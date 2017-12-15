@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;

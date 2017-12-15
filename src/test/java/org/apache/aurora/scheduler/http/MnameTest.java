@@ -14,12 +14,12 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.sun.jersey.api.client.ClientResponse;
@@ -149,9 +149,9 @@ public class MnameTest extends AbstractJettyTest {
   public void testRedirectPort() {
     replayAndStart();
 
-    assertEquals(Optional.absent(), getRedirectPort(null));
-    assertEquals(Optional.absent(), getRedirectPort(ImmutableMap.of()));
-    assertEquals(Optional.absent(), getRedirectPort(ImmutableMap.of("thrift", 5)));
+    assertEquals(Optional.empty(), getRedirectPort(null));
+    assertEquals(Optional.empty(), getRedirectPort(ImmutableMap.of()));
+    assertEquals(Optional.empty(), getRedirectPort(ImmutableMap.of("thrift", 5)));
     assertEquals(Optional.of(5), getRedirectPort(ImmutableMap.of("health", 5, "http", 6)));
     assertEquals(Optional.of(6), getRedirectPort(ImmutableMap.of("http", 6)));
     assertEquals(Optional.of(7), getRedirectPort(ImmutableMap.of("HTTP", 7)));

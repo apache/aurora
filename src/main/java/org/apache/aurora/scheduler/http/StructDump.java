@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import java.util.Optional;
+
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -22,7 +24,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import com.google.common.base.Optional;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -77,7 +78,7 @@ public class StructDump extends JerseyTemplateServlet {
     return dumpEntity(
         "Task " + taskId,
         storeProvider ->
-            storeProvider.getTaskStore().fetchTask(taskId).transform(IScheduledTask::newBuilder));
+            storeProvider.getTaskStore().fetchTask(taskId).map(IScheduledTask::newBuilder));
   }
 
   /**
@@ -96,7 +97,7 @@ public class StructDump extends JerseyTemplateServlet {
     final IJobKey jobKey = JobKeys.from(role, environment, job);
     return dumpEntity("Cron job " + JobKeys.canonicalString(jobKey),
         storeProvider -> storeProvider.getCronJobStore().fetchJob(jobKey)
-            .transform(IJobConfiguration::newBuilder));
+            .map(IJobConfiguration::newBuilder));
   }
 
   private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();

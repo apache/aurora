@@ -280,7 +280,7 @@ public class SnapshotStoreImpl implements Snapshotter {
     }
 
     SchedulerMetadata metadata = new SchedulerMetadata()
-        .setFrameworkId(storeProvider.getSchedulerStore().fetchFrameworkId().orNull())
+        .setFrameworkId(storeProvider.getSchedulerStore().fetchFrameworkId().orElse(null))
         .setDetails(buildInfo.getProperties());
 
     snapshot.setSchedulerMetadata(metadata);

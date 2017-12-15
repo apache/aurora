@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.events;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Optional;
 import com.google.gson.Gson;
 
 import org.apache.aurora.gen.ScheduleStatus;
@@ -98,7 +98,7 @@ public interface PubsubEvent {
      * @return A state change event.
      */
     public static TaskStateChange initialized(IScheduledTask task) {
-      return new TaskStateChange(task, Optional.absent());
+      return new TaskStateChange(task, Optional.empty());
     }
 
     /**

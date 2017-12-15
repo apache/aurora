@@ -16,11 +16,12 @@ package org.apache.aurora.scheduler.filter;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.Optional;
 import java.util.Set;
+
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
@@ -117,13 +118,13 @@ public class SchedulingFilterImpl implements SchedulingFilter {
       }
     }
 
-    return Optional.absent();
+    return Optional.empty();
   }
 
   private Optional<Veto> getAuroraMaintenanceVeto(MaintenanceMode mode) {
     return VETO_MODES.contains(mode)
         ? Optional.of(Veto.maintenance(mode.toString().toLowerCase()))
-        : Optional.absent();
+        : Optional.empty();
   }
 
   private Optional<Veto> getMesosMaintenanceVeto(Optional<Instant> unavailabilityStart) {
@@ -135,7 +136,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         return Optional.of(Veto.maintenance(DRAINING.toString().toLowerCase()));
       }
     }
-    return Optional.absent();
+    return Optional.empty();
   }
 
   private boolean isDedicated(IHostAttributes attributes) {
@@ -161,13 +162,13 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     // 2. Host maintenance check.
     Optional<Veto> maintenanceVeto = getAuroraMaintenanceVeto(resource.getAttributes().getMode());
     if (maintenanceVeto.isPresent()) {
-      return maintenanceVeto.asSet();
+      return ImmutableSet.of(maintenanceVeto.get());
     }
 
     Optional<Veto> mesosMaintenanceVeto =
         getMesosMaintenanceVeto(resource.getUnavailabilityStart());
     if (mesosMaintenanceVeto.isPresent()) {
-      return mesosMaintenanceVeto.asSet();
+      return ImmutableSet.of(mesosMaintenanceVeto.get());
     }
 
     // 3. Value and limit constraint check.
@@ -177,7 +178,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         resource.getAttributes().getAttributes());
 
     if (constraintVeto.isPresent()) {
-      return constraintVeto.asSet();
+      return ImmutableSet.of(constraintVeto.get());
     }
 
     // 4. Resource check (lowest score).

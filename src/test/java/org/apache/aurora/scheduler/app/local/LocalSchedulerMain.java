@@ -15,10 +15,10 @@ package org.apache.aurora.scheduler.app.local;
 
 import java.io.File;
 import java.util.List;
+import java.util.Optional;
 
 import javax.inject.Singleton;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
@@ -56,7 +56,7 @@ public final class LocalSchedulerMain {
           .build();
   private static final DriverSettings DRIVER_SETTINGS = new DriverSettings(
       "fakemaster",
-      Optional.absent());
+      Optional.empty());
 
   public static void main(String[] args) {
     File backupDir = Files.createTempDir();

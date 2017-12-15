@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.resources;
 
 import java.util.List;
+import java.util.Optional;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -55,15 +55,15 @@ public class MesosResourceConverterTest {
   @Test
   public void testAllocateRange() {
     List<Resource> expected = ImmutableList.<Resource>builder()
-        .add(mesosRange(PORTS, Optional.absent(), 80))
-        .add(mesosRange(PORTS, Optional.absent(), 90, 100))
+        .add(mesosRange(PORTS, Optional.empty(), 80))
+        .add(mesosRange(PORTS, Optional.empty(), 90, 100))
         .build();
 
     Iterable<Resource> actual = RANGES.toMesosResource(
         ImmutableSet.of(
-            mesosRange(PORTS, Optional.absent(), 79).toBuilder(),
-            mesosRange(PORTS, Optional.absent(), 80).toBuilder(),
-            mesosRange(PORTS, Optional.absent(), 80, 90, 91, 92, 100).toBuilder()),
+            mesosRange(PORTS, Optional.empty(), 79).toBuilder(),
+            mesosRange(PORTS, Optional.empty(), 80).toBuilder(),
+            mesosRange(PORTS, Optional.empty(), 80, 90, 91, 92, 100).toBuilder()),
         () -> ImmutableSet.of(80, 90, 100),
         false);
     assertEquals(expected, actual);
@@ -71,7 +71,7 @@ public class MesosResourceConverterTest {
 
   @Test
   public void testAllocateRangeRevocable() {
-    Resource.Builder builder = mesosRange(PORTS, Optional.absent(), 80).toBuilder()
+    Resource.Builder builder = mesosRange(PORTS, Optional.empty(), 80).toBuilder()
         .setRevocable(Resource.RevocableInfo.newBuilder());
 
     List<Resource> expected = ImmutableList.<Resource>builder().add(builder.build()).build();
@@ -86,7 +86,7 @@ public class MesosResourceConverterTest {
   @Test(expected = ResourceManager.InsufficientResourcesException.class)
   public void testAllocateRangeInsufficent() {
     RANGES.toMesosResource(
-        ImmutableSet.of(mesosRange(PORTS, Optional.absent(), 80, 81, 90, 91, 92).toBuilder()),
+        ImmutableSet.of(mesosRange(PORTS, Optional.empty(), 80, 81, 90, 91, 92).toBuilder()),
         () -> ImmutableSet.of(80, 90, 100),
         false);
   }

@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
@@ -111,14 +111,14 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
     return new SideEffect(
         Optional.of(action),
         ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build(),
-        Optional.absent());
+        Optional.empty());
   }
 
   private static SideEffect sideEffect(InstanceUpdateStatus... statuses) {
     return new SideEffect(
-        Optional.absent(),
+        Optional.empty(),
         ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build(),
-        Optional.absent());
+        Optional.empty());
   }
 
   @Test

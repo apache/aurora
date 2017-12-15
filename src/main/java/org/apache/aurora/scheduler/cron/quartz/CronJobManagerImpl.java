@@ -14,11 +14,11 @@
 package org.apache.aurora.scheduler.cron.quartz;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.TimeZone;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
@@ -197,7 +197,8 @@ class CronJobManagerImpl implements CronJobManager {
         // we're defensive here since this function is used for debugging.
         Optional<CronTrigger> trigger = FluentIterable.from(scheduler.getTriggersOfJob(jobKey))
             .filter(CronTrigger.class)
-            .first();
+            .first()
+            .toJavaUtil();
         if (trigger.isPresent()) {
           scheduledJobs.put(
               Quartz.auroraJobKey(jobKey),

@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
@@ -26,7 +27,6 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -399,7 +399,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   public void instanceDeleted(IInstanceKey instance) {
     // This is primarily used to detect when an instance was stuck in PENDING and killed, which
     // results in deletion.
-    instanceChanged(instance, Optional.absent());
+    instanceChanged(instance, Optional.empty());
   }
 
   private void instanceChanged(final IInstanceKey instance, final Optional<IScheduledTask> state) {
@@ -547,7 +547,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       IJobKey job,
       int instanceId) {
 
-    return Optional.fromNullable(Iterables.getOnlyElement(
+    return Optional.ofNullable(Iterables.getOnlyElement(
         taskStore.fetchTasks(Query.instanceScoped(job, instanceId).active()), null));
   }
 
@@ -745,7 +745,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   private static JobUpdateEvent addAuditData(JobUpdateEvent event, AuditData auditData) {
-    return event.setMessage(auditData.getMessage().orNull())
+    return event.setMessage(auditData.getMessage().orElse(null))
         .setUser(auditData.getUser());
   }
 

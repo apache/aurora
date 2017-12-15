@@ -14,8 +14,7 @@
 package org.apache.aurora.benchmark.fakes;
 
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.google.common.base.Supplier;
+import java.util.function.Supplier;
 
 import org.apache.aurora.common.stats.Stat;
 import org.apache.aurora.common.stats.StatsProvider;

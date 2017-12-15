@@ -15,9 +15,8 @@ package org.apache.aurora.scheduler.storage;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
-
-import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateStatus;

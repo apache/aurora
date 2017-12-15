@@ -15,9 +15,9 @@ package org.apache.aurora.scheduler.filter;
 
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;

@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -24,7 +25,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -135,12 +135,12 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
   private static final DriverSettings SETTINGS = new DriverSettings(
       "fakemaster",
-      Optional.absent());
+      Optional.empty());
 
   private final ExecutorService executor = Executors.newCachedThreadPool(
       new ThreadFactoryBuilder().setNameFormat("SchedulerIT-%d").setDaemon(true).build());
   private final AtomicReference<Optional<RuntimeException>> mainException =
-      Atomics.newReference(Optional.absent());
+      Atomics.newReference(Optional.empty());
 
   private IMocksControl control;
 

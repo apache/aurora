@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.preemptor;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.IntStream;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -103,7 +103,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   private static final String RACK_ATTRIBUTE = "rack";
   private static final String HOST_ATTRIBUTE = "host";
   private static final String OFFER = "offer";
-  private static final Optional<HostOffer> NO_OFFER = Optional.absent();
+  private static final Optional<HostOffer> NO_OFFER = Optional.empty();
   private static final Amount<Long, Time> UNAVAILABLITY_THRESHOLD = Amount.of(1L, Time.MINUTES);
 
   private StorageTestUtil storageUtil;
@@ -527,7 +527,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     assignToHost(a1);
     expectGetTier(a1, DEV_TIER);
 
-    expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.absent());
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.empty());
 
     control.replay();
 
@@ -604,7 +604,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   }
 
   private static void assertNoVictims(Optional<ImmutableSet<PreemptionVictim>> actual) {
-    assertEquals(Optional.<ImmutableSet<PreemptionVictim>>absent(), actual);
+    assertEquals(Optional.<ImmutableSet<PreemptionVictim>>empty(), actual);
   }
 
   private Optional<HostOffer> makeOffer(
@@ -621,7 +621,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
         mesosScalar(DISK_MB, disk.getValue()),
         mesosRange(
             PORTS,
-            Optional.absent(),
+            Optional.empty(),
             IntStream.range(1, numPorts).boxed().collect(toSet())));
     if (revocable) {
       resources = ImmutableList.<Resource>builder()
@@ -649,7 +649,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
   }
 
   private IExpectationSetters<Set<SchedulingFilter.Veto>> expectFiltering() {
-    return expectFiltering(Optional.absent());
+    return expectFiltering(Optional.empty());
   }
 
   private IExpectationSetters<Set<SchedulingFilter.Veto>> expectFiltering(
@@ -658,8 +658,7 @@ public class PreemptionVictimFilterTest extends EasyMockTest {
     return expect(schedulingFilter.filter(
         EasyMock.anyObject(),
         EasyMock.anyObject()))
-        .andAnswer(
-            veto::asSet);
+        .andAnswer(() -> veto.map(ImmutableSet::of).orElse(ImmutableSet.of()));
   }
 
   private IExpectationSetters<TierInfo> expectGetTier(ScheduledTask task, TierInfo tier) {

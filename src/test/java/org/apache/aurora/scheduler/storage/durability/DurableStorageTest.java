@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage.durability;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -21,7 +22,6 @@ import java.util.stream.Stream;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -652,7 +652,7 @@ public class DurableStorageTest extends EasyMockTest {
       protected void setupExpectations() throws Exception {
         storageUtil.expectWrite();
         expect(storageUtil.attributeStore.getHostAttributes(host))
-            .andReturn(Optional.absent());
+            .andReturn(Optional.empty());
 
         expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
 
@@ -670,7 +670,7 @@ public class DurableStorageTest extends EasyMockTest {
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
         AttributeStore.Mutable store = storeProvider.getAttributeStore();
-        assertEquals(Optional.absent(), store.getHostAttributes(host));
+        assertEquals(Optional.empty(), store.getHostAttributes(host));
 
         assertTrue(store.saveHostAttributes(hostAttributes.get()));
 

@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -61,15 +61,15 @@ public abstract class AbstractCronJobStoreTest {
 
   @Test
   public void testJobStore() {
-    assertNull(fetchJob(JobKeys.from("nobody", "nowhere", "noname")).orNull());
+    assertNull(fetchJob(JobKeys.from("nobody", "nowhere", "noname")).orElse(null));
     assertEquals(ImmutableSet.of(), fetchJobs());
 
     saveAcceptedJob(JOB_A);
-    assertEquals(JOB_A, fetchJob(KEY_A).orNull());
+    assertEquals(JOB_A, fetchJob(KEY_A).orElse(null));
     assertEquals(ImmutableSet.of(JOB_A), fetchJobs());
 
     saveAcceptedJob(JOB_B);
-    assertEquals(JOB_B, fetchJob(KEY_B).orNull());
+    assertEquals(JOB_B, fetchJob(KEY_B).orElse(null));
     assertEquals(ImmutableSet.of(JOB_A, JOB_B), fetchJobs());
 
     removeJob(KEY_B);
@@ -93,13 +93,13 @@ public abstract class AbstractCronJobStoreTest {
     saveAcceptedJob(staging);
 
     assertNull(fetchJob(
-        IJobKey.build(templateConfig.getKey().newBuilder().setEnvironment("test"))).orNull());
-    assertEquals(prod, fetchJob(prod.getKey()).orNull());
-    assertEquals(staging, fetchJob(staging.getKey()).orNull());
+        IJobKey.build(templateConfig.getKey().newBuilder().setEnvironment("test"))).orElse(null));
+    assertEquals(prod, fetchJob(prod.getKey()).orElse(null));
+    assertEquals(staging, fetchJob(staging.getKey()).orElse(null));
 
     removeJob(prod.getKey());
-    assertNull(fetchJob(prod.getKey()).orNull());
-    assertEquals(staging, fetchJob(staging.getKey()).orNull());
+    assertNull(fetchJob(prod.getKey()).orElse(null));
+    assertEquals(staging, fetchJob(staging.getKey()).orElse(null));
   }
 
   @Test
@@ -127,7 +127,7 @@ public abstract class AbstractCronJobStoreTest {
     IJobConfiguration jobAUpdated =
         IJobConfiguration.build(JOB_A.newBuilder().setCronSchedule("changed"));
     saveAcceptedJob(jobAUpdated);
-    assertEquals(jobAUpdated, fetchJob(KEY_A).orNull());
+    assertEquals(jobAUpdated, fetchJob(KEY_A).orElse(null));
   }
 
   private static IJobConfiguration makeJob(String name) {

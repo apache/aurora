@@ -15,13 +15,13 @@ package org.apache.aurora.scheduler.thrift;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -251,7 +251,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
         .setCronSchedule(cronSchedule)
         .setTaskConfig(task);
     expect(cronPredictor.predictNextRun(CrontabEntry.parse(cronSchedule)))
-        .andReturn(Optional.absent())
+        .andReturn(Optional.empty())
         .anyTimes();
     storageUtil.expectTaskFetch(Query.roleScoped(ROLE));
     Set<JobConfiguration> jobOnly = ImmutableSet.of(job);
@@ -739,7 +739,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
   @Test
   public void testGetJobUpdateDetailsInvalidId() throws Exception {
     expect(storageUtil.jobUpdateStore.fetchJobUpdate(UPDATE_KEY))
-        .andReturn(Optional.absent());
+        .andReturn(Optional.empty());
 
     control.replay();
 
@@ -761,7 +761,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     makeTasks(30, 40, task4, tasks);
     makeTasks(40, 50, task5, tasks);
 
-    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andReturn(Optional.absent());
+    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andReturn(Optional.empty());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active(), tasks.build());
 
     control.replay();
@@ -798,7 +798,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
     makeTasks(10, 20, task2, tasks);
     makeTasks(20, 30, task3, tasks);
 
-    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andReturn(Optional.absent());
+    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andReturn(Optional.empty());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active(), tasks.build());
 
     control.replay();
@@ -822,7 +822,7 @@ public class ReadOnlySchedulerImplTest extends EasyMockTest {
 
   @Test
   public void testGetJobUpdateDiffWithUnchanged() throws Exception {
-    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andReturn(Optional.absent());
+    expect(storageUtil.jobStore.fetchJob(JOB_KEY)).andReturn(Optional.empty());
     storageUtil.expectTaskFetch(
         Query.jobScoped(JOB_KEY).active(),
         ImmutableSet.copyOf(makeDefaultScheduledTasks(10)));

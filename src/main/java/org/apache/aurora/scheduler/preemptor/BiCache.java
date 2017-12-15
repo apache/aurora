@@ -14,13 +14,13 @@
 package org.apache.aurora.scheduler.preemptor;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -118,7 +118,7 @@ public class BiCache<K, V> {
    * @return Optional of value.
    */
   public synchronized Optional<V> get(K key) {
-    return Optional.fromNullable(cache.getIfPresent(key));
+    return Optional.ofNullable(cache.getIfPresent(key));
   }
 
   /**

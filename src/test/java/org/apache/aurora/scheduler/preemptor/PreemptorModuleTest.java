@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
+
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -87,7 +88,7 @@ public class PreemptorModuleTest extends EasyMockTest {
 
     injector.getBindings();
     assertEquals(
-        Optional.absent(),
+        Optional.empty(),
         injector.getInstance(Preemptor.class).attemptPreemptionFor(
             IAssignedTask.build(new AssignedTask()),
             AttributeAggregate.empty(),

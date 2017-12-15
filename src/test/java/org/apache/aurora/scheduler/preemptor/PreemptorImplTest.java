@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
@@ -63,7 +63,7 @@ public class PreemptorImplTest extends EasyMockTest {
       TaskGroupKey.from(ITaskConfig.build(makeTask().getAssignedTask().getTask()));
 
   private static final Set<PreemptionProposal> NO_SLOTS = ImmutableSet.of();
-  private static final Optional<String> EMPTY_RESULT = Optional.absent();
+  private static final Optional<String> EMPTY_RESULT = Optional.empty();
   private static final HostOffer OFFER =
       new HostOffer(Protos.Offer.getDefaultInstance(), IHostAttributes.build(new HostAttributes()));
 
@@ -115,7 +115,7 @@ public class PreemptorImplTest extends EasyMockTest {
   public void testPreemptTasksValidationFailed() throws Exception {
     expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL_1));
     slotCache.remove(PROPOSAL_1, GROUP_KEY);
-    expectSlotValidation(PROPOSAL_1, Optional.absent());
+    expectSlotValidation(PROPOSAL_1, Optional.empty());
 
     control.replay();
 
@@ -129,7 +129,7 @@ public class PreemptorImplTest extends EasyMockTest {
   public void testMultiplePreemptionProposalsSuccessful() throws Exception {
     expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL_1, PROPOSAL_2));
     slotCache.remove(PROPOSAL_1, GROUP_KEY);
-    expectSlotValidation(PROPOSAL_1, Optional.absent());
+    expectSlotValidation(PROPOSAL_1, Optional.empty());
     slotCache.remove(PROPOSAL_2, GROUP_KEY);
     expectSlotValidation(PROPOSAL_2, Optional.of(ImmutableSet.of(
         PreemptionVictim.fromTask(TASK.getAssignedTask()))));
@@ -148,9 +148,9 @@ public class PreemptorImplTest extends EasyMockTest {
   public void testMultiplePreemptionProposalsFailed() throws Exception {
     expect(slotCache.getByValue(GROUP_KEY)).andReturn(ImmutableSet.of(PROPOSAL_1, PROPOSAL_2));
     slotCache.remove(PROPOSAL_1, GROUP_KEY);
-    expectSlotValidation(PROPOSAL_1, Optional.absent());
+    expectSlotValidation(PROPOSAL_1, Optional.empty());
     slotCache.remove(PROPOSAL_2, GROUP_KEY);
-    expectSlotValidation(PROPOSAL_2, Optional.absent());
+    expectSlotValidation(PROPOSAL_2, Optional.empty());
 
     control.replay();
 
@@ -192,7 +192,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         anyObject(Storage.MutableStoreProvider.class),
         eq(Tasks.id(preempted)),
-        eq(Optional.absent()),
+        eq(Optional.empty()),
         eq(ScheduleStatus.PREEMPTING),
         anyObject()))
         .andReturn(StateChangeResult.SUCCESS);

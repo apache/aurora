@@ -13,10 +13,10 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
+import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -135,7 +135,7 @@ public class TaskThrottlerTest extends EasyMockTest {
         Tasks.id(task),
         Optional.of(THROTTLED),
         PENDING,
-        Optional.absent()))
+        Optional.empty()))
         .andReturn(StateChangeResult.SUCCESS);
   }
 

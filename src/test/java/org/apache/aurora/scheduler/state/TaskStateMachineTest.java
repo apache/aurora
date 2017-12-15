@@ -14,12 +14,13 @@
 package org.apache.aurora.scheduler.state;
 
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -278,7 +279,7 @@ public class TaskStateMachineTest {
   }
 
   private static final Function<Action, SideEffect> TO_SIDE_EFFECT =
-      action -> new SideEffect(action, Optional.absent());
+      action -> new SideEffect(action, Optional.empty());
 
   private void legalTransition(TaskState state, SideEffect.Action... expectedActions) {
     legalTransition(state, ImmutableSet.copyOf(expectedActions));
@@ -325,38 +326,38 @@ public class TaskStateMachineTest {
 
   private static final TransitionResult SAVE = new TransitionResult(
       SUCCESS,
-      ImmutableSet.of(new SideEffect(Action.SAVE_STATE, Optional.absent())));
+      ImmutableSet.of(new SideEffect(Action.SAVE_STATE, Optional.empty())));
   private static final TransitionResult SAVE_AND_KILL = new TransitionResult(
       SUCCESS,
       ImmutableSet.of(
-          new SideEffect(Action.SAVE_STATE, Optional.absent()),
-          new SideEffect(Action.KILL, Optional.absent())));
+          new SideEffect(Action.SAVE_STATE, Optional.empty()),
+          new SideEffect(Action.KILL, Optional.empty())));
   private static final TransitionResult SAVE_AND_RESCHEDULE = new TransitionResult(
       SUCCESS,
       ImmutableSet.of(
-          new SideEffect(Action.SAVE_STATE, Optional.absent()),
-          new SideEffect(Action.RESCHEDULE, Optional.absent())));
+          new SideEffect(Action.SAVE_STATE, Optional.empty()),
+          new SideEffect(Action.RESCHEDULE, Optional.empty())));
   private static final TransitionResult SAVE_KILL_AND_RESCHEDULE = new TransitionResult(
       SUCCESS,
       ImmutableSet.of(
-          new SideEffect(Action.SAVE_STATE, Optional.absent()),
-          new SideEffect(Action.KILL, Optional.absent()),
-          new SideEffect(Action.RESCHEDULE, Optional.absent())));
+          new SideEffect(Action.SAVE_STATE, Optional.empty()),
+          new SideEffect(Action.KILL, Optional.empty()),
+          new SideEffect(Action.RESCHEDULE, Optional.empty())));
   private static final TransitionResult ILLEGAL_KILL = new TransitionResult(
       ILLEGAL_WITH_SIDE_EFFECTS,
-      ImmutableSet.of(new SideEffect(Action.KILL, Optional.absent())));
+      ImmutableSet.of(new SideEffect(Action.KILL, Optional.empty())));
   private static final TransitionResult TRANSITION_TO_LOST = new TransitionResult(
       SUCCESS,
-      ImmutableSet.of(new SideEffect(Action.TRANSITION_TO_LOST, Optional.absent()),
-          new SideEffect(Action.SAVE_STATE, Optional.absent())));
+      ImmutableSet.of(new SideEffect(Action.TRANSITION_TO_LOST, Optional.empty()),
+          new SideEffect(Action.SAVE_STATE, Optional.empty())));
   private static final TransitionResult RECORD_FAILURE = new TransitionResult(
       SUCCESS,
       ImmutableSet.of(
-          new SideEffect(Action.SAVE_STATE, Optional.absent()),
-          new SideEffect(Action.INCREMENT_FAILURES, Optional.absent())));
+          new SideEffect(Action.SAVE_STATE, Optional.empty()),
+          new SideEffect(Action.INCREMENT_FAILURES, Optional.empty())));
   private static final TransitionResult DELETE_TASK = new TransitionResult(
       SUCCESS,
-      ImmutableSet.of(new SideEffect(Action.DELETE, Optional.absent())));
+      ImmutableSet.of(new SideEffect(Action.DELETE, Optional.empty())));
 
   private static final class TestCase {
     private final boolean taskPresent;
@@ -592,7 +593,7 @@ public class TaskStateMachineTest {
               if (expectException) {
                 fail();
               }
-            } catch (IllegalStateException e) {
+            } catch (NoSuchElementException e) {
               if (expectException) {
                 continue;
               } else {

@@ -15,8 +15,7 @@ package org.apache.aurora.common.stats;
 
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.google.common.base.Supplier;
+import java.util.function.Supplier;
 
 /**
  * A minimal interface to a Stats repository.

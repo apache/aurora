@@ -19,6 +19,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -28,7 +29,6 @@ import javax.inject.Qualifier;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -80,7 +80,7 @@ class MemTaskStore implements TaskStore.Mutable {
       JobKeys::from;
   private static final Function<Query.Builder, Optional<Set<String>>> QUERY_TO_SLAVE_HOST =
       query -> query.get().getSlaveHosts().isEmpty()
-          ? Optional.absent()
+          ? Optional.empty()
           : Optional.of(query.get().getSlaveHosts());
 
   // Since this class operates under the API and umbrella of {@link Storage}, it is expected to be
@@ -125,7 +125,7 @@ class MemTaskStore implements TaskStore.Mutable {
   @Override
   public Optional<IScheduledTask> fetchTask(String taskId) {
     requireNonNull(taskId);
-    return Optional.fromNullable(tasks.get(taskId)).transform(t -> t.storedTask);
+    return Optional.ofNullable(tasks.get(taskId)).map(t -> t.storedTask);
   }
 
   @Timed("mem_storage_fetch_tasks")
@@ -204,7 +204,7 @@ class MemTaskStore implements TaskStore.Mutable {
       String taskId,
       Function<IScheduledTask, IScheduledTask> mutator) {
 
-    return fetchTask(taskId).transform(original -> {
+    return fetchTask(taskId).map(original -> {
       IScheduledTask maybeMutated = mutator.apply(original);
       requireNonNull(maybeMutated);
       if (!original.equals(maybeMutated)) {
@@ -240,7 +240,7 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private FluentIterable<IScheduledTask> matches(Query.Builder query) {
     // Apply the query against the working set.
-    Optional<? extends Iterable<Task>> from = Optional.absent();
+    Optional<? extends Iterable<Task>> from = Optional.empty();
     if (query.get().getTaskIds().isEmpty()) {
       for (SecondaryIndex<?> index : secondaryIndices) {
         Optional<Iterable<String>> indexMatch = index.getMatches(query);
@@ -399,7 +399,7 @@ class MemTaskStore implements TaskStore.Mutable {
     };
 
     Optional<Iterable<String>> getMatches(Query.Builder query) {
-      return queryExtractor.apply(query).transform(lookup);
+      return queryExtractor.apply(query).map(lookup);
     }
   }
 }

@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.mesos;
 
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.Collections2;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.AbstractIdleService;
@@ -101,12 +101,12 @@ class VersionedSchedulerDriverService extends AbstractIdleService
       LOG.warn("Did not find a persisted framework ID, connecting as a new framework.");
     }
 
-    Credential credential = driverSettings.getCredentials().orNull();
+    Credential credential = driverSettings.getCredentials().orElse(null);
     Mesos mesos = factory.create(
         scheduler,
         frameworkBuilder.build(),
         driverSettings.getMasterUri(),
-        Optional.fromNullable(credential));
+        Optional.ofNullable(credential));
 
     mesosFuture.set(mesos);
   }

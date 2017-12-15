@@ -14,8 +14,7 @@
 package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
-
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.quantity.Amount;
@@ -50,11 +49,11 @@ public class ZooKeeperConfig {
   public static ZooKeeperConfig create(Iterable<InetSocketAddress> servers) {
     return new ZooKeeperConfig(
         servers,
-        Optional.absent(), // chrootPath
+        Optional.empty(), // chrootPath
         false,
         ZooKeeperUtils.DEFAULT_ZK_SESSION_TIMEOUT,
         ZooKeeperUtils.DEFAULT_ZK_CONNECTION_TIMEOUT,
-        Optional.absent()); // credentials
+        Optional.empty()); // credentials
   }
 
   private final Iterable<InetSocketAddress> servers;

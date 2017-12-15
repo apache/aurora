@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.cron.quartz;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.Date;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -25,7 +26,6 @@ import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
@@ -196,7 +196,7 @@ class AuroraCronJob implements Job, EventSubscriber {
             stateManager.changeState(
                 storeProvider,
                 taskId,
-                Optional.absent(),
+                Optional.empty(),
                 KILLING,
                 KILL_AUDIT_MESSAGE);
           }

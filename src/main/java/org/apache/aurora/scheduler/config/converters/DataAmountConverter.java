@@ -14,15 +14,13 @@
 
 package org.apache.aurora.scheduler.config.converters;
 
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import com.beust.jcommander.ParameterException;
 import com.beust.jcommander.converters.BaseConverter;
-import com.google.common.base.Functions;
-import com.google.common.base.Optional;
-import com.google.common.base.Predicates;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.quantity.Data;
@@ -43,10 +41,9 @@ public class DataAmountConverter extends BaseConverter<DataAmount> {
       throw new ParameterException(getErrorString(raw, "must be of the format 1KB, 2GB, etc."));
     }
 
-    Optional<Data> unit = FluentIterable.from(Data.values())
-        .firstMatch(Predicates.compose(
-            Predicates.equalTo(matcher.group(2)),
-            Functions.toStringFunction()));
+    Optional<Data> unit = Stream.of(Data.values())
+        .filter(value -> value.toString().equals(matcher.group(2)))
+        .findFirst();
     if (unit.isPresent()) {
       return new DataAmount(Integer.parseInt(matcher.group(1)), unit.get());
     } else {

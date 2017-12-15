@@ -13,13 +13,13 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
@@ -144,7 +144,7 @@ public interface MaintenanceController {
           stateManager.changeState(
               store,
               taskId,
-              Optional.absent(),
+              Optional.empty(),
               ScheduleStatus.DRAINING,
               DRAINING_MESSAGE);
         }
@@ -219,7 +219,7 @@ public interface MaintenanceController {
       if (offer.getUrl().getAddress().hasHostname()) {
         return Optional.of(offer.getUrl().getAddress().getHostname());
       } else {
-        return Optional.absent();
+        return Optional.empty();
       }
     }
 
@@ -249,9 +249,9 @@ public interface MaintenanceController {
     @Override
     public MaintenanceMode getMode(final String host) {
       return storage.read(storeProvider -> storeProvider.getAttributeStore().getHostAttributes(host)
-          .transform(ATTRS_TO_STATUS)
-          .transform(GET_MODE)
-          .or(MaintenanceMode.NONE));
+          .map(ATTRS_TO_STATUS)
+          .map(GET_MODE)
+          .orElse(MaintenanceMode.NONE));
     }
 
     @Override

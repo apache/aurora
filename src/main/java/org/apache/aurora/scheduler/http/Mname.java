@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.http;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -32,7 +33,6 @@ import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
@@ -139,7 +139,7 @@ public class Mname {
       @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, instanceId, uriInfo, Optional.absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.empty());
   }
 
   @PUT
@@ -151,7 +151,7 @@ public class Mname {
       @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, instanceId, uriInfo, Optional.absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.empty());
   }
 
   @POST
@@ -163,7 +163,7 @@ public class Mname {
       @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, instanceId, uriInfo, Optional.absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.empty());
   }
 
   @DELETE
@@ -175,7 +175,7 @@ public class Mname {
       @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, instanceId, uriInfo, Optional.absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.empty());
   }
 
   private Response get(
@@ -205,7 +205,7 @@ public class Mname {
     }
 
     UriBuilder redirect = UriBuilder
-        .fromPath(forwardRequest.or("/"))
+        .fromPath(forwardRequest.orElse("/"))
         .scheme("http")
         .host(assignedTask.getSlaveHost())
         .port(port.get());
@@ -227,7 +227,7 @@ public class Mname {
         return Optional.of(port);
       }
     }
-    return Optional.absent();
+    return Optional.empty();
   }
 
   private Response respond(Status status, String message) {

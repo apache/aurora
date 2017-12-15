@@ -18,6 +18,7 @@ import java.lang.annotation.Target;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -29,7 +30,6 @@ import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.UnmodifiableIterator;
@@ -197,7 +197,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
      * When {@code true}, indicates that the log has suffered a fatal error and no further
      * operations may be performed.
      */
-    @Nullable private Optional<WriterInterface> writer = Optional.absent();
+    @Nullable private Optional<WriterInterface> writer = Optional.empty();
 
     LogStream(
         LogInterface log,

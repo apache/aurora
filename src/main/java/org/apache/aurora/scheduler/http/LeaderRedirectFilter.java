@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.http;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Optional;
 
 import javax.inject.Inject;
 import javax.servlet.FilterChain;
@@ -24,7 +25,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.HttpHeaders;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.io.Resources;
 
 import org.slf4j.Logger;

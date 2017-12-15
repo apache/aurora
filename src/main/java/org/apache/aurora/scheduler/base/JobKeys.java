@@ -14,11 +14,11 @@
 package org.apache.aurora.scheduler.base;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 
@@ -136,7 +136,7 @@ public final class JobKeys {
       builder.addAll(taskQuery.getJobKeys());
       return Optional.of(assertValid(builder.build()));
     } else {
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 

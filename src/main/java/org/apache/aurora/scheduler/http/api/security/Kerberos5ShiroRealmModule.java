@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
+import java.util.Optional;
 
 import javax.inject.Singleton;
 import javax.security.auth.Subject;
@@ -27,7 +28,6 @@ import javax.security.auth.login.LoginException;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
@@ -93,8 +93,8 @@ public class Kerberos5ShiroRealmModule extends AbstractModule {
 
   public Kerberos5ShiroRealmModule(CliOptions options) {
     this(
-        Optional.fromNullable(options.kerberos.serverKeytab),
-        Optional.fromNullable(options.kerberos.serverPrincipal),
+        Optional.ofNullable(options.kerberos.serverKeytab),
+        Optional.ofNullable(options.kerberos.serverPrincipal),
         GSSManager.getInstance(),
         options.kerberos.kerberosDebug);
   }

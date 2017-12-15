@@ -13,9 +13,10 @@
  */
 package org.apache.aurora.scheduler.cron.quartz;
 
+import java.util.Optional;
+
 import javax.inject.Inject;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 
@@ -56,7 +57,7 @@ class CronSchedulerImpl implements CronScheduler {
       LOG.error(
           "Error reading job " + JobKeys.canonicalString(jobKey) + " cronExpression Quartz: " + e,
           e);
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 }

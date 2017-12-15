@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.offers;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -639,7 +639,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     offerManager.add(OFFER_A);
     assertEquals(0, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
     offerManager.ban(OFFER_A_ID);
-    assertEquals(Optional.absent(),
+    assertEquals(Optional.empty(),
         offerManager.getMatching(OFFER_A.getOffer().getAgentId(), EMPTY_REQUEST, false));
     assertEquals(1, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
   }
@@ -654,7 +654,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     control.replay();
     offerManager.add(OFFER_A);
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
-    assertEquals(Optional.absent(),
+    assertEquals(Optional.empty(),
         offerManager.getMatching(OFFER_A.getOffer().getAgentId(), EMPTY_REQUEST, false));
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
   }

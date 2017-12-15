@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.preemptor;
 
 import java.util.Arrays;
+import java.util.Optional;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.ImmutableSet;
@@ -316,7 +316,7 @@ public class PendingTaskProcessorTest extends EasyMockTest {
         eq(storageUtil.storeProvider)));
     expectLastCall().andReturn(
         victims.length == 0
-            ? Optional.absent()
+            ? Optional.empty()
             : Optional.of(ImmutableSet.copyOf(getVictims(victims).values())))
         .anyTimes();
   }

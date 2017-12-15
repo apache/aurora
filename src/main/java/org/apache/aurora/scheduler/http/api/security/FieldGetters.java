@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.thrift.TBase;
 
@@ -42,7 +42,7 @@ final class FieldGetters {
         if (parentValue.isPresent()) {
           return child.apply(parentValue.get());
         } else {
-          return Optional.absent();
+          return Optional.empty();
         }
       }
     };

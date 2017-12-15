@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.stats;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -64,7 +64,7 @@ public class ResourceCounterTest {
 
   private static final Metric ZERO = new Metric(TOTAL_CONSUMED, ResourceBag.EMPTY);
   private static final long GB = 1024;
-  private static final Optional<String> NOT_DEDICATED = Optional.absent();
+  private static final Optional<String> NOT_DEDICATED = Optional.empty();
 
   private static final boolean PRODUCTION = true;
   private static final boolean NONPRODUCTION = false;

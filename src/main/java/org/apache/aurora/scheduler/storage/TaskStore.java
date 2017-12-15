@@ -13,11 +13,11 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 
 import org.apache.aurora.scheduler.base.Query;

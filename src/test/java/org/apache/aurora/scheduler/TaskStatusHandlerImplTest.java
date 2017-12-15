@@ -13,12 +13,11 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-
-import com.google.common.base.Optional;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -96,7 +95,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID_A,
-        Optional.absent(),
+        Optional.empty(),
         RUNNING,
         Optional.of("fake message")))
         .andReturn(StateChangeResult.SUCCESS);
@@ -122,7 +121,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID_A,
-        Optional.absent(),
+        Optional.empty(),
         RUNNING,
         Optional.of("fake message")))
         .andAnswer(() -> {
@@ -164,7 +163,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID_A,
-        Optional.absent(),
+        Optional.empty(),
         FAILED,
         expectedMessage))
         .andReturn(StateChangeResult.SUCCESS);
@@ -195,7 +194,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
   public void testMemoryLimitTranslationNoMessage() throws Exception {
     assertResourceLimitBehavior(
         TaskStatus.Reason.REASON_CONTAINER_LIMITATION_MEMORY,
-        Optional.absent(),
+        Optional.empty(),
         Optional.of(TaskStatusHandlerImpl.MEMORY_LIMIT_DISPLAY));
   }
 
@@ -213,7 +212,7 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
   public void testDiskLimitTranslationNoMessage() throws Exception {
     assertResourceLimitBehavior(
         TaskStatus.Reason.REASON_CONTAINER_LIMITATION_DISK,
-        Optional.absent(),
+        Optional.empty(),
         Optional.of(TaskStatusHandlerImpl.DISK_LIMIT_DISPLAY));
   }
 
@@ -231,9 +230,9 @@ public class TaskStatusHandlerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID_A,
-        Optional.absent(),
+        Optional.empty(),
         KILLED,
-        Optional.absent()))
+        Optional.empty()))
         .andReturn(StateChangeResult.SUCCESS);
 
     CountDownLatch latch = new CountDownLatch(1);

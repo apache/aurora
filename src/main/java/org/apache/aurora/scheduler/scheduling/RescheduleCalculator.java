@@ -15,12 +15,12 @@ package org.apache.aurora.scheduler.scheduling;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -143,7 +143,7 @@ public interface RescheduleCalculator {
 
     private Optional<IScheduledTask> getTaskAncestor(IScheduledTask task) {
       if (!task.isSetAncestorId()) {
-        return Optional.absent();
+        return Optional.empty();
       }
 
       return Storage.Util.fetchTask(storage, task.getAncestorId());

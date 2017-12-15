@@ -128,7 +128,7 @@ public class ThriftIT extends EasyMockTest {
             bindMock(DriverFactory.class);
             bind(DriverSettings.class).toInstance(new DriverSettings(
                 "fakemaster",
-                com.google.common.base.Optional.absent()));
+                Optional.empty()));
             bind(FrameworkInfo.class)
                 .annotatedWith(BaseFrameworkInfo.class)
                 .toInstance(base);

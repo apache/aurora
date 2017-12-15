@@ -13,12 +13,12 @@
  */
 package org.apache.aurora.scheduler.preemptor;
 
+import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.scheduler.stats.CachedCounters;

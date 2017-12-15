@@ -15,11 +15,11 @@ package org.apache.aurora.scheduler.filter;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.offers.HostOffer;
 import org.apache.aurora.scheduler.resources.ResourceBag;
@@ -256,7 +256,7 @@ public interface SchedulingFilter {
 
     @VisibleForTesting
     public UnusedResource(ResourceBag offer, IHostAttributes attributes) {
-      this(offer, attributes, Optional.absent());
+      this(offer, attributes, Optional.empty());
     }
 
     public UnusedResource(HostOffer offer, boolean revocable) {

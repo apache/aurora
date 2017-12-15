@@ -31,7 +31,7 @@ public class ThriftFieldGetterTest {
 
     JobConfiguration jobConfiguration = new JobConfiguration().setKey(jobKey);
 
-    assertSame(jobKey, fieldGetter.apply(jobConfiguration).orNull());
+    assertSame(jobKey, fieldGetter.apply(jobConfiguration).orElse(null));
   }
 
   @Test
@@ -41,6 +41,6 @@ public class ThriftFieldGetterTest {
 
     JobConfiguration jobConfiguration = new JobConfiguration().setInstanceCount(5);
 
-    assertNull(fieldGetter.apply(jobConfiguration).orNull());
+    assertNull(fieldGetter.apply(jobConfiguration).orElse(null));
   }
 }

@@ -13,10 +13,10 @@
  */
 package org.apache.aurora.scheduler.storage.durability;
 
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;

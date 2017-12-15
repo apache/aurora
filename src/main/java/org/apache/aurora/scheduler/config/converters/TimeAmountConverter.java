@@ -14,15 +14,13 @@
 
 package org.apache.aurora.scheduler.config.converters;
 
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import com.beust.jcommander.ParameterException;
 import com.beust.jcommander.converters.BaseConverter;
-import com.google.common.base.Functions;
-import com.google.common.base.Optional;
-import com.google.common.base.Predicates;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.quantity.Time;
@@ -43,10 +41,9 @@ public class TimeAmountConverter extends BaseConverter<TimeAmount> {
       throw new ParameterException(getErrorString(raw, "must be of the format 1ns, 2secs, etc."));
     }
 
-    Optional<Time> unit = FluentIterable.from(Time.values())
-        .firstMatch(Predicates.compose(
-            Predicates.equalTo(matcher.group(2)),
-            Functions.toStringFunction()));
+    Optional<Time> unit = Stream.of(Time.values())
+        .filter(value -> value.toString().equals(matcher.group(2)))
+        .findFirst();
     if (unit.isPresent()) {
       return new TimeAmount(Long.parseLong(matcher.group(1)), unit.get());
     } else {

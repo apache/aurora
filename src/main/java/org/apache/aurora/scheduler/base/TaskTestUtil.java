@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.base;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -155,7 +155,7 @@ public final class TaskTestUtil {
   }
 
   public static IScheduledTask makeTask(String id, IJobKey job, int instanceId) {
-    return makeTask(id, makeConfig(job), instanceId, Optional.absent());
+    return makeTask(id, makeConfig(job), instanceId, Optional.empty());
   }
 
   public static IScheduledTask makeTask(String id, IJobKey job, int instanceId, String agentId) {
@@ -167,7 +167,7 @@ public final class TaskTestUtil {
   }
 
   public static IScheduledTask makeTask(String id, ITaskConfig config, int instanceId) {
-    return makeTask(id, config, instanceId, Optional.absent());
+    return makeTask(id, config, instanceId, Optional.empty());
   }
 
   public static IScheduledTask makeTask(

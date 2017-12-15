@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.Optional;
 import com.google.common.eventbus.EventBus;
 
 import org.apache.aurora.common.quantity.Amount;
@@ -88,7 +88,7 @@ public class TaskStatusStatsTest extends EasyMockTest {
     eventBus.post(new TaskStatusReceived(
         TaskState.TASK_RUNNING,
         Optional.of(Source.SOURCE_MASTER),
-        Optional.absent(),
+        Optional.empty(),
         Optional.of(agoMicros(ONE_SECOND))));
 
     clock.advance(ONE_SECOND);
@@ -111,19 +111,19 @@ public class TaskStatusStatsTest extends EasyMockTest {
     // No counting for these since they do not have both a source and timestamp.
     eventBus.post(new TaskStatusReceived(
         TaskState.TASK_LOST,
-        Optional.absent(),
-        Optional.absent(),
-        Optional.absent()));
+        Optional.empty(),
+        Optional.empty(),
+        Optional.empty()));
     eventBus.post(new TaskStatusReceived(
         TaskState.TASK_LOST,
-        Optional.absent(),
-        Optional.absent(),
+        Optional.empty(),
+        Optional.empty(),
         Optional.of(agoMicros(ONE_SECOND))));
     eventBus.post(new TaskStatusReceived(
         TaskState.TASK_LOST,
         Optional.of(Source.SOURCE_MASTER),
         Optional.of(Reason.REASON_AGENT_DISCONNECTED),
-        Optional.absent()));
+        Optional.empty()));
 
     // No time tracking for this since the timestamp is the current time.
     eventBus.post(new TaskStatusReceived(

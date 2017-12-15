@@ -32,8 +32,8 @@ public class AuditMessagesTest extends EasyMockTest {
 
     control.replay();
 
-    assertThat(emptyMessages.killedByRemoteUser(
-        com.google.common.base.Optional.absent()).get(),
+    assertThat(
+        emptyMessages.killedByRemoteUser(Optional.empty()).get(),
         containsString(DEFAULT_USER));
     assertThat(emptyMessages.restartedByRemoteUser().get(), containsString(DEFAULT_USER));
     assertThat(emptyMessages.transitionedBy().get(), containsString(DEFAULT_USER));
@@ -48,9 +48,7 @@ public class AuditMessagesTest extends EasyMockTest {
 
     control.replay();
 
-    assertThat(presentMessages.killedByRemoteUser(
-        com.google.common.base.Optional.absent()).get(),
-        containsString("shiro"));
+    assertThat(presentMessages.killedByRemoteUser(Optional.empty()).get(), containsString("shiro"));
     assertThat(presentMessages.restartedByRemoteUser().get(), containsString("shiro"));
     assertThat(presentMessages.transitionedBy().get(), containsString("shiro"));
   }
@@ -65,10 +63,8 @@ public class AuditMessagesTest extends EasyMockTest {
     control.replay();
 
     assertEquals(messages.killedByRemoteUser(
-        com.google.common.base.Optional.of("Test message")).get(),
+        Optional.of("Test message")).get(),
         "Killed by shiro.\nTest message");
-    assertEquals(messages.killedByRemoteUser(
-        com.google.common.base.Optional.absent()).get(),
-        "Killed by shiro");
+    assertEquals(messages.killedByRemoteUser(Optional.empty()).get(), "Killed by shiro");
   }
 }

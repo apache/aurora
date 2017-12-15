@@ -151,7 +151,7 @@ public class CrontabEntryTest {
     );
 
     for (String pattern : badPatterns) {
-      assertNull(CrontabEntry.tryParse(pattern).orNull());
+      assertNull(CrontabEntry.tryParse(pattern).orElse(null));
     }
   }
 

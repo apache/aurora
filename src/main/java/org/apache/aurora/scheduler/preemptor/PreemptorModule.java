@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.preemptor;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.List;
+import java.util.Optional;
 
 import javax.inject.Inject;
 import javax.inject.Qualifier;
@@ -23,7 +24,6 @@ import javax.inject.Singleton;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AbstractScheduledService;
 import com.google.inject.AbstractModule;
@@ -178,5 +178,5 @@ public class PreemptorModule extends AbstractModule {
   }
 
   private static final Preemptor NULL_PREEMPTOR =
-      (task, jobState, storeProvider) -> Optional.absent();
+      (task, jobState, storeProvider) -> Optional.empty();
 }

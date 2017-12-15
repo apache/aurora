@@ -15,10 +15,10 @@ package org.apache.aurora.scheduler.mesos;
 
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.Executor;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InetAddresses;
@@ -249,7 +249,7 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
   private void expectOfferAttributesSaved(HostOffer offer) {
     expect(storageUtil.attributeStore.getHostAttributes(offer.getOffer().getHostname()))
-        .andReturn(Optional.absent());
+        .andReturn(Optional.empty());
     IHostAttributes defaultMode = IHostAttributes.build(
         Conversions.getAttributes(offer.getOffer()).newBuilder().setMode(NONE));
     expect(storageUtil.attributeStore.saveHostAttributes(defaultMode)).andReturn(true);
@@ -378,8 +378,8 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
   public void testUpdate() {
     eventSink.post(new PubsubEvent.TaskStatusReceived(
         STATUS.getState(),
-        Optional.fromNullable(STATUS.getSource()),
-        Optional.fromNullable(STATUS.getReason()),
+        Optional.ofNullable(STATUS.getSource()),
+        Optional.ofNullable(STATUS.getReason()),
         Optional.of(1000000L)
     ));
     statusHandler.statusUpdate(STATUS);
@@ -396,8 +396,8 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
     eventSink.post(new PubsubEvent.TaskStatusReceived(
         status.getState(),
-        Optional.absent(),
-        Optional.fromNullable(status.getReason()),
+        Optional.empty(),
+        Optional.ofNullable(status.getReason()),
         Optional.of(1000000L)
     ));
     statusHandler.statusUpdate(status);
@@ -414,8 +414,8 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
     eventSink.post(new PubsubEvent.TaskStatusReceived(
         status.getState(),
-        Optional.fromNullable(status.getSource()),
-        Optional.absent(),
+        Optional.ofNullable(status.getSource()),
+        Optional.empty(),
         Optional.of(1000000L)
     ));
     statusHandler.statusUpdate(status);
@@ -432,8 +432,8 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
     eventSink.post(new PubsubEvent.TaskStatusReceived(
         status.getState(),
-        Optional.fromNullable(status.getSource()),
-        Optional.fromNullable(status.getReason()),
+        Optional.ofNullable(status.getSource()),
+        Optional.ofNullable(status.getReason()),
         Optional.of(1000000L)
     ));
     statusHandler.statusUpdate(status);
@@ -448,8 +448,8 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
   public void testUpdateWithException() {
     eventSink.post(new PubsubEvent.TaskStatusReceived(
         STATUS.getState(),
-        Optional.fromNullable(STATUS.getSource()),
-        Optional.fromNullable(STATUS.getReason()),
+        Optional.ofNullable(STATUS.getSource()),
+        Optional.ofNullable(STATUS.getReason()),
         Optional.of(1000000L)
     ));
     statusHandler.statusUpdate(STATUS);
@@ -472,8 +472,8 @@ public class MesosCallbackHandlerTest extends EasyMockTest {
 
     eventSink.post(new PubsubEvent.TaskStatusReceived(
         STATUS_RECONCILIATION.getState(),
-        Optional.fromNullable(STATUS_RECONCILIATION.getSource()),
-        Optional.fromNullable(STATUS_RECONCILIATION.getReason()),
+        Optional.ofNullable(STATUS_RECONCILIATION.getSource()),
+        Optional.ofNullable(STATUS_RECONCILIATION.getReason()),
         Optional.of(1000000L)
     ));
 

@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -132,7 +132,7 @@ public class NonVolatileStorageTest extends TearDownTestCase {
           stores.getQuotaStore().removeQuota("lucy");
         },
         stores -> {
-          assertEquals(Optional.absent(), stores.getQuotaStore().fetchQuota("lucy"));
+          assertEquals(Optional.empty(), stores.getQuotaStore().fetchQuota("lucy"));
         }
     ));
 

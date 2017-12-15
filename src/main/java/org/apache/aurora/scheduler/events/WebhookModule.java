@@ -16,11 +16,11 @@ package org.apache.aurora.scheduler.events;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
@@ -60,8 +60,8 @@ public class WebhookModule extends AbstractModule {
   private final Optional<String> webhookConfig;
 
   public WebhookModule(Options options) {
-    this.webhookConfig = Optional.fromNullable(options.webhookConfigFile)
-        .transform(f -> {
+    this.webhookConfig = Optional.ofNullable(options.webhookConfigFile)
+        .map(f -> {
           try {
             return Files.asCharSource(options.webhookConfigFile, StandardCharsets.UTF_8).read();
           } catch (IOException e) {

@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -22,7 +23,6 @@ import javax.annotation.Nullable;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -89,7 +89,7 @@ class TaskStateMachine {
       Stats.exportLong("scheduler_illegal_task_state_transitions");
 
   private final StateMachine<TaskState> stateMachine;
-  private Optional<TaskState> previousState = Optional.absent();
+  private Optional<TaskState> previousState = Optional.empty();
 
   private final Set<SideEffect> sideEffects = Sets.newHashSet();
 
@@ -123,7 +123,7 @@ class TaskStateMachine {
     /**
      * The task does not have an associated state as it has been deleted from the store.
      */
-    DELETED(Optional.<ScheduleStatus>absent());
+    DELETED(Optional.empty());
 
     private final Optional<ScheduleStatus> status;
 
@@ -143,7 +143,7 @@ class TaskStateMachine {
    * @param name Name of the state machine, for logging.
    */
   TaskStateMachine(String name) {
-    this(name, Optional.absent());
+    this(name, Optional.empty());
   }
 
   /**
@@ -160,7 +160,7 @@ class TaskStateMachine {
     MorePreconditions.checkNotBlank(name);
     requireNonNull(task);
 
-    final TaskState initialState = task.transform(SCHEDULED_TO_TASK_STATE).or(DELETED);
+    final TaskState initialState = task.map(SCHEDULED_TO_TASK_STATE).orElse(DELETED);
     if (task.isPresent()) {
       Preconditions.checkState(
           initialState != DELETED,
@@ -517,7 +517,7 @@ class TaskStateMachine {
   }
 
   private void addFollowup(Action action) {
-    addFollowup(new SideEffect(action, Optional.absent()));
+    addFollowup(new SideEffect(action, Optional.empty()));
   }
 
   private void addFollowup(SideEffect sideEffect) {
@@ -537,7 +537,7 @@ class TaskStateMachine {
    * TODO(maxim): The current StateManager/TaskStateMachine interaction makes it hard to expose
    * a dedicated task deletion method without leaking out the state machine implementation details.
    * Consider refactoring here to allow for an unambiguous task deletion without resorting to
-   * Optional.absent().
+   * Optional.empty().
    *
    * @param status Status to apply to the task or absent if a task deletion is required.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
@@ -551,7 +551,7 @@ class TaskStateMachine {
      * state transition (e.g. storing resource consumption of a running task), we need to find
      * a different way to suppress noop transitions.
      */
-    TaskState taskState = status.transform(STATUS_TO_TASK_STATE).or(DELETED);
+    TaskState taskState = status.map(STATUS_TO_TASK_STATE).orElse(DELETED);
     if (stateMachine.getState() == taskState) {
       return new TransitionResult(NOOP, ImmutableSet.of());
     }
@@ -574,7 +574,7 @@ class TaskStateMachine {
    */
   @Nullable
   ScheduleStatus getPreviousState() {
-    return previousState.transform(item -> item.getStatus().orNull()).orNull();
+    return previousState.map(item -> item.getStatus().orElse(null)).orElse(null);
   }
 
   @Override

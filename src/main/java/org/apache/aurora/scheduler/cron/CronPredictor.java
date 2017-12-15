@@ -15,7 +15,7 @@ package org.apache.aurora.scheduler.cron;
 
 import java.util.Date;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 /**
  * A utility function that predicts a cron run given a schedule.

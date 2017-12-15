@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.scheduler.updater;
 
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 
@@ -133,7 +133,7 @@ public interface UpdateAgentReserver {
 
     @Override
     public Optional<String> getAgent(IInstanceKey key) {
-      return Optional.absent();
+      return Optional.empty();
     }
 
     @Override

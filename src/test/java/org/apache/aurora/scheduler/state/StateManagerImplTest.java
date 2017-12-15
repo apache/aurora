@@ -16,11 +16,11 @@ package org.apache.aurora.scheduler.state;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -210,8 +210,8 @@ public class StateManagerImplTest extends EasyMockTest {
             .setTaskId(taskId)
             .setTask(NON_SERVICE_CONFIG.newBuilder()));
     assertEquals(
-        ImmutableSet.of(IScheduledTask.build(expected)),
-        Storage.Util.fetchTask(storage, taskId).asSet());
+        Optional.of(IScheduledTask.build(expected)),
+        Storage.Util.fetchTask(storage, taskId));
   }
 
   @Test
@@ -454,12 +454,12 @@ public class StateManagerImplTest extends EasyMockTest {
         taskId,
         Optional.of(PENDING),
         RUNNING,
-        Optional.absent()));
+        Optional.empty()));
     assertEquals(SUCCESS, changeState(
         taskId,
         Optional.of(ASSIGNED),
         FAILED,
-        Optional.absent()));
+        Optional.empty()));
   }
 
   @Test
@@ -470,7 +470,7 @@ public class StateManagerImplTest extends EasyMockTest {
         "a",
         Optional.of(PENDING),
         ASSIGNED,
-        Optional.absent()));
+        Optional.empty()));
   }
 
   @Test
@@ -631,9 +631,9 @@ public class StateManagerImplTest extends EasyMockTest {
   private StateChangeResult changeState(String taskId, ScheduleStatus status) {
     return changeState(
         taskId,
-        Optional.absent(),
+        Optional.empty(),
         status,
-        Optional.absent());
+        Optional.empty());
   }
 
   private void assignTask(String taskId, IHostAttributes host) {

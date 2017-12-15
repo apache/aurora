@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableMap;
@@ -183,7 +183,7 @@ final class JobUpdateStateMachine {
   }
 
   static MonitorAction getActionForStatus(JobUpdateStatus status) {
-    return Optional.fromNullable(ACTIONS.get(status)).or(MonitorAction.STOP_WATCHING);
+    return Optional.ofNullable(ACTIONS.get(status)).orElse(MonitorAction.STOP_WATCHING);
   }
 
   static boolean isActive(JobUpdateStatus status) {

@@ -14,6 +14,7 @@
 package org.apache.aurora.common.net.http.handlers;
 
 import java.util.List;
+import java.util.Optional;
 
 import javax.annotation.Nullable;
 import javax.ws.rs.GET;
@@ -23,7 +24,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -85,7 +85,7 @@ public class TimeSeriesDataSource {
       tsData.add(series.getSamples());
     }
 
-    final long since = Long.parseLong(Optional.fromNullable(sinceQuery).or("0"));
+    final long since = Long.parseLong(Optional.ofNullable(sinceQuery).orElse("0"));
     Predicate<List<Number>> sinceFilter = next -> next.get(0).longValue() > since;
 
     ResponseStruct response = new ResponseStruct(

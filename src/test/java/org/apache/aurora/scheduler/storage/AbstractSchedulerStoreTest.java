@@ -14,8 +14,7 @@
 package org.apache.aurora.scheduler.storage;
 
 import java.io.IOException;
-
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.junit.Before;
@@ -36,7 +35,7 @@ public abstract class AbstractSchedulerStoreTest {
 
   @Test
   public void testSchedulerStore() {
-    assertEquals(Optional.absent(), select());
+    assertEquals(Optional.empty(), select());
     save("a");
     assertEquals(Optional.of("a"), select());
     save("b");

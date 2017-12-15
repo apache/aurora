@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.scheduler.storage.mem;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Optional;
 import com.google.common.util.concurrent.Atomics;
 
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -33,6 +33,6 @@ class MemSchedulerStore implements SchedulerStore.Mutable {
 
   @Override
   public Optional<String> fetchFrameworkId() {
-    return Optional.fromNullable(frameworkId.get());
+    return Optional.ofNullable(frameworkId.get());
   }
 }

@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.mesos.MesosSchedulerDriver;
 import org.apache.mesos.Protos.Credential;
@@ -38,7 +38,7 @@ class DriverFactoryImpl implements DriverFactory {
       String master) {
 
     FrameworkInfo convertedFrameworkInfo = convert(frameworkInfo);
-    Optional<Credential> convertedCredentials = credentials.transform(ProtosConversion::convert);
+    Optional<Credential> convertedCredentials = credentials.map(ProtosConversion::convert);
 
     if (credentials.isPresent()) {
       return new MesosSchedulerDriver(

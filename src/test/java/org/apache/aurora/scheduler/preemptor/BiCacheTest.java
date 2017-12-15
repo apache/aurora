@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.preemptor;
 
 import java.util.Map;
+import java.util.Optional;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
@@ -38,7 +38,7 @@ public class BiCacheTest {
   private static final String CACHE_EXPIRATION_REMOVAL_STAT_NAME = "TEST_cache_expiration_removals";
   private static final String KEY_1 = "Key 1";
   private static final String KEY_2 = "Key 2";
-  private static final Optional<Integer> NO_VALUE = Optional.absent();
+  private static final Optional<Integer> NO_VALUE = Optional.empty();
 
   private FakeStatsProvider statsProvider;
   private FakeClock clock;

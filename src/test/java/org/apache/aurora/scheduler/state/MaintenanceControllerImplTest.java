@@ -13,10 +13,10 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
@@ -173,7 +173,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   @Test
   public void testUnknownHost() {
     expect(storageUtil.attributeStore.getHostAttributes("b"))
-        .andReturn(Optional.absent());
+        .andReturn(Optional.empty());
 
     control.replay();
 
@@ -217,7 +217,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   public void testGetMode() {
     expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.of(
         IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING))));
-    expect(storageUtil.attributeStore.getHostAttributes("unknown")).andReturn(Optional.absent());
+    expect(storageUtil.attributeStore.getHostAttributes("unknown")).andReturn(Optional.empty());
 
     control.replay();
 
@@ -239,7 +239,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         Tasks.id(task),
-        Optional.absent(),
+        Optional.empty(),
         ScheduleStatus.DRAINING,
         MaintenanceControllerImpl.DRAINING_MESSAGE))
         .andReturn(StateChangeResult.SUCCESS);

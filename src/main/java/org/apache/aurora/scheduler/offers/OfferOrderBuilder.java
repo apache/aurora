@@ -47,7 +47,7 @@ final class OfferOrderBuilder {
       Ordering
           .natural()
           .reverse()
-          .onResultOf(o -> o.getUnavailabilityStart().or(Instant.MAX));
+          .onResultOf(o -> o.getUnavailabilityStart().orElse(Instant.MAX));
 
   private static final Ordering<HostOffer> BASE_COMPARATOR =
       AURORA_MAINTENANCE_COMPARATOR.compound(MESOS_MAINTENANCE_COMPARATOR);

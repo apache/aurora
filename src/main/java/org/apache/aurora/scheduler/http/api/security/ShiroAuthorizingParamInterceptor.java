@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.http.api.security;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -24,7 +25,6 @@ import javax.inject.Provider;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -150,7 +150,9 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
         }
 
         Iterable<Class<?>> searchOrder = ImmutableList.<Class<?>>builder()
-            .addAll(Optional.fromNullable(declaringClass.getSuperclass()).asSet())
+            .addAll(Optional.ofNullable(declaringClass.getSuperclass())
+                .map(ImmutableSet::of)
+                .orElse(ImmutableSet.of()))
             .addAll(ImmutableList.copyOf(declaringClass.getInterfaces()))
             .build();
 
@@ -177,7 +179,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
           Class<?> parameterType = param.getType();
           @SuppressWarnings("unchecked")
           Optional<Function<Object, Optional<JobKey>>> jobKeyGetter =
-              Optional.fromNullable(
+              Optional.ofNullable(
                   (Function<Object, Optional<JobKey>>) FIELD_GETTERS_BY_TYPE.get(parameterType));
           if (!jobKeyGetter.isPresent()) {
             throw new UnsupportedOperationException(
@@ -226,7 +228,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
             Iterable<JobKeyGetter> nonNullArgGetters =
                 Iterables.filter(getters, getter -> arguments[getter.index] != null);
             if (Iterables.isEmpty(nonNullArgGetters)) {
-              return Optional.absent();
+              return Optional.empty();
             } else {
               if (Iterables.size(nonNullArgGetters) > 1) {
                 throw new IllegalStateException(
@@ -280,7 +282,7 @@ class ShiroAuthorizingParamInterceptor implements MethodInterceptor {
     Optional<IJobKey> jobKey = authorizingParamGetters
         .getUnchecked(invocation.getMethod())
         .apply(invocation.getArguments())
-        .transform(IJobKey::build);
+        .map(IJobKey::build);
     if (jobKey.isPresent() && JobKeys.isValid(jobKey.get())) {
       Permission targetPermission = makeTargetPermission(method.getName(), jobKey.get());
       if (subject.isPermitted(targetPermission)) {

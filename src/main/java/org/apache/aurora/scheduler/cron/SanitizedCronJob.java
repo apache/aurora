@@ -14,12 +14,12 @@
 package org.apache.aurora.scheduler.cron;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 
 import org.apache.aurora.gen.CronCollisionPolicy;
@@ -67,7 +67,7 @@ public final class SanitizedCronJob {
    * @return The given policy or a default if the policy was null.
    */
   public static CronCollisionPolicy orDefault(@Nullable CronCollisionPolicy policy) {
-    return Optional.fromNullable(policy).or(CronCollisionPolicy.KILL_EXISTING);
+    return Optional.ofNullable(policy).orElse(CronCollisionPolicy.KILL_EXISTING);
   }
 
   /**

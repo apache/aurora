@@ -15,11 +15,11 @@ package org.apache.aurora.scheduler.thrift;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -127,7 +127,7 @@ final class Fixtures {
   static Response response(ResponseCode code, Optional<Result> result, String... messages) {
     Response response = Responses.empty()
         .setResponseCode(code)
-        .setResult(result.orNull());
+        .setResult(result.orElse(null));
     if (messages.length > 0) {
       response.setDetails(FluentIterable.from(Arrays.asList(messages)).transform(MESSAGE_TO_DETAIL)
           .toList());

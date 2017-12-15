@@ -17,11 +17,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ContiguousSet;
@@ -136,7 +136,7 @@ public final class CrontabEntry {
     try {
       return Optional.of(parse(schedule));
     } catch (IllegalArgumentException e) {
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 

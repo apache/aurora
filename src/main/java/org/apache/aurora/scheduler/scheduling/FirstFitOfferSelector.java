@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
+
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
@@ -24,6 +25,6 @@ public class FirstFitOfferSelector implements OfferSelector {
   @Override
   public Optional<HostOffer> select(Iterable<HostOffer> offers, ResourceRequest resourceRequest) {
 
-    return Optional.fromNullable(Iterables.getFirst(offers, null));
+    return Optional.ofNullable(Iterables.getFirst(offers, null));
   }
 }

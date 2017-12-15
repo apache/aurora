@@ -14,11 +14,11 @@
 package org.apache.aurora.scheduler.storage.mem;
 
 import java.util.Map;
+import java.util.Optional;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
@@ -71,6 +71,6 @@ class MemCronJobStore implements CronJobStore.Mutable {
   @Timed("mem_storage_cron_fetch_job")
   @Override
   public Optional<IJobConfiguration> fetchJob(IJobKey jobKey) {
-    return Optional.fromNullable(jobs.get(jobKey));
+    return Optional.ofNullable(jobs.get(jobKey));
   }
 }

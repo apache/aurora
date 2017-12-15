@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
+
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
@@ -46,7 +47,7 @@ public class VersionedSchedulerDriverServiceTest extends EasyMockTest {
           .build();
   private static final DriverSettings SETTINGS = new DriverSettings(
       "fakemaster",
-      Optional.absent());
+      Optional.empty());
 
   private StorageTestUtil storage;
   private Scheduler scheduler;

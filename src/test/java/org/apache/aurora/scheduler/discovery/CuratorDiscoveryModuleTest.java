@@ -14,8 +14,8 @@
 package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;

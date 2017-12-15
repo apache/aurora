@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.InstanceKey;
@@ -75,7 +75,7 @@ public class KillTaskTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         id,
-        Optional.absent(),
+        Optional.empty(),
         ScheduleStatus.KILLING,
         Optional.of("Killed for job update " + UPDATE_ID.getId())))
             .andReturn(StateChangeResult.SUCCESS);
@@ -101,7 +101,7 @@ public class KillTaskTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         id,
-        Optional.absent(),
+        Optional.empty(),
         ScheduleStatus.KILLING,
         Optional.of("Killed for job update " + UPDATE_ID.getId())))
         .andReturn(StateChangeResult.SUCCESS);

@@ -15,12 +15,12 @@ package org.apache.aurora.scheduler.http;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Optional;
 
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
@@ -91,12 +91,12 @@ class LeaderRedirect implements Closeable {
     }
 
     LOG.warn("Leader service instance seems to be incomplete: " + leadingScheduler);
-    return Optional.absent();
+    return Optional.empty();
   }
 
   private Optional<HostAndPort> getLocalHttp() {
     HostAndPort localHttp = httpService.getAddress();
-    return (localHttp == null) ? Optional.absent()
+    return (localHttp == null) ? Optional.empty()
         : Optional.of(HostAndPort.fromParts(localHttp.getHost(), localHttp.getPort()));
   }
 
@@ -113,13 +113,13 @@ class LeaderRedirect implements Closeable {
 
     if (leaderHttp.isPresent()) {
       if (leaderHttp.equals(localHttp)) {
-        return Optional.absent();
+        return Optional.empty();
       } else {
         return leaderHttp;
       }
     } else {
       LOG.info("No leader found, not redirecting.");
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 
@@ -165,9 +165,9 @@ class LeaderRedirect implements Closeable {
           .append(
               // If Jetty rewrote the path, we want to be sure to redirect to the original path
               // rather than the rewritten path to be sure it's a route the UI code recognizes.
-              Optional.fromNullable(
+              Optional.ofNullable(
                   req.getAttribute(JettyServerModule.ORIGINAL_PATH_ATTRIBUTE_NAME))
-                  .or(req.getRequestURI()));
+                  .orElse(req.getRequestURI()));
 
       String queryString = req.getQueryString();
       if (queryString != null) {
@@ -176,7 +176,7 @@ class LeaderRedirect implements Closeable {
 
       return Optional.of(redirect.toString());
     } else {
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 
@@ -185,13 +185,13 @@ class LeaderRedirect implements Closeable {
     switch (hostSet.size()) {
       case 0:
         LOG.warn("No serviceGroupMonitor in host set, will not redirect despite not being leader.");
-        return Optional.absent();
+        return Optional.empty();
       case 1:
         LOG.debug("Found leader scheduler at {}", hostSet);
         return Optional.of(Iterables.getOnlyElement(hostSet));
       default:
         LOG.error("Multiple serviceGroupMonitor detected, will not redirect: {}", hostSet);
-        return Optional.absent();
+        return Optional.empty();
     }
   }
 }

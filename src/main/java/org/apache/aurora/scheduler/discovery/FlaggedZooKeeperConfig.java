@@ -15,12 +15,12 @@ package org.apache.aurora.scheduler.discovery;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.Optional;
 
 import javax.annotation.Nullable;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
-import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 
@@ -81,7 +81,7 @@ public final class FlaggedZooKeeperConfig {
   public static ZooKeeperConfig create(Options opts) {
     return new ZooKeeperConfig(
         opts.zkEndpoints,
-        Optional.fromNullable(opts.chrootPath),
+        Optional.ofNullable(opts.chrootPath),
         opts.inProcess,
         Amount.of(opts.sessionTimeout.getValue().intValue(), opts.sessionTimeout.getUnit()),
         Amount.of(opts.connectionTimeout.getValue().intValue(), opts.connectionTimeout.getUnit()),
@@ -90,7 +90,7 @@ public final class FlaggedZooKeeperConfig {
 
   private static Optional<Credentials> getCredentials(@Nullable String userAndPass) {
     if (userAndPass == null) {
-      return Optional.absent();
+      return Optional.empty();
     }
 
     List<String> parts = ImmutableList.copyOf(Splitter.on(":").split(userAndPass));

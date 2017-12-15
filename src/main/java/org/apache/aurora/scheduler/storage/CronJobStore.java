@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;

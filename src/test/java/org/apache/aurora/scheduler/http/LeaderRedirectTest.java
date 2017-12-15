@@ -14,12 +14,12 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.http.HttpServletRequest;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -77,7 +77,7 @@ public class LeaderRedirectTest extends EasyMockTest {
     replayAndMonitor(3);
     publishSchedulers(localPort(HTTP_PORT));
 
-    assertEquals(Optional.absent(), leaderRedirector.getRedirect());
+    assertEquals(Optional.empty(), leaderRedirector.getRedirect());
 
     // NB: LEADING takes 2 tests of the server group membership to calculate; thus we expect 3
     // server group get calls, 1 for the getRedirect() above and 2 here.
@@ -116,7 +116,7 @@ public class LeaderRedirectTest extends EasyMockTest {
   public void testNoLeaders() throws Exception {
     replayAndMonitor(2);
 
-    assertEquals(Optional.absent(), leaderRedirector.getRedirect());
+    assertEquals(Optional.empty(), leaderRedirector.getRedirect());
     assertEquals(LeaderStatus.NO_LEADER, leaderRedirector.getLeaderStatus());
   }
 
@@ -126,7 +126,7 @@ public class LeaderRedirectTest extends EasyMockTest {
 
     publishSchedulers(HostAndPort.fromParts("foobar", 500), HostAndPort.fromParts("baz", 800));
 
-    assertEquals(Optional.absent(), leaderRedirector.getRedirect());
+    assertEquals(Optional.empty(), leaderRedirector.getRedirect());
     assertEquals(LeaderStatus.NO_LEADER, leaderRedirector.getLeaderStatus());
   }
 

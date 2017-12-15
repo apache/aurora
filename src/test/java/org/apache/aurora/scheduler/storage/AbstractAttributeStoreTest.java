@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.storage;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.Attribute;
@@ -67,7 +67,7 @@ public abstract class AbstractAttributeStoreTest {
 
   @Test
   public void testSaveAttributes() {
-    assertEquals(Optional.absent(), read(HOST_A));
+    assertEquals(Optional.empty(), read(HOST_A));
 
     // Initial save returns true since it changes previous attributes
     assertTrue(insert(HOST_A_ATTRS));
@@ -79,7 +79,7 @@ public abstract class AbstractAttributeStoreTest {
 
   @Test
   public void testCrud() {
-    assertEquals(Optional.absent(), read(HOST_A));
+    assertEquals(Optional.empty(), read(HOST_A));
     assertEquals(ImmutableSet.of(), readAll());
 
     assertTrue(insert(HOST_A_ATTRS));
@@ -103,7 +103,7 @@ public abstract class AbstractAttributeStoreTest {
     assertEquals(ImmutableSet.of(updatedMode, HOST_B_ATTRS), readAll());
 
     truncate();
-    assertEquals(Optional.absent(), read(HOST_A));
+    assertEquals(Optional.empty(), read(HOST_A));
     assertEquals(ImmutableSet.of(), readAll());
   }
 

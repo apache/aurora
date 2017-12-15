@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.aurora.scheduler.http.api.security.FieldGetter.AbstractFieldGetter;
 import org.apache.thrift.TBase;
@@ -58,7 +58,7 @@ class ThriftFieldGetter<T extends TBase<T, F>, F extends TFieldIdEnum, V extends
     if (input.isSet(fieldId)) {
       return Optional.of((V) input.getFieldValue(fieldId));
     } else {
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 }

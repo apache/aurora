@@ -13,10 +13,10 @@
  */
 package org.apache.aurora.scheduler.filter;
 
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -55,7 +55,7 @@ final class ConstraintMatcher {
         Iterables.filter(hostAttributes, new NameFilter(constraint.getName()));
     Optional<IAttribute> attribute;
     if (Iterables.isEmpty(sameNameAttributes)) {
-      attribute = Optional.absent();
+      attribute = Optional.empty();
     } else {
       Set<String> attributeValues = ImmutableSet.copyOf(
           Iterables.concat(Iterables.transform(sameNameAttributes, GET_VALUES)));
@@ -67,10 +67,10 @@ final class ConstraintMatcher {
     switch (taskConstraint.getSetField()) {
       case VALUE:
         boolean matches = AttributeFilter.matches(
-            attribute.transform(GET_VALUES).or(ImmutableSet.of()),
+            attribute.map(GET_VALUES).orElse(ImmutableSet.of()),
             taskConstraint.getValue());
         return matches
-            ? Optional.absent()
+            ? Optional.empty()
             : Optional.of(Veto.constraintMismatch(constraint.getName()));
 
       case LIMIT:
@@ -83,7 +83,7 @@ final class ConstraintMatcher {
             taskConstraint.getLimit().getLimit(),
             cachedjobState);
         return satisfied
-            ? Optional.absent()
+            ? Optional.empty()
             : Optional.of(Veto.unsatisfiedLimit(constraint.getName()));
 
       default:

@@ -39,11 +39,11 @@ public class LibMesosLoadingModule extends AbstractModule {
         break;
       case V0_DRIVER:
         bind(VersionedDriverFactory.class).toInstance((scheduler, frameworkInfo, master, creds)
-            -> new V0Mesos(scheduler, frameworkInfo, master, creds.orNull()));
+            -> new V0Mesos(scheduler, frameworkInfo, master, creds.orElse(null)));
         break;
       case V1_DRIVER:
         bind(VersionedDriverFactory.class).toInstance((scheduler, frameworkInfo, master, creds)
-            -> new V1Mesos(scheduler, master, creds.orNull()));
+            -> new V1Mesos(scheduler, master, creds.orElse(null)));
         break;
       default:
         checkState(false, "Unknown driver kind");

@@ -13,8 +13,9 @@
  */
 package org.apache.aurora.scheduler.http.api.security;
 
+import java.util.Optional;
+
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -67,7 +68,7 @@ interface FieldGetter<T, V> extends Function<T, Optional<V>> {
 
     @Override
     public Optional<T> apply(T input) {
-      return Optional.fromNullable(input);
+      return Optional.ofNullable(input);
     }
   }
 }

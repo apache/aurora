@@ -15,8 +15,8 @@ package org.apache.aurora.scheduler.storage;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
@@ -46,7 +46,7 @@ public abstract class AbstractQuotaStoreTest {
 
   @Test
   public void testCrud() {
-    assertEquals(Optional.absent(), select(ROLE_A));
+    assertEquals(Optional.empty(), select(ROLE_A));
     assertQuotas(ImmutableMap.of());
 
     save(ROLE_A, StorageEntityUtil.assertFullyPopulated(QUOTA_A));
@@ -58,21 +58,21 @@ public abstract class AbstractQuotaStoreTest {
 
     delete(ROLE_B);
     assertEquals(Optional.of(QUOTA_A), select(ROLE_A));
-    assertEquals(Optional.absent(), select(ROLE_B));
+    assertEquals(Optional.empty(), select(ROLE_B));
     assertQuotas(ImmutableMap.of(ROLE_A, QUOTA_A));
 
     deleteAll();
-    assertEquals(Optional.absent(), select(ROLE_A));
-    assertEquals(Optional.absent(), select(ROLE_B));
+    assertEquals(Optional.empty(), select(ROLE_A));
+    assertEquals(Optional.empty(), select(ROLE_B));
     assertQuotas(ImmutableMap.of());
   }
 
   @Test
   public void testDeleteNonExistent() {
-    assertEquals(Optional.absent(), select(ROLE_A));
+    assertEquals(Optional.empty(), select(ROLE_A));
     assertQuotas(ImmutableMap.of());
     delete(ROLE_A);
-    assertEquals(Optional.absent(), select(ROLE_A));
+    assertEquals(Optional.empty(), select(ROLE_A));
     assertQuotas(ImmutableMap.of());
   }
 

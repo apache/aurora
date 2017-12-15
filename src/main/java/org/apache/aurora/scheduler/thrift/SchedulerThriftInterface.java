@@ -14,7 +14,9 @@
 package org.apache.aurora.scheduler.thrift;
 
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -22,12 +24,11 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -482,9 +483,9 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         if (StateChangeResult.SUCCESS == stateManager.changeState(
             storeProvider,
             taskId,
-            Optional.absent(),
+            Optional.empty(),
             ScheduleStatus.KILLING,
-            auditMessages.killedByRemoteUser(Optional.fromNullable(message)))) {
+            auditMessages.killedByRemoteUser(Optional.ofNullable(message)))) {
           ++tasksKilled;
         }
       }
@@ -519,7 +520,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
         stateManager.changeState(
             storeProvider,
             taskId,
-            Optional.absent(),
+            Optional.empty(),
             ScheduleStatus.RESTARTING,
             auditMessages.restartedByRemoteUser());
       }
@@ -592,7 +593,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     storage.write(storeProvider -> stateManager.changeState(
         storeProvider,
         taskId,
-        Optional.absent(),
+        Optional.empty(),
         status,
         auditMessages.transitionedBy()));
 
@@ -657,7 +658,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
       Optional<Integer> batchSize = settings.isSetBatchSize()
           ? Optional.of(settings.getBatchSize())
-          : Optional.absent();
+          : Optional.empty();
 
       taskReconciler.triggerExplicitReconciliation(batchSize);
       return ok();
@@ -689,21 +690,20 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
         jobUpdateController.assertNotUpdating(jobKey);
 
-        FluentIterable<IScheduledTask> currentTasks = FluentIterable.from(
+        List<IScheduledTask> currentTasks = ImmutableList.copyOf(
             storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()));
 
-        Optional<IScheduledTask> templateTask = Iterables.tryFind(
-            currentTasks,
-            e -> e.getAssignedTask().getInstanceId() == key.getInstanceId());
+        Optional<IScheduledTask> templateTask = currentTasks.stream()
+            .filter(e -> e.getAssignedTask().getInstanceId() == key.getInstanceId())
+            .findFirst();
         if (!templateTask.isPresent()) {
           return invalidRequest(INVALID_INSTANCE_ID);
         }
 
-        int lastId = currentTasks
-            .transform(e -> e.getAssignedTask().getInstanceId())
-            .toList()
-            .stream()
-            .max(Comparator.naturalOrder()).get();
+        int lastId = currentTasks.stream()
+            .map(e -> e.getAssignedTask().getInstanceId())
+            .max(Comparator.naturalOrder())
+            .get();
 
         Set<Integer> instanceIds = ContiguousSet.create(
             Range.openClosed(lastId, lastId + count),
@@ -748,7 +748,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
     if (quotaCheck.getResult() == INSUFFICIENT_QUOTA) {
       throw new TaskValidationException("Insufficient resource quota: "
-          + quotaCheck.getDetails().or(""));
+          + quotaCheck.getDetails().orElse(""));
     }
   }
 
@@ -870,7 +870,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
 
         jobUpdateController.start(
             update,
-            new AuditData(remoteUserName, Optional.fromNullable(message)));
+            new AuditData(remoteUserName, Optional.ofNullable(message)));
         startJobUpdateCounter.addAndGet(request.getInstanceCount());
         return response.setResponseCode(OK)
             .setResult(Result.startJobUpdateResult(
@@ -917,7 +917,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return changeJobUpdateState(
         mutableKey,
         JobUpdateController::pause,
-        Optional.fromNullable(message));
+        Optional.ofNullable(message));
   }
 
   @Override
@@ -925,7 +925,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return changeJobUpdateState(
         mutableKey,
         JobUpdateController::resume,
-        Optional.fromNullable(message));
+        Optional.ofNullable(message));
   }
 
   @Override
@@ -933,7 +933,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return changeJobUpdateState(
         mutableKey,
         JobUpdateController::abort,
-        Optional.fromNullable(message));
+        Optional.ofNullable(message));
   }
 
   @Override
@@ -941,7 +941,7 @@ class SchedulerThriftInterface implements AnnotatedAuroraAdmin {
     return changeJobUpdateState(
         mutableKey,
         JobUpdateController::rollback,
-        Optional.fromNullable(message));
+        Optional.ofNullable(message));
   }
 
   @Override

@@ -15,13 +15,13 @@ package org.apache.aurora.scheduler.preemptor;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
@@ -197,9 +197,10 @@ public interface PreemptionVictimFilter {
       // get the host for the schedulingFilter.
       Set<String> hosts = ImmutableSet.<String>builder()
           .addAll(Iterables.transform(possibleVictims, VICTIM_TO_HOST))
-          .addAll(Iterables.transform(offer.asSet(), OFFER_TO_HOST)).build();
+          .addAll(offer.map(OFFER_TO_HOST).map(ImmutableSet::of).orElse(ImmutableSet.of()))
+          .build();
 
-      ResourceBag slackResources = offer.asSet().stream()
+      ResourceBag slackResources = offer.map(ImmutableSet::of).orElse(ImmutableSet.of()).stream()
           .map(o -> bagFromMesosResources(getNonRevocableOfferResources(o.getOffer())))
           .reduce((l, r) -> l.add(r))
           .orElse(EMPTY);
@@ -209,7 +210,7 @@ public interface PreemptionVictimFilter {
 
       List<PreemptionVictim> sortedVictims = resourceOrder.immutableSortedCopy(preemptableTasks);
       if (sortedVictims.isEmpty()) {
-        return Optional.absent();
+        return Optional.empty();
       }
 
       Set<PreemptionVictim> toPreemptTasks = Sets.newHashSet();
@@ -219,7 +220,7 @@ public interface PreemptionVictimFilter {
 
       if (!attributes.isPresent()) {
         metrics.recordMissingAttributes();
-        return Optional.absent();
+        return Optional.empty();
       }
 
       ResourceBag overhead = pendingTask.isSetExecutorConfig()
@@ -232,7 +233,7 @@ public interface PreemptionVictimFilter {
         toPreemptTasks.add(victim);
         totalResource = totalResource.add(victimToResources.apply(victim));
 
-        Optional<Instant> unavailability = Optional.absent();
+        Optional<Instant> unavailability = Optional.empty();
         if (offer.isPresent()) {
           unavailability = offer.get().getUnavailabilityStart();
         }
@@ -248,7 +249,7 @@ public interface PreemptionVictimFilter {
           return Optional.of(ImmutableSet.copyOf(toPreemptTasks));
         }
       }
-      return Optional.absent();
+      return Optional.empty();
     }
 
     /**

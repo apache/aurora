@@ -16,9 +16,9 @@ package org.apache.aurora.scheduler.thrift;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -582,7 +582,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private void expectTransitionsToKilling() {
-    expectTransitionsToKilling(Optional.absent());
+    expectTransitionsToKilling(Optional.empty());
   }
 
   private void expectTransitionsToKilling(Optional<String> message) {
@@ -590,7 +590,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID,
-        Optional.absent(),
+        Optional.empty(),
         ScheduleStatus.KILLING,
         Optional.of("test"))).andReturn(StateChangeResult.SUCCESS);
   }
@@ -768,7 +768,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID,
-        Optional.absent(),
+        Optional.empty(),
         ScheduleStatus.FAILED,
         Optional.of("test"))).andReturn(StateChangeResult.SUCCESS);
 
@@ -852,7 +852,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(stateManager.changeState(
         storageUtil.mutableStoreProvider,
         TASK_ID,
-        Optional.absent(),
+        Optional.empty(),
         ScheduleStatus.RESTARTING,
         Optional.of("test"))).andReturn(StateChangeResult.SUCCESS);
 
@@ -1098,7 +1098,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private static Response okEmptyResponse() {
-    return response(OK, Optional.absent());
+    return response(OK, Optional.empty());
   }
 
   private static Response okEmptyResponse(String message) {
@@ -1137,7 +1137,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testExplicitTaskReconciliationWithNoBatchSize() throws Exception {
     ExplicitReconciliationSettings settings = new ExplicitReconciliationSettings();
 
-    taskReconciler.triggerExplicitReconciliation(Optional.absent());
+    taskReconciler.triggerExplicitReconciliation(Optional.empty());
     expectLastCall();
 
     control.replay();
@@ -1930,7 +1930,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private IExpectationSetters<?> expectNoCronJob() {
     return expect(storageUtil.jobStore.fetchJob(JOB_KEY))
-        .andReturn(Optional.absent());
+        .andReturn(Optional.empty());
   }
 
   private IExpectationSetters<?> expectInstanceQuotaCheck(

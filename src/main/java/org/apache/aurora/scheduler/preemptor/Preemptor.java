@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.preemptor;
 
 import java.util.Iterator;
+import java.util.Optional;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.scheduler.base.TaskGroupKey;
@@ -104,7 +104,7 @@ public interface Preemptor {
             stateManager.changeState(
                 store,
                 toPreempt.getTaskId(),
-                Optional.absent(),
+                Optional.empty(),
                 PREEMPTING,
                 Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
           }
@@ -112,7 +112,7 @@ public interface Preemptor {
         }
       }
 
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 }

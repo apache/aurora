@@ -13,8 +13,9 @@
  */
 package org.apache.aurora.scheduler.offers;
 
+import java.util.Optional;
+
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;

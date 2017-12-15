@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.benchmark.fakes;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent;
@@ -50,7 +50,7 @@ public class FakeOfferManager implements OfferManager {
 
   @Override
   public Optional<HostOffer> get(Protos.AgentID agentId) {
-    return Optional.absent();
+    return Optional.empty();
   }
 
   @Override
@@ -63,7 +63,7 @@ public class FakeOfferManager implements OfferManager {
                                          ResourceRequest resourceRequest,
                                          boolean revocable) {
 
-    return Optional.absent();
+    return Optional.empty();
   }
 
   @Override

@@ -18,6 +18,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -28,7 +29,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
@@ -250,7 +250,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
 
   @Override
   public Response getJobSummary(@Nullable String maybeNullRole) {
-    Optional<String> ownerRole = Optional.fromNullable(maybeNullRole);
+    Optional<String> ownerRole = Optional.ofNullable(maybeNullRole);
 
     Multimap<IJobKey, IScheduledTask> tasks = getTasks(maybeRoleScoped(ownerRole));
     Map<IJobKey, IJobConfiguration> jobs = getJobs(ownerRole, tasks);
@@ -264,7 +264,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
       if (job.isSetCronSchedule()) {
         CrontabEntry crontabEntry = CrontabEntry.parse(job.getCronSchedule());
         Optional<Date> nextRun = cronPredictor.predictNextRun(crontabEntry);
-        return nextRun.transform(date -> summary.setNextCronRunMs(date.getTime())).or(summary);
+        return nextRun.map(date -> summary.setNextCronRunMs(date.getTime())).orElse(summary);
       } else {
         return summary;
       }
@@ -278,7 +278,7 @@ class ReadOnlySchedulerImpl implements ReadOnlyScheduler.Iface {
 
   @Override
   public Response getJobs(@Nullable String maybeNullRole) {
-    Optional<String> ownerRole = Optional.fromNullable(maybeNullRole);
+    Optional<String> ownerRole = Optional.ofNullable(maybeNullRole);
 
     return ok(Result.getJobsResult(
         new GetJobsResult()

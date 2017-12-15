@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -32,7 +32,7 @@ import static org.easymock.EasyMock.expect;
 public class SchedulerDriverServiceTest extends EasyMockTest {
 
   private static final Optional<String> FRAMEWORK_ID = Optional.of("test framework");
-  private static final Optional<String> NEW_FRAMEWORK_ID = Optional.absent();
+  private static final Optional<String> NEW_FRAMEWORK_ID = Optional.empty();
 
   private static final FrameworkInfo BASE_INFO = FrameworkInfo.newBuilder()
           .setUser("framework user")
@@ -40,7 +40,7 @@ public class SchedulerDriverServiceTest extends EasyMockTest {
           .build();
   private static final DriverSettings SETTINGS = new DriverSettings(
       "fakemaster",
-      Optional.absent());
+      Optional.empty());
 
   private static final String TASK_1 = "1";
   private static final String TASK_2 = "2";

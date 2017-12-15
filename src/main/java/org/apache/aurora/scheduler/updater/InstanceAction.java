@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 
 import static org.apache.aurora.scheduler.updater.InstanceActionHandler.AddTask;
 import static org.apache.aurora.scheduler.updater.InstanceActionHandler.KillTask;
@@ -27,7 +27,7 @@ enum InstanceAction {
   // deciding to reschedule the task.
   ADD_TASK(Optional.of(new AddTask())),
   WATCH_TASK(Optional.of(new WatchRunningTask())),
-  AWAIT_STATE_CHANGE(Optional.absent());
+  AWAIT_STATE_CHANGE(Optional.empty());
 
   private final Optional<InstanceActionHandler> handler;
 

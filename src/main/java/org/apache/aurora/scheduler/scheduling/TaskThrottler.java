@@ -13,12 +13,12 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
+import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Optional;
 import com.google.common.eventbus.Subscribe;
 
 import org.apache.aurora.common.stats.SlidingStats;
@@ -81,7 +81,7 @@ class TaskThrottler implements EventSubscriber {
                     stateChange.getTaskId(),
                     Optional.of(THROTTLED),
                     PENDING,
-                    Optional.absent());
+                    Optional.empty());
                 return BatchWorker.NO_RESULT;
               }),
           delayMs,

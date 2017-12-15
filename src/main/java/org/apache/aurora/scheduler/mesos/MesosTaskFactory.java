@@ -15,12 +15,12 @@ package org.apache.aurora.scheduler.mesos;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
@@ -211,7 +211,7 @@ public interface MesosTaskFactory {
           taskBuilder.setExecutor(execBuilder.build());
         } else {
           LOG.warn("Running Docker-based task without an executor.");
-          taskBuilder.setContainer(getDockerContainerInfo(dockerContainer, Optional.absent()))
+          taskBuilder.setContainer(getDockerContainerInfo(dockerContainer, Optional.empty()))
               .setCommand(CommandInfo.newBuilder().setShell(false));
         }
       } else {
@@ -276,7 +276,7 @@ public interface MesosTaskFactory {
             .addVolumes(volume));
       }
 
-      return Optional.absent();
+      return Optional.empty();
     }
 
     private ContainerInfo getDockerContainerInfo(

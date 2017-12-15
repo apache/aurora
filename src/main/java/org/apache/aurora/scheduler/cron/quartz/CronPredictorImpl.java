@@ -14,11 +14,10 @@
 package org.apache.aurora.scheduler.cron.quartz;
 
 import java.util.Date;
+import java.util.Optional;
 import java.util.TimeZone;
 
 import javax.inject.Inject;
-
-import com.google.common.base.Optional;
 
 import org.apache.aurora.common.util.Clock;
 import org.apache.aurora.scheduler.cron.CronPredictor;
@@ -41,6 +40,6 @@ class CronPredictorImpl implements CronPredictor {
   public Optional<Date> predictNextRun(CrontabEntry schedule) {
     CronExpression cronExpression = Quartz.cronExpression(schedule, timeZone);
     // The getNextValidTimeAfter call may return null; eg: if the date is too far in the future.
-    return Optional.fromNullable(cronExpression.getNextValidTimeAfter(new Date(clock.nowMillis())));
+    return Optional.ofNullable(cronExpression.getNextValidTimeAfter(new Date(clock.nowMillis())));
   }
 }

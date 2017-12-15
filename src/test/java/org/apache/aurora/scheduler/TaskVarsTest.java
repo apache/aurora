@@ -15,9 +15,9 @@ package org.apache.aurora.scheduler;
 
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
 
-import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
@@ -334,7 +334,7 @@ public class TaskVarsTest extends EasyMockTest {
   public void testRackMissing() {
     expectStatusCountersInitialized();
     expect(storageUtil.attributeStore.getHostAttributes("a"))
-        .andReturn(Optional.absent());
+        .andReturn(Optional.empty());
 
     IScheduledTask a = makeTask(JOB_A, RUNNING, "a");
     expectStatExport(jobStatName(a, LOST), untrackedProvider);

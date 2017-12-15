@@ -13,10 +13,9 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
+
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
-import com.google.common.collect.Iterables;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -25,7 +24,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,10 +73,8 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
   }
 
   private static boolean isPermanentlyKilled(IScheduledTask task) {
-    boolean wasKilling =
-        Iterables.any(
-            task.getTaskEvents(),
-            Predicates.compose(Predicates.equalTo(KILLING), ITaskEvent::getStatus));
+    boolean wasKilling = task.getTaskEvents().stream()
+        .anyMatch(event -> event.getStatus() == KILLING);
     return task.getStatus() != KILLING && wasKilling;
   }
 
@@ -91,7 +87,7 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
   }
 
   @Override
-  public synchronized StateEvaluator.Result evaluate(Optional<IScheduledTask> actualState) {
+  public synchronized Result evaluate(Optional<IScheduledTask> actualState) {
     boolean desiredPresent = desiredState.isPresent();
     boolean actualPresent = isTaskPresent(actualState);
 
@@ -127,7 +123,7 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
     return desired.getConstraints().equals(existing.getConstraints());
   }
 
-  private StateEvaluator.Result handleActualAndDesiredPresent(IScheduledTask actualState) {
+  private Result handleActualAndDesiredPresent(IScheduledTask actualState) {
     Preconditions.checkState(desiredState.isPresent());
     Preconditions.checkArgument(!actualState.getTaskEvents().isEmpty());
 

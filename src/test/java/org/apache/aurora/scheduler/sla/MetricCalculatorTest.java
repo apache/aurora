@@ -107,11 +107,11 @@ public class MetricCalculatorTest extends EasyMockTest {
 
   private Set<String> generateMetricNames(
       Set<IScheduledTask> tasks,
-      Set<Multimap<AlgorithmType, SlaGroup.GroupType>> definitions) {
+      Set<Multimap<AlgorithmType, GroupType>> definitions) {
 
     ImmutableSet.Builder<String> names = ImmutableSet.builder();
-    for (Multimap<AlgorithmType, SlaGroup.GroupType> definition : definitions) {
-      for (Map.Entry<AlgorithmType, SlaGroup.GroupType> entry : definition.entries()) {
+    for (Multimap<AlgorithmType, GroupType> definition : definitions) {
+      for (Map.Entry<AlgorithmType, GroupType> entry : definition.entries()) {
         for (String metric : entry.getValue().getSlaGroup().createNamedGroups(tasks).keys()) {
           names.add(metric + entry.getKey().getAlgorithmName() + NAME_QUALIFIER_PROD);
           names.add(metric + entry.getKey().getAlgorithmName() + NAME_QUALIFIER_NON_PROD);

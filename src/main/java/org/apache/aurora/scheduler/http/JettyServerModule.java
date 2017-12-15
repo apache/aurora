@@ -19,6 +19,7 @@ import java.net.UnknownHostException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -33,7 +34,6 @@ import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
@@ -155,7 +155,7 @@ public class JettyServerModule extends AbstractModule {
         .toInstance(Suppliers.ofInstance(true));
 
     final Optional<String> hostnameOverride =
-        Optional.fromNullable(options.jetty.hostnameOverride);
+        Optional.ofNullable(options.jetty.hostnameOverride);
     if (hostnameOverride.isPresent()) {
       try {
         InetAddress.getByName(hostnameOverride.get());
@@ -368,7 +368,7 @@ public class JettyServerModule extends AbstractModule {
     public HostAndPort getAddress() {
       Preconditions.checkState(state() == State.RUNNING);
       return HostAndPort.fromParts(
-          advertisedHostOverride.or(serverAddress.getHost()),
+          advertisedHostOverride.orElse(serverAddress.getHost()),
           serverAddress.getPort());
     }
 
