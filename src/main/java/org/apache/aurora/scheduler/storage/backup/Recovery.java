@@ -136,22 +136,7 @@ public interface Recovery {
 
     @Override
     public void stage(String backupName) throws RecoveryException {
-      File backupFile = new File(backupDir, backupName);
-      if (!backupFile.exists()) {
-        throw new RecoveryException("Backup " + backupName + " does not exist.");
-      }
-
-      Snapshot snapshot = new Snapshot();
-      try {
-        TBinaryProtocol prot = new TBinaryProtocol(
-            new TIOStreamTransport(new BufferedInputStream(new FileInputStream(backupFile))));
-
-        snapshot.read(prot);
-      } catch (TException e) {
-        throw new RecoveryException("Failed to decode backup " + e, e);
-      } catch (IOException e) {
-        throw new RecoveryException("Failed to read backup " + e, e);
-      }
+      Snapshot snapshot = load(new File(backupDir, backupName));
       boolean applied =
           recovery.compareAndSet(null, new PendingRecovery(tempStorageFactory.apply(snapshot)));
       if (!applied) {
@@ -212,6 +197,24 @@ public interface Recovery {
       void delete(final Query.Builder query) {
         tempStorage.deleteTasks(query);
       }
+    }
+  }
+
+  static Snapshot load(File backupFile) throws RecoveryException {
+    if (!backupFile.exists()) {
+      throw new RecoveryException("Backup " + backupFile + " does not exist.");
+    }
+
+    try {
+      Snapshot snapshot = new Snapshot();
+      TBinaryProtocol prot = new TBinaryProtocol(
+          new TIOStreamTransport(new BufferedInputStream(new FileInputStream(backupFile))));
+      snapshot.read(prot);
+      return snapshot;
+    } catch (TException e) {
+      throw new RecoveryException("Failed to decode backup " + e, e);
+    } catch (IOException e) {
+      throw new RecoveryException("Failed to read backup " + e, e);
     }
   }
 }

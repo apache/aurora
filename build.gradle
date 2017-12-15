@@ -623,3 +623,16 @@ startScripts {
     unixScript.text = unixScript.text.replace('CLASSPATH=', "CLASSPATH=${environmentClasspathPrefix}:")
   }
 }
+
+// Include a script to run the recovery tool.
+task moreStartScripts(type: CreateStartScripts) {
+  mainClassName = 'org.apache.aurora.scheduler.storage.durability.RecoveryTool'
+  applicationName = 'recovery-tool'
+  outputDir = new File(project.buildDir, 'scripts')
+  classpath = jar.outputs.files + project.configurations.runtime
+}
+
+applicationDistribution.into('bin') {
+  from(moreStartScripts)
+  fileMode = 0755
+}

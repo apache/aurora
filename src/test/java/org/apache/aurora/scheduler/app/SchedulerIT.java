@@ -76,12 +76,14 @@ import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.mesos.FrameworkInfoFactory;
 import org.apache.aurora.scheduler.mesos.TestExecutorSettings;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
+import org.apache.aurora.scheduler.storage.durability.DurableStorageModule;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.log.EntrySerializer;
-import org.apache.aurora.scheduler.storage.log.LogStorageModule;
-import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+import org.apache.aurora.scheduler.storage.log.LogPersistenceModule;
+import org.apache.aurora.scheduler.storage.log.SnapshotModule;
+import org.apache.aurora.scheduler.storage.log.SnapshotterImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import org.apache.mesos.Protos;
@@ -198,7 +200,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         BackupModule.Options backupOptions = new BackupModule.Options();
         backupOptions.backupDir = backupDir;
 
-        install(new BackupModule(backupOptions, SnapshotStoreImpl.class));
+        install(new BackupModule(backupOptions, SnapshotterImpl.class));
 
         bind(IServerInfo.class).toInstance(
             IServerInfo.build(
@@ -217,7 +219,9 @@ public class SchedulerIT extends BaseZooKeeperTest {
         ImmutableList.<Module>builder()
             .add(SchedulerMain.getUniversalModule(new CliOptions()))
             .add(new TierModule(TaskTestUtil.TIER_CONFIG))
-            .add(new LogStorageModule(new LogStorageModule.Options()))
+            .add(new DurableStorageModule())
+            .add(new LogPersistenceModule(new LogPersistenceModule.Options()))
+            .add(new SnapshotModule(new SnapshotModule.Options()))
             .add(new ServiceDiscoveryModule(zkClientConfig, SERVERSET_PATH))
             .add(testModule)
             .build()

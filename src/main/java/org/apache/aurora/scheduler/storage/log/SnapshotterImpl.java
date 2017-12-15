@@ -65,14 +65,14 @@ import static java.util.Objects.requireNonNull;
  * Snapshot store implementation that delegates to underlying snapshot stores by
  * extracting/applying fields in a snapshot thrift struct.
  */
-public class SnapshotStoreImpl implements Snapshotter {
+public class SnapshotterImpl implements Snapshotter {
 
   @VisibleForTesting
   static final String SNAPSHOT_SAVE = "snapshot_save_";
   @VisibleForTesting
   static final String SNAPSHOT_RESTORE = "snapshot_restore_";
 
-  private static final Logger LOG = LoggerFactory.getLogger(SnapshotStoreImpl.class);
+  private static final Logger LOG = LoggerFactory.getLogger(SnapshotterImpl.class);
 
   private static final String HOST_ATTRIBUTES_FIELD = "hosts";
   private static final String QUOTA_FIELD = "quota";
@@ -264,7 +264,7 @@ public class SnapshotStoreImpl implements Snapshotter {
   private final Clock clock;
 
   @Inject
-  public SnapshotStoreImpl(BuildInfo buildInfo, Clock clock) {
+  public SnapshotterImpl(BuildInfo buildInfo, Clock clock) {
     this.buildInfo = requireNonNull(buildInfo);
     this.clock = requireNonNull(clock);
   }

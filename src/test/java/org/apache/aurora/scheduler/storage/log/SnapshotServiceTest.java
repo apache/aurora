@@ -48,7 +48,8 @@ import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Snapshotter;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
-import org.apache.aurora.scheduler.storage.log.LogStorageModule.Options;
+import org.apache.aurora.scheduler.storage.durability.DurableStorageModule;
+import org.apache.aurora.scheduler.storage.log.SnapshotModule.Options;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.IAnswer;
@@ -84,7 +85,9 @@ public class SnapshotServiceTest extends EasyMockTest {
 
     Injector injector = Guice.createInjector(
         new SchedulerServicesModule(),
-        new LogStorageModule(options),
+        new LogPersistenceModule(new LogPersistenceModule.Options()),
+        new SnapshotModule(options),
+        new DurableStorageModule(),
         new MemStorageModule(Bindings.annotatedKeyFactory(Volatile.class)),
         new TierModule(TaskTestUtil.TIER_CONFIG),
         new AbstractModule() {

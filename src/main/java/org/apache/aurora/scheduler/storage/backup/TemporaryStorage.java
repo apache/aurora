@@ -31,7 +31,7 @@ import org.apache.aurora.scheduler.storage.durability.Loader;
 import org.apache.aurora.scheduler.storage.durability.Persistence.Edit;
 import org.apache.aurora.scheduler.storage.durability.ThriftBackfill;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+import org.apache.aurora.scheduler.storage.log.SnapshotterImpl;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 
 import static java.util.Objects.requireNonNull;
@@ -84,7 +84,7 @@ interface TemporaryStorage {
       BuildInfo buildInfo = generateBuildInfo();
       FakeClock clock = new FakeClock();
       clock.setNowMillis(snapshot.getTimestamp());
-      Snapshotter snapshotter = new SnapshotStoreImpl(buildInfo, clock);
+      Snapshotter snapshotter = new SnapshotterImpl(buildInfo, clock);
 
       storage.write((NoResult.Quiet) stores -> {
         Loader.load(stores, thriftBackfill, snapshotter.asStream(snapshot).map(Edit::op));

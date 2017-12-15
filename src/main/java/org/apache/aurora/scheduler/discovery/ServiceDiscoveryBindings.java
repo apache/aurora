@@ -44,7 +44,7 @@ public final class ServiceDiscoveryBindings {
   /**
    * A binding key for the ZooKeeper cluster endpoints.
    */
-  static final Key<Iterable<InetSocketAddress>> ZOO_KEEPER_CLUSTER_KEY =
+  public static final Key<Iterable<InetSocketAddress>> ZOO_KEEPER_CLUSTER_KEY =
       Key.get(new TypeLiteral<Iterable<InetSocketAddress>>() { }, ZooKeeper.class);
 
   /**

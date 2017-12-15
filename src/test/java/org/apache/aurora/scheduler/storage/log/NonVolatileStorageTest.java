@@ -27,7 +27,6 @@ import org.apache.aurora.common.application.ShutdownRegistry.ShutdownRegistryImp
 import org.apache.aurora.common.collections.Pair;
 import org.apache.aurora.common.inject.Bindings;
 import org.apache.aurora.common.quantity.Data;
-import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.common.stats.StatsProvider;
 import org.apache.aurora.common.testing.TearDownTestCase;
 import org.apache.aurora.common.util.BuildInfo;
@@ -36,7 +35,6 @@ import org.apache.aurora.common.util.testing.FakeBuildInfo;
 import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.config.types.DataAmount;
-import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.resources.ResourceTestUtil;
@@ -46,8 +44,9 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
+import org.apache.aurora.scheduler.storage.durability.DurableStorageModule;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
-import org.apache.aurora.scheduler.storage.log.LogStorageModule.Options;
+import org.apache.aurora.scheduler.storage.log.LogPersistenceModule.Options;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Before;
@@ -74,12 +73,13 @@ public class NonVolatileStorageTest extends TearDownTestCase {
 
     Options options = new Options();
     options.maxLogEntrySize = new DataAmount(1, Data.GB);
-    options.snapshotInterval = new TimeAmount(1, Time.DAYS);
 
     ShutdownRegistryImpl shutdownRegistry = new ShutdownRegistryImpl();
     Injector injector = Guice.createInjector(
         new MemStorageModule(Bindings.annotatedKeyFactory(Volatile.class)),
-        new LogStorageModule(options),
+        new DurableStorageModule(),
+        new LogPersistenceModule(options),
+        new SnapshotModule(new SnapshotModule.Options()),
         new TierModule(new TierModule.Options()),
         new AbstractModule() {
           @Override
@@ -90,7 +90,7 @@ public class NonVolatileStorageTest extends TearDownTestCase {
             bind(ShutdownRegistry.class).toInstance(shutdownRegistry);
             bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(Log.class).toInstance(log);
-            bind(Snapshotter.class).to(SnapshotStoreImpl.class);
+            bind(Snapshotter.class).to(SnapshotterImpl.class);
           }
         }
     );

@@ -499,6 +499,41 @@ test_thermos_profile() {
   [[ "$read_env_output" = "hello" ]]
 }
 
+BACKUPS_DIR='/var/lib/aurora/backups'
+REPLICATED_LOG_DIR='/var/db/aurora'
+
+test_recovery_tool() {
+  local _cluster=$1
+
+  # As a cursory data validation step, fetch an arbitrary job update to ensure it exists after
+  # recovery completes.
+  update=$(aurora update list devcluster --write-json | jq  -r '.[0] | .job + " " + .id')
+
+  # Take a backup
+  aurora_admin scheduler_backup_now $_cluster
+  sudo stop aurora-scheduler
+
+  # Reset storage
+  sudo rm -r $REPLICATED_LOG_DIR
+  sudo mesos-log initialize --path=$REPLICATED_LOG_DIR
+
+  # Identify the newest backup file
+  backup=$(basename $(ls -dtr1 $BACKUPS_DIR/* | tail -n1))
+
+  # Recover
+  sudo /home/vagrant/aurora/dist/install/aurora-scheduler/bin/recovery-tool \
+    -from BACKUP \
+    -to LOG \
+    -backup $BACKUPS_DIR/$backup \
+    -native_log_zk_group_path=/aurora/replicated-log \
+    -native_log_file_path=$REPLICATED_LOG_DIR \
+    -zk_endpoints=localhost:2181
+  sudo start aurora-scheduler
+
+  # This command exits non-zero if the update is not found.
+  aurora update info $update
+}
+
 test_http_example() {
   local _cluster=$1 _role=$2 _env=$3
   local _base_config=$4 _updated_config=$5
@@ -792,6 +827,8 @@ test_basic_auth_unauthenticated  "${TEST_JOB_ARGS[@]}"
 test_ephemeral_daemon_with_final "${TEST_JOB_EPHEMERAL_DAEMON_WITH_FINAL_ARGS[@]}"
 
 test_daemonizing_process "${TEST_DAEMONIZING_PROCESS_ARGS[@]}"
+
+test_recovery_tool $TEST_CLUSTER
 
 /vagrant/src/test/sh/org/apache/aurora/e2e/test_kerberos_end_to_end.sh
 /vagrant/src/test/sh/org/apache/aurora/e2e/test_bypass_leader_redirect_end_to_end.sh
