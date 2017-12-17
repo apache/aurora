@@ -27,6 +27,7 @@ from apache.aurora.config.schema.base import (
     HealthCheckConfig,
     Job,
     Mesos,
+    Metadata,
     Mode,
     Parameter,
     SimpleTask,
@@ -267,6 +268,46 @@ def test_metadata_in_config():
   pi = iter(tti.metadata).next()
   assert pi.key == 'alpha'
   assert pi.value == '1'
+
+
+def test_config_with_metadata():
+  expected_metadata_tuples = frozenset([("city", "LA"), ("city", "SF")])
+  job = convert_pystachio_to_thrift(
+      HELLO_WORLD(metadata=[
+        Metadata(key=key, value=value)
+        for key, value in expected_metadata_tuples]))
+  tti = job.taskConfig
+
+  metadata_tuples = frozenset((key_value.key, key_value.value)
+                              for key_value in tti.metadata)
+  assert metadata_tuples == expected_metadata_tuples
+
+
+def test_config_with_key_collision_metadata():
+  input_metadata_tuples = frozenset([("city", "LA")])
+  job = convert_pystachio_to_thrift(
+      HELLO_WORLD(metadata=[
+        Metadata(key=key, value=value)
+        for key, value in input_metadata_tuples]), metadata=[('city', "SF")])
+  tti = job.taskConfig
+
+  metadata_tuples = frozenset((key_value.key, key_value.value)
+                              for key_value in tti.metadata)
+  expected_metadata_tuples = frozenset([("city", "LA"), ("city", "SF")])
+  assert metadata_tuples == expected_metadata_tuples
+
+
+def test_config_with_duplicate_metadata():
+  expected_metadata_tuples = frozenset([("city", "LA")])
+  job = convert_pystachio_to_thrift(
+      HELLO_WORLD(metadata=[
+        Metadata(key=key, value=value)
+        for key, value in expected_metadata_tuples]), metadata=[('city', "LA")])
+  tti = job.taskConfig
+
+  metadata_tuples = frozenset((key_value.key, key_value.value)
+                              for key_value in tti.metadata)
+  assert metadata_tuples == expected_metadata_tuples
 
 
 def test_task_instance_from_job():

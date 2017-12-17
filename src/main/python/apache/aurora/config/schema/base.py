@@ -159,6 +159,11 @@ class PartitionPolicy(Struct):
   delay_secs = Default(Integer, 0)
 
 
+class Metadata(Struct):
+  key   = Required(String)
+  value = Required(String)
+
+
 class MesosJob(Struct):
   name          = Default(String, '{{task.name}}')
   role          = Required(String)
@@ -176,6 +181,7 @@ class MesosJob(Struct):
   update_config = Default(UpdateConfig, UpdateConfig())
 
   constraints                = Map(String, String)
+  metadata                   = Default(List(Metadata), [])
   service                    = Default(Boolean, False)
   max_task_failures          = Default(Integer, 1)
   production                 = Default(Boolean, False)

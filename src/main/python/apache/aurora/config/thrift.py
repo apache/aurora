@@ -275,7 +275,15 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
       fully_interpolated(job.partition_policy().delay_secs()))
 
   # Add metadata to a task, to display in the scheduler UI.
-  task.metadata = frozenset(Metadata(key=str(key), value=str(value)) for key, value in metadata)
+  metadata_set = frozenset()
+  if job.has_metadata():
+    customized_metadata = job.metadata()
+    metadata_set |= frozenset(
+        (str(fully_interpolated(key_value_metadata.key())),
+         str(fully_interpolated(key_value_metadata.value())))
+        for key_value_metadata in customized_metadata)
+  metadata_set |= frozenset((str(key), str(value)) for key, value in metadata)
+  task.metadata = frozenset(Metadata(key=key, value=value) for key, value in metadata_set)
 
   # task components
   if not task_raw.has_resources():

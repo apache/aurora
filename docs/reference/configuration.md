@@ -357,6 +357,7 @@ Job Schema
   ```announce``` | ```Announcer``` object | Optionally enable Zookeeper ServerSet announcements. See [Announcer Objects] for more information.
   ```enable_hooks``` | Boolean | Whether to enable [Client Hooks](client-hooks.md) for this job. (Default: False)
   ```partition_policy``` | ```PartitionPolicy``` object | An optional partition policy that allows job owners to define how to handle partitions for running tasks (in partition-aware Aurora clusters)
+  ```metadata``` | list of ```Metadata``` objects | list of ```Metadata``` objects for user's customized metadata information.
 
 
 ### UpdateConfig Objects
@@ -410,6 +411,14 @@ Parameters for controlling a task's health checks via HTTP or a shell command.
 | ```reschedule```               | Boolean   | Whether or not to reschedule when running tasks become partitioned (Default: True)
 | ```delay_secs```               | Integer   | How long to delay transitioning to LOST when running tasks are partitioned. (Default: 0)
 
+### Metadata Objects
+
+Describes a piece of user metadata in a key value pair
+
+  param            | type            | description
+  -----            | :----:          | -----------
+  ```key```        | String          | Indicate which metadata the user provides
+  ```value```      | String          | Provide the metadata content for corresponding key
 
 ### Announcer Objects
 

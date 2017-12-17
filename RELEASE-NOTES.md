@@ -47,6 +47,7 @@
 - The scheduler no longer uses an internal H2 database for storage.
 - There is a new Scheduler UI which, in addition to the facelift, provides the ability to inject your
   own custom UI components.
+- Introduce a metadata field in the Job object of the DSL, which will populate TaskConfig.metadata.
 
 ### Deprecations and removals:
 
