@@ -1,0 +1,37 @@
+{
+  "10": {
+    "rec": {
+      "1": {
+        "rec": {
+          "1": {
+            "str": "string-value"
+          },
+          "2": {
+            "set": [
+              "rec",
+              1,
+              {
+                "1": {
+                  "str": "string-value"
+                },
+                "2": {
+                  "set": [
+                    "str",
+                    1,
+                    "string-value"
+                  ]
+                }
+              }
+            ]
+          },
+          "3": {
+            "i32": 1
+          },
+          "4": {
+            "str": "string-value"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "18": {
+    "rec": {
+      "1": {
+        "set": [
+          "rec",
+          1,
+          {
+            "1": {
+              "rec": {
+                "1": {
+                  "str": "string-value"
+                },
+                "2": {
+                  "str": "string-value"
+                },
+                "3": {
+                  "str": "string-value"
+                }
+              }
+            },
+            "2": {
+              "str": "string-value"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

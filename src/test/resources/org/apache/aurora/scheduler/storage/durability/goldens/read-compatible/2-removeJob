@@ -1,0 +1,19 @@
+{
+  "5": {
+    "rec": {
+      "2": {
+        "rec": {
+          "1": {
+            "str": "string-value"
+          },
+          "2": {
+            "str": "string-value"
+          },
+          "3": {
+            "str": "string-value"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "12": {
+    "rec": {
+      "1": {
+        "rec": {
+          "1": {
+            "rec": {
+              "1": {
+                "rec": {
+                  "1": {
+                    "str": "string-value"
+                  },
+                  "2": {
+                    "str": "string-value"
+                  },
+                  "3": {
+                    "str": "string-value"
+                  }
+                }
+              }
+            }
+          },
+          "2": {
+            "str": "string-value"
+          },
+          "3": {
+            "str": "string-value"
+          },
+          "4": {
+            "i64": 4
+          },
+          "5": {
+            "str": "string-value"
+          }
+        }
+      }
+    }
+  }
+}
