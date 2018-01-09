@@ -26,6 +26,7 @@ import com.google.inject.Module;
 
 import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
@@ -41,7 +42,8 @@ public class StateModule extends AbstractModule {
   @Parameters(separators = "=")
   public static class Options {
     @Parameter(names = "-task_assigner_modules",
-        description = "Guice modules for customizing task assignment.")
+        description = "Guice modules for customizing task assignment.",
+        splitter = CommaSplitter.class)
     @SuppressWarnings("rawtypes")
     public List<Class> taskAssignerModules = ImmutableList.of(TaskAssignerImplModule.class);
   }

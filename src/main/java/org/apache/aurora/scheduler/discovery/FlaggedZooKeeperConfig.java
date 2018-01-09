@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.zookeeper.Credentials;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.config.validators.NotEmptyIterable;
 
@@ -51,7 +52,8 @@ public final class FlaggedZooKeeperConfig {
         names = "-zk_endpoints",
         required = true,
         validateValueWith = NotEmptyIterable.class,
-        description = "Endpoint specification for the ZooKeeper servers.")
+        description = "Endpoint specification for the ZooKeeper servers.",
+        splitter = CommaSplitter.class)
     public List<InetSocketAddress> zkEndpoints;
 
     @Parameter(names = "-zk_chroot_path",

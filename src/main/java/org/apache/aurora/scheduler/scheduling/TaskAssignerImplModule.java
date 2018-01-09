@@ -24,6 +24,7 @@ import com.google.inject.Module;
 
 import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 
 /**
  * The default TaskAssigner implementation that allows the injection of custom offer
@@ -34,7 +35,8 @@ public class TaskAssignerImplModule extends AbstractModule {
   @Parameters(separators = "=")
   public static class Options {
     @Parameter(names = "-offer_selector_modules",
-        description = "Guice module for customizing the TaskAssignerImpl's OfferSelector.")
+        description = "Guice module for customizing the TaskAssignerImpl's OfferSelector.",
+        splitter = CommaSplitter.class)
     @SuppressWarnings("rawtypes")
     public List<Class> offerSelectorModules =
         ImmutableList.of(FirstFitOfferSelectorModule.class);

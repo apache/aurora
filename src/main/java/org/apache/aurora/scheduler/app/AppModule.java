@@ -37,6 +37,7 @@ import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.app.SchedulerMain.Options.DriverKind;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 import org.apache.aurora.scheduler.config.validators.PositiveNumber;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.ConfigurationManagerSettings;
@@ -85,7 +86,8 @@ public class AppModule extends AbstractModule {
     // parameters that define an arity. You will have to convert these values yourself..."
 
     @Parameter(names = "-allowed_container_types",
-        description = "Container types that are allowed to be used by jobs.")
+        description = "Container types that are allowed to be used by jobs.",
+        splitter = CommaSplitter.class)
     public List<_Fields> allowedContainerTypes = ImmutableList.of(Container._Fields.MESOS);
 
     @Parameter(names = "-allow_docker_parameters",
@@ -95,7 +97,8 @@ public class AppModule extends AbstractModule {
 
     @Parameter(names = "-default_docker_parameters",
         description =
-            "Default docker parameters for any job that does not explicitly declare parameters.")
+            "Default docker parameters for any job that does not explicitly declare parameters.",
+        splitter = CommaSplitter.class)
     public List<DockerParameter> defaultDockerParameters = ImmutableList.of();
 
     @Parameter(names = "-require_docker_use_executor",
