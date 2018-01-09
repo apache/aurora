@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
 
@@ -47,7 +48,7 @@ public interface TaskStore {
    * @param query Builder of the query to identify tasks with.
    * @return A read-only view of matching tasks.
    */
-  Iterable<IScheduledTask> fetchTasks(Query.Builder query);
+  Collection<IScheduledTask> fetchTasks(Query.Builder query);
 
   /**
    * Fetches all job keys represented in the task store.

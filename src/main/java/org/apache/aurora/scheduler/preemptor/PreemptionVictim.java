@@ -17,6 +17,7 @@ import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
 
+import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
@@ -54,8 +55,8 @@ public final class PreemptionVictim {
     return task.getTask().getPriority();
   }
 
-  public ResourceBag getResourceBag() {
-    return ResourceManager.bagFromResources(task.getTask().getResources());
+  public ResourceBag getResourceBag(ExecutorSettings executorSettings) {
+    return ResourceManager.bagFromTask(task.getTask(), executorSettings);
   }
 
   public String getTaskId() {

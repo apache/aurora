@@ -38,6 +38,7 @@ import org.apache.aurora.scheduler.configuration.executor.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -124,15 +125,13 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
       .setAgentId(SLAVE)
       .setHostname("slave-hostname")
       .addAllResources(mesosScalarFromBag(bagFromResources(
-              TASK_CONFIG.getResources()).add(THERMOS_EXECUTOR.getExecutorOverhead(
-                  TASK_CONFIG.getExecutorConfig().getName()).get())))
+              TASK_CONFIG.getResources()).add(THERMOS_EXECUTOR.getExecutorOverhead(TASK_CONFIG))))
       .addResources(mesosRange(PORTS, 80))
       .build();
   private static final Offer OFFER_SOME_OVERHEAD_EXECUTOR = OFFER_THERMOS_EXECUTOR.toBuilder()
       .clearResources()
       .addAllResources(mesosScalarFromBag(bagFromResources(
-          TASK_CONFIG.getResources()).add(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead(
-              TASK_CONFIG.getExecutorConfig().getName()).get())))
+          TASK_CONFIG.getResources()).add(SOME_OVERHEAD_EXECUTOR.getExecutorOverhead(TASK_CONFIG))))
       .addResources(mesosRange(PORTS, 80))
       .build();
 
@@ -282,10 +281,7 @@ public class MesosTaskFactoryImplTest extends EasyMockTest {
     ResourceBag executorResources =
         bagFromMesosResources(taskInfo.getExecutor().getResourcesList());
 
-    assertEquals(
-        bagFromResources(task.getResources()).add(
-            config.getExecutorOverhead(task.getExecutorConfig().getName()).get()),
-        taskResources.add(executorResources));
+    assertEquals(ResourceManager.bagFromTask(task, config), taskResources.add(executorResources));
   }
 
   private void checkDiscoveryInfoUnset(TaskInfo taskInfo) {

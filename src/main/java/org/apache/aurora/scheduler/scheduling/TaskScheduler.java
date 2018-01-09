@@ -31,5 +31,5 @@ public interface TaskScheduler extends EventSubscriber {
    * @return Successfully scheduled task IDs. The caller should call schedule again if a given
    *         task ID was not present in the result.
    */
-  Set<String> schedule(MutableStoreProvider storeProvider, Iterable<String> taskIds);
+  Set<String> schedule(MutableStoreProvider storeProvider, Set<String> taskIds);
 }

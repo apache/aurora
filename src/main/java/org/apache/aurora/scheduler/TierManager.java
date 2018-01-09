@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler;
 
 import java.util.Map;
+import java.util.Optional;
 
 import javax.inject.Inject;
 
@@ -102,7 +103,8 @@ public interface TierManager {
           !taskConfig.isSetTier() || tierConfig.tiers.containsKey(taskConfig.getTier()),
           "Invalid tier '%s' in TaskConfig.", taskConfig.getTier());
 
-      return tierConfig.tiers.get(taskConfig.getTier());
+      return tierConfig.tiers.get(
+          Optional.ofNullable(taskConfig.getTier()).orElse(tierConfig.defaultTier));
     }
 
     @Override

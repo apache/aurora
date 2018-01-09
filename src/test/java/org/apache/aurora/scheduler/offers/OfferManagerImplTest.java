@@ -29,6 +29,7 @@ import org.apache.aurora.common.util.testing.FakeTicker;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
+import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.HostAttributesChanged;
@@ -37,7 +38,6 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.offers.Deferment.Noop;
-import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -57,7 +57,6 @@ import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
-import static org.apache.aurora.scheduler.filter.AttributeAggregate.empty;
 import static org.apache.aurora.scheduler.offers.OfferManagerImpl.GLOBALLY_BANNED_OFFERS;
 import static org.apache.aurora.scheduler.offers.OfferManagerImpl.OFFER_ACCEPT_RACES;
 import static org.apache.aurora.scheduler.offers.OfferManagerImpl.OFFER_CANCEL_FAILURES;
@@ -100,10 +99,8 @@ public class OfferManagerImplTest extends EasyMockTest {
   private static final int PORT = 1000;
   private static final Protos.Offer MESOS_OFFER = offer(mesosRange(PORTS, PORT));
   private static final IScheduledTask TASK = makeTask("id", JOB);
-  private static final ResourceRequest EMPTY_REQUEST = new ResourceRequest(
-      TASK.getAssignedTask().getTask(),
-      ResourceBag.EMPTY,
-      empty());
+  private static final ResourceRequest EMPTY_REQUEST =
+      TaskTestUtil.toResourceRequest(TASK.getAssignedTask().getTask());
   private static final TaskGroupKey GROUP_KEY = TaskGroupKey.from(TASK.getAssignedTask().getTask());
   private static final TaskInfo TASK_INFO = TaskInfo.newBuilder()
       .setName("taskName")
@@ -250,14 +247,14 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     offerManager.add(OFFER_A);
     assertEquals(OFFER_A,
-        Iterables.getOnlyElement(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        Iterables.getOnlyElement(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getAll()));
 
     // Add static ban.
     offerManager.banForTaskGroup(OFFER_A_ID, GROUP_KEY);
     assertEquals(1, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getAll()));
-    assertTrue(Iterables.isEmpty(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+    assertTrue(Iterables.isEmpty(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
   }
 
   @Test
@@ -269,14 +266,14 @@ public class OfferManagerImplTest extends EasyMockTest {
     offerManager.add(OFFER_A);
     offerManager.banForTaskGroup(OFFER_A_ID, GROUP_KEY);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getAll()));
-    assertTrue(Iterables.isEmpty(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+    assertTrue(Iterables.isEmpty(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(1, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
 
     // Make sure the static ban expires after maximum amount of time an offer is held.
     FAKE_TICKER.advance(RETURN_DELAY);
     offerManager.cleanupStaticBans();
     assertEquals(OFFER_A,
-        Iterables.getOnlyElement(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        Iterables.getOnlyElement(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
   }
 
@@ -289,7 +286,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     offerManager.add(OFFER_A);
     offerManager.banForTaskGroup(OFFER_A_ID, GROUP_KEY);
     assertEquals(OFFER_A, Iterables.getOnlyElement(offerManager.getAll()));
-    assertTrue(Iterables.isEmpty(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+    assertTrue(Iterables.isEmpty(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(1, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
 
     // Make sure the static ban is cleared when driver is disconnected.
@@ -297,7 +294,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     offerManager.add(OFFER_A);
     assertEquals(OFFER_A,
-        Iterables.getOnlyElement(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        Iterables.getOnlyElement(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
   }
 
   @Test
@@ -361,14 +358,14 @@ public class OfferManagerImplTest extends EasyMockTest {
     offerManager.add(OFFER_A);
     assertEquals(1, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     assertEquals(1, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
-    assertTrue(Iterables.isEmpty(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+    assertTrue(Iterables.isEmpty(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
 
     offerManager.cancel(OFFER_A_ID);
     offerManager.add(OFFER_A);
     assertEquals(1, statsProvider.getLongValue(OUTSTANDING_OFFERS));
     assertEquals(0, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
     assertEquals(OFFER_A,
-        Iterables.getOnlyElement(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        Iterables.getOnlyElement(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
   }
 
   private static HostOffer setUnavailability(HostOffer offer, long startMs) {
@@ -423,7 +420,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     cpuManager.add(small);
 
     assertEquals(ImmutableList.of(small, medium, large),
-        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(ImmutableList.of(small, medium, large),
         ImmutableList.copyOf(cpuManager.getAll()));
   }
@@ -460,7 +457,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     cpuManager.add(small);
 
     assertEquals(ImmutableList.of(small, medium, large),
-        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, true)));
+        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(ImmutableList.of(small, medium, large),
         ImmutableList.copyOf(cpuManager.getAll()));
   }
@@ -488,7 +485,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     cpuManager.add(small);
 
     assertEquals(ImmutableList.of(small, medium, large),
-        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(ImmutableList.of(small, medium, large),
         ImmutableList.copyOf(cpuManager.getAll()));
   }
@@ -516,7 +513,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     cpuManager.add(small);
 
     assertEquals(ImmutableList.of(small, medium, large),
-        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(ImmutableList.of(small, medium, large),
         ImmutableList.copyOf(cpuManager.getAll()));
   }
@@ -555,7 +552,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     cpuManager.add(small);
 
     assertEquals(ImmutableList.of(small, medium, large),
-        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        ImmutableList.copyOf(cpuManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(ImmutableList.of(small, medium, large),
         ImmutableList.copyOf(cpuManager.getAll()));
   }
@@ -628,7 +625,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     control.replay();
     offerManager.add(OFFER_A);
     assertEquals(Optional.of(OFFER_A),
-        offerManager.getMatching(OFFER_A.getOffer().getAgentId(), EMPTY_REQUEST, false));
+        offerManager.getMatching(OFFER_A.getOffer().getAgentId(), EMPTY_REQUEST));
   }
 
   @Test
@@ -640,7 +637,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(0, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
     offerManager.ban(OFFER_A_ID);
     assertEquals(Optional.empty(),
-        offerManager.getMatching(OFFER_A.getOffer().getAgentId(), EMPTY_REQUEST, false));
+        offerManager.getMatching(OFFER_A.getOffer().getAgentId(), EMPTY_REQUEST));
     assertEquals(1, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
   }
 
@@ -655,7 +652,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     offerManager.add(OFFER_A);
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     assertEquals(Optional.empty(),
-        offerManager.getMatching(OFFER_A.getOffer().getAgentId(), EMPTY_REQUEST, false));
+        offerManager.getMatching(OFFER_A.getOffer().getAgentId(), EMPTY_REQUEST));
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
   }
 
@@ -669,7 +666,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     offerManager.add(OFFER_C);
     assertEquals(0, statsProvider.getLongValue(VETO_EVALUATED_OFFERS));
     assertEquals(ImmutableSet.of(OFFER_A, OFFER_B, OFFER_C),
-        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(3, statsProvider.getLongValue(VETO_EVALUATED_OFFERS));
   }
 
@@ -685,7 +682,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(0, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
     offerManager.ban(OFFER_B.getOffer().getId());
     assertEquals(ImmutableSet.of(OFFER_A, OFFER_C),
-        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(2, statsProvider.getLongValue(VETO_EVALUATED_OFFERS));
     assertEquals(1, statsProvider.getLongValue(GLOBALLY_BANNED_OFFERS));
   }
@@ -702,7 +699,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     offerManager.banForTaskGroup(OFFER_B.getOffer().getId(), GROUP_KEY);
     assertEquals(ImmutableSet.of(OFFER_A, OFFER_C),
-        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(2, statsProvider.getLongValue(VETO_EVALUATED_OFFERS));
     assertEquals(1, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     assertEquals(ImmutableSet.of(Pair.of(OFFER_B.getOffer().getId(), GROUP_KEY)),
@@ -727,7 +724,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     assertEquals(0, statsProvider.getLongValue(VETO_EVALUATED_OFFERS));
     assertEquals(ImmutableSet.of(OFFER_A),
-        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(1, statsProvider.getLongValue(VETO_EVALUATED_OFFERS));
     assertEquals(ImmutableSet.of(empty, OFFER_A),
         ImmutableSet.copyOf(offerManager.getAll()));
@@ -750,7 +747,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     assertEquals(0, statsProvider.getLongValue(VETO_EVALUATED_OFFERS));
     assertEquals(0, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     assertEquals(ImmutableSet.of(OFFER_B),
-        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST, false)));
+        ImmutableSet.copyOf(offerManager.getAllMatching(GROUP_KEY, EMPTY_REQUEST)));
     assertEquals(3, statsProvider.getLongValue(VETO_EVALUATED_OFFERS));
     assertEquals(1, statsProvider.getLongValue(STATICALLY_BANNED_OFFERS));
     assertEquals(ImmutableSet.of(Pair.of(OFFER_A.getOffer().getId(), GROUP_KEY)),

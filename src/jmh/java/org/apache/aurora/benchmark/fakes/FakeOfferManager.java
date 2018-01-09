@@ -15,6 +15,8 @@ package org.apache.aurora.benchmark.fakes;
 
 import java.util.Optional;
 
+import com.google.common.collect.ImmutableList;
+
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
@@ -59,18 +61,14 @@ public class FakeOfferManager implements OfferManager {
   }
 
   @Override
-  public Optional<HostOffer> getMatching(Protos.AgentID slaveId,
-                                         ResourceRequest resourceRequest,
-                                         boolean revocable) {
-
+  public Optional<HostOffer> getMatching(Protos.AgentID slaveId, ResourceRequest resourceRequest) {
     return Optional.empty();
   }
 
   @Override
   public Iterable<HostOffer> getAllMatching(TaskGroupKey groupKey,
-                                            ResourceRequest resourceRequest,
-                                            boolean revocable) {
+                                            ResourceRequest resourceRequest) {
 
-    return null;
+    return ImmutableList.of();
   }
 }

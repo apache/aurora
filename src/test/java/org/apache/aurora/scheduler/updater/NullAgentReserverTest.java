@@ -21,7 +21,6 @@ import org.apache.aurora.scheduler.updater.UpdateAgentReserver.NullAgentReserver
 import org.junit.Test;
 
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class NullAgentReserverTest extends EasyMockTest {
   private static final IInstanceKey INSTANCE_KEY =
@@ -33,6 +32,6 @@ public class NullAgentReserverTest extends EasyMockTest {
     NullAgentReserver reserver = new NullAgentReserver();
     reserver.reserve("test", INSTANCE_KEY);
     assertFalse(reserver.getAgent(INSTANCE_KEY).isPresent());
-    assertTrue(reserver.getReservations("test").isEmpty());
+    assertFalse(reserver.isReserved("test"));
   }
 }

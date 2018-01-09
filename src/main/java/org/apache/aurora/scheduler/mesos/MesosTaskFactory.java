@@ -152,12 +152,7 @@ public interface MesosTaskFactory {
 
       ITaskConfig config = task.getTask();
 
-      // Docker-based tasks don't need executors
-      ResourceBag executorOverhead = ResourceBag.EMPTY;
-      if (config.isSetExecutorConfig()) {
-        executorOverhead =
-            executorSettings.getExecutorOverhead(getExecutorName(task)).orElse(ResourceBag.EMPTY);
-      }
+      ResourceBag executorOverhead = executorSettings.getExecutorOverhead(config);
 
       AcceptedOffer acceptedOffer;
       // TODO(wfarner): Re-evaluate if/why we need to continue handling unset assignedPorts field.

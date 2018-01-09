@@ -21,11 +21,16 @@ import java.util.Set;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 
+import org.apache.aurora.scheduler.TierManager;
+import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.offers.HostOffer;
 import org.apache.aurora.scheduler.resources.ResourceBag;
+import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType.CONSTRAINT_MISMATCH;
 import static org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType.INSUFFICIENT_RESOURCES;
@@ -306,11 +311,31 @@ public interface SchedulingFilter {
     private final ITaskConfig task;
     private final ResourceBag request;
     private final AttributeAggregate jobState;
+    private final boolean revocable;
 
-    public ResourceRequest(ITaskConfig task, ResourceBag request, AttributeAggregate jobState) {
-      this.task = task;
-      this.request = request;
-      this.jobState = jobState;
+    private ResourceRequest(
+        ITaskConfig task,
+        ResourceBag request,
+        AttributeAggregate jobState,
+        boolean revocable) {
+
+      this.task = requireNonNull(task);
+      this.request = requireNonNull(request);
+      this.jobState = requireNonNull(jobState);
+      this.revocable = revocable;
+    }
+
+    public static ResourceRequest fromTask(
+        ITaskConfig task,
+        ExecutorSettings executorSettings,
+        AttributeAggregate jobState,
+        TierManager tierManager) {
+
+      return new ResourceRequest(
+          task,
+          ResourceManager.bagFromTask(task, executorSettings),
+          jobState,
+          tierManager.getTier(task).isRevocable());
     }
 
     public Iterable<IConstraint> getConstraints() {
@@ -329,6 +354,10 @@ public interface SchedulingFilter {
       return jobState;
     }
 
+    public boolean isRevocable() {
+      return revocable;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (!(o instanceof ResourceRequest)) {
@@ -338,12 +367,13 @@ public interface SchedulingFilter {
       ResourceRequest other = (ResourceRequest) o;
       return Objects.equals(task, other.task)
           && Objects.equals(request, other.request)
-          && Objects.equals(jobState, other.jobState);
+          && Objects.equals(jobState, other.jobState)
+          && revocable == other.revocable;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(task, request, jobState);
+      return Objects.hash(task, request, jobState, revocable);
     }
   }
 

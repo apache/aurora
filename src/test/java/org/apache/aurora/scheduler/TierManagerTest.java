@@ -48,6 +48,13 @@ public class TierManagerTest {
   }
 
   @Test
+  public void testDefaultTier() {
+    assertEquals(
+        DEV_TIER,
+        TIER_MANAGER.getTier(ITaskConfig.build(new TaskConfig())));
+  }
+
+  @Test
   public void testGetTierRevocableAndProduction() {
     assertEquals(
         REVOCABLE_TIER,

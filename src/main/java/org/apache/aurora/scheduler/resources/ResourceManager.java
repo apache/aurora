@@ -26,6 +26,7 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.scheduler.configuration.executor.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.durability.ThriftBackfill;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IResource;
@@ -243,6 +244,11 @@ public final class ResourceManager {
    */
   public static ResourceBag bagFromResources(Iterable<IResource> resources) {
     return bagFromResources(resources, RESOURCE_TO_TYPE, QUANTIFY_RESOURCE);
+  }
+
+  public static ResourceBag bagFromTask(ITaskConfig task, ExecutorSettings executorSettings) {
+    return bagFromResources(task.getResources(), RESOURCE_TO_TYPE, QUANTIFY_RESOURCE)
+        .add(executorSettings.getExecutorOverhead(task));
   }
 
   /**

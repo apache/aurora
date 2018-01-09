@@ -154,22 +154,13 @@ class HostOffers {
         .toSet();
   }
 
-  synchronized Optional<HostOffer> getMatching(Protos.AgentID slaveId,
-                                               ResourceRequest resourceRequest,
-                                               boolean revocable) {
+  synchronized Optional<HostOffer> getMatching(
+      Protos.AgentID slaveId,
+      ResourceRequest resourceRequest) {
 
-    Optional<HostOffer> optionalOffer = get(slaveId);
-    if (optionalOffer.isPresent()) {
-      HostOffer offer = optionalOffer.get();
-
-      if (isGloballyBanned(offer)
-          || isVetoed(offer, resourceRequest, revocable, Optional.empty())) {
-
-        return Optional.empty();
-      }
-    }
-
-    return optionalOffer;
+    return get(slaveId)
+        .filter(offer -> !isGloballyBanned(offer))
+        .filter(offer -> !isVetoed(offer, resourceRequest, Optional.empty()));
   }
 
   /**
@@ -182,14 +173,13 @@ class HostOffers {
    * @return The offers a given task group can use.
    */
   synchronized Iterable<HostOffer> getAllMatching(TaskGroupKey groupKey,
-                                                  ResourceRequest resourceRequest,
-                                                  boolean revocable) {
+                                                  ResourceRequest resourceRequest) {
 
     return Iterables.unmodifiableIterable(FluentIterable.from(offers)
         .filter(o -> !isGloballyBanned(o))
         .filter(o -> !isStaticallyBanned(o, groupKey))
         .filter(HostOffer::hasCpuAndMem)
-        .filter(o -> !isVetoed(o, resourceRequest, revocable, Optional.of(groupKey))));
+        .filter(o -> !isVetoed(o, resourceRequest, Optional.of(groupKey))));
   }
 
   private synchronized boolean isGloballyBanned(HostOffer offer) {
@@ -207,11 +197,10 @@ class HostOffers {
    */
   private boolean isVetoed(HostOffer offer,
                            ResourceRequest resourceRequest,
-                           boolean revocable,
                            Optional<TaskGroupKey> groupKey) {
 
     vetoEvaluatedOffers.incrementAndGet();
-    UnusedResource unusedResource = new UnusedResource(offer, revocable);
+    UnusedResource unusedResource = new UnusedResource(offer, resourceRequest.isRevocable());
     Set<Veto> vetoes = schedulingFilter.filter(unusedResource, resourceRequest);
     if (!vetoes.isEmpty()) {
       if (groupKey.isPresent() && Veto.identifyGroup(vetoes) == SchedulingFilter.VetoGroup.STATIC) {

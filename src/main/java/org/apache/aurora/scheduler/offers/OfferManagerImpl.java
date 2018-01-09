@@ -162,19 +162,15 @@ public class OfferManagerImpl implements OfferManager {
   }
 
   @Override
-  public Optional<HostOffer> getMatching(Protos.AgentID slaveId,
-                                         ResourceRequest resourceRequest,
-                                         boolean revocable) {
-
-    return hostOffers.getMatching(slaveId, resourceRequest, revocable);
+  public Optional<HostOffer> getMatching(Protos.AgentID slaveId, ResourceRequest resourceRequest) {
+    return hostOffers.getMatching(slaveId, resourceRequest);
   }
 
   @Override
   public Iterable<HostOffer> getAllMatching(TaskGroupKey groupKey,
-                                            ResourceRequest resourceRequest,
-                                            boolean revocable) {
+                                            ResourceRequest resourceRequest) {
 
-    return hostOffers.getAllMatching(groupKey, resourceRequest, revocable);
+    return hostOffers.getAllMatching(groupKey, resourceRequest);
   }
 
   /**

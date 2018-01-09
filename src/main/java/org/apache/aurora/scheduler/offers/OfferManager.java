@@ -81,12 +81,9 @@ public interface OfferManager extends EventSubscriber {
    *
    * @param slaveId Slave ID to get the offer for.
    * @param resourceRequest The request that the offer should satisfy.
-   * @param revocable Whether or not the request can use revocable resources.
    * @return An option containing the offer for the slave ID if it fits.
    */
-  Optional<HostOffer> getMatching(AgentID slaveId,
-                                  ResourceRequest resourceRequest,
-                                  boolean revocable);
+  Optional<HostOffer> getMatching(AgentID slaveId, ResourceRequest resourceRequest);
 
   /**
    * Gets all offers that the scheduler is holding that satisfy the supplied
@@ -94,12 +91,9 @@ public interface OfferManager extends EventSubscriber {
    *
    * @param groupKey The {@link TaskGroupKey} of the task in the {@link ResourceRequest}.
    * @param resourceRequest The request that the offer should satisfy.
-   * @param revocable Whether or not the request can use revocable resources.
    * @return An option containing the offer for the slave ID if it fits.
    */
-  Iterable<HostOffer> getAllMatching(TaskGroupKey groupKey,
-                                     ResourceRequest resourceRequest,
-                                     boolean revocable);
+  Iterable<HostOffer> getAllMatching(TaskGroupKey groupKey, ResourceRequest resourceRequest);
 
   /**
    * Launches the task matched against the offer.

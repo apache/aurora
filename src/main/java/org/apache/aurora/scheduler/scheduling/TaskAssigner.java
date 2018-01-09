@@ -41,6 +41,6 @@ public interface TaskAssigner {
       MutableStoreProvider storeProvider,
       ResourceRequest resourceRequest,
       TaskGroupKey groupKey,
-      Iterable<IAssignedTask> tasks,
+      Set<IAssignedTask> tasks,
       Map<String, TaskGroupKey> preemptionReservations);
 }

@@ -19,6 +19,9 @@ import java.util.Optional;
 
 import org.apache.aurora.scheduler.resources.ResourceBag;
 import org.apache.aurora.scheduler.resources.ResourceManager;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.util.Objects.requireNonNull;
 
@@ -26,6 +29,9 @@ import static java.util.Objects.requireNonNull;
  * Configuration for the executor to run, and resource overhead required for it.
  */
 public class ExecutorSettings {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ExecutorSettings.class);
+
   private final Map<String, ExecutorConfig> config;
   private final boolean populateDiscoveryInfo;
 
@@ -45,12 +51,19 @@ public class ExecutorSettings {
     return populateDiscoveryInfo;
   }
 
-  public Optional<ResourceBag> getExecutorOverhead(String name) {
+  public ResourceBag getExecutorOverhead(ITaskConfig task) {
+    if (!task.isSetExecutorConfig()) {
+      // Docker-based tasks don't need executors
+      return ResourceBag.EMPTY;
+    }
+
+    String name = task.getExecutorConfig().getName();
     if (config.containsKey(name)) {
-      return Optional.of(
-          ResourceManager.bagFromMesosResources(config.get(name).getExecutor().getResourcesList()));
+      return ResourceManager.bagFromMesosResources(
+          config.get(name).getExecutor().getResourcesList());
     } else {
-      return Optional.empty();
+      LOG.warn("No executor configuration found for " + name);
+      return ResourceBag.EMPTY;
     }
   }
 

@@ -13,25 +13,19 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.common.testing.easymock.EasyMockTest;
-import org.apache.aurora.gen.Resource;
-import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.updater.UpdateAgentReserver.UpdateAgentReserverImpl;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -42,16 +36,6 @@ public class UpdateAgentReserverImplTest extends EasyMockTest {
   private static final String AGENT_ID = "agent";
   private static final IInstanceKey INSTANCE_KEY =
       InstanceKeys.from(JobKeys.from("role", "env", "name"), 1);
-
-  private TaskGroupKey getTaskGroup(IInstanceKey key) {
-    return TaskGroupKey.from(ITaskConfig.build(
-        new TaskConfig()
-            .setJob(key.getJobKey().newBuilder())
-            .setResources(ImmutableSet.of(
-                Resource.numCpus(1.0),
-                Resource.ramMb(1L),
-                Resource.diskMb(1L)))));
-  }
 
   @Before
   public void setUp() {
@@ -76,32 +60,11 @@ public class UpdateAgentReserverImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testGetReservations() {
+  public void testIsReserved() {
     expect(cache.getByValue(AGENT_ID)).andReturn(ImmutableSet.of(INSTANCE_KEY));
+    expect(cache.getByValue(AGENT_ID)).andReturn(ImmutableSet.of());
     control.replay();
-    assertEquals(ImmutableSet.of(INSTANCE_KEY), reserver.getReservations(AGENT_ID));
+    assertTrue(reserver.isReserved(AGENT_ID));
+    assertFalse(reserver.isReserved(AGENT_ID));
   }
-
-  @Test
-  public void testHasReservations() {
-    IInstanceKey instanceKey2 = InstanceKeys.from(JobKeys.from("role", "env", "name"), 2);
-    IInstanceKey instanceKey3 = InstanceKeys.from(JobKeys.from("role2", "env2", "name2"), 1);
-    expect(cache.asMap())
-        .andReturn(ImmutableMap.of(
-            INSTANCE_KEY,
-            AGENT_ID,
-            instanceKey2,
-            AGENT_ID,
-            instanceKey3,
-            "different-agent")).anyTimes();
-    control.replay();
-    assertTrue(reserver.hasReservations(getTaskGroup(INSTANCE_KEY)));
-    assertTrue(reserver.hasReservations(getTaskGroup(instanceKey2)));
-    assertTrue(reserver.hasReservations(getTaskGroup(instanceKey3)));
-    assertTrue(reserver.hasReservations(
-        getTaskGroup(InstanceKeys.from(JobKeys.from("role", "env", "name"), 3))));
-    assertFalse(reserver.hasReservations(
-        getTaskGroup(InstanceKeys.from(JobKeys.from("not", "in", "map"), 1))));
-  }
-
 }

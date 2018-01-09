@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -21,22 +22,22 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 
 import org.apache.aurora.common.stats.StatsProvider;
-import org.apache.aurora.scheduler.TierManager;
 import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.offers.HostOffer;
 import org.apache.aurora.scheduler.offers.OfferManager;
+import org.apache.aurora.scheduler.offers.OfferManager.LaunchException;
 import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.updater.UpdateAgentReserver;
@@ -64,7 +65,6 @@ public class TaskAssignerImpl implements TaskAssigner {
   private final StateManager stateManager;
   private final MesosTaskFactory taskFactory;
   private final OfferManager offerManager;
-  private final TierManager tierManager;
   private final UpdateAgentReserver updateAgentReserver;
   private final OfferSelector offerSelector;
 
@@ -73,7 +73,6 @@ public class TaskAssignerImpl implements TaskAssigner {
       StateManager stateManager,
       MesosTaskFactory taskFactory,
       OfferManager offerManager,
-      TierManager tierManager,
       UpdateAgentReserver updateAgentReserver,
       StatsProvider statsProvider,
       OfferSelector offerSelector) {
@@ -81,7 +80,6 @@ public class TaskAssignerImpl implements TaskAssigner {
     this.stateManager = requireNonNull(stateManager);
     this.taskFactory = requireNonNull(taskFactory);
     this.offerManager = requireNonNull(offerManager);
-    this.tierManager = requireNonNull(tierManager);
     this.launchFailures = statsProvider.makeCounter(ASSIGNER_LAUNCH_FAILURES);
     this.updateAgentReserver = requireNonNull(updateAgentReserver);
     this.offerSelector = requireNonNull(offerSelector);
@@ -99,7 +97,7 @@ public class TaskAssignerImpl implements TaskAssigner {
   }
 
   private Protos.TaskInfo assign(
-      Storage.MutableStoreProvider storeProvider,
+      MutableStoreProvider storeProvider,
       Protos.Offer offer,
       String taskId,
       boolean revocable) {
@@ -118,20 +116,18 @@ public class TaskAssignerImpl implements TaskAssigner {
   }
 
   private void launchUsingOffer(
-      Storage.MutableStoreProvider storeProvider,
-      boolean revocable,
+      MutableStoreProvider stores,
       ResourceRequest resourceRequest,
       IAssignedTask task,
-      HostOffer offer,
-      ImmutableSet.Builder<String> assignmentResult) throws OfferManager.LaunchException {
+      HostOffer offer) throws LaunchException {
 
     String taskId = task.getTaskId();
-    Protos.TaskInfo taskInfo = assign(storeProvider, offer.getOffer(), taskId, revocable);
+    Protos.TaskInfo taskInfo =
+        assign(stores, offer.getOffer(), taskId, resourceRequest.isRevocable());
     resourceRequest.getJobState().updateAttributeAggregate(offer.getAttributes());
     try {
       offerManager.launchTask(offer.getOffer().getId(), taskInfo);
-      assignmentResult.add(taskId);
-    } catch (OfferManager.LaunchException e) {
+    } catch (LaunchException e) {
       LOG.warn("Failed to launch task.", e);
       launchFailures.incrementAndGet();
 
@@ -139,147 +135,144 @@ public class TaskAssignerImpl implements TaskAssigner {
       // It is in the LOST state and a new task will move to PENDING to replace it.
       // Should the state change fail due to storage issues, that's okay.  The task will
       // time out in the ASSIGNED state and be moved to LOST.
-      stateManager.changeState(
-          storeProvider,
-          taskId,
-          Optional.of(PENDING),
-          LOST,
-          LAUNCH_FAILED_MSG);
+      stateManager.changeState(stores, taskId, Optional.of(PENDING), LOST, LAUNCH_FAILED_MSG);
       throw e;
     }
   }
 
-  private Iterable<IAssignedTask> maybeAssignReserved(
-      Iterable<IAssignedTask> tasks,
-      Storage.MutableStoreProvider storeProvider,
-      boolean revocable,
-      ResourceRequest resourceRequest,
-      TaskGroupKey groupKey,
-      ImmutableSet.Builder<String> assignmentResult) {
+  private static final class ReservationStatus {
+    final boolean taskReserving;
+    final Optional<HostOffer> offer;
 
-    if (!updateAgentReserver.hasReservations(groupKey)) {
-      return tasks;
+    private ReservationStatus(boolean taskReserving, Optional<HostOffer> offer) {
+      this.taskReserving = taskReserving;
+      this.offer = requireNonNull(offer);
     }
 
-    // Data structure to record which tasks should be excluded from the regular (non-reserved)
-    // scheduling loop. This is important because we release reservations once they are used,
-    // so we need to record them separately to avoid them being double-scheduled.
-    ImmutableSet.Builder<IInstanceKey> excludeBuilder = ImmutableSet.builder();
+    static final ReservationStatus NOT_RESERVING = new ReservationStatus(false, Optional.empty());
+    static final ReservationStatus NOT_READY = new ReservationStatus(true, Optional.empty());
 
-    for (IAssignedTask task : tasks) {
-      IInstanceKey key = InstanceKeys.from(task.getTask().getJob(), task.getInstanceId());
-      Optional<String> maybeAgentId = updateAgentReserver.getAgent(key);
-      if (maybeAgentId.isPresent()) {
-        excludeBuilder.add(key);
-        Optional<HostOffer> offer = offerManager.getMatching(
-            Protos.AgentID.newBuilder().setValue(maybeAgentId.get()).build(),
-            resourceRequest,
-            revocable);
-        if (offer.isPresent()) {
-          try {
-            // The offer can still be veto'd because of changed constraints, or because the
-            // Scheduler hasn't been updated by Mesos yet...
-            launchUsingOffer(storeProvider,
-                revocable,
-                resourceRequest,
-                task,
-                offer.get(),
-                assignmentResult);
-            LOG.info("Used update reservation for {} on {}", key, maybeAgentId.get());
-            updateAgentReserver.release(maybeAgentId.get(), key);
-          } catch (OfferManager.LaunchException e) {
-            updateAgentReserver.release(maybeAgentId.get(), key);
-          }
-        } else {
-          LOG.info(
-              "Tried to reuse offer on {} for {}, but was not ready yet.",
-              maybeAgentId.get(),
-              key);
-        }
-      }
+    static ReservationStatus ready(HostOffer offer) {
+      return new ReservationStatus(true, Optional.of(offer));
     }
 
-    // Return only the tasks that didn't have reservations. Offers on agents that were reserved
-    // might not have been seen by Aurora yet, so we need to wait until the reservation expires
-    // before giving up and falling back to the first-fit algorithm.
-    Set<IInstanceKey> toBeExcluded = excludeBuilder.build();
-    return Iterables.filter(tasks, t -> !toBeExcluded.contains(
-        InstanceKeys.from(t.getTask().getJob(), t.getInstanceId())));
+    boolean isTaskReserving() {
+      return taskReserving;
+    }
+
+    Optional<HostOffer> getOffer() {
+      return offer;
+    }
+  }
+
+  private ReservationStatus getReservation(IAssignedTask task, ResourceRequest resourceRequest) {
+
+    IInstanceKey key = InstanceKeys.from(task.getTask().getJob(), task.getInstanceId());
+    Optional<String> agentId = updateAgentReserver.getAgent(key);
+    if (!agentId.isPresent()) {
+      return ReservationStatus.NOT_RESERVING;
+    }
+    Optional<HostOffer> offer = offerManager.getMatching(
+        Protos.AgentID.newBuilder().setValue(agentId.get()).build(),
+        resourceRequest);
+    if (offer.isPresent()) {
+      LOG.info("Used update reservation for {} on {}", key, agentId.get());
+      updateAgentReserver.release(agentId.get(), key);
+      return ReservationStatus.ready(offer.get());
+    } else {
+      LOG.info(
+          "Tried to reuse offer on {} for {}, but was not ready yet.",
+          agentId.get(),
+          key);
+      return ReservationStatus.NOT_READY;
+    }
   }
 
   /**
    * Determine whether or not the offer is reserved for a different task via preemption or
    * update affinity.
    */
-  @SuppressWarnings("PMD.UselessParentheses")  // TODO(jly): PMD bug, remove when upgrade from 5.5.3
-  private boolean isAgentReserved(HostOffer offer,
-                                  TaskGroupKey groupKey,
-                                  Map<String, TaskGroupKey> preemptionReservations) {
+  private boolean isAgentReserved(
+      HostOffer offer,
+      TaskGroupKey groupKey,
+      Map<String, TaskGroupKey> preemptionReservations) {
 
     String agentId = offer.getOffer().getAgentId().getValue();
-    Optional<TaskGroupKey> reservedGroup = Optional.ofNullable(
-        preemptionReservations.get(agentId));
+    boolean reservedForPreemption = Optional.ofNullable(preemptionReservations.get(agentId))
+        .map(group -> !group.equals(groupKey))
+        .orElse(false);
 
-    return (reservedGroup.isPresent() && !reservedGroup.get().equals(groupKey))
-        || !updateAgentReserver.getReservations(agentId).isEmpty();
+    return reservedForPreemption || updateAgentReserver.isReserved(agentId);
+  }
+
+  private static class SchedulingMatch {
+    final IAssignedTask task;
+    final HostOffer offer;
+
+    SchedulingMatch(IAssignedTask task, HostOffer offer) {
+      this.task = requireNonNull(task);
+      this.offer = requireNonNull(offer);
+    }
+  }
+
+  private Collection<SchedulingMatch> findMatches(
+      ResourceRequest resourceRequest,
+      TaskGroupKey groupKey,
+      Set<IAssignedTask> tasks,
+      Map<String, TaskGroupKey> preemptionReservations) {
+
+    // Avoid matching multiple tasks against any offer.
+    Map<String, SchedulingMatch> matchesByOffer = Maps.newHashMap();
+
+    tasks.forEach(task -> {
+      ReservationStatus reservation = getReservation(task, resourceRequest);
+      Optional<HostOffer> chosenOffer;
+      if (reservation.isTaskReserving()) {
+        // Use the reserved offer, which may not currently exist.
+        chosenOffer = reservation.getOffer();
+      } else {
+        // Get all offers that will satisfy the given ResourceRequest and that are not reserved
+        // for updates or preemption
+        Iterable<HostOffer> matchingOffers = Iterables.filter(
+            offerManager.getAllMatching(groupKey, resourceRequest),
+            o -> !matchesByOffer.containsKey(o.getOffer().getId().getValue())
+                && !isAgentReserved(o, groupKey, preemptionReservations));
+
+        // Determine which is the optimal offer to select for the given request
+        chosenOffer = offerSelector.select(matchingOffers, resourceRequest);
+      }
+
+      chosenOffer.ifPresent(hostOffer -> {
+        matchesByOffer.put(
+            hostOffer.getOffer().getId().getValue(),
+            new SchedulingMatch(task, hostOffer));
+      });
+    });
+
+    return matchesByOffer.values();
   }
 
   @Timed("assigner_maybe_assign")
   @Override
   public Set<String> maybeAssign(
-      Storage.MutableStoreProvider storeProvider,
+      MutableStoreProvider storeProvider,
       ResourceRequest resourceRequest,
       TaskGroupKey groupKey,
-      Iterable<IAssignedTask> tasks,
-      Map<String, TaskGroupKey> preemptionReservations) {
+      Set<IAssignedTask> tasks,
+      Map<String, TaskGroupKey> reservations) {
 
-    if (Iterables.isEmpty(tasks)) {
-      return ImmutableSet.of();
-    }
+    ImmutableSet.Builder<String> assigned = ImmutableSet.builder();
 
-    boolean revocable = tierManager.getTier(groupKey.getTask()).isRevocable();
-    ImmutableSet.Builder<String> assignmentResult = ImmutableSet.builder();
-
-    // Assign tasks reserved for a specific agent (e.g. for update affinity)
-    Iterable<IAssignedTask> nonReservedTasks = maybeAssignReserved(
-        tasks,
-        storeProvider,
-        revocable,
-        resourceRequest,
-        groupKey,
-        assignmentResult);
-
-    // Assign the rest of the non-reserved tasks
-    for (IAssignedTask task : nonReservedTasks) {
+    for (SchedulingMatch match : findMatches(resourceRequest, groupKey, tasks, reservations)) {
       try {
-        // Get all offers that will satisfy the given ResourceRequest and that are not reserved
-        // for updates or preemption
-        FluentIterable<HostOffer> matchingOffers = FluentIterable
-            .from(offerManager.getAllMatching(groupKey, resourceRequest, revocable))
-            .filter(o -> !isAgentReserved(o, groupKey, preemptionReservations));
-
-        // Determine which is the optimal offer to select for the given request
-        Optional<HostOffer> optionalOffer = offerSelector.select(matchingOffers, resourceRequest);
-
-        // If no offer is chosen, continue to the next task
-        if (!optionalOffer.isPresent()) {
-          continue;
-        }
-
-        // Attempt to launch the task using the chosen offer
-        HostOffer offer = optionalOffer.get();
-        launchUsingOffer(storeProvider,
-            revocable,
-            resourceRequest,
-            task,
-            offer,
-            assignmentResult);
-      } catch (OfferManager.LaunchException e) {
+        launchUsingOffer(storeProvider, resourceRequest, match.task, match.offer);
+        assigned.add(match.task.getTaskId());
+      } catch (LaunchException e) {
         // Any launch exception causes the scheduling round to terminate for this TaskGroup.
         break;
       }
     }
 
-    return assignmentResult.build();
+    return assigned.build();
   }
 }

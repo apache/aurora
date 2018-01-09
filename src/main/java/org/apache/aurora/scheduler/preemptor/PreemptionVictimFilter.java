@@ -38,7 +38,6 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.offers.HostOffer;
 import org.apache.aurora.scheduler.resources.ResourceBag;
-import org.apache.aurora.scheduler.resources.ResourceManager;
 import org.apache.aurora.scheduler.resources.ResourceType;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -113,13 +112,7 @@ public interface PreemptionVictimFilter {
         new Function<PreemptionVictim, ResourceBag>() {
           @Override
           public ResourceBag apply(PreemptionVictim victim) {
-            ResourceBag bag = victim.getResourceBag();
-
-            if (victim.getConfig().isSetExecutorConfig()) {
-              // Be pessimistic about revocable resource available if config is not available
-              bag.add(executorSettings.getExecutorOverhead(
-                  victim.getConfig().getExecutorConfig().getName()).orElse(EMPTY));
-            }
+            ResourceBag bag = victim.getResourceBag(executorSettings);
 
             if (tierManager.getTier(victim.getConfig()).isRevocable()) {
               // Revocable task CPU cannot be used for preemption purposes as it's a compressible
@@ -223,10 +216,8 @@ public interface PreemptionVictimFilter {
         return Optional.empty();
       }
 
-      ResourceBag overhead = pendingTask.isSetExecutorConfig()
-          ? executorSettings.getExecutorOverhead(
-              pendingTask.getExecutorConfig().getName()).orElse(EMPTY)
-          : EMPTY;
+      ResourceRequest requiredResources =
+          ResourceRequest.fromTask(pendingTask, executorSettings, jobState, tierManager);
 
       ResourceBag totalResource = slackResources;
       for (PreemptionVictim victim : sortedVictims) {
@@ -240,10 +231,7 @@ public interface PreemptionVictimFilter {
 
         Set<Veto> vetoes = schedulingFilter.filter(
             new UnusedResource(totalResource, attributes.get(), unavailability),
-            new ResourceRequest(
-                pendingTask,
-                ResourceManager.bagFromResources(pendingTask.getResources()).add(overhead),
-                jobState));
+            requiredResources);
 
         if (vetoes.isEmpty()) {
           return Optional.of(ImmutableSet.copyOf(toPreemptTasks));
