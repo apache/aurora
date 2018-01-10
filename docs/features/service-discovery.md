@@ -33,7 +33,8 @@ least the following:
  `_http_example.test.vagrant._tcp.aurora.mesos`, which includes IP address and every port. This should only
   be used if the service has one port.
 3. A SRV record `_{port-name}._http_example.test.vagrant._tcp.aurora.mesos` for each port name
-  defined. This should be used when the service has multiple ports.
+  defined. This should be used when the service has multiple ports. To have this working properly it's needed to
+  add `-populate_discovery_info` to scheduler's configuration.
 
 Things to note:
 
