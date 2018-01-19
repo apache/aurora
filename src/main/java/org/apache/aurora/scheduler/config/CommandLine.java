@@ -127,6 +127,16 @@ public final class CommandLine {
       CliOptions options = new CliOptions(ImmutableList.copyOf(customOptions));
       parser = prepareParser(options);
       parser.parse(args);
+
+      LOG.info("-----------------------------------------------------------------------");
+      LOG.info("Parameters:");
+      parser.getParameters().stream()
+          .map(param ->
+              param.getLongestName() + ": " + param.getParameterized().get(param.getObject()))
+          .sorted()
+          .forEach(LOG::info);
+      LOG.info("-----------------------------------------------------------------------");
+
       instance = options;
       return options;
     } catch (ParameterException e) {
@@ -136,8 +146,6 @@ public final class CommandLine {
       LOG.error(e.getMessage());
       System.exit(1);
       throw new RuntimeException(e);
-    } catch (RuntimeException e) {
-      throw e;
     }
   }
 
