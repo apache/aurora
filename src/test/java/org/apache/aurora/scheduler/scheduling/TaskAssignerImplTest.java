@@ -120,16 +120,12 @@ public class TaskAssignerImplTest extends EasyMockTest {
     offerManager = createMock(OfferManager.class);
     updateAgentReserver = createMock(UpdateAgentReserver.class);
     statsProvider = new FakeStatsProvider();
-    // TODO(jly): FirstFitOfferSelector returns the first offer which is what we want for testing,
-    // but if its implementation becomes more complex we may need to replace it with a fake.
-    OfferSelector offerSelector = new FirstFitOfferSelector();
     assigner = new TaskAssignerImpl(
         stateManager,
         taskFactory,
         offerManager,
         updateAgentReserver,
-        statsProvider,
-        offerSelector);
+        statsProvider);
     aggregate = empty();
     resourceRequest = ResourceRequest.fromTask(
         TASK.getTask(),

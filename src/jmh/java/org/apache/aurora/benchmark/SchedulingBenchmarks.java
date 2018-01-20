@@ -65,6 +65,8 @@ import org.apache.aurora.scheduler.offers.OfferManager;
 import org.apache.aurora.scheduler.offers.OfferManagerImpl;
 import org.apache.aurora.scheduler.offers.OfferManagerModule;
 import org.apache.aurora.scheduler.offers.OfferOrder;
+import org.apache.aurora.scheduler.offers.OfferOrderBuilder;
+import org.apache.aurora.scheduler.offers.OfferSetImpl;
 import org.apache.aurora.scheduler.offers.OfferSettings;
 import org.apache.aurora.scheduler.preemptor.BiCache;
 import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
@@ -153,7 +155,8 @@ public class SchedulingBenchmarks {
               bind(OfferManagerImpl.class).in(Singleton.class);
               bind(OfferSettings.class).toInstance(
                   new OfferSettings(NO_DELAY,
-                      ImmutableList.of(OfferOrder.RANDOM),
+                      new OfferSetImpl(
+                          OfferOrderBuilder.create(ImmutableList.of(OfferOrder.RANDOM))),
                       Amount.of(Long.MAX_VALUE, Time.SECONDS),
                       Long.MAX_VALUE,
                       new FakeTicker()));

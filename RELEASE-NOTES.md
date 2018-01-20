@@ -12,15 +12,17 @@
   a production cluster. For that reason, the functionality is behind a new flag `-partition_aware`
   that is disabled by default. When Mesos support is improved and the new behavior is vetted in
   production clusters, we'll enable this by default.
-- Added the ability to "score" offers for a given scheduling assignment via the `OfferSelector`
-  interface. The default implementation is first fit, but cluster operators can inject a custom
-  scoring algorithm through the `-offer_selector_modules` flag.
+- Added the ability to inject custom offer holding and scheduling logic via the `-offer_set_module`
+  scheduler flag. To take advantage of this feature, you will need to implement the `OfferSet`
+  interface.
 
 ### Deprecations and removals:
 
 - Removed the ability to recover from SQL-based backups and snapshots.  An 0.20.0 scheduler
   will not be able to recover backups or replicated log data created prior to 0.19.0.
 - Removed task level resource fields (`numCpus`, `ramMb`, `diskMb`, `requestedPorts`).
+- Removed the `-offer_order_modules` scheduler flag related to custom injectable offer orderings,
+  since this will now be subsumed under custom `OfferSet` implementations (see the comment above):
 
 0.19.0
 ======

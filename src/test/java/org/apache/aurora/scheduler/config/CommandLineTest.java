@@ -123,7 +123,7 @@ public class CommandLineTest {
     expected.offer.offerFilterDuration = TEST_TIME;
     expected.offer.unavailabilityThreshold = TEST_TIME;
     expected.offer.offerOrder = ImmutableList.of(OfferOrder.CPU, OfferOrder.DISK);
-    expected.offer.offerOrderModules = ImmutableList.of(NoopModule.class);
+    expected.offer.offerSetModule = NoopModule.class;
     expected.executor.customExecutorConfig = tempFile;
     expected.executor.thermosExecutorPath = "testing";
     expected.executor.thermosExecutorResources = ImmutableList.of("testing");
@@ -160,7 +160,6 @@ public class CommandLineTest {
     expected.scheduling.reservationDuration = TEST_TIME;
     expected.scheduling.schedulingMaxBatchSize = 42;
     expected.scheduling.maxTasksPerScheduleAttempt = 42;
-    expected.taskAssigner.offerSelectorModules = ImmutableList.of(NoopModule.class);
     expected.async.asyncWorkerThreads = 42;
     expected.zk.inProcess = true;
     expected.zk.zkEndpoints = ImmutableList.of(InetSocketAddress.createUnresolved("testing", 42));
@@ -269,7 +268,7 @@ public class CommandLineTest {
         "-offer_filter_duration=42days",
         "-unavailability_threshold=42days",
         "-offer_order=CPU,DISK",
-        "-offer_order_modules=org.apache.aurora.scheduler.config.CommandLineTest$NoopModule",
+        "-offer_set_module=org.apache.aurora.scheduler.config.CommandLineTest$NoopModule",
         "-offer_static_ban_cache_max_size=42",
         "-custom_executor_config=" + tempFile.getAbsolutePath(),
         "-thermos_executor_path=testing",
@@ -306,7 +305,6 @@ public class CommandLineTest {
         "-offer_reservation_duration=42days",
         "-scheduling_max_batch_size=42",
         "-max_tasks_per_schedule_attempt=42",
-        "-offer_selector_modules=org.apache.aurora.scheduler.config.CommandLineTest$NoopModule",
         "-async_worker_threads=42",
         "-zk_in_proc=true",
         "-zk_endpoints=testing:42",
@@ -403,12 +401,10 @@ public class CommandLineTest {
     expected.main.serversetPath = "testing";
     expected.zk.zkEndpoints = ImmutableList.of(InetSocketAddress.createUnresolved("testing", 42));
     expected.offer.offerOrder = ImmutableList.of();
-    expected.offer.offerOrderModules = ImmutableList.of();
     expected.executor.thermosExecutorResources = ImmutableList.of();
     expected.executor.globalContainerMounts = ImmutableList.of();
     expected.app.allowedContainerTypes = ImmutableList.of();
     expected.app.defaultDockerParameters = ImmutableList.of();
-    expected.taskAssigner.offerSelectorModules = ImmutableList.of();
     expected.state.taskAssignerModules = ImmutableList.of();
     expected.aop.methodInterceptorModules = ImmutableList.of();
     expected.httpSecurity.shiroRealmModule = ImmutableList.of();
@@ -423,12 +419,10 @@ public class CommandLineTest {
             "-serverset_path=testing",
             "-zk_endpoints=testing:42",
             "-offer_order=",
-            "-offer_order_modules=",
             "-thermos_executor_resources=",
             "-global_container_mounts=",
             "-allowed_container_types=",
             "-default_docker_parameters=",
-            "-offer_selector_modules=",
             "-task_assigner_modules=",
             "-thrift_method_interceptor_modules=",
             "-shiro_realm_modules=",

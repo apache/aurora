@@ -91,7 +91,7 @@ public interface OfferManager extends EventSubscriber {
    *
    * @param groupKey The {@link TaskGroupKey} of the task in the {@link ResourceRequest}.
    * @param resourceRequest The request that the offer should satisfy.
-   * @return An option containing the offer for the slave ID if it fits.
+   * @return An Iterable containing all offers that satisfy the {@link ResourceRequest}.
    */
   Iterable<HostOffer> getAllMatching(TaskGroupKey groupKey, ResourceRequest resourceRequest);
 

@@ -42,7 +42,6 @@ import org.apache.aurora.scheduler.pruning.PruningModule;
 import org.apache.aurora.scheduler.reconciliation.ReconciliationModule;
 import org.apache.aurora.scheduler.resources.ResourceSettings;
 import org.apache.aurora.scheduler.scheduling.SchedulingModule;
-import org.apache.aurora.scheduler.scheduling.TaskAssignerImplModule;
 import org.apache.aurora.scheduler.sla.SlaModule;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.stats.AsyncStatsModule;
@@ -87,7 +86,6 @@ public class CliOptions {
   public final StatsModule.Options stats = new StatsModule.Options();
   public final CronModule.Options cron = new CronModule.Options();
   public final ResourceSettings resourceSettings = new ResourceSettings();
-  public final TaskAssignerImplModule.Options taskAssigner = new TaskAssignerImplModule.Options();
   final List<Object> custom;
 
   public CliOptions() {

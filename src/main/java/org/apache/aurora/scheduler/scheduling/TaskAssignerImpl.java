@@ -66,7 +66,6 @@ public class TaskAssignerImpl implements TaskAssigner {
   private final MesosTaskFactory taskFactory;
   private final OfferManager offerManager;
   private final UpdateAgentReserver updateAgentReserver;
-  private final OfferSelector offerSelector;
 
   @Inject
   public TaskAssignerImpl(
@@ -74,15 +73,13 @@ public class TaskAssignerImpl implements TaskAssigner {
       MesosTaskFactory taskFactory,
       OfferManager offerManager,
       UpdateAgentReserver updateAgentReserver,
-      StatsProvider statsProvider,
-      OfferSelector offerSelector) {
+      StatsProvider statsProvider) {
 
     this.stateManager = requireNonNull(stateManager);
     this.taskFactory = requireNonNull(taskFactory);
     this.offerManager = requireNonNull(offerManager);
     this.launchFailures = statsProvider.makeCounter(ASSIGNER_LAUNCH_FAILURES);
     this.updateAgentReserver = requireNonNull(updateAgentReserver);
-    this.offerSelector = requireNonNull(offerSelector);
   }
 
   @VisibleForTesting
@@ -232,21 +229,18 @@ public class TaskAssignerImpl implements TaskAssigner {
         chosenOffer = reservation.getOffer();
       } else {
         // Get all offers that will satisfy the given ResourceRequest and that are not reserved
-        // for updates or preemption
+        // for updates or preemption.
         Iterable<HostOffer> matchingOffers = Iterables.filter(
             offerManager.getAllMatching(groupKey, resourceRequest),
             o -> !matchesByOffer.containsKey(o.getOffer().getId().getValue())
                 && !isAgentReserved(o, groupKey, preemptionReservations));
 
-        // Determine which is the optimal offer to select for the given request
-        chosenOffer = offerSelector.select(matchingOffers, resourceRequest);
+        chosenOffer = Optional.ofNullable(Iterables.getFirst(matchingOffers, null));
       }
 
-      chosenOffer.ifPresent(hostOffer -> {
-        matchesByOffer.put(
-            hostOffer.getOffer().getId().getValue(),
-            new SchedulingMatch(task, hostOffer));
-      });
+      chosenOffer.ifPresent(hostOffer -> matchesByOffer.put(
+          hostOffer.getOffer().getId().getValue(),
+          new SchedulingMatch(task, hostOffer)));
     });
 
     return matchesByOffer.values();

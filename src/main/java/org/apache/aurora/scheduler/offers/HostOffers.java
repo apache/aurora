@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.offers;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -43,7 +42,7 @@ import static java.util.Objects.requireNonNull;
  * reason about the different indices used and their consistency.
  */
 class HostOffers {
-  private final Set<HostOffer> offers;
+  private final OfferSet offers;
 
   private final Map<Protos.OfferID, HostOffer> offersById = Maps.newHashMap();
   private final Map<Protos.AgentID, HostOffer> offersBySlave = Maps.newHashMap();
@@ -63,15 +62,13 @@ class HostOffers {
   HostOffers(StatsProvider statsProvider,
              OfferSettings offerSettings,
              SchedulingFilter schedulingFilter) {
-    this.offers = new ConcurrentSkipListSet<>(offerSettings.getOrdering());
+    this.offers = offerSettings.getOfferSet();
     this.staticallyBannedOffers = offerSettings
         .getStaticBanCacheBuilder()
         .build();
     this.schedulingFilter = requireNonNull(schedulingFilter);
 
-    // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
-    // Could track this separately if it turns out to pose problems.
-    statsProvider.exportSize(OfferManagerImpl.OUTSTANDING_OFFERS, offers);
+    statsProvider.makeGauge(OfferManagerImpl.OUTSTANDING_OFFERS, offers::size);
     statsProvider.makeGauge(OfferManagerImpl.STATICALLY_BANNED_OFFERS,
         staticallyBannedOffers::size);
     statsProvider.makeGauge(OfferManagerImpl.STATICALLY_BANNED_OFFERS_HIT_RATE,
@@ -149,8 +146,8 @@ class HostOffers {
    * @return The offers currently known by the scheduler.
    */
   synchronized Iterable<HostOffer> getOffers() {
-    return FluentIterable.from(offers)
-        .filter(o -> !globallyBannedOffers.contains(o.getOffer().getId()))
+    return FluentIterable.from(offers.values())
+        .filter(offer -> !globallyBannedOffers.contains(offer.getOffer().getId()))
         .toSet();
   }
 
@@ -175,11 +172,12 @@ class HostOffers {
   synchronized Iterable<HostOffer> getAllMatching(TaskGroupKey groupKey,
                                                   ResourceRequest resourceRequest) {
 
-    return Iterables.unmodifiableIterable(FluentIterable.from(offers)
-        .filter(o -> !isGloballyBanned(o))
-        .filter(o -> !isStaticallyBanned(o, groupKey))
-        .filter(HostOffer::hasCpuAndMem)
-        .filter(o -> !isVetoed(o, resourceRequest, Optional.of(groupKey))));
+    return Iterables.unmodifiableIterable(
+        FluentIterable.from(offers.getOrdered(groupKey, resourceRequest))
+            .filter(o -> !isGloballyBanned(o))
+            .filter(o -> !isStaticallyBanned(o, groupKey))
+            .filter(HostOffer::hasCpuAndMem)
+            .filter(o -> !isVetoed(o, resourceRequest, Optional.of(groupKey))));
   }
 
   private synchronized boolean isGloballyBanned(HostOffer offer) {

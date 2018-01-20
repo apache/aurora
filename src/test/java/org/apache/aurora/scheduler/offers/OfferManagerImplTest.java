@@ -128,7 +128,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     driver = createMock(Driver.class);
     OfferSettings offerSettings = new OfferSettings(
         Amount.of(OFFER_FILTER_SECONDS, Time.SECONDS),
-        ImmutableList.of(OfferOrder.RANDOM),
+        new OfferSetImpl(OfferOrderBuilder.create(ImmutableList.of(OfferOrder.RANDOM))),
         RETURN_DELAY,
         Long.MAX_VALUE,
         FAKE_TICKER
@@ -386,7 +386,7 @@ public class OfferManagerImplTest extends EasyMockTest {
     OfferSettings settings =
         new OfferSettings(
             Amount.of(OFFER_FILTER_SECONDS, Time.SECONDS),
-            order,
+            new OfferSetImpl(OfferOrderBuilder.create(order)),
             RETURN_DELAY,
             Long.MAX_VALUE,
             FAKE_TICKER);
@@ -561,7 +561,7 @@ public class OfferManagerImplTest extends EasyMockTest {
   public void testDelayedOfferReturn() {
     OfferSettings settings = new OfferSettings(
         Amount.of(OFFER_FILTER_SECONDS, Time.SECONDS),
-        ImmutableList.of(OfferOrder.RANDOM),
+        new OfferSetImpl(OfferOrderBuilder.create(ImmutableList.of(OfferOrder.RANDOM))),
         RETURN_DELAY,
         Long.MAX_VALUE,
         FAKE_TICKER);

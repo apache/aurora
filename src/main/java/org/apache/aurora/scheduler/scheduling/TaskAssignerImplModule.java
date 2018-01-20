@@ -13,48 +13,17 @@
  */
 package org.apache.aurora.scheduler.scheduling;
 
-import java.util.List;
 import javax.inject.Singleton;
 
-import com.beust.jcommander.Parameter;
-import com.beust.jcommander.Parameters;
-import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
-import com.google.inject.Module;
-
-import org.apache.aurora.scheduler.app.MoreModules;
-import org.apache.aurora.scheduler.config.CliOptions;
-import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 
 /**
- * The default TaskAssigner implementation that allows the injection of custom offer
- * selecting modules via the '-offer_selector_modules' flag.
+ * The default TaskAssigner implementation.
  */
 public class TaskAssignerImplModule extends AbstractModule {
 
-  @Parameters(separators = "=")
-  public static class Options {
-    @Parameter(names = "-offer_selector_modules",
-        description = "Guice module for customizing the TaskAssignerImpl's OfferSelector.",
-        splitter = CommaSplitter.class)
-    @SuppressWarnings("rawtypes")
-    public List<Class> offerSelectorModules =
-        ImmutableList.of(FirstFitOfferSelectorModule.class);
-  }
-
-  private final CliOptions cliOptions;
-
-  public TaskAssignerImplModule(CliOptions cliOptions) {
-    this.cliOptions = cliOptions;
-  }
-
   @Override
   protected void configure() {
-    Options options = cliOptions.taskAssigner;
-    for (Module module : MoreModules.instantiateAll(options.offerSelectorModules, cliOptions)) {
-      install(module);
-    }
-
     bind(TaskAssigner.class).to(TaskAssignerImpl.class);
     bind(TaskAssignerImpl.class).in(Singleton.class);
   }

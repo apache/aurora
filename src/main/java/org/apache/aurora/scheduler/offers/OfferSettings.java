@@ -13,12 +13,9 @@
  */
 package org.apache.aurora.scheduler.offers;
 
-import java.util.List;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.Ordering;
 
 import org.apache.aurora.common.quantity.Amount;
 import org.apache.aurora.common.quantity.Time;
@@ -32,31 +29,18 @@ import static java.util.Objects.requireNonNull;
 public class OfferSettings {
 
   private final Amount<Long, Time> filterDuration;
-  private final Ordering<HostOffer> ordering;
+  private final OfferSet offerSet;
   private final CacheBuilder<Object, Object> staticBanCacheBuilder;
 
   @VisibleForTesting
   public OfferSettings(Amount<Long, Time> filterDuration,
-                       List<OfferOrder> ordering,
+                       OfferSet offerSet,
                        Amount<Long, Time> maxHoldTime,
                        long staticBanCacheMaxSize,
-                       Ticker staticBanCacheTicker) {
-
-    this(filterDuration,
-        OfferOrderBuilder.create(ordering),
-        maxHoldTime,
-        staticBanCacheMaxSize,
-        staticBanCacheTicker);
-  }
-
-  OfferSettings(Amount<Long, Time> filterDuration,
-                Ordering<HostOffer> ordering,
-                Amount<Long, Time> maxHoldTime,
-                long staticBanCacheMaxSize,
-                Ticker staticBanTicker) {
+                       Ticker staticBanTicker) {
 
     this.filterDuration = requireNonNull(filterDuration);
-    this.ordering = requireNonNull(ordering);
+    this.offerSet = requireNonNull(offerSet);
     this.staticBanCacheBuilder = CacheBuilder.newBuilder()
         .expireAfterWrite(maxHoldTime.as(Time.SECONDS), Time.SECONDS.getTimeUnit())
         .maximumSize(staticBanCacheMaxSize)
@@ -72,10 +56,10 @@ public class OfferSettings {
   }
 
   /**
-   * The ordering to use when fetching offers from OfferManager.
+   * The factory to create the {@link OfferSet} implementation.
    */
-  Ordering<HostOffer> getOrdering() {
-    return ordering;
+  OfferSet getOfferSet() {
+    return offerSet;
   }
 
   /**

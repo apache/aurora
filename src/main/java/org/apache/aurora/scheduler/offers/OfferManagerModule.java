@@ -27,7 +27,6 @@ import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import com.google.inject.AbstractModule;
-import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
@@ -96,11 +95,10 @@ public class OfferManagerModule extends AbstractModule {
         splitter = CommaSplitter.class)
     public List<OfferOrder> offerOrder = ImmutableList.of(OfferOrder.RANDOM);
 
-    @Parameter(names = "-offer_order_modules",
-        description = "Custom Guice module to provide an offer ordering.",
-        splitter = CommaSplitter.class)
+    @Parameter(names = "-offer_set_module",
+        description = "Custom Guice module to provide a custom OfferSet.")
     @SuppressWarnings("rawtypes")
-    public List<Class> offerOrderModules = ImmutableList.of(OfferOrderModule.class);
+    public Class offerSetModule = OfferSetModule.class;
 
     @Parameter(names = "-offer_static_ban_cache_max_size",
         validateValueWith = NotNegativeNumber.class,
@@ -118,17 +116,25 @@ public class OfferManagerModule extends AbstractModule {
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface UnavailabilityThreshold { }
 
-  public static class OfferOrderModule extends AbstractModule {
+  public static class OfferSetModule extends AbstractModule {
     private final CliOptions options;
 
-    public OfferOrderModule(CliOptions options) {
+    public OfferSetModule(CliOptions options) {
       this.options = options;
     }
 
     @Override
     protected void configure() {
-      bind(new TypeLiteral<Ordering<HostOffer>>() { })
-          .toInstance(OfferOrderBuilder.create(options.offer.offerOrder));
+      install(new PrivateModule() {
+        @Override
+        protected void configure() {
+          bind(new TypeLiteral<Ordering<HostOffer>>() { })
+              .toInstance(OfferOrderBuilder.create(options.offer.offerOrder));
+          bind(OfferSetImpl.class).in(Singleton.class);
+          bind(OfferSet.class).to(OfferSetImpl.class);
+          expose(OfferSet.class);
+        }
+      });
     }
   }
 
@@ -154,9 +160,7 @@ public class OfferManagerModule extends AbstractModule {
       }
     }
 
-    for (Module module: MoreModules.instantiateAll(options.offerOrderModules, cliOptions)) {
-      install(module);
-    }
+    install(MoreModules.instantiate(options.offerSetModule, cliOptions));
 
     bind(new TypeLiteral<Amount<Long, Time>>() { })
         .annotatedWith(UnavailabilityThreshold.class)
@@ -186,7 +190,7 @@ public class OfferManagerModule extends AbstractModule {
 
   @Provides
   @Singleton
-  OfferSettings provideOfferSettings(Ordering<HostOffer> offerOrdering) {
+  OfferSettings provideOfferSettings(OfferSet offerSet) {
     // We have a dual eviction strategy for the static ban cache in OfferManager that is based on
     // both maximum size of the cache and the length an offer is valid. We do this in order to
     // satisfy requirements in both single- and multi-framework environments. If offers are held for
@@ -205,7 +209,7 @@ public class OfferManagerModule extends AbstractModule {
 
     return new OfferSettings(
         cliOptions.offer.offerFilterDuration,
-        offerOrdering,
+        offerSet,
         Amount.of(maxOfferHoldTime, Time.SECONDS),
         cliOptions.offer.offerStaticBanCacheMaxSize,
         Ticker.systemTicker());

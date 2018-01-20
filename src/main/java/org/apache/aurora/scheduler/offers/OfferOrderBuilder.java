@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.offers;
 import java.time.Instant;
 import java.util.List;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Ordering;
 
 import org.apache.aurora.scheduler.resources.ResourceType;
@@ -31,7 +32,8 @@ import static org.apache.aurora.scheduler.resources.ResourceManager.getRevocable
 /**
  * Utility class for creating compounded offer orders based on some combination of offer ordering.
  */
-final class OfferOrderBuilder {
+@VisibleForTesting
+public final class OfferOrderBuilder {
   private OfferOrderBuilder() {
 
   }
@@ -112,7 +114,8 @@ final class OfferOrderBuilder {
    * @param order The list of offer orders. They will be compounded in the list order.
    * @return A HostOffer ordering.
    */
-  static Ordering<HostOffer> create(List<OfferOrder> order) {
+  @VisibleForTesting
+  public static Ordering<HostOffer> create(List<OfferOrder> order) {
     return create(BASE_COMPARATOR, order);
   }
 }
