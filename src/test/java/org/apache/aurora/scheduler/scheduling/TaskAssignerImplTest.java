@@ -47,8 +47,8 @@ import org.apache.mesos.v1.Protos.TaskInfo;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
-import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.JOB;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
 import static org.apache.aurora.scheduler.filter.AttributeAggregate.empty;
@@ -161,7 +161,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         storeProvider,
         TASK.getTaskId(),
-        Optional.of(PENDING),
+        Optional.of(ASSIGNED),
         LOST,
         LAUNCH_FAILED_MSG))
         .andReturn(StateChangeResult.SUCCESS);

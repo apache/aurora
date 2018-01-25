@@ -48,8 +48,8 @@ import org.slf4j.LoggerFactory;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.common.inject.TimedInterceptor.Timed;
+import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
-import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 
 public class TaskAssignerImpl implements TaskAssigner {
   private static final Logger LOG = LoggerFactory.getLogger(TaskAssignerImpl.class);
@@ -132,7 +132,7 @@ public class TaskAssignerImpl implements TaskAssigner {
       // It is in the LOST state and a new task will move to PENDING to replace it.
       // Should the state change fail due to storage issues, that's okay.  The task will
       // time out in the ASSIGNED state and be moved to LOST.
-      stateManager.changeState(stores, taskId, Optional.of(PENDING), LOST, LAUNCH_FAILED_MSG);
+      stateManager.changeState(stores, taskId, Optional.of(ASSIGNED), LOST, LAUNCH_FAILED_MSG);
       throw e;
     }
   }
