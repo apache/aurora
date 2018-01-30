@@ -178,12 +178,8 @@ class TaskStateMachine {
               // order to mark the task as terminal and unblock any operations that depend on
               // kills (e.g. job updates). Just sending a KILL signal alone is insufficient,
               // as any partitioned task will be on an agent that is unreachable.
-              if (transition.getTo() == PARTITIONED) {
-                if (transition.getFrom() == KILLING) {
-                  addFollowup(TRANSITION_TO_LOST);
-                } else {
-                  addFollowup(KILL);
-                }
+              if (transition.getFrom() == KILLING && transition.getTo() == PARTITIONED) {
+                addFollowup(TRANSITION_TO_LOST);
               }
             })
             // Kill a task that we believe to be terminated when an attempt is made to revive.
@@ -312,7 +308,7 @@ class TaskStateMachine {
         .addState(
             Rule.from(ASSIGNED)
                 .to(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, DRAINING,
-                    KILLED, KILLING, LOST, PREEMPTING, PARTITIONED)
+                    KILLED, KILLING, LOST, PREEMPTING)
                 .withCallback(
                     transition -> {
                       switch (transition.getTo()) {
