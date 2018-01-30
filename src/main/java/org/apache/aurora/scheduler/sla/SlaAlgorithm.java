@@ -330,6 +330,7 @@ interface SlaAlgorithm {
                 break;
 
               case RUNNING:
+              case PARTITIONED:
                 current = updateIntervals(timestamp, SlaState.UP, current, intervals);
                 break;
 

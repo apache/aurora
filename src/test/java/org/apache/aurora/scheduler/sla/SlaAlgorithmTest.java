@@ -31,6 +31,7 @@ import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
+import static org.apache.aurora.gen.ScheduleStatus.PARTITIONED;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
@@ -288,7 +289,8 @@ public class SlaAlgorithmTest {
                 100L, PENDING,
                 200L, ASSIGNED,
                 300L, STARTING,
-                400L, RUNNING), 1), // 100% uptime.
+                400L, RUNNING,
+                500L, PARTITIONED), 1), // 100% uptime.
             makeTask(ImmutableMap.<Long, ScheduleStatus>builder()
                 .put(5L, INIT)
                 .put(10L, PENDING)
@@ -329,6 +331,15 @@ public class SlaAlgorithmTest {
         ImmutableSet.of(makeTask(ImmutableMap.of(50L, PENDING), 0)),
         Range.closedOpen(100L, 500L));
     assertEquals(100.0, actual);
+  }
+
+  @Test
+  public void testSupportAllStatuses() {
+    for (ScheduleStatus status: ScheduleStatus.values()) {
+      AGGREGATE_PLATFORM_UPTIME.getAlgorithm().calculate(
+          ImmutableSet.of(makeTask(ImmutableMap.of(50L, status), 0)),
+          Range.closedOpen(100L, 500L));
+    }
   }
 
   private static Set<IScheduledTask> makeUptimeTasks(int num, long now) {
