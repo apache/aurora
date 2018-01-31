@@ -16,7 +16,6 @@ package org.apache.aurora.benchmark;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.util.Modules;
@@ -27,6 +26,7 @@ import org.apache.aurora.common.util.testing.FakeClock;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
@@ -54,6 +54,7 @@ public class TaskStoreBenchmarks {
   @State(Scope.Thread)
   public abstract static class AbstractFetchTasksBenchmark {
     protected Storage storage;
+    protected IJobKey job;
     public abstract void setUp();
 
     @Param({"10000", "50000", "100000"})
@@ -63,6 +64,7 @@ public class TaskStoreBenchmarks {
       storage.write((Storage.MutateWork.NoResult.Quiet) storeProvider -> {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
         Set<IScheduledTask> tasks = new Tasks.Builder().build(size);
+        job = tasks.stream().findFirst().get().getAssignedTask().getTask().getJob();
         taskStore.saveTasks(tasks);
       });
     }
@@ -75,7 +77,7 @@ public class TaskStoreBenchmarks {
     }
   }
 
-  public static class MemFetchTasksBenchmark extends AbstractFetchTasksBenchmark {
+  public static class FetchAll extends AbstractFetchTasksBenchmark {
     @Setup(Level.Trial)
     @Override
     public void setUp() {
@@ -105,9 +107,42 @@ public class TaskStoreBenchmarks {
 
     @Benchmark
     public int run() {
-      // Iterate through results in case the result is lazily computed.
-      return Iterables.size(
-          storage.read(store -> store.getTaskStore().fetchTasks(Query.unscoped())));
+      return storage.read(store -> store.getTaskStore().fetchTasks(Query.unscoped())).size();
+    }
+  }
+
+  public static class IndexedFetchAndFilter extends AbstractFetchTasksBenchmark {
+    @Setup(Level.Trial)
+    @Override
+    public void setUp() {
+      storage = Guice.createInjector(
+          Modules.combine(
+              new MemStorageModule(),
+              new AbstractModule() {
+                @Override
+                protected void configure() {
+                  bind(StatsProvider.class).toInstance(new FakeStatsProvider());
+                  bind(Clock.class).toInstance(new FakeClock());
+                }
+              }))
+          .getInstance(Storage.class);
+
+    }
+
+    @Setup(Level.Iteration)
+    public void setUpIteration() {
+      createTasks(numTasks);
+    }
+
+    @TearDown(Level.Iteration)
+    public void tearDownIteration() {
+      deleteTasks();
+    }
+
+    @Benchmark
+    public int run() {
+      return storage.read(
+          store -> store.getTaskStore().fetchTasks(Query.instanceScoped(job, 0))).size();
     }
   }
 }

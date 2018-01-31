@@ -17,6 +17,9 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.ArrayDeque;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,12 +31,9 @@ import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -130,11 +130,11 @@ class MemTaskStore implements TaskStore.Mutable {
 
   @Timed("mem_storage_fetch_tasks")
   @Override
-  public ImmutableSet<IScheduledTask> fetchTasks(Query.Builder query) {
+  public Collection<IScheduledTask> fetchTasks(Query.Builder query) {
     requireNonNull(query);
 
     long start = System.nanoTime();
-    ImmutableSet<IScheduledTask> result = matches(query).toSet();
+    Collection<IScheduledTask> result = matches(query);
     long durationNanos = System.nanoTime() - start;
     boolean infoLevel = durationNanos >= slowQueryThresholdNanos;
     long time = Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
@@ -164,9 +164,9 @@ class MemTaskStore implements TaskStore.Mutable {
         "Proposed new tasks would create task ID collision.");
 
     Iterable<Task> canonicalized = Iterables.transform(newTasks, toTask);
-    tasks.putAll(Maps.uniqueIndex(canonicalized, TO_ID));
+    tasks.putAll(Maps.uniqueIndex(canonicalized, task -> Tasks.id(task.storedTask)));
     for (SecondaryIndex<?> index : secondaryIndices) {
-      index.insert(Iterables.transform(canonicalized, TO_SCHEDULED));
+      index.insert(Iterables.transform(canonicalized, task -> task.storedTask));
     }
   }
 
@@ -220,27 +220,22 @@ class MemTaskStore implements TaskStore.Mutable {
     });
   }
 
-  private static Predicate<Task> queryFilter(Query.Builder query) {
-    return Predicates.compose(
-        Util.queryFilter(query),
-        new Function<Task, IScheduledTask>() {
-          @Override
-          public IScheduledTask apply(Task canonicalTask) {
-            return canonicalTask.storedTask;
-          }
-        });
+  private Collection<IScheduledTask> fromIdIndex(
+      Iterable<String> taskIds,
+      Predicate<IScheduledTask> filter) {
+
+    Collection<IScheduledTask> result = new ArrayDeque<>();
+    for (String id : taskIds) {
+      Task match = tasks.get(id);
+      if (match != null && filter.apply(match.storedTask)) {
+        result.add(match.storedTask);
+      }
+    }
+    return result;
   }
 
-  private Iterable<Task> fromIdIndex(Iterable<String> taskIds) {
-    return FluentIterable.from(taskIds)
-        .transform(Functions.forMap(tasks, null))
-        .filter(Predicates.notNull())
-        .toList();
-  }
-
-  private FluentIterable<IScheduledTask> matches(Query.Builder query) {
-    // Apply the query against the working set.
-    Optional<? extends Iterable<Task>> from = Optional.empty();
+  private Collection<IScheduledTask> matches(Query.Builder query) {
+    Predicate<IScheduledTask> filter = Util.queryFilter(query);
     if (query.get().getTaskIds().isEmpty()) {
       for (SecondaryIndex<?> index : secondaryIndices) {
         Optional<Iterable<String>> indexMatch = index.getMatches(query);
@@ -248,30 +243,24 @@ class MemTaskStore implements TaskStore.Mutable {
           // Note: we could leverage multiple indexes here if the query applies to them, by
           // choosing to intersect the results.  Given current indexes and query profile, this is
           // unlikely to offer much improvement, though.
-          from = Optional.of(fromIdIndex(indexMatch.get()));
-          break;
+          return fromIdIndex(indexMatch.get(), filter);
         }
       }
 
       // No indices match, fall back to a full scan.
-      if (!from.isPresent()) {
-        taskQueriesAll.incrementAndGet();
-        from = Optional.of(tasks.values());
+      taskQueriesAll.incrementAndGet();
+      Collection<IScheduledTask> result = new ArrayDeque<>();
+      for (Task task : tasks.values()) {
+        if (filter.test(task.storedTask)) {
+          result.add(task.storedTask);
+        }
       }
+      return Collections.unmodifiableCollection(result);
     } else {
       taskQueriesById.incrementAndGet();
-      from = Optional.of(fromIdIndex(query.get().getTaskIds()));
+      return fromIdIndex(query.get().getTaskIds(), filter);
     }
-
-    return FluentIterable.from(from.get())
-        .filter(queryFilter(query))
-        .transform(TO_SCHEDULED);
   }
-
-  private static final Function<Task, IScheduledTask> TO_SCHEDULED = task -> task.storedTask;
-
-  private static final Function<Task, String> TO_ID =
-      Functions.compose(Tasks::id, TO_SCHEDULED);
 
   private static class Task {
     private final IScheduledTask storedTask;
@@ -388,13 +377,13 @@ class MemTaskStore implements TaskStore.Mutable {
           @Override
           public Iterable<String> apply(Set<K> keys) {
             hitCount.incrementAndGet();
-            ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+            Collection<String> matches = new ArrayDeque<>();
             synchronized (index) {
               for (K key : keys) {
-                builder.addAll(index.get(key));
+                matches.addAll(index.get(key));
               }
             }
-            return builder.build();
+            return matches;
           }
     };
 
