@@ -41,12 +41,13 @@ def _validate_announce_configuration(config):
     return
 
   primary_port = config.raw().announce().primary_port().get()
-  if primary_port not in config.ports():
+  portmap = config.raw().announce().portmap().get()
+
+  if primary_port not in config.ports() and primary_port not in portmap:
     print(ANNOUNCE_WARNING % {'primary_port': primary_port}, file=sys.stderr)
 
-  if config.raw().has_announce() and not config.raw().has_constraints() or (
-      'dedicated' not in config.raw().constraints()):
-    for port in config.raw().announce().portmap().get().values():
+  if not (config.raw().has_constraints() and 'dedicated' in config.raw().constraints()):
+    for port in portmap.values():
       try:
         port = int(port)
       except ValueError:
