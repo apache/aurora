@@ -37,6 +37,7 @@ import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.base.TaskGroupKey;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.config.validators.PositiveNumber;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
@@ -80,7 +81,8 @@ public class PreemptorModule extends AbstractModule {
     public int reservationMaxBatchSize = 5;
 
     @Parameter(names = "-preemption_slot_finder_modules",
-        description = "Guice modules for custom preemption slot searching for pending tasks.")
+        description = "Guice modules for custom preemption slot searching for pending tasks.",
+        splitter = CommaSplitter.class)
     @SuppressWarnings("rawtypes")
     public List<Class> slotFinderModules = ImmutableList.of(
         PendingTaskProcessorModule.class,

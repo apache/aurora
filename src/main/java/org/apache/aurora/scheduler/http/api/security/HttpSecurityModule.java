@@ -43,6 +43,7 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraSchedulerManager;
 import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 import org.apache.aurora.scheduler.http.api.security.HttpSecurityModule.Options.HttpAuthenticationMechanism;
 import org.apache.aurora.scheduler.thrift.aop.AnnotatedAuroraAdmin;
 import org.apache.shiro.SecurityUtils;
@@ -80,7 +81,8 @@ public class HttpSecurityModule extends ServletModule {
   @Parameters(separators = "=")
   public static class Options {
     @Parameter(names = "-shiro_realm_modules",
-        description = "Guice modules for configuring Shiro Realms.")
+        description = "Guice modules for configuring Shiro Realms.",
+        splitter = CommaSplitter.class)
     @SuppressWarnings("rawtypes")
     public List<Class> shiroRealmModule = ImmutableList.of(IniShiroRealmModule.class);
 

@@ -34,6 +34,7 @@ import org.apache.aurora.common.base.MorePreconditions;
 import org.apache.aurora.common.quantity.Data;
 import org.apache.aurora.gen.Volume;
 import org.apache.aurora.gen.apiConstants;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 import org.apache.aurora.scheduler.config.types.DataAmount;
 import org.apache.aurora.scheduler.config.validators.ReadableFile;
 import org.apache.aurora.scheduler.resources.ResourceType;
@@ -68,7 +69,8 @@ public class ExecutorModule extends AbstractModule {
     @Parameter(names = "-thermos_executor_resources",
         description = "A comma separated list of additional resources to copy into the sandbox."
             + "Note: if thermos_executor_path is not the thermos_executor.pex file itself, "
-            + "this must include it.")
+            + "this must include it.",
+        splitter = CommaSplitter.class)
     public List<String> thermosExecutorResources = ImmutableList.of();
 
     @Parameter(names = "-thermos_executor_flags",
@@ -98,7 +100,8 @@ public class ExecutorModule extends AbstractModule {
 
     @Parameter(names = "-global_container_mounts",
         description = "A comma separated list of mount points (in host:container form) to mount "
-            + "into all (non-mesos) containers.")
+            + "into all (non-mesos) containers.",
+        splitter = CommaSplitter.class)
     public List<Volume> globalContainerMounts = ImmutableList.of();
 
     @Parameter(names = "-populate_discovery_info",

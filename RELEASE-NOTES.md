@@ -1,3 +1,12 @@
+0.19.1
+======
+
+### New/updated:
+
+- Argument list parsing regression fix: Custom splitter is used to allow JCommander to return an
+  empty list when an argument that takes a list of elements is given an empty string. This matches
+  the behavior of the previous arg parsing library.
+
 0.19.0
 ======
 

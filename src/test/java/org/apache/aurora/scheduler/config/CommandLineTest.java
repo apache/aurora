@@ -388,6 +388,75 @@ public class CommandLineTest {
     assertEqualOptions(expected, parsed);
   }
 
+  @Test
+  public void testEmptyListOptions() {
+
+    // This test ensures that all list options are capable of returning
+    // empty lists.
+
+    CliOptions expected = new CliOptions();
+    expected.main.clusterName = "testing";
+    expected.driver.mesosMasterAddress = "testing";
+    expected.backup.backupDir = new File("testing");
+    expected.main.serversetPath = "testing";
+    expected.zk.zkEndpoints = ImmutableList.of(InetSocketAddress.createUnresolved("testing", 42));
+    expected.offer.offerOrder = ImmutableList.of();
+    expected.offer.offerOrderModules = ImmutableList.of();
+    expected.executor.thermosExecutorResources = ImmutableList.of();
+    expected.executor.globalContainerMounts = ImmutableList.of();
+    expected.app.allowedContainerTypes = ImmutableList.of();
+    expected.app.defaultDockerParameters = ImmutableList.of();
+    expected.state.taskAssignerModules = ImmutableList.of();
+    expected.aop.methodInterceptorModules = ImmutableList.of();
+    expected.httpSecurity.shiroRealmModule = ImmutableList.of();
+    expected.preemptor.slotFinderModules = ImmutableList.of();
+    expected.sla.slaProdMetrics = ImmutableList.of();
+    expected.sla.slaNonProdMetrics = ImmutableList.of();
+
+    CliOptions parsed = CommandLine.parseOptions(
+            "-cluster_name=testing",
+            "-mesos_master_address=testing",
+            "-backup_dir=testing",
+            "-serverset_path=testing",
+            "-zk_endpoints=testing:42",
+            "-offer_order=",
+            "-offer_order_modules=",
+            "-thermos_executor_resources=",
+            "-global_container_mounts=",
+            "-allowed_container_types=",
+            "-default_docker_parameters=",
+            "-task_assigner_modules=",
+            "-thrift_method_interceptor_modules=",
+            "-shiro_realm_modules=",
+            "-preemption_slot_finder_modules=",
+            "-sla_prod_metrics=",
+            "-sla_non_prod_metrics=");
+
+    assertEqualOptions(expected, parsed);
+
+    // Test other ways in which an empty list can be passed
+    // as thermos executor resources such as "" and ''.
+    parsed = CommandLine.parseOptions(
+            "-cluster_name=testing",
+            "-mesos_master_address=testing",
+            "-backup_dir=testing",
+            "-serverset_path=testing",
+            "-zk_endpoints=testing:42",
+            "-thermos_executor_resources=\"\"");
+
+    assertEquals(ImmutableList.of(), parsed.executor.thermosExecutorResources);
+
+    parsed = CommandLine.parseOptions(
+            "-cluster_name=testing",
+            "-mesos_master_address=testing",
+            "-backup_dir=testing",
+            "-serverset_path=testing",
+            "-zk_endpoints=testing:42",
+            "-thermos_executor_resources=''");
+
+    assertEquals(ImmutableList.of(), parsed.executor.thermosExecutorResources);
+  }
+
   private static void assertEqualOptions(CliOptions expected, CliOptions actual) {
     List<Object> actualObjects = CommandLine.getOptionsObjects(actual);
     for (Object expectedOptionContainer : CommandLine.getOptionsObjects(expected)) {

@@ -34,6 +34,7 @@ import com.google.inject.Singleton;
 import org.apache.aurora.common.quantity.Time;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.config.validators.PositiveAmount;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
@@ -66,12 +67,14 @@ public class SlaModule extends AbstractModule {
     public TimeAmount slaRefreshInterval = new TimeAmount(1, Time.MINUTES);
 
     @Parameter(names = "-sla_prod_metrics",
-        description = "Metric categories collected for production tasks.")
+        description = "Metric categories collected for production tasks.",
+        splitter = CommaSplitter.class)
     public List<MetricCategory> slaProdMetrics =
         ImmutableList.of(JOB_UPTIMES, PLATFORM_UPTIME, MEDIANS);
 
     @Parameter(names = "-sla_non_prod_metrics",
-        description = "Metric categories collected for non production tasks.")
+        description = "Metric categories collected for non production tasks.",
+        splitter = CommaSplitter.class)
     public List<MetricCategory> slaNonProdMetrics = ImmutableList.of();
   }
 

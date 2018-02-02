@@ -28,6 +28,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 
 /**
@@ -38,7 +39,9 @@ public class AopModule extends AbstractModule {
   @Parameters(separators = "=")
   public static class Options {
     @Parameter(names = "-thrift_method_interceptor_modules",
-        description = "Custom Guice module(s) to provide additional Thrift method interceptors.")
+        description = "Custom Guice module(s) to provide additional Thrift method interceptors.",
+        splitter = CommaSplitter.class)
+
     @SuppressWarnings("rawtypes")
     public List<Class> methodInterceptorModules = ImmutableList.of();
   }

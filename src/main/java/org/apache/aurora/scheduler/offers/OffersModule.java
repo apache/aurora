@@ -38,6 +38,7 @@ import org.apache.aurora.common.util.Random;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.app.MoreModules;
 import org.apache.aurora.scheduler.config.CliOptions;
+import org.apache.aurora.scheduler.config.splitters.CommaSplitter;
 import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.config.validators.NotNegativeAmount;
 import org.apache.aurora.scheduler.config.validators.NotNegativeNumber;
@@ -92,11 +93,13 @@ public class OffersModule extends AbstractModule {
         description =
             "Iteration order for offers, to influence task scheduling. Multiple orderings will be "
                 + "compounded together. E.g. CPU,MEMORY,RANDOM would sort first by cpus offered,"
-                + " then memory and finally would randomize any equal offers.")
+                + " then memory and finally would randomize any equal offers.",
+        splitter = CommaSplitter.class)
     public List<OfferOrder> offerOrder = ImmutableList.of(OfferOrder.RANDOM);
 
     @Parameter(names = "-offer_order_modules",
-        description = "Custom Guice module to provide an offer ordering.")
+        description = "Custom Guice module to provide an offer ordering.",
+        splitter = CommaSplitter.class)
     @SuppressWarnings("rawtypes")
     public List<Class> offerOrderModules = ImmutableList.of(OfferOrderModule.class);
 
