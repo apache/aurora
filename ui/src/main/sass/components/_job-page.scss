@@ -83,6 +83,10 @@
     th {
       text-transform: uppercase;
     }
+
+    th, td {
+      word-break: break-word;
+    }
   }
 
   .update-preview {
