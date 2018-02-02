@@ -3,6 +3,7 @@ import React from 'react';
 
 import { RelativeTime } from 'components/Time';
 
+import { isNully } from 'utils/Common';
 import { formatMb } from 'utils/Quota';
 import { constraintToString, getResource, getResources, instanceRangeToString } from 'utils/Task';
 import { COLLISION_POLICY } from 'utils/Thrift';
@@ -52,6 +53,25 @@ function Metadata({ config }) {
   </tr>);
 }
 
+// ESLint doesn't like React's new adjacent elements, so we need to disable it here
+/* eslint-disable */
+function PartitionPolicy({ config }) {
+  if (isNully(config.partitionPolicy)) {
+    return null;
+  }
+
+  return [<tr>
+    <th rowSpan='2'>Partition Policy</th>
+    <td>reschedule</td>
+    <td>{'' + config.partitionPolicy.reschedule}</td>
+  </tr>,
+  <tr>
+    <td>delay secs</td>
+    <td>{config.partitionPolicy.delaySecs}</td>
+  </tr>];
+}
+/* eslint-enable */
+
 export function CronConfigSummary({ cronJob }) {
   const config = cronJob.job.taskConfig;
   return (<table className='table table-bordered task-config-summary cron-config-summary'>
@@ -87,6 +107,7 @@ export function CronConfigSummary({ cronJob }) {
         <td colSpan='2'>{config.tier}</td>
       </tr>
       <Metadata config={config} />
+      <PartitionPolicy config={config} />
       <tr>
         <th>Contact</th>
         <td colSpan='2'>{config.contactEmail}</td>
@@ -114,6 +135,7 @@ export default function TaskConfigSummary({ config, instances }) {
         <td colSpan='2'>{config.isService ? 'true' : 'false'}</td>
       </tr>
       <Metadata config={config} />
+      <PartitionPolicy config={config} />
       <tr>
         <th>Contact</th>
         <td colSpan='2'>{config.contactEmail}</td>
