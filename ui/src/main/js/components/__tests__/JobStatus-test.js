@@ -1,6 +1,7 @@
 import React from 'react';
 import { shallow } from 'enzyme';
 
+import CronJobPreview from '../CronJobPreview';
 import JobStatus from '../JobStatus';
 import TaskList from '../TaskList';
 import { Tab } from '../Tabs';
@@ -31,7 +32,9 @@ describe('JobStatus', () => {
   });
 
   it('Should show one configuration when there is a cron job', () => {
-    const el = shallow(JobStatus({cronJob: {}, queryParams: {}, tasks: []}));
+    const cronJob = {};
+    const el = shallow(JobStatus({cronJob: cronJob, queryParams: {}, tasks: []}));
+    expect(el.contains(<CronJobPreview cronJob={cronJob} />)).toBe(true);
     expect(el.find(Tab).someWhere((t) => t.props().name === 'Configuration (1)')).toBe(true);
   });
 });

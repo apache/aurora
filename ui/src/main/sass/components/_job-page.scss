@@ -1,4 +1,8 @@
 .job-page {
+  .cron-job-preview {
+    padding: 15px;
+  }
+
   .job-overview {
     .tab-navigation {
       background-color: rgba(0, 0, 0, 0.01);
@@ -84,7 +88,7 @@
       text-transform: uppercase;
     }
 
-    th, td {
+    td {
       word-break: break-word;
     }
   }
