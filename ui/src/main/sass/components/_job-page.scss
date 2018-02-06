@@ -89,7 +89,8 @@
     }
 
     td {
-      word-break: break-word;
+      max-width: 250px;
+      overflow: auto;
     }
   }
 
