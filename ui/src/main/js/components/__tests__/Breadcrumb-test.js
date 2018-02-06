@@ -29,4 +29,12 @@ describe('Breadcrumb', () => {
     expect(el.contains(<Link to='/scheduler/www-data/prod/hello'>hello</Link>)).toBe(true);
     expect(el.find(Link).length).toBe(4);
   });
+
+  it('Should render taskId crumb', () => {
+    const el = shallow(
+      <Breadcrumb cluster='devcluster' env='prod' name='hello' role='www-data' taskId='task-id' />);
+    expect(el.contains(
+      <Link to='/scheduler/www-data/prod/hello/task/task-id'>task-id</Link>)).toBe(true);
+    expect(el.find(Link).length).toBe(5);
+  });
 });

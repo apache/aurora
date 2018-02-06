@@ -8,7 +8,7 @@ import TaskNeighbors from 'components/TaskNeighbors';
 import { isNully } from 'utils/Common';
 import { getClassForScheduleStatus, taskToStateMachine } from 'utils/Task';
 
-export default function TaskStatus({ task, neighbors }) {
+export default function TaskStatus({ task, title, neighbors }) {
   if (isNully(task)) {
     return (<Container>
       <PanelGroup title={<StandardPanelTitle title='Active Task' />}>
@@ -18,7 +18,7 @@ export default function TaskStatus({ task, neighbors }) {
   }
 
   return (<Container>
-    <PanelGroup title={<StandardPanelTitle title='Active Task' />}>
+    <PanelGroup title={<StandardPanelTitle title={title || 'Active Task'} />}>
       <div className='row'>
         <div className='col-md-6'>
           <TaskDetails task={task} />

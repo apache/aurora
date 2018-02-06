@@ -8,6 +8,7 @@ import Home from 'pages/Home';
 import Instance from 'pages/Instance';
 import Job from 'pages/Job';
 import Jobs from 'pages/Jobs';
+import Task from 'pages/Task';
 import Update from 'pages/Update';
 import Updates from 'pages/Updates';
 
@@ -29,6 +30,10 @@ const SchedulerUI = () => (
         component={injectApi(Instance)}
         exact
         path='/scheduler/:role/:environment/:name/:instance' />
+      <Route
+        component={injectApi(Task)}
+        exact
+        path='/scheduler/:role/:environment/:name/task/:taskId' />
       <Route
         component={injectApi(Update)}
         exact
