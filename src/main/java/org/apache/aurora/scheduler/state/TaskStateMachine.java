@@ -289,7 +289,13 @@ class TaskStateMachine {
                       switch (transition.getTo()) {
                         case LOST:
                           addFollowup(KILL);
-                          addFollowup(RESCHEDULE);
+                          // only reschedule if we didn't go KILLING -> PARTITIONED -> LOST.
+                          if (task.get()
+                              .getTaskEvents()
+                              .stream()
+                              .noneMatch(e -> e.getStatus().equals(ScheduleStatus.KILLING))) {
+                            addFollowup(RESCHEDULE);
+                          }
                           break;
                         case KILLING:
                         case RESTARTING:

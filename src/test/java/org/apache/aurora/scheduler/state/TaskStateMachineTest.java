@@ -29,6 +29,7 @@ import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.SideEffect.Action;
@@ -87,6 +88,17 @@ public class TaskStateMachineTest {
     stateMachine = makeStateMachine(makeTask(true));
     expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
     legalTransition(FINISHED, Action.SAVE_STATE, Action.RESCHEDULE);
+  }
+
+  @Test
+  public void testPartitionedAndLostOnlyReschedulesWhenNotKilling() {
+    ScheduledTask task = makeTask(true);
+    task.addToTaskEvents(new TaskEvent().setStatus(ScheduleStatus.KILLING));
+    stateMachine = makeStateMachine(task);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(KILLING, Action.SAVE_STATE, Action.KILL);
+    legalTransition(PARTITIONED, Action.SAVE_STATE, Action.TRANSITION_TO_LOST);
+    legalTransition(LOST, Action.SAVE_STATE, Action.KILL);
   }
 
   @Test
