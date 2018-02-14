@@ -41,6 +41,8 @@ public class ApiModule extends ServletModule {
   private static final MediaType GENERIC_THRIFT = new MediaType("application", "x-thrift");
   private static final MediaType THRIFT_JSON =
       new MediaType("application", "vnd.apache.thrift.json");
+  private static final MediaType THRIFT_JSON_UTF_8 =
+      new MediaType("application", "vnd.apache.thrift.json", "UTF-8");
   private static final MediaType THRIFT_BINARY =
       new MediaType("application", "vnd.apache.thrift.binary");
 
@@ -112,6 +114,7 @@ public class ApiModule extends ServletModule {
     InputConfig inputConfig = new InputConfig(GENERIC_THRIFT, ImmutableMap.of(
         GENERIC_THRIFT, jsonFactory,
         THRIFT_JSON, jsonFactory,
+        THRIFT_JSON_UTF_8, jsonFactory,
         APPLICATION_JSON_TYPE, jsonFactory,
         THRIFT_BINARY, binFactory
     ));

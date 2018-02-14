@@ -95,6 +95,26 @@ public class ApiIT extends AbstractJettyTest {
   }
 
   @Test
+  public void testThriftJsonUtf8Accepted() throws Exception {
+    expect(thrift.getRoleSummary()).andReturn(new Response());
+
+    replayAndStart();
+
+    // TODO(rdelvalle): If UTF-8 is not in caps, the accept method doesn't register a charset
+    // when building the request. The servlet accepts the charset in lower caps for now but
+    // might be worth resisting this oddity in the future to prevent regressions.
+    ClientResponse response = getPlainRequestBuilder(ApiModule.API_PATH)
+        .type("application/vnd.apache.thrift.json; charset=UTF-8")
+        .accept("application/vnd.apache.thrift.json; charset=UTF-8")
+        .post(ClientResponse.class, JSON_FIXTURE);
+
+    assertEquals(SC_OK, response.getStatus());
+    assertEquals(
+        "application/vnd.apache.thrift.json",
+        response.getHeaders().getFirst(CONTENT_TYPE));
+  }
+
+  @Test
   public void testUnknownContentTypeRejected() throws Exception {
     replayAndStart();
 
