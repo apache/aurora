@@ -13,12 +13,13 @@
  */
 package org.apache.aurora.scheduler.http.api;
 
+import java.nio.charset.Charset;
 import javax.inject.Singleton;
-import javax.ws.rs.core.MediaType;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.net.MediaType;
 import com.google.inject.Provides;
 import com.google.inject.servlet.ServletModule;
 
@@ -34,17 +35,17 @@ import org.apache.thrift.protocol.TJSONProtocol;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.util.resource.Resource;
 
-import static javax.ws.rs.core.MediaType.APPLICATION_JSON_TYPE;
-
 public class ApiModule extends ServletModule {
   public static final String API_PATH = "/api";
-  private static final MediaType GENERIC_THRIFT = new MediaType("application", "x-thrift");
-  private static final MediaType THRIFT_JSON =
-      new MediaType("application", "vnd.apache.thrift.json");
-  private static final MediaType THRIFT_JSON_UTF_8 =
-      new MediaType("application", "vnd.apache.thrift.json", "UTF-8");
-  private static final MediaType THRIFT_BINARY =
-      new MediaType("application", "vnd.apache.thrift.binary");
+  private static final MediaType GENERIC_JSON = MediaType.JSON_UTF_8.withoutParameters();
+  private static final MediaType GENERIC_THRIFT = MediaType.create("application", "x-thrift");
+  private static final MediaType THRIFT_JSON = MediaType
+      .create("application", "vnd.apache.thrift.json");
+  private static final MediaType THRIFT_JSON_UTF_8 = MediaType
+      .create("application", "vnd.apache.thrift.json")
+      .withCharset(Charset.forName("UTF-8"));
+  private static final MediaType THRIFT_BINARY = MediaType
+      .create("application", "vnd.apache.thrift.binary");
 
   @Parameters(separators = "=")
   public static class Options {
@@ -112,18 +113,19 @@ public class ApiModule extends ServletModule {
 
     // Which factory to use based on the Content-Type header of the request for reading the request.
     InputConfig inputConfig = new InputConfig(GENERIC_THRIFT, ImmutableMap.of(
+        GENERIC_JSON, jsonFactory,
         GENERIC_THRIFT, jsonFactory,
         THRIFT_JSON, jsonFactory,
         THRIFT_JSON_UTF_8, jsonFactory,
-        APPLICATION_JSON_TYPE, jsonFactory,
         THRIFT_BINARY, binFactory
     ));
 
     // Which factory to use based on the Accept header of the request for the response.
-    OutputConfig outputConfig = new OutputConfig(APPLICATION_JSON_TYPE, ImmutableMap.of(
-        APPLICATION_JSON_TYPE, jsonFactory,
+    OutputConfig outputConfig = new OutputConfig(GENERIC_JSON, ImmutableMap.of(
+        GENERIC_JSON, jsonFactory,
         GENERIC_THRIFT, jsonFactory,
         THRIFT_JSON, jsonFactory,
+        THRIFT_JSON_UTF_8, jsonFactory,
         THRIFT_BINARY, binFactory
         ));
 

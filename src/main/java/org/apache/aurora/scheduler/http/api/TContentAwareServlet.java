@@ -22,7 +22,8 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.core.MediaType;
+
+import com.google.common.net.MediaType;
 
 import org.apache.thrift.TException;
 import org.apache.thrift.TProcessor;
@@ -120,7 +121,7 @@ public class TContentAwareServlet extends HttpServlet {
       throws ServletException, IOException {
 
     Optional<ContentFactoryPair> factoryOptional = inputConfig
-        .getFactory(Optional.ofNullable(request.getContentType()).map(MediaType::valueOf));
+        .getFactory(Optional.ofNullable(request.getContentType()).map(MediaType::parse));
 
     if (!factoryOptional.isPresent()) {
       response.setStatus(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
@@ -138,7 +139,7 @@ public class TContentAwareServlet extends HttpServlet {
     Optional<MediaType> acceptType = Optional.empty();
     if (acceptHeader.isPresent()) {
       try {
-        acceptType = acceptHeader.map(MediaType::valueOf);
+        acceptType = acceptHeader.map(MediaType::parse);
       } catch (IllegalArgumentException e) {
         // Thrown if the Accept header contains more than one type or something else we can't
         // parse, we just treat is as no header (which will pick up the default value).
