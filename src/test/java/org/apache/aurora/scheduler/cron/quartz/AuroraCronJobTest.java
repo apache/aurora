@@ -50,7 +50,7 @@ import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class AuroraCronJobTest extends EasyMockTest {
@@ -157,13 +157,18 @@ public class AuroraCronJobTest extends EasyMockTest {
 
     // Simulate a trigger in progress.
     jobDetails.getJobDataMap().put(JobKeys.canonicalString(AURORA_JOB_KEY), null);
-    assertFalse(jobDetails.getJobDataMap().isEmpty());
+    assertEquals(
+        jobDetails.getJobDataMap().get(JobKeys.canonicalString(AURORA_JOB_KEY)),
+        null);
 
     // Attempt a concurrent run that must be rejected.
     auroraCronJob.doExecute(context);
 
     // Complete previous run and trigger another one.
     killResult.complete(BatchWorker.NO_RESULT);
+    assertEquals(
+        jobDetails.getJobDataMap().get(JobKeys.canonicalString(AURORA_JOB_KEY)),
+        AURORA_JOB_KEY);
     auroraCronJob.doExecute(context);
     assertTrue(jobDetails.getJobDataMap().isEmpty());
   }
