@@ -29,6 +29,7 @@ class ResourceType(Enum):
   RAM_MB = ('ramMb', 'RAM', ' MB', int, 2)
   DISK_MB = ('diskMb', 'Disk', ' MB', int, 3)
   PORTS = ('namedPort', 'Port', '', str, 4)
+  GPUS = ('numGpus', 'GPU', ' GPU(s)', int, 5)
 
   def __init__(self, field, display_name, display_unit, value_type, display_position):
     self._field = field
