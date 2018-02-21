@@ -9,31 +9,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-description "aurora scheduler (kerberos e2e test)"
-start on stopped rc RUNLEVEL=[2345]
-respawn
-post-stop exec sleep 5
-manual
 
+[Unit]
+Description=Aurora Scheduler (Kerberos e2e test)
+After=network.target
+Wants=network.target
+
+[Service]
 # Environment variables control the behavior of the Mesos scheduler driver (libmesos).
-env GLOG_v=0
-env LIBPROCESS_PORT=8083
-env LIBPROCESS_IP=192.168.33.7
-env DIST_DIR=/home/vagrant/aurora/dist
+Environment="GLOG_v=0"
+Environment="LIBPROCESS_PORT=8083"
+Environment="LIBPROCESS_IP=192.168.33.7"
+Environment="MESOS_NATIVE_JAVA_LIBRARY=/usr/lib/libmesos.so"
+
+Environment="DIST_DIR=/home/vagrant/aurora/dist"
 
 # Flags that control the behavior of the JVM.
-env JAVA_OPTS='-Djava.library.path=/usr/lib
-  -Xdebug
-  -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005
-  -Djava.security.krb5.conf=/home/vagrant/src/krb5-1.13.1/build/testdir/krb5.conf
-  -Dsun.security.krb5.debug=true
-  -Dsun.security.jgss.debug=true
-  -Djavax.net.debug=all
-'
-
-chdir /home/vagrant/aurora/dist/install/aurora-scheduler
-exec bin/aurora-scheduler \
+Environment="JAVA_OPTS='-Djava.library.path=/usr/lib \
+  -Xdebug \
+  -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005 \
+  -Djava.security.krb5.conf=/home/vagrant/src/krb5-1.13.1/build/testdir/krb5.conf \
+  -Dsun.security.krb5.debug=true \
+  -Dsun.security.jgss.debug=true \
+  -Djavax.net.debug=all'"
+WorkingDirectory=/home/vagrant/aurora/dist/install/aurora-scheduler
+ExecStart=/home/vagrant/aurora/dist/install/aurora-scheduler/bin/aurora-scheduler \
   -cluster_name=example \
   -http_port=8081 \
   -hostname=aurora.local \
@@ -44,7 +44,7 @@ exec bin/aurora-scheduler \
   -native_log_zk_group_path=/aurora/replicated-log \
   -native_log_file_path=/var/db/aurora \
   -backup_dir=/var/lib/aurora/backups \
-  -thermos_executor_path=$DIST_DIR/thermos_executor.pex \
+  -thermos_executor_path=${DIST_DIR}/thermos_executor.pex \
   -thermos_executor_flags="--announcer-ensemble localhost:2181" \
   -allowed_container_types=MESOS,DOCKER \
   -shiro_realm_modules=KERBEROS5_AUTHN,INI_AUTHNZ \
@@ -54,3 +54,11 @@ exec bin/aurora-scheduler \
   -kerberos_server_principal=HTTP/aurora.local@KRBTEST.COM \
   -tier_config=/home/vagrant/aurora/src/main/resources/org/apache/aurora/scheduler/tiers.json \
   -offer_filter_duration=0secs
+User=root
+Group=root
+Restart=always
+RestartSec=20
+LimitNOFILE=16384
+
+[Install]
+WantedBy=multi-user.target

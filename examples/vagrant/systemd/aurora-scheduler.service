@@ -9,26 +9,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-description "aurora scheduler"
-start on stopped rc RUNLEVEL=[2345]
-respawn
-post-stop exec sleep 5
 
+[Unit]
+Description=Aurora Scheduler
+After=network.target
+Wants=network.target
+
+[Service]
 # Environment variables control the behavior of the Mesos scheduler driver (libmesos).
-env GLOG_v=1
-env LIBPROCESS_PORT=8083
-env LIBPROCESS_IP=192.168.33.7
-env DIST_DIR=/home/vagrant/aurora/dist
+Environment="GLOG_v=1"
+Environment="LIBPROCESS_PORT=8083"
+Environment="LIBPROCESS_IP=192.168.33.7"
+Environment="MESOS_NATIVE_JAVA_LIBRARY=/usr/lib/libmesos.so"
+
+Environment="DIST_DIR=/home/vagrant/aurora/dist"
 
 # Flags that control the behavior of the JVM.
-env JAVA_OPTS='-Djava.library.path=/usr/lib
-  -Xdebug
-  -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005
-'
-
-chdir /home/vagrant/aurora/dist/install/aurora-scheduler
-exec bin/aurora-scheduler \
+Environment="JAVA_OPTS='-Djava.library.path=/usr/lib \
+  -Xdebug \
+  -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005'"
+WorkingDirectory=/home/vagrant/aurora/dist/install/aurora-scheduler
+ExecStart=/home/vagrant/aurora/dist/install/aurora-scheduler/bin/aurora-scheduler \
   -cluster_name=devcluster \
   -hostname=aurora.local \
   -http_port=8081 \
@@ -39,7 +40,7 @@ exec bin/aurora-scheduler \
   -native_log_zk_group_path=/aurora/replicated-log \
   -native_log_file_path=/var/db/aurora \
   -backup_dir=/var/lib/aurora/backups \
-  -thermos_executor_path=$DIST_DIR/thermos_executor.pex \
+  -thermos_executor_path=${DIST_DIR}/thermos_executor.pex \
   -global_container_mounts=/home/vagrant/aurora/examples/vagrant/config:/home/vagrant/aurora/examples/vagrant/config:ro,/home/vagrant/aurora/.auroraversion:/home/vagrant/aurora/.auroraversion:ro \
   -thermos_executor_flags="--announcer-ensemble localhost:2181 --announcer-zookeeper-auth-config /home/vagrant/aurora/examples/vagrant/config/announcer-auth.json --mesos-containerizer-path=/usr/libexec/mesos/mesos-containerizer" \
   -allowed_container_types=MESOS,DOCKER \
@@ -56,3 +57,11 @@ exec bin/aurora-scheduler \
   -offer_filter_duration=0secs \
   -mesos_driver=V1_DRIVER \
   -unavailability_threshold=1mins
+User=root
+Group=root
+Restart=always
+RestartSec=20
+LimitNOFILE=16384
+
+[Install]
+WantedBy=multi-user.target

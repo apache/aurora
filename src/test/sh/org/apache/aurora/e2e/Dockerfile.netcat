@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-FROM buildpack-deps:jessie
+FROM buildpack-deps:stretch
 
 RUN apt-get update && apt-get install -y netcat-openbsd
 COPY run-server.sh /usr/local/bin

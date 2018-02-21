@@ -1,6 +1,8 @@
 {
   "variables": {
     "base_box_ovf": "{{env `UBUNTU_OVF`}}",
+    "cloud_token": "{{env `VAGRANT_CLOUD_TOKEN`}}",
+    "version": "{{env `BOX_VERSION`}}"
   },
   "builders": [{
     "type": "virtualbox-ovf",
@@ -21,5 +23,16 @@
       "build.sh"
     ]
   }],
-  "post-processors": ["vagrant"]
+  "post-processors": [[
+    {
+      "type": "vagrant"
+    },
+    {
+      "type": "vagrant-cloud",
+      "box_tag": "apache-aurora/dev-environment",
+      "access_token": "{{user `cloud_token`}}",
+      "version": "{{user `version`}}"
+    }
+    ]
+  ]
 }

@@ -23,15 +23,6 @@ set -o nounset
 REPO_DIR=/home/vagrant/aurora
 DIST_DIR=$REPO_DIR/dist
 
-function upstart_update {
-  # Stop and start is necessary to update a the configuration of
-  # an upstart job.  We'll rarely change the configuration, but
-  # it's probably better to do this upfront and avoid surprises/confusion.
-  # Executing true on failure to please bash -e
-  sudo stop $1  || true
-  sudo start $1 || true
-}
-
 function build_client {
   ./pants binary src/main/python/apache/aurora/kerberos:kaurora
   sudo ln -sf $DIST_DIR/kaurora.pex /usr/local/bin/aurora
@@ -63,7 +54,7 @@ function build_scheduler {
   else
     echo "Replicated log initialization failed with code $? (likely already initialized)."
   fi
-  upstart_update aurora-scheduler
+  sudo systemctl restart aurora-scheduler
 }
 
 function build_executor {
@@ -80,7 +71,7 @@ function build_observer {
   ./pants binary src/main/python/apache/aurora/tools:thermos_observer
   ./pants binary src/main/python/apache/aurora/tools:thermos
   sudo ln -sf $DIST_DIR/thermos.pex /usr/local/bin/thermos
-  upstart_update aurora-thermos-observer
+  sudo systemctl restart aurora-executor
 }
 
 function build_all {

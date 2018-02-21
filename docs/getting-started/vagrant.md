@@ -148,7 +148,7 @@ Most of the Vagrant related problems can be fixed by the following steps:
 
 If that still doesn't solve your problem, make sure to inspect the log files:
 
-* Scheduler: `/var/log/upstart/aurora-scheduler.log`
-* Observer: `/var/log/upstart/aurora-thermos-observer.log`
+* Scheduler: `sudo journalctl -u aurora-scheduler`
+* Observer: `sudo journalctl -u aurora-executor`
 * Mesos Master: `/var/log/mesos/mesos-master.INFO` (also see `.WARNING` and `.ERROR`)
 * Mesos Agent: `/var/log/mesos/mesos-slave.INFO` (also see `.WARNING` and `.ERROR`)

@@ -9,14 +9,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-description "aurora thermos observer"
-start on stopped rc RUNLEVEL=[2345]
-respawn
-post-stop exec sleep 5
 
-exec /home/vagrant/aurora/dist/thermos_observer.pex \
+[Unit]
+Description=Aurora Thermos Observer
+After=network.target
+Wants=network.target
+
+[Service]
+ExecStart=/home/vagrant/aurora/dist/thermos_observer.pex \
   --ip=192.168.33.7 \
   --port=1338 \
   --log_to_disk=NONE \
   --log_to_stderr=google:INFO
+User=root
+Group=root
+Restart=always
+RestartSec=20
+LimitNOFILE=16384
+
+[Install]
+WantedBy=multi-user.target

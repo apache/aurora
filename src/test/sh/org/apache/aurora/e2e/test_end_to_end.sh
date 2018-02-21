@@ -261,7 +261,7 @@ test_update() {
   local _update_id=$(aurora update list $_jobkey --status ROLLING_FORWARD \
       | tail -n +2 | awk '{print $2}')
   aurora_admin scheduler_snapshot devcluster
-  sudo restart aurora-scheduler
+  sudo systemctl restart aurora-scheduler
   assert_update_state $_jobkey 'ROLLING_FORWARD'
   aurora update pause $_jobkey --message='hello'
   assert_update_state $_jobkey 'ROLL_FORWARD_PAUSED'
@@ -313,7 +313,7 @@ test_partition_awareness() {
   aurora update start --wait $_delay_jobkey $_config
 
   # partition the agent
-  sudo stop mesos-slave
+  sudo systemctl stop mesos-slave
 
   # the default job should become LOST and then transition to PENDING
   wait_until_task_status $_default_jobkey "0" "PENDING"
@@ -323,7 +323,7 @@ test_partition_awareness() {
   assert_task_status $_delay_jobkey "0" "PARTITIONED"
 
   # start the agent back up
-  sudo start mesos-slave
+  sudo systemctl start mesos-slave
 
   # This can be removed when https://issues.apache.org/jira/browse/MESOS-6406 is resolved.
   # We have to pause and let the agent reregister with Mesos, then ask Aurora to explicitly
@@ -511,7 +511,7 @@ test_recovery_tool() {
 
   # Take a backup
   aurora_admin scheduler_backup_now $_cluster
-  sudo stop aurora-scheduler
+  sudo systemctl stop aurora-scheduler
 
   # Reset storage
   sudo rm -r $REPLICATED_LOG_DIR
@@ -528,7 +528,7 @@ test_recovery_tool() {
     -native_log_zk_group_path=/aurora/replicated-log \
     -native_log_file_path=$REPLICATED_LOG_DIR \
     -zk_endpoints=localhost:2181
-  sudo start aurora-scheduler
+  sudo systemctl start aurora-scheduler
 
   # This command exits non-zero if the update is not found.
   aurora update info $update
@@ -657,14 +657,14 @@ setup_image_stores() {
   # build the appc image from the docker image
   docker2aci http_example_netcat-latest.tar
 
-  APPC_IMAGE_ID="sha512-$(sha512sum http_example_netcat-latest.aci | awk '{print $1}')"
+  APPC_IMAGE_ID="sha512-$(sha512sum library-http_example_netcat-latest.aci | awk '{print $1}')"
   export APPC_IMAGE_ID
   APPC_IMAGE_DIRECTORY="/tmp/mesos/images/appc/images/$APPC_IMAGE_ID"
 
   sudo mkdir -p "$APPC_IMAGE_DIRECTORY"
-  sudo tar -xf http_example_netcat-latest.aci -C "$APPC_IMAGE_DIRECTORY"
+  sudo tar -xf library-http_example_netcat-latest.aci -C "$APPC_IMAGE_DIRECTORY"
   # This restart is necessary for mesos to pick up the image from the local store.
-  sudo restart mesos-slave
+  sudo systemctl restart mesos-slave
 
   popd
   rm -rf "$TEMP_PATH"

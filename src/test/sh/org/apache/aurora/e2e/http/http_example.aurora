@@ -129,7 +129,7 @@ job = Service(
 
 volumes = [
   Volume(container_path="etc/rsyslog.d.container", host_path="/etc/rsyslog.d", mode=Mode("RO")),
-  Volume(container_path="etc/w3m.container", host_path="/etc/w3m", mode=Mode("RO"))
+  Volume(container_path="etc/w3m.container", host_path="/etc/X11", mode=Mode("RO"))
 ]
 
 jobs = [
