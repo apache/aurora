@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.http.api;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import javax.inject.Singleton;
 
 import com.beust.jcommander.Parameter;
@@ -43,7 +43,7 @@ public class ApiModule extends ServletModule {
       .create("application", "vnd.apache.thrift.json");
   private static final MediaType THRIFT_JSON_UTF_8 = MediaType
       .create("application", "vnd.apache.thrift.json")
-      .withCharset(Charset.forName("UTF-8"));
+      .withCharset(StandardCharsets.UTF_8);
   private static final MediaType THRIFT_BINARY = MediaType
       .create("application", "vnd.apache.thrift.binary");
 

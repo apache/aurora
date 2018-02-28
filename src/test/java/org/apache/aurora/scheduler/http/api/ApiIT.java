@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.http.api;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
@@ -103,18 +104,20 @@ public class ApiIT extends AbstractJettyTest {
     // We also want to ensure charset parsing is case-insensitive because different browsers have
     // different default behaviors (Chrome and Safari will change charset to all uppercase, while
     // Firefox may leave it lowercase.
+    String upperUTF8 = StandardCharsets.UTF_8.name().toUpperCase();
     ClientResponse upperCaseUTF = getPlainRequestBuilder(ApiModule.API_PATH)
-        .type("application/vnd.apache.thrift.json; charset=UTF-8")
-        .accept("application/vnd.apache.thrift.json; charset=UTF-8")
+        .type("application/vnd.apache.thrift.json; charset=" + upperUTF8)
+        .accept("application/vnd.apache.thrift.json; charset=" + upperUTF8)
         .post(ClientResponse.class, JSON_FIXTURE);
     assertEquals(SC_OK, upperCaseUTF.getStatus());
     assertEquals(
         "application/vnd.apache.thrift.json",
         upperCaseUTF.getHeaders().getFirst(CONTENT_TYPE));
 
+    String lowerUTF8 = StandardCharsets.UTF_8.name().toLowerCase();
     ClientResponse lowerCaseUTF = getPlainRequestBuilder(ApiModule.API_PATH)
-        .type("application/vnd.apache.thrift.json; charset=utf-8")
-        .accept("application/vnd.apache.thrift.json; charset=utf-8")
+        .type("application/vnd.apache.thrift.json; charset=" + lowerUTF8)
+        .accept("application/vnd.apache.thrift.json; charset=" + lowerUTF8)
         .post(ClientResponse.class, JSON_FIXTURE);
     assertEquals(SC_OK, lowerCaseUTF.getStatus());
     assertEquals(
