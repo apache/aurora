@@ -29,9 +29,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 
-import org.apache.aurora.scheduler.preemptor.ClusterState;
-import org.apache.aurora.scheduler.preemptor.ClusterStateImpl;
 import org.apache.aurora.scheduler.preemptor.PreemptionVictim;
+import org.apache.aurora.scheduler.state.ClusterState;
+import org.apache.aurora.scheduler.state.ClusterStateImpl;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.util.Objects.requireNonNull;

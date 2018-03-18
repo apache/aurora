@@ -42,6 +42,7 @@ import org.apache.aurora.scheduler.config.types.TimeAmount;
 import org.apache.aurora.scheduler.config.validators.PositiveNumber;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.preemptor.BiCache.BiCacheSettings;
+import org.apache.aurora.scheduler.state.ClusterStateImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,9 +124,6 @@ public class PreemptorModule extends AbstractModule {
           bind(new TypeLiteral<Integer>() { })
               .annotatedWith(PendingTaskProcessor.ReservationBatchSize.class)
               .toInstance(options.reservationMaxBatchSize);
-          bind(ClusterState.class).to(ClusterStateImpl.class);
-          bind(ClusterStateImpl.class).in(Singleton.class);
-          expose(ClusterStateImpl.class);
 
           for (Module module: MoreModules.instantiateAll(options.slotFinderModules, cliOptions)) {
             install(module);

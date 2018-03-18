@@ -70,6 +70,9 @@ public class StateModule extends AbstractModule {
     PubsubEventModule.bindSubscriber(binder(), PartitionManager.class);
 
     bindMaintenanceController(binder());
+
+    bind(ClusterState.class).to(ClusterStateImpl.class);
+    bind(ClusterStateImpl.class).in(Singleton.class);
   }
 
   @VisibleForTesting

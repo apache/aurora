@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.preemptor;
+package org.apache.aurora.scheduler.state;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSetMultimap;
@@ -21,6 +21,7 @@ import com.google.common.eventbus.Subscribe;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.preemptor.PreemptionVictim;
 
 /**
  * A cached view of cluster state, kept up to date by pubsub notifications.

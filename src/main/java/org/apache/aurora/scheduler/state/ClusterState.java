@@ -11,22 +11,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.preemptor;
+package org.apache.aurora.scheduler.state;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Multimap;
 
+import org.apache.aurora.scheduler.preemptor.PreemptionVictim;
+
 /**
- * A facade for the preemptor to gain access to the state of scheduled tasks in the cluster.
+ * The current state of scheduled tasks within the cluster.
  */
-@VisibleForTesting
 public interface ClusterState {
 
   /**
    * Gets a snapshot of the active tasks in the cluster, indexed by the slave IDs they are
    * assigned to.
-   * <p>
-   * TODO(wfarner): Return a more minimal type than IAssignedTask here.
    *
    * @return Active tasks and their associated slave IDs.
    */
