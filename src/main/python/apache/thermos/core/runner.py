@@ -100,20 +100,20 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
     self._runner = runner
 
   def on_waiting(self, process_update):
-    log.debug('Process on_waiting %s' % process_update)
+    log.debug('Process on_waiting %s', process_update)
     self._runner._task_processes[process_update.process] = (
       self._runner._task_process_from_process_name(
         process_update.process, process_update.seq + 1))
     self._runner._watcher.register(process_update.process, process_update.seq - 1)
 
   def on_forked(self, process_update):
-    log.debug('Process on_forked %s' % process_update)
+    log.debug('Process on_forked %s', process_update)
     task_process = self._runner._task_processes[process_update.process]
     task_process.rebind(process_update.coordinator_pid, process_update.fork_time)
     self._runner._plan.set_running(process_update.process)
 
   def on_running(self, process_update):
-    log.debug('Process on_running %s' % process_update)
+    log.debug('Process on_running %s', process_update)
     self._runner._plan.set_running(process_update.process)
 
   def _cleanup(self, process_update):
@@ -121,39 +121,39 @@ class TaskRunnerProcessHandler(ProcessStateHandler):
       TaskRunnerHelper.kill_process(self._runner.state, process_update.process)
 
   def on_success(self, process_update):
-    log.debug('Process on_success %s' % process_update)
-    log.info('Process(%s) finished successfully [rc=%s]' % (
-      process_update.process, process_update.return_code))
+    log.debug('Process on_success %s', process_update)
+    log.info('Process(%s) finished successfully [rc=%s]',
+      process_update.process, process_update.return_code)
     self._cleanup(process_update)
     self._runner._task_processes.pop(process_update.process)
     self._runner._watcher.unregister(process_update.process)
     self._runner._plan.add_success(process_update.process)
 
   def _on_abnormal(self, process_update):
-    log.info('Process %s had an abnormal termination' % process_update.process)
+    log.info('Process %s had an abnormal termination', process_update.process)
     self._runner._task_processes.pop(process_update.process)
     self._runner._watcher.unregister(process_update.process)
 
   def on_failed(self, process_update):
-    log.debug('Process on_failed %s' % process_update)
-    log.info('Process(%s) failed [rc=%s]' % (process_update.process, process_update.return_code))
+    log.debug('Process on_failed %s', process_update)
+    log.info('Process(%s) failed [rc=%s]', process_update.process, process_update.return_code)
     self._cleanup(process_update)
     self._on_abnormal(process_update)
     self._runner._plan.add_failure(process_update.process)
     if process_update.process in self._runner._plan.failed:
-      log.info('Process %s reached maximum failures, marking process run failed.' %
+      log.info('Process %s reached maximum failures, marking process run failed.',
           process_update.process)
     else:
-      log.info('Process %s under maximum failure limit, restarting.' % process_update.process)
+      log.info('Process %s under maximum failure limit, restarting.', process_update.process)
 
   def on_lost(self, process_update):
-    log.debug('Process on_lost %s' % process_update)
+    log.debug('Process on_lost %s', process_update)
     self._cleanup(process_update)
     self._on_abnormal(process_update)
     self._runner._plan.lost(process_update.process)
 
   def on_killed(self, process_update):
-    log.debug('Process on_killed %s' % process_update)
+    log.debug('Process on_killed %s', process_update)
     self._cleanup(process_update)
     self._runner._task_processes.pop(process_update.process)
     self._runner._watcher.unregister(process_update.process)
@@ -177,7 +177,7 @@ class TaskRunnerTaskHandler(TaskStateHandler):
     self._pathspec = self._runner._pathspec
 
   def on_active(self, task_update):
-    log.debug('Task on_active(%s)' % task_update)
+    log.debug('Task on_active(%s)', task_update)
     self._runner._plan = self._runner._regular_plan
     if self._runner._recovery:
       return
@@ -185,12 +185,12 @@ class TaskRunnerTaskHandler(TaskStateHandler):
         ThermosTaskWrapper(self._runner._task).to_json())
 
   def on_cleaning(self, task_update):
-    log.debug('Task on_cleaning(%s)' % task_update)
+    log.debug('Task on_cleaning(%s)', task_update)
     self._runner._finalization_start = task_update.timestamp_ms / 1000.0
     self._runner._terminate_plan(self._runner._regular_plan)
 
   def on_finalizing(self, task_update):
-    log.debug('Task on_finalizing(%s)' % task_update)
+    log.debug('Task on_finalizing(%s)', task_update)
     if not self._runner._recovery:
       self._runner._kill()
     self._runner._plan = self._runner._finalizing_plan
@@ -198,20 +198,20 @@ class TaskRunnerTaskHandler(TaskStateHandler):
       self._runner._finalization_start = task_update.timestamp_ms / 1000.0
 
   def on_killed(self, task_update):
-    log.debug('Task on_killed(%s)' % task_update)
+    log.debug('Task on_killed(%s)', task_update)
     self._cleanup()
 
   def on_success(self, task_update):
-    log.debug('Task on_success(%s)' % task_update)
+    log.debug('Task on_success(%s)', task_update)
     self._cleanup()
     log.info('Task succeeded.')
 
   def on_failed(self, task_update):
-    log.debug('Task on_failed(%s)' % task_update)
+    log.debug('Task on_failed(%s)', task_update)
     self._cleanup()
 
   def on_lost(self, task_update):
-    log.debug('Task on_lost(%s)' % task_update)
+    log.debug('Task on_lost(%s)', task_update)
     self._cleanup()
 
   def _cleanup(self):
@@ -235,15 +235,15 @@ class TaskRunnerUniversalHandler(UniversalStateHandler):
     self._runner._ckpt_write(record)
 
   def on_process_transition(self, state, process_update):
-    log.debug('_on_process_transition: %s' % process_update)
+    log.debug('_on_process_transition: %s', process_update)
     self._checkpoint(RunnerCkpt(process_status=process_update))
 
   def on_task_transition(self, state, task_update):
-    log.debug('_on_task_transition: %s' % task_update)
+    log.debug('_on_task_transition: %s', task_update)
     self._checkpoint(RunnerCkpt(task_status=task_update))
 
   def on_initialization(self, header):
-    log.debug('_on_initialization: %s' % header)
+    log.debug('_on_initialization: %s', header)
     ThermosTaskValidator.assert_valid_task(self._runner.task)
     ThermosTaskValidator.assert_valid_ports(self._runner.task, header.ports)
     self._checkpoint(RunnerCkpt(runner_header=header))
@@ -413,7 +413,7 @@ class TaskRunner(object):
                  log_dir=checkpoint.header.log_dir, task_id=task_id,
                  portmap=checkpoint.header.ports, hostname=checkpoint.header.hostname)
     except Exception as e:
-      log.error('Failed to reconstitute checkpoint in TaskRunner.get: %s' % e, exc_info=True)
+      log.error('Failed to reconstitute checkpoint in TaskRunner.get: %s', e, exc_info=True)
       return None
 
   def __init__(self, task, checkpoint_root, sandbox, log_dir=None,
@@ -577,8 +577,8 @@ class TaskRunner(object):
     try:
       yield
     except Exception as e:
-      log.error('Caught exception in self.control(): %s' % e)
-      log.error('  %s' % traceback.format_exc())
+      log.error('Caught exception in self.control(): %s', e)
+      log.error('  %s', traceback.format_exc())
     self._ckpt.close()
 
   def _resume_task(self):
@@ -612,7 +612,7 @@ class TaskRunner(object):
       with open(ckpt_file, 'r') as fp:
         ckpt_recover = ThriftRecordReader(fp, RunnerCkpt)
         for record in ckpt_recover:
-          log.debug('Replaying runner checkpoint record: %s' % record)
+          log.debug('Replaying runner checkpoint record: %s', record)
           self._dispatcher.dispatch(self._state, record, recovery=True)
 
   def _replay_process_ckpts(self):
@@ -640,7 +640,7 @@ class TaskRunner(object):
       except KeyError:
         # This will cause failures downstream, but they will at least be correctly
         # reflected in the process state.
-        log.error('Unknown user %s.' % self._user)
+        log.error('Unknown user %s.', self._user)
         uid = None
 
       header = RunnerHeader(
@@ -677,8 +677,8 @@ class TaskRunner(object):
   def _set_process_status(self, process_name, process_state, **kw):
     if 'sequence_number' in kw:
       sequence_number = kw.pop('sequence_number')
-      log.debug('_set_process_status(%s <= %s, seq=%s[force])' % (process_name,
-        ProcessState._VALUES_TO_NAMES.get(process_state), sequence_number))
+      log.debug('_set_process_status(%s <= %s, seq=%s[force])', process_name,
+        ProcessState._VALUES_TO_NAMES.get(process_state), sequence_number)
     else:
       current_run = self._current_process_run(process_name)
       if not current_run:
@@ -686,8 +686,8 @@ class TaskRunner(object):
         sequence_number = 0
       else:
         sequence_number = current_run.seq + 1
-      log.debug('_set_process_status(%s <= %s, seq=%s[auto])' % (process_name,
-        ProcessState._VALUES_TO_NAMES.get(process_state), sequence_number))
+      log.debug('_set_process_status(%s <= %s, seq=%s[auto])', process_name,
+        ProcessState._VALUES_TO_NAMES.get(process_state), sequence_number)
     runner_ckpt = RunnerCkpt(process_status=ProcessStatus(
         process=process_name, state=process_state, seq=sequence_number, **kw))
     self._dispatcher.dispatch(self._state, runner_ckpt, self._recovery)
@@ -781,8 +781,8 @@ class TaskRunner(object):
     running = list(plan.running)
     runnable = list(plan.runnable_at(now))
     waiting = list(plan.waiting_at(now))
-    log.debug('running:%d runnable:%d waiting:%d complete:%s' % (
-      len(running), len(runnable), len(waiting), plan.is_complete()))
+    log.debug('running:%d runnable:%d waiting:%d complete:%s',
+      len(running), len(runnable), len(waiting), plan.is_complete())
     return len(running + runnable + waiting) == 0 and not plan.is_complete()
 
   def is_healthy(self):
@@ -791,9 +791,9 @@ class TaskRunner(object):
     max_failures = self._task.max_failures().get()
     deadlocked = self.deadlocked()
     under_failure_limit = max_failures == 0 or len(self._regular_plan.failed) < max_failures
-    log.debug('max_failures:%d failed:%d under_failure_limit:%s deadlocked:%s ==> health:%s' % (
+    log.debug('max_failures:%d failed:%d under_failure_limit:%s deadlocked:%s ==> health:%s',
       max_failures, len(self._regular_plan.failed), under_failure_limit, deadlocked,
-      not deadlocked and under_failure_limit))
+      not deadlocked and under_failure_limit)
     return not deadlocked and under_failure_limit
 
   def _current_process_run(self, process_name):
@@ -822,9 +822,9 @@ class TaskRunner(object):
       return True
 
     if forked_but_never_came_up() or running_but_coordinator_died():
-      log.info('Detected a LOST task: %s' % current_run)
-      log.debug('  forked_but_never_came_up: %s' % forked_but_never_came_up())
-      log.debug('  running_but_coordinator_died: %s' % running_but_coordinator_died())
+      log.info('Detected a LOST task: %s', current_run)
+      log.debug('  forked_but_never_came_up: %s', forked_but_never_came_up())
+      log.debug('  running_but_coordinator_died: %s', running_but_coordinator_died())
       return True
 
     return False
@@ -833,8 +833,8 @@ class TaskRunner(object):
     log.debug('Schedule pass:')
 
     running = list(plan.running)
-    log.debug('running: %s' % ' '.join(plan.running))
-    log.debug('finished: %s' % ' '.join(plan.finished))
+    log.debug('running: %s', ' '.join(plan.running))
+    log.debug('finished: %s', ' '.join(plan.finished))
 
     launched = []
     for process_name in plan.running:
@@ -844,8 +844,8 @@ class TaskRunner(object):
     now = self._clock.time()
     runnable = list(plan.runnable_at(now))
     waiting = list(plan.waiting_at(now))
-    log.debug('runnable: %s' % ' '.join(runnable))
-    log.debug('waiting: %s' % ' '.join(
+    log.debug('runnable: %s', ' '.join(runnable))
+    log.debug('waiting: %s', ' '.join(
         '%s[T-%.1fs]' % (process, plan.get_wait(process)) for process in waiting))
 
     def pick_processes(process_list):
@@ -862,12 +862,12 @@ class TaskRunner(object):
       else:
         self._set_process_status(process_name, ProcessState.WAITING)
         tp = self._task_processes[process_name]
-      log.info('Forking Process(%s)' % process_name)
+      log.info('Forking Process(%s)', process_name)
       try:
         tp.start()
         launched.append(tp)
       except Process.Error as e:
-        log.error('Failed to launch process: %s' % e)
+        log.error('Failed to launch process: %s', e)
         self._set_process_status(process_name, ProcessState.FAILED)
 
     return len(launched) > 0
@@ -948,15 +948,15 @@ class TaskRunner(object):
             TaskState._VALUES_TO_NAMES.get(self.task_state(), 'UNKNOWN'))
         self._set_task_status(runner.transition_to())
         continue
-      log.debug('Run loop: Work to be done within %.1fs' % iteration_wait)
+      log.debug('Run loop: Work to be done within %.1fs', iteration_wait)
       # step 2: check child process checkpoint streams for updates
       if not self.collect_updates(iteration_wait):
         # If we don't collect any updates, at least 'touch' the checkpoint stream
         # so as to prevent garbage collection.
         elapsed = self._clock.time() - start
         if elapsed < iteration_wait:
-          log.debug('Update collection only took %.1fs, idling %.1fs' % (
-              elapsed, iteration_wait - elapsed))
+          log.debug('Update collection only took %.1fs, idling %.1fs',
+              elapsed, iteration_wait - elapsed)
           self._clock.sleep(iteration_wait - elapsed)
         log.debug('Run loop: No updates collected, touching checkpoint.')
         os.utime(self._pathspec.getpath('runner_checkpoint'), None)
@@ -969,8 +969,8 @@ class TaskRunner(object):
       Kill all processes associated with this task and set task/process states as terminal_status
       (defaults to KILLED)
     """
-    log.debug('Runner issued kill: force:%s, preemption_wait:%s' % (
-      force, preemption_wait))
+    log.debug('Runner issued kill: force:%s, preemption_wait:%s',
+      force, preemption_wait)
     assert terminal_status in (TaskState.KILLED, TaskState.LOST)
     self._preemption_deadline = self._clock.time() + preemption_wait.as_(Time.SECONDS)
     with self.control(force):
@@ -995,17 +995,17 @@ class TaskRunner(object):
       coordinator_pid, pid, tree = pid_tuple
       if TaskRunnerHelper.is_process_terminal(current_run.state):
         if coordinator_pid or pid or tree:
-          log.warning('Terminal process (%s) still has running pids:' % process)
-          log.warning('  coordinator_pid: %s' % coordinator_pid)
-          log.warning('              pid: %s' % pid)
-          log.warning('             tree: %s' % tree)
+          log.warning('Terminal process (%s) still has running pids:', process)
+          log.warning('  coordinator_pid: %s', coordinator_pid)
+          log.warning('              pid: %s', pid)
+          log.warning('             tree: %s', tree)
         TaskRunnerHelper.kill_process(self.state, process)
       else:
         if coordinator_pid or pid or tree:
-          log.info('Transitioning %s to KILLED' % process)
+          log.info('Transitioning %s to KILLED', process)
           self._set_process_status(process, ProcessState.KILLED,
             stop_time=self._clock.time(), return_code=-1)
         else:
-          log.info('Transitioning %s to LOST' % process)
+          log.info('Transitioning %s to LOST', process)
           if current_run.state != ProcessState.WAITING:
             self._set_process_status(process, ProcessState.LOST)

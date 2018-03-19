@@ -42,7 +42,7 @@ def _read_chunk(filename, offset=None, length=None):
   try:
     fstat = os.stat(filename)
   except Exception as e:
-    log.error('Could not read from %s: %s' % (filename, e))
+    log.error('Could not read from %s: %s', filename, e)
     return {}
 
   if offset == -1:
@@ -56,7 +56,7 @@ def _read_chunk(filename, offset=None, length=None):
     try:
       data = fp.read(length)
     except IOError as e:
-      log.error('Failed to read %s: %s' % (filename, e), exc_info=True)
+      log.error('Failed to read %s: %s', filename, e, exc_info=True)
       return {}
 
   if data:

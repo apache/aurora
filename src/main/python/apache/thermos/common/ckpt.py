@@ -186,7 +186,7 @@ class CheckpointDispatcher(object):
         builder.dispatch(state, update, truncate=truncate)
       return state
     except cls.Error as e:
-      log.error('Failed to recover from %s: %s' % (filename, e))
+      log.error('Failed to recover from %s: %s', filename, e)
 
   def __init__(self):
     self._task_handlers = []
@@ -325,7 +325,7 @@ class CheckpointDispatcher(object):
         raise self.ErrorRecoveringState(
           "Attempting to rebind task with different parameters!")
       else:
-        log.debug('Initializing TaskRunner header to %s' % runner_ckpt.runner_header)
+        log.debug('Initializing TaskRunner header to %s', runner_ckpt.runner_header)
         state.header = runner_ckpt.runner_header
         self._run_header_dispatch(runner_ckpt.runner_header)
       return
@@ -343,9 +343,9 @@ class CheckpointDispatcher(object):
       else:
         state.statuses = [runner_ckpt.task_status]
       new_state = runner_ckpt.task_status.state
-      log.debug('Flipping task state from %s to %s' % (
+      log.debug('Flipping task state from %s to %s',
         TaskState._VALUES_TO_NAMES.get(old_state, '(undefined)'),
-        TaskState._VALUES_TO_NAMES.get(new_state, '(undefined)')))
+        TaskState._VALUES_TO_NAMES.get(new_state, '(undefined)'))
       self._run_task_dispatch(new_state, runner_ckpt.task_status)
       return
 
@@ -358,11 +358,11 @@ class CheckpointDispatcher(object):
       current_run = state.processes[name][-1] if name in state.processes else None
       if current_run and process_update.seq != current_run.seq + 1:
         if recovery:
-          log.debug('Skipping replayed out-of-order update: %s' % process_update)
+          log.debug('Skipping replayed out-of-order update: %s', process_update)
           return
         else:
           raise self.InvalidSequenceNumber(
-            "Out of order sequence number! %s => %s" % (current_run, process_update))
+            "Out of order sequence number! %s => %s", current_run, process_update)
 
       # One special case for WAITING: Initialize a new target ProcessState.
       if process_update.state == ProcessState.WAITING:
@@ -376,7 +376,7 @@ class CheckpointDispatcher(object):
             state.processes[name] = [ProcessStatus(seq=current_run.seq)]
 
       # Run the process state machine.
-      log.debug('Running state machine for process=%s/seq=%s' % (name, process_update.seq))
+      log.debug('Running state machine for process=%s/seq=%s', name, process_update.seq)
       if not state.processes or name not in state.processes:
         raise self.ErrorRecoveringState("Encountered potentially out of order "
           "process update.  Are you sure this is a full checkpoint stream?")

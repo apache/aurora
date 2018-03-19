@@ -60,11 +60,11 @@ class ObservedTask(AbstractClass):
       if os.path.exists(path):
         task = ThermosTaskWrapper.from_file(path)
         if task is None:
-          log.error('Error reading ThermosTask from %s in observer.' % path)
+          log.error('Error reading ThermosTask from %s in observer.', path)
         else:
           context = self.context(self._task_id)
           if not context:
-            log.warning('Task not yet available: %s' % self._task_id)
+            log.warning('Task not yet available: %s', self._task_id)
           task = task.task() % Environment(thermos=context)
           memoized[self._task_id] = task
 
@@ -77,7 +77,7 @@ class ObservedTask(AbstractClass):
     if mtime is None:
       mtime = self.safe_mtime(get_path('finished'))
     if mtime is None:
-      log.error("Couldn't get mtime for task %s!" % self._task_id)
+      log.error("Couldn't get mtime for task %s!", self._task_id)
     return mtime
 
   def context(self, task_id):

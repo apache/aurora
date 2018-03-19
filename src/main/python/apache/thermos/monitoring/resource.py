@@ -137,7 +137,7 @@ class HistoryProvider(object):
     history_length = int(history_time.as_(Time.SECONDS) / min_collection_interval)
     if history_length > self.MAX_HISTORY:
       raise ValueError("Requested history length too large")
-    log.debug("Initialising ResourceHistory of length %s" % history_length)
+    log.debug("Initialising ResourceHistory of length %s", history_length)
     return ResourceHistory(history_length)
 
 
@@ -166,7 +166,7 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
     """
     self._task_monitor = task_monitor  # exposes PIDs, sandbox
     self._task_id = task_id
-    log.debug('Initialising resource collection for task %s' % self._task_id)
+    log.debug('Initialising resource collection for task %s', self._task_id)
     self._process_collectors = dict()  # ProcessStatus => ProcessTreeCollector
     self._disk_collector_class = disk_collector
     self._disk_collector = None
@@ -225,7 +225,7 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
     """Thread entrypoint. Loop indefinitely, polling collectors at self._collection_interval and
     collating samples."""
 
-    log.debug('Commencing resource monitoring for task "%s"' % self._task_id)
+    log.debug('Commencing resource monitoring for task "%s"', self._task_id)
     next_process_collection = 0
     next_disk_collection = 0
 
@@ -252,7 +252,7 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
         if self._disk_collector:
           self._disk_collector.sample()
         else:
-          log.debug('No sandbox detected yet for %s' % self._task_id)
+          log.debug('No sandbox detected yet for %s', self._task_id)
 
       try:
         disk_usage = self._disk_collector.value if self._disk_collector else 0
@@ -264,10 +264,10 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
 
         self._history.add(now, self.FullResourceResult(proc_usage_dict, disk_usage))
       except ValueError as err:
-        log.warning("Error recording resource sample: %s" % err)
+        log.warning("Error recording resource sample: %s", err)
 
-      log.debug("TaskResourceMonitor: finished collection of %s in %.2fs" % (
-          self._task_id, (time.time() - now)))
+      log.debug("TaskResourceMonitor: finished collection of %s in %.2fs",
+          self._task_id, (time.time() - now))
 
       # Sleep until any of the following conditions are met:
       # - it's time for the next disk collection
@@ -288,4 +288,4 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
         log.warning('Task resource collection is backlogged. Consider increasing '
                     'process_collection_interval and disk_collection_interval.')
 
-    log.debug('Stopping resource monitoring for task "%s"' % self._task_id)
+    log.debug('Stopping resource monitoring for task "%s"', self._task_id)

@@ -96,9 +96,9 @@ class TaskObserver(ExceptionalThread, Lockable):
     ExceptionalThread.start(self)
 
   def __on_active(self, root, task_id):
-    log.debug('on_active(%r, %r)' % (root, task_id))
+    log.debug('on_active(%r, %r)', root, task_id)
     if task_id in self.finished_tasks:
-      log.error('Found an active task (%s) in finished tasks?' % task_id)
+      log.error('Found an active task (%s) in finished tasks?', task_id)
       return
     task_monitor = TaskMonitor(root, task_id)
     resource_monitor = TaskResourceMonitor(
@@ -115,14 +115,14 @@ class TaskObserver(ExceptionalThread, Lockable):
     )
 
   def __on_finished(self, root, task_id):
-    log.debug('on_finished(%r, %r)' % (root, task_id))
+    log.debug('on_finished(%r, %r)', root, task_id)
     active_task = self._active_tasks.pop(task_id, None)
     if active_task:
       active_task.resource_monitor.kill()
     self._finished_tasks[task_id] = FinishedObservedTask(root, task_id)
 
   def __on_removed(self, root, task_id):
-    log.debug('on_removed(%r, %r)' % (root, task_id))
+    log.debug('on_removed(%r, %r)', root, task_id)
     active_task = self._active_tasks.pop(task_id, None)
     if active_task:
       active_task.resource_monitor.kill()
@@ -139,7 +139,7 @@ class TaskObserver(ExceptionalThread, Lockable):
       with self.lock:
         start = time.time()
         self._detector.refresh()
-        log.debug("TaskObserver: finished checkpoint refresh in %.2fs" % (time.time() - start))
+        log.debug("TaskObserver: finished checkpoint refresh in %.2fs", time.time() - start)
 
   @Lockable.sync
   def process_from_name(self, task_id, process_id):
@@ -178,7 +178,7 @@ class TaskObserver(ExceptionalThread, Lockable):
     }.get(type, None)
 
     if tasks is None:
-      log.error('Unknown task type %s' % type)
+      log.error('Unknown task type %s', type)
       return {}
 
     return tasks
@@ -313,7 +313,7 @@ class TaskObserver(ExceptionalThread, Lockable):
       resource_sample = self.active_tasks[task_id].resource_monitor.sample()[1]
       sample = resource_sample.process_sample.to_dict()
       sample['disk'] = resource_sample.disk_usage
-      log.debug("Got sample for task %s: %s" % (task_id, sample))
+      log.debug("Got sample for task %s: %s", task_id, sample)
     return sample
 
   @Lockable.sync
@@ -390,7 +390,7 @@ class TaskObserver(ExceptionalThread, Lockable):
     task = self.all_tasks[task_id].task
     if task is None:
       # TODO(wickman)  Can this happen?
-      log.error('Could not find task: %s' % task_id)
+      log.error('Could not find task: %s', task_id)
       return {}
 
     state = self.raw_state(task_id)
@@ -425,7 +425,7 @@ class TaskObserver(ExceptionalThread, Lockable):
     if task_id not in self.active_tasks:
       return ProcessSample.empty().to_dict()
     sample = self.active_tasks[task_id].resource_monitor.sample_by_process(process_name).to_dict()
-    log.debug('Resource consumption (%s, %s) => %s' % (task_id, process_name, sample))
+    log.debug('Resource consumption (%s, %s) => %s', task_id, process_name, sample)
     return sample
 
   @Lockable.sync

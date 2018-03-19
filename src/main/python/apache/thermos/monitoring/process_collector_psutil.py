@@ -39,7 +39,7 @@ def process_to_sample(process):
     threads = process.num_threads()
     return ProcessSample(rate, user, system, rss, vms, nice, status, threads)
   except (AccessDenied, NoSuchProcess) as e:
-    log.debug('Error during process sampling [pid=%s]: %s' % (process.pid, e))
+    log.debug('Error during process sampling [pid=%s]: %s', process.pid, e)
     return ProcessSample.empty()
 
 
@@ -72,7 +72,7 @@ class ProcessTreeCollector(object):
       new_samples[self._pid] = parent_sample
 
     except (IOError, PsutilError) as e:
-      log.debug('Error during process sampling: %s' % e)
+      log.debug('Error during process sampling: %s', e)
       self._sample = ProcessSample.empty()
       self._rate = 0.0
 
@@ -90,7 +90,7 @@ class ProcessTreeCollector(object):
         new_user_sys = sum(map(attrgetter('user'), new)) + sum(map(attrgetter('system'), new))
         old_user_sys = sum(map(attrgetter('user'), old)) + sum(map(attrgetter('system'), old))
         self._rate = (new_user_sys - old_user_sys) / (self._stamp - last_stamp)
-        log.debug("Calculated rate for pid=%s and children: %s" % (self._process.pid, self._rate))
+        log.debug("Calculated rate for pid=%s and children: %s", self._process.pid, self._rate)
       self._sampled_tree = new_samples
 
   @property

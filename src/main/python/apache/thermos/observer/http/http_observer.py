@@ -134,5 +134,5 @@ class BottleObserver(HttpServer, StaticAssets, TaskObserverFileBrowser, TaskObse
     }
     template['process'].update(**all_processes[current_run_number].get('used', {}))
     template['runs'] = all_processes
-    log.debug('Rendering template is: %s' % template)
+    log.debug('Rendering template is: %s', template)
     return template

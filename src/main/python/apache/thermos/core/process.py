@@ -151,7 +151,7 @@ class ProcessBase(object):
         raise ValueError('Log backups cannot be less than one.')
 
   def _log(self, msg, exc_info=None):
-    log.debug('[process:%5s=%s]: %s' % (self._pid, self.name(), msg),
+    log.debug('[process:%5s=%s]: %s', self._pid, self.name(), msg,
             exc_info=exc_info)
 
   def _getpwuid(self):
@@ -442,7 +442,7 @@ class Process(ProcessBase):
     })
 
     wrapped_cmdline = self.wrapped_cmdline(cwd)
-    log.debug('Wrapped cmdline: %s' % wrapped_cmdline)
+    log.debug('Wrapped cmdline: %s', wrapped_cmdline)
 
     real_thermos_profile_path = os.path.join(
         os.environ['MESOS_DIRECTORY'],
@@ -452,7 +452,7 @@ class Process(ProcessBase):
     if os.path.exists(real_thermos_profile_path):
       env.update(BASH_ENV=thermos_profile)
 
-    log.debug('ENV is: %s' % env)
+    log.debug('ENV is: %s', env)
     subprocess_args = {
       'args': wrapped_cmdline,
       'close_fds': self.FD_CLOEXEC,

@@ -176,13 +176,13 @@ def get_task_from_options(opts):
 def runner_teardown(runner, sig=signal.SIGUSR1, frame=None):
   """Destroy runner on SIGUSR1 (kill) or SIGUSR2 (lose)"""
   op = 'kill' if sig == signal.SIGUSR1 else 'lose'
-  log.info('Thermos runner got signal %s, shutting down.' % sig)
+  log.info('Thermos runner got signal %s, shutting down.', sig)
   log.info('Interrupted frame:')
   if frame:
     for line in ''.join(traceback.format_stack(frame)).splitlines():
       log.info(line)
   runner.close_ckpt()
-  log.info('Calling runner.%s()' % op)
+  log.info('Calling runner.%s()', op)
   getattr(runner, op)()
   sys.exit(0)
 
@@ -201,7 +201,7 @@ def proxy_main(args, opts):
   missing_ports = set(thermos_task.ports()) - set(prebound_ports)
 
   if missing_ports:
-    log.error('ERROR!  Unbound ports: %s' % ' '.join(port for port in missing_ports))
+    log.error('ERROR!  Unbound ports: %s', ' '.join(port for port in missing_ports))
     sys.exit(INTERNAL_ERROR)
 
   if opts.setuid:
@@ -213,7 +213,7 @@ def proxy_main(args, opts):
   try:
     pwd.getpwnam(user).pw_uid
   except KeyError:
-    log.error('Unknown user: %s' % user)
+    log.error('Unknown user: %s', user)
     sys.exit(UNKNOWN_USER)
 
   task_runner = TaskRunner(
@@ -240,22 +240,22 @@ def proxy_main(args, opts):
   try:
     task_runner.run()
   except TaskRunner.InternalError as err:
-    log.error('Internal error: %s' % err)
+    log.error('Internal error: %s', err)
     sys.exit(INTERNAL_ERROR)
   except TaskRunner.InvalidTask as err:
-    log.error('Invalid task: %s' % err)
+    log.error('Invalid task: %s', err)
     sys.exit(INVALID_TASK)
   except TaskRunner.StateError as err:
-    log.error('Checkpoint error: %s' % err)
+    log.error('Checkpoint error: %s', err)
     sys.exit(TERMINAL_TASK)
   except Process.UnknownUserError as err:
-    log.error('User ceased to exist: %s' % err)
+    log.error('User ceased to exist: %s', err)
     sys.exit(UNKNOWN_USER)
   except KeyboardInterrupt:
     log.info('Caught ^C, tearing down runner.')
     runner_teardown(task_runner)
   except Exception as e:
-    log.error('Unknown exception: %s' % e)
+    log.error('Unknown exception: %s', e)
     for line in traceback.format_exc().splitlines():
       log.error(line)
     sys.exit(UNKNOWN_ERROR)

@@ -85,8 +85,8 @@ class TaskRunnerHelper(object):
     process_create_time = process.create_time()
 
     if abs(start_time - process_create_time) >= cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS):
-      log.info("Expected pid %s start time to be %s but it's %s" % (
-          process.pid, start_time, process_create_time))
+      log.info("Expected pid %s start time to be %s but it's %s",
+          process.pid, start_time, process_create_time)
       return False
 
     if uid is not None:
@@ -104,12 +104,12 @@ class TaskRunnerHelper(object):
       elif uid == 0:
         # If the process was launched as root but is now not root, we should
         # kill this because it could have called `setuid` on itself.
-        log.info("pid %s appears to be have launched by root but it's uid is now %s" % (
-            process.pid, process_uid))
+        log.info("pid %s appears to be have launched by root but it's uid is now %s",
+            process.pid, process_uid)
         return True
       else:
-        log.info("Expected pid %s to be ours but the pid uid is %s and we're %s" % (
-            process.pid, process_uid, uid))
+        log.info("Expected pid %s to be ours but the pid uid is %s and we're %s",
+            process.pid, process_uid, uid)
         return False
 
     try:
@@ -121,8 +121,8 @@ class TaskRunnerHelper(object):
       # If the uid was not provided, we must use user -- which is possibly flaky if the
       # user gets deleted from the system, so process_user will be None and we must
       # return False.
-      log.info("Expected pid %s to be ours but the pid user is %s and we're %s" % (
-          process.pid, process_user, user))
+      log.info("Expected pid %s to be ours but the pid user is %s and we're %s",
+          process.pid, process_user, user)
       return True
 
     return False
@@ -141,7 +141,7 @@ class TaskRunnerHelper(object):
     coordinator_pid, pid, tree = None, None, set()
 
     if uid is None:
-      log.debug('Legacy thermos checkpoint stream detected, user = %s' % user)
+      log.debug('Legacy thermos checkpoint stream detected, user = %s', user)
 
     if process_run.coordinator_pid:
       try:
@@ -149,11 +149,11 @@ class TaskRunnerHelper(object):
         if cls.this_is_really_our_pid(coordinator_process, uid, user, process_run.fork_time):
           coordinator_pid = process_run.coordinator_pid
       except psutil.NoSuchProcess:
-        log.info('  Coordinator %s [pid: %s] completed.' % (process_run.process,
-            process_run.coordinator_pid))
+        log.info('  Coordinator %s [pid: %s] completed.', process_run.process,
+            process_run.coordinator_pid)
       except psutil.Error as err:
-        log.warning('  Error gathering information on pid %s: %s' % (process_run.coordinator_pid,
-            err))
+        log.warning('  Error gathering information on pid %s: %s', process_run.coordinator_pid,
+            err)
 
     if process_run.pid:
       try:
@@ -161,15 +161,15 @@ class TaskRunnerHelper(object):
         if cls.this_is_really_our_pid(process, uid, user, process_run.start_time):
           pid = process.pid
       except psutil.NoSuchProcess:
-        log.info('  Process %s [pid: %s] completed.' % (process_run.process, process_run.pid))
+        log.info('  Process %s [pid: %s] completed.', process_run.process, process_run.pid)
       except psutil.Error as err:
-        log.warning('  Error gathering information on pid %s: %s' % (process_run.pid, err))
+        log.warning('  Error gathering information on pid %s: %s', process_run.pid, err)
       else:
         if pid:
           try:
             tree = set(child.pid for child in process.children(recursive=True))
           except psutil.Error:
-            log.warning('  Error gathering information on children of pid %s' % pid)
+            log.warning('  Error gathering information on children of pid %s', pid)
 
     return (coordinator_pid, pid, tree)
 
@@ -192,9 +192,9 @@ class TaskRunnerHelper(object):
       os.kill(pid, sig)
     except OSError as e:
       if e.errno not in (errno.ESRCH, errno.EPERM):
-        log.error('Unexpected error in os.kill: %s' % e)
+        log.error('Unexpected error in os.kill: %s', e)
     except Exception as e:
-      log.error('Unexpected error in os.kill: %s' % e)
+      log.error('Unexpected error in os.kill: %s', e)
 
   @classmethod
   def terminate_pid(cls, pid):
@@ -240,16 +240,16 @@ class TaskRunnerHelper(object):
 
   @classmethod
   def terminate_process(cls, state, process_name):
-    log.debug('TaskRunnerHelper.terminate_process(%s)' % process_name)
+    log.debug('TaskRunnerHelper.terminate_process(%s)', process_name)
     _, pid, _ = cls._get_process_tuple(state, process_name)
     if pid:
-      log.debug('   => SIGTERM pid %s' % pid)
+      log.debug('   => SIGTERM pid %s', pid)
       cls.terminate_pid(pid)
     return bool(pid)
 
   @classmethod
   def kill_process(cls, state, process_name):
-    log.debug('TaskRunnerHelper.kill_process(%s)' % process_name)
+    log.debug('TaskRunnerHelper.kill_process(%s)', process_name)
     coordinator_pgid = cls._get_coordinator_group(state, process_name)
     coordinator_pid, pid, tree = cls._get_process_tuple(state, process_name)
     # This is super dangerous.  TODO(wickman)  Add a heuristic that determines
@@ -257,16 +257,16 @@ class TaskRunnerHelper(object):
     #  and 2) those processes have inherited the coordinator checkpoint filehandle
     # This way we validate that it is in fact the process group we expect.
     if coordinator_pgid:
-      log.debug('   => SIGKILL coordinator group %s' % coordinator_pgid)
+      log.debug('   => SIGKILL coordinator group %s', coordinator_pgid)
       cls.kill_group(coordinator_pgid)
     if coordinator_pid:
-      log.debug('   => SIGKILL coordinator %s' % coordinator_pid)
+      log.debug('   => SIGKILL coordinator %s', coordinator_pid)
       cls.kill_pid(coordinator_pid)
     if pid:
-      log.debug('   => SIGKILL pid %s' % pid)
+      log.debug('   => SIGKILL pid %s', pid)
       cls.kill_pid(pid)
     for child in tree:
-      log.debug('   => SIGKILL child %s' % child)
+      log.debug('   => SIGKILL child %s', child)
       cls.kill_pid(child)
     return bool(coordinator_pid or pid or tree)
 
@@ -380,11 +380,11 @@ class TaskRunnerHelper(object):
         if pid == 0:
           break
         pids.add(pid)
-        log.debug('Detected terminated process: pid=%s, status=%s, rusage=%s' % (
-          pid, status, rusage))
+        log.debug('Detected terminated process: pid=%s, status=%s, rusage=%s',
+          pid, status, rusage)
       except OSError as e:
         if e.errno != errno.ECHILD:
-          log.warning('Unexpected error when calling waitpid: %s' % e)
+          log.warning('Unexpected error when calling waitpid: %s', e)
         break
 
     return pids

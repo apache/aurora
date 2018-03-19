@@ -80,7 +80,7 @@ class TaskMonitor(object):
             try:
               self._dispatcher.dispatch(self._runnerstate, runner_update)
             except CheckpointDispatcher.InvalidSequenceNumber as e:
-              log.error('Checkpoint stream is corrupt: %s' % e)
+              log.error('Checkpoint stream is corrupt: %s', e)
               break
           new_ckpt_head = fp.tell()
           updated = self._ckpt_head != new_ckpt_head
@@ -89,7 +89,7 @@ class TaskMonitor(object):
     except OSError as e:
       if e.errno == errno.ENOENT:
         # The log doesn't yet exist, will retry later.
-        log.warning('Could not read from checkpoint %s' % self._runner_ckpt)
+        log.warning('Could not read from checkpoint %s', self._runner_ckpt)
         return False
       else:
         raise

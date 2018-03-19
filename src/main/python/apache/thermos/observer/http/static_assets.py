@@ -35,7 +35,7 @@ class StaticAssets(object):
     assets = pkg_resources.resource_listdir(__name__, 'assets')
     cached_assets = {}
     for asset in assets:
-      log.info('  detected asset: %s' % asset)
+      log.info('  detected asset: %s', asset)
       cached_assets[asset] = pkg_resources.resource_string(
         __name__, os.path.join('assets', asset))
     self._assets = cached_assets
