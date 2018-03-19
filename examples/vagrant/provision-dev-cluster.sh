@@ -42,6 +42,18 @@ Host *
 EOF
 }
 
+function install_rsyslog_config {
+  cat >> /etc/rsyslog.d/10-aurora.conf <<EOF
+# Send scheduler logs to /var/log/aurora/scheduler.log
+:syslogtag, contains, "aurora-scheduler" /var/log/aurora/scheduler.log
+
+# Send observer logs to /var/log/thermos/observer.log
+:syslogtag, contains, "thermos-observer" /var/log/thermos/observer.log
+
+EOF
+  systemctl restart rsyslog
+}
+
 function configure_netrc {
   cat > /home/vagrant/.netrc <<EOF
 machine $(hostname -f)
@@ -94,6 +106,7 @@ prepare_sources
 prepare_extras
 install_cluster_config
 install_ssh_config
+install_rsyslog_config
 start_services
 configure_netrc
 docker_setup

@@ -16,6 +16,9 @@ After=network.target
 Wants=network.target
 
 [Service]
+# Identifier for rsyslog redirect (see `install_rsyslog_config` in `provision-dev-cluster.sh`).
+SyslogIdentifier=thermos-observer
+
 ExecStart=/home/vagrant/aurora/dist/thermos_observer.pex \
   --ip=192.168.33.7 \
   --port=1338 \

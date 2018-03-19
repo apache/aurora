@@ -71,7 +71,7 @@ function build_observer {
   ./pants binary src/main/python/apache/aurora/tools:thermos_observer
   ./pants binary src/main/python/apache/aurora/tools:thermos
   sudo ln -sf $DIST_DIR/thermos.pex /usr/local/bin/thermos
-  sudo systemctl restart aurora-executor
+  sudo systemctl restart thermos
 }
 
 function build_all {

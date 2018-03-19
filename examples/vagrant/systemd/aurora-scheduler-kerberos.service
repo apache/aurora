@@ -21,8 +21,10 @@ Environment="GLOG_v=0"
 Environment="LIBPROCESS_PORT=8083"
 Environment="LIBPROCESS_IP=192.168.33.7"
 Environment="MESOS_NATIVE_JAVA_LIBRARY=/usr/lib/libmesos.so"
-
 Environment="DIST_DIR=/home/vagrant/aurora/dist"
+
+# Identifier for rsyslog redirect (see `install_rsyslog_config` in `provision-dev-cluster.sh`).
+SyslogIdentifier=aurora-scheduler
 
 # Flags that control the behavior of the JVM.
 Environment="JAVA_OPTS='-Djava.library.path=/usr/lib \
