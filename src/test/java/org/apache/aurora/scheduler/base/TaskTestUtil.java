@@ -59,9 +59,6 @@ import org.apache.mesos.v1.Protos.ExecutorInfo;
 
 /**
  * Convenience methods for working with tasks.
- * <p>
- * TODO(wfarner): This lives in under src/main only so benchmarks can access it.  Reconsider the
- * project layout so this is not necessary.
  */
 public final class TaskTestUtil {
 

@@ -30,9 +30,7 @@ import com.google.inject.Injector;
 
 import org.apache.aurora.common.util.BuildInfo;
 import org.apache.aurora.common.util.Clock;
-import org.apache.aurora.scheduler.TierModule;
 import org.apache.aurora.scheduler.app.LifecycleModule;
-import org.apache.aurora.scheduler.base.TaskTestUtil;
 import org.apache.aurora.scheduler.config.converters.DataAmountConverter;
 import org.apache.aurora.scheduler.config.converters.InetSocketAddressConverter;
 import org.apache.aurora.scheduler.config.converters.TimeAmountConverter;
@@ -78,7 +76,6 @@ public final class RecoveryTool {
     @Override
     public Persistence create() {
       Injector injector = Guice.createInjector(
-          new TierModule(TaskTestUtil.TIER_CONFIG),
           new MesosLogStreamModule(logOptions, FlaggedZooKeeperConfig.create(zkOptions)),
           new LogPersistenceModule(options),
           new LifecycleModule(),
