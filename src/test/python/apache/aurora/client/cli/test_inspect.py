@@ -22,6 +22,8 @@ from apache.aurora.config import AuroraConfig
 from apache.aurora.config.schema.base import Job
 from apache.thermos.config.schema_base import MB, Process, Resources, Task
 
+from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME
+
 from .util import AuroraClientCommandTest
 
 
@@ -138,6 +140,10 @@ Process 'process':
         "production": False,
         "role": "bozo",
         "contact": "bozo@the.clown",
+        "executor_config": {
+         "name": AURORA_EXECUTOR_NAME,
+         "data": ""
+        },
         "metadata": [],
         "lifecycle": {
             "http": {

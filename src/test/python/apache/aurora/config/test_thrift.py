@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import json
 import getpass
 import re
 
@@ -24,6 +25,7 @@ from apache.aurora.config.schema.base import (
     Container,
     Docker,
     DockerImage,
+    ExecutorConfig,
     HealthCheckConfig,
     Job,
     Mesos,
@@ -37,7 +39,7 @@ from apache.aurora.config.thrift import convert as convert_pystachio_to_thrift
 from apache.aurora.config.thrift import InvalidConfig, task_instance_from_job
 from apache.thermos.config.schema import Process, Resources, Task
 
-from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
+from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME, GOOD_IDENTIFIER_PATTERN_PYTHON
 from gen.apache.aurora.api.ttypes import Mode as ThriftMode
 from gen.apache.aurora.api.ttypes import (
     CronCollisionPolicy,
@@ -59,6 +61,75 @@ HELLO_WORLD = Job(
     resources=Resources(cpu=0.1, ram=64 * 1048576, disk=64 * 1048576, gpu=2),
   )
 )
+
+HELLO_WORLD_EXECUTOR_DATA = {
+  "environment": "staging66",
+  "health_check_config": {
+    "health_checker": {
+      "http": {
+        "expected_response_code": 0,
+        "endpoint": "/health",
+        "expected_response": "ok"
+      }
+    },
+    "min_consecutive_successes": 1,
+    "initial_interval_secs": 15.0,
+    "max_consecutive_failures": 0,
+    "timeout_secs": 1.0,
+    "interval_secs": 10.0
+  },
+  "name": "hello_world",
+  "service": False,
+  "max_task_failures": 1,
+  "executor_config": {
+    "data": "",
+    "name": "AuroraExecutor"
+  },
+  "cron_collision_policy": "KILL_EXISTING",
+  "enable_hooks": False,
+  "cluster": "smf1-test",
+  "task": {
+    "processes": [
+      {
+        "daemon": False,
+        "name": "hello_world",
+        "ephemeral": False,
+        "max_failures": 1,
+        "min_duration": 5,
+        "cmdline": "echo {{mesos.instance}}",
+        "final": False
+      }
+    ],
+    "name": "main",
+    "finalization_wait": 30,
+    "max_failures": 1,
+    "max_concurrency": 0,
+    "resources": {
+      "gpu": 2,
+      "disk": 67108864,
+      "ram": 67108864,
+      "cpu": 0.1
+    },
+    "constraints": [
+
+    ]
+  },
+  "production": False,
+  "role": "john_doe",
+  "metadata": [
+
+  ],
+  "lifecycle": {
+    "http": {
+      "graceful_shutdown_endpoint": "/quitquitquit",
+      "graceful_shutdown_wait_secs": 5,
+      "port": "health",
+      "shutdown_wait_secs": 5,
+      "shutdown_endpoint": "/abortabortabort"
+    }
+  },
+  "priority": 0
+}
 
 
 def test_simple_config():
@@ -308,6 +379,30 @@ def test_config_with_duplicate_metadata():
   metadata_tuples = frozenset((key_value.key, key_value.value)
                               for key_value in tti.metadata)
   assert metadata_tuples == expected_metadata_tuples
+
+
+def test_config_with_implicit_thermos_executor_config():
+  job = convert_pystachio_to_thrift(HELLO_WORLD())
+
+  assert str(job.taskConfig.executorConfig.name) == AURORA_EXECUTOR_NAME
+  assert json.loads(job.taskConfig.executorConfig.data) == HELLO_WORLD_EXECUTOR_DATA
+
+
+def test_config_with_explicit_thermos_executor_config():
+  job = convert_pystachio_to_thrift(
+      HELLO_WORLD(executor_config=ExecutorConfig(name=AURORA_EXECUTOR_NAME)))
+
+  assert str(job.taskConfig.executorConfig.name) == AURORA_EXECUTOR_NAME
+  assert json.loads(job.taskConfig.executorConfig.data) == HELLO_WORLD_EXECUTOR_DATA
+
+
+def test_config_with_custom_executor_config():
+  job = convert_pystachio_to_thrift(
+      HELLO_WORLD(executor_config=ExecutorConfig(
+          name="CustomExecutor", data="{test:'payload'}")))
+
+  assert str(job.taskConfig.executorConfig.name) == "CustomExecutor"
+  assert str(job.taskConfig.executorConfig.data) == "{test:'payload'}"
 
 
 def test_task_instance_from_job():

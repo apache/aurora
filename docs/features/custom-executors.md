@@ -145,9 +145,22 @@ Some information about launched tasks can still be accessed via the Mesos Web UI
 
 ### Using a custom executor
 
-At this time, it is not currently possible create a job that runs on a custom executor using the default
-Aurora client. To allow the scheduler to pick the correct executor, the `JobConfiguration.TaskConfig.ExecutorConfig.name`
-field must be set to match the name used in the custom executor configuration blob. (e.g. to run a job using myExecutor,
-`JobConfiguration.TaskConfig.ExecutorConfig.name` must be set to `myExecutor`). While support for modifying
-this field in Pystachio created, the easiest way to launch jobs with custom executors is to use
-an existing custom Client such as [gorealis](https://github.com/rdelval/gorealis).
+To launch tasks using a custom executor,
+an [ExecutorConfig](../reference/configuration.md#executorconfig-objects) object must be added to
+the Job or Service object. The `name` parameter of ExecutorConfig must match the name of an executor
+defined in the JSON object provided to the scheduler at startup time.
+
+For example, if we desire to launch tasks using `myExecutor` (defined above), we may do so in
+the following manner:
+
+```
+jobs = [Service(
+  task = task,
+  cluster = 'devcluster',
+  role = 'www-data',
+  environment = 'prod',
+  name = 'hello',
+  executor_config = ExecutorConfig(name='myExecutor'))]
+```
+
+This will create a Service Job which will launch tasks using myExecutor instead of Thermos.

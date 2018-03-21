@@ -337,9 +337,16 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   if unbound:
     raise InvalidConfig('Config contains unbound variables: %s' % ' '.join(map(str, unbound)))
 
-  task.executorConfig = ExecutorConfig(
+  # set the executor that will be used by the Mesos task. Thermos is the default
+  executor = job.executor_config()
+  if fully_interpolated(executor.name()) == AURORA_EXECUTOR_NAME:
+    task.executorConfig = ExecutorConfig(
       name=AURORA_EXECUTOR_NAME,
       data=filter_aliased_fields(underlying).json_dumps())
+  else:
+    task.executorConfig = ExecutorConfig(
+      name=fully_interpolated(executor.name()),
+      data=fully_interpolated(executor.data()))
 
   return JobConfiguration(
       key=key,

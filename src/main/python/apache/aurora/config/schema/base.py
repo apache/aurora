@@ -19,6 +19,7 @@ from pystachio import Choice
 
 from apache.thermos.config.schema import *
 
+from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME
 
 # TODO(wickman) Bind {{mesos.instance}} to %shard_id%
 class MesosContext(Struct):
@@ -163,6 +164,9 @@ class Metadata(Struct):
   key   = Required(String)
   value = Required(String)
 
+class ExecutorConfig(Struct):
+  name = Default(String, AURORA_EXECUTOR_NAME)
+  data = Default(String, "")
 
 class MesosJob(Struct):
   name          = Default(String, '{{task.name}}')
@@ -190,6 +194,7 @@ class MesosJob(Struct):
   # TODO(wickman) Make Default(Any, LifecycleConfig()) once pystachio #17 is addressed.
   lifecycle                  = Default(LifecycleConfig, DefaultLifecycleConfig)
   task_links                 = Map(String, String)  # Unsupported.  See AURORA-739
+  executor_config            = Default(ExecutorConfig, ExecutorConfig())
 
   enable_hooks = Default(Boolean, False)  # enable client API hooks; from env python-list 'hooks'
 

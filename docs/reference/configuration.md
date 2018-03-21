@@ -358,6 +358,7 @@ Job Schema
   ```enable_hooks``` | Boolean | Whether to enable [Client Hooks](client-hooks.md) for this job. (Default: False)
   ```partition_policy``` | ```PartitionPolicy``` object | An optional partition policy that allows job owners to define how to handle partitions for running tasks (in partition-aware Aurora clusters)
   ```metadata``` | list of ```Metadata``` objects | list of ```Metadata``` objects for user's customized metadata information.
+  ```executor_config``` | ```ExecutorConfig``` object | Allows choosing an alternative executor defined in `custom_executor_config` to be used instead of Thermos. Tasks will be launched with Thermos as the executor by default. See [Custom Executors](../features/custom-executors.md) for more info.
 
 
 ### UpdateConfig Objects
@@ -419,6 +420,15 @@ Describes a piece of user metadata in a key value pair
   -----            | :----:          | -----------
   ```key```        | String          | Indicate which metadata the user provides
   ```value```      | String          | Provide the metadata content for corresponding key
+
+### ExecutorConfig Objects
+
+Describes an Executor name and data to pass to the Mesos Task
+
+| param                          | type      | description
+| -------                        | :-------: | --------
+| ```name```               | String   | Name of the executor to use for this task. Must match the name of an executor in `custom_executor_config` or Thermos (`AuroraExecutor`). (Default: AuroraExecutor)
+| ```data```               | String   | Data blob to pass on to the executor. (Default: "")
 
 ### Announcer Objects
 
