@@ -51,7 +51,7 @@ final class Tasks {
    */
   static final class Builder {
     private JobKey jobKey = new JobKey("jmh", "dev", "benchmark");
-    private boolean isProduction = false;
+    private String tier = TaskTestUtil.DEV_TIER_NAME;
     private double cpu = 6.0;
     private Amount<Long, Data> ram = Amount.of(8L, Data.GB);
     private Amount<Long, Data> disk = Amount.of(128L, Data.GB);
@@ -95,8 +95,8 @@ final class Tasks {
       return this;
     }
 
-    Builder setProduction(boolean newProduction) {
-      isProduction = newProduction;
+    Builder setTier(String newTier) {
+      tier = newTier;
       return this;
     }
 
@@ -144,7 +144,7 @@ final class Tasks {
         builder.getAssignedTask().setAssignedPorts(ImmutableMap.of());
         builder.getAssignedTask().getTask()
             .setConstraints(constraints.build())
-            .setProduction(isProduction)
+            .setTier(tier)
             .setResources(ImmutableSet.of(
                 numCpus(cpu),
                 ramMb(ram.as(Data.MB)),

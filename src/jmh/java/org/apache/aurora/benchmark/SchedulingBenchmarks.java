@@ -220,10 +220,11 @@ public class SchedulingBenchmarks {
       int numVictimTasks = (int) Math.round(numOffers * settings.getVictimClusterUtilization());
       return Sets.union(
         new Tasks.Builder()
+          .setTier(TaskTestUtil.PROD_TIER_NAME)
           .build(numSiblingTasks),
         new Tasks.Builder()
           .setRole("victim")
-          .setProduction(!settings.areAllVictimsEligibleForPreemption())
+          .setTier(TaskTestUtil.DEV_TIER_NAME)
           .build(numVictimTasks));
     }
 
@@ -310,7 +311,7 @@ public class SchedulingBenchmarks {
       return new BenchmarkSettings.Builder()
           .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(1000))
           .setTasks(new Tasks.Builder()
-              .setProduction(true)
+              .setTier(TaskTestUtil.PROD_TIER_NAME)
               .setCpu(32)
               .build(1)).build();
     }
@@ -325,7 +326,7 @@ public class SchedulingBenchmarks {
       return new BenchmarkSettings.Builder()
           .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(1000))
           .setTasks(new Tasks.Builder()
-              .setProduction(true)
+              .setTier(TaskTestUtil.PROD_TIER_NAME)
               .addValueConstraint("host", "denied")
               .build(1)).build();
     }
@@ -340,7 +341,7 @@ public class SchedulingBenchmarks {
       return new BenchmarkSettings.Builder()
           .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(1000))
           .setTasks(new Tasks.Builder()
-              .setProduction(true)
+              .setTier(TaskTestUtil.PROD_TIER_NAME)
               .addLimitConstraint("host", 0)
               .build(1)).build();
     }
@@ -356,10 +357,9 @@ public class SchedulingBenchmarks {
       return new BenchmarkSettings.Builder()
           .setSiblingClusterUtilization(0.1)
           .setVictimClusterUtilization(0.9)
-          .setVictimPreemptionEligibilty(true)
           .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(10000))
           .setTasks(new Tasks.Builder()
-              .setProduction(true)
+              .setTier(TaskTestUtil.PROD_TIER_NAME)
               .addLimitConstraint("host", 0)
               .build(1)).build();
     }
@@ -387,7 +387,7 @@ public class SchedulingBenchmarks {
           .setVictimClusterUtilization(0.9)
           .setHostAttributes(new Hosts.Builder().setNumHostsPerRack(2).build(10000))
           .setTasks(new Tasks.Builder()
-              .setProduction(true)
+              .setTier(TaskTestUtil.PROD_TIER_NAME)
               .addValueConstraint("host", "denied")
               .build(numPendingTasks)).build();
     }
