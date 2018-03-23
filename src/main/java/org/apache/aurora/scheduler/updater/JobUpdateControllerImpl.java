@@ -573,9 +573,6 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   @VisibleForTesting
-  static final String LOST_LOCK_MESSAGE = "Updater has lost its exclusive lock, unable to proceed.";
-
-  @VisibleForTesting
   static final String PULSE_TIMEOUT_MESSAGE = "Pulses from external service have timed out.";
 
   private void evaluateUpdater(
