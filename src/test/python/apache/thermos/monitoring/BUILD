@@ -16,10 +16,16 @@ python_tests(
   name = 'monitoring',
   sources = globs('*.py'),
   dependencies = [
+    '3rdparty/python:certifi',
+    '3rdparty/python:chardet',
+    '3rdparty/python:httpretty',
+    '3rdparty/python:idna',
     '3rdparty/python:mock',
+    '3rdparty/python:requests',
     '3rdparty/python:twitter.common.contextutil',
     '3rdparty/python:twitter.common.dirutil',
     '3rdparty/python:twitter.common.quantity',
+    '3rdparty/python:urllib3',
     'src/main/python/apache/thermos/common',
     'src/main/python/apache/thermos/monitoring',
   ]

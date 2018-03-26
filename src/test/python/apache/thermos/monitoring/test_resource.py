@@ -19,9 +19,11 @@ import mock
 import pytest
 from twitter.common.quantity import Amount, Time
 
+from apache.thermos.monitoring.disk import DuDiskCollector, MesosDiskCollector
 from apache.thermos.monitoring.monitor import TaskMonitor
 from apache.thermos.monitoring.process import ProcessSample
 from apache.thermos.monitoring.resource import (
+    DiskCollectorProvider,
     HistoryProvider,
     ResourceHistory,
     ResourceMonitorBase,
@@ -35,6 +37,16 @@ class TestResourceHistoryProvider(TestCase):
   def test_too_long_history(self):
     with pytest.raises(ValueError):
       HistoryProvider().provides(Amount(1, Time.DAYS), 1)
+
+
+class TestDiskCollectorProvider(TestCase):
+  def test_default_collector_class(self):
+    assert isinstance(DiskCollectorProvider().provides("some_path"), DuDiskCollector)
+
+  def test_mesos_collector_class(self):
+    assert isinstance(
+      DiskCollectorProvider(enable_mesos_disk_collector=True).provides("some_path"),
+      MesosDiskCollector)
 
 
 class TestResourceHistory(TestCase):

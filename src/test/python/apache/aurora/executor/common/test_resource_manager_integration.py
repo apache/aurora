@@ -23,7 +23,7 @@ from apache.aurora.executor.common.resource_manager import ResourceManagerProvid
 from apache.aurora.executor.common.sandbox import DirectorySandbox
 from apache.thermos.common.path import TaskPath
 from apache.thermos.core.helper import TaskRunnerHelper
-from apache.thermos.monitoring.disk import DiskCollector
+from apache.thermos.monitoring.resource import DiskCollectorProvider
 
 from gen.apache.thermos.ttypes import RunnerCkpt, RunnerHeader
 
@@ -88,8 +88,8 @@ def test_resource_manager():
     root = os.path.join(td, 'thermos')
     write_header(root, sandbox, assigned_task.taskId)
 
-    mock_disk_collector_class = mock.create_autospec(DiskCollector, spec_set=True)
-    mock_disk_collector = mock_disk_collector_class.return_value
+    mock_disk_collector_provider = mock.create_autospec(DiskCollectorProvider, spec_set=True)
+    mock_disk_collector = mock_disk_collector_provider.provides.return_value
 
     mock_disk_collector.sample.return_value = None
     value_mock = mock.PropertyMock(return_value=4197)
@@ -99,7 +99,7 @@ def test_resource_manager():
     completed_mock = mock.PropertyMock(return_value=completed_event)
     type(mock_disk_collector).completed_event = completed_mock
 
-    rmp = ResourceManagerProvider(root, disk_collector=mock_disk_collector_class)
+    rmp = ResourceManagerProvider(root, disk_collector_provider=mock_disk_collector_provider)
     rm = rmp.from_assigned_task(assigned_task, DirectorySandbox(sandbox))
 
     assert rm.status is None

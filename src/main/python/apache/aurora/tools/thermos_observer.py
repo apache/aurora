@@ -23,6 +23,7 @@ from twitter.common.quantity import Amount, Time
 
 from apache.aurora.executor.common.path_detector import MesosPathDetector
 from apache.thermos.common.excepthook import ExceptionTerminationHandler
+from apache.thermos.monitoring.disk import DiskCollectorSettings
 from apache.thermos.monitoring.resource import TaskResourceMonitor
 from apache.thermos.observer.http.configure import configure_server
 from apache.thermos.observer.task_observer import TaskObserver
@@ -53,26 +54,59 @@ app.add_option(
 
 app.add_option(
     '--polling_interval_secs',
-      dest='polling_interval_secs',
-      type='int',
-      default=int(TaskObserver.POLLING_INTERVAL.as_(Time.SECONDS)),
-      help='The number of seconds between observer refresh attempts.')
+    dest='polling_interval_secs',
+    type='int',
+    default=int(TaskObserver.POLLING_INTERVAL.as_(Time.SECONDS)),
+    help='The number of seconds between observer refresh attempts.')
 
 
 app.add_option(
     '--task_process_collection_interval_secs',
-      dest='task_process_collection_interval_secs',
-      type='int',
-      default=int(TaskResourceMonitor.PROCESS_COLLECTION_INTERVAL.as_(Time.SECONDS)),
-      help='The number of seconds between per task process resource collections.')
+    dest='task_process_collection_interval_secs',
+    type='int',
+    default=int(TaskResourceMonitor.PROCESS_COLLECTION_INTERVAL.as_(Time.SECONDS)),
+    help='The number of seconds between per task process resource collections.')
 
 
 app.add_option(
     '--task_disk_collection_interval_secs',
-      dest='task_disk_collection_interval_secs',
-      type='int',
-      default=int(TaskResourceMonitor.DISK_COLLECTION_INTERVAL.as_(Time.SECONDS)),
-      help='The number of seconds between per task disk resource collections.')
+    dest='task_disk_collection_interval_secs',
+    type='int',
+    default=int(DiskCollectorSettings.DISK_COLLECTION_INTERVAL.as_(Time.SECONDS)),
+    help='The number of seconds between per task disk resource collections.')
+
+
+app.add_option(
+    '--enable_mesos_disk_collector',
+    dest='enable_mesos_disk_collector',
+    default=False,
+    action='store_true',
+    help="Delegate per task disk usage collection to agent. Should be enabled in conjunction to "
+         "disk isolation in Mesos-agent. This is not compatible with an authenticated agent API.")
+
+
+app.add_option(
+    '--agent_api_url',
+    dest='agent_api_url',
+    type='string',
+    default=DiskCollectorSettings.DEFAULT_AGENT_CONTAINERS_ENDPOINT,
+    help='Mesos Agent API url.')
+
+
+app.add_option(
+    '--executor_id_json_path',
+    dest='executor_id_json_path',
+    type='string',
+    default=DiskCollectorSettings.DEFAULT_EXECUTOR_ID_PATH,
+    help='`jmespath` to executor_id key in agent response json object.')
+
+
+app.add_option(
+    '--disk_usage_json_path',
+    dest='disk_usage_json_path',
+    type='string',
+    default=DiskCollectorSettings.DEFAULT_DISK_USAGE_PATH,
+    help='`jmespath` to disk usage bytes value in agent response json object.')
 
 
 # Allow an interruptible sleep so that ^C works.
@@ -83,11 +117,18 @@ def sleep_forever():
 
 def initialize(options):
   path_detector = MesosPathDetector(options.mesos_root)
+  disk_collector_settings = DiskCollectorSettings(
+      options.agent_api_url,
+      options.executor_id_json_path,
+      options.disk_usage_json_path,
+      Amount(options.task_disk_collection_interval_secs, Time.SECONDS))
+
   return TaskObserver(
       path_detector,
       Amount(options.polling_interval_secs, Time.SECONDS),
       Amount(options.task_process_collection_interval_secs, Time.SECONDS),
-      Amount(options.task_disk_collection_interval_secs, Time.SECONDS))
+      enable_mesos_disk_collector=options.enable_mesos_disk_collector,
+      disk_collector_settings=disk_collector_settings)
 
 
 def main(_, options):

@@ -19,6 +19,7 @@ python_library(
   name = 'monitoring',
   sources = rglobs('*.py'),
   dependencies = [
+    '3rdparty/python:jmespath',
     '3rdparty/python:psutil',
     '3rdparty/python:twitter.common.collections',
     '3rdparty/python:twitter.common.concurrent',

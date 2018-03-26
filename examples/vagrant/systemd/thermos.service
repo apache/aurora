@@ -22,6 +22,8 @@ SyslogIdentifier=thermos-observer
 ExecStart=/home/vagrant/aurora/dist/thermos_observer.pex \
   --ip=192.168.33.7 \
   --port=1338 \
+  --enable_mesos_disk_collector \
+  --agent_api_url=http://192.168.33.7:5051/containers \
   --log_to_disk=NONE \
   --log_to_stderr=google:INFO
 User=root

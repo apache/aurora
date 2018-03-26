@@ -41,7 +41,7 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Time
 
-from .disk import DiskCollector
+from .disk import DiskCollectorSettings, DuDiskCollector, MesosDiskCollector
 from .process import ProcessSample
 from .process_collector_psutil import ProcessTreeCollector
 
@@ -141,6 +141,23 @@ class HistoryProvider(object):
     return ResourceHistory(history_length)
 
 
+class DiskCollectorProvider(object):
+  DEFAULT_DISK_COLLECTOR_CLASS = DuDiskCollector
+
+  def __init__(
+      self,
+      enable_mesos_disk_collector=False,
+      settings=DiskCollectorSettings()):
+
+    self.settings = settings
+    self.disk_collector_class = self.DEFAULT_DISK_COLLECTOR_CLASS
+    if enable_mesos_disk_collector:
+      self.disk_collector_class = MesosDiskCollector
+
+  def provides(self, sandbox):
+    return self.disk_collector_class(sandbox, settings=self.settings)
+
+
 class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
   """ Lightweight thread to aggregate resource consumption for a task's constituent processes.
       Actual resource calculation is delegated to collectors; this class periodically polls the
@@ -149,17 +166,18 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
   """
 
   PROCESS_COLLECTION_INTERVAL = Amount(20, Time.SECONDS)
-  DISK_COLLECTION_INTERVAL = Amount(60, Time.SECONDS)
   HISTORY_TIME = Amount(1, Time.HOURS)
 
-  def __init__(self,
-               task_id,
-               task_monitor,
-               disk_collector=DiskCollector,
-               process_collection_interval=PROCESS_COLLECTION_INTERVAL,
-               disk_collection_interval=DISK_COLLECTION_INTERVAL,
-               history_time=HISTORY_TIME,
-               history_provider=HistoryProvider()):
+  def __init__(
+      self,
+      task_id,
+      task_monitor,
+      disk_collector_provider=DiskCollectorProvider(),
+      process_collection_interval=PROCESS_COLLECTION_INTERVAL,
+      disk_collection_interval=DiskCollectorSettings.DISK_COLLECTION_INTERVAL,
+      history_time=HISTORY_TIME,
+      history_provider=HistoryProvider()):
+
     """
       task_monitor: TaskMonitor object specifying the task whose resources should be monitored
       sandbox: Directory for which to monitor disk utilisation
@@ -168,7 +186,8 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
     self._task_id = task_id
     log.debug('Initialising resource collection for task %s', self._task_id)
     self._process_collectors = dict()  # ProcessStatus => ProcessTreeCollector
-    self._disk_collector_class = disk_collector
+
+    self._disk_collector_provider = disk_collector_provider
     self._disk_collector = None
     self._process_collection_interval = process_collection_interval.as_(Time.SECONDS)
     self._disk_collection_interval = disk_collection_interval.as_(Time.SECONDS)
@@ -248,7 +267,7 @@ class TaskResourceMonitor(ResourceMonitorBase, ExceptionalThread):
         if not self._disk_collector:
           sandbox = self._task_monitor.get_sandbox()
           if sandbox:
-            self._disk_collector = self._disk_collector_class(sandbox)
+            self._disk_collector = self._disk_collector_provider.provides(sandbox)
         if self._disk_collector:
           self._disk_collector.sample()
         else:

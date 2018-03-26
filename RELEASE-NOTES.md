@@ -6,6 +6,11 @@
   `JobConfiguration.TaskConfig.ExecutorConfig`. This allows for using custom executors defined
   through the `--custom_executor_config` scheduler flag. See our
   [custom-executors](docs/features/custom-executors.md) documentation for more information.
+- Added support in Thermos Observer for delegating disk usage monitoring to Mesos agent. The feature
+  can be enabled via `--enable_mesos_disk_collector` flag, in which case Observer will use the
+  agent's containers HTTP API to query the amount of used bytes for each container. Note that disk
+  isolation should be enabled in Mesos agent. This feature is not compatible with authentication
+  enabled agents.
 
 0.20.0
 ===================

@@ -30,9 +30,10 @@ from twitter.common.lang import Lockable
 from twitter.common.quantity import Amount, Time
 
 from apache.thermos.common.path import TaskPath
+from apache.thermos.monitoring.disk import DiskCollectorSettings
 from apache.thermos.monitoring.monitor import TaskMonitor
 from apache.thermos.monitoring.process import ProcessSample
-from apache.thermos.monitoring.resource import TaskResourceMonitor
+from apache.thermos.monitoring.resource import DiskCollectorProvider, TaskResourceMonitor
 
 from .detector import ObserverTaskDetector
 from .observed_task import ActiveObservedTask, FinishedObservedTask
@@ -54,11 +55,14 @@ class TaskObserver(ExceptionalThread, Lockable):
 
   POLLING_INTERVAL = Amount(5, Time.SECONDS)
 
-  def __init__(self,
-               path_detector,
-               interval=POLLING_INTERVAL,
-               task_process_collection_interval=TaskResourceMonitor.PROCESS_COLLECTION_INTERVAL,
-               task_disk_collection_interval=TaskResourceMonitor.DISK_COLLECTION_INTERVAL):
+  def __init__(
+      self,
+      path_detector,
+      interval=POLLING_INTERVAL,
+      task_process_collection_interval=TaskResourceMonitor.PROCESS_COLLECTION_INTERVAL,
+      enable_mesos_disk_collector=False,
+      disk_collector_settings=DiskCollectorSettings()):
+
     self._detector = ObserverTaskDetector(
         path_detector,
         self.__on_active,
@@ -66,7 +70,8 @@ class TaskObserver(ExceptionalThread, Lockable):
         self.__on_removed)
     self._interval = interval
     self._task_process_collection_interval = task_process_collection_interval
-    self._task_disk_collection_interval = task_disk_collection_interval
+    self._enable_mesos_disk_collector = enable_mesos_disk_collector
+    self._disk_collector_settings = disk_collector_settings
     self._active_tasks = {}    # task_id => ActiveObservedTask
     self._finished_tasks = {}  # task_id => FinishedObservedTask
     self._stop_event = threading.Event()
@@ -101,18 +106,23 @@ class TaskObserver(ExceptionalThread, Lockable):
       log.error('Found an active task (%s) in finished tasks?', task_id)
       return
     task_monitor = TaskMonitor(root, task_id)
+
+    disk_collector_provider = DiskCollectorProvider(
+      self._enable_mesos_disk_collector,
+      self._disk_collector_settings)
+
     resource_monitor = TaskResourceMonitor(
         task_id,
         task_monitor,
+        disk_collector_provider=disk_collector_provider,
         process_collection_interval=self._task_process_collection_interval,
-        disk_collection_interval=self._task_disk_collection_interval)
+        disk_collection_interval=self._disk_collector_settings.disk_collection_interval)
     resource_monitor.start()
     self._active_tasks[task_id] = ActiveObservedTask(
         root,
         task_id,
         task_monitor,
-        resource_monitor
-    )
+        resource_monitor)
 
   def __on_finished(self, root, task_id):
     log.debug('on_finished(%r, %r)', root, task_id)

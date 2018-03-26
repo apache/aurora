@@ -19,6 +19,8 @@ chardet==3.0.4
 CherryPy==8.0.0
 enum34==1.1.6
 idna==2.6
+httpretty==0.8.14
+jmespath==0.7.1
 mako==1.0.4
 mock==1.0.1
 mox==0.5.3

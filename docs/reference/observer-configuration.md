@@ -29,6 +29,20 @@ Options:
   --task_disk_collection_interval_secs=TASK_DISK_COLLECTION_INTERVAL_SECS
                         The number of seconds between per task disk resource
                         collections. [default: 60]
+  --enable_mesos_disk_collector
+                        Delegate per task disk usage collection to agent.
+                        Should be enabled in conjunction to disk isolation in
+                        Mesos-agent. This is not compatible with an
+                        authenticated agent API. [default: False]
+  --agent_api_url=AGENT_API_URL
+                        Mesos Agent API url. [default:
+                        http://localhost:5051/containers]
+  --executor_id_json_path=EXECUTOR_ID_JSON_PATH
+                        `jmespath` to executor_id key in agent response json
+                        object. [default: executor_id]
+  --disk_usage_json_path=DISK_USAGE_JSON_PATH
+                        `jmespath` to disk usage bytes value in agent response
+                        json object. [default: statistics.disk_used_bytes]
 
   From module twitter.common.app:
     --app_daemonize     Daemonize this application. [default: False]
