@@ -1,24 +1,3 @@
-Aurora 0.20.0
---------------------------------------------------------------------------------
-## Bug
-    * [AURORA-1963] - Structdump endpoint shows thrift metadata
-    * [AURORA-1965] - LaunchException needs transient task timeout for reschedule
-    * [AURORA-1956] - test_du_diskcollector fails on macOS
-    * [AURORA-1233] - primary_port warning does not appear to respect portmap
-    * [AURORA-1959] - Missing Ops prevent upgrade from 0.19 to master
-
-## Story
-    * [AURORA-1380] - Upgrade to guice 4.0
-    * [AURORA-1249] - Upgrade 3rdparty python dependencies
-    * [AURORA-1412] - Conflicting `slow_query_log_threshold` arguments for aurora-scheduler
-    * [AURORA-1471] - Reconsider use of shiro-guice
-
-## Task
-    * [AURORA-1964] - Move Vagrant setup from Trusty to Xenial
-    * [AURORA-1901] - Expose thrift workload stats on pruneTasks() invocations
-    * [AURORA-1707] - Remove deprecated resource fields in TaskConfig and ResourceAggregate
-
-
 Aurora 0.19.0
 --------------------------------------------------------------------------------
 ## Bug
