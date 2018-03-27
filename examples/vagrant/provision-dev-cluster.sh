@@ -86,7 +86,7 @@ function prepare_sources {
   systemctl start mesos-master
   systemctl start mesos-slave
 
-  sudo cp /vagrant/examples/vagrant/systemd/*.service /etc/systemd/system
+  sudo cp /vagrant/examples/vagrant/systemd/{aurora-scheduler,thermos}.service /etc/systemd/system
   cat > /usr/local/bin/update-sources <<EOF
 #!/bin/bash
 rsync -urzvhl /vagrant/ /home/vagrant/aurora \
@@ -95,7 +95,7 @@ rsync -urzvhl /vagrant/ /home/vagrant/aurora \
     --exclude=/third_party \
     --delete
 # Install/update the upstart configurations.
-sudo cp /vagrant/examples/vagrant/systemd/*.service /etc/systemd/system
+sudo cp /vagrant/examples/vagrant/systemd/{aurora-scheduler,thermos}.service /etc/systemd/system
 EOF
   chmod +x /usr/local/bin/update-sources
   update-sources > /dev/null

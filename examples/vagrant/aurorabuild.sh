@@ -54,7 +54,7 @@ function build_scheduler {
   else
     echo "Replicated log initialization failed with code $? (likely already initialized)."
   fi
-  sudo systemctl restart aurora-scheduler
+  sudo systemctl daemon-reload && sudo systemctl restart aurora-scheduler
 }
 
 function build_executor {
@@ -71,7 +71,7 @@ function build_observer {
   ./pants binary src/main/python/apache/aurora/tools:thermos_observer
   ./pants binary src/main/python/apache/aurora/tools:thermos
   sudo ln -sf $DIST_DIR/thermos.pex /usr/local/bin/thermos
-  sudo systemctl restart thermos
+  sudo systemctl daemon-reload && sudo systemctl restart thermos
 }
 
 function build_all {

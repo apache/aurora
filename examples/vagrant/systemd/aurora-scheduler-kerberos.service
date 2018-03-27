@@ -22,6 +22,7 @@ Environment="LIBPROCESS_PORT=8083"
 Environment="LIBPROCESS_IP=192.168.33.7"
 Environment="MESOS_NATIVE_JAVA_LIBRARY=/usr/lib/libmesos.so"
 Environment="DIST_DIR=/home/vagrant/aurora/dist"
+Environment="KRB5_MAJOR_MINOR=1.16"
 
 # Identifier for rsyslog redirect (see `install_rsyslog_config` in `provision-dev-cluster.sh`).
 SyslogIdentifier=aurora-scheduler
@@ -30,7 +31,7 @@ SyslogIdentifier=aurora-scheduler
 Environment="JAVA_OPTS='-Djava.library.path=/usr/lib \
   -Xdebug \
   -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005 \
-  -Djava.security.krb5.conf=/home/vagrant/src/krb5-1.13.1/build/testdir/krb5.conf \
+  -Djava.security.krb5.conf=/home/vagrant/src/krb5-${KRB5_MAJOR_MINOR}/build/testdir/krb5.conf \
   -Dsun.security.krb5.debug=true \
   -Dsun.security.jgss.debug=true \
   -Djavax.net.debug=all'"
@@ -52,7 +53,7 @@ ExecStart=/home/vagrant/aurora/dist/install/aurora-scheduler/bin/aurora-schedule
   -shiro_realm_modules=KERBEROS5_AUTHN,INI_AUTHNZ \
   -shiro_ini_path=/home/vagrant/aurora/src/test/resources/org/apache/aurora/scheduler/http/api/security/shiro-example.ini \
   -http_authentication_mechanism=NEGOTIATE \
-  -kerberos_server_keytab=/home/vagrant/krb5-1.13.1/build/testdir/HTTP-aurora.local.keytab \
+  -kerberos_server_keytab=/home/vagrant/krb5-${KRB5_MAJOR_MINOR}/build/testdir/HTTP-aurora.local.keytab \
   -kerberos_server_principal=HTTP/aurora.local@KRBTEST.COM \
   -tier_config=/home/vagrant/aurora/src/main/resources/org/apache/aurora/scheduler/tiers.json \
   -offer_filter_duration=0secs

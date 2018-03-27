@@ -31,8 +31,8 @@ function await_scheduler_ready {
 function setup {
   aurorabuild all
   sudo cp /vagrant/examples/vagrant/clusters_direct.json /etc/aurora/clusters.json
-  sudo stop mesos-master || true
-  sudo restart aurora-scheduler
+  sudo systemctl stop mesos-master || true
+  sudo systemctl restart aurora-scheduler
   await_scheduler_ready
 }
 
@@ -43,7 +43,7 @@ function test_bypass_leader_redirect {
 function tear_down {
   local retcode=$1
   sudo cp /vagrant/examples/vagrant/clusters.json /etc/aurora/clusters.json
-  sudo start mesos-master || true
+  sudo systemctl start mesos-master || true
   if [[ $retcode -ne 0 ]]; then
     echo
     echo '!!! FAILED'

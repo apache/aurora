@@ -16,12 +16,11 @@
 # An integration test for the client, using the vagrant environment as a testbed.
 set -eux
 
-readonly KRB5_MAJOR_MINOR=1.13
-readonly KRB5_VERSION=1.13.1
+readonly KRB5_MAJOR_MINOR=1.16
+readonly KRB5_VERSION=1.16
 readonly KRB5_URL_BASE=http://web.mit.edu/kerberos/dist/krb5/
-readonly KRB5_SIGNED_TARBALL=krb5-$KRB5_VERSION-signed.tar
-readonly KRB5_TARBALL=krb5-$KRB5_VERSION.tar.gz
-readonly KRB5_KEY_ID=0x749D7889
+readonly KRB5_TARBALL=krb5-$KRB5_MAJOR_MINOR.tar.gz
+readonly KRB5_KEY_IDS=(5F8372DF 253AAB87 0055C305)
 readonly SCHEDULER_HOSTNAME=aurora.local
 
 function enter_vagrant {
@@ -30,9 +29,9 @@ function enter_vagrant {
 
 function enter_testrealm {
   cd $HOME
-    [[ -f $KRB5_SIGNED_TARBALL ]] || wget "$KRB5_URL_BASE/$KRB5_MAJOR_MINOR/$KRB5_SIGNED_TARBALL"
-    [[ -f $KRB5_TARBALL.asc ]] || tar xvf $KRB5_SIGNED_TARBALL
-    gpg --list-keys $KRB5_KEY_ID &>/dev/null || gpg --keyserver pgp.mit.edu --recv-keys $KRB5_KEY_ID
+    [[ -f $KRB5_TARBALL ]] || wget "$KRB5_URL_BASE/$KRB5_VERSION/$KRB5_TARBALL"
+    [[ -f $KRB5_TARBALL.asc ]] || wget "$KRB5_URL_BASE/$KRB5_VERSION/$KRB5_TARBALL.asc"
+    gpg --list-keys ${KRB5_KEY_IDS[@]} &>/dev/null || gpg --keyserver pgp.mit.edu --recv-keys ${KRB5_KEY_IDS[@]}
     gpg --verify $KRB5_TARBALL.asc
     [[ -d `basename $KRB5_TARBALL .tar.gz` ]] || tar zxvf $KRB5_TARBALL
     cd `basename $KRB5_TARBALL .tar.gz`
@@ -70,10 +69,11 @@ function setup {
 EOF
 
   aurorabuild all
-  sudo cp /vagrant/examples/vagrant/upstart/aurora-scheduler-kerberos.conf \
-    /etc/init/aurora-scheduler-kerberos.conf
-  sudo stop aurora-scheduler || true
-  sudo start aurora-scheduler-kerberos
+  sudo cp /vagrant/examples/vagrant/systemd/aurora-scheduler-kerberos.service \
+    /etc/systemd/system/aurora-scheduler-kerberos.service
+  sudo systemctl stop aurora-scheduler || true
+  sudo systemctl daemon-reload
+  sudo systemctl start aurora-scheduler-kerberos
   await_scheduler_ready
 
   kadmin.local -q "addprinc -randkey HTTP/$SCHEDULER_HOSTNAME"
@@ -117,9 +117,9 @@ function test_clients {
 function tear_down {
   local retcode=$1
   sudo cp /vagrant/examples/vagrant/clusters.json /etc/aurora/clusters.json
-  sudo stop aurora-scheduler-kerberos || true
-  sudo rm -f /etc/init/aurora-scheduler-kerberos.conf
-  sudo start aurora-scheduler || true
+  sudo systemctl stop aurora-scheduler-kerberos || true
+  sudo rm -f /etc/systemd/system/aurora-scheduler-kerberos.service
+  sudo systemctl start aurora-scheduler || true
   if [[ $retcode -ne 0 ]]; then
     echo
     echo '!!! FAILED'

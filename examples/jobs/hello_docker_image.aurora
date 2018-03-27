@@ -34,7 +34,7 @@ jobs = [
     role = 'www-data',
     name = 'hello_docker_image',
     task = task,
-    container = Mesos(image=DockerImage(name='debian', tag='stretch'))
+    container = Mesos(image=DockerImage(name='debian', tag='slim-stretch'))
   )
 ]
 
